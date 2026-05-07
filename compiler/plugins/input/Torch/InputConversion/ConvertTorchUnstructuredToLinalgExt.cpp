@@ -512,6 +512,372 @@ struct FlexAttentionOpConversion
   }
 };
 
+// Result of recognizing the canonical torch-mlir chain emitted for
+// `onnx.ArgMax/ArgMin{select_last_index=1}`:
+//   %f = aten.flip %x, [dim]
+//   %a = aten.argmax/argmin %f, dim, keepdim
+//   %s = aten.sub.Scalar %a, dim_size-1, 1
+//   %r = aten.abs %s
+struct SelectLastIndexChain {
+  torch::Torch::AtenFlipOp flip;
+  torch::Torch::AtenSubScalarOp sub;
+  torch::Torch::AtenAbsOp abs;
+  Value flipInput;
+};
+
+// Snapshot of the input state seen by the chain matcher after any dim=None
+// flatten has already been applied. Grouped so the matcher's signature stays
+// short and the call site reads as one logical "post-flatten state" argument.
+struct ArgInputState {
+  Value self;
+  ArrayRef<int64_t> shape;
+  int64_t rank;
+};
+
+// Returns the matched chain when `argOp` participates in the
+// flip -> argmax/argmin -> sub.Scalar -> abs sequence on `dim`. Returns
+// `std::nullopt` for any precondition miss; the caller falls back to a
+// strict-comparator lowering.
+template <typename OpTy>
+static std::optional<SelectLastIndexChain>
+tryMatchSelectLastIndexChain(OpTy argOp, int64_t dim, bool dimIsNone,
+                             const ArgInputState &state) {
+  if (dimIsNone) {
+    return std::nullopt;
+  }
+  auto flipOp = state.self.getDefiningOp<torch::Torch::AtenFlipOp>();
+  if (!flipOp || !flipOp->hasOneUse() || !argOp->hasOneUse()) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> flipDims;
+  if (!matchPattern(flipOp.getDims(),
+                    torch::Torch::m_TorchListOfConstantInts(flipDims)) ||
+      flipDims.size() != 1) {
+    return std::nullopt;
+  }
+  int64_t flipDim = flipDims[0];
+  if (flipDim < 0) {
+    flipDim += state.rank;
+  }
+  if (flipDim != dim || state.shape[dim] == torch::Torch::kUnknownSize) {
+    return std::nullopt;
+  }
+  auto subOp = dyn_cast<torch::Torch::AtenSubScalarOp>(*argOp->user_begin());
+  if (!subOp || !subOp->hasOneUse()) {
+    return std::nullopt;
+  }
+  int64_t subVal, subAlpha;
+  if (!matchPattern(subOp.getOther(),
+                    torch::Torch::m_TorchConstantInt(&subVal)) ||
+      !matchPattern(subOp.getAlpha(),
+                    torch::Torch::m_TorchConstantInt(&subAlpha)) ||
+      subAlpha != 1 || subVal != state.shape[dim] - 1) {
+    return std::nullopt;
+  }
+  auto absOp = dyn_cast<torch::Torch::AtenAbsOp>(*subOp->user_begin());
+  if (!absOp) {
+    return std::nullopt;
+  }
+  return SelectLastIndexChain{flipOp, subOp, absOp, flipOp.getSelf()};
+}
+
+template <typename OpTy, bool isMax>
+struct ArgCompareOpConversion : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Value self = op.getSelf();
+
+    auto inputTensorType = cast<torch::Torch::ValueTensorType>(self.getType());
+    if (!inputTensorType.hasSizes()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected input type having sizes");
+    }
+    ArrayRef<int64_t> inputShape = inputTensorType.getSizes();
+    int64_t inputRank = inputShape.size();
+    if (inputRank == 0) {
+      return rewriter.notifyMatchFailure(op, "expected input with rank > 0");
+    }
+
+    int64_t dim;
+    bool dimIsNone = isa<torch::Torch::NoneType>(op.getDim().getType());
+    if (!dimIsNone &&
+        !matchPattern(op.getDim(), torch::Torch::m_TorchConstantInt(&dim))) {
+      return rewriter.notifyMatchFailure(op, "requires dim to be constant");
+    }
+
+    bool keepdim;
+    if (!matchPattern(op.getKeepdim(),
+                      torch::Torch::m_TorchConstantBool(&keepdim))) {
+      return rewriter.notifyMatchFailure(op, "requires keepdim to be constant");
+    }
+
+    // Captured before flatten collapses inputRank to 1 — needed to rebuild
+    // the all-ones keepdim shape in the dim=None case.
+    int64_t preFlattenRank = inputRank;
+
+    // Handle dim=None: flatten to 1D, reduce on dim 0.
+    if (dimIsNone) {
+      Value cstZero = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(0));
+      Value cstLastDim = torch::Torch::ConstantIntOp::create(
+          rewriter, loc, rewriter.getI64IntegerAttr(inputRank - 1));
+
+      int64_t flattenedSize = torch::Torch::kUnknownSize;
+      if (llvm::none_of(inputShape, [](int64_t s) {
+            return s == torch::Torch::kUnknownSize;
+          })) {
+        flattenedSize = 1;
+        for (int64_t s : inputShape) {
+          flattenedSize *= s;
+        }
+      }
+
+      auto flattenedType = inputTensorType.getWithSizesAndDtype(
+          {flattenedSize}, inputTensorType.getDtype());
+      self = torch::Torch::AtenFlattenUsingIntsOp::create(
+          rewriter, loc, flattenedType, self, cstZero, cstLastDim);
+      inputTensorType = cast<torch::Torch::ValueTensorType>(self.getType());
+      inputShape = inputTensorType.getSizes();
+      inputRank = 1;
+      dim = 0;
+    }
+
+    if (dim < 0) {
+      dim += inputRank;
+    }
+
+    // arg_compare with a non-strict comparator (oge/ole) computes the same
+    // last-index result directly from %x, eliminating the flip and the
+    // post-process. Fusing the flip into a non-affine `tensor.extract` later
+    // produces an `llvm.intr.masked.gather` that the AMDGPU backend cannot
+    // codegen efficiently, so this rewrite is a soundness *and* a compile-time
+    // win.
+    std::optional<SelectLastIndexChain> chain = tryMatchSelectLastIndexChain(
+        op, dim, dimIsNone, ArgInputState{self, inputShape, inputRank});
+    bool useNonStrictPredicate = chain.has_value();
+    if (useNonStrictPredicate) {
+      self = chain->flipInput;
+      inputTensorType = cast<torch::Torch::ValueTensorType>(self.getType());
+      inputShape = inputTensorType.getSizes();
+    }
+
+    // Capture original signedness from the Torch dtype before lowering to a
+    // signless builtin type. arith comparison and min/max ops need the
+    // matching signed/unsigned variant for unsigned integer inputs (e.g.
+    // ui8/ui16) — picking signed `sgt`/`maxs` on a `ui8` tensor would read
+    // 0xFF as -1 and silently return the wrong argmax/argmin index.
+    bool isUnsigned = false;
+    if (auto torchIntTy = dyn_cast<IntegerType>(inputTensorType.getDtype())) {
+      isUnsigned = torchIntTy.isUnsigned();
+    }
+
+    auto builtinTensorType =
+        cast<RankedTensorType>(inputTensorType.toBuiltinTensor());
+    Type elemType = builtinTensorType.getElementType();
+    // Ensure signless integer types for compatibility with arith ops.
+    auto intTy = dyn_cast<IntegerType>(elemType);
+    if (intTy && !intTy.isSignless()) {
+      elemType = IntegerType::get(rewriter.getContext(), intTy.getWidth());
+      builtinTensorType =
+          RankedTensorType::get(builtinTensorType.getShape(), elemType);
+    }
+    Value builtinInput = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, builtinTensorType, self);
+
+    ArrayRef<int64_t> builtinShape = builtinTensorType.getShape();
+    SmallVector<int64_t> outputShape;
+    for (int64_t i = 0; i < inputRank; ++i) {
+      if (i != dim) {
+        outputShape.push_back(builtinShape[i]);
+      }
+    }
+
+    auto outputValueType = RankedTensorType::get(outputShape, elemType);
+    auto i32Type = rewriter.getI32Type();
+    auto outputIndexType = RankedTensorType::get(outputShape, i32Type);
+
+    SmallVector<Value> dynamicDims;
+    for (int64_t i = 0; i < inputRank; ++i) {
+      if (i != dim && builtinShape[i] == ShapedType::kDynamic) {
+        Value dimIdx = arith::ConstantIndexOp::create(rewriter, loc, i);
+        dynamicDims.push_back(
+            tensor::DimOp::create(rewriter, loc, builtinInput, dimIdx));
+      }
+    }
+
+    Value outputValueEmpty = tensor::EmptyOp::create(rewriter, loc, outputShape,
+                                                     elemType, dynamicDims);
+    Value outputIndexEmpty = tensor::EmptyOp::create(rewriter, loc, outputShape,
+                                                     i32Type, dynamicDims);
+
+    bool isFloat = isa<FloatType>(elemType);
+    arith::AtomicRMWKind initKind;
+    if (isFloat) {
+      initKind = isMax ? arith::AtomicRMWKind::maximumf
+                       : arith::AtomicRMWKind::minimumf;
+    } else if (isUnsigned) {
+      initKind =
+          isMax ? arith::AtomicRMWKind::maxu : arith::AtomicRMWKind::minu;
+    } else {
+      initKind =
+          isMax ? arith::AtomicRMWKind::maxs : arith::AtomicRMWKind::mins;
+    }
+    // Seed with the true identity (+/-inf for floats), not a finite extremum.
+    // PyTorch's argmax/argmin treats -FLT_MAX as strictly greater than -inf,
+    // so seeding with -FLT_MAX would silently return index 0 on inputs like
+    // [-inf, -FLT_MAX] instead of 1. Strict `ogt`/`olt` already filter NaN
+    // operands, so the inf seed does not change NaN-handling behavior.
+    Value valueInit = arith::getIdentityValue(initKind, elemType, rewriter, loc,
+                                              /*useOnlyFiniteValue=*/false);
+    Value indexInit =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getI32IntegerAttr(0));
+
+    Value filledValue =
+        linalg::FillOp::create(rewriter, loc, ValueRange{valueInit},
+                               outputValueEmpty)
+            .getResult(0);
+    Value filledIndex =
+        linalg::FillOp::create(rewriter, loc, ValueRange{indexInit},
+                               outputIndexEmpty)
+            .getResult(0);
+
+    // Null `input_index` and `index_base` mean "indices start at 0", which
+    // matches the i32(0) `linalg.fill` seed for `filledIndex` above.
+    auto argCompareOp = IREE::LinalgExt::ArgCompareOp::create(
+        rewriter, loc, TypeRange{outputValueType, outputIndexType},
+        builtinInput, /*input_index=*/Value(), filledValue, filledIndex,
+        /*index_base=*/Value(), rewriter.getI64IntegerAttr(dim));
+
+    {
+      Region &region = argCompareOp.getRegion();
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *block = rewriter.createBlock(&region, region.end(),
+                                          {elemType, elemType}, {loc, loc});
+      Value lhs = block->getArgument(0);
+      Value rhs = block->getArgument(1);
+      Value cmp;
+      if (isFloat) {
+        arith::CmpFPredicate pred =
+            isMax ? (useNonStrictPredicate ? arith::CmpFPredicate::OGE
+                                           : arith::CmpFPredicate::OGT)
+                  : (useNonStrictPredicate ? arith::CmpFPredicate::OLE
+                                           : arith::CmpFPredicate::OLT);
+        cmp = arith::CmpFOp::create(rewriter, loc, pred, lhs, rhs);
+      } else {
+        arith::CmpIPredicate pred;
+        if (isMax) {
+          if (useNonStrictPredicate) {
+            pred = isUnsigned ? arith::CmpIPredicate::uge
+                              : arith::CmpIPredicate::sge;
+          } else {
+            pred = isUnsigned ? arith::CmpIPredicate::ugt
+                              : arith::CmpIPredicate::sgt;
+          }
+        } else {
+          if (useNonStrictPredicate) {
+            pred = isUnsigned ? arith::CmpIPredicate::ule
+                              : arith::CmpIPredicate::sle;
+          } else {
+            pred = isUnsigned ? arith::CmpIPredicate::ult
+                              : arith::CmpIPredicate::slt;
+          }
+        }
+        cmp = arith::CmpIOp::create(rewriter, loc, pred, lhs, rhs);
+      }
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, cmp);
+    }
+
+    Value indexResult = argCompareOp.getResult(1);
+    auto torchResultType =
+        cast<torch::Torch::ValueTensorType>(op.getResult().getType());
+
+    // The arg_compare op produces i32 indices, but PyTorch expects i64.
+    auto resultDtype = torchResultType.getDtype();
+    Type builtinIndexType = resultDtype;
+    if (auto resultIntTy = dyn_cast<IntegerType>(resultDtype)) {
+      builtinIndexType =
+          IntegerType::get(rewriter.getContext(), resultIntTy.getWidth());
+    }
+
+    if (builtinIndexType != i32Type) {
+      auto i64OutputType = RankedTensorType::get(outputShape, builtinIndexType);
+      Value emptyI64 = tensor::EmptyOp::create(rewriter, loc, outputShape,
+                                               builtinIndexType, dynamicDims);
+      auto identityMap = AffineMap::getMultiDimIdentityMap(
+          outputShape.size(), rewriter.getContext());
+      SmallVector<utils::IteratorType> iterTypes(outputShape.size(),
+                                                 utils::IteratorType::parallel);
+      indexResult =
+          linalg::GenericOp::create(
+              rewriter, loc, i64OutputType, ValueRange{indexResult},
+              ValueRange{emptyI64},
+              SmallVector<AffineMap>{identityMap, identityMap}, iterTypes,
+              [&](OpBuilder &b, Location loc, ValueRange args) {
+                Value ext =
+                    arith::ExtSIOp::create(b, loc, builtinIndexType, args[0]);
+                linalg::YieldOp::create(b, loc, ext);
+              })
+              .getResult(0);
+    }
+
+    // In the chain-fold case the terminal `abs` is the user-visible op and
+    // the argmax/sub/flip behind it become dead; otherwise we replace the
+    // original argmax/argmin directly.
+    Operation *replaceTarget = op.getOperation();
+    if (useNonStrictPredicate) {
+      replaceTarget = chain->abs.getOperation();
+    }
+
+    Value finalReplacement;
+    if (keepdim) {
+      // Re-insert the reduced dimension as size 1 via torch ops that will be
+      // lowered by the subsequent ConvertTorchToLinalgPass.
+      SmallVector<int64_t> torchOutputShape(outputShape.begin(),
+                                            outputShape.end());
+      auto intermediateTorchType = torch::Torch::ValueTensorType::get(
+          rewriter.getContext(), torchOutputShape, resultDtype);
+      Value torchResult = torch::TorchConversion::FromBuiltinTensorOp::create(
+          rewriter, loc, intermediateTorchType, indexResult);
+
+      if (dimIsNone) {
+        // For dim=None, the result is scalar; reshape to all-ones shape.
+        SmallVector<Value> shapeValues;
+        Value cstOne = torch::Torch::ConstantIntOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(1));
+        for (int64_t i = 0; i < preFlattenRank; ++i) {
+          shapeValues.push_back(cstOne);
+        }
+        auto listType = torch::Torch::ListType::get(
+            torch::Torch::IntType::get(rewriter.getContext()));
+        Value shapeList = torch::Torch::PrimListConstructOp::create(
+            rewriter, loc, listType, shapeValues);
+        finalReplacement = torch::Torch::AtenViewOp::create(
+            rewriter, loc, torchResultType, torchResult, shapeList);
+      } else {
+        Value cstDim = torch::Torch::ConstantIntOp::create(
+            rewriter, loc, rewriter.getI64IntegerAttr(dim));
+        finalReplacement = torch::Torch::AtenUnsqueezeOp::create(
+            rewriter, loc, torchResultType, torchResult, cstDim);
+      }
+    } else {
+      // Without keepdim, the reduced shape matches the torch result directly.
+      finalReplacement = torch::TorchConversion::FromBuiltinTensorOp::create(
+          rewriter, loc, torchResultType, indexResult);
+    }
+
+    rewriter.replaceOp(replaceTarget, finalReplacement);
+    if (useNonStrictPredicate) {
+      // Erase the now-dead intermediate ops in chain order: sub, argmax, flip.
+      rewriter.eraseOp(chain->sub);
+      rewriter.eraseOp(op);
+      rewriter.eraseOp(chain->flip);
+    }
+    return success();
+  }
+};
+
 class ConvertTorchUnstructuredToLinalgExtPass final
     : public impl::ConvertTorchUnstructuredToLinalgExtPassBase<
           ConvertTorchUnstructuredToLinalgExtPass> {
@@ -529,6 +895,10 @@ public:
 
     patterns.add<FftRfftOpConversion>(context);
     patterns.add<FlexAttentionOpConversion>(context);
+    patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgmaxOp,
+                                        /*isMax=*/true>>(context);
+    patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgminOp,
+                                        /*isMax=*/false>>(context);
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();

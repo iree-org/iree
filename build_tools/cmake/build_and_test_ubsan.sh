@@ -31,7 +31,7 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 
 # Build hip tests for gfx942 to exercise codegen, but we won't run them.
 # The user can override this to test other chips.
-IREE_ROCM_TEST_TARGET_CHIP="${IREE_ROCM_TEST_TARGET_CHIP:-${IREE_HIP_TEST_TARGET_CHIP:-gfx942}}"
+IREE_ROCM_TEST_TARGET_CHIP="${IREE_ROCM_TEST_TARGET_CHIP:-gfx942}"
 
 source build_tools/cmake/setup_build.sh
 

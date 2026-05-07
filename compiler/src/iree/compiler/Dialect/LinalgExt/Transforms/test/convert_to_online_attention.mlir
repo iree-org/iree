@@ -47,18 +47,16 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d3)>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
-#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
-#map5 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#mapMask = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
-func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16>, %v: tensor<2x10x4096x128xf16>,
-                            %mask: tensor<2x10x4096x4096xf16>) -> tensor<2x10x4096x128xf16> {
+func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16>, %v: tensor<2x10x4096x128xf16>, %mask: tensor<2x10x4096x4096xf16>)
+                            -> tensor<2x10x4096x128xf16> {
   %scale = arith.constant 0.125 : f16
   %acc = tensor.empty() : tensor<2x10x4096x128xf16>
   %out = iree_linalg_ext.attention
-         {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5]}
-         ins(%q, %k, %v, %scale, %mask :
-             tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>,
-             tensor<2x10x4096x128xf16>, f16, tensor<2x10x4096x4096xf16>)
+         {indexing_maps = [#map, #map1, #map2, #map3, #mapMask, #map4]}
+         ins(%q, %k, %v, %scale, %mask : tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, f16, tensor<2x10x4096x4096xf16>)
          outs(%acc : tensor<2x10x4096x128xf16>) {
               ^bb0(%score: f32):
                 iree_linalg_ext.yield %score : f32
@@ -67,10 +65,14 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 }
 
 // CHECK-LABEL: func.func @masked_attention
-// CHECK-SAME: %[[Q:.+]]: tensor<2x10x4096x128xf16>, %[[K:.+]]: tensor<2x10x4096x128xf16>, %[[V:.+]]: tensor<2x10x4096x128xf16>, %[[MASK:.+]]: tensor<2x10x4096x4096xf16>
-// CHECK-DAG: %[[SCALE:.+]] = arith.constant {{.*}} : f16
+// Masked: finalization uses max(sum, 1) as a compact fully-masked-row guard.
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
-// Scale and mask must be in the correct ODS positions (scale before mask).
-// CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]], %[[SCALE]], %[[MASK]]
-// CHECK-SAME:             f16, tensor<2x10x4096x4096xf16>
 // CHECK: linalg.generic
+// CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
+// CHECK: arith.maximumf
+// CHECK: arith.divf
+// CHECK: arith.mulf
+// CHECK-NOT: arith.cmpf
+// CHECK-NOT: arith.select
+// CHECK: arith.truncf
+// CHECK: linalg.yield

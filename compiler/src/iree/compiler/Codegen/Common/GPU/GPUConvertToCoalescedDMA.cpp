@@ -173,21 +173,6 @@ static bool sourceIsFromFatRawBuffer(Value source) {
   return hasAMDGPUFatRawBufferAddressSpace(memrefType);
 }
 
-/// Check if the target architecture supports global load DMA.
-/// Returns true only for CDNA4+ (gfx950+) architectures.
-static bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
-  if (!target) {
-    return false;
-  }
-  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
-  if (failed(chipset)) {
-    return false;
-  }
-  // CDNA4 is gfx950+ (major=9, minor>=5). Other major versions (RDNA, etc.)
-  // do not support global load DMA.
-  return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
-}
-
 /// Returns the subgroup size if the available elements are aligned to DMA
 /// transfer sizes, std::nullopt otherwise.
 static std::optional<int64_t>

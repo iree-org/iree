@@ -123,7 +123,7 @@ You can check for HIP support by looking for a matching driver and device:
 ```
 
 To see device details, including the architecture to use as a
-[HIP target](#choosing-hip-targets) when
+[ROCm target](#choosing-rocm-targets) when
 [compiling a program](#compile-and-run-a-program):
 
 ```console hl_lines="9-10 15"
@@ -156,20 +156,20 @@ on GPUs.
 Then run the following command to compile with the `rocm` target backend:
 
 ```shell hl_lines="7-8"
-# You need to specify a HIP target for your GPU. For this example we extract
+# You need to specify a ROCm target for your GPU. For this example we extract
 # the architecture name for the first device using rocm_agent_enumerator.
 # See the section below for more context and alternatives.
-IREE_HIP_TARGET=$(rocm_agent_enumerator | sed -n '1 p')  # e.g. gfx1100
+IREE_ROCM_TARGET=$(rocm_agent_enumerator | sed -n '1 p')  # e.g. gfx1100
 
 iree-compile \
     --iree-hal-target-device=hip \
-    --iree-rocm-target=${IREE_HIP_TARGET} \
-    mobilenetv2.mlir -o mobilenet_hip.vmfb
+    --iree-rocm-target=${IREE_ROCM_TARGET} \
+    mobilenetv2.mlir -o mobilenet_rocm.vmfb
 ```
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
 
-???+ tip "Tip - HIP bitcode files"
+???+ tip "Tip - ROCm bitcode files"
 
     That IREE comes with bundled bitcode files, which are used for linking
     certain intrinsics on AMD GPUs. These will be used automatically or if the
@@ -178,9 +178,9 @@ iree-compile \
     For example, in ROCm installations on Linux, this is often found under
     `/opt/rocm/amdgcn/bitcode`.
 
-#### Choosing HIP targets
+#### Choosing ROCm targets
 
-A HIP target (`iree-rocm-target`) matching the LLVM AMDGPU backend is needed
+A ROCm target (`iree-rocm-target`) matching the LLVM AMDGPU backend is needed
 to compile towards each GPU chip. Here is a table of commonly used
 architectures:
 

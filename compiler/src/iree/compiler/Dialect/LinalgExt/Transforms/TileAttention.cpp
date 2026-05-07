@@ -123,9 +123,15 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   Value x = onlineAttn.getResult(0);
   Value sum = onlineAttn.getResult(2);
+  bool hasMask = static_cast<bool>(mask);
 
-  // Merge the outputs of online attention:
-  //  x = (1 / sum) * x
+  // Finalize online attention:
+  //   unmasked: x = (1 / sum) * x
+  //   masked:   x = (1 / max(sum, 1)) * x
+  // With a mask, fully-masked rows can have `sum == 0` and `x == 0`, while
+  // non-fully-masked rows have `sum >= 1`; guard that case to produce 0 instead
+  // of NaN. Keep this in the existing finalization loop to avoid an extra row
+  // pass and the extra ops from a cmp/select guard.
 
   // Compress the indexing maps.
   SmallVector<AffineMap> compressedMaps =
@@ -138,12 +144,21 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
       attnOp.getOutput(), compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value one = arith::ConstantOp::create(
-            b, loc, b.getFloatAttr(args[0].getType(), 1.0));
-        Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
-        // Both sum and x are in fp32, as created earlier, so we only need
-        // to cast after the mul.
-        Value result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+        Value result;
+        if (hasMask) {
+          Value one = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(args[0].getType(), 1.0));
+          Value denominator = arith::MaximumFOp::create(b, loc, args[0], one);
+          Value reciprocal = arith::DivFOp::create(b, loc, one, denominator);
+          result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+        } else {
+          Value one = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(args[0].getType(), 1.0));
+          Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
+          // Both sum and x are in fp32, as created earlier, so we only need to
+          // cast after the mul.
+          result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
+        }
         // Cast result to the required type by attention output.
         result = convertScalarToDtype(b, loc, result, args[2].getType(),
                                       /*isUnsignedCast=*/false);

@@ -212,19 +212,11 @@ struct ROCMOptions {
             "for more details."
             // clang-format on
             ));
-    binder.opt<std::string>(
-        "iree-hip-target", target, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-target instead."),
-        Deprecated("use --iree-rocm-target instead"));
 
     binder.opt<std::string>(
         "iree-rocm-target-features", targetFeatures, cl::cat(category),
         cl::desc("ROCM target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
-    binder.opt<std::string>(
-        "iree-hip-target-features", targetFeatures, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-target-features instead."),
-        Deprecated("use --iree-rocm-target-features instead"));
 
     binder.opt<ContainerType>(
         "iree-rocm-container-type", containerType,
@@ -243,28 +235,16 @@ struct ROCMOptions {
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of ROCM Bitcode."));
-    binder.opt<std::string>(
-        "iree-hip-bc-dir", bitcodeDirectory, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-bc-dir instead."),
-        Deprecated("use --iree-rocm-bc-dir instead"));
 
     binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
-    binder.opt<int>(
-        "iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-waves-per-eu instead."),
-        Deprecated("use --iree-rocm-waves-per-eu instead"));
 
     binder.opt<std::string>(
         "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
         cl::desc("Enables microkernels in the ROCM compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<std::string>(
-        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-ukernels instead."),
-        Deprecated("use --iree-rocm-enable-ukernels instead"));
 
     binder.opt<std::string>(
         "iree-rocm-encoding-layout-resolver", encodingLayoutResolver,
@@ -274,48 +254,24 @@ struct ROCMOptions {
                  "identity layout), `pad` (additional padding "
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
-    binder.opt<std::string>(
-        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
-        cl::cat(category),
-        cl::desc(
-            "Deprecated; use --iree-rocm-encoding-layout-resolver instead."),
-        Deprecated("use --iree-rocm-encoding-layout-resolver instead"));
 
     binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
-    binder.opt<bool>(
-        "iree-hip-llvm-slp-vec", slpVectorization, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-llvm-slp-vec instead."),
-        Deprecated("use --iree-rocm-llvm-slp-vec instead"));
 
     binder.opt<bool>("iree-rocm-llvm-global-isel", globalISel,
                      cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
-    binder.opt<bool>(
-        "iree-hip-llvm-global-isel", globalISel, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-llvm-global-isel instead."),
-        Deprecated("use --iree-rocm-llvm-global-isel instead"));
 
     binder.opt<bool>(
         "iree-rocm-specialize-dispatches", specializeDispatches,
         cl::cat(category),
         cl::desc(
             "Enable runtime specialization of dynamically shaped dispatches."));
-    binder.opt<bool>(
-        "iree-hip-specialize-dispatches", specializeDispatches,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-specialize-dispatches instead."),
-        Deprecated("use --iree-rocm-specialize-dispatches instead"));
 
     binder.opt<bool>("iree-rocm-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
-    binder.opt<bool>(
-        "iree-hip-enable-tensor-ukernels", enableTensorUKernels,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-tensor-ukernels instead."),
-        Deprecated("use --iree-rocm-enable-tensor-ukernels instead"));
 
     binder.opt<IREE::Codegen::DenormalFpMath>(
         "iree-rocm-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
@@ -326,34 +282,14 @@ struct ROCMOptions {
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
                        "positive-zero", "Convert denormals to positive zero")));
-    binder.opt<IREE::Codegen::DenormalFpMath>(
-        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-denormal-fp-math-f32 instead."),
-        Deprecated("use --iree-rocm-denormal-fp-math-f32 instead"),
-        cl::values(
-            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
-                       "preserve-sign",
-                       "Convert denormals to zero while preserving sign"),
-            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
-                       "positive-zero", "Convert denormals to positive zero")));
 
     binder.opt<bool>("iree-rocm-enable-register-spill-warning",
                      enableRegSpillWarning, cl::cat(category),
                      cl::desc("Report register spilling for AMD GPUs"));
-    binder.opt<bool>(
-        "iree-hip-enable-register-spill-warning", enableRegSpillWarning,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-register-spill-warning "
-                 "instead."),
-        Deprecated("use --iree-rocm-enable-register-spill-warning instead"));
 
     binder.opt<bool>("iree-rocm-emit-debug-info", debugSymbols,
                      cl::cat(category),
                      cl::desc("Generate and embed debug information (DWARF)."));
-    binder.opt<bool>(
-        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),
-        Deprecated("use --iree-rocm-emit-debug-info instead"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {

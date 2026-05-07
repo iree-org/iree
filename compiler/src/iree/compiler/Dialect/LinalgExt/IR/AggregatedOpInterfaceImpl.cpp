@@ -81,6 +81,44 @@ static Value reciprocalValue(OpBuilder &b, Location loc, Value input,
   return genericOp.getResult(0);
 }
 
+// Use max(sum, 1) before the final P / sum in masked attention. This is a
+// compact fully-masked-row guard, not a general softmax denominator clamp.
+//
+// The guard relies on two invariants from this decomposition. First, rowMax(S)
+// is initialized with a finite minimum value (`useOnlyFiniteValue=true`), not
+// -inf. For a fully-masked row, all post-mask S values are -inf, so that finite
+// maximum remains in place and P = exp2(S - max) is all zeros, making sum == 0.
+// Second, any non-fully-masked row has at least one finite max element, so one
+// P term is exp2(0) == 1 and sum >= 1.
+//
+// Therefore max(sum, 1) is equivalent to select(sum == 0, 1, sum) for valid
+// attention rows: only fully-masked rows are changed, and their zero numerator
+// divides by 1 to produce 0 instead of 0/0 == NaN. This matches PyTorch SDPA's
+// `_safe_softmax` fully-masked-row convention without adding a separate
+// all(-inf) row scan.
+static Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc,
+                                          Value sum) {
+  auto sumType = cast<RankedTensorType>(sum.getType());
+  Type elementType = sumType.getElementType();
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(builder, loc, sum);
+  Value output = tensor::EmptyOp::create(builder, loc, sizes, elementType);
+
+  SmallVector<AffineMap> maps = {
+      builder.getMultiDimIdentityMap(sumType.getRank()),
+      builder.getMultiDimIdentityMap(sumType.getRank())};
+  SmallVector<utils::IteratorType> iteratorTypes(sumType.getRank(),
+                                                 utils::IteratorType::parallel);
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), sum, output, maps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value one =
+            arith::ConstantOp::create(b, loc, b.getFloatAttr(elementType, 1.0));
+        Value result = arith::MaximumFOp::create(b, loc, args[0], one);
+        linalg::YieldOp::create(b, loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
 static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
                            AffineMap outputMap, Value value, Value output,
                            bool clampToFPRange) {
@@ -485,6 +523,9 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
 
   // P = P / sum
+  if (mask != nullptr) {
+    sum = createSafeSoftmaxDenominator(b, loc, sum);
+  }
   p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
 
   // ---- Scale and truncate LHS to match RHS ----

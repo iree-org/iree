@@ -329,7 +329,6 @@
     "onnx/node/generated/test_reduce_min_bool_inputs",
     "onnx/node/generated/test_resize_downsample_scales_cubic_align_corners",
     "onnx/node/generated/test_resize_downsample_scales_linear_align_corners",
-    "onnx/node/generated/test_reversesequence_time",
     "onnx/node/generated/test_scan_sum",
     "onnx/node/generated/test_sce_mean_weight",
     "onnx/node/generated/test_sce_mean_weight_ii",
