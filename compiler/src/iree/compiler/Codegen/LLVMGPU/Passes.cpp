@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUConstraintGenerator.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
@@ -272,8 +273,7 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
                                       bool vectorizeCopies, bool enableMasking,
                                       bool foldIdentitySlices,
-                                      bool decomposeMasks,
-                                      bool vectorizeArgCompare) {
+                                      bool decomposeMasks) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -287,7 +287,6 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
   options.foldCastIntoContract = true;
   options.enableVectorMasking = enableMasking;
   options.vectorizeMapStore = true;
-  options.vectorizeArgCompare = vectorizeArgCompare;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   // Im2col decomposition runs after vectorization so that im2col ops get
   // direct vectorization via VectorizableOpInterface when possible. Any
@@ -328,8 +327,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/false,
-                            /*vectorizeArgCompare=*/true);
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -574,18 +572,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
   // Step 6. Vectorize.
-  // Skip vectorization of `iree_linalg_ext.arg_compare` here: the resulting
-  // `iree_vector_ext.arg_compare` only has a lowering through the nested-layout
-  // distribution patterns owned by the VectorDistribute pipeline. Ops routed
-  // to TileAndFuse (small reductions, f64) need the scalar-loop lowering from
-  // `LinalgExtToLoops` instead. This gate is intentionally narrow.
-  // TODO(#24365): Remove this option once a generic vector lowering for
-  // `iree_vector_ext.arg_compare` exists.
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/false,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true,
-                            /*decomposeMasks=*/false,
-                            /*vectorizeArgCompare=*/false);
+                            /*decomposeMasks=*/false);
+  funcPassManager.addPass(IREE::VectorExt::createLowerArgCompareToVectorPass());
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
 
@@ -670,8 +661,7 @@ void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/false,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/false,
-                            /*vectorizeArgCompare=*/true);
+                            /*decomposeMasks=*/false);
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
@@ -834,8 +824,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/true,
-                            /*vectorizeArgCompare=*/true);
+                            /*decomposeMasks=*/true);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());

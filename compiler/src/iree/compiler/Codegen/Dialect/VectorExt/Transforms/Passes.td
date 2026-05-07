@@ -28,4 +28,15 @@ def LowerTransferGatherScatterToVectorPass :
   ];
 }
 
+def LowerArgCompareToVectorPass :
+    Pass<"iree-vector-ext-lower-arg-compare-to-vector", "func::FuncOp"> {
+  let summary = "Lower iree_vector_ext.arg_compare to vector/SCF ops";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_PASSES
