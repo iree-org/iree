@@ -37,6 +37,36 @@ typedef enum iree_hal_amdgpu_queue_placement_e {
   IREE_HAL_AMDGPU_QUEUE_PLACEMENT_DEVICE,
 } iree_hal_amdgpu_queue_placement_t;
 
+// Selects the command-buffer encoding and execution path.
+typedef enum iree_hal_amdgpu_command_buffer_mode_e {
+  // Records and replays command buffers as AMDGPU AQL command-buffer programs.
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AQL = 0,
+  // Records dispatch-only reusable command buffers into resident PM4 IBs and
+  // submits them through AQL PM4-IB envelopes.
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4 = 1,
+  // Automatically selects PM4 when the command-buffer request and physical
+  // device meet every currently validated PM4 requirement; otherwise uses AQL.
+  IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO = 2,
+} iree_hal_amdgpu_command_buffer_mode_t;
+
+// Selects how PM4 command buffers publish materialized resident storage.
+typedef enum iree_hal_amdgpu_pm4_command_buffer_publication_mode_e {
+  // Reserved direct-resident materialization mode. This is not accepted by the
+  // driver because CPU writes into executable device-local PM4 storage are not
+  // a validated publication path.
+  IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_DIRECT = 0,
+  // Materializes into host-owned staging builders, then copies each populated
+  // resident segment into the HSA allocation with hsa_memory_copy.
+  IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_COPY = 1,
+  // Materializes into a host-owned staging image, then copies the contiguous
+  // resident image into the HSA allocation with hsa_amd_memory_async_copy.
+  IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_ASYNC_COPY = 2,
+  // Like HOST_ASYNC_COPY, but end() returns after launching the async copy.
+  // Queue execution waits on copy completion before the PM4 IB can execute.
+  IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_ASYNC_COPY_NONBLOCKING =
+      3,
+} iree_hal_amdgpu_pm4_command_buffer_publication_mode_t;
+
 // Parameters configuring an iree_hal_amdgpu_logical_device_t.
 // Must be initialized with iree_hal_amdgpu_logical_device_options_initialize
 // prior to use.
@@ -93,6 +123,13 @@ typedef struct iree_hal_amdgpu_logical_device_options_t {
   // queues. DEVICE is reserved for future device-side scheduling and fails
   // loudly until that path is implemented.
   iree_hal_amdgpu_queue_placement_t queue_placement;
+
+  // Selects the command-buffer recording and replay implementation.
+  iree_hal_amdgpu_command_buffer_mode_t command_buffer_mode;
+
+  // Selects how PM4 command buffers publish their resident storage.
+  iree_hal_amdgpu_pm4_command_buffer_publication_mode_t
+      pm4_command_buffer_publication_mode;
 
   // Per-physical-device host queue policy.
   struct {

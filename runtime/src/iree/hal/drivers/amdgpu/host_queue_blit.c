@@ -194,8 +194,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_write_data(
   iree_hal_amdgpu_host_queue_pm4_ib_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
       queue, resolution, signal_semaphore_list,
-      IREE_ARRAYSIZE(operation_resources), profile_event_info, out_ready,
-      &submission));
+      IREE_ARRAYSIZE(operation_resources), iree_hsa_signal_null(),
+      profile_event_info, out_ready, &submission));
   if (!*out_ready) return iree_ok_status();
 
   bool did_emit = false;
@@ -273,8 +273,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_copy_data(
   iree_hal_amdgpu_host_queue_pm4_ib_submission_t submission;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
       queue, resolution, signal_semaphore_list,
-      IREE_ARRAYSIZE(operation_resources), profile_event_info, out_ready,
-      &submission));
+      IREE_ARRAYSIZE(operation_resources), iree_hsa_signal_null(),
+      profile_event_info, out_ready, &submission));
   if (!*out_ready) return iree_ok_status();
 
   bool did_emit = false;

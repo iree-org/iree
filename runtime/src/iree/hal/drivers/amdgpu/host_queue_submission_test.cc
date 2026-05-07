@@ -25,6 +25,7 @@ namespace iree::hal::amdgpu {
 namespace {
 
 constexpr uint32_t kNoHarvestPacketOffset = UINT32_MAX;
+constexpr uint32_t kNoPublicationPacketOffset = UINT32_MAX;
 
 class HostQueueSubmissionTest : public ::testing::Test {
  protected:
@@ -185,6 +186,34 @@ static iree_hal_profile_sink_t* NoopProfileSinkAsBase(NoopProfileSink* sink) {
   return reinterpret_cast<iree_hal_profile_sink_t*>(sink);
 }
 
+TEST(HostQueueSubmissionUnitTest, WritesPersistentPm4IbPacketBody) {
+  iree_hsa_amd_aql_pm4_ib_packet_t packet = {};
+  const uint32_t* ib_dwords = reinterpret_cast<const uint32_t*>(
+      static_cast<uintptr_t>(0x123456789ABCDEF0ull));
+  const uint32_t ib_dword_count = 0x13579u;
+  const iree_hal_amdgpu_aql_packet_control_t packet_control =
+      iree_hal_amdgpu_aql_packet_control_barrier_system();
+  const iree_hsa_signal_t completion_signal = {.handle = 0x2468u};
+
+  uint16_t setup = 0;
+  const uint16_t header = iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
+      &packet, ib_dwords, ib_dword_count, packet_control, completion_signal,
+      &setup);
+
+  EXPECT_EQ(header, iree_hal_amdgpu_aql_make_header(
+                        IREE_HSA_PACKET_TYPE_VENDOR_SPECIFIC, packet_control));
+  EXPECT_EQ(setup, IREE_HSA_AMD_AQL_FORMAT_PM4_IB);
+  EXPECT_EQ(packet.completion_signal.handle, completion_signal.handle);
+  EXPECT_EQ(packet.ib_jump_cmd[0],
+            iree_hal_amdgpu_pm4_make_header(
+                IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_INDIRECT_BUFFER, 4));
+  const uintptr_t ib_address = reinterpret_cast<uintptr_t>(ib_dwords);
+  EXPECT_EQ(packet.ib_jump_cmd[1], iree_hal_amdgpu_pm4_addr_lo(ib_address));
+  EXPECT_EQ(packet.ib_jump_cmd[2], iree_hal_amdgpu_pm4_ib_addr_hi(ib_address));
+  EXPECT_EQ(packet.ib_jump_cmd[3], ib_dword_count | (1u << 23));
+  EXPECT_EQ(packet.dw_cnt_remain, 0xAu);
+}
+
 typedef struct DispatchSubmissionPlanCase {
   // Number of wait-barrier packets preceding the dispatch payload.
   uint8_t barrier_count;
@@ -276,10 +305,14 @@ static void ExpectDispatchSubmissionPlan(
 typedef struct Pm4IbSubmissionPlanCase {
   // Number of wait-barrier packets preceding the PM4-IB payload.
   uint8_t barrier_count;
+  // Whether a publication barrier is reserved before the PM4-IB payload.
+  bool reserve_publication_barrier;
   // Whether a queue-device event is reserved for the submission.
   bool reserve_queue_device_event;
   // Expected total AQL packets reserved for the submission.
   uint32_t expected_packet_count;
+  // Expected publication barrier offset, or kNoPublicationPacketOffset.
+  uint32_t expected_publication_packet_offset;
   // Expected PM4-IB packet offset from the first reserved packet.
   uint32_t expected_pm4_ib_packet_offset;
 } Pm4IbSubmissionPlanCase;
@@ -301,13 +334,32 @@ static void ExpectPm4IbSubmissionPlan(
 
   bool is_ready = false;
   iree_hal_amdgpu_host_queue_pm4_ib_submission_t submission = {};
+  iree_hsa_signal_t publication_signal = iree_hsa_signal_null();
+  if (plan_case.reserve_publication_barrier) {
+    publication_signal.handle = 0x1234u;
+  }
   iree_slim_mutex_lock(&queue->locks.submission_mutex);
   iree_status_t status = iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
       queue, &resolution, empty_signal_list,
-      /*operation_resource_count=*/0, &profile_queue_event_info, &is_ready,
-      &submission);
+      /*operation_resource_count=*/0, publication_signal,
+      &profile_queue_event_info, &is_ready, &submission);
   if (iree_status_is_ok(status) && is_ready) {
     EXPECT_EQ(plan_case.expected_packet_count, submission.kernel.packet_count);
+    const bool has_publication_packet =
+        plan_case.expected_publication_packet_offset !=
+        kNoPublicationPacketOffset;
+    if (has_publication_packet) {
+      EXPECT_EQ(iree_hal_amdgpu_aql_ring_packet(
+                    &queue->aql_ring,
+                    submission.kernel.first_packet_id +
+                        plan_case.expected_publication_packet_offset),
+                submission.publication_barrier_slot);
+      EXPECT_EQ(publication_signal.handle,
+                submission.publication_signal.handle);
+    } else {
+      EXPECT_EQ(NULL, submission.publication_barrier_slot);
+      EXPECT_EQ(0u, submission.publication_signal.handle);
+    }
     EXPECT_EQ(
         iree_hal_amdgpu_aql_ring_packet(
             &queue->aql_ring, submission.kernel.first_packet_id +
@@ -319,18 +371,11 @@ static void ExpectPm4IbSubmissionPlan(
               submission.pm4_ib_slot);
     if (plan_case.reserve_queue_device_event) {
       EXPECT_EQ(1u, submission.profile_queue_device_events.event_count);
-      EXPECT_EQ(IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT,
-                iree_hal_amdgpu_pm4_ib_builder_dword_count(
-                    &submission.pm4_ib_builder));
-      EXPECT_EQ(submission.pm4_ib_slot->dwords[0],
-                iree_hal_amdgpu_pm4_make_header(
-                    IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_COPY_DATA,
-                    IREE_HAL_AMDGPU_PM4_COPY_TIMESTAMP_DWORD_COUNT));
     } else {
       EXPECT_EQ(0u, submission.profile_queue_device_events.event_count);
-      EXPECT_EQ(0u, iree_hal_amdgpu_pm4_ib_builder_dword_count(
-                        &submission.pm4_ib_builder));
     }
+    EXPECT_EQ(0u, iree_hal_amdgpu_pm4_ib_builder_dword_count(
+                      &submission.pm4_ib_builder));
 
     iree_hal_amdgpu_host_queue_fail_pm4_ib_submission(queue, &submission);
   }
@@ -478,27 +523,59 @@ TEST_F(HostQueueSubmissionTest, Pm4IbPacketAccountingCombinations) {
   const Pm4IbSubmissionPlanCase cases[] = {
       {
           /*barrier_count=*/0,
+          /*reserve_publication_barrier=*/false,
           /*reserve_queue_device_event=*/false,
           /*expected_packet_count=*/1,
+          /*expected_publication_packet_offset=*/kNoPublicationPacketOffset,
           /*expected_pm4_ib_packet_offset=*/0,
       },
       {
           /*barrier_count=*/2,
+          /*reserve_publication_barrier=*/false,
           /*reserve_queue_device_event=*/false,
           /*expected_packet_count=*/3,
+          /*expected_publication_packet_offset=*/kNoPublicationPacketOffset,
           /*expected_pm4_ib_packet_offset=*/2,
       },
       {
           /*barrier_count=*/0,
+          /*reserve_publication_barrier=*/false,
           /*reserve_queue_device_event=*/true,
-          /*expected_packet_count=*/1,
-          /*expected_pm4_ib_packet_offset=*/0,
+          /*expected_packet_count=*/3,
+          /*expected_publication_packet_offset=*/kNoPublicationPacketOffset,
+          /*expected_pm4_ib_packet_offset=*/1,
       },
       {
           /*barrier_count=*/2,
+          /*reserve_publication_barrier=*/false,
           /*reserve_queue_device_event=*/true,
-          /*expected_packet_count=*/3,
+          /*expected_packet_count=*/5,
+          /*expected_publication_packet_offset=*/kNoPublicationPacketOffset,
+          /*expected_pm4_ib_packet_offset=*/3,
+      },
+      {
+          /*barrier_count=*/0,
+          /*reserve_publication_barrier=*/true,
+          /*reserve_queue_device_event=*/false,
+          /*expected_packet_count=*/2,
+          /*expected_publication_packet_offset=*/0,
+          /*expected_pm4_ib_packet_offset=*/1,
+      },
+      {
+          /*barrier_count=*/0,
+          /*reserve_publication_barrier=*/true,
+          /*reserve_queue_device_event=*/true,
+          /*expected_packet_count=*/4,
+          /*expected_publication_packet_offset=*/1,
           /*expected_pm4_ib_packet_offset=*/2,
+      },
+      {
+          /*barrier_count=*/2,
+          /*reserve_publication_barrier=*/true,
+          /*reserve_queue_device_event=*/true,
+          /*expected_packet_count=*/6,
+          /*expected_publication_packet_offset=*/3,
+          /*expected_pm4_ib_packet_offset=*/4,
       },
   };
   for (const Pm4IbSubmissionPlanCase& plan_case : cases) {

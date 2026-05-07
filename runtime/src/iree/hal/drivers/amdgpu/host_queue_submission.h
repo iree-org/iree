@@ -7,8 +7,10 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_SUBMISSION_H_
 #define IREE_HAL_DRIVERS_AMDGPU_HOST_QUEUE_SUBMISSION_H_
 
+#include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/host_queue_policy.h"
 #include "iree/hal/drivers/amdgpu/host_queue_waits.h"
+#include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/hal/drivers/amdgpu/util/pm4_emitter.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -143,7 +145,8 @@ typedef struct iree_hal_amdgpu_host_queue_dispatch_submission_t {
 } iree_hal_amdgpu_host_queue_dispatch_submission_t;
 
 // One in-flight PM4-IB payload submission assembled under submission_mutex.
-// Operation implementations append payload packets through |pm4_ib_builder|
+// Operation implementations either append queue-private snippets through
+// |pm4_ib_builder| or provide |persistent_ib_dwords| for resident PM4 programs
 // while generic ownership and publication stay in |kernel|.
 typedef struct iree_hal_amdgpu_host_queue_pm4_ib_submission_t {
   // Generic payload-shaped submission state.
@@ -151,12 +154,21 @@ typedef struct iree_hal_amdgpu_host_queue_pm4_ib_submission_t {
   // Queue device profile event reservation for this submission.
   iree_hal_amdgpu_profile_queue_device_event_reservation_t
       profile_queue_device_events;
+  // Optional barrier slot waiting for nonblocking resident PM4 publication.
+  iree_hal_amdgpu_aql_packet_t* publication_barrier_slot;
+  // Optional async-copy completion signal consumed by
+  // |publication_barrier_slot|.
+  iree_hsa_signal_t publication_signal;
   // Uncommitted PM4-IB payload AQL slot.
   iree_hal_amdgpu_aql_packet_t* pm4_ib_packet_slot;
-  // Queue-owned PM4 IB storage referenced by |pm4_ib_packet_slot|.
+  // Queue-owned PM4 IB storage used when |persistent_ib_dwords| is NULL.
   iree_hal_amdgpu_pm4_ib_slot_t* pm4_ib_slot;
   // Bounded builder for appending PM4 packets to |pm4_ib_slot|.
   iree_hal_amdgpu_pm4_ib_builder_t pm4_ib_builder;
+  // Persistent device-visible PM4 IB dwords referenced by |pm4_ib_packet_slot|.
+  const uint32_t* persistent_ib_dwords;
+  // Number of PM4 dwords referenced by |pm4_ib_packet_slot|.
+  uint32_t ib_dword_count;
 } iree_hal_amdgpu_host_queue_pm4_ib_submission_t;
 
 // Returns the number of retained resources required for a submission with
@@ -306,12 +318,14 @@ iree_status_t iree_hal_amdgpu_host_queue_try_begin_dispatch_submission(
     iree_hal_amdgpu_host_queue_dispatch_submission_t* out_submission);
 
 // Attempts to begin one PM4-IB payload submission without waiting for ring
-// capacity. Caller must hold submission_mutex.
+// capacity. |publication_signal| reserves an internal barrier before the PM4
+// IB packet when non-null. Caller must hold submission_mutex.
 iree_status_t iree_hal_amdgpu_host_queue_try_begin_pm4_ib_submission(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t operation_resource_count,
+    iree_hsa_signal_t publication_signal,
     const iree_hal_amdgpu_host_queue_profile_event_info_t*
         profile_queue_event_info,
     bool* out_ready,
@@ -331,6 +345,14 @@ uint16_t iree_hal_amdgpu_host_queue_write_dispatch_packet_body(
     const iree_hsa_kernel_dispatch_packet_t* IREE_RESTRICT
         dispatch_packet_template,
     void* kernarg_address, iree_hsa_signal_t completion_signal);
+
+// Writes one PM4-IB packet body referencing arbitrary device-visible PM4
+// dwords and returns the packet header that must be published with |out_setup|.
+uint16_t iree_hal_amdgpu_host_queue_write_pm4_ib_packet_body(
+    iree_hsa_amd_aql_pm4_ib_packet_t* IREE_RESTRICT pm4_ib_packet,
+    const uint32_t* ib_dwords, uint32_t ib_dword_count,
+    iree_hal_amdgpu_aql_packet_control_t packet_control,
+    iree_hsa_signal_t completion_signal, uint16_t* out_setup);
 
 // Finishes a submission by transferring retained resources to the reclaim
 // entry, publishing queue/semaphore frontier state, committing the final
@@ -376,6 +398,49 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch_packet(
     iree_host_size_t operation_resource_count,
     const iree_hal_amdgpu_host_queue_profile_event_info_t*
         profile_queue_event_info,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready, uint64_t* out_submission_id);
+
+// Emits one PM4-IB payload submission referencing persistent device-visible PM4
+// dwords. Caller must hold submission_mutex and keep |ib_dwords| and any
+// non-null |publication_signal| live through |operation_resources|,
+// |publication_retire_action|, or an equivalent queue-retired resource owner.
+// |publication_retire_action| runs when the submission that references
+// |publication_signal| retires.
+iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_ib(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const uint32_t* ib_dwords, uint32_t ib_dword_count,
+    iree_hsa_signal_t publication_signal,
+    iree_hal_amdgpu_reclaim_action_t publication_retire_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    const iree_hal_amdgpu_host_queue_profile_event_info_t*
+        profile_queue_event_info,
+    iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
+    bool* out_ready, uint64_t* out_submission_id);
+
+// Emits one fixup-dispatch plus PM4-IB payload submission. The fixup dispatch
+// patches command-buffer-owned resident kernarg templates from |binding_ptrs|
+// before the following PM4-IB packet executes. |publication_signal| inserts a
+// barrier before the fixup dispatch when non-null. |publication_retire_action|
+// runs when the submission that references |publication_signal| retires. Caller
+// must hold submission_mutex.
+iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_ib_with_binding_table_fixup(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    const iree_hal_amdgpu_device_kernel_args_t* fixup_kernel_args,
+    const iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t* fixup_entries,
+    uint32_t fixup_entry_count, uint8_t* fixup_target_base,
+    const uint64_t* binding_ptrs, uint32_t binding_count,
+    const uint32_t* ib_dwords, uint32_t ib_dword_count,
+    iree_hsa_signal_t publication_signal,
+    iree_hal_amdgpu_reclaim_action_t publication_retire_action,
+    iree_hal_resource_t* const* operation_resources,
+    iree_host_size_t operation_resource_count,
+    iree_hal_resource_set_t** inout_resource_set,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,
     bool* out_ready, uint64_t* out_submission_id);
 

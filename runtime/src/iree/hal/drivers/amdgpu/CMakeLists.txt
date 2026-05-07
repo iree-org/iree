@@ -132,6 +132,8 @@ iree_cc_library(
     "physical_device.h"
     "physical_device_capabilities.c"
     "physical_device_capabilities.h"
+    "pm4_command_buffer.c"
+    "pm4_command_buffer.h"
     "profile_aqlprofile.c"
     "profile_aqlprofile.h"
     "profile_counters.c"
@@ -183,6 +185,8 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::libaqlprofile
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::packet
+    iree::hal::drivers::amdgpu::util::pm4_dispatch
+    iree::hal::drivers::amdgpu::util::pm4_program
     iree::hal::drivers::amdgpu::util::queue_primitives
     iree::hal::drivers::amdgpu::util::target_id
     iree::hal::drivers::amdgpu::util::topology
@@ -237,6 +241,7 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.h"
     "physical_device_capabilities.h"
+    "pm4_command_buffer.h"
     "profile_aqlprofile.h"
     "profile_counters.h"
     "profile_device_metrics.h"
@@ -265,6 +270,8 @@ iree_cc_library(
     iree::hal::drivers::amdgpu::util::info
     iree::hal::drivers::amdgpu::util::libhsa
     iree::hal::drivers::amdgpu::util::packet
+    iree::hal::drivers::amdgpu::util::pm4_dispatch
+    iree::hal::drivers::amdgpu::util::pm4_program
     iree::hal::drivers::amdgpu::util::queue_primitives
     iree::hal::drivers::amdgpu::util::target_id
     iree::hal::drivers::amdgpu::util::topology
@@ -467,7 +474,60 @@ iree_cc_test(
   GROUP
     "iree-hal-drivers-amdgpu-tests"
 )
+if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
+add_custom_command(OUTPUT pm4_command_buffer_benchmark_testdata_srcs.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch pm4_command_buffer_benchmark_testdata_srcs.stamp
+  DEPENDS
+    "pm4_command_buffer_benchmark_testdata.mlir"
+)
 
+add_custom_target(pm4_command_buffer_benchmark_testdata_srcs
+    DEPENDS pm4_command_buffer_benchmark_testdata_srcs.stamp
+)
+
+iree_hal_cts_testdata(
+  FORMAT_NAME
+    amdgpu_pm4_command_buffer_benchmark
+  TARGET_DEVICE
+    "amdgpu"
+  IDENTIFIER
+    "iree_pm4_command_buffer_benchmark_testdata_amdgpu"
+  BACKEND_NAME
+    "amdgpu"
+  FORMAT_STRING
+    "\"amdgcn-amd-amdhsa--${IREE_ROCM_TEST_TARGET_CHIP}\""
+  TESTDATA_DIR
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/drivers/amdgpu"
+  FLAGS
+    "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}"
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    pm4_command_buffer_benchmark
+  SRCS
+    "pm4_command_buffer_benchmark.cc"
+  DEPS
+    ::amdgpu
+    ::headers
+    ::testdata_amdgpu_pm4_command_buffer_benchmark
+    benchmark
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::drivers::amdgpu::abi
+    iree::hal::drivers::amdgpu::util::benchmark_flags
+    iree::hal::drivers::amdgpu::util::benchmark_profile
+  TESTONLY
+  LABELS
+    "benchmark"
+    "driver=amdgpu"
+    "nodocker"
+)
+endif()
 iree_cc_test(
   NAME
     host_queue_pending_test

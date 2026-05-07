@@ -13,6 +13,7 @@
 #include "iree/hal/drivers/amdgpu/device/dispatch.h"
 #include "iree/hal/drivers/amdgpu/profile_metadata.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
+#include "iree/hal/drivers/amdgpu/util/pm4_dispatch.h"
 
 typedef struct iree_hal_amdgpu_topology_t iree_hal_amdgpu_topology_t;
 
@@ -83,6 +84,16 @@ typedef struct iree_hal_amdgpu_executable_dispatch_descriptor_t {
   uint32_t max_workgroup_count[3];
   // Maximum dynamic group-memory byte count accepted for this export.
   uint32_t max_dynamic_workgroup_local_memory;
+  // PM4 launch state for the default executable workgroup size.
+  iree_hal_amdgpu_pm4_dispatch_launch_state_t pm4_launch_state;
+  // PM4 setup packet dwords for |pm4_launch_state|.
+  uint32_t pm4_setup_dwords[IREE_HAL_AMDGPU_PM4_DISPATCH_SETUP_DWORD_COUNT];
+  // Number of valid dwords in |pm4_setup_dwords|.
+  uint32_t pm4_setup_dword_count;
+  // AMDHSA descriptor fixed group segment byte size validated for PM4 launch.
+  uint32_t pm4_group_segment_fixed_size;
+  // True when the PM4 metadata fields are valid for this dispatch.
+  bool pm4_launch_state_valid;
 } iree_hal_amdgpu_executable_dispatch_descriptor_t;
 
 // Infers the format of the executable and calculates its total size.
@@ -154,6 +165,20 @@ iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
     iree_hal_executable_export_ordinal_t export_ordinal,
     iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_executable_dispatch_descriptor_t** out_descriptor);
+
+// Returns PM4 compute launch state for an exported kernel function on a
+// physical device.
+//
+// The returned state is precomputed at executable load from the HSA kernel
+// object and immutable executable metadata. It is suitable for recording into
+// a PM4 command-buffer block; dynamic kernarg/userdata values are intentionally
+// not embedded. The pointer remains valid for the lifetime of the executable.
+iree_status_t
+iree_hal_amdgpu_executable_lookup_pm4_dispatch_launch_state_for_device(
+    iree_hal_executable_t* executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t device_ordinal,
+    const iree_hal_amdgpu_pm4_dispatch_launch_state_t** out_state);
 
 #ifdef __cplusplus
 }  // extern "C"

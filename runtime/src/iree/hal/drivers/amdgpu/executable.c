@@ -1156,6 +1156,38 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_dispatch_descriptor(
   }
   out_descriptor->max_dynamic_workgroup_local_memory =
       UINT32_MAX - kernel_args->group_segment_size;
+
+  // HSA reports the kernel object as the process-addressable AMDHSA descriptor
+  // address. The descriptor also acts as the base for the signed entry offset.
+  const uint64_t kernel_object = kernel_args->kernel_object;
+  if (IREE_UNLIKELY(kernel_object == 0)) {
+    return iree_ok_status();
+  }
+  const iree_hal_amdgpu_kernel_descriptor_t* amdhsa_descriptor =
+      (const iree_hal_amdgpu_kernel_descriptor_t*)(uintptr_t)kernel_object;
+  out_descriptor->pm4_group_segment_fixed_size =
+      amdhsa_descriptor->group_segment_fixed_size;
+  out_descriptor->pm4_launch_state_valid =
+      iree_hal_amdgpu_pm4_dispatch_launch_state_is_supported_gfx10(
+          amdhsa_descriptor, kernel_object, kernel_args->workgroup_size,
+          IREE_HAL_AMDGPU_PM4_DISPATCH_LAUNCH_FLAG_NONE);
+  if (out_descriptor->pm4_launch_state_valid) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_pm4_dispatch_launch_state_initialize_gfx10(
+            amdhsa_descriptor, kernel_object, kernel_args->workgroup_size,
+            IREE_HAL_AMDGPU_PM4_DISPATCH_LAUNCH_FLAG_NONE,
+            &out_descriptor->pm4_launch_state));
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pm4_dispatch_emit_setup(
+        &out_descriptor->pm4_launch_state,
+        IREE_HAL_AMDGPU_PM4_DISPATCH_SETUP_DWORD_COUNT,
+        out_descriptor->pm4_setup_dwords,
+        &out_descriptor->pm4_setup_dword_count));
+    if (IREE_UNLIKELY(out_descriptor->pm4_setup_dword_count !=
+                      IREE_HAL_AMDGPU_PM4_DISPATCH_SETUP_DWORD_COUNT)) {
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "PM4 dispatch setup emission changed size");
+    }
+  }
   return iree_ok_status();
 }
 
@@ -2323,6 +2355,33 @@ iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
   const iree_host_size_t descriptor_ordinal =
       device_ordinal * executable->kernel_count + export_ordinal;
   *out_descriptor = &executable->host_dispatch_descriptors[descriptor_ordinal];
+  return iree_ok_status();
+}
+
+iree_status_t
+iree_hal_amdgpu_executable_lookup_pm4_dispatch_launch_state_for_device(
+    iree_hal_executable_t* base_executable,
+    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_host_size_t device_ordinal,
+    const iree_hal_amdgpu_pm4_dispatch_launch_state_t** out_state) {
+  IREE_ASSERT_ARGUMENT(out_state);
+  *out_state = NULL;
+
+  const iree_hal_amdgpu_executable_dispatch_descriptor_t* dispatch_descriptor =
+      NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
+          base_executable, export_ordinal, device_ordinal,
+          &dispatch_descriptor));
+  if (IREE_UNLIKELY(!dispatch_descriptor->pm4_launch_state_valid)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "export ordinal %" PRIu32
+                            " on device ordinal %" PRIhsz
+                            " does not have PM4 dispatch launch metadata",
+                            export_ordinal, device_ordinal);
+  }
+
+  *out_state = &dispatch_descriptor->pm4_launch_state;
   return iree_ok_status();
 }
 

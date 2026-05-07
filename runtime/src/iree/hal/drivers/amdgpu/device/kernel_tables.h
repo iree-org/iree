@@ -68,6 +68,8 @@ IREE_HAL_AMDGPU_DEVICE_KERNEL(
 
 IREE_HAL_AMDGPU_DEVICE_KERNEL(
     iree_hal_amdgpu_device_dispatch_patch_indirect_params, 1, 1, 1)
+IREE_HAL_AMDGPU_DEVICE_KERNEL(
+    iree_hal_amdgpu_device_dispatch_patch_pm4_bindings, 32, 1, 1)
 
 //===----------------------------------------------------------------------===//
 // Timestamp helpers (timestamp.h)

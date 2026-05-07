@@ -26,6 +26,8 @@
 
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
+typedef struct iree_hal_amdgpu_pm4_command_buffer_resident_pool_t
+    iree_hal_amdgpu_pm4_command_buffer_resident_pool_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
@@ -233,6 +235,10 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 
   // Per-device pool of materialized slab-backed HAL buffer view wrappers.
   iree_hal_amdgpu_buffer_pool_t materialized_buffer_pool;
+
+  // Per-device pool of executable PM4 command-buffer resident allocations.
+  iree_hal_amdgpu_pm4_command_buffer_resident_pool_t*
+      pm4_command_buffer_resident_pool;
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;

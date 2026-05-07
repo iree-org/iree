@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_DRIVERS_AMDGPU_DEVICE_DISPATCH_H_
 #define IREE_HAL_DRIVERS_AMDGPU_DEVICE_DISPATCH_H_
 
+#include "iree/hal/drivers/amdgpu/abi/command_buffer.h"
 #include "iree/hal/drivers/amdgpu/abi/kernel_args.h"
 #include "iree/hal/drivers/amdgpu/abi/queue.h"
 #include "iree/hal/drivers/amdgpu/device/support/common.h"
@@ -112,6 +113,23 @@ IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_device_dispatch_patch_indirect_params_args_t) == 32,
     "indirect dispatch patch args must match the kernel ABI");
 
+// Kernel arguments for the builtin PM4 command-buffer binding fixup dispatch.
+typedef struct iree_hal_amdgpu_device_dispatch_patch_pm4_bindings_args_t {
+  // Device pointer to queue_execute binding pointers indexed by binding slot.
+  const uint64_t* binding_ptrs;
+  // Device pointer to immutable fixup entries owned by the command buffer.
+  const iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t* entries;
+  // Device pointer to the command buffer's resident kernarg-template base.
+  uint8_t* target_base;
+  // Number of valid entries in |entries|.
+  uint32_t entry_count;
+  // Reserved padding that must be zero.
+  uint32_t reserved0;
+} iree_hal_amdgpu_device_dispatch_patch_pm4_bindings_args_t;
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_device_dispatch_patch_pm4_bindings_args_t) == 32,
+    "PM4 binding patch args must match the kernel ABI");
+
 // Populates a kernel dispatch packet body in already-reserved storage.
 //
 // The caller owns packet header commit, completion-signal assignment, and
@@ -191,6 +209,18 @@ void iree_hal_amdgpu_device_dispatch_emplace_indirect_params_patch(
     iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT patch_packet,
     void* IREE_AMDGPU_RESTRICT kernarg_ptr);
 
+// Populates the builtin patch dispatch that updates resident PM4 command-buffer
+// kernarg templates from a queue_execute binding table.
+void iree_hal_amdgpu_device_dispatch_emplace_pm4_binding_patch(
+    const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
+        patch_kernel_args,
+    const uint64_t* IREE_AMDGPU_RESTRICT binding_ptrs,
+    const iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t* IREE_AMDGPU_RESTRICT
+        entries,
+    uint8_t* IREE_AMDGPU_RESTRICT target_base, uint32_t entry_count,
+    iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT patch_packet,
+    void* IREE_AMDGPU_RESTRICT kernarg_ptr);
+
 #if defined(IREE_AMDGPU_TARGET_DEVICE)
 
 // Device builtin that patches a following dispatch packet from indirect
@@ -201,6 +231,15 @@ iree_hal_amdgpu_device_dispatch_patch_indirect_params(
     iree_hsa_kernel_dispatch_packet_t* IREE_AMDGPU_RESTRICT dispatch_packet,
     iree_amdgpu_kernel_implicit_args_t* IREE_AMDGPU_RESTRICT implicit_args,
     uint32_t dispatch_header_setup);
+
+// Device builtin that patches PM4 command-buffer resident kernarg templates
+// from a compact queue_execute binding pointer table.
+IREE_AMDGPU_ATTRIBUTE_KERNEL void
+iree_hal_amdgpu_device_dispatch_patch_pm4_bindings(
+    const uint64_t* IREE_AMDGPU_RESTRICT binding_ptrs,
+    const iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t* IREE_AMDGPU_RESTRICT
+        entries,
+    uint8_t* IREE_AMDGPU_RESTRICT target_base, uint32_t entry_count);
 
 #endif  // IREE_AMDGPU_TARGET_DEVICE
 

@@ -10,6 +10,7 @@
 #include "iree/hal/drivers/amdgpu/aql_program_validation.h"
 #include "iree/hal/drivers/amdgpu/host_queue_command_buffer_block.h"
 #include "iree/hal/drivers/amdgpu/host_queue_command_buffer_replay.h"
+#include "iree/hal/drivers/amdgpu/pm4_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
 iree_status_t iree_hal_amdgpu_host_queue_validate_execute_flags(
@@ -80,6 +81,151 @@ iree_status_t iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
   return status;
 }
 
+static void iree_hal_amdgpu_host_queue_retire_pm4_publication_reference(
+    iree_hal_amdgpu_reclaim_entry_t* entry, void* user_data,
+    iree_status_t status) {
+  (void)entry;
+  iree_hal_amdgpu_pm4_command_buffer_retire_publication_reference(
+      (iree_hal_command_buffer_t*)user_data, status);
+}
+
+static iree_hal_amdgpu_reclaim_action_t
+iree_hal_amdgpu_host_queue_make_pm4_publication_retire_action(
+    iree_hal_command_buffer_t* command_buffer,
+    hsa_signal_t publication_signal) {
+  if (iree_hsa_signal_is_null(publication_signal)) {
+    return (iree_hal_amdgpu_reclaim_action_t){0};
+  }
+  iree_hal_amdgpu_reclaim_action_t action = {
+      .fn = iree_hal_amdgpu_host_queue_retire_pm4_publication_reference,
+      .user_data = command_buffer,
+  };
+  return action;
+}
+
+static void iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
+    iree_hal_command_buffer_t* command_buffer,
+    hsa_signal_t publication_signal) {
+  if (iree_hsa_signal_is_null(publication_signal)) return;
+  iree_hal_amdgpu_pm4_command_buffer_cancel_publication_reference(
+      command_buffer);
+}
+
+static iree_status_t iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
+    iree_hal_amdgpu_host_queue_t* queue,
+    const iree_hal_amdgpu_wait_resolution_t* resolution,
+    const iree_hal_semaphore_list_t signal_semaphore_list,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_execute_flags_t execute_flags,
+    iree_hal_resource_set_t** inout_binding_resource_set, bool* out_ready) {
+  const iree_host_size_t command_buffer_device_ordinal =
+      iree_hal_amdgpu_pm4_command_buffer_device_ordinal(command_buffer);
+  if (IREE_UNLIKELY(command_buffer_device_ordinal != queue->device_ordinal)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "PM4 command buffer recorded for physical device %" PRIhsz
+        " cannot execute on physical device %" PRIhsz,
+        command_buffer_device_ordinal, queue->device_ordinal);
+  }
+
+  const iree_hal_amdgpu_pm4_program_t* program =
+      iree_hal_amdgpu_pm4_command_buffer_program(command_buffer);
+  if (IREE_UNLIKELY(!program->dwords || program->dword_count == 0)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "PM4 command buffer has not been finalized");
+  }
+
+  iree_hal_resource_t* command_buffer_resource =
+      (iree_hal_resource_t*)command_buffer;
+  if (command_buffer->binding_count == 0) {
+    if (IREE_UNLIKELY(binding_table.count != 0)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "static PM4 command buffer cannot execute with a binding table");
+    }
+    const hsa_signal_t publication_signal =
+        iree_hal_amdgpu_pm4_command_buffer_acquire_publication_reference(
+            command_buffer);
+    const iree_hal_amdgpu_reclaim_action_t publication_retire_action =
+        iree_hal_amdgpu_host_queue_make_pm4_publication_retire_action(
+            command_buffer, publication_signal);
+    iree_status_t status = iree_hal_amdgpu_host_queue_submit_pm4_ib(
+        queue, resolution, signal_semaphore_list, program->dwords,
+        program->dword_count, publication_signal, publication_retire_action,
+        &command_buffer_resource, /*operation_resource_count=*/1,
+        /*profile_queue_event_info=*/NULL,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, out_ready,
+        /*out_submission_id=*/NULL);
+    if (!iree_status_is_ok(status) || !*out_ready) {
+      iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
+          command_buffer, publication_signal);
+    }
+    return status;
+  }
+
+  if (!*inout_binding_resource_set) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_amdgpu_host_queue_create_binding_table_resource_set(
+            queue, command_buffer, binding_table, execute_flags,
+            inout_binding_resource_set));
+  }
+
+  const iree_hal_amdgpu_pm4_command_buffer_fixup_plan_t* fixup_plan =
+      iree_hal_amdgpu_pm4_command_buffer_fixup_plan(command_buffer);
+  if (IREE_UNLIKELY(fixup_plan->entry_count == 0 || !fixup_plan->entries ||
+                    !fixup_plan->target_base)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "dynamic PM4 command buffer has no finalized binding fixup plan");
+  }
+
+  iree_arena_allocator_t scratch_arena;
+  iree_arena_initialize(queue->block_pool, &scratch_arena);
+  uint64_t* binding_ptrs = NULL;
+  iree_host_size_t binding_ptr_bytes = 0;
+  iree_status_t status = IREE_STRUCT_LAYOUT(
+      0, &binding_ptr_bytes,
+      IREE_STRUCT_FIELD(command_buffer->binding_count, uint64_t, NULL));
+  if (iree_status_is_ok(status)) {
+    status = iree_arena_allocate(&scratch_arena, binding_ptr_bytes,
+                                 (void**)&binding_ptrs);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_host_queue_resolve_command_buffer_binding_ptrs(
+        command_buffer, binding_table, binding_ptrs);
+  }
+  if (iree_status_is_ok(status)) {
+    const hsa_signal_t publication_signal =
+        iree_hal_amdgpu_pm4_command_buffer_acquire_publication_reference(
+            command_buffer);
+    const iree_hal_amdgpu_reclaim_action_t publication_retire_action =
+        iree_hal_amdgpu_host_queue_make_pm4_publication_retire_action(
+            command_buffer, publication_signal);
+    status = iree_hal_amdgpu_host_queue_submit_pm4_ib_with_binding_table_fixup(
+        queue, resolution, signal_semaphore_list,
+        &queue->transfer_context->kernels
+             ->iree_hal_amdgpu_device_dispatch_patch_pm4_bindings,
+        fixup_plan->entries, fixup_plan->entry_count, fixup_plan->target_base,
+        binding_ptrs, command_buffer->binding_count, program->dwords,
+        program->dword_count, publication_signal, publication_retire_action,
+        &command_buffer_resource, /*operation_resource_count=*/1,
+        inout_binding_resource_set,
+        IREE_HAL_AMDGPU_HOST_QUEUE_SUBMISSION_FLAG_RETAIN_RESOURCES, out_ready,
+        /*out_submission_id=*/NULL);
+    if (!iree_status_is_ok(status) || !*out_ready) {
+      iree_hal_amdgpu_host_queue_cancel_pm4_publication_reference(
+          command_buffer, publication_signal);
+    }
+  }
+  iree_arena_deinitialize(&scratch_arena);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_resource_set_free(*inout_binding_resource_set);
+    *inout_binding_resource_set = NULL;
+  }
+  return status;
+}
+
 iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
     iree_hal_amdgpu_host_queue_t* queue,
     const iree_hal_amdgpu_wait_resolution_t* resolution,
@@ -101,6 +247,11 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_command_buffer(
   if (IREE_UNLIKELY(!command_buffer)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "command buffer is required");
+  }
+  if (iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer)) {
+    return iree_hal_amdgpu_host_queue_submit_pm4_command_buffer(
+        queue, resolution, signal_semaphore_list, command_buffer, binding_table,
+        execute_flags, inout_binding_resource_set, out_ready);
   }
   if (IREE_UNLIKELY(!iree_hal_amdgpu_aql_command_buffer_isa(command_buffer))) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

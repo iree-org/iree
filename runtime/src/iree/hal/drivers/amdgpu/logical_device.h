@@ -126,6 +126,13 @@ typedef struct iree_hal_amdgpu_logical_device_t {
   // Mask indicating which queue affinities are valid.
   iree_hal_queue_affinity_t queue_affinity_mask;
 
+  // Selected command-buffer recording and replay implementation.
+  iree_hal_amdgpu_command_buffer_mode_t command_buffer_mode;
+
+  // Selected PM4 command-buffer resident publication strategy.
+  iree_hal_amdgpu_pm4_command_buffer_publication_mode_t
+      pm4_command_buffer_publication_mode;
+
   // Logical allocator.
   iree_hal_allocator_t* device_allocator;
 
