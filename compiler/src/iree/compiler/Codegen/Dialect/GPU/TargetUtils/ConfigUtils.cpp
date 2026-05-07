@@ -917,8 +917,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // innermost (contiguous reads) to avoid LDS bank conflicts.
     // TODO(#24255): Fix untuned swizzle logic for DMA.
     if (!transposedLhs) {
-      auto dmaConstraintFn = makeDmaConstraintFn(target,
-          lhsElemType.getIntOrFloatBitWidth());
+      auto dmaConstraintFn =
+          makeDmaConstraintFn(target, lhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
           /*skipUntunedFallback=*/false, dmaConstraintFn);
@@ -927,8 +927,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       }
     }
     if (transposedRhs) {
-      auto dmaConstraintFn = makeDmaConstraintFn(target,
-          rhsElemType.getIntOrFloatBitWidth());
+      auto dmaConstraintFn =
+          makeDmaConstraintFn(target, rhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
           /*skipUntunedFallback=*/false, dmaConstraintFn);

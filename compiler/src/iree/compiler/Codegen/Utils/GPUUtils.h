@@ -309,8 +309,8 @@ Value applyInverseXorSwizzleToDMASourceOffset(
 /// parameters based on the DMA sizes available in the target.
 /// The swizzle access width (in bits) must be at least as wide as the
 /// narrowest supported DMA load.
-std::function<LogicalResult(XorShuffleParams)> makeDmaConstraintFn(
-    IREE::GPU::TargetAttr target, int64_t elemBits);
+std::function<LogicalResult(XorShuffleParams)>
+makeDmaConstraintFn(IREE::GPU::TargetAttr target, int64_t elemBits);
 
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
