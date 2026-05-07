@@ -110,6 +110,20 @@ func.func @transfer_tensor(%src : tensor<8x8xf32>, %idx : index) -> vector<4xf32
 
 // -----
 
+// Rank-0 transfer_read is lowered to vector.load.
+// CHECK-LABEL: func @transfer_read_rank0(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x8xf32>,
+// CHECK-SAME:    %[[IDX:.*]]: index) -> vector<f32> {
+// CHECK-NEXT:    %[[RES:.*]] = vector.load %[[MEM]][%[[IDX]], %[[IDX]]] : memref<8x8xf32>, vector<f32>
+// CHECK-NEXT:    return %[[RES]] : vector<f32>
+func.func @transfer_read_rank0(%mem : memref<8x8xf32>, %idx : index) -> vector<f32> {
+  %cf0 = arith.constant 0.0 : f32
+  %res = vector.transfer_read %mem[%idx, %idx], %cf0 {in_bounds = []} : memref<8x8xf32>, vector<f32>
+  return %res : vector<f32>
+}
+
+// -----
+
 // 1-D vector.multi_reduction is lowered to vector.reduction.
 // CHECK-LABEL: func @one_dim_reduction
 // CHECK-SAME:    %[[INPUT:.+]]: vector<8xf32>, %[[ACC:.+]]: f32
