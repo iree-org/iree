@@ -572,13 +572,13 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Dispatch workgroup configuration captured from queue_dispatch.
     iree_hal_dispatch_config_t config;
 
-    // Push constant bytes copied from queue_dispatch.
+    // Push constant bytes copied into the submission allocation tail.
     void* constants_data;
 
     // Number of bytes in constants_data.
     iree_host_size_t constants_data_length;
 
-    // Direct buffer bindings copied from queue_dispatch.
+    // Direct buffer bindings copied into the submission allocation tail.
     iree_hal_buffer_ref_t* bindings;
 
     // Number of entries populated in bindings.
@@ -3130,18 +3130,37 @@ static void iree_hal_vulkan_queue_consume_completion_action(
   }
 }
 
+// Allocates a pending submission with optional trailing payload storage owned
+// by the submission allocation.
 static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_vulkan_queue_submission_kind_t kind, iree_hal_host_call_t call,
     const uint64_t args[4], iree_hal_host_call_flags_t flags,
+    iree_host_size_t payload_storage_length,
+    iree_byte_span_t* out_payload_storage,
     iree_hal_vulkan_queue_pending_submission_t** out_submission) {
   *out_submission = NULL;
+  if (out_payload_storage) {
+    *out_payload_storage = iree_byte_span_empty();
+  }
+
+  iree_host_size_t payload_storage_offset = 0;
+  iree_host_size_t allocation_size =
+      sizeof(iree_hal_vulkan_queue_pending_submission_t);
+  if (payload_storage_length != 0) {
+    IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
+        iree_sizeof_struct(iree_hal_vulkan_queue_pending_submission_t),
+        &allocation_size,
+        IREE_STRUCT_FIELD_ALIGNED(payload_storage_length, uint8_t,
+                                  iree_max_align_t, &payload_storage_offset)));
+  }
+
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      queue->host_allocator, sizeof(*submission), (void**)&submission));
-  memset(submission, 0, sizeof(*submission));
+      queue->host_allocator, allocation_size, (void**)&submission));
+  memset(submission, 0, allocation_size);
   submission->queue = queue;
   submission->kind = kind;
   submission->native_command_buffer_lease.slot =
@@ -3175,6 +3194,11 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
                                            &submission->signal_semaphore_list);
   }
   if (iree_status_is_ok(status)) {
+    if (out_payload_storage && payload_storage_length != 0) {
+      *out_payload_storage =
+          iree_make_byte_span((uint8_t*)submission + payload_storage_offset,
+                              payload_storage_length);
+    }
     *out_submission = submission;
   } else {
     if (submission->wait_semaphore_list.semaphores) {
@@ -3267,15 +3291,10 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   if (submission->dispatch.executable) {
     iree_hal_executable_release(submission->dispatch.executable);
   }
-  if (submission->dispatch.constants_data) {
-    iree_allocator_free(queue->host_allocator,
-                        submission->dispatch.constants_data);
-  }
   if (submission->dispatch.bindings) {
     for (iree_host_size_t i = 0; i < submission->dispatch.binding_count; ++i) {
       iree_hal_buffer_release(submission->dispatch.bindings[i].buffer);
     }
-    iree_allocator_free(queue->host_allocator, submission->dispatch.bindings);
   }
   if (iree_hal_dispatch_uses_indirect_parameters(submission->dispatch.flags)) {
     iree_hal_buffer_release(
@@ -5876,7 +5895,9 @@ static iree_status_t iree_hal_vulkan_queue_submit_barrier_with_action(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_BARRIER,
         (iree_hal_host_call_t){0},
-        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE, &submission);
+        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
+        &submission);
   }
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_queue_set_completion_action(submission, completion_action);
@@ -5993,7 +6014,9 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA, (iree_hal_host_call_t){0},
-        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE, &submission);
+        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
+        &submission);
   }
   if (iree_status_is_ok(status)) {
     submission->alloca.buffer = buffer;
@@ -6080,6 +6103,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DEALLOCA,
         (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
         &submission);
   }
   if (iree_status_is_ok(status)) {
@@ -6172,6 +6196,7 @@ iree_status_t iree_hal_vulkan_queue_submit_sparse_bind(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND,
         (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
         &submission);
   }
   if (iree_status_is_ok(status)) {
@@ -6248,7 +6273,9 @@ iree_status_t iree_hal_vulkan_queue_submit_fill(
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_FILL, (iree_hal_host_call_t){0},
-        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE, &submission);
+        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
+        &submission);
   }
   if (iree_status_is_ok(status)) {
     submission->fill.target_buffer = target_buffer;
@@ -6346,7 +6373,9 @@ iree_status_t iree_hal_vulkan_queue_submit_update(
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_UPDATE, (iree_hal_host_call_t){0},
-        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE, &submission);
+        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
+        &submission);
   }
   if (iree_status_is_ok(status)) {
     submission->update.target_buffer = target_buffer;
@@ -6448,7 +6477,9 @@ static iree_status_t iree_hal_vulkan_queue_submit_copy_with_action(
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_COPY, (iree_hal_host_call_t){0},
-        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE, &submission);
+        /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
+        &submission);
   }
   if (iree_status_is_ok(status)) {
     submission->copy.source_buffer = source_buffer;
@@ -7952,6 +7983,20 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
   }
 }
 
+static iree_status_t iree_hal_vulkan_queue_calculate_dispatch_payload_layout(
+    iree_const_byte_span_t constants, iree_host_size_t binding_count,
+    iree_host_size_t* out_payload_storage_length,
+    iree_host_size_t* out_constants_data_offset,
+    iree_host_size_t* out_bindings_offset) {
+  return IREE_STRUCT_LAYOUT(
+      0, out_payload_storage_length,
+      IREE_STRUCT_FIELD(constants.data_length, uint8_t,
+                        out_constants_data_offset),
+      IREE_STRUCT_FIELD_ALIGNED(binding_count, iree_hal_buffer_ref_t,
+                                iree_alignof(iree_hal_buffer_ref_t),
+                                out_bindings_offset));
+}
+
 iree_status_t iree_hal_vulkan_queue_submit_dispatch(
     iree_hal_vulkan_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -8030,12 +8075,23 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
         queue, signal_semaphore_list, IREE_SV("signal"));
   }
 
+  iree_host_size_t dispatch_payload_storage_length = 0;
+  iree_host_size_t dispatch_constants_data_offset = 0;
+  iree_host_size_t dispatch_bindings_offset = 0;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_queue_calculate_dispatch_payload_layout(
+        constants, bindings.count, &dispatch_payload_storage_length,
+        &dispatch_constants_data_offset, &dispatch_bindings_offset);
+  }
+
+  iree_byte_span_t dispatch_payload_storage = iree_byte_span_empty();
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DISPATCH,
         (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        dispatch_payload_storage_length, &dispatch_payload_storage,
         &submission);
   }
   if (iree_status_is_ok(status)) {
@@ -8053,24 +8109,19 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
         submission->dispatch.config.workgroup_count_ref.buffer);
   }
   if (iree_status_is_ok(status) && constants.data_length != 0) {
-    status = iree_allocator_malloc(queue->host_allocator, constants.data_length,
-                                   &submission->dispatch.constants_data);
-    if (iree_status_is_ok(status)) {
-      memcpy(submission->dispatch.constants_data, constants.data,
-             constants.data_length);
-    }
+    submission->dispatch.constants_data =
+        dispatch_payload_storage.data + dispatch_constants_data_offset;
+    memcpy(submission->dispatch.constants_data, constants.data,
+           constants.data_length);
   }
   if (iree_status_is_ok(status) && bindings.count != 0) {
-    status =
-        iree_allocator_malloc_array(queue->host_allocator, bindings.count,
-                                    sizeof(submission->dispatch.bindings[0]),
-                                    (void**)&submission->dispatch.bindings);
-    if (iree_status_is_ok(status)) {
-      memcpy(submission->dispatch.bindings, bindings.values,
-             bindings.count * sizeof(submission->dispatch.bindings[0]));
-      for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-        iree_hal_buffer_retain(submission->dispatch.bindings[i].buffer);
-      }
+    submission->dispatch.bindings =
+        (iree_hal_buffer_ref_t*)(dispatch_payload_storage.data +
+                                 dispatch_bindings_offset);
+    memcpy(submission->dispatch.bindings, bindings.values,
+           bindings.count * sizeof(submission->dispatch.bindings[0]));
+    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
+      iree_hal_buffer_retain(submission->dispatch.bindings[i].buffer);
     }
   }
   if (iree_status_is_ok(status)) {
@@ -8232,6 +8283,7 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE,
         (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
         &submission);
   }
   if (iree_status_is_ok(status)) {
@@ -8325,6 +8377,7 @@ iree_status_t iree_hal_vulkan_queue_submit_host_call(
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_HOST_CALL, call, args, flags,
+        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
         &submission);
   }
   if (iree_status_is_ok(status)) {
