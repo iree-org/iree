@@ -51,6 +51,34 @@ typedef struct iree_hal_vulkan_queue_native_replay_t
 typedef struct iree_hal_vulkan_queue_staging_ring_t
     iree_hal_vulkan_queue_staging_ring_t;
 
+// Logical-device-owned clock alignment state shared with queue lanes while
+// profiling is active.
+typedef struct iree_hal_vulkan_profile_clock_alignment_t {
+  // Mutex protecting the sampled tick ranges and invalid-alignment flag.
+  iree_slim_mutex_t mutex;
+
+  // Earliest calibrated device clock tick observed during the session.
+  uint64_t minimum_clock_tick;
+
+  // Latest calibrated device clock tick observed during the session.
+  uint64_t maximum_clock_tick;
+
+  // Earliest device event tick observed during the active profiling session.
+  uint64_t minimum_event_tick;
+
+  // Latest device event tick observed during the active profiling session.
+  uint64_t maximum_event_tick;
+
+  // True when at least one calibrated device clock tick has been observed.
+  bool has_clock_ticks;
+
+  // True when at least one device event tick has been observed.
+  bool has_event_ticks;
+
+  // True when calibrated device timestamps are not aligned with event ticks.
+  bool has_invalid_alignment;
+} iree_hal_vulkan_profile_clock_alignment_t;
+
 typedef enum iree_hal_vulkan_queue_role_e {
   IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE = 0,
   IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER = 1,
@@ -368,6 +396,9 @@ typedef struct iree_hal_vulkan_queue_t {
 
   // Shared submission id source for HAL-native profile records. Borrowed.
   iree_atomic_int64_t* profile_submission_counter;
+
+  // Shared profiling clock alignment state. Borrowed when profiling is active.
+  iree_hal_vulkan_profile_clock_alignment_t* profile_clock_alignment;
 } iree_hal_vulkan_queue_t;
 
 // Initializes a queue lane around a borrowed VkQueue.
@@ -402,7 +433,8 @@ void iree_hal_vulkan_queue_set_profile_recorder(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t profile_scope,
-    iree_atomic_int64_t* submission_counter);
+    iree_atomic_int64_t* submission_counter,
+    iree_hal_vulkan_profile_clock_alignment_t* clock_alignment);
 
 // Queries queue-local scalar diagnostics for device-level query_i64.
 bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,

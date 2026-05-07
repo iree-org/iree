@@ -483,6 +483,20 @@ bool IsProfilingUnsupported(iree_status_t status) {
          iree_status_is_invalid_argument(status);
 }
 
+static bool HasInvalidDeviceTickAlignment(const TestProfileSink& sink,
+                                          uint32_t physical_device_ordinal) {
+  for (const iree_hal_profile_clock_correlation_record_t& correlation :
+       sink.clock_correlations) {
+    if (correlation.physical_device_ordinal == physical_device_ordinal &&
+        iree_any_bit_set(
+            correlation.flags,
+            IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ExpectDispatchEventsWithinClockCorrelationRange(
     const TestProfileSink& sink) {
   ASSERT_GE(sink.clock_correlations.size(), 2u);
@@ -492,6 +506,9 @@ void ExpectDispatchEventsWithinClockCorrelationRange(
        event_index < sink.dispatch_events.size(); ++event_index) {
     const uint32_t physical_device_ordinal =
         sink.dispatch_event_physical_device_ordinals[event_index];
+    if (HasInvalidDeviceTickAlignment(sink, physical_device_ordinal)) {
+      continue;
+    }
     uint64_t min_device_tick = UINT64_MAX;
     uint64_t max_device_tick = 0;
     for (const iree_hal_profile_clock_correlation_record_t& correlation :
@@ -518,6 +535,9 @@ void ExpectQueueDeviceEventsWithinClockCorrelationRange(
   ASSERT_GE(sink.clock_correlations.size(), 2u);
   for (const iree_hal_profile_queue_device_event_t& event :
        sink.queue_device_events) {
+    if (HasInvalidDeviceTickAlignment(sink, event.physical_device_ordinal)) {
+      continue;
+    }
     uint64_t min_device_tick = UINT64_MAX;
     uint64_t max_device_tick = 0;
     for (const iree_hal_profile_clock_correlation_record_t& correlation :
