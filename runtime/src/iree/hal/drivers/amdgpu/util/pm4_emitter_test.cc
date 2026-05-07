@@ -85,10 +85,27 @@ TEST(PM4CapabilitiesTest, DispatchCommandBuffersRequireBarrierPacketFamilies) {
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10 |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
   EXPECT_TRUE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
           capabilities));
+  capabilities &=
+      ~IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+  capabilities |= IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9;
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+  capabilities |=
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+  capabilities &=
+      ~IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
   capabilities &= ~IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM;
   EXPECT_FALSE(
       iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
@@ -216,6 +233,29 @@ TEST(PM4EmitterTest, BuilderAppendsAcquireMemGfx10Packet) {
   EXPECT_EQ(dwords[7], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE);
 }
 
+TEST(PM4EmitterTest, BuilderAppendsAcquireMemGfx9Packet) {
+  iree_hal_amdgpu_pm4_ib_slot_t slot;
+  iree_hal_amdgpu_pm4_ib_builder_t builder;
+  iree_hal_amdgpu_pm4_ib_builder_initialize(&slot, &builder);
+
+  EXPECT_TRUE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx9(
+      &builder,
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE));
+  EXPECT_EQ(iree_hal_amdgpu_pm4_ib_builder_dword_count(&builder), 7u);
+
+  const uint32_t* dwords = slot.dwords;
+  EXPECT_EQ(dwords[0], iree_hal_amdgpu_pm4_make_compute_header(
+                           IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM,
+                           IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_DWORD_COUNT));
+  EXPECT_EQ(dwords[1],
+            IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE);
+  EXPECT_EQ(dwords[2], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_COHER_SIZE);
+  EXPECT_EQ(dwords[3], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_COHER_SIZE_HI);
+  EXPECT_EQ(dwords[4], 0u);
+  EXPECT_EQ(dwords[5], 0u);
+  EXPECT_EQ(dwords[6], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_POLL_INTERVAL);
+}
+
 TEST(PM4EmitterTest, BuilderAppendsComputeDispatchPackets) {
   iree_hal_amdgpu_pm4_ib_slot_t slot;
   iree_hal_amdgpu_pm4_ib_builder_t builder;
@@ -323,6 +363,8 @@ TEST(PM4EmitterTest, BuilderRejectsInvalidRegisterPackets) {
       IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE));
   EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx10(
       &builder, IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_ENGINE_ME, /*gcr_cntl=*/0));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_acquire_mem_gfx9(
+      &builder, /*cp_coher_cntl=*/0));
   EXPECT_FALSE(iree_hal_amdgpu_pm4_ib_builder_emit_dispatch_indirect_mec(
       &builder, unaligned_target,
       iree_hal_amdgpu_pm4_dispatch_initiator(

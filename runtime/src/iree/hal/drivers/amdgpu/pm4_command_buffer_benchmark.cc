@@ -650,7 +650,7 @@ class Pm4CommandBufferBenchmark : public benchmark::Fixture {
         fixup_plan->entry_count *
         sizeof(iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t));
     state.counters["pm4_template_bytes"] =
-        static_cast<double>(fixup_plan->target_byte_length);
+        static_cast<double>(fixup_plan->template_byte_length);
     state.counters["pm4_publication_mode"] =
         strcmp(FLAG_pm4_publication_mode, "host-copy") == 0         ? 1.0
         : strcmp(FLAG_pm4_publication_mode, "host-async-copy") == 0 ? 2.0

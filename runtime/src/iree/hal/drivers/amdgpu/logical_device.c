@@ -2194,10 +2194,18 @@ iree_hal_amdgpu_logical_device_profiling_requires_aql_command_buffer(
     const iree_hal_amdgpu_logical_device_t* logical_device) {
   return iree_any_bit_set(
       logical_device->profiling.options.data_families,
-      IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
-          IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
+      IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
           IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES |
           IREE_HAL_DEVICE_PROFILING_DATA_COMMAND_REGION_EVENTS);
+}
+
+static bool
+iree_hal_amdgpu_logical_device_profiling_requests_dispatch_timestamps(
+    const iree_hal_amdgpu_logical_device_t* logical_device) {
+  return iree_any_bit_set(logical_device->profiling.options.data_families,
+                          IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS |
+                              IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES |
+                              IREE_HAL_DEVICE_PROFILING_DATA_EXECUTABLE_TRACES);
 }
 
 static bool iree_hal_amdgpu_logical_device_can_auto_select_pm4_command_buffer(
@@ -2226,6 +2234,12 @@ static bool iree_hal_amdgpu_logical_device_can_auto_select_pm4_command_buffer(
   }
   if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
           physical_device->vendor_packet_capabilities)) {
+    return false;
+  }
+  if (iree_hal_amdgpu_logical_device_profiling_requests_dispatch_timestamps(
+          logical_device) &&
+      !iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+          physical_device->pm4_timestamp_strategy)) {
     return false;
   }
   // Auto mode must be able to replay either static or dynamic reusable dispatch
@@ -2267,10 +2281,18 @@ static iree_status_t iree_hal_amdgpu_logical_device_create_pm4_command_buffer(
       flags |= IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_FLAG_NONBLOCKING_PUBLICATION;
     }
   }
+  if (iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA) &&
+      iree_hal_amdgpu_logical_device_profiling_requests_dispatch_timestamps(
+          logical_device)) {
+    flags |=
+        IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_FLAG_MATERIALIZE_PROFILE_DISPATCH_TIMESTAMPS;
+  }
   return iree_hal_amdgpu_pm4_command_buffer_create(
       logical_device->device_allocator, mode, command_categories,
       effective_queue_affinity, binding_capacity, device_ordinal, flags,
       physical_device->vendor_packet_capabilities,
+      physical_device->pm4_timestamp_strategy,
       physical_device->pm4_command_buffer_resident_pool,
       &logical_device->profile_metadata,
       &logical_device->host_block_pools.small, logical_device->host_allocator,

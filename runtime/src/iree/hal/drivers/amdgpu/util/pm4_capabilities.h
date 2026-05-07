@@ -88,6 +88,10 @@ enum iree_hal_amdgpu_vendor_packet_capability_bits_t {
   // stream.
   IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_INDIRECT =
       1u << 13,
+  // PM4 ACQUIRE_MEM uses the gfx9 CP_COHER_CNTL packet layout.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 = 1u << 14,
+  // PM4 ACQUIRE_MEM uses the gfx10+ GCR_CNTL packet layout.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10 = 1u << 15,
 };
 typedef uint32_t iree_hal_amdgpu_vendor_packet_capability_flags_t;
 
@@ -140,13 +144,23 @@ iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_compute_dispatch_indirect
 static inline bool
 iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
     iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
-  return iree_all_bits_set(
-      capabilities,
-      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
-          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT);
+  if (!iree_all_bits_set(
+          capabilities,
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT)) {
+    return false;
+  }
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t acquire_mem_layouts =
+      capabilities &
+      (IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
+       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10);
+  return acquire_mem_layouts ==
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 ||
+         acquire_mem_layouts ==
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
 }
 
 // Returns true if the device can emit the gfx10+ packet families needed for

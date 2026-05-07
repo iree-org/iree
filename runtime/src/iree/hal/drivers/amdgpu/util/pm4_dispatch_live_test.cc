@@ -45,7 +45,8 @@ constexpr uint32_t kDispatchGridSize[3] = {64, 1, 1};
 constexpr iree_hal_amdgpu_vendor_packet_capability_flags_t
     kBarrierCapabilities =
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
-        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM;
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
 
 struct StoreKernargs {
   uint32_t* target;
@@ -252,8 +253,9 @@ static iree_status_t AppendPm4DispatchDirect(
       &emitted_dword_count));
   *inout_dword_count += emitted_dword_count;
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_pm4_dispatch_emit_user_data(
-      &launch_state, kernarg_address, capacity - *inout_dword_count,
-      &dwords[*inout_dword_count], &emitted_dword_count));
+      &launch_state, kernarg_address, /*kernarg_preload_data=*/nullptr,
+      capacity - *inout_dword_count, &dwords[*inout_dword_count],
+      &emitted_dword_count));
   *inout_dword_count += emitted_dword_count;
   if (capacity - *inout_dword_count <
       IREE_HAL_AMDGPU_PM4_DISPATCH_DIRECT_DWORD_COUNT) {
@@ -548,6 +550,7 @@ TEST_F(PM4DispatchLiveTest, AqlAndAqlPm4IbLaunchMixedKernels) {
   IREE_ASSERT_OK(iree_hal_amdgpu_pm4_dispatch_emit_user_data(
       &launch_states[1],
       reinterpret_cast<uintptr_t>(&memory->store_kernargs[2]),
+      /*kernarg_preload_data=*/nullptr,
       IREE_ARRAYSIZE(pm4_dwords) - pm4_dword_count,
       &pm4_dwords[pm4_dword_count], &barrier_dword_count));
   pm4_dword_count += barrier_dword_count;

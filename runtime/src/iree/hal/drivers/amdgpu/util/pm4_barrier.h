@@ -34,10 +34,17 @@ typedef enum iree_hal_amdgpu_pm4_barrier_flag_bits_e {
 typedef uint32_t iree_hal_amdgpu_pm4_barrier_flags_t;
 
 enum {
+  // Maximum dwords emitted by one gfx9 PM4 command-buffer barrier.
+  IREE_HAL_AMDGPU_PM4_BARRIER_GFX9_MAX_DWORD_COUNT =
+      IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT +
+      IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_DWORD_COUNT,
   // Maximum dwords emitted by one gfx10+ PM4 command-buffer barrier.
   IREE_HAL_AMDGPU_PM4_BARRIER_GFX10_MAX_DWORD_COUNT =
       IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT +
       IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_DWORD_COUNT,
+  // Maximum dwords emitted by any supported PM4 command-buffer barrier.
+  IREE_HAL_AMDGPU_PM4_BARRIER_MAX_DWORD_COUNT =
+      IREE_HAL_AMDGPU_PM4_BARRIER_GFX10_MAX_DWORD_COUNT,
 };
 
 static inline bool iree_hal_amdgpu_pm4_fence_scope_is_valid(
@@ -70,6 +77,43 @@ static inline uint32_t iree_hal_amdgpu_pm4_barrier_gcr_cntl_for_scopes_gfx10(
                 IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_GL2_WB;
   }
   return gcr_cntl;
+}
+
+// Returns conservative CP_COHER_CNTL bits for one gfx9 HAL fence-scope pair.
+static inline uint32_t
+iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(
+    iree_hsa_fence_scope_t acquire_scope,
+    iree_hsa_fence_scope_t release_scope) {
+  const iree_hsa_fence_scope_t scope =
+      iree_hal_amdgpu_pm4_max_fence_scope(acquire_scope, release_scope);
+  if (scope == IREE_HSA_FENCE_SCOPE_NONE) return 0;
+  return IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE;
+}
+
+static inline bool iree_hal_amdgpu_pm4_barrier_has_gfx9_acquire_mem_layout(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t layouts =
+      capabilities &
+      (IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
+       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10);
+  return iree_all_bits_set(
+             capabilities,
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM) &&
+         layouts ==
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9;
+}
+
+static inline bool iree_hal_amdgpu_pm4_barrier_has_gfx10_acquire_mem_layout(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities) {
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t layouts =
+      capabilities &
+      (IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
+       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10);
+  return iree_all_bits_set(
+             capabilities,
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM) &&
+         layouts ==
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
 }
 
 // Returns the exact dword count a gfx10+ barrier would emit, or zero when the
@@ -114,6 +158,69 @@ static inline uint32_t iree_hal_amdgpu_pm4_barrier_dword_count_gfx10(
     dword_count += IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX10_DWORD_COUNT;
   }
   return dword_count;
+}
+
+// Returns the exact dword count a gfx9 barrier would emit, or zero when the
+// arguments do not describe a valid PM4 command-buffer barrier.
+static inline uint32_t iree_hal_amdgpu_pm4_barrier_dword_count_gfx9(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities,
+    iree_hal_amdgpu_pm4_barrier_flags_t barrier_flags,
+    iree_hsa_fence_scope_t acquire_scope,
+    iree_hsa_fence_scope_t release_scope) {
+  if (!iree_hal_amdgpu_pm4_fence_scope_is_valid(acquire_scope) ||
+      !iree_hal_amdgpu_pm4_fence_scope_is_valid(release_scope)) {
+    return 0;
+  }
+  const iree_hal_amdgpu_pm4_barrier_flags_t valid_barrier_flags =
+      IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION |
+      IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB;
+  if ((barrier_flags & ~valid_barrier_flags) != 0) {
+    return 0;
+  }
+  const bool has_execution_barrier = iree_any_bit_set(
+      barrier_flags, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION |
+                         IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB);
+  uint32_t cp_coher_cntl =
+      iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(acquire_scope,
+                                                                release_scope);
+  if (iree_any_bit_set(barrier_flags,
+                       IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB)) {
+    cp_coher_cntl =
+        IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE;
+  }
+  if (!has_execution_barrier) return 0;
+  if (!iree_any_bit_set(
+          capabilities,
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE)) {
+    return 0;
+  }
+  uint32_t dword_count = IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT;
+  if (cp_coher_cntl != 0) {
+    if (!iree_hal_amdgpu_pm4_barrier_has_gfx9_acquire_mem_layout(
+            capabilities)) {
+      return 0;
+    }
+    dword_count += IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_DWORD_COUNT;
+  }
+  return dword_count;
+}
+
+// Returns the exact dword count a supported PM4 barrier would emit, or zero
+// when the arguments do not describe a valid barrier for |capabilities|.
+static inline uint32_t iree_hal_amdgpu_pm4_barrier_dword_count(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities,
+    iree_hal_amdgpu_pm4_barrier_flags_t barrier_flags,
+    iree_hsa_fence_scope_t acquire_scope,
+    iree_hsa_fence_scope_t release_scope) {
+  if (iree_hal_amdgpu_pm4_barrier_has_gfx9_acquire_mem_layout(capabilities)) {
+    return iree_hal_amdgpu_pm4_barrier_dword_count_gfx9(
+        capabilities, barrier_flags, acquire_scope, release_scope);
+  }
+  if (iree_hal_amdgpu_pm4_barrier_has_gfx10_acquire_mem_layout(capabilities)) {
+    return iree_hal_amdgpu_pm4_barrier_dword_count_gfx10(
+        capabilities, barrier_flags, acquire_scope, release_scope);
+  }
+  return 0;
 }
 
 // Emits a gfx10+ PM4 command-buffer barrier into |target_dwords|.
@@ -164,6 +271,77 @@ static inline bool iree_hal_amdgpu_pm4_barrier_emit_gfx10(
 
   *out_dword_count = dword_count;
   return true;
+}
+
+// Emits a gfx9 PM4 command-buffer barrier into |target_dwords|.
+//
+// The conservative fixup-to-IB contract is intentionally stronger than normal
+// dispatch-to-dispatch visibility: a fixup dispatch writes PM4 dwords that the
+// command processor, not a shader, fetches immediately afterward.
+static inline bool iree_hal_amdgpu_pm4_barrier_emit_gfx9(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities,
+    iree_hal_amdgpu_pm4_barrier_flags_t barrier_flags,
+    iree_hsa_fence_scope_t acquire_scope, iree_hsa_fence_scope_t release_scope,
+    uint32_t capacity, uint32_t* target_dwords, uint32_t* out_dword_count) {
+  *out_dword_count = 0;
+  const uint32_t dword_count = iree_hal_amdgpu_pm4_barrier_dword_count_gfx9(
+      capabilities, barrier_flags, acquire_scope, release_scope);
+  if (dword_count == 0 || capacity < dword_count) return false;
+
+  uint32_t cp_coher_cntl =
+      iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(acquire_scope,
+                                                                release_scope);
+  if (iree_any_bit_set(barrier_flags,
+                       IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB)) {
+    cp_coher_cntl =
+        IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE;
+  }
+
+  uint32_t dword_index = 0;
+  target_dwords[dword_index++] = iree_hal_amdgpu_pm4_make_header(
+      IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_EVENT_WRITE,
+      IREE_HAL_AMDGPU_PM4_EVENT_WRITE_DWORD_COUNT);
+  target_dwords[dword_index++] =
+      IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH |
+      IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH;
+
+  if (cp_coher_cntl != 0) {
+    target_dwords[dword_index++] = iree_hal_amdgpu_pm4_make_compute_header(
+        IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM,
+        IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_DWORD_COUNT);
+    target_dwords[dword_index++] = cp_coher_cntl;
+    target_dwords[dword_index++] = IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_COHER_SIZE;
+    target_dwords[dword_index++] =
+        IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_COHER_SIZE_HI;
+    target_dwords[dword_index++] = 0;
+    target_dwords[dword_index++] = 0;
+    target_dwords[dword_index++] =
+        IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_POLL_INTERVAL;
+  }
+
+  *out_dword_count = dword_count;
+  return true;
+}
+
+// Emits a PM4 command-buffer barrier for the ACQUIRE_MEM layout selected by
+// |capabilities|.
+static inline bool iree_hal_amdgpu_pm4_barrier_emit(
+    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities,
+    iree_hal_amdgpu_pm4_barrier_flags_t barrier_flags,
+    iree_hsa_fence_scope_t acquire_scope, iree_hsa_fence_scope_t release_scope,
+    uint32_t capacity, uint32_t* target_dwords, uint32_t* out_dword_count) {
+  if (iree_hal_amdgpu_pm4_barrier_has_gfx9_acquire_mem_layout(capabilities)) {
+    return iree_hal_amdgpu_pm4_barrier_emit_gfx9(
+        capabilities, barrier_flags, acquire_scope, release_scope, capacity,
+        target_dwords, out_dword_count);
+  }
+  if (iree_hal_amdgpu_pm4_barrier_has_gfx10_acquire_mem_layout(capabilities)) {
+    return iree_hal_amdgpu_pm4_barrier_emit_gfx10(
+        capabilities, barrier_flags, acquire_scope, release_scope, capacity,
+        target_dwords, out_dword_count);
+  }
+  *out_dword_count = 0;
+  return false;
 }
 
 #ifdef __cplusplus

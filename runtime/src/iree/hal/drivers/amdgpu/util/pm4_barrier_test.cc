@@ -13,9 +13,16 @@
 namespace {
 
 constexpr iree_hal_amdgpu_vendor_packet_capability_flags_t
-    kBarrierCapabilities =
+    kBarrierCapabilitiesGfx10 =
         IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
-        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM;
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10;
+
+constexpr iree_hal_amdgpu_vendor_packet_capability_flags_t
+    kBarrierCapabilitiesGfx9 =
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+        IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9;
 
 TEST(PM4BarrierTest, MapsFenceScopesToGfx10GcrControl) {
   EXPECT_EQ(iree_hal_amdgpu_pm4_barrier_gcr_cntl_for_scopes_gfx10(
@@ -36,13 +43,27 @@ TEST(PM4BarrierTest, MapsFenceScopesToGfx10GcrControl) {
             IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE);
 }
 
+TEST(PM4BarrierTest, MapsFenceScopesToGfx9CpCoherControl) {
+  EXPECT_EQ(iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(
+                IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE),
+            0u);
+
+  EXPECT_EQ(iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(
+                IREE_HSA_FENCE_SCOPE_AGENT, IREE_HSA_FENCE_SCOPE_NONE),
+            IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE);
+
+  EXPECT_EQ(iree_hal_amdgpu_pm4_barrier_cp_coher_cntl_for_scopes_gfx9(
+                IREE_HSA_FENCE_SCOPE_AGENT, IREE_HSA_FENCE_SCOPE_SYSTEM),
+            IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE);
+}
+
 TEST(PM4BarrierTest, EmitsExecutionOnlyBarrier) {
   uint32_t dwords[IREE_HAL_AMDGPU_PM4_BARRIER_GFX10_MAX_DWORD_COUNT];
   std::memset(dwords, 0xCC, sizeof(dwords));
   uint32_t dword_count = 0;
 
   EXPECT_TRUE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
       IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
       IREE_ARRAYSIZE(dwords), dwords, &dword_count));
 
@@ -61,7 +82,7 @@ TEST(PM4BarrierTest, EmitsScopedExecutionBarrier) {
   uint32_t dword_count = 0;
 
   EXPECT_TRUE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
       IREE_HSA_FENCE_SCOPE_AGENT, IREE_HSA_FENCE_SCOPE_SYSTEM,
       IREE_ARRAYSIZE(dwords), dwords, &dword_count));
 
@@ -87,7 +108,7 @@ TEST(PM4BarrierTest, EmitsConservativeFixupToIbVisibilityBarrier) {
   uint32_t dword_count = 0;
 
   EXPECT_TRUE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB,
       IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
       IREE_ARRAYSIZE(dwords), dwords, &dword_count));
 
@@ -98,20 +119,44 @@ TEST(PM4BarrierTest, EmitsConservativeFixupToIbVisibilityBarrier) {
   EXPECT_EQ(dwords[9], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GCR_CNTL_CONSERVATIVE);
 }
 
+TEST(PM4BarrierTest, EmitsGfx9ConservativeFixupToIbVisibilityBarrier) {
+  uint32_t dwords[IREE_HAL_AMDGPU_PM4_BARRIER_GFX9_MAX_DWORD_COUNT];
+  std::memset(dwords, 0xCC, sizeof(dwords));
+  uint32_t dword_count = 0;
+
+  EXPECT_TRUE(iree_hal_amdgpu_pm4_barrier_emit(
+      kBarrierCapabilitiesGfx9, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB,
+      IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
+      IREE_ARRAYSIZE(dwords), dwords, &dword_count));
+
+  EXPECT_EQ(dword_count, IREE_HAL_AMDGPU_PM4_BARRIER_GFX9_MAX_DWORD_COUNT);
+  EXPECT_EQ(dwords[1],
+            IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_TYPE_CS_PARTIAL_FLUSH |
+                IREE_HAL_AMDGPU_PM4_EVENT_WRITE_EVENT_INDEX_CS_PARTIAL_FLUSH);
+  EXPECT_EQ(dwords[2], iree_hal_amdgpu_pm4_make_compute_header(
+                           IREE_HAL_AMDGPU_PM4_HDR_IT_OPCODE_ACQUIRE_MEM,
+                           IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_DWORD_COUNT));
+  EXPECT_EQ(dwords[3],
+            IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_CP_COHER_CNTL_CONSERVATIVE);
+  EXPECT_EQ(dwords[4], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_COHER_SIZE);
+  EXPECT_EQ(dwords[5], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_GFX9_COHER_SIZE_HI);
+  EXPECT_EQ(dwords[8], IREE_HAL_AMDGPU_PM4_ACQUIRE_MEM_POLL_INTERVAL);
+}
+
 TEST(PM4BarrierTest, RejectsInvalidArgumentsWithoutWriting) {
   uint32_t dwords[IREE_HAL_AMDGPU_PM4_BARRIER_GFX10_MAX_DWORD_COUNT];
   std::memset(dwords, 0xCC, sizeof(dwords));
   uint32_t dword_count = 1234;
 
   EXPECT_FALSE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_NONE,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_NONE,
       IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
       IREE_ARRAYSIZE(dwords), dwords, &dword_count));
   EXPECT_EQ(dword_count, 0u);
   EXPECT_EQ(dwords[0], 0xCCCCCCCCu);
 
   EXPECT_FALSE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_EXECUTION,
       (iree_hsa_fence_scope_t)3, IREE_HSA_FENCE_SCOPE_NONE,
       IREE_ARRAYSIZE(dwords), dwords, &dword_count));
   EXPECT_EQ(dwords[0], 0xCCCCCCCCu);
@@ -124,10 +169,17 @@ TEST(PM4BarrierTest, RejectsInvalidArgumentsWithoutWriting) {
   EXPECT_EQ(dwords[0], 0xCCCCCCCCu);
 
   EXPECT_FALSE(iree_hal_amdgpu_pm4_barrier_emit_gfx10(
-      kBarrierCapabilities, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB,
+      kBarrierCapabilitiesGfx10, IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB,
       IREE_HSA_FENCE_SCOPE_NONE, IREE_HSA_FENCE_SCOPE_NONE,
       IREE_HAL_AMDGPU_PM4_BARRIER_GFX10_MAX_DWORD_COUNT - 1, dwords,
       &dword_count));
+  EXPECT_EQ(dwords[0], 0xCCCCCCCCu);
+
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_barrier_emit(
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+          IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM,
+      IREE_HAL_AMDGPU_PM4_BARRIER_FLAG_FIXUP_TO_IB, IREE_HSA_FENCE_SCOPE_NONE,
+      IREE_HSA_FENCE_SCOPE_NONE, IREE_ARRAYSIZE(dwords), dwords, &dword_count));
   EXPECT_EQ(dwords[0], 0xCCCCCCCCu);
 }
 

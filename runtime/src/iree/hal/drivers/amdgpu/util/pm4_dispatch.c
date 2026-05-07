@@ -27,6 +27,66 @@ static bool iree_hal_amdgpu_pm4_kernel_descriptor_uses_wave32(
       IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_WAVEFRONT_SIZE32);
 }
 
+static bool iree_hal_amdgpu_pm4_kernel_descriptor_has_kernarg_pointer(
+    const iree_hal_amdgpu_kernel_descriptor_t* descriptor) {
+  return iree_any_bit_set(
+      descriptor->kernel_code_properties,
+      IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR);
+}
+
+static uint32_t iree_hal_amdgpu_pm4_kernel_descriptor_user_data_prefix_count(
+    const iree_hal_amdgpu_kernel_descriptor_t* descriptor) {
+  uint32_t count = 0;
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_BUFFER)) {
+    count += 4;
+  }
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_PTR)) {
+    count += 2;
+  }
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_QUEUE_PTR)) {
+    count += 2;
+  }
+  if (iree_hal_amdgpu_pm4_kernel_descriptor_has_kernarg_pointer(descriptor)) {
+    count += 2;
+  }
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_DISPATCH_ID)) {
+    count += 2;
+  }
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_FLAT_SCRATCH_INIT)) {
+    count += 2;
+  }
+  if (iree_any_bit_set(
+          descriptor->kernel_code_properties,
+          IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_PRIVATE_SEGMENT_SIZE)) {
+    count += 1;
+  }
+  return count;
+}
+
+static uint32_t iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_count(
+    const iree_hal_amdgpu_kernel_descriptor_t* descriptor) {
+  return (descriptor->kernarg_preload &
+          IREE_HAL_AMDGPU_KERNEL_DESCRIPTOR_KERNARG_PRELOAD_LENGTH_MASK) >>
+         IREE_HAL_AMDGPU_KERNEL_DESCRIPTOR_KERNARG_PRELOAD_LENGTH_SHIFT;
+}
+
+static uint32_t iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_offset(
+    const iree_hal_amdgpu_kernel_descriptor_t* descriptor) {
+  return (descriptor->kernarg_preload &
+          IREE_HAL_AMDGPU_KERNEL_DESCRIPTOR_KERNARG_PRELOAD_OFFSET_MASK) >>
+         IREE_HAL_AMDGPU_KERNEL_DESCRIPTOR_KERNARG_PRELOAD_OFFSET_SHIFT;
+}
+
 static iree_status_t iree_hal_amdgpu_pm4_entry_address(
     uint64_t kernel_object, int64_t byte_offset, uint64_t* out_entry_address) {
   if (byte_offset >= 0) {
@@ -63,12 +123,6 @@ static iree_status_t iree_hal_amdgpu_pm4_dispatch_validate_descriptor_gfx10(
         IREE_STATUS_UNIMPLEMENTED,
         "PM4 dispatch scratch setup is required by COMPUTE_PGM_RSRC2");
   }
-  if (IREE_UNLIKELY(descriptor->kernarg_preload != 0)) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "PM4 dispatch kernarg preload setup is unsupported");
-  }
-
   const uint32_t allowed_properties =
       IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR |
       IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_WAVEFRONT_SIZE32;
@@ -81,9 +135,8 @@ static iree_status_t iree_hal_amdgpu_pm4_dispatch_validate_descriptor_gfx10(
         descriptor->kernel_code_properties);
   }
 
-  const bool has_kernarg_pointer = iree_any_bit_set(
-      descriptor->kernel_code_properties,
-      IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR);
+  const bool has_kernarg_pointer =
+      iree_hal_amdgpu_pm4_kernel_descriptor_has_kernarg_pointer(descriptor);
   const uint32_t user_data_dword_count =
       iree_hal_amdgpu_pm4_kernel_descriptor_user_sgpr_count(descriptor);
   if (IREE_UNLIKELY(user_data_dword_count >
@@ -95,18 +148,61 @@ static iree_status_t iree_hal_amdgpu_pm4_dispatch_validate_descriptor_gfx10(
         IREE_HAL_AMDGPU_PM4_DISPATCH_USER_DATA_DWORD_CAPACITY,
         user_data_dword_count);
   }
+  const uint32_t kernarg_preload_dword_count =
+      iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_count(descriptor);
+  const uint32_t kernarg_preload_dword_offset =
+      iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_offset(descriptor);
+  const uint32_t user_data_prefix_count =
+      iree_hal_amdgpu_pm4_kernel_descriptor_user_data_prefix_count(descriptor);
   if (has_kernarg_pointer) {
-    if (IREE_UNLIKELY(user_data_dword_count < 2)) {
+    if (IREE_UNLIKELY(user_data_dword_count < user_data_prefix_count)) {
       return iree_make_status(
           IREE_STATUS_FAILED_PRECONDITION,
-          "kernarg pointer dispatch expects at least two user data dwords, but "
-          "descriptor requires %" PRIu32,
-          user_data_dword_count);
+          "kernarg pointer dispatch expects at least %" PRIu32
+          " user data dwords, but descriptor requires %" PRIu32,
+          user_data_prefix_count, user_data_dword_count);
     }
   } else if (IREE_UNLIKELY(user_data_dword_count != 0)) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
         "PM4 dispatch non-kernarg user data dwords are unsupported");
+  }
+  if (kernarg_preload_dword_count != 0) {
+    if (IREE_UNLIKELY(!has_kernarg_pointer)) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "PM4 dispatch kernarg preload requires a kernarg-segment pointer");
+    }
+    if (IREE_UNLIKELY(kernarg_preload_dword_count >
+                      user_data_dword_count - user_data_prefix_count)) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "kernarg preload requires %" PRIu32
+                              " user data dwords after the %" PRIu32
+                              " dword prefix, but descriptor provides %" PRIu32,
+                              kernarg_preload_dword_count,
+                              user_data_prefix_count, user_data_dword_count);
+    }
+    if (IREE_UNLIKELY(kernarg_preload_dword_offset >
+                      UINT32_MAX - kernarg_preload_dword_count)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "kernarg preload dword range overflows");
+    }
+    const uint32_t kernarg_preload_end_dword =
+        kernarg_preload_dword_offset + kernarg_preload_dword_count;
+    if (IREE_UNLIKELY(kernarg_preload_end_dword >
+                      descriptor->kernarg_size / sizeof(uint32_t))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "kernarg preload range [%" PRIu32 ", %" PRIu32
+                              ") exceeds kernarg size %" PRIu32,
+                              kernarg_preload_dword_offset,
+                              kernarg_preload_end_dword,
+                              descriptor->kernarg_size);
+    }
+  } else if (IREE_UNLIKELY(kernarg_preload_dword_offset != 0)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "kernarg preload offset %" PRIu32
+                            " is set without a preload length",
+                            kernarg_preload_dword_offset);
   }
   return iree_ok_status();
 }
@@ -127,8 +223,6 @@ static bool iree_hal_amdgpu_pm4_dispatch_descriptor_is_supported_gfx10(
           IREE_HAL_AMDGPU_COMPUTE_PGM_RSRC2_ENABLE_PRIVATE_SEGMENT)) {
     return false;
   }
-  if (descriptor->kernarg_preload != 0) return false;
-
   const uint32_t allowed_properties =
       IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR |
       IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_WAVEFRONT_SIZE32;
@@ -143,11 +237,39 @@ static bool iree_hal_amdgpu_pm4_dispatch_descriptor_is_supported_gfx10(
       IREE_HAL_AMDGPU_PM4_DISPATCH_USER_DATA_DWORD_CAPACITY) {
     return false;
   }
-  const bool has_kernarg_pointer = iree_any_bit_set(
-      descriptor->kernel_code_properties,
-      IREE_HAL_AMDGPU_KERNEL_CODE_PROPERTY_ENABLE_SGPR_KERNARG_SEGMENT_PTR);
-  if (has_kernarg_pointer) return user_data_dword_count >= 2;
-  return user_data_dword_count == 0;
+  const bool has_kernarg_pointer =
+      iree_hal_amdgpu_pm4_kernel_descriptor_has_kernarg_pointer(descriptor);
+  const uint32_t user_data_prefix_count =
+      iree_hal_amdgpu_pm4_kernel_descriptor_user_data_prefix_count(descriptor);
+  if (has_kernarg_pointer && user_data_dword_count < user_data_prefix_count) {
+    return false;
+  }
+  if (!has_kernarg_pointer && user_data_dword_count != 0) return false;
+
+  const uint32_t kernarg_preload_dword_count =
+      iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_count(descriptor);
+  if (kernarg_preload_dword_count != 0) {
+    if (!has_kernarg_pointer) return false;
+    if (kernarg_preload_dword_count >
+        user_data_dword_count - user_data_prefix_count) {
+      return false;
+    }
+    const uint32_t kernarg_preload_dword_offset =
+        iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_offset(
+            descriptor);
+    if (kernarg_preload_dword_offset >
+        UINT32_MAX - kernarg_preload_dword_count) {
+      return false;
+    }
+    if (kernarg_preload_dword_offset + kernarg_preload_dword_count >
+        descriptor->kernarg_size / sizeof(uint32_t)) {
+      return false;
+    }
+  } else if (iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_offset(
+                 descriptor) != 0) {
+    return false;
+  }
+  return true;
 }
 
 bool iree_hal_amdgpu_pm4_dispatch_launch_state_is_supported_gfx10(
@@ -243,6 +365,12 @@ iree_status_t iree_hal_amdgpu_pm4_dispatch_launch_state_initialize_gfx10(
   out_state->start_and_threads[7] = 0;
   out_state->user_data_dword_count =
       iree_hal_amdgpu_pm4_kernel_descriptor_user_sgpr_count(descriptor);
+  out_state->kernarg_preload_dword_offset =
+      iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_offset(descriptor);
+  out_state->kernarg_preload_dword_count =
+      iree_hal_amdgpu_pm4_kernel_descriptor_kernarg_preload_count(descriptor);
+  out_state->kernarg_preload_user_data_offset =
+      iree_hal_amdgpu_pm4_kernel_descriptor_user_data_prefix_count(descriptor);
 
   iree_hal_amdgpu_pm4_dispatch_initiator_flags_t initiator_flags =
       IREE_HAL_AMDGPU_PM4_DISPATCH_INITIATOR_FORCE_START_AT_000;
@@ -300,8 +428,8 @@ iree_status_t iree_hal_amdgpu_pm4_dispatch_emit_setup(
 
 iree_status_t iree_hal_amdgpu_pm4_dispatch_emit_user_data(
     const iree_hal_amdgpu_pm4_dispatch_launch_state_t* state,
-    uint64_t kernarg_address, uint32_t capacity, uint32_t* target_dwords,
-    uint32_t* out_dword_count) {
+    uint64_t kernarg_address, const void* kernarg_preload_data,
+    uint32_t capacity, uint32_t* target_dwords, uint32_t* out_dword_count) {
   IREE_ASSERT_ARGUMENT(state);
   IREE_ASSERT_ARGUMENT(target_dwords);
   IREE_ASSERT_ARGUMENT(out_dword_count);
@@ -319,6 +447,24 @@ iree_status_t iree_hal_amdgpu_pm4_dispatch_emit_user_data(
       0};
   user_data[0] = (uint32_t)kernarg_address;
   user_data[1] = (uint32_t)(kernarg_address >> 32);
+  if (state->kernarg_preload_dword_count != 0) {
+    if (IREE_UNLIKELY(!kernarg_preload_data)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "kernarg preload data is required for PM4 dispatch userdata");
+    }
+    if (IREE_UNLIKELY(state->kernarg_preload_user_data_offset >
+                          state->user_data_dword_count ||
+                      state->kernarg_preload_dword_count >
+                          state->user_data_dword_count -
+                              state->kernarg_preload_user_data_offset)) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "PM4 dispatch kernarg preload exceeds userdata");
+    }
+    memcpy(&user_data[state->kernarg_preload_user_data_offset],
+           kernarg_preload_data,
+           state->kernarg_preload_dword_count * sizeof(uint32_t));
+  }
   iree_hal_amdgpu_pm4_dispatch_emit_set_sh_reg_sequence(
       target_dwords, IREE_HAL_AMDGPU_PM4_COMPUTE_USER_DATA_0_REGISTER,
       user_data, state->user_data_dword_count);

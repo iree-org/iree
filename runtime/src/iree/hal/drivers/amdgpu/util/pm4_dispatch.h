@@ -56,6 +56,12 @@ typedef struct iree_hal_amdgpu_pm4_dispatch_launch_state_t {
   // Number of COMPUTE_USER_DATA_N dwords seeded for this dispatch, including
   // compiler-required padding dwords that are zero-filled by the emitter.
   uint32_t user_data_dword_count;
+  // Kernarg dword offset copied into preloaded user-data SGPRs.
+  uint32_t kernarg_preload_dword_offset;
+  // Kernarg dword count copied into preloaded user-data SGPRs.
+  uint32_t kernarg_preload_dword_count;
+  // User-data dword offset where the kernarg preload payload starts.
+  uint32_t kernarg_preload_user_data_offset;
   // DISPATCH_DIRECT initiator bits for this kernel.
   uint32_t dispatch_initiator;
 } iree_hal_amdgpu_pm4_dispatch_launch_state_t;
@@ -79,8 +85,8 @@ iree_status_t iree_hal_amdgpu_pm4_dispatch_emit_setup(
 
 iree_status_t iree_hal_amdgpu_pm4_dispatch_emit_user_data(
     const iree_hal_amdgpu_pm4_dispatch_launch_state_t* state,
-    uint64_t kernarg_address, uint32_t capacity, uint32_t* target_dwords,
-    uint32_t* out_dword_count);
+    uint64_t kernarg_address, const void* kernarg_preload_data,
+    uint32_t capacity, uint32_t* target_dwords, uint32_t* out_dword_count);
 
 #ifdef __cplusplus
 }  // extern "C"
