@@ -139,11 +139,101 @@ func.func @transfer_write_rank0(%mem : memref<8x8xf32>, %idx : index, %vec : vec
 // -----
 
 // 1-D vector.multi_reduction is lowered to vector.reduction.
-// CHECK-LABEL: func @one_dim_reduction
+// CHECK-LABEL: func @one_dim_reduction(
 // CHECK-SAME:    %[[INPUT:.+]]: vector<8xf32>, %[[ACC:.+]]: f32
 func.func @one_dim_reduction(%arg0: vector<8xf32>, %acc: f32) -> f32 {
   // CHECK: %[[RESULT:.+]] = vector.reduction <add>, %[[INPUT]], %[[ACC]] : vector<8xf32> into f32
   %0 = vector.multi_reduction <add>, %arg0, %acc [0] : vector<8xf32> to f32
   // CHECK: return %[[RESULT]]
   return %0 : f32
+}
+
+// -----
+
+// Rank-1 transfer_gather with a vector.step index vec folds to vector.load.
+// CHECK-LABEL: func @transfer_gather_step_to_load(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x16xf32>,
+// CHECK-SAME:    %[[O0:.*]]: index,
+// CHECK-SAME:    %[[O1:.*]]: index) -> vector<4xf32> {
+// CHECK-NEXT:    %[[RES:.*]] = vector.load %[[MEM]][%[[O0]], %[[O1]]] : memref<8x16xf32>, vector<4xf32>
+// CHECK-NEXT:    return %[[RES]] : vector<4xf32>
+func.func @transfer_gather_step_to_load(%mem : memref<8x16xf32>, %o0 : index, %o1 : index) -> vector<4xf32> {
+  %pad = arith.constant 0.0 : f32
+  %idx = vector.step : vector<4xindex>
+  %res = iree_vector_ext.transfer_gather %mem[%o0, %o1]
+      [%idx : vector<4xindex>], %pad {
+        indexing_maps = [
+          affine_map<(d0)[s0] -> (0, s0)>,
+          affine_map<(d0)[s0] -> (d0)>
+        ]
+      } : memref<8x16xf32>, vector<4xf32>
+  return %res : vector<4xf32>
+}
+
+// -----
+
+// Rank-1 transfer_scatter with a vector.step index vec folds to vector.store.
+// CHECK-LABEL: func @transfer_scatter_step_to_store(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x16xf32>,
+// CHECK-SAME:    %[[O0:.*]]: index, %[[O1:.*]]: index,
+// CHECK-SAME:    %[[VEC:.*]]: vector<4xf32>) {
+// CHECK-NEXT:    vector.store %[[VEC]], %[[MEM]][%[[O0]], %[[O1]]] : memref<8x16xf32>, vector<4xf32>
+// CHECK-NEXT:    return
+func.func @transfer_scatter_step_to_store(%mem : memref<8x16xf32>, %o0 : index, %o1 : index, %vec : vector<4xf32>) {
+  %idx = vector.step : vector<4xindex>
+  iree_vector_ext.transfer_scatter %vec into %mem[%o0, %o1]
+      [%idx : vector<4xindex>] {
+        indexing_maps = [
+          affine_map<(d0)[s0] -> (0, s0)>,
+          affine_map<(d0)[s0] -> (d0)>
+        ]
+      } : vector<4xf32>, memref<8x16xf32>
+  return
+}
+
+// -----
+
+// Masked rank-1 transfer_gather with a vector.step index vec folds to vector.maskedload.
+// CHECK-LABEL: func @transfer_gather_step_masked(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x16xf32>,
+// CHECK-SAME:    %[[O0:.*]]: index, %[[O1:.*]]: index,
+// CHECK-SAME:    %[[MASK:.*]]: vector<4xi1>) -> vector<4xf32> {
+// CHECK-NEXT:    %[[FILL:.*]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK-NEXT:    %[[RES:.*]] = vector.maskedload %[[MEM]][%[[O0]], %[[O1]]], %[[MASK]], %[[FILL]] : memref<8x16xf32>, vector<4xi1>, vector<4xf32> into vector<4xf32>
+// CHECK-NEXT:    return %[[RES]] : vector<4xf32>
+func.func @transfer_gather_step_masked(%mem : memref<8x16xf32>, %o0 : index, %o1 : index, %mask : vector<4xi1>) -> vector<4xf32> {
+  %pad = arith.constant 0.0 : f32
+  %idx = vector.step : vector<4xindex>
+  %res = iree_vector_ext.transfer_gather %mem[%o0, %o1]
+      [%idx : vector<4xindex>], %pad, %mask {
+        indexing_maps = [
+          affine_map<(d0)[s0] -> (0, s0)>,
+          affine_map<(d0)[s0] -> (d0)>,
+          affine_map<(d0)[s0] -> (d0)>
+        ]
+      } : memref<8x16xf32>, vector<4xf32>, vector<4xi1>
+  return %res : vector<4xf32>
+}
+
+// -----
+
+// Masked rank-1 transfer_scatter with a vector.step index vec folds to vector.maskedstore.
+// CHECK-LABEL: func @transfer_scatter_step_masked(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x16xf32>,
+// CHECK-SAME:    %[[O0:.*]]: index, %[[O1:.*]]: index,
+// CHECK-SAME:    %[[VEC:.*]]: vector<4xf32>,
+// CHECK-SAME:    %[[MASK:.*]]: vector<4xi1>) {
+// CHECK-NEXT:    vector.maskedstore %[[MEM]][%[[O0]], %[[O1]]], %[[MASK]], %[[VEC]] : memref<8x16xf32>, vector<4xi1>, vector<4xf32>
+// CHECK-NEXT:    return
+func.func @transfer_scatter_step_masked(%mem : memref<8x16xf32>, %o0 : index, %o1 : index, %vec : vector<4xf32>, %mask : vector<4xi1>) {
+  %idx = vector.step : vector<4xindex>
+  iree_vector_ext.transfer_scatter %vec into %mem[%o0, %o1]
+      [%idx : vector<4xindex>], %mask {
+        indexing_maps = [
+          affine_map<(d0)[s0] -> (0, s0)>,
+          affine_map<(d0)[s0] -> (d0)>,
+          affine_map<(d0)[s0] -> (d0)>
+        ]
+      } : vector<4xf32>, memref<8x16xf32>, vector<4xi1>
+  return
 }
