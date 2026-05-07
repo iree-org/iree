@@ -411,188 +411,192 @@ struct iree_hal_vulkan_queue_pending_submission_t {
   // Wakes cancellation or promotion owners waiting for callbacks to quiesce.
   iree_notification_t callback_notification;
 
-  // Queue-ordered host action payload.
-  struct {
-    // Host callback and user data captured from queue_host_call.
-    iree_hal_host_call_t call;
+  // Operation payload selected by kind.
+  union {
+    // Queue-ordered host action payload.
+    struct {
+      // Host callback and user data captured from queue_host_call.
+      iree_hal_host_call_t call;
 
-    // User arguments copied from queue_host_call.
-    uint64_t args[4];
+      // User arguments copied from queue_host_call.
+      uint64_t args[4];
 
-    // HAL host-call flags captured from queue_host_call.
-    iree_hal_host_call_flags_t flags;
-  } host_call;
+      // HAL host-call flags captured from queue_host_call.
+      iree_hal_host_call_flags_t flags;
+    } host_call;
 
-  // Native buffer fill payload.
-  struct {
-    // Target buffer retained until the fill retires.
-    iree_hal_buffer_t* target_buffer;
+    // Native buffer fill payload.
+    struct {
+      // Target buffer retained until the fill retires.
+      iree_hal_buffer_t* target_buffer;
 
-    // Target byte offset captured from queue_fill.
-    iree_device_size_t target_offset;
+      // Target byte offset captured from queue_fill.
+      iree_device_size_t target_offset;
 
-    // Number of bytes to fill in the target buffer.
-    iree_device_size_t length;
+      // Number of bytes to fill in the target buffer.
+      iree_device_size_t length;
 
-    // Fill pattern bytes captured from queue_fill.
-    uint8_t pattern[4];
+      // Fill pattern bytes captured from queue_fill.
+      uint8_t pattern[4];
 
-    // Number of bytes in pattern.
-    iree_host_size_t pattern_length;
+      // Number of bytes in pattern.
+      iree_host_size_t pattern_length;
 
-    // HAL fill flags captured from queue_fill.
-    iree_hal_fill_flags_t flags;
-  } fill;
+      // HAL fill flags captured from queue_fill.
+      iree_hal_fill_flags_t flags;
+    } fill;
 
-  // Native buffer update payload.
-  struct {
-    // Source bytes copied from the queue_update caller.
-    void* source_data;
+    // Native buffer update payload.
+    struct {
+      // Source bytes copied from the queue_update caller.
+      void* source_data;
 
-    // Target buffer retained until the update retires.
-    iree_hal_buffer_t* target_buffer;
+      // Target buffer retained until the update retires.
+      iree_hal_buffer_t* target_buffer;
 
-    // Target byte offset captured from queue_update.
-    iree_device_size_t target_offset;
+      // Target byte offset captured from queue_update.
+      iree_device_size_t target_offset;
 
-    // Number of bytes to copy into the target buffer.
-    iree_device_size_t length;
+      // Number of bytes to copy into the target buffer.
+      iree_device_size_t length;
 
-    // HAL update flags captured from queue_update.
-    iree_hal_update_flags_t flags;
-  } update;
+      // HAL update flags captured from queue_update.
+      iree_hal_update_flags_t flags;
+    } update;
 
-  // Host-mediated buffer copy payload.
-  struct {
-    // Source buffer retained until the copy retires.
-    iree_hal_buffer_t* source_buffer;
+    // Host-mediated buffer copy payload.
+    struct {
+      // Source buffer retained until the copy retires.
+      iree_hal_buffer_t* source_buffer;
 
-    // Source byte offset captured from queue_copy.
-    iree_device_size_t source_offset;
+      // Source byte offset captured from queue_copy.
+      iree_device_size_t source_offset;
 
-    // Target buffer retained until the copy retires.
-    iree_hal_buffer_t* target_buffer;
+      // Target buffer retained until the copy retires.
+      iree_hal_buffer_t* target_buffer;
 
-    // Target byte offset captured from queue_copy.
-    iree_device_size_t target_offset;
+      // Target byte offset captured from queue_copy.
+      iree_device_size_t target_offset;
 
-    // Number of bytes to copy into the target buffer.
-    iree_device_size_t length;
+      // Number of bytes to copy into the target buffer.
+      iree_device_size_t length;
 
-    // HAL copy flags captured from queue_copy.
-    iree_hal_copy_flags_t flags;
-  } copy;
+      // HAL copy flags captured from queue_copy.
+      iree_hal_copy_flags_t flags;
+    } copy;
 
-  // Queue-ordered allocation payload.
-  struct {
-    // Transient buffer retained until the alloca retires.
-    iree_hal_buffer_t* buffer;
+    // Queue-ordered allocation payload.
+    struct {
+      // Transient buffer retained until the alloca retires.
+      iree_hal_buffer_t* buffer;
 
-    // Backing strategy selected by the allocator.
-    iree_hal_vulkan_queue_alloca_strategy_t strategy;
+      // Backing strategy selected by the allocator.
+      iree_hal_vulkan_queue_alloca_strategy_t strategy;
 
-    // Borrowed allocator used by the sparse strategy.
-    iree_hal_allocator_t* allocator;
+      // Borrowed allocator used by the sparse strategy.
+      iree_hal_allocator_t* allocator;
 
-    // Borrowed pool used by the pool strategy.
-    iree_hal_pool_t* pool;
+      // Borrowed pool used by the pool strategy.
+      iree_hal_pool_t* pool;
 
-    // Buffer parameters captured from queue_alloca after normalization.
-    iree_hal_buffer_params_t params;
+      // Buffer parameters captured from queue_alloca after normalization.
+      iree_hal_buffer_params_t params;
 
-    // Physical allocation size requested from pool.
-    iree_device_size_t allocation_size;
+      // Physical allocation size requested from pool.
+      iree_device_size_t allocation_size;
 
-    // HAL allocation flags captured from queue_alloca.
-    iree_hal_alloca_flags_t flags;
+      // HAL allocation flags captured from queue_alloca.
+      iree_hal_alloca_flags_t flags;
 
-    // Pool reservation flags used when probing pool.
-    iree_hal_pool_reserve_flags_t reserve_flags;
+      // Pool reservation flags used when probing pool.
+      iree_hal_pool_reserve_flags_t reserve_flags;
 
-    // Active memory-readiness wait kind.
-    iree_hal_vulkan_queue_alloca_memory_wait_kind_t memory_wait_kind;
+      // Active memory-readiness wait kind.
+      iree_hal_vulkan_queue_alloca_memory_wait_kind_t memory_wait_kind;
 
-    // Set to non-zero after the memory wait callback's final access completes.
-    iree_atomic_int32_t memory_wait_callback_complete;
+      // Set to non-zero after the memory wait callback's final access
+      // completes.
+      iree_atomic_int32_t memory_wait_callback_complete;
 
-    // Pool death frontier borrowed while buffer keeps the reservation armed.
-    const iree_async_frontier_t* wait_frontier;
+      // Pool death frontier borrowed while buffer keeps the reservation armed.
+      const iree_async_frontier_t* wait_frontier;
 
-    // Tracker waiter storage for wait_frontier.
-    iree_async_frontier_waiter_t frontier_waiter;
+      // Tracker waiter storage for wait_frontier.
+      iree_async_frontier_waiter_t frontier_waiter;
 
-    // Pool notification borrowed while a notification wait is active.
-    iree_async_notification_t* pool_notification;
+      // Pool notification borrowed while a notification wait is active.
+      iree_async_notification_t* pool_notification;
 
-    // Notification epoch observed before retrying pool reservation.
-    uint32_t pool_notification_wait_token;
+      // Notification epoch observed before retrying pool reservation.
+      uint32_t pool_notification_wait_token;
 
-    // Whether an observe scope is held until the wait operation is submitted.
-    bool pool_notification_observation_held;
+      // Whether an observe scope is held until the wait operation is submitted.
+      bool pool_notification_observation_held;
 
-    // Async wait operations rotated so callbacks can arm another wait.
-    iree_async_notification_wait_operation_t pool_notification_wait_ops[2];
+      // Async wait operations rotated so callbacks can arm another wait.
+      iree_async_notification_wait_operation_t pool_notification_wait_ops[2];
 
-    // Active slot in pool_notification_wait_ops.
-    uint8_t pool_notification_wait_slot;
-  } alloca;
+      // Active slot in pool_notification_wait_ops.
+      uint8_t pool_notification_wait_slot;
+    } alloca;
 
-  // Queue-ordered deallocation payload.
-  struct {
-    // Transient buffer retained until the dealloca retires.
-    iree_hal_buffer_t* buffer;
+    // Queue-ordered deallocation payload.
+    struct {
+      // Transient buffer retained until the dealloca retires.
+      iree_hal_buffer_t* buffer;
 
-    // HAL dealloca flags captured from queue_dealloca.
-    iree_hal_dealloca_flags_t flags;
-  } dealloca;
+      // HAL dealloca flags captured from queue_dealloca.
+      iree_hal_dealloca_flags_t flags;
+    } dealloca;
 
-  // Recorded command-buffer execution payload.
-  struct {
-    // Command buffer retained until execution retires.
-    iree_hal_command_buffer_t* command_buffer;
+    // Recorded command-buffer execution payload.
+    struct {
+      // Command buffer retained until execution retires.
+      iree_hal_command_buffer_t* command_buffer;
 
-    // Binding table entries copied into the submission allocation tail.
-    iree_hal_buffer_binding_t* binding_table_bindings;
+      // Binding table entries copied into the submission allocation tail.
+      iree_hal_buffer_binding_t* binding_table_bindings;
 
-    // Number of entries populated in binding_table_bindings.
-    iree_host_size_t binding_table_count;
+      // Number of entries populated in binding_table_bindings.
+      iree_host_size_t binding_table_count;
 
-    // BDA slot-address cache copied into the submission allocation tail.
-    iree_hal_vulkan_command_buffer_bda_binding_slot_t* bda_binding_slots;
+      // BDA slot-address cache copied into the submission allocation tail.
+      iree_hal_vulkan_command_buffer_bda_binding_slot_t* bda_binding_slots;
 
-    // Number of entries populated in bda_binding_slots.
-    iree_host_size_t bda_binding_slot_count;
+      // Number of entries populated in bda_binding_slots.
+      iree_host_size_t bda_binding_slot_count;
 
-    // HAL execute flags captured from queue_execute.
-    iree_hal_execute_flags_t flags;
-  } execute;
+      // HAL execute flags captured from queue_execute.
+      iree_hal_execute_flags_t flags;
+    } execute;
 
-  // Direct dispatch payload.
-  struct {
-    // Executable retained until dispatch completion.
-    iree_hal_executable_t* executable;
+    // Direct dispatch payload.
+    struct {
+      // Executable retained until dispatch completion.
+      iree_hal_executable_t* executable;
 
-    // Export ordinal captured from queue_dispatch.
-    iree_hal_executable_export_ordinal_t export_ordinal;
+      // Export ordinal captured from queue_dispatch.
+      iree_hal_executable_export_ordinal_t export_ordinal;
 
-    // Dispatch workgroup configuration captured from queue_dispatch.
-    iree_hal_dispatch_config_t config;
+      // Dispatch workgroup configuration captured from queue_dispatch.
+      iree_hal_dispatch_config_t config;
 
-    // Push constant bytes copied into the submission allocation tail.
-    void* constants_data;
+      // Push constant bytes copied into the submission allocation tail.
+      void* constants_data;
 
-    // Number of bytes in constants_data.
-    iree_host_size_t constants_data_length;
+      // Number of bytes in constants_data.
+      iree_host_size_t constants_data_length;
 
-    // Direct buffer bindings copied into the submission allocation tail.
-    iree_hal_buffer_ref_t* bindings;
+      // Direct buffer bindings copied into the submission allocation tail.
+      iree_hal_buffer_ref_t* bindings;
 
-    // Number of entries populated in bindings.
-    iree_host_size_t binding_count;
+      // Number of entries populated in bindings.
+      iree_host_size_t binding_count;
 
-    // HAL dispatch flags captured from queue_dispatch.
-    iree_hal_dispatch_flags_t flags;
-  } dispatch;
+      // HAL dispatch flags captured from queue_dispatch.
+      iree_hal_dispatch_flags_t flags;
+    } dispatch;
+  };
 };
 
 static iree_status_t iree_hal_vulkan_queue_create_timeline_semaphore(
@@ -3247,8 +3251,10 @@ static iree_status_t iree_hal_vulkan_queue_pending_submission_create(
   submission->profile.dispatch_base_query =
       IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
   iree_notification_initialize(&submission->callback_notification);
-  iree_atomic_store(&submission->alloca.memory_wait_callback_complete, 1,
-                    iree_memory_order_relaxed);
+  if (kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA) {
+    iree_atomic_store(&submission->alloca.memory_wait_callback_complete, 1,
+                      iree_memory_order_relaxed);
+  }
   if (kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_HOST_CALL) {
     submission->host_call.call = call;
     memcpy(submission->host_call.args, args,
@@ -3286,37 +3292,10 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   if (submission->wait_entries) {
     iree_allocator_free(queue->host_allocator, submission->wait_entries);
   }
-  if (submission->sparse_bind.binds) {
-    iree_allocator_free(queue->host_allocator, submission->sparse_bind.binds);
-  }
+  iree_allocator_free(queue->host_allocator, submission->sparse_bind.binds);
   iree_hal_vulkan_queue_release_descriptor_cache_sets(queue, submission);
   iree_hal_vulkan_queue_release_native_descriptor_pool(queue, submission);
   iree_hal_vulkan_queue_release_bda_publication(queue, submission);
-  if (submission->fill.target_buffer) {
-    iree_hal_buffer_release(submission->fill.target_buffer);
-  }
-  if (submission->update.target_buffer) {
-    iree_hal_buffer_release(submission->update.target_buffer);
-  }
-  if (submission->update.source_data) {
-    iree_allocator_free(queue->host_allocator, submission->update.source_data);
-  }
-  if (submission->copy.source_buffer) {
-    iree_hal_buffer_release(submission->copy.source_buffer);
-  }
-  if (submission->copy.target_buffer) {
-    iree_hal_buffer_release(submission->copy.target_buffer);
-  }
-  if (submission->alloca.buffer) {
-    if (submission->alloca.pool_notification_observation_held) {
-      submission->alloca.pool_notification_observation_held = false;
-      iree_async_notification_end_observe(submission->alloca.pool_notification);
-    }
-    iree_hal_buffer_release(submission->alloca.buffer);
-  }
-  if (submission->dealloca.buffer) {
-    iree_hal_buffer_release(submission->dealloca.buffer);
-  }
   iree_hal_vulkan_queue_release_completion_action(submission);
   if (submission->profile.query_pool) {
     iree_vkDestroyQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
@@ -3330,32 +3309,65 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   }
   iree_hal_vulkan_queue_release_native_replay(queue, submission);
   iree_hal_vulkan_queue_release_native_command_buffer(queue, submission);
-  if (submission->execute.command_buffer) {
-    iree_hal_command_buffer_release(submission->execute.command_buffer);
-  }
-  if (submission->execute.binding_table_bindings) {
-    if (!iree_any_bit_set(
-            submission->execute.flags,
-            IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME)) {
-      for (iree_host_size_t i = 0; i < submission->execute.binding_table_count;
-           ++i) {
-        iree_hal_buffer_release(
-            submission->execute.binding_table_bindings[i].buffer);
+
+  switch (submission->kind) {
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_SPARSE_BIND:
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_FILL:
+      iree_hal_buffer_release(submission->fill.target_buffer);
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_UPDATE:
+      iree_allocator_free(queue->host_allocator,
+                          submission->update.source_data);
+      iree_hal_buffer_release(submission->update.target_buffer);
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_COPY:
+      iree_hal_buffer_release(submission->copy.source_buffer);
+      iree_hal_buffer_release(submission->copy.target_buffer);
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_ALLOCA:
+      if (submission->alloca.pool_notification_observation_held) {
+        submission->alloca.pool_notification_observation_held = false;
+        iree_async_notification_end_observe(
+            submission->alloca.pool_notification);
       }
-    }
+      iree_hal_buffer_release(submission->alloca.buffer);
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DEALLOCA:
+      iree_hal_buffer_release(submission->dealloca.buffer);
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE:
+      iree_hal_command_buffer_release(submission->execute.command_buffer);
+      if (submission->execute.binding_table_bindings &&
+          !iree_any_bit_set(
+              submission->execute.flags,
+              IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME)) {
+        for (iree_host_size_t i = 0;
+             i < submission->execute.binding_table_count; ++i) {
+          iree_hal_buffer_release(
+              submission->execute.binding_table_bindings[i].buffer);
+        }
+      }
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DISPATCH:
+      iree_hal_executable_release(submission->dispatch.executable);
+      if (submission->dispatch.bindings) {
+        for (iree_host_size_t i = 0; i < submission->dispatch.binding_count;
+             ++i) {
+          iree_hal_buffer_release(submission->dispatch.bindings[i].buffer);
+        }
+      }
+      if (iree_hal_dispatch_uses_indirect_parameters(
+              submission->dispatch.flags)) {
+        iree_hal_buffer_release(
+            submission->dispatch.config.workgroup_count_ref.buffer);
+      }
+      break;
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_BARRIER:
+    case IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_HOST_CALL:
+      break;
   }
-  if (submission->dispatch.executable) {
-    iree_hal_executable_release(submission->dispatch.executable);
-  }
-  if (submission->dispatch.bindings) {
-    for (iree_host_size_t i = 0; i < submission->dispatch.binding_count; ++i) {
-      iree_hal_buffer_release(submission->dispatch.bindings[i].buffer);
-    }
-  }
-  if (iree_hal_dispatch_uses_indirect_parameters(submission->dispatch.flags)) {
-    iree_hal_buffer_release(
-        submission->dispatch.config.workgroup_count_ref.buffer);
-  }
+
   iree_notification_deinitialize(&submission->callback_notification);
   iree_allocator_free(queue->host_allocator, submission);
 }
