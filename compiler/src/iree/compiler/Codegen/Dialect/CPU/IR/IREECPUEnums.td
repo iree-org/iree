@@ -46,13 +46,11 @@ class IREECPU_I32EnumAttr<string name, string summary,
 //       with different tile sizes.
 //
 // Note that even a scalar multiply-accumulate is technically a matmul
-// with MxNxK shape 1x1x1. Vector element-wise multiply-accumulate with vector
-// size N is seen here as a matrix multiply-accumulate with MxNxK shape 1xNx1.
-// It could be equivalently seen as shape Nx1x1, so we have to pick a convention
-// here, breaking the M-N symmetry: we choose to spread the vector dimension
-// along the N matrix dimension. The MMA attribute types that wrap this enum
-// shall combine it with a boolean "transpose" parameter flipping that, which
-// will typically be used for narrow matmuls with a small N-dimension size.
+// with MxNxK shape 1x1x1. A vector multiply-accumulate of N lanes can be
+// spread along either M (Nx1x1) or N (1xNx1); both orientations are
+// useful (different ACC layouts and broadcast directions). We enumerate
+// each orientation as its own `MMAIntrinsic` value — see the bit-0
+// convention on D below.
 //
 // Symbolic names are of the form
 //
@@ -93,7 +91,11 @@ class IREECPU_I32EnumAttr<string name, string summary,
 //   * 4 = 8-bit float (incl. f8E5M2, f8E4M3FN, etc).
 //   * A = 16-bit integer (any signedness).
 //   * C = 8-bit integer (any signedness).
-// * D enumerates intrinsics that share the same 0xABC* bits.
+// * D enumerates intrinsics sharing the same 0xABC* bits. Bit 0 of D
+//   (mask 0x1) marks the M↔N-swapped orientation: each natural/swapped
+//   pair occupies two consecutive values, and the swapped sibling of `X`
+//   is `X ^ 1`. Neither orientation is fundamental — the cost model picks
+//   whichever fits the matmul shape best.
 //
 def IREECPU_MMA_None : I32EnumAttrCase<"None", 0>;
 
@@ -103,34 +105,54 @@ def IREECPU_MMA_None : I32EnumAttrCase<"None", 0>;
 // `+fma`.
 def MMA_X86_AVX2_FMA_1x8x1_F32_F32
     : I32EnumAttrCase<"MMA_X86_AVX2_FMA_1x8x1_F32_F32", 0x1210>;
+def MMA_X86_AVX2_FMA_8x1x1_F32_F32
+    : I32EnumAttrCase<"MMA_X86_AVX2_FMA_8x1x1_F32_F32", 0x1211>;
 
-// X86 AVX-512 (ZMM registers). Only the "natural" (canonical M<=N) orientation
-// of each intrinsic is listed here; the M/N-swapped ("transposed") variant is
-// expressed by the `transposed_intrinsic` boolean on DataTiledMMAAttr rather
-// than as a separate enum value.
+// X86 AVX-512 (ZMM registers). Each intrinsic is listed in both its natural
+// and M↔N-swapped orientations; the swapped variant has bit 0 of D set.
 def MMA_X86_AVX512_1x8x1_F64_F64
     : I32EnumAttrCase<"MMA_X86_AVX512_1x8x1_F64_F64", 0x1300>;
+def MMA_X86_AVX512_8x1x1_F64_F64
+    : I32EnumAttrCase<"MMA_X86_AVX512_8x1x1_F64_F64", 0x1301>;
 def MMA_X86_AVX512_1x16x1_F32_F32
     : I32EnumAttrCase<"MMA_X86_AVX512_1x16x1_F32_F32", 0x1310>;
+def MMA_X86_AVX512_16x1x1_F32_F32
+    : I32EnumAttrCase<"MMA_X86_AVX512_16x1x1_F32_F32", 0x1311>;
 def MMA_X86_AVX512_1x16x1_F32_F16_CASTF32
     : I32EnumAttrCase<"MMA_X86_AVX512_1x16x1_F32_F16_CASTF32", 0x1320>;
+def MMA_X86_AVX512_16x1x1_F32_F16_CASTF32
+    : I32EnumAttrCase<"MMA_X86_AVX512_16x1x1_F32_F16_CASTF32", 0x1321>;
 def MMA_X86_AVX512FP16_1x32x1_F16_F16
-    : I32EnumAttrCase<"MMA_X86_AVX512FP16_1x32x1_F16_F16", 0x1321>;
+    : I32EnumAttrCase<"MMA_X86_AVX512FP16_1x32x1_F16_F16", 0x1322>;
+def MMA_X86_AVX512FP16_32x1x1_F16_F16
+    : I32EnumAttrCase<"MMA_X86_AVX512FP16_32x1x1_F16_F16", 0x1323>;
 def MMA_X86_AVX512BF16_1x16x2_F32_BF16
     : I32EnumAttrCase<"MMA_X86_AVX512BF16_1x16x2_F32_BF16", 0x1330>;
+def MMA_X86_AVX512BF16_16x1x2_F32_BF16
+    : I32EnumAttrCase<"MMA_X86_AVX512BF16_16x1x2_F32_BF16", 0x1331>;
 def MMA_X86_AVX512_1x16x2_I32_I16
     : I32EnumAttrCase<"MMA_X86_AVX512_1x16x2_I32_I16", 0x13A0>;
+def MMA_X86_AVX512_16x1x2_I32_I16
+    : I32EnumAttrCase<"MMA_X86_AVX512_16x1x2_I32_I16", 0x13A1>;
 def MMA_X86_AVX512VNNI_1x16x2_I32_I16
-    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I16", 0x13A1>;
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I16", 0x13A2>;
+def MMA_X86_AVX512VNNI_16x1x2_I32_I16
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x1x2_I32_I16", 0x13A3>;
 def MMA_X86_AVX512_1x16x2_I32_I8_CASTI16
     : I32EnumAttrCase<"MMA_X86_AVX512_1x16x2_I32_I8_CASTI16", 0x13C0>;
+def MMA_X86_AVX512_16x1x2_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_X86_AVX512_16x1x2_I32_I8_CASTI16", 0x13C1>;
 def MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16
-    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16", 0x13C1>;
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16", 0x13C2>;
+def MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16", 0x13C3>;
 
-// AArch64 SVE `fmla` (f32, f32): 1×N×1 matmul tile; N is a scalable vector of
-// 4 f32 lanes per 128-bit chunk (see `ArmSveVLIn128bitUnits`).
+// AArch64 SVE `fmla` (f32, f32): N×1×1 or 1×N×1 matmul tile; N is a scalable
+// vector of 4 f32 lanes per 128-bit chunk (see `ArmSveVLIn128bitUnits`).
 def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
     : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32", 0x2210>;
+def MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32
+    : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32", 0x2211>;
 
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
@@ -157,19 +179,25 @@ def IREECPU_MMAIntrinsic
           [IREECPU_MMA_None,
 
            // X86 AVX/AVX2 + FMA
-           MMA_X86_AVX2_FMA_1x8x1_F32_F32,
+           MMA_X86_AVX2_FMA_1x8x1_F32_F32, MMA_X86_AVX2_FMA_8x1x1_F32_F32,
 
            // X86 AVX-512
-           MMA_X86_AVX512_1x8x1_F64_F64, MMA_X86_AVX512_1x16x1_F32_F32,
+           MMA_X86_AVX512_1x8x1_F64_F64, MMA_X86_AVX512_8x1x1_F64_F64,
+           MMA_X86_AVX512_1x16x1_F32_F32, MMA_X86_AVX512_16x1x1_F32_F32,
            MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
-           MMA_X86_AVX512FP16_1x32x1_F16_F16,
-           MMA_X86_AVX512BF16_1x16x2_F32_BF16, MMA_X86_AVX512_1x16x2_I32_I16,
-           MMA_X86_AVX512VNNI_1x16x2_I32_I16,
+           MMA_X86_AVX512_16x1x1_F32_F16_CASTF32,
+           MMA_X86_AVX512FP16_1x32x1_F16_F16, MMA_X86_AVX512FP16_32x1x1_F16_F16,
+           MMA_X86_AVX512BF16_1x16x2_F32_BF16,
+           MMA_X86_AVX512BF16_16x1x2_F32_BF16, MMA_X86_AVX512_1x16x2_I32_I16,
+           MMA_X86_AVX512_16x1x2_I32_I16, MMA_X86_AVX512VNNI_1x16x2_I32_I16,
+           MMA_X86_AVX512VNNI_16x1x2_I32_I16,
            MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
+           MMA_X86_AVX512_16x1x2_I32_I8_CASTI16,
            MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
+           MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
 
            // Arm SVE
-           MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32,
+           MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;
