@@ -261,31 +261,6 @@ preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
   return success();
 }
 
-static LogicalResult
-verifyNonGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
-                                   PatternRewriter &rewriter, Value query,
-                                   Value key, Value value) {
-  auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
-  auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
-  auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
-
-  int64_t rank = queryType.getSizes().size();
-  int64_t qNumHeads = queryType.getSizes()[rank - 3];
-  int64_t kNumHeads = keyType.getSizes()[rank - 3];
-  int64_t vNumHeads = valueType.getSizes()[rank - 3];
-
-  if (llvm::any_of(ArrayRef<int64_t>{qNumHeads, kNumHeads, vNumHeads},
-                   [](int64_t d) { return d == torch::Torch::kUnknownSize; })) {
-    return success();
-  }
-
-  if (qNumHeads != kNumHeads || qNumHeads != vNumHeads) {
-    return rewriter.notifyMatchFailure(
-        op, "expected matching attention head counts when enable_gqa is false");
-  }
-  return success();
-}
-
 /// Inline a single-block torch function's body at the current insertion point.
 /// Falls back to func.call for multi-block or external functions.
 static SmallVector<Value> inlineTorchFunction(PatternRewriter &rewriter,
@@ -421,6 +396,7 @@ struct FlexAttentionOpConversion
     Value value = op.getValue();
     Value scaleVal = op.getScale();
 
+    bool enableGqa = op.getEnableGqa().value_or(false);
     auto scoreModSymbol = op.getScoreModFnAttr();
     auto maskModSymbol = op.getMaskModFnAttr();
 
@@ -436,14 +412,7 @@ struct FlexAttentionOpConversion
       return rewriter.notifyMatchFailure(
           op, "expected return_max_scores to be a constant bool");
     }
-
-    std::optional<bool> enableGqa = op.getEnableGqa();
-    if (enableGqa.has_value() && !*enableGqa) {
-      if (failed(verifyNonGroupQueryAttentionInputs(op, rewriter, query, key,
-                                                    value))) {
-        return failure();
-      }
-    } else {
+    if (enableGqa) {
       if (failed(preProcessGroupQueryAttentionInputs(op, rewriter, query, key,
                                                      value))) {
         return failure();

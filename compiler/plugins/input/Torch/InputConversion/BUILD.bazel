@@ -91,6 +91,7 @@ iree_compiler_cc_library(
         "@torch-mlir//:TorchMLIRTorchConversionPasses",
         "@torch-mlir//:TorchMLIRTorchConversionToMLProgram",
         "@torch-mlir//:TorchMLIRTorchDialect",
+        "@torch-mlir//:TorchMLIRTorchDialectUtils",
         "@torch-mlir//:TorchMLIRTorchOnnxToTorch",
         "@torch-mlir//:TorchMLIRTorchPasses",
         "@torch-mlir//:TorchMLIRTorchToArith",

@@ -131,6 +131,9 @@ class TargetConverter:
                 "@torch-mlir//:TorchMLIRTorchDialect": [
                     f"{torch_mlir_cmake_prefix}::torch-mlir::TorchDialectIR",
                 ],
+                "@torch-mlir//:TorchMLIRTorchDialectUtils": [
+                    f"{torch_mlir_cmake_prefix}::torch-mlir::TorchDialectUtils",
+                ],
                 "@torch-mlir//:TorchMLIRTorchOnnxToTorch": [
                     f"{torch_mlir_cmake_prefix}::torch-mlir::TorchOnnxToTorchPasses",
                 ],
