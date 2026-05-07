@@ -1624,7 +1624,7 @@ static bool iree_hal_vulkan_queue_staging_ring_queue_waiter(
   return should_queue;
 }
 
-static bool iree_hal_vulkan_queue_staging_ring_cancel_waiter(
+static void iree_hal_vulkan_queue_staging_ring_cancel_waiter(
     iree_hal_vulkan_queue_staging_ring_t* ring,
     iree_hal_vulkan_queue_staging_waiter_t* waiter) {
   bool was_queued = false;
@@ -1646,7 +1646,6 @@ static bool iree_hal_vulkan_queue_staging_ring_cancel_waiter(
     iree_hal_resource_release(waiter->resource);
     waiter->resource = NULL;
   }
-  return was_queued;
 }
 
 static void iree_hal_vulkan_queue_staging_ring_release(
@@ -6882,7 +6881,6 @@ static void iree_hal_vulkan_staged_transfer_slot_available(void* user_data) {
 static void iree_hal_vulkan_staged_transfer_try_finish(
     iree_hal_vulkan_staged_transfer_t* transfer) {
   bool should_complete = false;
-  bool should_release_waiter_ref = false;
   iree_status_t status = iree_ok_status();
 
   iree_slim_mutex_lock(&transfer->mutex);
@@ -6898,14 +6896,9 @@ static void iree_hal_vulkan_staged_transfer_try_finish(
   }
   iree_slim_mutex_unlock(&transfer->mutex);
 
-  if (should_complete && iree_hal_vulkan_queue_staging_ring_cancel_waiter(
-                             transfer->ring, &transfer->slot_waiter)) {
-    should_release_waiter_ref = true;
-  }
-  if (should_release_waiter_ref) {
-    iree_hal_resource_release(&transfer->resource);
-  }
   if (should_complete) {
+    iree_hal_vulkan_queue_staging_ring_cancel_waiter(transfer->ring,
+                                                     &transfer->slot_waiter);
     iree_hal_vulkan_staged_transfer_complete(transfer, status);
   }
 }
