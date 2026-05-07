@@ -1007,6 +1007,18 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                                             swizzleAttr);
 }
 
+std::function<LogicalResult(XorShuffleParams)> makeDmaConstraintFn(IREE::GPU::TargetAttr target, int64_t elemBits) {
+  return [target, elemBits](XorShuffleParams params) -> LogicalResult {
+    DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
+    if (!dmaSizesAttr || dmaSizesAttr.empty()) {
+      return failure();
+    }
+    int64_t minDmaBits = *llvm::min_element(dmaSizesAttr.asArrayRef());
+    int64_t accessBits = params.accessElems * elemBits;
+    return accessBits >= minDmaBits ? success() : failure();
+  };
+}
+
 //===----------------------------------------------------------------------===//
 // getMmaNativeVectorSize
 //===----------------------------------------------------------------------===//

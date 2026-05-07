@@ -913,33 +913,25 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (useDirectLoad) {
     Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    // Build a DMA compatibility constraint: the swizzle access width (in bits)
-    // must be at least as wide as the narrowest supported DMA load.
-    DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
-    int64_t elemBits = 0;
-    auto dmaConstraint = [&](XorShuffleParams params) -> LogicalResult {
-      if (!dmaSizesAttr || dmaSizesAttr.empty()) {
-        return failure();
-      }
-      int64_t minDmaBits = *llvm::min_element(dmaSizesAttr.asArrayRef());
-      int64_t accessBits = params.accessElems * elemBits;
-      return accessBits >= minDmaBits ? success() : failure();
-    };
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid LDS bank conflicts.
     // TODO(#24255): Fix untuned swizzle logic for DMA.
     if (!transposedLhs) {
+      auto dmaConstraintFn = makeDmaConstraintFn(target,
+          lhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
-          /*skipUntunedFallback=*/false, dmaConstraint);
+          /*skipUntunedFallback=*/false, dmaConstraintFn);
       if (succeeded(lhsSwizzleAttr)) {
         lhsAttr = *lhsSwizzleAttr;
       }
     }
     if (transposedRhs) {
+      auto dmaConstraintFn = makeDmaConstraintFn(target,
+          rhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
-          /*skipUntunedFallback=*/false, dmaConstraint);
+          /*skipUntunedFallback=*/false, dmaConstraintFn);
       if (succeeded(rhsSwizzleAttr)) {
         rhsAttr = *rhsSwizzleAttr;
       }

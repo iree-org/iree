@@ -305,6 +305,13 @@ Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
     IREE::Codegen::XORShuffleAttr swizzle, Value dest);
 
+/// When using direct-load, this function is used to constrain the XOR shuffle
+/// parameters based on the DMA sizes available in the target.
+/// The swizzle access width (in bits) must be at least as wide as the
+/// narrowest supported DMA load.
+std::function<LogicalResult(XorShuffleParams)> makeDmaConstraintFn(
+    IREE::GPU::TargetAttr target, int64_t elemBits);
+
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
 //===----------------------------------------------------------------------===//
