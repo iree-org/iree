@@ -207,8 +207,8 @@ static Value repeatTensorElementsForDim(PatternRewriter &rewriter,
   Value expandShapeList =
       torch::Torch::toIntListConstruct(rewriter, loc, expandShapeForBroadcast);
 
-  Type expandType = selfType.getWithSizesAndDtype(
-      ArrayRef<int64_t>(expandShape), selfType.getOptionalDtype());
+  Type expandType =
+      selfType.getWithSizesAndDtype(expandShape, selfType.getOptionalDtype());
   Value expanded = torch::Torch::AtenBroadcastToOp::create(
       rewriter, loc, expandType, self, expandShapeList);
 
@@ -251,7 +251,7 @@ preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
     SmallVector<int64_t> resultShape(inputType.getSizes());
     resultShape[rank - 3] = qNumHeads;
     Type resultType = inputType.getWithSizesAndDtype(
-        ArrayRef<int64_t>(resultShape), inputType.getOptionalDtype());
+        resultShape, inputType.getOptionalDtype());
     return repeatTensorElementsForDim(rewriter, op, resultType, input,
                                       qNumHeads / inputNumHeads, rank - 3);
   };
