@@ -756,7 +756,7 @@ getOperandBitwidth(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
                    int operandIndex) {
   SmallVector<Type> elementTypes;
   intrinsic.getElementTypes(elementTypes);
-  assert(operandIndex >= 0 && "operand index must be non-negative");
+  assert(operandIndex > 0 && "operand index must be positive");
   return elementTypes[operandIndex].getIntOrFloatBitWidth();
 }
 
@@ -819,8 +819,6 @@ static FailureOr<XorShuffleParams> getXorShuffleParamsForGfx950(
   }
   if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(intrinsic)) {
     switch (mma.getIntrinsic()) {
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_F16:
-    case IREE::GPU::MMAIntrinsic::MFMA_F32_32x32x16_F16:
     case IREE::GPU::MMAIntrinsic::MFMA_F32_16x16x32_BF16:
     case IREE::GPU::MMAIntrinsic::MFMA_F32_32x32x16_BF16:
       return XorShuffleParams({/*rowElems=*/64,
@@ -1311,18 +1309,6 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   return getGPUTargetAttr(op->getContext(),
                           IREE::HAL::ExecutableTargetAttr::lookup(op));
 }
-
-bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
-  if (!target) {
-    return false;
-  }
-  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
-  if (failed(chipset)) {
-    return false;
-  }
-  return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
-}
-
 void addConfigGPUTarget(MLIRContext *context,
                         IREE::GPU::TargetAttr gpuTargetAttr,
                         SmallVectorImpl<NamedAttribute> &config) {

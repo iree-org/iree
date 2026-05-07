@@ -330,10 +330,6 @@ IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
                                        IREE::HAL::ExecutableTargetAttr attr);
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
-/// Check if the target architecture supports global load DMA.
-/// Returns true only for CDNA4+ (gfx950+) architectures.
-bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
-
 // Methods to retrieve information association with `configuration` field
 // of `hal.executable.target` attribute used commonly in GPU codegen pipelines.
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);

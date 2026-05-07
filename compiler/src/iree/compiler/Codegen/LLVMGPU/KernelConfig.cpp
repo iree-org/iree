@@ -106,7 +106,7 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(true));
+                    llvm::cl::Hidden, llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
