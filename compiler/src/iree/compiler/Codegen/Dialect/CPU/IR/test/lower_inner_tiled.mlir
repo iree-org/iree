@@ -211,3 +211,54 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[RHS_UI32:.+]] = arith.extui %{{.+}} : vector<4x1xi8> to vector<4x1xi32>
 //       CHECK:   vector.contract
 //  CHECK-SAME:     %[[LHS_UI32]], %[[RHS_UI32]], %{{.+}} : vector<4x1xi32>, vector<4x1xi32> into vector<4x4xi32>
+
+// -----
+
+// AVX-512 16×1×1 f32 (M↔N-swapped orientation of 1×16×1) with intrinsics_m=2,
+// intrinsics_n=4. The narrow side is RHS, so broadcast widens RHS 1→16; FMA
+// is LHS/RHS-symmetric so the call args don't swap.
+//
+// First test to exercise a non-identity ACC swizzle permutation. The
+// swizzle's `expandShape` dims `[2, 16, 4, 1]` are reordered by the
+// permutation `[0, 2, 1, 3]` (cross-intrinsic dims placed before internal
+// dims), giving the distributed N-D shape `<2x4x16x1>`. The `inner_tiled`
+// op uses a more-compact form with the trailing 1 dropped (`<2x4x16>` —
+// matchable against the full shape by `matchTileTypes`' filter); the
+// lowering shape_casts that into and out of the `<2x4x16x1>` form for
+// the per-intrinsic distribute/reassemble.
+
+#contraction_accesses_t = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_avx512_16x1x1_f32(
+    %lhs: vector<2x16xf32>, %rhs: vector<4x1xf32>, %acc: vector<2x4x16xf32>)
+    -> vector<2x4x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses_t,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_16x1x1_F32_F32, intrinsics_m = 2, intrinsics_n = 4>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<2x16xf32>, vector<4x1xf32> into vector<2x4x16xf32>
+  return %0 : vector<2x4x16xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_avx512_16x1x1_f32
+//       CHECK:   util.hoistable_conversion "shape_cast_to_intrinsic"
+//       CHECK:     vector.shape_cast {{.*}} : vector<2x4x16xf32> to vector<2x4x16x1xf32>
+//       CHECK:   vector.broadcast {{.*}} : vector<1xf32> to vector<16x1xf32>
+//       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"
+//       CHECK:   util.hoistable_conversion "shape_cast_from_intrinsic"
+//       CHECK:     vector.shape_cast {{.*}} : vector<2x4x16x1xf32> to vector<2x4x16xf32>

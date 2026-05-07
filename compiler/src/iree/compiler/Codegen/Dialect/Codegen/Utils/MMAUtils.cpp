@@ -78,7 +78,9 @@ static SmallVector<int64_t> fullDistributedShape(const TileSwizzle &swizzle) {
 // in the lane id, not the per-lane vector). CPU `getDistributedTileTypes`
 // produces a 2-D (outer × inner) collapsed form while GPU produces the
 // distributed N-D form; this reshape lets the shared lowering body operate
-// uniformly.
+// uniformly. Both sides apply the swizzle's permutation (CPU's permutation is
+// always identity, see `IREECPUAttrs.cpp:getSwizzle`), so a plain `shape_cast`
+// suffices — no transpose is needed.
 static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
                                          Value value,
                                          const TileSwizzle &swizzle) {
