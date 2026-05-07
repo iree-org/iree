@@ -68,20 +68,6 @@ static iree_status_t iree_hal_vulkan_spirv_next_instruction(
   return iree_ok_status();
 }
 
-static bool iree_hal_vulkan_spirv_entry_point_name_matches(
-    const uint32_t* operands, uint16_t operand_word_count,
-    iree_string_view_t entry_point) {
-  if (operand_word_count < 3) return false;
-  const char* name = (const char*)&operands[2];
-  const iree_host_size_t name_capacity = (operand_word_count - 2) * 4;
-  iree_host_size_t name_length = 0;
-  while (name_length < name_capacity && name[name_length] != 0) {
-    ++name_length;
-  }
-  return name_length == entry_point.size &&
-         memcmp(name, entry_point.data, name_length) == 0;
-}
-
 static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
     const uint32_t* operands, uint16_t operand_word_count,
     iree_string_view_t* out_name) {
@@ -100,6 +86,17 @@ static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
                             "SPIR-V entry point name is not NUL-terminated");
   }
   *out_name = iree_make_string_view(name, name_length);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_entry_point_name_matches(
+    const uint32_t* operands, uint16_t operand_word_count,
+    iree_string_view_t entry_point, bool* out_matches) {
+  *out_matches = false;
+  iree_string_view_t name = iree_string_view_empty();
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_entry_point_name(
+      operands, operand_word_count, &name));
+  *out_matches = iree_string_view_equal(name, entry_point);
   return iree_ok_status();
 }
 
@@ -622,8 +619,10 @@ iree_status_t iree_hal_vulkan_spirv_parse_compute_workgroup_size(
     if (operands[0] != IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE) {
       continue;
     }
-    if (iree_hal_vulkan_spirv_entry_point_name_matches(
-            operands, (uint16_t)(word_count - 1), entry_point)) {
+    bool matches = false;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_entry_point_name_matches(
+        operands, (uint16_t)(word_count - 1), entry_point, &matches));
+    if (matches) {
       entry_point_id = operands[1];
       if (out_entry_point_found) *out_entry_point_found = true;
       break;

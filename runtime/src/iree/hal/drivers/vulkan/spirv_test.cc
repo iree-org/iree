@@ -256,6 +256,36 @@ TEST(SpirvTest, RejectsTruncatedEntryPointOperands) {
           IREE_ARRAYSIZE(kTruncatedEntryPointModule), &analysis));
 }
 
+TEST(SpirvTest, RejectsUnterminatedEntryPointNameDuringWorkgroupLookup) {
+  static constexpr uint32_t kUnterminatedEntryPointModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // OpEntryPoint GLCompute %1 "main" without a trailing NUL.
+      0x0004000fu,
+      5u,
+      1u,
+      0x6e69616du,
+      // OpExecutionMode %1 LocalSize 4 5 6.
+      0x00060010u,
+      1u,
+      17u,
+      4u,
+      5u,
+      6u,
+  };
+  bool entry_point_found = false;
+  uint32_t workgroup_size[3] = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_compute_workgroup_size(
+          kUnterminatedEntryPointModule,
+          IREE_ARRAYSIZE(kUnterminatedEntryPointModule), IREE_SV("main"),
+          &entry_point_found, workgroup_size));
+}
+
 TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {
   static constexpr uint32_t kLogicalModule[] = {
       0x07230203u,
