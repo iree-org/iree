@@ -11,6 +11,7 @@
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -23,6 +24,48 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
 
 namespace {
+
+/// Converts 1D vector.multi_reduction directly to vector.reduction.
+///
+/// Example:
+/// ```mlir
+/// // Before
+/// %r = vector.multi_reduction <add>, %v, %acc [0] : vector<Nxf32> to f32
+///
+/// // After
+/// %r = vector.reduction <add>, %v, %acc : vector<Nxf32> into f32
+/// ```
+struct OneDimMultiReductionToReduction
+    : public vector::MaskableOpRewritePattern<vector::MultiDimReductionOp> {
+  using MaskableOpRewritePattern::MaskableOpRewritePattern;
+
+  FailureOr<Value>
+  matchAndRewriteMaskableOp(vector::MultiDimReductionOp multiReductionOp,
+                            vector::MaskingOpInterface maskingOp,
+                            PatternRewriter &rewriter) const override {
+    auto srcRank = multiReductionOp.getSourceVectorType().getRank();
+    if (srcRank != 1) {
+      return failure();
+    }
+
+    if (!multiReductionOp.isReducedDim(0)) {
+      return failure();
+    }
+
+    auto loc = multiReductionOp.getLoc();
+    Value mask = maskingOp ? maskingOp.getMask() : Value();
+
+    Operation *reductionOp = vector::ReductionOp::create(
+        rewriter, loc, multiReductionOp.getKind(), multiReductionOp.getSource(),
+        multiReductionOp.getAcc());
+
+    if (mask) {
+      reductionOp = mlir::vector::maskOperation(rewriter, reductionOp, mask);
+    }
+
+    return reductionOp->getResult(0);
+  }
+};
 
 /// Collapse trailing unit dimensions from the memref source of a
 /// vector.transfer_read, adjusting the permutation map accordingly.
@@ -272,6 +315,7 @@ struct LLVMGPULower1DVectorOpsPass final
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
+    patterns.add<OneDimMultiReductionToReduction>(ctx);
     patterns.add<CollapseTrailingUnitDimsTransferRead,
                  CollapseTrailingUnitDimsTransferWrite>(ctx);
     patterns.add<TransferReadToVectorLoadLowering,

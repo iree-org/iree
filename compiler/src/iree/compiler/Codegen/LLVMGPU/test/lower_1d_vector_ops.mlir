@@ -107,3 +107,15 @@ func.func @transfer_tensor(%src : tensor<8x8xf32>, %idx : index) -> vector<4xf32
   %res = vector.transfer_read %src[%idx, %idx], %cf0 {in_bounds = [true]} : tensor<8x8xf32>, vector<4xf32>
   return %res : vector<4xf32>
 }
+
+// -----
+
+// 1-D vector.multi_reduction is lowered to vector.reduction.
+// CHECK-LABEL: func @one_dim_reduction
+// CHECK-SAME:    %[[INPUT:.+]]: vector<8xf32>, %[[ACC:.+]]: f32
+func.func @one_dim_reduction(%arg0: vector<8xf32>, %acc: f32) -> f32 {
+  // CHECK: %[[RESULT:.+]] = vector.reduction <add>, %[[INPUT]], %[[ACC]] : vector<8xf32> into f32
+  %0 = vector.multi_reduction <add>, %arg0, %acc [0] : vector<8xf32> to f32
+  // CHECK: return %[[RESULT]]
+  return %0 : f32
+}
