@@ -1518,16 +1518,19 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     spirv_words = aligned_spirv_words;
   }
 
-  iree_hal_vulkan_spirv_module_analysis_t analysis;
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {0};
   iree_status_t status = iree_hal_vulkan_spirv_analyze_module(
       spirv_words, spirv_word_count, &analysis);
-  const iree_host_size_t entry_point_count = analysis.compute_entry_point_count;
-  const iree_host_size_t name_storage_size =
-      analysis.compute_entry_point_name_storage_size;
-  if (iree_status_is_ok(status) && entry_point_count == 0) {
-    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "raw Vulkan BDA executable has no compute entry "
-                              "points");
+  iree_host_size_t entry_point_count = 0;
+  iree_host_size_t name_storage_size = 0;
+  if (iree_status_is_ok(status)) {
+    entry_point_count = analysis.compute_entry_point_count;
+    name_storage_size = analysis.compute_entry_point_name_storage_size;
+    if (entry_point_count == 0) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "raw Vulkan BDA executable has no compute entry points");
+    }
   }
 
   iree_hal_vulkan_spirv_compute_entry_point_t* entry_points = NULL;

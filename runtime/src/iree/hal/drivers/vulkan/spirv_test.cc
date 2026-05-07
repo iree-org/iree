@@ -74,6 +74,7 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
   EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
+  EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
   EXPECT_EQ(1u, analysis.compute_entry_point_count);
   EXPECT_EQ(5u, analysis.compute_entry_point_name_storage_size);
 
@@ -141,6 +142,7 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
   EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
   EXPECT_TRUE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(1u, analysis.push_constant_variable_count);
+  EXPECT_EQ(2u, analysis.single_push_constant_pointer_type_id);
   EXPECT_TRUE(analysis.has_descriptor_storage_class_variables);
   EXPECT_EQ(0u, analysis.compute_entry_point_count);
   EXPECT_EQ(0u, analysis.compute_entry_point_name_storage_size);
@@ -151,6 +153,7 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
   EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
   EXPECT_FALSE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(0u, analysis.push_constant_variable_count);
+  EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
   EXPECT_FALSE(analysis.has_descriptor_storage_class_variables);
   EXPECT_EQ(1u, analysis.compute_entry_point_count);
   EXPECT_EQ(5u, analysis.compute_entry_point_name_storage_size);
@@ -407,10 +410,35 @@ TEST(SpirvTest, CountsPushConstantVariables) {
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kPushConstantModule, IREE_ARRAYSIZE(kPushConstantModule), &analysis));
   EXPECT_EQ(1u, analysis.push_constant_variable_count);
+  EXPECT_EQ(2u, analysis.single_push_constant_pointer_type_id);
+
+  static constexpr uint32_t kMultiplePushConstantVariablesModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpVariable %3 in PushConstant storage class.
+      0x0004003bu,
+      2u,
+      3u,
+      9u,
+      // Declares OpVariable %5 in PushConstant storage class.
+      0x0004003bu,
+      4u,
+      5u,
+      9u,
+  };
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kMultiplePushConstantVariablesModule,
+      IREE_ARRAYSIZE(kMultiplePushConstantVariablesModule), &analysis));
+  EXPECT_EQ(2u, analysis.push_constant_variable_count);
+  EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
 
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
   EXPECT_EQ(0u, analysis.push_constant_variable_count);
+  EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
 }
 
 TEST(SpirvTest, VerifiesBdaRootPushConstantLayout) {
@@ -551,6 +579,79 @@ TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
       iree_hal_vulkan_spirv_parse_compute_workgroup_size(
           kDuplicateEntryModule, IREE_ARRAYSIZE(kDuplicateEntryModule),
           IREE_SV("main"), &entry_point_found, workgroup_size));
+}
+
+TEST(SpirvTest, RejectsDuplicateLocalSizeExecutionModes) {
+  static constexpr uint32_t kDuplicateLocalSizeModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // OpEntryPoint GLCompute %1 "main"
+      0x0005000fu,
+      5u,
+      1u,
+      0x6e69616du,
+      0u,
+      // OpExecutionMode %1 LocalSize 4 5 6
+      0x00060010u,
+      1u,
+      17u,
+      4u,
+      5u,
+      6u,
+      // OpExecutionMode %1 LocalSize 7 8 9
+      0x00060010u,
+      1u,
+      17u,
+      7u,
+      8u,
+      9u,
+  };
+  iree_hal_vulkan_spirv_compute_entry_point_t entry_point = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_compute_entry_points(
+          kDuplicateLocalSizeModule, IREE_ARRAYSIZE(kDuplicateLocalSizeModule),
+          /*entry_point_capacity=*/1, &entry_point));
+
+  bool entry_point_found = false;
+  uint32_t workgroup_size[3] = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_compute_workgroup_size(
+          kDuplicateLocalSizeModule, IREE_ARRAYSIZE(kDuplicateLocalSizeModule),
+          IREE_SV("main"), &entry_point_found, workgroup_size));
+}
+
+TEST(SpirvTest, RejectsZeroLocalSizeExecutionMode) {
+  static constexpr uint32_t kZeroLocalSizeModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // OpEntryPoint GLCompute %1 "main"
+      0x0005000fu,
+      5u,
+      1u,
+      0x6e69616du,
+      0u,
+      // OpExecutionMode %1 LocalSize 4 0 6
+      0x00060010u,
+      1u,
+      17u,
+      4u,
+      0u,
+      6u,
+  };
+  iree_hal_vulkan_spirv_compute_entry_point_t entry_point = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_compute_entry_points(
+          kZeroLocalSizeModule, IREE_ARRAYSIZE(kZeroLocalSizeModule),
+          /*entry_point_capacity=*/1, &entry_point));
 }
 
 }  // namespace

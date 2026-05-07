@@ -39,6 +39,9 @@ typedef struct iree_hal_vulkan_spirv_module_analysis_t {
   // Number of OpVariable declarations in the PushConstant storage class.
   iree_host_size_t push_constant_variable_count;
 
+  // Result type id of the sole PushConstant OpVariable, or 0 otherwise.
+  uint32_t single_push_constant_pointer_type_id;
+
   // Whether any OpVariable declares a descriptor-backed storage class.
   bool has_descriptor_storage_class_variables;
 
