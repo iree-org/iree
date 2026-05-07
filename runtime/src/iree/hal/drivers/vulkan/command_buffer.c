@@ -137,7 +137,8 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Current recording lifecycle state.
   iree_hal_vulkan_command_buffer_state_t state;
 
-  // Retained resources referenced by recorded commands.
+  // Lazily allocated retained resources referenced by recorded commands.
+  // NULL when the command buffer is UNRETAINED or has only dynamic refs.
   iree_hal_resource_set_t* resource_set;
 
   // First command block in recording order.
@@ -315,6 +316,19 @@ static bool iree_hal_vulkan_command_buffer_validates(
 #endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
 }
 
+static bool iree_hal_vulkan_command_buffer_retains_resources(
+    const iree_hal_vulkan_command_buffer_t* command_buffer) {
+  return !iree_all_bits_set(command_buffer->base.mode,
+                            IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED);
+}
+
+static iree_status_t iree_hal_vulkan_command_buffer_ensure_resource_set(
+    iree_hal_vulkan_command_buffer_t* command_buffer) {
+  if (command_buffer->resource_set) return iree_ok_status();
+  return iree_hal_resource_set_allocate(
+      command_buffer->payload_arena.block_pool, &command_buffer->resource_set);
+}
+
 static iree_status_t iree_hal_vulkan_command_buffer_ensure_command_capacity(
     iree_hal_vulkan_command_buffer_t* command_buffer,
     iree_host_size_t payload_length, iree_host_size_t* out_record_length,
@@ -448,7 +462,12 @@ static iree_status_t iree_hal_vulkan_command_buffer_validate_buffer_ref(
 
 static iree_status_t iree_hal_vulkan_command_buffer_retain_resource(
     iree_hal_vulkan_command_buffer_t* command_buffer, void* resource) {
-  if (!command_buffer->resource_set) return iree_ok_status();
+  if (!resource ||
+      !iree_hal_vulkan_command_buffer_retains_resources(command_buffer)) {
+    return iree_ok_status();
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_command_buffer_ensure_resource_set(command_buffer));
   return iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                       &resource);
 }
@@ -478,7 +497,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_track_buffer_refs(
     }
   }
   command_buffer->base.binding_count = binding_count;
-  if (has_static_refs) {
+  if (has_static_refs &&
+      iree_hal_vulkan_command_buffer_retains_resources(command_buffer)) {
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_command_buffer_ensure_resource_set(command_buffer));
     IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
         command_buffer->resource_set, count, buffer_refs,
         offsetof(iree_hal_buffer_ref_t, buffer), sizeof(buffer_refs[0])));
@@ -649,19 +671,10 @@ iree_status_t iree_hal_vulkan_command_buffer_create(
   iree_arena_initialize(command_buffer_block_pool,
                         &command_buffer->payload_arena);
   command_buffer->state = IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_INITIAL;
-  iree_status_t status = iree_ok_status();
-  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
-    status = iree_hal_resource_set_allocate(command_buffer_block_pool,
-                                            &command_buffer->resource_set);
-  }
-  if (iree_status_is_ok(status)) {
-    *out_command_buffer = &command_buffer->base;
-  } else {
-    iree_hal_vulkan_command_buffer_destroy(&command_buffer->base);
-  }
+  *out_command_buffer = &command_buffer->base;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 bool iree_hal_vulkan_command_buffer_isa(
