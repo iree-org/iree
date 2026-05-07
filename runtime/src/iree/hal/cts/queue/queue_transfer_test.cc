@@ -345,6 +345,40 @@ TEST_P(QueueTransferTest, UpdateLargerThanCommandBufferLimit) {
   EXPECT_THAT(readback, ContainerEq(expected));
 }
 
+TEST_P(QueueTransferTest, UpdateCapturesSourceBeforeWaitResolves) {
+  const iree_host_size_t source_offset = 7;
+  const iree_device_size_t target_offset = 5;
+  const iree_device_size_t update_length =
+      IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE * 2 + 97;
+  const iree_host_size_t source_size =
+      source_offset + (iree_host_size_t)update_length + 13;
+  const iree_device_size_t buffer_size = target_offset + update_length + 17;
+
+  std::vector<uint8_t> source = MakeDeterministicBytes(source_size);
+  std::vector<uint8_t> expected(buffer_size, 0);
+  memcpy(expected.data() + target_offset, source.data() + source_offset,
+         update_length);
+
+  Ref<iree_hal_buffer_t> buffer;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, buffer.out()));
+
+  SemaphoreList update_wait(device_, {0}, {1});
+  SemaphoreList update_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_update(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, update_wait, update_signal,
+      source.data(), source_offset, buffer, target_offset, update_length,
+      IREE_HAL_UPDATE_FLAG_NONE));
+
+  std::fill(source.begin(), source.end(), 0xEE);
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(update_wait.semaphores[0], 1,
+                                           /*frontier=*/NULL));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      update_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  auto readback = ReadBufferBytes(buffer, 0, buffer_size);
+  EXPECT_THAT(readback, ContainerEq(expected));
+}
+
 TEST_P(QueueTransferTest, UpdateSizeAndAlignmentClasses) {
   struct UpdateCase {
     iree_host_size_t source_offset = 0;
