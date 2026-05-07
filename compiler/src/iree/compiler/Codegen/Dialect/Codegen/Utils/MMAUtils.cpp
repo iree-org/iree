@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -72,23 +73,35 @@ static SmallVector<int64_t> fullDistributedShape(const TileSwizzle &swizzle) {
   });
 }
 
-// Reshapes `value` to the swizzle's distributed N-D vector type if it is not
-// already in that form. "Distributed" here means every dim of the swizzle's
-// expand groups, with CrossThread dim sizes collapsed to 1 (those factors live
-// in the lane id, not the per-lane vector). CPU `getDistributedTileTypes`
-// produces a 2-D (outer × inner) collapsed form while GPU produces the
-// distributed N-D form; this reshape lets the shared lowering body operate
-// uniformly.
+// Reshapes `value` into the swizzle's distributed N-D form, ready for
+// `distributeMmaFragmentToIntrinsics`. Two caller conventions:
+//   * GPU: `value` is already in the distributed shape (from
+//     `DataTiledMMAInterfaceAttr::getDistributedTileTypes`, which applies
+//     the swizzle's permutation). Return as-is.
+//   * CPU: `value` is in operand-natural (M, K)/(N, K)/(M, N) row-major
+//     (from CPU's `getUndistributedTileTypes`, which does NOT apply the
+//     permutation). Reshape to logical N-D, then `vector.transpose` by
+//     the swizzle's permutation to reach distributed form.
 static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
                                          Value value,
                                          const TileSwizzle &swizzle) {
   auto vecType = cast<VectorType>(value.getType());
-  SmallVector<int64_t> fullShape = fullDistributedShape(swizzle);
-  if (vecType.getShape() == ArrayRef<int64_t>(fullShape)) {
+  SmallVector<int64_t> distShape = fullDistributedShape(swizzle);
+  if (vecType.getShape() == ArrayRef<int64_t>(distShape)) {
     return value;
   }
-  auto fullType = VectorType::get(fullShape, vecType.getElementType());
-  return vector::ShapeCastOp::create(builder, loc, fullType, value);
+  ArrayRef<int64_t> perm = swizzle.permutation();
+  SmallVector<int64_t> logicalShape =
+      applyPermutation(distShape, invertPermutationVector(perm));
+  Value reshaped = value;
+  if (vecType.getShape() != ArrayRef<int64_t>(logicalShape)) {
+    auto reshapedType = VectorType::get(logicalShape, vecType.getElementType());
+    reshaped = vector::ShapeCastOp::create(builder, loc, reshapedType, value);
+  }
+  if (isIdentityPermutation(perm)) {
+    return reshaped;
+  }
+  return vector::TransposeOp::create(builder, loc, reshaped, perm);
 }
 
 LogicalResult buildDataTiledMMAUnderlyingOperations(
@@ -173,6 +186,18 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
           acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
                                                      indices, strides);
           incrementIndices(indices, accCrossIntrinsicShape);
+        }
+        // Inverse of `reshapeToSwizzleDistributed`. The reassembled `acc` is
+        // in distributed shape, which is already what the GPU caller expects;
+        // for CPU (operand-natural tile type), transpose by the inverse
+        // permutation and shape_cast down to the 2-D tile type.
+        if (acc.getType() == origAccType) {
+          return {acc};
+        }
+        ArrayRef<int64_t> perm = accSwizzle.permutation();
+        if (!isIdentityPermutation(perm)) {
+          acc = vector::TransposeOp::create(b, loc, acc,
+                                            invertPermutationVector(perm));
         }
         if (acc.getType() != origAccType) {
           acc = vector::ShapeCastOp::create(b, loc, origAccType, acc);
