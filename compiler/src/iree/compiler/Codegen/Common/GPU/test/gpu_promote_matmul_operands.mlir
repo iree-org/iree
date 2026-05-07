@@ -1,4 +1,5 @@
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands),canonicalize)" | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands{skip-operand-promotion=true}),canonicalize)" | FileCheck %s --check-prefix=RESULTS-ONLY
 
 #lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
 
@@ -130,6 +131,15 @@ func.func @promote_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : in
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
 //  CHECK-SAME:       ins(%[[BARRIER]] : tensor<?x?xf32>)
 //       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
+// RESULTS-ONLY-LABEL: func @promote_result(
+// RESULTS-ONLY:       %[[MATMUL:.+]] = linalg.matmul
+// RESULTS-ONLY:       %[[ALLOC:.+]] = bufferization.alloc_tensor
+// RESULTS-ONLY:       %[[COPY1:.+]] = linalg.copy
+// RESULTS-ONLY-SAME:      ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+// RESULTS-ONLY:       %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+// RESULTS-ONLY:       %[[COPY2:.+]] = linalg.copy
+// RESULTS-ONLY-SAME:      ins(%[[BARRIER]] : tensor<?x?xf32>)
+// RESULTS-ONLY:       return %[[COPY2]] : tensor<?x?xf32>
 
 // -----
 
@@ -159,6 +169,44 @@ func.func @promote_padded_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %md
 //  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
 //  CHECK-SAME:       ins(%[[EXTRACT]] : tensor<?x?xf32>)
 //       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
+// RESULTS-ONLY-LABEL: func @promote_padded_result(
+// RESULTS-ONLY:       %[[MATMUL:.+]] = linalg.matmul
+// RESULTS-ONLY:       %[[ALLOC:.+]] = bufferization.alloc_tensor
+// RESULTS-ONLY:       %[[COPY1:.+]] = linalg.copy
+// RESULTS-ONLY-SAME:      ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+// RESULTS-ONLY:       %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+// RESULTS-ONLY:       %[[EXTRACT:.+]] = tensor.extract_slice %[[BARRIER]]
+// RESULTS-ONLY:       %[[COPY2:.+]] = linalg.copy
+// RESULTS-ONLY-SAME:      ins(%[[EXTRACT]] : tensor<?x?xf32>)
+// RESULTS-ONLY:       return %[[COPY2]] : tensor<?x?xf32>
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2]}>
+
+func.func @promote_results_only(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%a, %b : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// CHECK-LABEL: func.func @promote_results_only
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
+//       CHECK:   %[[PA:.+]] = linalg.copy {{.*}} ins(%[[A]] : tensor<32x1024xf32>)
+//       CHECK:   %[[PB:.+]] = linalg.copy {{.*}} ins(%[[B]] : tensor<1024x128xf32>)
+//       CHECK:   %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>)
+//       CHECK:   linalg.copy{{.*}}ins(%[[MM]] : tensor<32x128xf32>)
+// RESULTS-ONLY-LABEL: func.func @promote_results_only
+//  RESULTS-ONLY-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
+//  RESULTS-ONLY-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
+//   RESULTS-ONLY-NOT:   linalg.copy {{.*}} ins(%[[A]] : tensor<32x1024xf32>)
+//   RESULTS-ONLY-NOT:   linalg.copy {{.*}} ins(%[[B]] : tensor<1024x128xf32>)
+//       RESULTS-ONLY:   %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[A]], %[[B]] : tensor<32x1024xf32>, tensor<1024x128xf32>)
+//       RESULTS-ONLY:   linalg.copy{{.*}}ins(%[[MM]] : tensor<32x128xf32>)
 
 // -----
 

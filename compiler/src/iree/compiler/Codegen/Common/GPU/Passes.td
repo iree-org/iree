@@ -286,6 +286,11 @@ def GPUPromoteMatmulOperandsPass :
     logic for "promoting" an operand is deferred to an attribute interface
     allowing for custom logic.
   }];
+  let options = [
+    Option<"skipOperandPromotion", "skip-operand-promotion", "bool",
+            /*default=*/"false",
+           "Skip promotion of DPS input operands, promoting only results.">,
+  ];
   let dependentDialects = [
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",

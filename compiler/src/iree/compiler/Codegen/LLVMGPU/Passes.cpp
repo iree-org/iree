@@ -755,7 +755,11 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+  {
+    GPUPromoteMatmulOperandsPassOptions options;
+    options.skipOperandPromotion = true;
+    funcPassManager.addPass(createGPUPromoteMatmulOperandsPass(options));
+  }
 
   // Tile to reduction loops.
   {
