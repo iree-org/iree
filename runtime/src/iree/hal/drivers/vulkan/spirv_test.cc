@@ -318,6 +318,49 @@ TEST(SpirvTest, DetectsPhysicalStorageBufferAddressesCapability) {
   EXPECT_FALSE(analysis.has_physical_storage_buffer_addresses_capability);
 }
 
+TEST(SpirvTest, VerifiesBdaModuleAbi) {
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_bda_module(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+      IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE));
+
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_verify_bda_module(
+          kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+          IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT));
+
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_verify_bda_module(
+          kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability,
+          IREE_ARRAYSIZE(
+              kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability),
+          IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE));
+
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_verify_bda_module(
+          kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+          (iree_hal_vulkan_spirv_bda_verification_flags_t)0x80000000u));
+}
+
+TEST(SpirvTest, VerifiesBdaEntryPoint) {
+  uint32_t workgroup_size[3] = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_bda_entry_point(
+      kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), IREE_SV("main"),
+      IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE, workgroup_size));
+  EXPECT_EQ(4u, workgroup_size[0]);
+  EXPECT_EQ(5u, workgroup_size[1]);
+  EXPECT_EQ(6u, workgroup_size[2]);
+
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_verify_bda_entry_point(
+          kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule),
+          IREE_SV("missing"), IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE,
+          workgroup_size));
+}
+
 TEST(SpirvTest, DetectsDescriptorBindingDecorations) {
   static constexpr uint32_t kDescriptorDecoratedModule[] = {
       0x07230203u,

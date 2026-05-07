@@ -49,6 +49,16 @@ typedef struct iree_hal_vulkan_spirv_module_analysis_t {
   iree_host_size_t compute_entry_point_name_storage_size;
 } iree_hal_vulkan_spirv_module_analysis_t;
 
+typedef enum iree_hal_vulkan_spirv_bda_verification_flag_bits_e {
+  // No additional BDA module verification requirements.
+  IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE = 0u,
+
+  // Require the hidden BDA root push-constant block shape.
+  IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT = 0x1u,
+} iree_hal_vulkan_spirv_bda_verification_flag_bits_t;
+
+typedef uint32_t iree_hal_vulkan_spirv_bda_verification_flags_t;
+
 // Verifies the structural SPIR-V header and instruction stream.
 iree_status_t iree_hal_vulkan_spirv_verify_module(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count);
@@ -61,6 +71,24 @@ iree_status_t iree_hal_vulkan_spirv_analyze_module(
 // Verifies the raw BDA v1 hidden root push-constant block shape.
 iree_status_t iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
     const uint32_t* spirv_words, iree_host_size_t spirv_word_count);
+
+// Verifies that |analysis| and |spirv_words| satisfy the BDA executable ABI.
+iree_status_t iree_hal_vulkan_spirv_verify_bda_module_analysis(
+    const iree_hal_vulkan_spirv_module_analysis_t* analysis,
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags);
+
+// Verifies that a SPIR-V module satisfies the BDA executable ABI.
+iree_status_t iree_hal_vulkan_spirv_verify_bda_module(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags);
+
+// Verifies a BDA executable entry point and returns its local workgroup size.
+iree_status_t iree_hal_vulkan_spirv_verify_bda_entry_point(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_string_view_t entry_point,
+    iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags,
+    uint32_t out_workgroup_size[3]);
 
 // Parses compute entry points and their static local workgroup sizes.
 //

@@ -1258,81 +1258,6 @@ static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
       /*out_entry_point_found=*/NULL, out_workgroup_size);
 }
 
-typedef enum iree_hal_vulkan_bda_spirv_verification_flag_bits_e {
-  IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE = 0u,
-  IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT = 0x1u,
-} iree_hal_vulkan_bda_spirv_verification_flag_bits_t;
-typedef uint32_t iree_hal_vulkan_bda_spirv_verification_flags_t;
-
-static iree_status_t iree_hal_vulkan_verify_bda_spirv_analysis(
-    const iree_hal_vulkan_spirv_module_analysis_t* analysis,
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
-  if (!analysis->has_physical_storage_buffer_addresses_capability) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable must declare PhysicalStorageBufferAddresses");
-  }
-
-  if (!analysis->uses_physical_storage_buffer64_glsl450) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
-  }
-  if (analysis->has_descriptor_binding_decorations) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable must not declare descriptor set or binding "
-        "decorations");
-  }
-  if (analysis->has_descriptor_storage_class_variables) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable must not declare descriptor-backed variables");
-  }
-
-  if (iree_all_bits_set(
-          verification_flags,
-          IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT)) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_vulkan_spirv_verify_bda_root_push_constant_layout(
-            spirv_words, spirv_word_count));
-  }
-
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_vulkan_verify_bda_spirv_module(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags) {
-  iree_hal_vulkan_spirv_module_analysis_t analysis;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_analyze_module(
-      spirv_words, spirv_word_count, &analysis));
-  return iree_hal_vulkan_verify_bda_spirv_analysis(
-      &analysis, spirv_words, spirv_word_count, verification_flags);
-}
-
-static iree_status_t iree_hal_vulkan_verify_bda_spirv(
-    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
-    iree_string_view_t entry_point,
-    iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags,
-    uint32_t out_workgroup_size[3]) {
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv_module(
-      spirv_words, spirv_word_count, verification_flags));
-
-  bool entry_point_found = false;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_compute_workgroup_size(
-      spirv_words, spirv_word_count, entry_point, &entry_point_found,
-      out_workgroup_size));
-  if (!entry_point_found) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable has no compute entry point '%.*s'",
-        (int)entry_point.size, entry_point.data);
-  }
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_create_compute_pipeline(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     VkPipelineCache pipeline_cache,
@@ -1384,10 +1309,10 @@ static iree_status_t iree_hal_vulkan_create_compute_pipeline(
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_initialize_pipeline_bda_metadata(
           iree_hal_vulkan_PipelineDef_bda_dispatch_layout_get(pipeline_def),
           host_allocator, out_pipeline));
-      IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_bda_spirv(
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_verify_bda_entry_point(
           (const uint32_t*)spirv_code_vec,
           flatbuffers_uint32_vec_len(spirv_code_vec), entry_point_view,
-          IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE,
+          IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE,
           out_pipeline->workgroup_size));
       break;
     }
@@ -1621,15 +1546,15 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     status = iree_hal_vulkan_spirv_parse_compute_entry_points(
         spirv_words, spirv_word_count, entry_point_count, entry_points);
   }
-  iree_hal_vulkan_bda_spirv_verification_flags_t verification_flags =
-      IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT;
+  iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags =
+      IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT;
   if (iree_all_bits_set(
           executable_params->caching_mode,
           IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION)) {
-    verification_flags = IREE_HAL_VULKAN_BDA_SPIRV_VERIFICATION_FLAG_NONE;
+    verification_flags = IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE;
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_verify_bda_spirv_analysis(
+    status = iree_hal_vulkan_spirv_verify_bda_module_analysis(
         &analysis, spirv_words, spirv_word_count, verification_flags);
   }
 
