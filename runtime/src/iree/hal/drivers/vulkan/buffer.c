@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/vulkan/sparse_buffer.h"
 #include "iree/hal/local/transient_buffer.h"
 
@@ -24,6 +25,21 @@ enum iree_hal_vulkan_buffer_ownership_bits_e {
   IREE_HAL_VULKAN_BUFFER_OWNS_NONE = 0u,
   IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE = 1u << 0,
   IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY = 1u << 1,
+  IREE_HAL_VULKAN_BUFFER_OWNS_MAPPING_STATE = 1u << 2,
+};
+
+struct iree_hal_vulkan_buffer_mapping_state_t {
+  // Mutex protecting |mapped_data| and |active_mapping_count|.
+  iree_slim_mutex_t mutex;
+
+  // Host pointer returned by vkMapMemory while the allocation is mapped.
+  void* mapped_data;
+
+  // Number of live HAL mappings using |mapped_data|.
+  iree_host_size_t active_mapping_count;
+
+  // Byte length of the dense VkDeviceMemory allocation.
+  VkDeviceSize device_memory_size;
 };
 
 typedef struct iree_hal_vulkan_buffer_t {
@@ -44,6 +60,12 @@ typedef struct iree_hal_vulkan_buffer_t {
 
   // Byte offset within |device_memory| where this buffer's allocation begins.
   VkDeviceSize device_memory_offset;
+
+  // Shared mapping state for |device_memory|.
+  iree_hal_vulkan_buffer_mapping_state_t* mapping_state;
+
+  // Mapping state storage for buffers that own |device_memory|.
+  iree_hal_vulkan_buffer_mapping_state_t inline_mapping_state;
 
   // Vulkan buffer handle.
   VkBuffer handle;
@@ -72,6 +94,28 @@ static iree_hal_vulkan_buffer_t* iree_hal_vulkan_buffer_cast(
   return (iree_hal_vulkan_buffer_t*)base_value;
 }
 
+static void iree_hal_vulkan_buffer_mapping_state_initialize(
+    VkDeviceSize device_memory_size,
+    iree_hal_vulkan_buffer_mapping_state_t* out_mapping_state) {
+  memset(out_mapping_state, 0, sizeof(*out_mapping_state));
+  iree_slim_mutex_initialize(&out_mapping_state->mutex);
+  out_mapping_state->device_memory_size = device_memory_size;
+}
+
+static void iree_hal_vulkan_buffer_mapping_state_deinitialize(
+    iree_hal_vulkan_buffer_t* buffer,
+    iree_hal_vulkan_buffer_mapping_state_t* mapping_state) {
+  iree_slim_mutex_lock(&mapping_state->mutex);
+  if (mapping_state->mapped_data) {
+    iree_vkUnmapMemory(IREE_VULKAN_DEVICE(&buffer->syms),
+                       buffer->logical_device, buffer->device_memory);
+    mapping_state->mapped_data = NULL;
+    mapping_state->active_mapping_count = 0;
+  }
+  iree_slim_mutex_unlock(&mapping_state->mutex);
+  iree_slim_mutex_deinitialize(&mapping_state->mutex);
+}
+
 static iree_status_t iree_hal_vulkan_buffer_create_internal(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
@@ -80,8 +124,9 @@ static iree_status_t iree_hal_vulkan_buffer_create_internal(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkDeviceSize device_memory_offset, VkBuffer handle,
-    VkDeviceAddress device_address,
+    VkDeviceSize device_memory_offset, VkDeviceSize device_memory_size,
+    iree_hal_vulkan_buffer_mapping_state_t* borrowed_mapping_state,
+    VkBuffer handle, VkDeviceAddress device_address,
     iree_hal_vulkan_buffer_ownership_t ownership,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
@@ -116,6 +161,13 @@ static iree_status_t iree_hal_vulkan_buffer_create_internal(
   buffer->logical_device = logical_device;
   buffer->device_memory = device_memory;
   buffer->device_memory_offset = device_memory_offset;
+  if (iree_any_bit_set(ownership, IREE_HAL_VULKAN_BUFFER_OWNS_MAPPING_STATE)) {
+    iree_hal_vulkan_buffer_mapping_state_initialize(
+        device_memory_size, &buffer->inline_mapping_state);
+    buffer->mapping_state = &buffer->inline_mapping_state;
+  } else {
+    buffer->mapping_state = borrowed_mapping_state;
+  }
   buffer->handle = handle;
   buffer->device_address = device_address;
   buffer->memory_property_flags = memory_property_flags;
@@ -136,17 +188,19 @@ iree_status_t iree_hal_vulkan_buffer_create(
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_length, VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkDeviceSize device_memory_offset, VkBuffer handle,
-    VkDeviceAddress device_address,
+    VkDeviceSize device_memory_offset, VkDeviceSize device_memory_size,
+    VkBuffer handle, VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   return iree_hal_vulkan_buffer_create_internal(
       syms, logical_device, placement, memory_type, allowed_access,
       allowed_usage, allocation_size, /*byte_offset=*/0, byte_length,
       memory_property_flags, non_coherent_atom_size, device_memory,
-      device_memory_offset, handle, device_address,
+      device_memory_offset, device_memory_size, /*borrowed_mapping_state=*/NULL,
+      handle, device_address,
       IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE |
-          IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY,
+          IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY |
+          IREE_HAL_VULKAN_BUFFER_OWNS_MAPPING_STATE,
       release_callback, host_allocator, out_buffer);
 }
 
@@ -158,16 +212,18 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkBuffer handle, VkDeviceAddress device_address,
+    iree_hal_vulkan_buffer_mapping_state_t* mapping_state, VkBuffer handle,
+    VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   return iree_hal_vulkan_buffer_create_internal(
       syms, logical_device, placement, memory_type, allowed_access,
       allowed_usage, allocation_size, byte_offset, byte_length,
       memory_property_flags, non_coherent_atom_size, device_memory,
-      /*device_memory_offset=*/0, handle, device_address,
-      IREE_HAL_VULKAN_BUFFER_OWNS_NONE, release_callback, host_allocator,
-      out_buffer);
+      /*device_memory_offset=*/0,
+      mapping_state ? mapping_state->device_memory_size : 0, mapping_state,
+      handle, device_address, IREE_HAL_VULKAN_BUFFER_OWNS_NONE,
+      release_callback, host_allocator, out_buffer);
 }
 
 static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
@@ -177,6 +233,11 @@ static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
+  if (iree_any_bit_set(buffer->ownership,
+                       IREE_HAL_VULKAN_BUFFER_OWNS_MAPPING_STATE)) {
+    iree_hal_vulkan_buffer_mapping_state_deinitialize(buffer,
+                                                      buffer->mapping_state);
+  }
   if (buffer->handle &&
       iree_any_bit_set(buffer->ownership, IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE)) {
     IREE_TRACE_FREE_NAMED(IREE_HAL_VULKAN_ALLOCATOR_ID, (void*)buffer->handle);
@@ -203,6 +264,13 @@ static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
 bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer) {
   return iree_hal_resource_is((const iree_hal_resource_t*)buffer,
                               &iree_hal_vulkan_buffer_vtable);
+}
+
+iree_hal_vulkan_buffer_mapping_state_t* iree_hal_vulkan_buffer_mapping_state(
+    iree_hal_buffer_t* buffer) {
+  if (!iree_hal_vulkan_buffer_isa(buffer)) return NULL;
+  iree_hal_vulkan_buffer_t* vulkan_buffer = iree_hal_vulkan_buffer_cast(buffer);
+  return vulkan_buffer->mapping_state;
 }
 
 iree_status_t iree_hal_vulkan_buffer_resolve_backing(
@@ -311,32 +379,48 @@ static bool iree_hal_vulkan_buffer_is_host_coherent(
                            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 }
 
-static VkMappedMemoryRange iree_hal_vulkan_buffer_make_mapped_memory_range(
+static iree_status_t iree_hal_vulkan_buffer_make_mapped_memory_range(
     const iree_hal_vulkan_buffer_t* buffer,
-    iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length) {
+    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
+    VkMappedMemoryRange* out_range) {
+  if (!buffer->mapping_state) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan buffer has no dense device memory mapping state");
+  }
   const VkDeviceSize atom_size = buffer->non_coherent_atom_size;
   const VkDeviceSize atom_mask = atom_size - 1;
-  const VkDeviceSize allocation_size =
-      (VkDeviceSize)iree_hal_buffer_allocation_size(&buffer->base);
-  VkDeviceSize range_offset = (VkDeviceSize)local_byte_offset & ~atom_mask;
-  VkDeviceSize range_end =
-      (VkDeviceSize)local_byte_offset + (VkDeviceSize)local_byte_length;
-  if (range_end < allocation_size) {
-    range_end = (range_end + atom_mask) & ~atom_mask;
+  const VkDeviceSize device_memory_size =
+      buffer->mapping_state->device_memory_size;
+  if (IREE_UNLIKELY((VkDeviceSize)local_byte_offset > device_memory_size ||
+                    buffer->device_memory_offset >
+                        device_memory_size - (VkDeviceSize)local_byte_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan mapped-memory range offset overflows");
   }
-  if (range_end > allocation_size) range_end = allocation_size;
-  return (VkMappedMemoryRange){
+  VkDeviceSize range_offset =
+      buffer->device_memory_offset + (VkDeviceSize)local_byte_offset;
+  if (IREE_UNLIKELY((VkDeviceSize)local_byte_length >
+                    device_memory_size - range_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan mapped-memory range exceeds allocation");
+  }
+  VkDeviceSize range_end = range_offset + (VkDeviceSize)local_byte_length;
+  range_offset &= ~atom_mask;
+  if (range_end < device_memory_size) {
+    range_end = atom_mask > device_memory_size - range_end
+                    ? device_memory_size
+                    : (range_end + atom_mask) & ~atom_mask;
+  }
+  if (range_end > device_memory_size) range_end = device_memory_size;
+  *out_range = (VkMappedMemoryRange){
       .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
       .memory = buffer->device_memory,
-      .offset = buffer->device_memory_offset + range_offset,
-      .size =
-          range_end == allocation_size &&
-                  iree_all_bits_set(buffer->ownership,
-                                    IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY)
-              ? VK_WHOLE_SIZE
-              : range_end - range_offset,
+      .offset = range_offset,
+      .size = range_end == device_memory_size ? VK_WHOLE_SIZE
+                                              : range_end - range_offset,
   };
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_buffer_map_range(
@@ -351,6 +435,11 @@ static iree_status_t iree_hal_vulkan_buffer_map_range(
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "Vulkan buffer has no dense device memory to map");
   }
+  if (!buffer->mapping_state) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan buffer has no dense device memory mapping state");
+  }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(base_buffer),
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
@@ -364,13 +453,41 @@ static iree_status_t iree_hal_vulkan_buffer_map_range(
     return iree_ok_status();
   }
 
-  void* data = NULL;
-  IREE_RETURN_IF_ERROR(iree_vkMapMemory(
-      IREE_VULKAN_DEVICE(&buffer->syms), buffer->logical_device,
-      buffer->device_memory,
-      buffer->device_memory_offset + (VkDeviceSize)local_byte_offset,
-      (VkDeviceSize)local_byte_length, /*flags=*/0, &data));
-  mapping->contents = iree_make_byte_span(data, local_byte_length);
+  iree_hal_vulkan_buffer_mapping_state_t* mapping_state = buffer->mapping_state;
+  if (IREE_UNLIKELY(
+          (VkDeviceSize)local_byte_offset > mapping_state->device_memory_size ||
+          buffer->device_memory_offset > mapping_state->device_memory_size -
+                                             (VkDeviceSize)local_byte_offset ||
+          (VkDeviceSize)local_byte_length >
+              mapping_state->device_memory_size - buffer->device_memory_offset -
+                  (VkDeviceSize)local_byte_offset)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "Vulkan mapped byte range exceeds VkDeviceMemory");
+  }
+
+  iree_status_t status = iree_ok_status();
+  iree_slim_mutex_lock(&mapping_state->mutex);
+  if (!mapping_state->mapped_data) {
+    status = iree_vkMapMemory(IREE_VULKAN_DEVICE(&buffer->syms),
+                              buffer->logical_device, buffer->device_memory,
+                              /*offset=*/0, mapping_state->device_memory_size,
+                              /*flags=*/0, &mapping_state->mapped_data);
+  }
+  if (iree_status_is_ok(status) &&
+      IREE_UNLIKELY(mapping_state->active_mapping_count ==
+                    IREE_HOST_SIZE_MAX)) {
+    status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "Vulkan buffer mapping count overflow");
+  }
+  if (iree_status_is_ok(status)) {
+    mapping_state->active_mapping_count += 1;
+    mapping->impl.reserved[0] = (uint64_t)(uintptr_t)mapping_state;
+    uint8_t* data = (uint8_t*)mapping_state->mapped_data +
+                    buffer->device_memory_offset + local_byte_offset;
+    mapping->contents = iree_make_byte_span(data, local_byte_length);
+  }
+  iree_slim_mutex_unlock(&mapping_state->mutex);
+  IREE_RETURN_IF_ERROR(status);
 
 #if !defined(NDEBUG)
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
@@ -387,9 +504,26 @@ static iree_status_t iree_hal_vulkan_buffer_unmap_range(
   iree_hal_vulkan_buffer_t* buffer = iree_hal_vulkan_buffer_cast(base_buffer);
   (void)local_byte_offset;
   (void)local_byte_length;
-  (void)mapping;
-  iree_vkUnmapMemory(IREE_VULKAN_DEVICE(&buffer->syms), buffer->logical_device,
-                     buffer->device_memory);
+  iree_hal_vulkan_buffer_mapping_state_t* mapping_state =
+      (iree_hal_vulkan_buffer_mapping_state_t*)(uintptr_t)
+          mapping->impl.reserved[0];
+  if (!mapping_state) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "Vulkan buffer mapping has no mapping state");
+  }
+  iree_slim_mutex_lock(&mapping_state->mutex);
+  if (IREE_UNLIKELY(mapping_state->active_mapping_count == 0)) {
+    iree_slim_mutex_unlock(&mapping_state->mutex);
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "Vulkan buffer mapping count underflow");
+  }
+  mapping_state->active_mapping_count -= 1;
+  if (mapping_state->active_mapping_count == 0) {
+    iree_vkUnmapMemory(IREE_VULKAN_DEVICE(&buffer->syms),
+                       buffer->logical_device, buffer->device_memory);
+    mapping_state->mapped_data = NULL;
+  }
+  iree_slim_mutex_unlock(&mapping_state->mutex);
   return iree_ok_status();
 }
 
@@ -401,8 +535,9 @@ static iree_status_t iree_hal_vulkan_buffer_invalidate_range(
       iree_hal_vulkan_buffer_is_host_coherent(buffer)) {
     return iree_ok_status();
   }
-  VkMappedMemoryRange range = iree_hal_vulkan_buffer_make_mapped_memory_range(
-      buffer, local_byte_offset, local_byte_length);
+  VkMappedMemoryRange range;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_make_mapped_memory_range(
+      buffer, local_byte_offset, local_byte_length, &range));
   return iree_vkInvalidateMappedMemoryRanges(IREE_VULKAN_DEVICE(&buffer->syms),
                                              buffer->logical_device,
                                              /*memoryRangeCount=*/1, &range);
@@ -416,8 +551,9 @@ static iree_status_t iree_hal_vulkan_buffer_flush_range(
       iree_hal_vulkan_buffer_is_host_coherent(buffer)) {
     return iree_ok_status();
   }
-  VkMappedMemoryRange range = iree_hal_vulkan_buffer_make_mapped_memory_range(
-      buffer, local_byte_offset, local_byte_length);
+  VkMappedMemoryRange range;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_make_mapped_memory_range(
+      buffer, local_byte_offset, local_byte_length, &range));
   return iree_vkFlushMappedMemoryRanges(IREE_VULKAN_DEVICE(&buffer->syms),
                                         buffer->logical_device,
                                         /*memoryRangeCount=*/1, &range);

@@ -346,6 +346,8 @@ static iree_status_t iree_hal_vulkan_slab_provider_wrap_buffer(
   VkDeviceAddress device_address = 0;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_slab_provider_query_device_address(
       slab_buffer, &device_address));
+  iree_hal_vulkan_buffer_mapping_state_t* mapping_state =
+      iree_hal_vulkan_buffer_mapping_state(slab_buffer);
 
   const iree_hal_buffer_placement_t placement = {
       .device = provider->parent_device,
@@ -354,10 +356,10 @@ static iree_status_t iree_hal_vulkan_slab_provider_wrap_buffer(
   };
   return iree_hal_vulkan_buffer_create_borrowed(
       &provider->syms, provider->logical_device, placement, resolved_type,
-      params.access, params.usage, slab_offset + allocation_size, slab_offset,
-      allocation_size, provider->memory_property_flags,
-      provider->non_coherent_atom_size, device_memory, handle, device_address,
-      release_callback, provider->host_allocator, out_buffer);
+      params.access, params.usage, slab->length, slab_offset, allocation_size,
+      provider->memory_property_flags, provider->non_coherent_atom_size,
+      device_memory, mapping_state, handle, device_address, release_callback,
+      provider->host_allocator, out_buffer);
 }
 
 static void iree_hal_vulkan_slab_provider_prefault(

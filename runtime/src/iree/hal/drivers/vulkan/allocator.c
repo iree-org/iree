@@ -1705,7 +1705,8 @@ iree_hal_vulkan_allocator_allocate_direct_buffer_with_memory_type_bits(
           compat_params.usage, allocation_size, byte_length,
           memory_placement.memory_property_flags,
           allocator->properties2.properties.limits.nonCoherentAtomSize,
-          device_memory, /*device_memory_offset=*/0, handle,
+          device_memory, /*device_memory_offset=*/0, memory_requirements.size,
+          handle,
           iree_hal_vulkan_allocator_query_device_address(
               allocator, compat_params.usage, handle),
           iree_hal_buffer_release_callback_null(), allocator->host_allocator,
@@ -2132,7 +2133,8 @@ static iree_status_t iree_hal_vulkan_allocator_import_buffer(
         allocation_size, external_buffer->size,
         memory_placement.memory_property_flags,
         allocator->properties2.properties.limits.nonCoherentAtomSize,
-        device_memory, /*device_memory_offset=*/0, handle,
+        device_memory, /*device_memory_offset=*/0, memory_requirements.size,
+        handle,
         iree_hal_vulkan_allocator_query_device_address(
             allocator, compat_params.usage, handle),
         release_callback, allocator->host_allocator, &buffer);

@@ -19,6 +19,10 @@ extern "C" {
 // iree_hal_vulkan_buffer_t
 //===----------------------------------------------------------------------===//
 
+// Shared mapping state for one dense VkDeviceMemory allocation.
+typedef struct iree_hal_vulkan_buffer_mapping_state_t
+    iree_hal_vulkan_buffer_mapping_state_t;
+
 // Wraps a bound Vulkan buffer allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_vulkan_buffer_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
@@ -27,8 +31,8 @@ iree_status_t iree_hal_vulkan_buffer_create(
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
     iree_device_size_t byte_length, VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkDeviceSize device_memory_offset, VkBuffer handle,
-    VkDeviceAddress device_address,
+    VkDeviceSize device_memory_offset, VkDeviceSize device_memory_size,
+    VkBuffer handle, VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
@@ -48,12 +52,17 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkBuffer handle, VkDeviceAddress device_address,
+    iree_hal_vulkan_buffer_mapping_state_t* mapping_state, VkBuffer handle,
+    VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
 // Returns true if |buffer| is a Vulkan HAL buffer.
 bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer);
+
+// Returns the shared mapping state for a dense Vulkan HAL buffer.
+iree_hal_vulkan_buffer_mapping_state_t* iree_hal_vulkan_buffer_mapping_state(
+    iree_hal_buffer_t* buffer);
 
 // Resolves |buffer| to a Vulkan-backed buffer view suitable for queue packet
 // emission. Transient queue-allocation wrappers return their staged backing
