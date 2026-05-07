@@ -941,6 +941,60 @@ static bool iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
   return true;
 }
 
+iree_status_t iree_hal_vulkan_command_buffer_count_profiled_dispatches(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id,
+    uint32_t* out_dispatch_count) {
+  *out_dispatch_count = 0;
+  if (!iree_hal_local_profile_recorder_is_enabled(
+          profile_recorder, IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  if (command_buffer->state != IREE_HAL_VULKAN_COMMAND_BUFFER_STATE_ENDED) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan dispatch profile counting requires ended command buffer");
+  }
+
+  const bool is_command_buffer_dispatch = command_buffer_id != 0;
+  uint32_t dispatch_count = 0;
+  iree_hal_vulkan_command_buffer_iterator_t iterator =
+      iree_hal_vulkan_command_buffer_iterator(command_buffer);
+  const iree_hal_vulkan_command_t* command = NULL;
+  iree_host_size_t command_index = 0;
+  while (iree_hal_vulkan_command_buffer_iterator_next(&iterator, &command,
+                                                      &command_index)) {
+    if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
+    const iree_hal_vulkan_command_dispatch_t* dispatch =
+        iree_hal_vulkan_command_dispatch_payload(command);
+    if (is_command_buffer_dispatch && command_index > UINT32_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan dispatch profile command index exceeds uint32_t");
+    }
+    const uint32_t profile_command_index =
+        is_command_buffer_dispatch ? (uint32_t)command_index : UINT32_MAX;
+    if (!iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
+            profile_recorder, scope, command_buffer_id, profile_command_index,
+            dispatch->pipeline)) {
+      continue;
+    }
+    if (dispatch_count == UINT32_MAX) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan dispatch profile dispatch count exceeds uint32_t");
+    }
+    dispatch_count = dispatch_count + 1;
+  }
+
+  *out_dispatch_count = dispatch_count;
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_local_profile_recorder_t* profile_recorder,
@@ -976,13 +1030,6 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     if (command->type != IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH) continue;
     const iree_hal_vulkan_command_dispatch_t* dispatch =
         iree_hal_vulkan_command_dispatch_payload(command);
-    if (dispatch_ordinal >= dispatch_count) {
-      return iree_make_status(
-          IREE_STATUS_OUT_OF_RANGE,
-          "Vulkan dispatch profile timestamp count is smaller than the "
-          "recorded dispatch count");
-    }
-
     const iree_hal_vulkan_pipeline_t* pipeline = dispatch->pipeline;
     if (is_command_buffer_dispatch && command_index > UINT32_MAX) {
       return iree_make_status(
@@ -994,8 +1041,13 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     if (!iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
             profile_recorder, scope, command_buffer_id, profile_command_index,
             pipeline)) {
-      ++dispatch_ordinal;
       continue;
+    }
+    if (dispatch_ordinal >= dispatch_count) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan dispatch profile timestamp count is smaller than the "
+          "profiled dispatch count");
     }
     if (pipeline->workgroup_size[0] == 0) {
       return iree_make_status(
@@ -1042,7 +1094,7 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
   if (dispatch_ordinal != dispatch_count) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan dispatch profile timestamp count exceeds recorded dispatch "
+        "Vulkan dispatch profile timestamp count exceeds profiled dispatch "
         "count");
   }
   return iree_ok_status();
@@ -2240,7 +2292,8 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
   if (iree_status_is_ok(status) && profile_marker &&
       profile_marker->query_pool && profile_marker->query_count != 0) {
     iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(syms), native_command_buffer,
-                             profile_marker->query_pool, /*firstQuery=*/0,
+                             profile_marker->query_pool,
+                             profile_marker->first_query,
                              profile_marker->query_count);
     if (profile_marker->queue_start_query !=
         IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
@@ -2254,9 +2307,10 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
   iree_hal_vulkan_command_buffer_iterator_t iterator =
       iree_hal_vulkan_command_buffer_iterator(command_buffer);
   const iree_hal_vulkan_command_t* command = NULL;
+  iree_host_size_t command_index = 0;
   while (iree_status_is_ok(status) &&
-         iree_hal_vulkan_command_buffer_iterator_next(
-             &iterator, &command, /*out_command_index=*/NULL)) {
+         iree_hal_vulkan_command_buffer_iterator_next(&iterator, &command,
+                                                      &command_index)) {
     switch (command->type) {
       case IREE_HAL_VULKAN_COMMAND_TYPE_FILL_BUFFER:
         status = iree_hal_vulkan_command_buffer_record_fill_native(
@@ -2280,28 +2334,48 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
         if (profile_marker && profile_marker->query_pool &&
             profile_marker->dispatch_base_query !=
                 IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
-          if (dispatch_query_ordinal >= profile_marker->dispatch_query_count) {
+          const iree_hal_vulkan_command_dispatch_t* dispatch =
+              iree_hal_vulkan_command_dispatch_payload(command);
+          if (profile_marker->command_buffer_id != 0 &&
+              command_index > UINT32_MAX) {
             status = iree_make_status(
                 IREE_STATUS_OUT_OF_RANGE,
-                "Vulkan dispatch profile query count is smaller than the "
-                "recorded dispatch count");
+                "Vulkan dispatch profile command index exceeds uint32_t");
             break;
           }
-          const uint32_t query_index =
-              profile_marker->dispatch_base_query + dispatch_query_ordinal * 2;
-          dispatch_profile_marker =
-              (iree_hal_vulkan_command_buffer_dispatch_profile_marker_t){
-                  .query_pool = profile_marker->query_pool,
-                  .start_query = query_index,
-                  .end_query = query_index + 1,
-              };
-          dispatch_profile_marker_ptr = &dispatch_profile_marker;
+          const uint32_t profile_command_index =
+              profile_marker->command_buffer_id != 0 ? (uint32_t)command_index
+                                                     : UINT32_MAX;
+          const bool profile_dispatch =
+              iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
+                  profile_marker->recorder, profile_marker->scope,
+                  profile_marker->command_buffer_id, profile_command_index,
+                  dispatch->pipeline);
+          if (profile_dispatch) {
+            if (dispatch_query_ordinal >=
+                profile_marker->dispatch_query_count) {
+              status = iree_make_status(
+                  IREE_STATUS_OUT_OF_RANGE,
+                  "Vulkan dispatch profile query count is smaller than the "
+                  "profiled dispatch count");
+              break;
+            }
+            const uint32_t query_index = profile_marker->dispatch_base_query +
+                                         dispatch_query_ordinal * 2;
+            dispatch_profile_marker =
+                (iree_hal_vulkan_command_buffer_dispatch_profile_marker_t){
+                    .query_pool = profile_marker->query_pool,
+                    .start_query = query_index,
+                    .end_query = query_index + 1,
+                };
+            dispatch_profile_marker_ptr = &dispatch_profile_marker;
+            dispatch_query_ordinal = dispatch_query_ordinal + 1;
+          }
         }
         status = iree_hal_vulkan_command_buffer_record_dispatch_native(
             syms, logical_device, native_command_buffer, binding_table, command,
             descriptor_pool, &bda_recording_state, bda_binding_cache,
             dispatch_profile_marker_ptr, host_allocator);
-        ++dispatch_query_ordinal;
         break;
       }
       case IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER:
@@ -2323,7 +2397,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
       dispatch_query_ordinal != profile_marker->dispatch_query_count) {
     status = iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan dispatch profile query count exceeds recorded dispatch count");
+        "Vulkan dispatch profile query count exceeds profiled dispatch count");
   }
   if (iree_status_is_ok(status) && profile_marker &&
       profile_marker->query_pool &&

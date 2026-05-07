@@ -127,10 +127,18 @@ iree_status_t iree_hal_vulkan_command_buffer_record_profile_metadata(
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id);
 
+// Counts dispatch commands that match the active profile capture filter.
+iree_status_t iree_hal_vulkan_command_buffer_count_profiled_dispatches(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_local_profile_recorder_t* profile_recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id,
+    uint32_t* out_dispatch_count);
+
 // Appends dispatch profile events from timestamp pairs recorded around each
-// dispatch command.
+// profiled dispatch command.
 //
-// |dispatch_ticks| contains |dispatch_count| adjacent start/end tick pairs.
+// |dispatch_ticks| contains |dispatch_count| adjacent start/end tick pairs for
+// dispatch commands that matched the active profile capture filter.
 // |command_buffer_id| is 0 for direct queue dispatches and nonzero for reusable
 // command-buffer dispatches.
 iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
@@ -159,7 +167,10 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
   // Query pool receiving timestamp records, or VK_NULL_HANDLE when absent.
   VkQueryPool query_pool;
 
-  // Number of query slots allocated in query_pool.
+  // First query slot reset before timestamp writes.
+  uint32_t first_query;
+
+  // Number of query slots reset before timestamp writes.
   uint32_t query_count;
 
   // Query index written before the command-buffer payload, or ABSENT.
@@ -173,6 +184,15 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 
   // Number of dispatch commands with per-dispatch timestamp pairs.
   uint32_t dispatch_query_count;
+
+  // Profile recorder used to apply capture filters to dispatch timestamping.
+  iree_hal_local_profile_recorder_t* recorder;
+
+  // Queue metadata identity used to match profile capture filters.
+  iree_hal_local_profile_queue_scope_t scope;
+
+  // Session-local command-buffer id used to match profile capture filters.
+  uint64_t command_buffer_id;
 } iree_hal_vulkan_command_buffer_profile_marker_t;
 
 // Records Vulkan-native commands into |native_command_buffer|.

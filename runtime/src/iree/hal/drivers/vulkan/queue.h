@@ -44,6 +44,8 @@ typedef struct iree_hal_vulkan_queue_native_descriptor_block_t
     iree_hal_vulkan_queue_native_descriptor_block_t;
 typedef struct iree_hal_vulkan_queue_bda_publication_block_t
     iree_hal_vulkan_queue_bda_publication_block_t;
+typedef struct iree_hal_vulkan_queue_timestamp_query_block_t
+    iree_hal_vulkan_queue_timestamp_query_block_t;
 typedef struct iree_hal_vulkan_queue_native_replay_t
     iree_hal_vulkan_queue_native_replay_t;
 typedef struct iree_hal_vulkan_queue_staging_ring_t
@@ -270,6 +272,21 @@ typedef struct iree_hal_vulkan_queue_t {
     uint32_t block_count;
   } bda_publication_cache;
 
+  // Queue-owned timestamp query pool cache for device profiling.
+  struct {
+    // First timestamp query block owned by this queue.
+    iree_hal_vulkan_queue_timestamp_query_block_t* head;
+
+    // Last timestamp query block owned by this queue.
+    iree_hal_vulkan_queue_timestamp_query_block_t* tail;
+
+    // Next timestamp query block considered for acquisition.
+    iree_hal_vulkan_queue_timestamp_query_block_t* cursor;
+
+    // Number of timestamp query blocks currently owned by this queue.
+    uint32_t block_count;
+  } timestamp_query_cache;
+
   // Queue-owned native BDA command-buffer replay cache.
   struct {
     // First native replay instance owned by this queue.
@@ -367,6 +384,10 @@ void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue);
 
 // Trims idle queue-owned replay/cache resources.
 void iree_hal_vulkan_queue_trim(iree_hal_vulkan_queue_t* queue);
+
+// Prepares queue-owned timestamp query storage for a profiling session.
+iree_status_t iree_hal_vulkan_queue_prepare_profile_timestamp_queries(
+    iree_hal_vulkan_queue_t* queue);
 
 // Assigns this queue's causal frontier axis and starts completion processing.
 iree_status_t iree_hal_vulkan_queue_assign_frontier(

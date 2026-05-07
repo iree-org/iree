@@ -1802,6 +1802,11 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
     IREE_RETURN_IF_ERROR(
         iree_hal_vulkan_logical_device_validate_queue_device_profiling(
             device, &profile_host_time_domain));
+    for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+      IREE_RETURN_IF_ERROR(
+          iree_hal_vulkan_queue_prepare_profile_timestamp_queries(
+              &device->queue_lanes[i]));
+    }
   }
 
   const uint32_t physical_device_ordinal =

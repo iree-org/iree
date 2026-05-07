@@ -31,6 +31,7 @@
 #define IREE_HAL_VULKAN_QUEUE_NATIVE_DESCRIPTOR_BLOCK_SET_CAPACITY 4096
 #define IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_BLOCK_SIZE (64ull * 1024ull)
 #define IREE_HAL_VULKAN_QUEUE_BDA_PUBLICATION_ALIGNMENT 8ull
+#define IREE_HAL_VULKAN_QUEUE_TIMESTAMP_QUERY_BLOCK_CAPACITY (64 * 1024)
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_SET_CAPACITY 8
 #define IREE_HAL_VULKAN_QUEUE_DISPATCH_INLINE_BINDING_CAPACITY 16
 
@@ -168,6 +169,37 @@ typedef struct iree_hal_vulkan_queue_bda_publication_lease_t {
   // Byte length of the leased range.
   iree_device_size_t length;
 } iree_hal_vulkan_queue_bda_publication_lease_t;
+
+struct iree_hal_vulkan_queue_timestamp_query_block_t {
+  // Next block in the queue-owned timestamp query cache.
+  iree_hal_vulkan_queue_timestamp_query_block_t* next;
+
+  // Query pool backing |query_values|.
+  VkQueryPool pool;
+
+  // Host storage used for retired timestamp query results.
+  uint64_t* query_values;
+
+  // Total query slot capacity of |pool|.
+  uint32_t capacity;
+
+  // Bump allocation position within |pool|.
+  uint32_t allocated_count;
+
+  // Number of submissions retaining ranges from this block.
+  uint32_t active_lease_count;
+};
+
+typedef struct iree_hal_vulkan_queue_timestamp_query_lease_t {
+  // Timestamp query block containing the leased range.
+  iree_hal_vulkan_queue_timestamp_query_block_t* block;
+
+  // First query slot in |block|.
+  uint32_t first_query;
+
+  // Number of query slots in the lease.
+  uint32_t query_count;
+} iree_hal_vulkan_queue_timestamp_query_lease_t;
 
 struct iree_hal_vulkan_queue_native_replay_t {
   // Next native replay instance in the queue-owned cache.
@@ -339,10 +371,16 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Set after the queue event has been appended to the recorder.
     bool queue_event_recorded;
 
+    // Timestamp query cache lease held by this submission.
+    iree_hal_vulkan_queue_timestamp_query_lease_t timestamp_query_lease;
+
     // Query pool receiving device timestamps, or VK_NULL_HANDLE.
     VkQueryPool query_pool;
 
-    // Number of query slots allocated in query_pool.
+    // First query slot leased from query_pool.
+    uint32_t first_query;
+
+    // Number of query slots leased from query_pool.
     uint32_t query_count;
 
     // Query index written before native command payloads, or ABSENT.
@@ -2366,6 +2404,256 @@ static iree_status_t iree_hal_vulkan_queue_create_timestamp_query_pool(
                                 /*pAllocator=*/NULL, out_query_pool);
 }
 
+static iree_status_t iree_hal_vulkan_queue_timestamp_query_block_create(
+    iree_hal_vulkan_queue_t* queue, uint32_t minimum_query_count,
+    iree_hal_vulkan_queue_timestamp_query_block_t** out_block) {
+  *out_block = NULL;
+  const uint32_t capacity =
+      iree_max(minimum_query_count,
+               (uint32_t)IREE_HAL_VULKAN_QUEUE_TIMESTAMP_QUERY_BLOCK_CAPACITY);
+
+  iree_hal_vulkan_queue_timestamp_query_block_t* block = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(queue->host_allocator,
+                                             sizeof(*block), (void**)&block));
+  memset(block, 0, sizeof(*block));
+  block->capacity = capacity;
+
+  iree_status_t status = iree_hal_vulkan_queue_create_timestamp_query_pool(
+      queue, capacity, &block->pool);
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc_array(queue->host_allocator, capacity,
+                                         sizeof(block->query_values[0]),
+                                         (void**)&block->query_values);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_block = block;
+  } else {
+    if (block->pool) {
+      iree_vkDestroyQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
+                              queue->logical_device, block->pool,
+                              /*pAllocator=*/NULL);
+    }
+    iree_allocator_free(queue->host_allocator, block->query_values);
+    iree_allocator_free(queue->host_allocator, block);
+  }
+  return status;
+}
+
+static void iree_hal_vulkan_queue_timestamp_query_block_destroy(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_timestamp_query_block_t* block) {
+  if (!block) return;
+  if (block->pool) {
+    iree_vkDestroyQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
+                            queue->logical_device, block->pool,
+                            /*pAllocator=*/NULL);
+  }
+  iree_allocator_free(queue->host_allocator, block->query_values);
+  iree_allocator_free(queue->host_allocator, block);
+}
+
+static void iree_hal_vulkan_queue_timestamp_query_cache_append_block(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_timestamp_query_block_t* block) {
+  block->next = NULL;
+  if (queue->timestamp_query_cache.tail) {
+    queue->timestamp_query_cache.tail->next = block;
+  } else {
+    queue->timestamp_query_cache.head = block;
+  }
+  queue->timestamp_query_cache.tail = block;
+  if (!queue->timestamp_query_cache.cursor) {
+    queue->timestamp_query_cache.cursor = block;
+  }
+  queue->timestamp_query_cache.block_count =
+      queue->timestamp_query_cache.block_count + 1;
+}
+
+static void iree_hal_vulkan_queue_timestamp_query_cache_deinitialize(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_hal_vulkan_queue_timestamp_query_block_t* block =
+      queue->timestamp_query_cache.head;
+  while (block) {
+    iree_hal_vulkan_queue_timestamp_query_block_t* next = block->next;
+    iree_hal_vulkan_queue_timestamp_query_block_destroy(queue, block);
+    block = next;
+  }
+  memset(&queue->timestamp_query_cache, 0,
+         sizeof(queue->timestamp_query_cache));
+}
+
+static void iree_hal_vulkan_queue_timestamp_query_cache_unlink_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_timestamp_query_block_t* previous,
+    iree_hal_vulkan_queue_timestamp_query_block_t* block) {
+  if (previous) {
+    previous->next = block->next;
+  } else {
+    queue->timestamp_query_cache.head = block->next;
+  }
+  if (queue->timestamp_query_cache.tail == block) {
+    queue->timestamp_query_cache.tail = previous;
+  }
+  if (queue->timestamp_query_cache.cursor == block) {
+    queue->timestamp_query_cache.cursor =
+        block->next ? block->next : queue->timestamp_query_cache.head;
+  }
+  IREE_ASSERT(queue->timestamp_query_cache.block_count > 0,
+              "timestamp query block count underflow");
+  queue->timestamp_query_cache.block_count =
+      queue->timestamp_query_cache.block_count - 1;
+  block->next = NULL;
+}
+
+static void iree_hal_vulkan_queue_timestamp_query_cache_trim(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_hal_vulkan_queue_timestamp_query_block_t* destroy_head = NULL;
+  iree_hal_vulkan_queue_timestamp_query_block_t* destroy_tail = NULL;
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  bool retained_default_idle_block = false;
+  iree_hal_vulkan_queue_timestamp_query_block_t* previous = NULL;
+  iree_hal_vulkan_queue_timestamp_query_block_t* block =
+      queue->timestamp_query_cache.head;
+  while (block) {
+    iree_hal_vulkan_queue_timestamp_query_block_t* next = block->next;
+    const bool has_active_leases = block->active_lease_count != 0;
+    const bool should_retain_idle =
+        !has_active_leases && !retained_default_idle_block &&
+        block->capacity <=
+            (uint32_t)IREE_HAL_VULKAN_QUEUE_TIMESTAMP_QUERY_BLOCK_CAPACITY;
+    if (has_active_leases || should_retain_idle) {
+      if (should_retain_idle) {
+        block->allocated_count = 0;
+        retained_default_idle_block = true;
+      }
+      previous = block;
+    } else {
+      iree_hal_vulkan_queue_timestamp_query_cache_unlink_under_lock(
+          queue, previous, block);
+      if (destroy_tail) {
+        destroy_tail->next = block;
+      } else {
+        destroy_head = block;
+      }
+      destroy_tail = block;
+    }
+    block = next;
+  }
+  if (!queue->timestamp_query_cache.cursor) {
+    queue->timestamp_query_cache.cursor = queue->timestamp_query_cache.head;
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  while (destroy_head) {
+    iree_hal_vulkan_queue_timestamp_query_block_t* next = destroy_head->next;
+    destroy_head->next = NULL;
+    iree_hal_vulkan_queue_timestamp_query_block_destroy(queue, destroy_head);
+    destroy_head = next;
+  }
+}
+
+static bool iree_hal_vulkan_queue_timestamp_query_block_try_allocate(
+    iree_hal_vulkan_queue_timestamp_query_block_t* block, uint32_t query_count,
+    uint32_t* out_first_query) {
+  *out_first_query = 0;
+  if (query_count > block->capacity) return false;
+  if (query_count > block->capacity - block->allocated_count) {
+    if (block->active_lease_count != 0) return false;
+    block->allocated_count = 0;
+  }
+  if (query_count > block->capacity - block->allocated_count) return false;
+  *out_first_query = block->allocated_count;
+  block->allocated_count = block->allocated_count + query_count;
+  return true;
+}
+
+static bool iree_hal_vulkan_queue_try_acquire_timestamp_queries_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    uint32_t query_count) {
+  uint32_t first_query = 0;
+  iree_hal_vulkan_queue_timestamp_query_block_t* first_block =
+      queue->timestamp_query_cache.cursor ? queue->timestamp_query_cache.cursor
+                                          : queue->timestamp_query_cache.head;
+  iree_hal_vulkan_queue_timestamp_query_block_t* block = first_block;
+  while (block) {
+    if (iree_hal_vulkan_queue_timestamp_query_block_try_allocate(
+            block, query_count, &first_query)) {
+      block->active_lease_count = block->active_lease_count + 1;
+      submission->profile.timestamp_query_lease =
+          (iree_hal_vulkan_queue_timestamp_query_lease_t){
+              .block = block,
+              .first_query = first_query,
+              .query_count = query_count,
+          };
+      submission->profile.query_pool = block->pool;
+      submission->profile.first_query = first_query;
+      submission->profile.query_count = query_count;
+      submission->profile.query_values = block->query_values;
+      queue->timestamp_query_cache.cursor = block;
+      return true;
+    }
+    block = block->next;
+    if (!block && first_block != queue->timestamp_query_cache.head) {
+      block = queue->timestamp_query_cache.head;
+      first_block = queue->timestamp_query_cache.head;
+    }
+  }
+  return false;
+}
+
+static iree_status_t iree_hal_vulkan_queue_acquire_timestamp_queries_under_lock(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission,
+    uint32_t query_count) {
+  if (query_count == 0) return iree_ok_status();
+  if (submission->profile.timestamp_query_lease.block) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "Vulkan queue submission already owns timestamp query slots");
+  }
+
+  if (iree_hal_vulkan_queue_try_acquire_timestamp_queries_under_lock(
+          queue, submission, query_count)) {
+    return iree_ok_status();
+  }
+
+  iree_hal_vulkan_queue_timestamp_query_block_t* block = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_timestamp_query_block_create(
+      queue, query_count, &block));
+  iree_hal_vulkan_queue_timestamp_query_cache_append_block(queue, block);
+  return iree_hal_vulkan_queue_try_acquire_timestamp_queries_under_lock(
+             queue, submission, query_count)
+             ? iree_ok_status()
+             : iree_make_status(
+                   IREE_STATUS_INTERNAL,
+                   "Vulkan timestamp query block had no free slots "
+                   "immediately after allocation");
+}
+
+static void iree_hal_vulkan_queue_release_timestamp_queries(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_hal_vulkan_queue_timestamp_query_lease_t* lease =
+      &submission->profile.timestamp_query_lease;
+  if (!lease->block) return;
+
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  IREE_ASSERT(lease->block->active_lease_count > 0,
+              "timestamp query block active lease count underflow");
+  lease->block->active_lease_count = lease->block->active_lease_count - 1;
+  queue->timestamp_query_cache.cursor = lease->block;
+  lease->block = NULL;
+  lease->first_query = 0;
+  lease->query_count = 0;
+  submission->profile.query_pool = VK_NULL_HANDLE;
+  submission->profile.first_query = 0;
+  submission->profile.query_count = 0;
+  submission->profile.query_values = NULL;
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+}
+
 static bool iree_hal_vulkan_queue_try_acquire_descriptor_cache_sets_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission,
@@ -2890,32 +3178,6 @@ static bool iree_hal_vulkan_queue_profile_submission_requires_native_timestamp(
   }
 }
 
-static iree_status_t iree_hal_vulkan_queue_profile_dispatch_count(
-    const iree_hal_vulkan_queue_pending_submission_t* submission,
-    uint32_t* out_dispatch_count) {
-  *out_dispatch_count = 0;
-  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
-    return iree_ok_status();
-  }
-  if (submission->kind != IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE ||
-      !submission->execute.command_buffer) {
-    if (submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DISPATCH) {
-      *out_dispatch_count = 1;
-    }
-    return iree_ok_status();
-  }
-  const iree_host_size_t dispatch_count =
-      iree_hal_vulkan_command_buffer_dispatch_count(
-          submission->execute.command_buffer);
-  if (dispatch_count > UINT32_MAX) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "Vulkan dispatch profile dispatch count exceeds uint32_t");
-  }
-  *out_dispatch_count = (uint32_t)dispatch_count;
-  return iree_ok_status();
-}
-
 static bool iree_hal_vulkan_queue_profile_filter_matches_dispatch(
     iree_hal_local_profile_recorder_t* profile_recorder,
     iree_hal_local_profile_queue_scope_t scope, uint64_t command_buffer_id,
@@ -2937,6 +3199,36 @@ static bool iree_hal_vulkan_queue_profile_filter_matches_dispatch(
     return false;
   }
   return true;
+}
+
+static iree_status_t iree_hal_vulkan_queue_profile_dispatch_count(
+    const iree_hal_vulkan_queue_pending_submission_t* submission,
+    uint32_t* out_dispatch_count) {
+  *out_dispatch_count = 0;
+  if (!iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
+    return iree_ok_status();
+  }
+  if (submission->kind != IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE ||
+      !submission->execute.command_buffer) {
+    if (submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DISPATCH) {
+      const iree_hal_vulkan_pipeline_t* pipeline = NULL;
+      IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
+          submission->dispatch.executable, submission->dispatch.export_ordinal,
+          &pipeline));
+      if (iree_hal_vulkan_queue_profile_filter_matches_dispatch(
+              submission->profile.recorder, submission->profile.scope,
+              /*command_buffer_id=*/0, /*command_index=*/UINT32_MAX,
+              pipeline)) {
+        *out_dispatch_count = 1;
+      }
+    }
+    return iree_ok_status();
+  }
+  return iree_hal_vulkan_command_buffer_count_profiled_dispatches(
+      submission->execute.command_buffer, submission->profile.recorder,
+      submission->profile.scope,
+      iree_hal_vulkan_queue_profile_command_buffer_id(submission),
+      out_dispatch_count);
 }
 
 static iree_status_t iree_hal_vulkan_queue_append_dispatch_profile_event(
@@ -3011,7 +3303,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_profile_metadata(
       iree_hal_vulkan_executable_profile_id(submission->dispatch.executable));
 }
 
-static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+static iree_status_t
+iree_hal_vulkan_queue_profile_prepare_native_timestamps_under_lock(
     iree_hal_vulkan_queue_t* queue,
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   if (!submission->native_command_buffer) {
@@ -3039,9 +3332,12 @@ static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
   }
 
   uint32_t query_count = 0;
+  uint32_t queue_start_query = IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
+  uint32_t queue_end_query = IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
+  uint32_t dispatch_base_query = IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT;
   if (needs_queue_device_timestamps) {
-    submission->profile.queue_start_query = query_count++;
-    submission->profile.queue_end_query = query_count++;
+    queue_start_query = query_count++;
+    queue_end_query = query_count++;
   }
   if (dispatch_query_count != 0) {
     if (dispatch_query_count > (UINT32_MAX - query_count) / 2) {
@@ -3049,18 +3345,46 @@ static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
           IREE_STATUS_OUT_OF_RANGE,
           "Vulkan dispatch profile query count exceeds uint32_t");
     }
-    submission->profile.dispatch_base_query = query_count;
-    submission->profile.dispatch_query_count = dispatch_query_count;
+    dispatch_base_query = query_count;
     query_count += dispatch_query_count * 2;
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_create_timestamp_query_pool(
-      queue, query_count, &submission->profile.query_pool));
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
-      queue->host_allocator, query_count, sizeof(uint64_t),
-      (void**)&submission->profile.query_values));
-  submission->profile.query_count = query_count;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_queue_acquire_timestamp_queries_under_lock(
+          queue, submission, query_count));
+  const uint32_t first_query = submission->profile.first_query;
+  if (queue_start_query != IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    submission->profile.queue_start_query = first_query + queue_start_query;
+    submission->profile.queue_end_query = first_query + queue_end_query;
+  }
+  if (dispatch_base_query != IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
+    submission->profile.dispatch_base_query = first_query + dispatch_base_query;
+    submission->profile.dispatch_query_count = dispatch_query_count;
+  }
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+    iree_hal_vulkan_queue_t* queue,
+    iree_hal_vulkan_queue_pending_submission_t* submission) {
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  iree_status_t status =
+      iree_hal_vulkan_queue_profile_prepare_native_timestamps_under_lock(
+          queue, submission);
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+  return status;
+}
+
+static void iree_hal_vulkan_queue_profile_reset_native_timestamps(
+    iree_hal_vulkan_queue_t* queue,
+    const iree_hal_vulkan_queue_pending_submission_t* submission) {
+  if (!submission->profile.query_pool || submission->profile.query_count == 0) {
+    return;
+  }
+  iree_vkCmdResetQueryPool(
+      IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
+      submission->profile.query_pool, submission->profile.first_query,
+      submission->profile.query_count);
 }
 
 static void iree_hal_vulkan_queue_profile_write_timestamp_begin(
@@ -3071,10 +3395,6 @@ static void iree_hal_vulkan_queue_profile_write_timestamp_begin(
           IREE_HAL_VULKAN_PROFILE_QUERY_ABSENT) {
     return;
   }
-  iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
-                           submission->native_command_buffer,
-                           submission->profile.query_pool, /*firstQuery=*/0,
-                           submission->profile.query_count);
   iree_vkCmdWriteTimestamp2(
       IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
       VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT, submission->profile.query_pool,
@@ -3103,10 +3423,10 @@ static iree_status_t iree_hal_vulkan_queue_profile_read_native_timestamps(
   }
   VkResult result = iree_vkGetQueryPoolResults_raw(
       &queue->syms, queue->logical_device, submission->profile.query_pool,
-      /*firstQuery=*/0, submission->profile.query_count,
+      submission->profile.first_query, submission->profile.query_count,
       submission->profile.query_count * sizeof(uint64_t),
-      submission->profile.query_values, sizeof(uint64_t),
-      VK_QUERY_RESULT_64_BIT);
+      &submission->profile.query_values[submission->profile.first_query],
+      sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
   if (result != VK_SUCCESS) {
     return iree_status_from_vk_result(__FILE__, __LINE__, result,
                                       "vkGetQueryPoolResults");
@@ -3411,17 +3731,8 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
   iree_hal_vulkan_queue_release_descriptor_cache_sets(queue, submission);
   iree_hal_vulkan_queue_release_native_descriptor_pool(queue, submission);
   iree_hal_vulkan_queue_release_bda_publication(queue, submission);
+  iree_hal_vulkan_queue_release_timestamp_queries(queue, submission);
   iree_hal_vulkan_queue_release_completion_action(submission);
-  if (submission->profile.query_pool) {
-    iree_vkDestroyQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
-                            queue->logical_device,
-                            submission->profile.query_pool,
-                            /*pAllocator=*/NULL);
-  }
-  if (submission->profile.query_values) {
-    iree_allocator_free(queue->host_allocator,
-                        submission->profile.query_values);
-  }
   iree_hal_vulkan_queue_release_native_replay(queue, submission);
   iree_hal_vulkan_queue_release_native_command_buffer(queue, submission);
 
@@ -3707,6 +4018,7 @@ static iree_status_t iree_hal_vulkan_queue_record_fill_native(
   IREE_RETURN_IF_ERROR(iree_vkBeginCommandBuffer(
       IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
       &begin_info));
+  iree_hal_vulkan_queue_profile_reset_native_timestamps(queue, submission);
   iree_hal_vulkan_queue_profile_write_timestamp_begin(queue, submission);
   VkDeviceSize fill_offset = (VkDeviceSize)target_offset;
   VkDeviceSize fill_length = (VkDeviceSize)submission->fill.length;
@@ -3841,6 +4153,7 @@ static iree_status_t iree_hal_vulkan_queue_record_update_native(
   IREE_RETURN_IF_ERROR(iree_vkBeginCommandBuffer(
       IREE_VULKAN_DEVICE(&queue->syms), submission->native_command_buffer,
       &begin_info));
+  iree_hal_vulkan_queue_profile_reset_native_timestamps(queue, submission);
   iree_hal_vulkan_queue_profile_write_timestamp_begin(queue, submission);
   VkDeviceSize update_offset = (VkDeviceSize)target_offset;
   VkDeviceSize update_length = (VkDeviceSize)submission->update.length;
@@ -3955,6 +4268,7 @@ static iree_status_t iree_hal_vulkan_queue_record_copy_native_buffers(
   IREE_RETURN_IF_ERROR(iree_vkBeginCommandBuffer(
       IREE_VULKAN_DEVICE(&queue->syms), command_buffer, &begin_info));
   if (submission) {
+    iree_hal_vulkan_queue_profile_reset_native_timestamps(queue, submission);
     iree_hal_vulkan_queue_profile_write_timestamp_begin(queue, submission);
   }
   VkBufferCopy copy_region = {
@@ -5774,6 +6088,7 @@ void iree_hal_vulkan_queue_deinitialize(iree_hal_vulkan_queue_t* queue) {
   iree_hal_vulkan_queue_native_descriptor_cache_deinitialize(queue);
   iree_hal_vulkan_queue_native_replay_cache_deinitialize(queue);
   iree_hal_vulkan_queue_bda_publication_cache_deinitialize(queue);
+  iree_hal_vulkan_queue_timestamp_query_cache_deinitialize(queue);
   iree_hal_vulkan_queue_command_buffer_cache_deinitialize(queue);
   if (queue->epoch_semaphore) {
     iree_vkDestroySemaphore(IREE_VULKAN_DEVICE(&queue->syms),
@@ -5842,6 +6157,33 @@ void iree_hal_vulkan_queue_trim(iree_hal_vulkan_queue_t* queue) {
     destroy_head = next;
   }
   iree_hal_vulkan_queue_bda_publication_cache_trim(queue);
+  iree_hal_vulkan_queue_timestamp_query_cache_trim(queue);
+}
+
+iree_status_t iree_hal_vulkan_queue_prepare_profile_timestamp_queries(
+    iree_hal_vulkan_queue_t* queue) {
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  const bool has_query_block = queue->timestamp_query_cache.head != NULL;
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+  if (has_query_block) return iree_ok_status();
+
+  iree_hal_vulkan_queue_timestamp_query_block_t* block = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_timestamp_query_block_create(
+      queue, IREE_HAL_VULKAN_QUEUE_TIMESTAMP_QUERY_BLOCK_CAPACITY, &block));
+
+  bool should_destroy_block = false;
+  iree_slim_mutex_lock(&queue->submission_mutex);
+  if (queue->timestamp_query_cache.head) {
+    should_destroy_block = true;
+  } else {
+    iree_hal_vulkan_queue_timestamp_query_cache_append_block(queue, block);
+  }
+  iree_slim_mutex_unlock(&queue->submission_mutex);
+
+  if (should_destroy_block) {
+    iree_hal_vulkan_queue_timestamp_query_block_destroy(queue, block);
+  }
+  return iree_ok_status();
 }
 
 static int64_t iree_hal_vulkan_queue_i64_saturate_u64(uint64_t value) {
@@ -5861,6 +6203,43 @@ bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,
     iree_slim_mutex_lock(&queue->submission_mutex);
     if (iree_string_view_equal(key, IREE_SV("block_count"))) {
       *out_value = (int64_t)queue->bda_publication_cache.block_count;
+    } else {
+      iree_slim_mutex_unlock(&queue->submission_mutex);
+      return false;
+    }
+    iree_slim_mutex_unlock(&queue->submission_mutex);
+    return true;
+  }
+
+  if (iree_string_view_equal(category,
+                             IREE_SV("vulkan.queue.timestamp_query_cache"))) {
+    iree_slim_mutex_lock(&queue->submission_mutex);
+    if (iree_string_view_equal(key, IREE_SV("block_count"))) {
+      *out_value = (int64_t)queue->timestamp_query_cache.block_count;
+    } else if (iree_string_view_equal(key, IREE_SV("query_capacity"))) {
+      uint64_t query_capacity = 0;
+      for (iree_hal_vulkan_queue_timestamp_query_block_t* block =
+               queue->timestamp_query_cache.head;
+           block; block = block->next) {
+        query_capacity += block->capacity;
+      }
+      *out_value = iree_hal_vulkan_queue_i64_saturate_u64(query_capacity);
+    } else if (iree_string_view_equal(key, IREE_SV("allocated_count"))) {
+      uint64_t allocated_count = 0;
+      for (iree_hal_vulkan_queue_timestamp_query_block_t* block =
+               queue->timestamp_query_cache.head;
+           block; block = block->next) {
+        allocated_count += block->allocated_count;
+      }
+      *out_value = iree_hal_vulkan_queue_i64_saturate_u64(allocated_count);
+    } else if (iree_string_view_equal(key, IREE_SV("active_lease_count"))) {
+      uint64_t active_lease_count = 0;
+      for (iree_hal_vulkan_queue_timestamp_query_block_t* block =
+               queue->timestamp_query_cache.head;
+           block; block = block->next) {
+        active_lease_count += block->active_lease_count;
+      }
+      *out_value = iree_hal_vulkan_queue_i64_saturate_u64(active_lease_count);
     } else {
       iree_slim_mutex_unlock(&queue->submission_mutex);
       return false;
@@ -8138,7 +8517,7 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_descriptor_native(
   status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
       queue, submission);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps_under_lock(
         queue, submission);
   }
 
@@ -8236,14 +8615,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_descriptor_native(
                                        submission->native_command_buffer,
                                        &begin_info);
   }
-  if (iree_status_is_ok(status) && submission->profile.query_pool &&
-      submission->profile.query_count != 0) {
-    iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
-                             submission->native_command_buffer,
-                             submission->profile.query_pool,
-                             /*firstQuery=*/0, submission->profile.query_count);
-  }
   if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_queue_profile_reset_native_timestamps(queue, submission);
     iree_hal_vulkan_queue_profile_write_timestamp_begin(queue, submission);
     if (descriptor_requirements.set_count != 0) {
       iree_vkCmdBindDescriptorSets(
@@ -8318,7 +8691,7 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
   status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
       queue, submission);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps_under_lock(
         queue, submission);
   }
 
@@ -8376,14 +8749,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
                                        submission->native_command_buffer,
                                        &begin_info);
   }
-  if (iree_status_is_ok(status) && submission->profile.query_pool &&
-      submission->profile.query_count != 0) {
-    iree_vkCmdResetQueryPool(IREE_VULKAN_DEVICE(&queue->syms),
-                             submission->native_command_buffer,
-                             submission->profile.query_pool,
-                             /*firstQuery=*/0, submission->profile.query_count);
-  }
   if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_queue_profile_reset_native_timestamps(queue, submission);
     if (binding_table_length != 0) {
       VkMemoryBarrier2 memory_barrier = {
           .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
@@ -8696,7 +9063,7 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
   status = iree_hal_vulkan_queue_allocate_native_command_buffer_under_lock(
       queue, submission);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps(
+    status = iree_hal_vulkan_queue_profile_prepare_native_timestamps_under_lock(
         queue, submission);
   }
   VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
@@ -8726,11 +9093,16 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
         iree_hal_vulkan_queue_execute_bda_binding_cache(submission);
     iree_hal_vulkan_command_buffer_profile_marker_t profile_marker = {
         .query_pool = submission->profile.query_pool,
+        .first_query = submission->profile.first_query,
         .query_count = submission->profile.query_count,
         .queue_start_query = submission->profile.queue_start_query,
         .queue_end_query = submission->profile.queue_end_query,
         .dispatch_base_query = submission->profile.dispatch_base_query,
         .dispatch_query_count = submission->profile.dispatch_query_count,
+        .recorder = submission->profile.recorder,
+        .scope = submission->profile.scope,
+        .command_buffer_id =
+            iree_hal_vulkan_queue_profile_command_buffer_id(submission),
     };
     status = iree_hal_vulkan_command_buffer_record_native(
         submission->execute.command_buffer, &queue->syms, queue->logical_device,
