@@ -997,8 +997,8 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
   if (failed(xorShuffleParams)) {
     return failure();
   }
-  int64_t effectiverowElems = xorShuffleParams->rowElems;
-  int64_t numAccessElems = xorShuffleParams->accessElems;
+  int64_t effectiverowElems = xorShuffleParams.value().rowElems;
+  int64_t numAccessElems = xorShuffleParams.value().accessElems;
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
       context, effectiverowElems, numAccessElems,
       /*row_stride=*/int64_t(0),
@@ -1008,7 +1008,7 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 }
 
 std::function<LogicalResult(XorShuffleParams)>
-makeDmaConstraintForXorShuffleFn(IREE::GPU::TargetAttr target,
+makeDmaConstraintFnForXorShuffle(IREE::GPU::TargetAttr target,
                                  int64_t elemBits) {
   return [target, elemBits](XorShuffleParams params) -> LogicalResult {
     DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes();
