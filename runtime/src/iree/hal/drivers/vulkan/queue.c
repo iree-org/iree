@@ -551,7 +551,7 @@ struct iree_hal_vulkan_queue_pending_submission_t {
     // Command buffer retained until execution retires.
     iree_hal_command_buffer_t* command_buffer;
 
-    // Captured binding table entries used by indirect command references.
+    // Binding table entries copied into the submission allocation tail.
     iree_hal_buffer_binding_t* binding_table_bindings;
 
     // Number of entries populated in binding_table_bindings.
@@ -3285,8 +3285,6 @@ static void iree_hal_vulkan_queue_pending_submission_destroy(
             submission->execute.binding_table_bindings[i].buffer);
       }
     }
-    iree_allocator_free(queue->host_allocator,
-                        submission->execute.binding_table_bindings);
   }
   if (submission->dispatch.executable) {
     iree_hal_executable_release(submission->dispatch.executable);
@@ -8277,14 +8275,24 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         "bindings",
         command_buffer->binding_count);
   }
+  iree_host_size_t execute_payload_storage_length = 0;
+  if (iree_status_is_ok(status) && command_buffer->binding_count != 0 &&
+      !iree_host_size_checked_mul(command_buffer->binding_count,
+                                  sizeof(binding_table.bindings[0]),
+                                  &execute_payload_storage_length)) {
+    status = iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan queue execute binding table capture is too large");
+  }
+
+  iree_byte_span_t execute_payload_storage = iree_byte_span_empty();
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_pending_submission_create(
         queue, wait_semaphore_list, signal_semaphore_list,
         IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_EXECUTE,
         (iree_hal_host_call_t){0}, /*args=*/NULL, IREE_HAL_HOST_CALL_FLAG_NONE,
-        /*payload_storage_length=*/0, /*out_payload_storage=*/NULL,
-        &submission);
+        execute_payload_storage_length, &execute_payload_storage, &submission);
   }
   if (iree_status_is_ok(status)) {
     submission->execute.command_buffer = command_buffer;
@@ -8293,28 +8301,15 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
     submission->profile.type = queue_event_type;
     submission->execute.binding_table_count = command_buffer->binding_count;
     if (command_buffer->binding_count != 0) {
-      iree_host_size_t binding_table_size = 0;
-      if (!iree_host_size_checked_mul(command_buffer->binding_count,
-                                      sizeof(*binding_table.bindings),
-                                      &binding_table_size)) {
-        status = iree_make_status(
-            IREE_STATUS_OUT_OF_RANGE,
-            "Vulkan queue execute binding table capture is too large");
-      }
-      if (iree_status_is_ok(status)) {
-        status = iree_allocator_malloc(
-            queue->host_allocator, binding_table_size,
-            (void**)&submission->execute.binding_table_bindings);
-      }
-      if (iree_status_is_ok(status)) {
-        memcpy(submission->execute.binding_table_bindings,
-               binding_table.bindings, binding_table_size);
-        if (!iree_any_bit_set(
-                flags, IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME)) {
-          for (iree_host_size_t i = 0; i < command_buffer->binding_count; ++i) {
-            iree_hal_buffer_retain(
-                submission->execute.binding_table_bindings[i].buffer);
-          }
+      submission->execute.binding_table_bindings =
+          (iree_hal_buffer_binding_t*)execute_payload_storage.data;
+      memcpy(submission->execute.binding_table_bindings, binding_table.bindings,
+             execute_payload_storage_length);
+      if (!iree_any_bit_set(
+              flags, IREE_HAL_EXECUTE_FLAG_BORROW_BINDING_TABLE_LIFETIME)) {
+        for (iree_host_size_t i = 0; i < command_buffer->binding_count; ++i) {
+          iree_hal_buffer_retain(
+              submission->execute.binding_table_bindings[i].buffer);
         }
       }
     }
