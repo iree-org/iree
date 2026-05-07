@@ -969,7 +969,24 @@ static SmallVector<int64_t> getLocalComputeShape(NestedLayoutAttr layout) {
   return shape;
 }
 
-struct CompactContractInfo {
+static VectorValue getLocalUnpackedComputeForm(PatternRewriter &rewriter,
+                                               VectorValue distributedValue,
+                                               NestedLayoutAttr layout) {
+  return getDeinterleavedUnpackedForm(rewriter, distributedValue, layout);
+}
+
+static VectorValue shapeCastLocalComputeValue(RewriterBase &rewriter,
+                                              Location loc, VectorValue value,
+                                              ArrayRef<int64_t> shape) {
+  VectorType sourceType = value.getType();
+  VectorType targetType = VectorType::get(shape, sourceType.getElementType());
+  if (sourceType == targetType) {
+    return value;
+  }
+  return vector::ShapeCastOp::create(rewriter, loc, targetType, value);
+}
+
+struct CompactLocalContractInfo {
   SmallVector<int64_t> lhsShape;
   SmallVector<int64_t> rhsShape;
   SmallVector<int64_t> accShape;
@@ -1017,10 +1034,9 @@ static SmallVector<int64_t> getCompactShape(AffineMap map,
   return compactShape;
 }
 
-static std::optional<CompactContractInfo>
-getCompactContractInfo(vector::ContractionOp contractOp,
-                       NestedLayoutAttr lhsLayout, NestedLayoutAttr rhsLayout,
-                       NestedLayoutAttr resLayout) {
+static std::optional<CompactLocalContractInfo> getCompactLocalContractInfo(
+    vector::ContractionOp contractOp, NestedLayoutAttr lhsLayout,
+    NestedLayoutAttr rhsLayout, NestedLayoutAttr resLayout) {
   SmallVector<AffineMap> maps = contractOp.getIndexingMapsArray();
   if (maps.size() != 3) {
     return std::nullopt;
@@ -1100,32 +1116,21 @@ getCompactContractInfo(vector::ContractionOp contractOp,
     return std::nullopt;
   }
 
-  return CompactContractInfo{std::move(compactLhsShape),
-                             std::move(compactRhsShape),
-                             std::move(compactAccShape), std::move(compactMaps),
-                             std::move(compactIteratorTypes)};
+  return CompactLocalContractInfo{
+      std::move(compactLhsShape), std::move(compactRhsShape),
+      std::move(compactAccShape), std::move(compactMaps),
+      std::move(compactIteratorTypes)};
 }
 
-static VectorValue shapeCastToLocalComputeShape(RewriterBase &rewriter,
-                                                Location loc, VectorValue value,
-                                                ArrayRef<int64_t> shape) {
-  VectorType sourceType = value.getType();
-  VectorType targetType = VectorType::get(shape, sourceType.getElementType());
-  if (sourceType == targetType) {
-    return value;
-  }
-  return vector::ShapeCastOp::create(rewriter, loc, targetType, value);
-}
-
-struct CompactMultiReductionInfo {
+struct CompactLocalMultiReductionInfo {
   SmallVector<int64_t> sourceShape;
   SmallVector<int64_t> resultShape;
   SmallVector<bool> reductionMask;
 };
 
-static std::optional<CompactMultiReductionInfo>
-getCompactMultiReductionInfo(NestedLayoutAttr srcLayout,
-                             ArrayRef<bool> reductionMask) {
+static std::optional<CompactLocalMultiReductionInfo>
+getCompactLocalMultiReductionInfo(NestedLayoutAttr srcLayout,
+                                  ArrayRef<bool> reductionMask) {
   SmallVector<int64_t> localShape = getLocalComputeShape(srcLayout);
   if (localShape.size() != reductionMask.size()) {
     return std::nullopt;
@@ -1154,9 +1159,9 @@ getCompactMultiReductionInfo(NestedLayoutAttr srcLayout,
     return std::nullopt;
   }
 
-  return CompactMultiReductionInfo{std::move(compactSourceShape),
-                                   std::move(compactResultShape),
-                                   std::move(compactReductionMask)};
+  return CompactLocalMultiReductionInfo{std::move(compactSourceShape),
+                                        std::move(compactResultShape),
+                                        std::move(compactReductionMask)};
 }
 
 /// Computes the undistributed shape after subgroup-level reduction, where
@@ -1510,8 +1515,8 @@ struct DistributeMultiReduction final
 
     SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
     int64_t rank = srcVector.getType().getRank();
-    std::optional<CompactMultiReductionInfo> compactInfo =
-        getCompactMultiReductionInfo(srcLayout, reducedDims);
+    std::optional<CompactLocalMultiReductionInfo> compactInfo =
+        getCompactLocalMultiReductionInfo(srcLayout, reducedDims);
     NestedLayoutAttr accLayout;
     if (compactInfo && accVector) {
       accLayout = dyn_cast<NestedLayoutAttr>(signature[accVector]);
@@ -1523,10 +1528,13 @@ struct DistributeMultiReduction final
     // Do thread local reduce.
     Value localReduction;
     if (compactInfo) {
-      VectorValue compactSrc =
-          getDeinterleavedUnpackedForm(rewriter, disSrc, srcLayout);
-      compactSrc = shapeCastToLocalComputeShape(rewriter, loc, compactSrc,
-                                                compactInfo->sourceShape);
+      // Use the existing distributed-to-local unpacking helper first, then
+      // shape-cast away only the unit local dimensions proven removable by the
+      // reduction-mask analysis above.
+      VectorValue localSrc =
+          getLocalUnpackedComputeForm(rewriter, disSrc, srcLayout);
+      localSrc = shapeCastLocalComputeValue(rewriter, loc, localSrc,
+                                            compactInfo->sourceShape);
       Type localInitType =
           compactInfo->resultShape.empty()
               ? elemTy
@@ -1535,16 +1543,16 @@ struct DistributeMultiReduction final
           loc, rewriter, multiReduceOp.getKind(), localInitType);
       if (llvm::is_contained(compactInfo->reductionMask, true)) {
         localReduction = vector::MultiDimReductionOp::create(
-            rewriter, loc, compactSrc, localInit, compactInfo->reductionMask,
+            rewriter, loc, localSrc, localInit, compactInfo->reductionMask,
             multiReduceOp.getKind());
       } else {
-        localReduction = compactSrc;
+        localReduction = localSrc;
       }
       if (accVector) {
-        VectorValue compactAcc = getDeinterleavedUnpackedForm(
+        VectorValue localAcc = getLocalUnpackedComputeForm(
             rewriter, cast<VectorValue>(disAcc), accLayout);
-        disAcc = shapeCastToLocalComputeShape(rewriter, loc, compactAcc,
-                                              compactInfo->resultShape);
+        disAcc = shapeCastLocalComputeValue(rewriter, loc, localAcc,
+                                            compactInfo->resultShape);
       }
     } else {
       // The distributed reduction mask is simply the same mask appended
@@ -1627,10 +1635,12 @@ struct DistributeMultiReduction final
       }
       if (resVector) {
         if (compactInfo) {
+          // Return compact local results to the distributed result shape at the
+          // existing replacement boundary.
           VectorType distributedType = VectorType::get(
               signature[resVector].getDistributedShape(), elemTy);
-          accReduced = shapeCastToLocalComputeShape(rewriter, loc, accReduced,
-                                                    distributedType.getShape());
+          accReduced = shapeCastLocalComputeValue(rewriter, loc, accReduced,
+                                                  distributedType.getShape());
         }
         replaceOpWithDistributedValues(rewriter, multiReduceOp, accReduced);
       } else {
@@ -2690,25 +2700,29 @@ struct DistributeContract final
       vector::ContractionOp contractOp, Value lhs, Value rhs, Value acc,
       NestedLayoutAttr lhsLayout, NestedLayoutAttr rhsLayout,
       NestedLayoutAttr resLayout) const {
-    if (std::optional<CompactContractInfo> compactInfo = getCompactContractInfo(
-            contractOp, lhsLayout, rhsLayout, resLayout)) {
-      VectorValue unpackedLhs = getDeinterleavedUnpackedForm(
+    if (std::optional<CompactLocalContractInfo> compactInfo =
+            getCompactLocalContractInfo(contractOp, lhsLayout, rhsLayout,
+                                        resLayout)) {
+      // Convert distributed values to local unpacked compute form using the
+      // existing nested-layout conversion helper. The compact analysis only
+      // controls which proven unit local dimensions are dropped from that form.
+      VectorValue localLhs = getLocalUnpackedComputeForm(
           rewriter, cast<VectorValue>(lhs), lhsLayout);
-      VectorValue unpackedRhs = getDeinterleavedUnpackedForm(
+      VectorValue localRhs = getLocalUnpackedComputeForm(
           rewriter, cast<VectorValue>(rhs), rhsLayout);
-      Value compactLhs = shapeCastToLocalComputeShape(
-          rewriter, loc, unpackedLhs, compactInfo->lhsShape);
-      Value compactRhs = shapeCastToLocalComputeShape(
-          rewriter, loc, unpackedRhs, compactInfo->rhsShape);
-      Value compactAcc = acc;
+      Value compactLhs = shapeCastLocalComputeValue(rewriter, loc, localLhs,
+                                                    compactInfo->lhsShape);
+      Value compactRhs = shapeCastLocalComputeValue(rewriter, loc, localRhs,
+                                                    compactInfo->rhsShape);
+      Value localAcc = acc;
       if (auto accVector = dyn_cast<VectorValue>(acc)) {
         VectorValue unpackedAcc =
-            getDeinterleavedUnpackedForm(rewriter, accVector, resLayout);
-        compactAcc = shapeCastToLocalComputeShape(rewriter, loc, unpackedAcc,
-                                                  compactInfo->accShape);
+            getLocalUnpackedComputeForm(rewriter, accVector, resLayout);
+        localAcc = shapeCastLocalComputeValue(rewriter, loc, unpackedAcc,
+                                              compactInfo->accShape);
       }
       return vector::ContractionOp::create(
-          rewriter, loc, compactLhs, compactRhs, compactAcc,
+          rewriter, loc, compactLhs, compactRhs, localAcc,
           rewriter.getAffineMapArrayAttr(compactInfo->indexingMaps),
           rewriter.getArrayAttr(compactInfo->iteratorTypes),
           contractOp.getKind(), contractOp.getFastmath());

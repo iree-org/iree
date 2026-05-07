@@ -1419,6 +1419,75 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#contraction_accesses = [
+  affine_map<(m, k) -> (m, k)>,
+  affine_map<(m, k) -> (k)>,
+  affine_map<(m, k) -> (m)>
+]
+
+#contraction_trait = {
+  indexing_maps = #contraction_accesses,
+  iterator_types = ["parallel", "reduction"],
+  kind = #vector.kind<add>
+}
+
+#layout_lhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [1, 32],
+  element_tile = [1, 2],
+
+  subgroup_strides = [0, 1],
+  thread_strides = [0, 1]
+>
+
+#layout_rhs = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [32],
+  element_tile = [2],
+
+  subgroup_strides = [1],
+  thread_strides = [1]
+>
+
+#layout_acc = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [1],
+  element_tile = [1],
+
+  subgroup_strides = [0],
+  thread_strides = [0]
+>
+
+func.func @nofold_contract_vector_acc_to_scalar(%a: vector<1x64xf32>, %b: vector<64xf32>, %init: vector<1xf32>) -> vector<1xf32> {
+  %al = iree_vector_ext.to_layout %a to layout(#layout_lhs) : vector<1x64xf32>
+  %bl = iree_vector_ext.to_layout %b to layout(#layout_rhs) : vector<64xf32>
+  %output = vector.contract #contraction_trait %al, %bl, %init : vector<1x64xf32>, vector<64xf32>, vector<1xf32> into vector<1xf32>
+  %0 = iree_vector_ext.to_layout %output to layout(#layout_acc) : vector<1xf32>
+  return %0 : vector<1xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @nofold_contract_vector_acc_to_scalar
+// Local contraction falls back to the layout-rank form because compacting the
+// vector accumulator would make the local accumulator scalar.
+// CHECK: vector.contract
+// CHECK-SAME: vector<1x1x1x1x1x2xf32>, vector<1x1x2xf32> into vector<1x1x1xf32>
+
+// -----
+
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
   batch_tile = [1],

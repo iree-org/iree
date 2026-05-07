@@ -555,43 +555,45 @@ struct LLVMGPUVectorLoweringPass final
     }
 
     {
-      // Dot contract lowering creates arith.mul + vector.reduction chains.
-      // Lower the AMDGPU-compatible reductions to amdgpu.dot while those
-      // reductions are still present.
-      IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-      if (target && target.isAMD()) {
-        FailureOr<amdgpu::Chipset> chipset =
-            amdgpu::Chipset::parse(target.getArch());
-        if (failed(chipset)) {
-          funcOp.emitError() << "failed to parse amdgpu chipset from target "
-                             << target.getArch();
-          return signalPassFailure();
-        }
+      //   // Dot contract lowering creates arith.mul + vector.reduction chains.
+      //   // Lower the AMDGPU-compatible reductions to amdgpu.dot while those
+      //   // reductions are still present.
+      //   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+      //   if (target && target.isAMD()) {
+      //     FailureOr<amdgpu::Chipset> chipset =
+      //         amdgpu::Chipset::parse(target.getArch());
+      //     if (failed(chipset)) {
+      //       funcOp.emitError() << "failed to parse amdgpu chipset from target
+      //       "
+      //                          << target.getArch();
+      //       return signalPassFailure();
+      //     }
 
-        RewritePatternSet amdgpuDotPatterns(ctx);
-        amdgpu::populateAmdgpuVectorReductionToDotPatterns(amdgpuDotPatterns,
-                                                           *chipset);
-        if (failed(
-                applyPatternsGreedily(funcOp, std::move(amdgpuDotPatterns)))) {
+      //     RewritePatternSet amdgpuDotPatterns(ctx);
+      //     amdgpu::populateAmdgpuVectorReductionToDotPatterns(amdgpuDotPatterns,
+      //                                                        *chipset);
+      //     if (failed(
+      //             applyPatternsGreedily(funcOp,
+      //             std::move(amdgpuDotPatterns)))) {
+      //       return signalPassFailure();
+      //     }
+      //   }
+      // }
+
+      {
+        RewritePatternSet vectorToLoopsPatterns(&getContext());
+        VectorTransferToSCFOptions vectorToSCFOptions;
+        vectorToSCFOptions.enableFullUnroll();
+        populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
+                                              vectorToSCFOptions);
+        memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
+        vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
+        if (failed(applyPatternsGreedily(funcOp,
+                                         std::move(vectorToLoopsPatterns)))) {
           return signalPassFailure();
         }
       }
     }
-
-    {
-      RewritePatternSet vectorToLoopsPatterns(&getContext());
-      VectorTransferToSCFOptions vectorToSCFOptions;
-      vectorToSCFOptions.enableFullUnroll();
-      populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
-                                            vectorToSCFOptions);
-      memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
-      vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-      if (failed(applyPatternsGreedily(funcOp,
-                                       std::move(vectorToLoopsPatterns)))) {
-        return signalPassFailure();
-      }
-    }
-  }
-};
+  };
 } // namespace
 } // namespace mlir::iree_compiler
