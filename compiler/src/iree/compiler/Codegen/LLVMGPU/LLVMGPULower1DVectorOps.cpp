@@ -79,57 +79,64 @@ struct CollapseTrailingUnitDimsTransferRead
   LogicalResult matchAndRewrite(vector::TransferReadOp read,
                                 PatternRewriter &rewriter) const override {
     auto memRefType = dyn_cast<MemRefType>(read.getShapedType());
-    if (!memRefType)
+    if (!memRefType) {
       return rewriter.notifyMatchFailure(read, "not a memref source");
+    }
 
     int64_t rank = memRefType.getRank();
-    if (rank <= 1)
+    if (rank <= 1) {
       return rewriter.notifyMatchFailure(read, "rank too low to collapse");
+    }
 
     ArrayRef<int64_t> shape = memRefType.getShape();
     int64_t numTrailingUnitDims = 0;
     for (int64_t i = rank - 1; i >= 0; --i) {
-      if (shape[i] != 1)
+      if (shape[i] != 1) {
         break;
+      }
       ++numTrailingUnitDims;
     }
-    if (numTrailingUnitDims == 0)
+    if (numTrailingUnitDims == 0) {
       return rewriter.notifyMatchFailure(read, "no trailing unit dims");
+    }
 
     AffineMap map = read.getPermutationMap();
     int64_t firstUnitDim = rank - numTrailingUnitDims;
     for (AffineExpr expr : map.getResults()) {
       if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        if (static_cast<int64_t>(dimExpr.getPosition()) >= firstUnitDim)
+        if (static_cast<int64_t>(dimExpr.getPosition()) >= firstUnitDim) {
           return rewriter.notifyMatchFailure(
               read, "permutation map references a trailing unit dim");
+        }
       }
     }
 
     int64_t newRank = firstUnitDim;
 
     SmallVector<ReassociationIndices> reassoc;
-    for (int64_t i = 0; i < newRank - 1; ++i)
+    for (int64_t i = 0; i < newRank - 1; ++i) {
       reassoc.push_back({i});
+    }
     ReassociationIndices lastGroup;
-    for (int64_t i = newRank - 1; i < rank; ++i)
+    for (int64_t i = newRank - 1; i < rank; ++i) {
       lastGroup.push_back(i);
+    }
     reassoc.push_back(lastGroup);
 
     Location loc = read.getLoc();
-    auto collapsed = memref::CollapseShapeOp::create(rewriter, loc,
-                                                     read.getBase(), reassoc);
+    auto collapsed =
+        memref::CollapseShapeOp::create(rewriter, loc, read.getBase(), reassoc);
 
     AffineMap newMap =
         AffineMap::get(newRank, 0, map.getResults(), map.getContext());
 
     SmallVector<Value> newIndices(read.getIndices().begin(),
-                                 read.getIndices().begin() + newRank);
+                                  read.getIndices().begin() + newRank);
 
     SmallVector<bool> newInBounds;
     if (read.getInBoundsAttr()) {
-      for (int64_t i = 0; i < static_cast<int64_t>(
-                                   read.getInBoundsAttr().size()); ++i) {
+      for (int64_t i = 0;
+           i < static_cast<int64_t>(read.getInBoundsAttr().size()); ++i) {
         newInBounds.push_back(
             cast<BoolAttr>(read.getInBoundsAttr()[i]).getValue());
       }
@@ -153,41 +160,48 @@ struct CollapseTrailingUnitDimsTransferWrite
   LogicalResult matchAndRewrite(vector::TransferWriteOp write,
                                 PatternRewriter &rewriter) const override {
     auto memRefType = dyn_cast<MemRefType>(write.getShapedType());
-    if (!memRefType)
+    if (!memRefType) {
       return rewriter.notifyMatchFailure(write, "not a memref dest");
+    }
 
     int64_t rank = memRefType.getRank();
-    if (rank <= 1)
+    if (rank <= 1) {
       return rewriter.notifyMatchFailure(write, "rank too low to collapse");
+    }
 
     ArrayRef<int64_t> shape = memRefType.getShape();
     int64_t numTrailingUnitDims = 0;
     for (int64_t i = rank - 1; i >= 0; --i) {
-      if (shape[i] != 1)
+      if (shape[i] != 1) {
         break;
+      }
       ++numTrailingUnitDims;
     }
-    if (numTrailingUnitDims == 0)
+    if (numTrailingUnitDims == 0) {
       return rewriter.notifyMatchFailure(write, "no trailing unit dims");
+    }
 
     AffineMap map = write.getPermutationMap();
     int64_t firstUnitDim = rank - numTrailingUnitDims;
     for (AffineExpr expr : map.getResults()) {
       if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        if (static_cast<int64_t>(dimExpr.getPosition()) >= firstUnitDim)
+        if (static_cast<int64_t>(dimExpr.getPosition()) >= firstUnitDim) {
           return rewriter.notifyMatchFailure(
               write, "permutation map references a trailing unit dim");
+        }
       }
     }
 
     int64_t newRank = firstUnitDim;
 
     SmallVector<ReassociationIndices> reassoc;
-    for (int64_t i = 0; i < newRank - 1; ++i)
+    for (int64_t i = 0; i < newRank - 1; ++i) {
       reassoc.push_back({i});
+    }
     ReassociationIndices lastGroup;
-    for (int64_t i = newRank - 1; i < rank; ++i)
+    for (int64_t i = newRank - 1; i < rank; ++i) {
       lastGroup.push_back(i);
+    }
     reassoc.push_back(lastGroup);
 
     Location loc = write.getLoc();
@@ -198,12 +212,12 @@ struct CollapseTrailingUnitDimsTransferWrite
         AffineMap::get(newRank, 0, map.getResults(), map.getContext());
 
     SmallVector<Value> newIndices(write.getIndices().begin(),
-                                 write.getIndices().begin() + newRank);
+                                  write.getIndices().begin() + newRank);
 
     SmallVector<bool> newInBounds;
     if (write.getInBoundsAttr()) {
-      for (int64_t i = 0; i < static_cast<int64_t>(
-                                    write.getInBoundsAttr().size()); ++i) {
+      for (int64_t i = 0;
+           i < static_cast<int64_t>(write.getInBoundsAttr().size()); ++i) {
         newInBounds.push_back(
             cast<BoolAttr>(write.getInBoundsAttr()[i]).getValue());
       }
@@ -228,7 +242,8 @@ struct TransferReadToVectorLoadLowering
   LogicalResult matchAndRewrite(vector::TransferReadOp read,
                                 PatternRewriter &rewriter) const override {
     if (read.getVectorType().getRank() > 1) {
-      return rewriter.notifyMatchFailure(read, "expected rank-1 or rank-0 vector");
+      return rewriter.notifyMatchFailure(read,
+                                         "expected rank-1 or rank-0 vector");
     }
 
     if (!read.getPermutationMap().isMinorIdentity()) {
@@ -275,7 +290,8 @@ struct TransferWriteToVectorStoreLowering
   LogicalResult matchAndRewrite(vector::TransferWriteOp write,
                                 PatternRewriter &rewriter) const override {
     if (write.getVectorType().getRank() > 1) {
-      return rewriter.notifyMatchFailure(write, "expected rank-1 or rank-0 vector");
+      return rewriter.notifyMatchFailure(write,
+                                         "expected rank-1 or rank-0 vector");
     }
 
     if (!write.getPermutationMap().isMinorIdentity()) {

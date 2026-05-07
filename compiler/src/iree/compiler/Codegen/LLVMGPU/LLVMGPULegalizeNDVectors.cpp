@@ -1441,8 +1441,8 @@ struct LLVMGPULegalizeNDVectorsPass final
         ConvertVectorToElements, ConvertVectorFromElements,
         ConvertVectorBroadcast, ConvertVectorBitcast, ConvertVectorInterleave,
         ConvertVectorDeinterleave, ConvertVectorMultiReduction,
-	ConvertTransferRead, ConvertTransferWrite, ConvertTransferGather,
-	ConvertTransferScatter>(typeConverter, ctx);
+        ConvertTransferRead, ConvertTransferWrite, ConvertTransferGather,
+        ConvertTransferScatter>(typeConverter, ctx);
 
     // Some nvgpu ops abuse n-D vector types to represent a "struct of
     // vectors". These ops are legal despite having n-D vectors — the
