@@ -124,6 +124,20 @@ func.func @transfer_read_rank0(%mem : memref<8x8xf32>, %idx : index) -> vector<f
 
 // -----
 
+// Rank-0 transfer_write is lowered to vector.store.
+// CHECK-LABEL: func @transfer_write_rank0(
+// CHECK-SAME:    %[[MEM:.*]]: memref<8x8xf32>,
+// CHECK-SAME:    %[[IDX:.*]]: index,
+// CHECK-SAME:    %[[VEC:.*]]: vector<f32>) {
+// CHECK-NEXT:    vector.store %[[VEC]], %[[MEM]][%[[IDX]], %[[IDX]]] : memref<8x8xf32>, vector<f32>
+// CHECK-NEXT:    return
+func.func @transfer_write_rank0(%mem : memref<8x8xf32>, %idx : index, %vec : vector<f32>) {
+  vector.transfer_write %vec, %mem[%idx, %idx] {in_bounds = []} : vector<f32>, memref<8x8xf32>
+  return
+}
+
+// -----
+
 // 1-D vector.multi_reduction is lowered to vector.reduction.
 // CHECK-LABEL: func @one_dim_reduction
 // CHECK-SAME:    %[[INPUT:.+]]: vector<8xf32>, %[[ACC:.+]]: f32

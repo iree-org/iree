@@ -274,8 +274,8 @@ struct TransferWriteToVectorStoreLowering
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp write,
                                 PatternRewriter &rewriter) const override {
-    if (write.getVectorType().getRank() != 1) {
-      return rewriter.notifyMatchFailure(write, "expected rank-1 vector");
+    if (write.getVectorType().getRank() > 1) {
+      return rewriter.notifyMatchFailure(write, "expected rank-1 or rank-0 vector");
     }
 
     if (!write.getPermutationMap().isMinorIdentity()) {
