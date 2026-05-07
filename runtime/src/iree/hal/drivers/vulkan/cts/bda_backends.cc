@@ -73,7 +73,7 @@ static bool vulkan_bda_registered_ =
           /*executable_data=*/nullptr, RecordingMode::kDirect,
           /*unsupported_tests=*/{},
           /*expected_failures=*/{}},
-         {"async_queue", "vulkan_bda"},
+         {"async_queue", "file_io", "vulkan_bda"},
      }),
      CtsRegistry::RegisterBackend({
          "vulkan_bda_replay_cache",
@@ -82,7 +82,7 @@ static bool vulkan_bda_registered_ =
           /*executable_data=*/nullptr, RecordingMode::kDirect,
           /*unsupported_tests=*/{},
           /*expected_failures=*/{}},
-         {"async_queue", "vulkan_bda", "vulkan_bda_replay_cache"},
+         {"async_queue", "file_io", "vulkan_bda", "vulkan_bda_replay_cache"},
      }),
      true);
 

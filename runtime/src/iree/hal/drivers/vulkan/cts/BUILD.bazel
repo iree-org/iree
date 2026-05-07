@@ -39,6 +39,19 @@ iree_runtime_cc_library(
     alwayslink = True,
 )
 
+iree_runtime_cc_library(
+    name = "vulkan_file_test",
+    testonly = True,
+    srcs = ["file_test.cc"],
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/testing:temp_file",
+    ],
+    alwayslink = True,
+)
+
 iree_hal_cts_testdata(
     backend_name = "vulkan",
     format_name = "vulkan_spirv",
@@ -817,8 +830,9 @@ iree_runtime_cc_test(
     ],
     deps = [
         ":backends",
+        ":vulkan_file_test",
         "//runtime/src/iree/base/tooling:flags",
-        "//runtime/src/iree/hal/cts/file:all_tests",
+        "//runtime/src/iree/hal/cts/file:file_test",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/testing:gtest",

@@ -181,21 +181,31 @@ static iree_status_t iree_hal_platform_fd_pwrite(
 
 #endif  // IREE_PLATFORM_WINDOWS
 
-#if defined(IREE_ASYNC_HAVE_FD)
+#if defined(IREE_ASYNC_HAVE_FD) || defined(IREE_ASYNC_HAVE_WIN32_HANDLE)
 // Attempts to duplicate |fd| for optional async I/O ownership transfer.
 static bool iree_hal_platform_fd_try_dup_for_async(
     int fd, iree_async_primitive_t* out_primitive) {
   *out_primitive = iree_async_primitive_none();
 #if defined(IREE_PLATFORM_WINDOWS)
-  int dup_fd = _dup(fd);
+  HANDLE handle = (HANDLE)_get_osfhandle(fd);
+  if (handle == INVALID_HANDLE_VALUE) return false;
+  HANDLE dup_handle = NULL;
+  if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
+                       &dup_handle, /*dwDesiredAccess=*/0,
+                       /*bInheritHandle=*/FALSE, DUPLICATE_SAME_ACCESS)) {
+    return false;
+  }
+  *out_primitive =
+      iree_async_primitive_from_win32_handle((uintptr_t)dup_handle);
+  return true;
 #else
   int dup_fd = dup(fd);
-#endif  // IREE_PLATFORM_WINDOWS
   if (dup_fd == -1) return false;
   *out_primitive = iree_async_primitive_from_fd(dup_fd);
   return true;
+#endif  // IREE_PLATFORM_WINDOWS
 }
-#endif  // IREE_ASYNC_HAVE_FD
+#endif  // IREE_ASYNC_HAVE_FD || IREE_ASYNC_HAVE_WIN32_HANDLE
 
 #endif  // IREE_FILE_IO_ENABLE
 
@@ -238,8 +248,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
 
-  // For now we only support posix file descriptors but could support other
-  // handle types so long as they are compatible with pread/pwrite.
+  // For now we only support descriptor-backed file handles that can satisfy
+  // positional read/write operations.
   iree_io_file_handle_primitive_t primitive =
       iree_io_file_handle_primitive(handle);
   if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_FD) {
@@ -288,14 +298,14 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
 
   iree_status_t status = iree_ok_status();
 
-#if defined(IREE_ASYNC_HAVE_FD)
+#if defined(IREE_ASYNC_HAVE_FD) || defined(IREE_ASYNC_HAVE_WIN32_HANDLE)
   if (proactor) {
-    // If a proactor is provided, attempt to duplicate the fd and import it for
-    // async I/O. The duplicate is owned by the proactor-managed async file and
-    // closed when the async file is released.
+    // If a proactor is provided, attempt to duplicate the platform handle and
+    // import it for async I/O. The duplicate is owned by the proactor-managed
+    // async file and closed when the async file is released.
     //
-    // Duplication is an optional fast-path probe: if the OS cannot produce a
-    // duplicate fd then the file remains synchronous-only. Once duplication
+    // Duplication is an optional capability probe: if the OS cannot produce a
+    // duplicate handle then the file remains synchronous-only. Once duplication
     // succeeds, import failures are real construction failures and propagate.
     iree_async_primitive_t dup_primitive;
     if (iree_hal_platform_fd_try_dup_for_async(fd, &dup_primitive)) {
@@ -306,7 +316,7 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
       }
     }
   }
-#endif  // IREE_ASYNC_HAVE_FD
+#endif  // IREE_ASYNC_HAVE_FD || IREE_ASYNC_HAVE_WIN32_HANDLE
 
   if (iree_status_is_ok(status)) {
     *out_file = (iree_hal_file_t*)file;

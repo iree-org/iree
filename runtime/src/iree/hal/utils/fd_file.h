@@ -26,10 +26,10 @@ extern "C" {
 // File handles are stateless and each host file opened from one may see
 // different versions of the file depending on the platform and file type.
 //
-// If |proactor| is non-NULL, the file descriptor is duplicated and imported
-// into the proactor for async I/O. The resulting async handle is accessible
-// via iree_hal_file_async_handle(). If |proactor| is NULL, only synchronous
-// I/O is supported.
+// If |proactor| is non-NULL, the descriptor-backed platform handle is
+// duplicated and imported into the proactor for async I/O. The async handle is
+// accessible via iree_hal_file_async_handle(). If |proactor| is NULL, only
+// synchronous I/O is supported.
 IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
     iree_hal_memory_access_t access, iree_io_file_handle_t* handle,
     iree_async_proactor_t* proactor, iree_allocator_t host_allocator,

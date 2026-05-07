@@ -1441,10 +1441,11 @@ static iree_status_t iree_hal_vulkan_logical_device_import_file(
       device->proactor, device->host_allocator, &file);
   if (iree_status_is_ok(status) &&
       iree_io_file_handle_type(handle) == IREE_IO_FILE_HANDLE_TYPE_FD &&
-      !iree_hal_file_storage_buffer(file)) {
-    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "Vulkan fd file transfers require queue staging "
-                              "support");
+      !iree_hal_file_storage_buffer(file) &&
+      !iree_hal_file_async_handle(file)) {
+    status = iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan fd file transfers require a proactor-backed async file handle");
   }
   if (iree_status_is_ok(status)) {
     *out_file = file;

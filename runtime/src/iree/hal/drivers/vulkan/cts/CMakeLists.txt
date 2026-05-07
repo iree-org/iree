@@ -38,6 +38,21 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    vulkan_file_test
+  SRCS
+    "file_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+    iree::io::file_handle
+    iree::testing::temp_file
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
 iree_hal_cts_testdata(
   FORMAT_NAME
     vulkan_spirv
@@ -749,8 +764,9 @@ iree_cc_test(
     iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
+    ::vulkan_file_test
     iree::base::tooling::flags
-    iree::hal::cts::file::all_tests
+    iree::hal::cts::file::file_test
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
     iree::testing::gtest

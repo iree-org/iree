@@ -53,7 +53,7 @@ static bool vulkan_registered_ =
           /*executable_data=*/nullptr, RecordingMode::kDirect,
           /*unsupported_tests=*/{},
           /*expected_failures=*/{}},
-         {"async_queue"},
+         {"async_queue", "file_io"},
      }),
      true);
 
