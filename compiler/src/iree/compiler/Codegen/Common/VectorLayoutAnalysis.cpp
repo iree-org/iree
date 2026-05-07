@@ -354,6 +354,58 @@ void LayoutAnalysis::fixupRegion(Region &region) {
   }
 }
 
+/// Returns a source layout for a reduction whose projected layout matches the
+/// resolved result layout. The source layout is preserved on reduction
+/// dimensions, while non-reduction dimensions are taken from the result layout.
+static VectorLayoutInterface
+getSourceLayoutForReduction(VectorLayoutInterface sourceLayout,
+                            VectorLayoutInterface resultLayout,
+                            ArrayRef<bool> reductionMask) {
+  auto nestedSource = dyn_cast_if_present<NestedLayoutAttr>(sourceLayout);
+  auto nestedResult = dyn_cast_if_present<NestedLayoutAttr>(resultLayout);
+  if (!nestedSource || !nestedResult) {
+    return {};
+  }
+
+  int64_t sourceRank = nestedSource.getRank();
+  if (static_cast<int64_t>(reductionMask.size()) != sourceRank) {
+    return {};
+  }
+  if (nestedResult.getRank() != llvm::count(reductionMask, false)) {
+    return {};
+  }
+
+  MLIRContext *context = nestedSource.getContext();
+  SmallVector<AffineExpr> reductionExprs;
+  SmallVector<AffineExpr> resultExprs;
+  reductionExprs.reserve(llvm::count(reductionMask, true));
+  resultExprs.reserve(llvm::count(reductionMask, false));
+
+  for (int64_t sourceDim = 0; sourceDim < sourceRank; ++sourceDim) {
+    AffineExpr dim = getAffineDimExpr(sourceDim, context);
+    if (reductionMask[sourceDim]) {
+      reductionExprs.push_back(dim);
+    } else {
+      resultExprs.push_back(dim);
+    }
+  }
+
+  AffineMap reductionMap =
+      AffineMap::get(sourceRank, /*symbolCount=*/0, reductionExprs, context);
+  AffineMap resultMap =
+      AffineMap::get(sourceRank, /*symbolCount=*/0, resultExprs, context);
+  AffineMap sourceIdentityMap =
+      AffineMap::getMultiDimIdentityMap(sourceRank, context);
+
+  VectorLayoutInterface reductionLayout = nestedSource.apply(reductionMap);
+  if (!reductionLayout) {
+    return {};
+  }
+  return nestedSource.getRecombinedLayout({reductionLayout, nestedResult},
+                                          {reductionMap, resultMap},
+                                          sourceIdentityMap);
+}
+
 /// Fix up operand layouts for a single operation. Result layouts are fixed
 /// (from resolve); this determines what operand layouts should be.
 void LayoutAnalysis::fixupOp(Operation *op) {
@@ -404,8 +456,21 @@ void LayoutAnalysis::fixupOp(Operation *op) {
 
   // multi_dim_reduction: result layout -> acc gets same layout.
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
-    VectorLayoutInterface layout = getResolvedLayout(multiReduce.getResult());
-    setLayoutOrClone(&multiReduce.getAccMutable(), layout);
+    VectorLayoutInterface resultLayout =
+        getResolvedLayout(multiReduce.getResult());
+    setLayoutOrClone(&multiReduce.getAccMutable(), resultLayout);
+
+    VectorLayoutInterface sourceLayout =
+        getResolvedLayout(multiReduce.getSource());
+    VectorLayoutInterface compatibleSourceLayout = getSourceLayoutForReduction(
+        sourceLayout, resultLayout, multiReduce.getReductionMask());
+    setLayoutOrClone(&multiReduce.getSourceMutable(), compatibleSourceLayout);
+
+    if (auto maskOp = dyn_cast<vector::MaskOp>(multiReduce->getParentOp())) {
+      // Multi-reduction masks index the source iteration space, so keep the
+      // parent mask in the same source-compatible layout used by the reduction.
+      setLayoutOrClone(&maskOp.getMaskMutable(), compatibleSourceLayout);
+    }
     return;
   }
 
