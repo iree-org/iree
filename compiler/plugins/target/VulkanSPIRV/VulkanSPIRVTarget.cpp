@@ -43,6 +43,12 @@ constexpr uint32_t kBdaDispatchConstantOffset = kBdaDispatchRootLength;
 constexpr char kVulkanSpirvFlatbufferFormat[] = "vulkan-spirv-fb";
 constexpr char kVulkanSpirvBdaFormat[] = "vulkan-spirv-bda-v1";
 
+enum class VulkanDispatchAbi {
+  Descriptors,
+  Bda,
+  All,
+};
+
 class PropagateExecutableTargetPass final
     : public PassWrapper<PropagateExecutableTargetPass,
                          OperationPass<ModuleOp>> {
@@ -96,7 +102,7 @@ struct VulkanSPIRVTargetOptions {
   // lowest common denominator to guarantee the generated SPIR-V is widely
   // accepted for now. Eventually we want to use a list for multi-targeting.
   std::string target = "vp_android_baseline_2022";
-  bool indirectBindings = false;
+  VulkanDispatchAbi dispatchAbi = VulkanDispatchAbi::Descriptors;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
@@ -112,10 +118,18 @@ struct VulkanSPIRVTargetOptions {
             "GPUs. See "
             "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
             "more details."));
-    binder.opt<bool>(
-        "iree-vulkan-experimental-indirect-bindings", indirectBindings,
-        llvm::cl::desc(
-            "Force BDA root binding tables for all generated dispatches."));
+    binder.opt<VulkanDispatchAbi>(
+        "iree-vulkan-dispatch-abi", dispatchAbi,
+        llvm::cl::desc("Selects the Vulkan dispatch ABI emitted for generated "
+                       "executables."),
+        llvm::cl::values(
+            clEnumValN(VulkanDispatchAbi::Descriptors, "descriptors",
+                       "Emit descriptor-set executables."),
+            clEnumValN(VulkanDispatchAbi::Bda, "bda",
+                       "Emit BDA root binding table executables."),
+            clEnumValN(VulkanDispatchAbi::All, "all",
+                       "Emit all supported executable ABI variants ordered by "
+                       "runtime preference.")));
   }
 };
 
@@ -293,16 +307,26 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const final {
-    executableTargetAttrs.push_back(
-        getExecutableTarget(context, options_.indirectBindings));
+    switch (options_.dispatchAbi) {
+    case VulkanDispatchAbi::Descriptors:
+      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      break;
+    case VulkanDispatchAbi::Bda:
+      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      break;
+    case VulkanDispatchAbi::All:
+      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      break;
+    }
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context, bool indirectBindings) const {
+  getExecutableTarget(MLIRContext *context, bool useBdaRootAbi) const {
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
-      if (indirectBindings) {
+      if (useBdaRootAbi) {
         target = getTargetAttrWithBdaRootAbiFeatures(target);
       }
       addConfigGPUTarget(context, target, configItems);
@@ -314,8 +338,8 @@ public:
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("vulkan-spirv"),
-        indirectBindings ? b.getStringAttr(kVulkanSpirvBdaFormat)
-                         : b.getStringAttr(kVulkanSpirvFlatbufferFormat),
+        useBdaRootAbi ? b.getStringAttr(kVulkanSpirvBdaFormat)
+                      : b.getStringAttr(kVulkanSpirvFlatbufferFormat),
         b.getDictionaryAttr(configItems));
   }
 
