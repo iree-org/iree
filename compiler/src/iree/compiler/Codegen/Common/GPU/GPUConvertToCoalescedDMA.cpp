@@ -448,6 +448,84 @@ tileToThreadLevel(OpTy op, PatternRewriter &rewriter,
   return threadForallOp;
 }
 
+/// Create a sub-slice from the pre-pad source that corresponds to the tiled
+/// view of the padded tensor. Sizes on padded dims are clamped to source
+/// bounds; the DMA in_bounds attribute handles zero-fill for the remaining
+/// padded area.
+static Value createClampedSourceSliceFromPad(PatternRewriter &rewriter,
+                                             Location loc, tensor::PadOp pad,
+                                             scf::InParallelOp inParallelOp) {
+  Value preSource = pad.getSource();
+
+  // The per-tile view of the padded tensor is the (single) extract_slice user
+  // of the pad, created either by `tileAtSubgroupLevel` (warp tile) or by
+  // `tileToThreadLevel` in the `ConvertPadFusionCopyToCoalescedDMA` fallback
+  // (thread tile). Either way, after tiling the copy's input always traces
+  // through this slice, so it must exist.
+  tensor::ExtractSliceOp tilingES;
+  for (Operation *user : pad->getUsers()) {
+    if (auto es = dyn_cast<tensor::ExtractSliceOp>(user)) {
+      tilingES = es;
+      break;
+    }
+  }
+  assert(tilingES && "pad output must have an extract_slice user after tiling");
+
+  // Build a sub-slice of the pre-pad source at this tile's offset, with sizes
+  // clamped to source bounds on padded dims. Pad uses low=[0,...], so padded
+  // and pre-pad coordinates align.
+  rewriter.setInsertionPoint(inParallelOp);
+
+  SmallVector<OpFoldResult> warpOffsets = tilingES.getMixedOffsets();
+  SmallVector<OpFoldResult> warpSizes = tilingES.getMixedSizes();
+  auto preSourceType = cast<RankedTensorType>(preSource.getType());
+  int64_t rank = preSourceType.getRank();
+
+  SmallVector<OpFoldResult> subOffsets, subSizes, subStrides;
+  for (int64_t i = 0; i < rank; i++) {
+    subStrides.push_back(rewriter.getIndexAttr(1));
+
+    bool dimHasPadding = !isConstantIntValue(pad.getMixedHighPad()[i], 0);
+    if (!dimHasPadding) {
+      subOffsets.push_back(warpOffsets[i]);
+      subSizes.push_back(warpSizes[i]);
+      continue;
+    }
+
+    // Source may be smaller than the padded dimension. Clamp offset and size to
+    // stay within source bounds.
+    Value offsetVal =
+        getValueOrCreateConstantIndexOp(rewriter, loc, warpOffsets[i]);
+    Value tileSizeVal =
+        getValueOrCreateConstantIndexOp(rewriter, loc, warpSizes[i]);
+
+    int64_t staticDim = preSourceType.getShape()[i];
+    Value sourceDimSize;
+    if (ShapedType::isDynamic(staticDim)) {
+      sourceDimSize = tensor::DimOp::create(rewriter, loc, preSource, i);
+    } else {
+      sourceDimSize = arith::ConstantIndexOp::create(rewriter, loc, staticDim);
+    }
+
+    Value clampedOffset =
+        arith::MinSIOp::create(rewriter, loc, offsetVal, sourceDimSize);
+    Value remaining =
+        arith::SubIOp::create(rewriter, loc, sourceDimSize, clampedOffset);
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value clampedRemaining =
+        arith::MaxSIOp::create(rewriter, loc, remaining, zero);
+    Value clampedSize =
+        arith::MinSIOp::create(rewriter, loc, clampedRemaining, tileSizeVal);
+
+    subOffsets.push_back(clampedOffset);
+    subSizes.push_back(clampedSize);
+  }
+
+  auto sourceSlice = tensor::ExtractSliceOp::create(
+      rewriter, loc, preSource, subOffsets, subSizes, subStrides);
+  return sourceSlice.getResult();
+}
+
 /// Create a coalesced DMA operation in the in_parallel region.
 /// Handles both copy and gather operations.
 template <typename OpTy>
@@ -493,78 +571,8 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     // We need to trace through extract_slice to find if source is tensor.pad.
     tensor::PadOp pad = traceToTensorPad(input);
     if (pad && isValidPadForDMA(pad)) {
-      Value preSource = pad.getSource();
-
-      // The per-tile view of the padded tensor is the (single) extract_slice
-      // user of the pad — created by `tileAtSubgroupLevel` (warp tile) or by
-      // `tileToThreadLevel` in the `ConvertPadFusionCopyToCoalescedDMA`
-      // fallback (thread tile). Either way, after tiling the copy's input
-      // always traces through this slice, so it must exist.
-      tensor::ExtractSliceOp tilingES;
-      for (Operation *user : pad->getUsers()) {
-        if (auto es = dyn_cast<tensor::ExtractSliceOp>(user)) {
-          tilingES = es;
-          break;
-        }
-      }
-      assert(tilingES &&
-             "pad output must have an extract_slice user after tiling");
-
-      // Build a sub-slice of the pre-pad source at this tile's offset, with
-      // sizes clamped to source bounds on padded dims. Pad uses low=[0,...]
-      // so padded and pre-pad coordinates align. The DMA's in_bounds attr
-      // handles the case where the clamped source is smaller than the init
-      // tile (fat_raw_buffer returns zero for OOB reads).
-      rewriter.setInsertionPoint(inParallelOp);
-
-      SmallVector<OpFoldResult> warpOffsets = tilingES.getMixedOffsets();
-      SmallVector<OpFoldResult> warpSizes = tilingES.getMixedSizes();
-      auto preSourceType = cast<RankedTensorType>(preSource.getType());
-      int64_t rank = preSourceType.getRank();
-
-      SmallVector<OpFoldResult> subOffsets, subSizes, subStrides;
-      for (int64_t i = 0; i < rank; i++) {
-        subStrides.push_back(rewriter.getIndexAttr(1));
-
-        bool dimHasPadding = !isConstantIntValue(pad.getMixedHighPad()[i], 0);
-
-        if (dimHasPadding) {
-          // Source may be smaller than the padded dimension. Clamp offset
-          // and size to stay within source bounds.
-          Value offsetVal =
-              getValueOrCreateConstantIndexOp(rewriter, loc, warpOffsets[i]);
-          Value tileSizeVal =
-              getValueOrCreateConstantIndexOp(rewriter, loc, warpSizes[i]);
-
-          int64_t staticDim = preSourceType.getShape()[i];
-          Value sourceDimSize;
-          if (ShapedType::isDynamic(staticDim)) {
-            sourceDimSize = tensor::DimOp::create(rewriter, loc, preSource, i);
-          } else {
-            sourceDimSize =
-                arith::ConstantIndexOp::create(rewriter, loc, staticDim);
-          }
-
-          Value clampedOffset =
-              arith::MinSIOp::create(rewriter, loc, offsetVal, sourceDimSize);
-          Value remaining = arith::SubIOp::create(rewriter, loc, sourceDimSize,
-                                                  clampedOffset);
-          Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-          Value clampedRemaining =
-              arith::MaxSIOp::create(rewriter, loc, remaining, zero);
-          Value clampedSize = arith::MinSIOp::create(
-              rewriter, loc, clampedRemaining, tileSizeVal);
-
-          subOffsets.push_back(clampedOffset);
-          subSizes.push_back(clampedSize);
-        } else {
-          subOffsets.push_back(warpOffsets[i]);
-          subSizes.push_back(warpSizes[i]);
-        }
-      }
-
-      source = tensor::ExtractSliceOp::create(rewriter, loc, preSource,
-                                              subOffsets, subSizes, subStrides);
+      source =
+          createClampedSourceSliceFromPad(rewriter, loc, pad, inParallelOp);
 
       // Compute in_bounds based on whether padding was added per dimension.
       for (auto [low, high] :
