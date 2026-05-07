@@ -354,8 +354,7 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
     auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::UB,
         ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
-        /*stopCondition=*/stopConditionFn,
-        /*addConservativeSemiAffineBounds=*/true);
+        /*stopCondition=*/stopConditionFn);
     return succeeded(ubConstantBound) && *ubConstantBound <= 0;
   };
 
