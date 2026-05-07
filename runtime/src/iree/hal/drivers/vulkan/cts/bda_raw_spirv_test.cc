@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <vector>
 
 #include "iree/hal/cts/util/profile_test_util.h"
@@ -361,6 +362,44 @@ static std::vector<uint32_t> MakeDescriptorDecoratedRawBdaSpirv() {
   spirv.push_back(0x0000000fu);
   spirv.push_back(0x00000022u);
   spirv.push_back(0x00000000u);
+  return spirv;
+}
+
+static void AppendSpirvStringInstruction(uint16_t opcode, const char* value,
+                                         std::vector<uint32_t>* words) {
+  const size_t byte_length = std::strlen(value) + 1;
+  const size_t string_word_count =
+      (byte_length + sizeof(uint32_t) - 1) / sizeof(uint32_t);
+  words->push_back(
+      (uint32_t)(((string_word_count + 1) << 16) | (uint32_t)opcode));
+  const size_t string_word_offset = words->size();
+  words->resize(string_word_offset + string_word_count, 0);
+  std::memcpy(&(*words)[string_word_offset], value, byte_length);
+}
+
+static std::vector<uint32_t> MakeRawBdaSpirvWithMetadata(
+    std::initializer_list<const char*> metadata_strings) {
+  std::vector<uint32_t> source(kRawBdaSpirv,
+                               kRawBdaSpirv + IREE_ARRAYSIZE(kRawBdaSpirv));
+  iree_host_size_t insertion_offset = IREE_ARRAYSIZE(kRawBdaSpirv);
+  for (iree_host_size_t word_offset = 5; word_offset < source.size();) {
+    const uint32_t instruction = source[word_offset];
+    const uint16_t word_count = (uint16_t)(instruction >> 16);
+    const uint16_t opcode = (uint16_t)(instruction & 0xFFFFu);
+    if (opcode == 71u) {
+      insertion_offset = word_offset;
+      break;
+    }
+    word_offset += word_count;
+  }
+
+  std::vector<uint32_t> spirv;
+  spirv.insert(spirv.end(), source.begin(), source.begin() + insertion_offset);
+  for (const char* metadata_string : metadata_strings) {
+    AppendSpirvStringInstruction(/*OpModuleProcessed=*/330u, metadata_string,
+                                 &spirv);
+  }
+  spirv.insert(spirv.end(), source.begin() + insertion_offset, source.end());
   return spirv;
 }
 
@@ -771,6 +810,140 @@ TEST_P(BdaRawSpirvTest, QueueDispatchExecutesRawBdaShader) {
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
       dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 
+  ExpectOutput(output_buffer);
+}
+
+TEST_P(BdaRawSpirvTest, QueueDispatchExecutesRawBdaShaderWithMetadata) {
+  std::vector<uint32_t> metadata_spirv = MakeRawBdaSpirvWithMetadata({
+      "iree.vulkan.bda.v1",
+      "iree.vulkan.bda.v1.bindings=2",
+  });
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(PrepareRawBdaExecutable(
+      iree_make_const_byte_span(metadata_spirv.data(),
+                                metadata_spirv.size() * sizeof(uint32_t)),
+      executable.out()));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_ref_list_t bindings =
+      MakeBindings(input_buffer, output_buffer, binding_refs);
+
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      dispatch_signal, executable.get(), /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  ExpectOutput(output_buffer);
+}
+
+TEST_P(BdaRawSpirvTest, QueueDispatchRejectsRawBdaMetadataBindingMismatch) {
+  std::vector<uint32_t> metadata_spirv = MakeRawBdaSpirvWithMetadata({
+      "iree.vulkan.bda.v1",
+      "iree.vulkan.bda.v1.bindings=2",
+  });
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(PrepareRawBdaExecutable(
+      iree_make_const_byte_span(metadata_spirv.data(),
+                                metadata_spirv.size() * sizeof(uint32_t)),
+      executable.out()));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[1] = {
+      iree_hal_make_buffer_ref(input_buffer.get(), /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer.get())),
+  };
+  iree_hal_buffer_ref_list_t bindings = {
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
+  };
+
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_device_queue_dispatch(
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+          iree_hal_semaphore_list_empty(), executable.get(),
+          /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(4, 1, 1),
+          iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+}
+
+TEST_P(BdaRawSpirvTest, QueueDispatchRejectsRawBdaMetadataBindingLength) {
+  std::vector<uint32_t> metadata_spirv = MakeRawBdaSpirvWithMetadata({
+      "iree.vulkan.bda.v1",
+      "iree.vulkan.bda.v1.bindings=2",
+      "iree.vulkan.bda.v1.binding.1=4,17",
+  });
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(PrepareRawBdaExecutable(
+      iree_make_const_byte_span(metadata_spirv.data(),
+                                metadata_spirv.size() * sizeof(uint32_t)),
+      executable.out()));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_ref_list_t bindings =
+      MakeBindings(input_buffer, output_buffer, binding_refs);
+
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_device_queue_dispatch(
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+          iree_hal_semaphore_list_empty(), executable.get(),
+          /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(4, 1, 1),
+          iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+}
+
+TEST_P(BdaRawSpirvTest, QueueDispatchUsesRawBdaMetadataConstantCount) {
+  std::vector<uint32_t> metadata_spirv = MakeRawBdaSpirvWithMetadata({
+      "iree.vulkan.bda.v1",
+      "iree.vulkan.bda.v1.bindings=2",
+      "iree.vulkan.bda.v1.constants=1",
+  });
+  Ref<iree_hal_executable_t> executable;
+  IREE_ASSERT_OK(PrepareRawBdaExecutable(
+      iree_make_const_byte_span(metadata_spirv.data(),
+                                metadata_spirv.size() * sizeof(uint32_t)),
+      executable.out()));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  Ref<iree_hal_buffer_t> output_buffer;
+  CreateInputOutputBuffers(&input_buffer, &output_buffer);
+
+  iree_hal_buffer_ref_t binding_refs[2];
+  iree_hal_buffer_ref_list_t bindings =
+      MakeBindings(input_buffer, output_buffer, binding_refs);
+
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_hal_device_queue_dispatch(
+          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+          iree_hal_semaphore_list_empty(), executable.get(),
+          /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(4, 1, 1),
+          iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+
+  const uint32_t ignored_constant = 123u;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      dispatch_signal, executable.get(), /*export_ordinal=*/0,
+      iree_hal_make_static_dispatch_config(4, 1, 1),
+      iree_make_const_byte_span(&ignored_constant, sizeof(ignored_constant)),
+      bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
   ExpectOutput(output_buffer);
 }
 

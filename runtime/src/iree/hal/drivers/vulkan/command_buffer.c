@@ -2686,7 +2686,14 @@ iree_hal_vulkan_command_buffer_validate_dispatch_descriptor(
 static iree_status_t iree_hal_vulkan_command_buffer_validate_dispatch_bda(
     const iree_hal_vulkan_pipeline_t* pipeline,
     iree_const_byte_span_t constants, iree_hal_buffer_ref_list_t bindings) {
-  (void)constants;
+  const iree_host_size_t expected_constant_length =
+      (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t);
+  if (constants.data_length != expected_constant_length) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan command buffer dispatch provides %" PRIhsz
+                            " constant bytes but BDA pipeline expects %" PRIhsz,
+                            constants.data_length, expected_constant_length);
+  }
   if (pipeline->bda.root_push_constant_length !=
       sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t)) {
     return iree_make_status(

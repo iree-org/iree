@@ -52,6 +52,42 @@ typedef struct iree_hal_vulkan_spirv_module_analysis_t {
   iree_host_size_t compute_entry_point_name_storage_size;
 } iree_hal_vulkan_spirv_module_analysis_t;
 
+// Per-binding requirements reflected from raw SPIR-V BDA metadata.
+typedef struct iree_hal_vulkan_spirv_bda_binding_requirement_t {
+  // Minimum device address alignment required by the shader.
+  uint32_t minimum_alignment;
+
+  // Minimum buffer range byte length required by the shader.
+  uint64_t minimum_length;
+} iree_hal_vulkan_spirv_bda_binding_requirement_t;
+
+// Raw SPIR-V BDA dispatch metadata reflected from OpModuleProcessed strings.
+typedef struct iree_hal_vulkan_spirv_bda_dispatch_metadata_t {
+  // Whether any recognized iree.vulkan.bda.v1 metadata string was found.
+  bool is_present;
+
+  // Push-constant byte offset of iree_hal_vulkan_bda_dispatch_root_v1_t.
+  uint32_t root_push_constant_offset;
+
+  // Push-constant byte length reserved for the hidden BDA root.
+  uint32_t root_push_constant_length;
+
+  // Push-constant byte offset of the first HAL inline constant.
+  uint32_t constant_push_constant_offset;
+
+  // Number of 32-bit HAL inline constants accepted by the pipeline.
+  uint16_t constant_count;
+
+  // Number of HAL buffer bindings accepted by the pipeline.
+  uint16_t binding_count;
+
+  // Number of entries in |binding_requirements|.
+  iree_host_size_t binding_requirement_count;
+
+  // Per-binding requirements owned by this metadata object.
+  iree_hal_vulkan_spirv_bda_binding_requirement_t* binding_requirements;
+} iree_hal_vulkan_spirv_bda_dispatch_metadata_t;
+
 typedef enum iree_hal_vulkan_spirv_bda_verification_flag_bits_e {
   // No additional BDA module verification requirements.
   IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE = 0u,
@@ -92,6 +128,30 @@ iree_status_t iree_hal_vulkan_spirv_verify_bda_entry_point(
     iree_string_view_t entry_point,
     iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags,
     uint32_t out_workgroup_size[3]);
+
+// Parses raw BDA dispatch metadata from OpModuleProcessed strings.
+//
+// Recognized strings use the following decimal ASCII forms:
+//
+//   iree.vulkan.bda.v1
+//   iree.vulkan.bda.v1.root=<byte_offset>,<byte_length>
+//   iree.vulkan.bda.v1.constant_offset=<byte_offset>
+//   iree.vulkan.bda.v1.constants=<count>
+//   iree.vulkan.bda.v1.bindings=<count>
+//   iree.vulkan.bda.v1.binding.<ordinal>=<alignment>,<minimum_length>
+//
+// Unknown OpModuleProcessed strings are ignored. Recognized malformed strings
+// fail load. |out_metadata| must be released with
+// iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize.
+iree_status_t iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_t* out_metadata);
+
+// Releases storage owned by |metadata|.
+void iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata,
+    iree_allocator_t host_allocator);
 
 // Parses compute entry points and their static local workgroup sizes.
 //

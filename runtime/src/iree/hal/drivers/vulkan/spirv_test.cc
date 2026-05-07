@@ -6,6 +6,10 @@
 
 #include "iree/hal/drivers/vulkan/spirv.h"
 
+#include <cstring>
+#include <initializer_list>
+#include <vector>
+
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -65,6 +69,30 @@ static constexpr uint32_t
         5u,
         6u,
 };
+
+static void AppendSpirvStringInstruction(uint16_t opcode, const char* value,
+                                         std::vector<uint32_t>* words) {
+  const size_t byte_length = std::strlen(value) + 1;
+  const size_t string_word_count =
+      (byte_length + sizeof(uint32_t) - 1) / sizeof(uint32_t);
+  words->push_back(
+      (uint32_t)(((string_word_count + 1) << 16) | (uint32_t)opcode));
+  const size_t string_word_offset = words->size();
+  words->resize(string_word_offset + string_word_count, 0);
+  std::memcpy(&(*words)[string_word_offset], value, byte_length);
+}
+
+static std::vector<uint32_t> MakeBdaMetadataModule(
+    std::initializer_list<const char*> metadata_strings) {
+  std::vector<uint32_t> words = {
+      0x07230203u, 0x00010600u, 0u, 8u, 0u,
+  };
+  for (const char* metadata_string : metadata_strings) {
+    AppendSpirvStringInstruction(/*OpModuleProcessed=*/330u, metadata_string,
+                                 &words);
+  }
+  return words;
+}
 
 TEST(SpirvTest, ParsesComputeEntryPoint) {
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_module(
@@ -652,6 +680,70 @@ TEST(SpirvTest, RejectsZeroLocalSizeExecutionMode) {
       iree_hal_vulkan_spirv_parse_compute_entry_points(
           kZeroLocalSizeModule, IREE_ARRAYSIZE(kZeroLocalSizeModule),
           /*entry_point_capacity=*/1, &entry_point));
+}
+
+TEST(SpirvTest, ParsesBdaDispatchMetadata) {
+  std::vector<uint32_t> module = MakeBdaMetadataModule({
+      "iree.vulkan.bda.v1",
+      "iree.vulkan.bda.v1.bindings=2",
+      "iree.vulkan.bda.v1.constants=3",
+      "iree.vulkan.bda.v1.constant_offset=48",
+      "iree.vulkan.bda.v1.binding.1=16,64",
+  });
+
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t metadata = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+      module.data(), module.size(), iree_allocator_system(), &metadata));
+  EXPECT_TRUE(metadata.is_present);
+  EXPECT_EQ(0u, metadata.root_push_constant_offset);
+  EXPECT_EQ(32u, metadata.root_push_constant_length);
+  EXPECT_EQ(48u, metadata.constant_push_constant_offset);
+  EXPECT_EQ(3u, metadata.constant_count);
+  EXPECT_EQ(2u, metadata.binding_count);
+  ASSERT_EQ(2u, metadata.binding_requirement_count);
+  EXPECT_EQ(1u, metadata.binding_requirements[0].minimum_alignment);
+  EXPECT_EQ(0u, metadata.binding_requirements[0].minimum_length);
+  EXPECT_EQ(16u, metadata.binding_requirements[1].minimum_alignment);
+  EXPECT_EQ(64u, metadata.binding_requirements[1].minimum_length);
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+      &metadata, iree_allocator_system());
+}
+
+TEST(SpirvTest, IgnoresUnknownBdaDispatchMetadataVersions) {
+  std::vector<uint32_t> module = MakeBdaMetadataModule({
+      "some.other.tool.metadata",
+      "iree.vulkan.bda.v10.bindings=2",
+  });
+
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t metadata = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+      module.data(), module.size(), iree_allocator_system(), &metadata));
+  EXPECT_FALSE(metadata.is_present);
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+      &metadata, iree_allocator_system());
+}
+
+TEST(SpirvTest, RejectsMalformedBdaDispatchMetadata) {
+  std::vector<uint32_t> unknown_field_module =
+      MakeBdaMetadataModule({"iree.vulkan.bda.v1.surprise=1"});
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t metadata = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+          unknown_field_module.data(), unknown_field_module.size(),
+          iree_allocator_system(), &metadata));
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+      &metadata, iree_allocator_system());
+
+  std::vector<uint32_t> missing_binding_count_module =
+      MakeBdaMetadataModule({"iree.vulkan.bda.v1.binding.0=4,16"});
+  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
+                        iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+                            missing_binding_count_module.data(),
+                            missing_binding_count_module.size(),
+                            iree_allocator_system(), &metadata));
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+      &metadata, iree_allocator_system());
 }
 
 }  // namespace

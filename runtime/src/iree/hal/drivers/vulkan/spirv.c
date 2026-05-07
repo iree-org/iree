@@ -20,6 +20,7 @@ enum {
   IREE_HAL_VULKAN_SPIRV_OP_VARIABLE = 59u,
   IREE_HAL_VULKAN_SPIRV_OP_DECORATE = 71u,
   IREE_HAL_VULKAN_SPIRV_OP_MEMBER_DECORATE = 72u,
+  IREE_HAL_VULKAN_SPIRV_OP_MODULE_PROCESSED = 330u,
   IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES = 5347u,
   IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
   IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
@@ -36,6 +37,7 @@ enum {
   IREE_HAL_VULKAN_SPIRV_DECORATION_DESCRIPTOR_SET = 34u,
   IREE_HAL_VULKAN_SPIRV_DECORATION_OFFSET = 35u,
   IREE_HAL_VULKAN_SPIRV_BDA_ROOT_MEMBER_COUNT = 6u,
+  IREE_HAL_VULKAN_SPIRV_BDA_ROOT_BYTE_LENGTH = 32u,
 };
 
 static const uint32_t iree_hal_vulkan_spirv_bda_root_member_offsets[] = {
@@ -68,6 +70,23 @@ static iree_status_t iree_hal_vulkan_spirv_next_instruction(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_spirv_string_operand(
+    const uint32_t* words, uint16_t word_count, const char* description,
+    iree_string_view_t* out_value) {
+  const char* name = (const char*)words;
+  const iree_host_size_t name_capacity = word_count * sizeof(uint32_t);
+  iree_host_size_t name_length = 0;
+  while (name_length < name_capacity && name[name_length] != 0) {
+    ++name_length;
+  }
+  if (name_length == name_capacity) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "%s is not NUL-terminated", description);
+  }
+  *out_value = iree_make_string_view(name, name_length);
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
     const uint32_t* operands, uint16_t operand_word_count,
     iree_string_view_t* out_name) {
@@ -75,17 +94,61 @@ static iree_status_t iree_hal_vulkan_spirv_entry_point_name(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "SPIR-V entry point instruction is truncated");
   }
-  const char* name = (const char*)&operands[2];
-  const iree_host_size_t name_capacity = (operand_word_count - 2) * 4;
-  iree_host_size_t name_length = 0;
-  while (name_length < name_capacity && name[name_length] != 0) {
-    ++name_length;
+  return iree_hal_vulkan_spirv_string_operand(
+      &operands[2], (uint16_t)(operand_word_count - 2),
+      "SPIR-V entry point name", out_name);
+}
+
+static iree_status_t iree_hal_vulkan_spirv_module_processed_string(
+    const uint32_t* operands, uint16_t word_count,
+    iree_string_view_t* out_string) {
+  if (word_count < 2) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "SPIR-V OpModuleProcessed instruction is truncated");
   }
-  if (name_length == name_capacity) {
+  return iree_hal_vulkan_spirv_string_operand(
+      operands, (uint16_t)(word_count - 1), "SPIR-V OpModuleProcessed string",
+      out_string);
+}
+
+static iree_status_t iree_hal_vulkan_spirv_parse_metadata_uint64(
+    iree_string_view_t value, uint64_t max_value, const char* field_name,
+    uint64_t* out_value) {
+  if (iree_string_view_is_empty(value)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "SPIR-V entry point name is not NUL-terminated");
+                            "Vulkan BDA metadata field '%s' is empty",
+                            field_name);
   }
-  *out_name = iree_make_string_view(name, name_length);
+  uint64_t parsed_value = 0;
+  for (iree_host_size_t i = 0; i < value.size; ++i) {
+    const char c = value.data[i];
+    if (c < '0' || c > '9') {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA metadata field '%s' has non-decimal value '%.*s'",
+          field_name, (int)value.size, value.data);
+    }
+    const uint64_t digit = (uint64_t)(c - '0');
+    if (parsed_value > (max_value - digit) / 10u) {
+      return iree_make_status(
+          IREE_STATUS_OUT_OF_RANGE,
+          "Vulkan BDA metadata field '%s' value '%.*s' overflows", field_name,
+          (int)value.size, value.data);
+    }
+    parsed_value = parsed_value * 10u + digit;
+  }
+  *out_value = parsed_value;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_parse_metadata_uint32(
+    iree_string_view_t value, uint32_t max_value, const char* field_name,
+    uint32_t* out_value) {
+  uint64_t parsed_value = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint64(
+      value, max_value, field_name, &parsed_value));
+  *out_value = (uint32_t)parsed_value;
   return iree_ok_status();
 }
 
@@ -407,6 +470,337 @@ iree_status_t iree_hal_vulkan_spirv_analyze_module(
   };
   return iree_hal_vulkan_spirv_scan_module(spirv_words, spirv_word_count,
                                            &state);
+}
+
+static void iree_hal_vulkan_spirv_bda_dispatch_metadata_initialize(
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_t* out_metadata) {
+  memset(out_metadata, 0, sizeof(*out_metadata));
+  out_metadata->root_push_constant_offset = 0;
+  out_metadata->root_push_constant_length =
+      IREE_HAL_VULKAN_SPIRV_BDA_ROOT_BYTE_LENGTH;
+  out_metadata->constant_push_constant_offset =
+      IREE_HAL_VULKAN_SPIRV_BDA_ROOT_BYTE_LENGTH;
+}
+
+void iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata,
+    iree_allocator_t host_allocator) {
+  if (!metadata) return;
+  iree_allocator_free(host_allocator, metadata->binding_requirements);
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_initialize(metadata);
+}
+
+typedef struct iree_hal_vulkan_spirv_bda_metadata_parse_state_t {
+  // Reflected metadata receiving parsed scalar fields.
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata;
+
+  // Whether root layout metadata was already parsed.
+  bool has_root_layout;
+
+  // Whether constant offset metadata was already parsed.
+  bool has_constant_offset;
+
+  // Whether constant count metadata was already parsed.
+  bool has_constant_count;
+
+  // Whether binding count metadata was already parsed.
+  bool has_binding_count;
+
+  // Whether any per-binding requirement metadata was found.
+  bool has_binding_requirements;
+
+  // Whether this pass should populate |metadata->binding_requirements|.
+  bool populate_binding_requirements;
+} iree_hal_vulkan_spirv_bda_metadata_parse_state_t;
+
+static iree_status_t iree_hal_vulkan_spirv_parse_metadata_pair_u32_u32(
+    iree_string_view_t value, const char* field_name, uint32_t* out_lhs,
+    uint32_t* out_rhs) {
+  iree_string_view_t lhs = iree_string_view_empty();
+  iree_string_view_t rhs = iree_string_view_empty();
+  if (iree_string_view_split(value, ',', &lhs, &rhs) < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA metadata field '%s' must be '<uint32>,<uint32>'",
+        field_name);
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+      lhs, UINT32_MAX, field_name, out_lhs));
+  return iree_hal_vulkan_spirv_parse_metadata_uint32(rhs, UINT32_MAX,
+                                                     field_name, out_rhs);
+}
+
+static iree_status_t iree_hal_vulkan_spirv_parse_metadata_pair_u32_u64(
+    iree_string_view_t value, const char* field_name, uint32_t* out_lhs,
+    uint64_t* out_rhs) {
+  iree_string_view_t lhs = iree_string_view_empty();
+  iree_string_view_t rhs = iree_string_view_empty();
+  if (iree_string_view_split(value, ',', &lhs, &rhs) < 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan BDA metadata field '%s' must be '<uint32>,<uint64>'",
+        field_name);
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+      lhs, UINT32_MAX, field_name, out_lhs));
+  return iree_hal_vulkan_spirv_parse_metadata_uint64(rhs, UINT64_MAX,
+                                                     field_name, out_rhs);
+}
+
+static iree_status_t iree_hal_vulkan_spirv_parse_bda_metadata_string(
+    iree_string_view_t value,
+    iree_hal_vulkan_spirv_bda_metadata_parse_state_t* state) {
+  static const iree_string_view_t prefix =
+      iree_string_view_literal("iree.vulkan.bda.v1");
+  if (!iree_string_view_starts_with(value, prefix)) return iree_ok_status();
+
+  value = iree_string_view_remove_prefix(value, prefix.size);
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata = state->metadata;
+  if (iree_string_view_is_empty(value)) {
+    metadata->is_present = true;
+    return iree_ok_status();
+  }
+  if (!iree_string_view_consume_prefix(&value, IREE_SV("."))) {
+    return iree_ok_status();
+  }
+  metadata->is_present = true;
+  if (state->populate_binding_requirements &&
+      !iree_string_view_starts_with(value, IREE_SV("binding."))) {
+    return iree_ok_status();
+  }
+
+  if (iree_string_view_consume_prefix(&value, IREE_SV("root="))) {
+    if (state->has_root_layout) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan BDA metadata root layout is duplicated");
+    }
+    state->has_root_layout = true;
+    return iree_hal_vulkan_spirv_parse_metadata_pair_u32_u32(
+        value, "root", &metadata->root_push_constant_offset,
+        &metadata->root_push_constant_length);
+  }
+
+  if (iree_string_view_consume_prefix(&value, IREE_SV("constant_offset="))) {
+    if (state->has_constant_offset) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan BDA metadata constant offset is "
+                              "duplicated");
+    }
+    state->has_constant_offset = true;
+    uint32_t constant_offset = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+        value, UINT32_MAX, "constant_offset", &constant_offset));
+    metadata->constant_push_constant_offset = constant_offset;
+    return iree_ok_status();
+  }
+
+  if (iree_string_view_consume_prefix(&value, IREE_SV("constants="))) {
+    if (state->has_constant_count) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan BDA metadata constant count is "
+                              "duplicated");
+    }
+    state->has_constant_count = true;
+    uint32_t constant_count = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+        value, UINT16_MAX, "constants", &constant_count));
+    metadata->constant_count = (uint16_t)constant_count;
+    return iree_ok_status();
+  }
+
+  if (iree_string_view_consume_prefix(&value, IREE_SV("bindings="))) {
+    if (state->has_binding_count) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "Vulkan BDA metadata binding count is "
+                              "duplicated");
+    }
+    state->has_binding_count = true;
+    uint32_t binding_count = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+        value, UINT16_MAX, "bindings", &binding_count));
+    metadata->binding_count = (uint16_t)binding_count;
+    return iree_ok_status();
+  }
+
+  if (iree_string_view_consume_prefix(&value, IREE_SV("binding."))) {
+    iree_string_view_t ordinal_text = iree_string_view_empty();
+    iree_string_view_t requirement_text = iree_string_view_empty();
+    if (iree_string_view_split(value, '=', &ordinal_text, &requirement_text) <
+        0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA binding metadata must be "
+          "'binding.<ordinal>=<alignment>,<minimum_length>'");
+    }
+    uint32_t binding_ordinal = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_uint32(
+        ordinal_text, UINT16_MAX, "binding ordinal", &binding_ordinal));
+    uint32_t minimum_alignment = 0;
+    uint64_t minimum_length = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_parse_metadata_pair_u32_u64(
+        requirement_text, "binding requirement", &minimum_alignment,
+        &minimum_length));
+    if (minimum_alignment == 0 ||
+        !iree_device_size_is_power_of_two(minimum_alignment)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA binding metadata for ordinal %u has invalid alignment %u",
+          binding_ordinal, minimum_alignment);
+    }
+    state->has_binding_requirements = true;
+    if (!state->populate_binding_requirements) return iree_ok_status();
+    if (binding_ordinal >= metadata->binding_count) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA binding metadata ordinal %u exceeds binding count %u",
+          binding_ordinal, metadata->binding_count);
+    }
+    iree_hal_vulkan_spirv_bda_binding_requirement_t* requirement =
+        &metadata->binding_requirements[binding_ordinal];
+    if (requirement->minimum_alignment != 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA binding metadata for ordinal %u is duplicated",
+          binding_ordinal);
+    }
+    *requirement = (iree_hal_vulkan_spirv_bda_binding_requirement_t){
+        .minimum_alignment = minimum_alignment,
+        .minimum_length = minimum_length,
+    };
+    return iree_ok_status();
+  }
+
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "Vulkan BDA metadata string has unknown field '%.*s'",
+                          (int)value.size, value.data);
+}
+
+static iree_status_t iree_hal_vulkan_spirv_scan_bda_metadata_strings(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_hal_vulkan_spirv_bda_metadata_parse_state_t* state) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_verify_module_header(
+      spirv_words, spirv_word_count));
+  iree_host_size_t word_offset = IREE_HAL_VULKAN_SPIRV_HEADER_WORD_COUNT;
+  while (word_offset < spirv_word_count) {
+    uint16_t opcode = 0;
+    uint16_t word_count = 0;
+    const uint32_t* operands = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_next_instruction(
+        spirv_words, spirv_word_count, &word_offset, &opcode, &word_count,
+        &operands));
+    if (opcode != IREE_HAL_VULKAN_SPIRV_OP_MODULE_PROCESSED) continue;
+    iree_string_view_t value = iree_string_view_empty();
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_module_processed_string(
+        operands, word_count, &value));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_vulkan_spirv_parse_bda_metadata_string(value, state));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_spirv_validate_bda_metadata(
+    const iree_hal_vulkan_spirv_bda_metadata_parse_state_t* state) {
+  const iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata =
+      state->metadata;
+  if (!metadata->is_present) return iree_ok_status();
+  if (metadata->root_push_constant_offset != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA metadata root push constant offset must be zero");
+  }
+  if (metadata->root_push_constant_length !=
+      IREE_HAL_VULKAN_SPIRV_BDA_ROOT_BYTE_LENGTH) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA metadata root push constant length %u does not match "
+        "ABI v1 length %u",
+        metadata->root_push_constant_length,
+        IREE_HAL_VULKAN_SPIRV_BDA_ROOT_BYTE_LENGTH);
+  }
+  if ((metadata->constant_push_constant_offset % sizeof(uint32_t)) != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA metadata constant push constant offset must be "
+        "4-byte aligned");
+  }
+  const uint64_t constant_length =
+      (uint64_t)metadata->constant_count * sizeof(uint32_t);
+  const uint64_t constant_end =
+      (uint64_t)metadata->constant_push_constant_offset + constant_length;
+  if (constant_end > UINT32_MAX) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "raw Vulkan BDA metadata constant push constant range overflows");
+  }
+  const uint64_t root_end = (uint64_t)metadata->root_push_constant_offset +
+                            metadata->root_push_constant_length;
+  if (constant_length != 0 &&
+      metadata->root_push_constant_offset < constant_end &&
+      metadata->constant_push_constant_offset < root_end) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA metadata inline constants overlap the hidden root");
+  }
+  if (state->has_binding_requirements && !state->has_binding_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "raw Vulkan BDA binding requirements require an "
+                            "explicit binding count");
+  }
+  if (state->has_binding_requirements && metadata->binding_count == 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "raw Vulkan BDA binding requirements require a non-zero binding count");
+  }
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+    const uint32_t* spirv_words, iree_host_size_t spirv_word_count,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_t* out_metadata) {
+  IREE_ASSERT_ARGUMENT(out_metadata);
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_initialize(out_metadata);
+
+  iree_hal_vulkan_spirv_bda_metadata_parse_state_t state = {
+      .metadata = out_metadata,
+  };
+  iree_status_t status = iree_hal_vulkan_spirv_scan_bda_metadata_strings(
+      spirv_words, spirv_word_count, &state);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_spirv_validate_bda_metadata(&state);
+  }
+  if (iree_status_is_ok(status) && out_metadata->is_present &&
+      state.has_binding_requirements) {
+    out_metadata->binding_requirement_count = out_metadata->binding_count;
+    status = iree_allocator_malloc_array(
+        host_allocator, out_metadata->binding_requirement_count,
+        sizeof(out_metadata->binding_requirements[0]),
+        (void**)&out_metadata->binding_requirements);
+    if (iree_status_is_ok(status)) {
+      memset(out_metadata->binding_requirements, 0,
+             out_metadata->binding_requirement_count *
+                 sizeof(out_metadata->binding_requirements[0]));
+      state.populate_binding_requirements = true;
+      status = iree_hal_vulkan_spirv_scan_bda_metadata_strings(
+          spirv_words, spirv_word_count, &state);
+    }
+    if (iree_status_is_ok(status)) {
+      for (iree_host_size_t i = 0; i < out_metadata->binding_requirement_count;
+           ++i) {
+        iree_hal_vulkan_spirv_bda_binding_requirement_t* requirement =
+            &out_metadata->binding_requirements[i];
+        if (requirement->minimum_alignment == 0) {
+          requirement->minimum_alignment = 1;
+          requirement->minimum_length = 0;
+        }
+      }
+    }
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(out_metadata,
+                                                             host_allocator);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_spirv_find_push_constant_pointee_type(

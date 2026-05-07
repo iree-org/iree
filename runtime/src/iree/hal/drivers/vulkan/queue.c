@@ -7923,13 +7923,22 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_bda(
     iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  (void)constants;
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(queue->enabled_dispatch_abis,
                          IREE_HAL_VULKAN_DISPATCH_ABI_BDA)) {
     status =
         iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                          "Vulkan BDA dispatch ABI is disabled for this queue");
+  }
+  const iree_host_size_t expected_constant_length =
+      (iree_host_size_t)pipeline->constant_count * sizeof(uint32_t);
+  if (iree_status_is_ok(status) &&
+      constants.data_length != expected_constant_length) {
+    status =
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "Vulkan queue_dispatch provides %" PRIhsz
+                         " constant bytes but BDA pipeline expects %" PRIhsz,
+                         constants.data_length, expected_constant_length);
   }
   if (iree_status_is_ok(status) &&
       pipeline->bda.root_push_constant_length !=

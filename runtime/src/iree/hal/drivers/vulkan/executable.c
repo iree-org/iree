@@ -1249,6 +1249,40 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_bda_metadata(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_initialize_raw_pipeline_bda_metadata(
+    const iree_hal_vulkan_spirv_bda_dispatch_metadata_t* metadata,
+    iree_allocator_t host_allocator, iree_hal_vulkan_pipeline_t* out_pipeline) {
+  out_pipeline->constant_count =
+      metadata->is_present ? metadata->constant_count : 0;
+  out_pipeline->binding_count =
+      metadata->is_present ? metadata->binding_count : 0;
+  out_pipeline->bda.root_push_constant_offset =
+      metadata->root_push_constant_offset;
+  out_pipeline->bda.root_push_constant_length =
+      metadata->root_push_constant_length;
+  out_pipeline->bda.constant_push_constant_offset =
+      metadata->constant_push_constant_offset;
+  out_pipeline->bda.binding_table_entry_length = sizeof(uint64_t);
+  out_pipeline->bda.binding_count_known = metadata->is_present;
+
+  if (metadata->binding_requirement_count == 0) return iree_ok_status();
+  out_pipeline->bda.binding_requirement_count =
+      metadata->binding_requirement_count;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
+      host_allocator, metadata->binding_requirement_count,
+      sizeof(out_pipeline->bda.binding_requirements[0]),
+      (void**)&out_pipeline->bda.binding_requirements));
+  for (iree_host_size_t i = 0; i < metadata->binding_requirement_count; ++i) {
+    out_pipeline->bda.binding_requirements[i] =
+        (iree_hal_vulkan_bda_binding_requirement_t){
+            .minimum_alignment =
+                metadata->binding_requirements[i].minimum_alignment,
+            .minimum_length = metadata->binding_requirements[i].minimum_length,
+        };
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_parse_flatbuffer_spirv_workgroup_size(
     flatbuffers_uint32_vec_t spirv_code_vec, iree_string_view_t entry_point,
     uint32_t out_workgroup_size[3]) {
@@ -1549,6 +1583,11 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     status = iree_hal_vulkan_spirv_parse_compute_entry_points(
         spirv_words, spirv_word_count, entry_point_count, entry_points);
   }
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_t bda_metadata = {0};
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_spirv_parse_bda_dispatch_metadata(
+        spirv_words, spirv_word_count, host_allocator, &bda_metadata);
+  }
   iree_hal_vulkan_spirv_bda_verification_flags_t verification_flags =
       IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_REQUIRE_PUSH_CONSTANT_ROOT;
   if (iree_all_bits_set(
@@ -1582,10 +1621,18 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
   }
 
   if (iree_status_is_ok(status)) {
+    const uint64_t root_end = (uint64_t)bda_metadata.root_push_constant_offset +
+                              bda_metadata.root_push_constant_length;
+    const uint64_t constant_length =
+        (uint64_t)bda_metadata.constant_count * sizeof(uint32_t);
+    const uint64_t constant_end =
+        (uint64_t)bda_metadata.constant_push_constant_offset + constant_length;
+    const uint64_t range_end =
+        constant_length != 0 ? iree_max(root_end, constant_end) : root_end;
     VkPushConstantRange root_range = {
         .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .offset = 0,
-        .size = sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t),
+        .offset = bda_metadata.root_push_constant_offset,
+        .size = (uint32_t)(range_end - bda_metadata.root_push_constant_offset),
     };
     VkPipelineLayoutCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -1621,13 +1668,9 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     pipeline->handle = VK_NULL_HANDLE;
     pipeline->dispatch_abi = IREE_HAL_VULKAN_DISPATCH_ABI_BDA;
     pipeline->layout = executable->pipeline_layouts[0];
-    pipeline->bda.root_push_constant_offset = 0;
-    pipeline->bda.root_push_constant_length =
-        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t);
-    pipeline->bda.constant_push_constant_offset =
-        sizeof(iree_hal_vulkan_bda_dispatch_root_v1_t);
-    pipeline->bda.binding_table_entry_length = sizeof(uint64_t);
-    pipeline->bda.binding_count_known = false;
+    status = iree_hal_vulkan_initialize_raw_pipeline_bda_metadata(
+        &bda_metadata, host_allocator, pipeline);
+    if (!iree_status_is_ok(status)) break;
     memcpy(pipeline->workgroup_size, entry_points[i].workgroup_size,
            sizeof(pipeline->workgroup_size));
 
@@ -1664,6 +1707,8 @@ static iree_status_t iree_hal_vulkan_create_raw_bda_executable(
     iree_vkDestroyShaderModule(IREE_VULKAN_DEVICE(syms), logical_device,
                                shader_module, /*pAllocator=*/NULL);
   }
+  iree_hal_vulkan_spirv_bda_dispatch_metadata_deinitialize(&bda_metadata,
+                                                           host_allocator);
   iree_allocator_free(host_allocator, entry_points);
   iree_allocator_free(host_allocator, aligned_spirv_words);
 
