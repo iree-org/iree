@@ -107,7 +107,7 @@ def LLVMGPULinkExecutablesPass :
 
 def LLVMGPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
-  let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
+  let summary = "Perform lowering of executable target using a pipeline attribute";
   let options = [
     Option<"forROCDL", "for-rocdl", "bool",
            /*default=*/"false",
@@ -138,7 +138,7 @@ def ROCDLPrefetchSharedMemoryPass :
 
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
-  let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let summary = "Select a pipeline attribute for lowering the target variant";
   let options = [
     Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
       /*default=*/"GPUCodegenOptions()",

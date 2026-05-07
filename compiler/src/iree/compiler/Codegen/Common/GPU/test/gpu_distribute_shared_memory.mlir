@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-distribute-shared-memory-copy, fold-memref-alias-ops, canonicalize, cse))' %s | FileCheck %s
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 4, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 4, 1]>
 module {
   memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>
   memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>
@@ -81,7 +81,7 @@ module {
 // -----
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 8, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 8, 1]>
 module {
 
   func.func @unaligned_shared_memory_copy(
@@ -127,7 +127,7 @@ module {
 // -----
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 8, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 8, 1]>
 module {
   func.func @zero_dim_shared_memory_copy(%global : memref<f32>, %shared : memref<f32>)
   attributes {hal.executable.target = #executable_target, translation_info = #translation_info} {
@@ -153,7 +153,7 @@ module {
 // -----
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 8, 1]>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 8, 1]>
 module {
   func.func @dequant_shared_memory_copy(%A: memref<1x32x128xi4>, %B: memref<1x128xf32>, %C: memref<1x128xi4>,
                                         %SM: memref<1x32x128xf32, #gpu.address_space<workgroup>>)

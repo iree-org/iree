@@ -81,7 +81,7 @@ def LLVMCPULinkExecutablesPass :
 def LLVMCPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmcpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
-      "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+      "Lower executable target using a pipeline attribute";
   let description = [{
     Pass to lower the module an hal.executable.variant operation to external
     dialect. Currently this pass lowers to LLVM dialect, but could be
@@ -113,7 +113,7 @@ def LLVMCPUPeelPass :
 def LLVMCPUSelectLoweringStrategyPass :
     Pass<"iree-llvmcpu-select-lowering-strategy", "ModuleOp"> {
   let summary =
-      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+      "Select a pipeline attribute for lowering the variant";
   let description = [{
     Pass to select a lowering strategy for a hal.executable.variant operation.
     The variant is annotated with the selected strategies, which are

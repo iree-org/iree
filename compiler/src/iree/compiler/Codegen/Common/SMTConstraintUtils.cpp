@@ -67,11 +67,10 @@ static void emitCommonConstraints(OpBuilder &builder, Location loc,
   }
 }
 
-ConstraintsOpShell
-createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
-                         IREE::Codegen::RootOpAttr rootOpAttr,
-                         Attribute pipelineAttr, DictionaryAttr knobs,
-                         unsigned numLoops, ArrayRef<AffineMap> indexingMaps) {
+ConstraintsOpShell createConstraintsOpShell(
+    OpBuilder &builder, Operation *rootOp, IREE::Codegen::RootOpAttr rootOpAttr,
+    IREE::Codegen::PipelineAttrInterface pipelineAttr, DictionaryAttr knobs,
+    unsigned numLoops, ArrayRef<AffineMap> indexingMaps) {
   MLIRContext *ctx = rootOp->getContext();
   Location loc = rootOp->getLoc();
   builder.setInsertionPointAfter(rootOp);

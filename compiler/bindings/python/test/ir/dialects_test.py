@@ -74,16 +74,38 @@ def run(fn):
 
 
 @run
-def codegen_dispatch_lowering_pass_pipeline():
-    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
-    )
+def codegen_vmvx_pipeline_attr():
+    pipeline_attr = iree_codegen.VMVXPipelineAttr.get()
     assert pipeline_attr is not None
-    assert pipeline_attr.value == iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
-    assert pipeline_attr.raw_value == int(
-        iree_codegen.DispatchLoweringPassPipeline.VMVXDefault
+    assert isinstance(pipeline_attr, iree_codegen.VMVXPipelineAttr)
+    assert str(pipeline_attr) == "#iree_codegen.vmvx_pipeline"
+
+
+@run
+def codegen_transform_dialect_codegen_pipeline_attr():
+    pipeline_attr = iree_codegen.TransformDialectCodegenPipelineAttr.get()
+    assert pipeline_attr is not None
+    assert isinstance(pipeline_attr, iree_codegen.TransformDialectCodegenPipelineAttr)
+    assert str(pipeline_attr) == "#iree_codegen.transform_dialect_codegen"
+
+
+@run
+def codegen_no_pipeline_attr():
+    pipeline_attr = iree_codegen.NoPipelineAttr.get()
+    assert pipeline_attr is not None
+    assert isinstance(pipeline_attr, iree_codegen.NoPipelineAttr)
+    assert str(pipeline_attr) == "#iree_codegen.no_pipeline"
+
+
+@run
+def codegen_pass_pipeline_attr():
+    pipeline_attr = iree_codegen.PassPipelineAttr.get("func.func(canonicalize)")
+    assert pipeline_attr is not None
+    assert isinstance(pipeline_attr, iree_codegen.PassPipelineAttr)
+    assert pipeline_attr.pipeline == "func.func(canonicalize)"
+    assert (
+        str(pipeline_attr) == '#iree_codegen.pass_pipeline<"func.func(canonicalize)">'
     )
-    assert "VMVXDefault" in str(pipeline_attr)
 
 
 @run
@@ -97,12 +119,13 @@ def gpu_pipeline_attr():
 
 @run
 def codegen_translation_info_minimal():
-    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.None_
-    )
+    pipeline_attr = iree_codegen.NoPipelineAttr.get()
     translation_info = iree_codegen.TranslationInfoAttr.get(pipeline_attr)
     assert translation_info is not None
-    assert str(translation_info) == "#iree_codegen.translation_info<pipeline = None>"
+    assert (
+        str(translation_info)
+        == "#iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline>"
+    )
     assert translation_info.pass_pipeline == pipeline_attr
     assert translation_info.codegen_spec is None
     assert translation_info.workgroup_size == []
@@ -112,14 +135,13 @@ def codegen_translation_info_minimal():
 
 @run
 def codegen_translation_info_with_sizes():
-    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.Custom
-    )
+    pipeline_attr = iree_codegen.PassPipelineAttr.get("canonicalize")
     translation_info = iree_codegen.TranslationInfoAttr.get(
         pipeline_attr, None, [64, 4, 1], 32
     )
     assert translation_info is not None
     assert translation_info.pass_pipeline == pipeline_attr
+    assert pipeline_attr.pipeline == "canonicalize"
     assert translation_info.codegen_spec is None
     assert translation_info.workgroup_size == [64, 4, 1]
     assert translation_info.subgroup_size == 32
@@ -128,9 +150,7 @@ def codegen_translation_info_with_sizes():
 
 @run
 def codegen_translation_info_full():
-    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.TransformDialectCodegen
-    )
+    pipeline_attr = iree_codegen.TransformDialectCodegenPipelineAttr.get()
     foo_symbol = ir.SymbolRefAttr.get(["foo"])
     configuration = ir.DictAttr.get({"A": ir.IntegerAttr.get(ir.IndexType.get(), 42)})
     translation_info = iree_codegen.TranslationInfoAttr.get(
@@ -449,9 +469,7 @@ def lowering_config_attr():
 def compilation_info():
     attributes = ir.DictAttr.get({"reduction": get_index_array_attr([])})
     lowering_config = iree_gpu.LoweringConfigAttr.get(attributes)
-    pipeline_attr = iree_codegen.DispatchLoweringPassPipelineAttr.get(
-        iree_codegen.DispatchLoweringPassPipeline.None_
-    )
+    pipeline_attr = iree_codegen.NoPipelineAttr.get()
     translation_info = iree_codegen.TranslationInfoAttr.get(pipeline_attr)
 
     compilation_info = iree_codegen.CompilationInfoAttr.get(

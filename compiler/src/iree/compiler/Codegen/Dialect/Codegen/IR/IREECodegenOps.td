@@ -609,15 +609,14 @@ def IREECodegen_ConstraintsOp :
   }];
   let arguments = (ins
     IREECodegen_RootOpAttr:$target,
-    AnyAttrOf<[DispatchLoweringPassPipelineAttr,
-               IREECodegen_PipelineAttrInterface]>:$pipeline,
+    IREECodegen_PipelineAttrInterface:$pipeline,
     DictionaryAttr:$knobs,
     Variadic<Index>:$problem_dims
   );
   let regions = (region SizedRegion<1>:$body);
   let results = (outs);
   let assemblyFormat = [{
-    `target` `=` $target `,` `pipeline` `=` custom<PipelineAttr>($pipeline) `,`
+    `target` `=` $target `,` `pipeline` `=` $pipeline `,`
     custom<KnobsDictionary>($knobs)
     `dims` `(` $problem_dims `)` attr-dict-with-keyword
     $body

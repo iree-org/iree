@@ -138,8 +138,6 @@ static llvm::cl::opt<bool> clEnableRiscvAggressiveDist(
         "set distConfig.maxTileSizes[i] to 2 * distConfig.minTileSizes[i]."),
     llvm::cl::init(false));
 
-using IREE::Codegen::DispatchLoweringPassPipeline;
-
 // Encodes the pre-processing strategy to be applied on a Linalg operation
 // before vectorization.
 enum class VectorPreProcStrategy {
@@ -4040,9 +4038,11 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
-  DispatchLoweringPassPipeline pipeline =
-      getTranslationInfo(entryPointFn).getDispatchLoweringPassPipeline();
-  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(entryPointFn);
+  if (!translationInfo ||
+      !isa<IREE::Codegen::TransformDialectCodegenPipelineAttr>(
+          translationInfo.getPassPipeline())) {
     if (failed(adjustTileSizesForRootUnPackOp(entryPointFn, rootOperation))) {
       return failure();
     }

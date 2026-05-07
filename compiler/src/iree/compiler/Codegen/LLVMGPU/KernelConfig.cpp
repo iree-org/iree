@@ -2666,9 +2666,12 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   }
 
   if (!rootOperation) {
-    // No root operation found, set it to none.
+    // No root operation found, set it to no_pipeline.
+    MLIRContext *context = funcOp.getContext();
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+        context, IREE::Codegen::NoPipelineAttr::get(context),
+        /*codegenSpec=*/SymbolRefAttr(), /*workgroupSize=*/ArrayRef<int64_t>(),
+        /*subgroupSize=*/int64_t(), /*configuration=*/DictionaryAttr());
     if (failed(setTranslationInfo(funcOp, translationInfo))) {
       return failure();
     }

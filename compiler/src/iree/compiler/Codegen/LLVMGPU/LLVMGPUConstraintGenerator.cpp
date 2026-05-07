@@ -68,8 +68,9 @@ static LogicalResult emitConstraints(OpBuilder &builder, Operation *rootOp,
 }
 
 /// Emit constraints for a single root op under VectorDistribute pipeline.
-static LogicalResult emitConstraintsForOp(Operation *rootOp,
-                                          Attribute pipelineAttr) {
+static LogicalResult
+emitConstraintsForOp(Operation *rootOp,
+                     IREE::Codegen::PipelineAttrInterface pipelineAttr) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp) {
     return success();
@@ -89,10 +90,12 @@ static LogicalResult emitConstraintsForOp(Operation *rootOp,
 
 LogicalResult emitLLVMGPUConstraints(Attribute attr,
                                      ArrayRef<Operation *> rootOps) {
-  auto pipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
+  auto gpuPipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
+  auto pipelineAttr =
+      cast<IREE::Codegen::PipelineAttrInterface>(gpuPipelineAttr);
 
   // Only VectorDistribute has constraint generation today.
-  if (pipelineAttr.getValue() !=
+  if (gpuPipelineAttr.getValue() !=
       IREE::GPU::LoweringPipeline::VectorDistribute) {
     return success();
   }
