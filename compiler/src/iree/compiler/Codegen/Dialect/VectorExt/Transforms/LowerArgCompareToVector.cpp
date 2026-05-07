@@ -10,11 +10,12 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
@@ -40,18 +41,7 @@ static Value cloneComparatorRegion(RewriterBase &rewriter, Region &region,
     }
   }
   auto yieldOp = cast<YieldOp>(block.getTerminator());
-  return mapper.lookup(yieldOp.getValues()[0]);
-}
-
-static SmallVector<int64_t> delinearizeIndex(int64_t linearIdx,
-                                             ArrayRef<int64_t> shape) {
-  SmallVector<int64_t> indices;
-  for (int64_t i = static_cast<int64_t>(shape.size()) - 1; i >= 0; --i) {
-    indices.push_back(linearIdx % shape[i]);
-    linearIdx /= shape[i];
-  }
-  std::reverse(indices.begin(), indices.end());
-  return indices;
+  return mapper.lookupOrDefault(yieldOp.getValues()[0]);
 }
 
 static SmallVector<int64_t> buildMoveToLastPerm(int64_t rank, int64_t dim) {
@@ -102,7 +92,15 @@ struct LowerArgCompareToVector final : OpRewritePattern<ArgCompareOp> {
     VectorType transposedType = cast<VectorType>(inputValue.getType());
     ArrayRef<int64_t> shape = transposedType.getShape();
 
-    SmallVector<int64_t> parallelShape(shape.begin(), shape.end() - 1);
+    // Fully unroll the parallel dimensions at compile time. Safe today
+    // because setArgCompareConfig gives every parallel loop a thread tile of
+    // 1, so `numParallelElems` is 1; static extract/insert positions also
+    // satisfy LLVMGPULegalizeNDVectors on rank > 1 vectors.
+    // TODO(Bangtian): if a config produces non-unit parallel dims, replace
+    // with an scf.for over a vector.shape_cast'd flat leading dim (a dynamic
+    // loop index can't be used directly — LLVMGPULegalizeNDVectors rejects
+    // dynamic positions on rank > 1 vectors).
+    ArrayRef<int64_t> parallelShape = shape.drop_back();
     int64_t numParallelElems = ShapedType::getNumElements(parallelShape);
 
     VectorType resultValueType = op.getInitValueType();
@@ -118,20 +116,12 @@ struct LowerArgCompareToVector final : OpRewritePattern<ArgCompareOp> {
 
     for (int64_t p = 0; p < numParallelElems; ++p) {
       SmallVector<int64_t> parallelIndices =
-          delinearizeIndex(p, parallelShape);
+          delinearize(p, computeStrides(parallelShape));
 
-      Value accVal, accIdx;
-      if (resultValueType.getRank() == 0) {
-        accVal = vector::ExtractOp::create(rewriter, loc, initValue,
-                                           ArrayRef<int64_t>{});
-        accIdx = vector::ExtractOp::create(rewriter, loc, initIndex,
-                                           ArrayRef<int64_t>{});
-      } else {
-        accVal = vector::ExtractOp::create(rewriter, loc, initValue,
-                                           parallelIndices);
-        accIdx = vector::ExtractOp::create(rewriter, loc, initIndex,
-                                           parallelIndices);
-      }
+      Value accVal =
+          vector::ExtractOp::create(rewriter, loc, initValue, parallelIndices);
+      Value accIdx =
+          vector::ExtractOp::create(rewriter, loc, initIndex, parallelIndices);
 
       Value inputSlice, indexSlice;
       if (rank == 1) {
@@ -215,9 +205,7 @@ struct LowerArgCompareToVectorPass final
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
     patterns.add<LowerArgCompareToVector>(ctx);
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };
 

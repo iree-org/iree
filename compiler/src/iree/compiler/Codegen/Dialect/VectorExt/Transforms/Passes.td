@@ -28,6 +28,8 @@ def LowerTransferGatherScatterToVectorPass :
   ];
 }
 
+// TODO(Bangtian): Consolidate per-op lowering passes into a single generic
+// pass once we have more such lowerings.
 def LowerArgCompareToVectorPass :
     Pass<"iree-vector-ext-lower-arg-compare-to-vector", "func::FuncOp"> {
   let summary = "Lower iree_vector_ext.arg_compare to vector/SCF ops";

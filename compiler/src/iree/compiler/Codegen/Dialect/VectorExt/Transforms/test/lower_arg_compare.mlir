@@ -70,6 +70,7 @@ func.func @argmax_2d_reduce_last_dim(%input: vector<4x128xf32>,
 // CHECK-NOT:     vector.transpose
 // CHECK:         arith.constant 128 : index
 // CHECK-COUNT-4: scf.for {{.*}} to %{{.*}} step
+// CHECK-NOT:     scf.for
 // CHECK:         return %{{.*}}, %{{.*}} : vector<4xf32>, vector<4xi32>
 
 // -----
@@ -89,9 +90,10 @@ func.func @argmax_2d_reduce_first_dim(%input: vector<2x4xf32>,
   return %result#0, %result#1 : vector<4xf32>, vector<4xi64>
 }
 // CHECK-LABEL: func.func @argmax_2d_reduce_first_dim
-// CHECK:         arith.constant 2 : index
-// CHECK:         vector.transpose %{{.*}}, [1, 0] : vector<2x4xf32> to vector<4x2xf32>
+// CHECK-DAG:     arith.constant 2 : index
+// CHECK-DAG:     vector.transpose %{{.*}}, [1, 0] : vector<2x4xf32> to vector<4x2xf32>
 // CHECK-COUNT-4: scf.for {{.*}} to %{{.*}} step
+// CHECK-NOT:     scf.for
 // CHECK:         arith.index_cast %{{.*}} : index to i64
 // CHECK:         return %{{.*}}, %{{.*}} : vector<4xf32>, vector<4xi64>
 
@@ -112,9 +114,10 @@ func.func @argmax_3d_reduce_first_dim(%input: vector<2x3x4xf32>,
   return %result#0, %result#1 : vector<3x4xf32>, vector<3x4xi64>
 }
 // CHECK-LABEL: func.func @argmax_3d_reduce_first_dim
-// CHECK:         arith.constant 2 : index
-// CHECK:         vector.transpose %{{.*}}, [1, 2, 0] : vector<2x3x4xf32> to vector<3x4x2xf32>
+// CHECK-DAG:     arith.constant 2 : index
+// CHECK-DAG:     vector.transpose %{{.*}}, [1, 2, 0] : vector<2x3x4xf32> to vector<3x4x2xf32>
 // CHECK-COUNT-12: scf.for {{.*}} to %{{.*}} step
+// CHECK-NOT:     scf.for
 // CHECK:         return %{{.*}}, %{{.*}} : vector<3x4xf32>, vector<3x4xi64>
 
 // -----
@@ -134,9 +137,10 @@ func.func @argmax_3d_reduce_middle_dim(%input: vector<3x4x5xf32>,
   return %result#0, %result#1 : vector<3x5xf32>, vector<3x5xi32>
 }
 // CHECK-LABEL: func.func @argmax_3d_reduce_middle_dim
-// CHECK:         arith.constant 4 : index
-// CHECK:         vector.transpose %{{.*}}, [0, 2, 1] : vector<3x4x5xf32> to vector<3x5x4xf32>
+// CHECK-DAG:     arith.constant 4 : index
+// CHECK-DAG:     vector.transpose %{{.*}}, [0, 2, 1] : vector<3x4x5xf32> to vector<3x5x4xf32>
 // CHECK-COUNT-15: scf.for {{.*}} to %{{.*}} step
+// CHECK-NOT:     scf.for
 // CHECK:         return %{{.*}}, %{{.*}} : vector<3x5xf32>, vector<3x5xi32>
 
 // -----
@@ -239,6 +243,78 @@ func.func @argmin_1d(%input: vector<128xf32>,
 // CHECK:           scf.yield
 // CHECK:         vector.broadcast %{{.*}} : f32 to vector<f32>
 // CHECK:         vector.broadcast %{{.*}} : i32 to vector<i32>
+
+// -----
+
+func.func @argmax_captured_predicate(%input: vector<128xf32>,
+                                     %init_val: vector<f32>,
+                                     %init_idx: vector<i32>,
+                                     %external_cmp: i1)
+    -> (vector<f32>, vector<i32>) {
+  %result:2 = iree_vector_ext.arg_compare
+    dimension(0)
+    ins(%input : vector<128xf32>)
+    inits(%init_val, %init_idx : vector<f32>, vector<i32>) {
+  ^bb0(%a: f32, %b: f32):
+    iree_vector_ext.yield %external_cmp : i1
+  } -> vector<f32>, vector<i32>
+  return %result#0, %result#1 : vector<f32>, vector<i32>
+}
+// CHECK-LABEL: func.func @argmax_captured_predicate
+// CHECK-SAME:    %[[EXT_CMP:[a-zA-Z0-9]+]]: i1
+// CHECK:         scf.for
+// CHECK:           arith.select %[[EXT_CMP]]
+// CHECK:           arith.select %[[EXT_CMP]]
+// CHECK:           scf.yield
+
+// -----
+
+func.func @argmax_multi_op_comparator(%input: vector<128xf32>,
+                                      %init_val: vector<f32>,
+                                      %init_idx: vector<i32>)
+    -> (vector<f32>, vector<i32>) {
+  %result:2 = iree_vector_ext.arg_compare
+    dimension(0)
+    ins(%input : vector<128xf32>)
+    inits(%init_val, %init_idx : vector<f32>, vector<i32>) {
+  ^bb0(%a: f32, %b: f32):
+    %diff = arith.subf %a, %b : f32
+    %zero = arith.constant 0.0 : f32
+    %cmp = arith.cmpf ogt, %diff, %zero : f32
+    iree_vector_ext.yield %cmp : i1
+  } -> vector<f32>, vector<i32>
+  return %result#0, %result#1 : vector<f32>, vector<i32>
+}
+// CHECK-LABEL: func.func @argmax_multi_op_comparator
+// CHECK:         scf.for
+// CHECK:           arith.subf
+// CHECK:           arith.cmpf ogt
+// CHECK:           arith.select
+// CHECK:           arith.select
+// CHECK:           scf.yield
+
+// -----
+
+func.func @argmax_index_base_2d(%input: vector<4x128xf32>,
+                                 %init_val: vector<4xf32>,
+                                 %init_idx: vector<4xi32>,
+                                 %base: index)
+    -> (vector<4xf32>, vector<4xi32>) {
+  %result:2 = iree_vector_ext.arg_compare
+    dimension(1)
+    ins(%input : vector<4x128xf32>)
+    inits(%init_val, %init_idx : vector<4xf32>, vector<4xi32>)
+    index_base(%base : index) {
+  ^bb0(%a: f32, %b: f32):
+    %cmp = arith.cmpf ogt, %a, %b : f32
+    iree_vector_ext.yield %cmp : i1
+  } -> vector<4xf32>, vector<4xi32>
+  return %result#0, %result#1 : vector<4xf32>, vector<4xi32>
+}
+// CHECK-LABEL: func.func @argmax_index_base_2d
+// CHECK-COUNT-4: arith.addi
+// CHECK-NOT:     arith.addi
+// CHECK-NOT:     iree_vector_ext.arg_compare
 
 // -----
 

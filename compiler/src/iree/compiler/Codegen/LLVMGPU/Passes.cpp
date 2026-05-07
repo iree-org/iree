@@ -576,6 +576,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/true,
                             /*decomposeMasks=*/false);
+  // Lower vectorized arg_compare to scf.for + vector ops before bufferization.
+  // Only needed for the TileAndFuse pipeline; the VectorDistribute pipeline
+  // handles arg_compare later via DistributeArgCompare in
+  // LLVMGPUVectorDistributePass, so this pass is not part of that pipeline.
   funcPassManager.addPass(IREE::VectorExt::createLowerArgCompareToVectorPass());
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createGPUCombineValueSemanticBarriersPass());
