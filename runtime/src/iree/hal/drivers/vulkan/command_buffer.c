@@ -1776,9 +1776,11 @@ static void iree_hal_vulkan_command_buffer_record_execution_barrier_native(
     const iree_hal_vulkan_command_t* command) {
   const iree_hal_vulkan_command_execution_barrier_t* execution_barrier =
       iree_hal_vulkan_command_execution_barrier_payload(command);
+  // HAL barriers with no fine-grained barrier payload are coarse memory
+  // barriers over the requested stages.
   const bool has_memory_visibility =
-      execution_barrier->memory_barrier_count != 0 ||
-      execution_barrier->buffer_barrier_count != 0;
+      execution_barrier->source_stage_mask != 0 &&
+      execution_barrier->target_stage_mask != 0;
   VkMemoryBarrier2 memory_barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
       .srcStageMask =
