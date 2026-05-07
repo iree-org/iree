@@ -24,6 +24,14 @@ func.func @lowering_config_invalid_promotion_type() attributes {
 
 // -----
 
+func.func @lowering_config_invalid_promotion_types_attr() attributes {
+    // expected-error @+1 {{promotion_types must be an array}}
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0], promotion_types = "invalid"}>} {
+  return
+}
+
+// -----
+
 func.func @mma_inner_tiled_invalid_num_inputs(%lhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
   // expected-error @+1 {{number of inputs (1) doesn't match expected number from kind (2)}}
   %0 = iree_codegen.inner_tiled ins(%lhs) outs(%acc) {

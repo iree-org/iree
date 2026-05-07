@@ -2838,9 +2838,13 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            DictionaryAttr attributes) {
-  auto promotionTypes = attributes.getAs<ArrayAttr>(kPromotionTypesName);
-  if (!promotionTypes) {
+  Attribute promotionTypesAttr = attributes.get(kPromotionTypesName);
+  if (!promotionTypesAttr) {
     return success();
+  }
+  auto promotionTypes = dyn_cast<ArrayAttr>(promotionTypesAttr);
+  if (!promotionTypes) {
+    return emitError() << "promotion_types must be an array";
   }
 
   auto promotedOperandsAttr = attributes.getAs<ArrayAttr>(kPromoteOperandsName);
