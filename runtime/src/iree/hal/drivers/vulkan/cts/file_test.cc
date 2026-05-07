@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -14,8 +15,6 @@
 #include "iree/testing/temp_file.h"
 
 namespace iree::hal::cts {
-
-using ::testing::ContainerEq;
 
 namespace {
 
@@ -29,56 +28,70 @@ using FileHandlePtr = std::unique_ptr<iree_io_file_handle_t, FileHandleDeleter>;
 
 }  // namespace
 
-class VulkanFileTest : public CtsTestBase<> {};
+class VulkanFileTest : public CtsTestBase<> {
+ protected:
+  void NativeFileRoundTrip(iree_device_size_t file_length,
+                           const char* temp_file_stem) {
+    std::vector<uint8_t> file_contents(file_length, 0);
+    const std::vector<uint8_t> source_contents =
+        MakeDeterministicBytes(file_length);
+
+    iree::testing::TempFilePath path(temp_file_stem);
+    IREE_ASSERT_OK(iree_io_file_contents_write(
+        path.path_view(),
+        iree_make_const_byte_span(file_contents.data(), file_contents.size()),
+        iree_allocator_system()));
+
+    iree_io_file_handle_t* raw_handle = nullptr;
+    IREE_ASSERT_OK(iree_io_file_handle_open(
+        IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
+            IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
+            IREE_IO_FILE_MODE_SHARE_WRITE,
+        path.path_view(), iree_allocator_system(), &raw_handle));
+    FileHandlePtr handle(raw_handle);
+
+    Ref<iree_hal_file_t> file;
+    IREE_ASSERT_OK(iree_hal_file_import(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+        IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+        handle.get(), IREE_HAL_EXTERNAL_FILE_FLAG_NONE, file.out()));
+
+    Ref<iree_hal_buffer_t> source_buffer;
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        source_contents.data(), source_contents.size(), source_buffer.out()));
+    Ref<iree_hal_buffer_t> target_buffer;
+    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(file_length, target_buffer.out()));
+
+    SemaphoreList empty_wait;
+    SemaphoreList write_signal(device_, {0}, {1});
+    SemaphoreList read_signal(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_write(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, write_signal,
+        source_buffer.get(), /*source_offset=*/0, file.get(),
+        /*target_offset=*/0, file_length, IREE_HAL_WRITE_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_device_queue_read(
+        device_, IREE_HAL_QUEUE_AFFINITY_ANY, write_signal, read_signal,
+        file.get(), /*source_offset=*/0, target_buffer.get(),
+        /*target_offset=*/0, file_length, IREE_HAL_READ_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        read_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+    const std::vector<uint8_t> actual_contents =
+        ReadBufferBytes(target_buffer.get(), /*offset=*/0, file_length);
+    ASSERT_EQ(actual_contents.size(), source_contents.size());
+    EXPECT_EQ(0, std::memcmp(actual_contents.data(), source_contents.data(),
+                             source_contents.size()));
+  }
+};
 
 TEST_P(VulkanFileTest, NativeFileLargeRangeRoundTrip) {
   const iree_device_size_t file_length = 256 * 1024 + 31;
-  std::vector<uint8_t> file_contents(file_length, 0);
-  const std::vector<uint8_t> source_contents =
-      MakeDeterministicBytes(file_length);
+  NativeFileRoundTrip(file_length, "iree_vulkan_hal_cts_native_file");
+}
 
-  iree::testing::TempFilePath path("iree_vulkan_hal_cts_native_file");
-  IREE_ASSERT_OK(iree_io_file_contents_write(
-      path.path_view(),
-      iree_make_const_byte_span(file_contents.data(), file_contents.size()),
-      iree_allocator_system()));
-
-  iree_io_file_handle_t* raw_handle = nullptr;
-  IREE_ASSERT_OK(iree_io_file_handle_open(
-      IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
-          IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
-          IREE_IO_FILE_MODE_SHARE_WRITE,
-      path.path_view(), iree_allocator_system(), &raw_handle));
-  FileHandlePtr handle(raw_handle);
-
-  Ref<iree_hal_file_t> file;
-  IREE_ASSERT_OK(iree_hal_file_import(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
-      IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE, handle.get(),
-      IREE_HAL_EXTERNAL_FILE_FLAG_NONE, file.out()));
-
-  Ref<iree_hal_buffer_t> source_buffer;
-  IREE_ASSERT_OK(CreateDeviceBufferWithData(
-      source_contents.data(), source_contents.size(), source_buffer.out()));
-  Ref<iree_hal_buffer_t> target_buffer;
-  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(file_length, target_buffer.out()));
-
-  SemaphoreList empty_wait;
-  SemaphoreList write_signal(device_, {0}, {1});
-  SemaphoreList read_signal(device_, {0}, {1});
-  IREE_ASSERT_OK(iree_hal_device_queue_write(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, write_signal,
-      source_buffer.get(), /*source_offset=*/0, file.get(),
-      /*target_offset=*/0, file_length, IREE_HAL_WRITE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_device_queue_read(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY, write_signal, read_signal,
-      file.get(), /*source_offset=*/0, target_buffer.get(),
-      /*target_offset=*/0, file_length, IREE_HAL_READ_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      read_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-
-  EXPECT_THAT(ReadBufferBytes(target_buffer.get(), /*offset=*/0, file_length),
-              ContainerEq(source_contents));
+TEST_P(VulkanFileTest, NativeFileRoundTripExceedsStagingRing) {
+  const iree_device_size_t file_length = 20 * 1024 * 1024 + 31;
+  NativeFileRoundTrip(file_length, "iree_vulkan_hal_cts_native_file_staging");
 }
 
 CTS_REGISTER_TEST_SUITE_WITH_TAGS(VulkanFileTest, {"file_io"}, {});
