@@ -126,6 +126,28 @@ util.func public @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : ten
 
 // -----
 
+// CHECK-LABEL: util.func public @multiple_results_tied_to_same_input
+util.func public @multiple_results_tied_to_same_input(%arg0: tensor<4x4xf32>)
+    -> (tensor<4x4xf32>, tensor<4x4xf32>) {
+  %c1 = arith.constant 1 : index
+  // CHECK: flow.dispatch.workgroups[%c1](%arg0) : (tensor<4x4xf32>) -> (%arg0, %arg0) =
+  // CHECK-NEXT: (%{{.+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>)
+  %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0) :
+      (tensor<4x4xf32>) -> (%arg0, %arg0) =
+      (%arg0_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>) {
+    %1 = iree_tensor_ext.dispatch.tensor.load %arg0_capture,
+        offsets = [0, 0], sizes = [4, 4], strides = [1, 1]
+        : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>> -> tensor<4x4xf32>
+    iree_tensor_ext.dispatch.tensor.store %1, %arg0_capture,
+        offsets = [0, 0], sizes = [4, 4], strides = [1, 1]
+        : tensor<4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>
+    flow.return
+  }
+  util.return %0#0, %0#1 : tensor<4x4xf32>, tensor<4x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @drop_unused_dispatch_region_result
 util.func public @drop_unused_dispatch_region_result(
     %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
