@@ -543,6 +543,14 @@ TEST(SpirvTest, RejectsDuplicateComputeEntryNames) {
       iree_hal_vulkan_spirv_parse_compute_entry_points(
           kDuplicateEntryModule, IREE_ARRAYSIZE(kDuplicateEntryModule),
           IREE_ARRAYSIZE(entry_points), entry_points));
+
+  bool entry_point_found = false;
+  uint32_t workgroup_size[3] = {};
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_spirv_parse_compute_workgroup_size(
+          kDuplicateEntryModule, IREE_ARRAYSIZE(kDuplicateEntryModule),
+          IREE_SV("main"), &entry_point_found, workgroup_size));
 }
 
 }  // namespace

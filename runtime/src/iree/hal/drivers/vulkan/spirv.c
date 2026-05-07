@@ -681,9 +681,14 @@ iree_status_t iree_hal_vulkan_spirv_parse_compute_workgroup_size(
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_spirv_entry_point_name_matches(
         operands, (uint16_t)(word_count - 1), entry_point, &matches));
     if (matches) {
+      if (entry_point_id != 0) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "SPIR-V module has duplicate compute entry "
+                                "point '%.*s'",
+                                (int)entry_point.size, entry_point.data);
+      }
       entry_point_id = operands[1];
       if (out_entry_point_found) *out_entry_point_found = true;
-      break;
     }
   }
   if (entry_point_id == 0) return iree_ok_status();
