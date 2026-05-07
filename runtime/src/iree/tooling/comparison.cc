@@ -19,32 +19,36 @@
 using namespace iree;
 
 IREE_FLAG(float, expected_f16_threshold, 0.001f,
-          "Threshold under which two f16 values are considered equal.");
+          "Per-element-type absolute tolerance for f16 in approximate mode.");
 IREE_FLAG(float, expected_f32_threshold, 0.0001f,
-          "Threshold under which two f32 values are considered equal.");
+          "Per-element-type absolute tolerance for f32 in approximate mode.");
 IREE_FLAG(double, expected_f64_threshold, 0.0001,
-          "Threshold under which two f64 values are considered equal.");
+          "Per-element-type absolute tolerance for f64 in approximate mode.");
 IREE_FLAG(float, expected_bf16_threshold, 0.01f,
-          "Threshold under which two bf16 values are considered equal.");
-IREE_FLAG(string, equality_mode, "absolute",
-          "Choose the type of comparison desired between buffers from "
-          "[`absolute`, `relative`, `exact`].");
+          "Per-element-type absolute tolerance for bf16 in approximate mode.");
+IREE_FLAG(double, expected_rtol, 1e-5,
+          "Relative tolerance shared across float types in approximate mode.");
+IREE_FLAG(string, equality_mode, "approximate",
+          "Type of buffer comparison. One of [`approximate`, `exact`]. "
+          "`approximate` checks `abs(actual - expected) <= atol + rtol * "
+          "abs(expected)` per element with NaN considered equal to NaN. "
+          "`exact` is a byte-equality compare and ignores the tolerance "
+          "flags.");
 
 static iree_hal_buffer_equality_t iree_tooling_equality_from_flags(void) {
-  iree_hal_buffer_equality_t equality;
-  if (strcmp(FLAG_equality_mode, "absolute") == 0) {
-    equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_ABSOLUTE;
-  } else if (strcmp(FLAG_equality_mode, "relative") == 0) {
-    equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_RELATIVE;
+  iree_hal_buffer_equality_t equality = {};
+  if (strcmp(FLAG_equality_mode, "approximate") == 0) {
+    equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE;
   } else if (strcmp(FLAG_equality_mode, "exact") == 0) {
     equality.mode = IREE_HAL_BUFFER_EQUALITY_EXACT;
   } else {
     IREE_ASSERT_UNREACHABLE("unhandled equality mode");
   }
-  equality.f16_threshold = FLAG_expected_f16_threshold;
-  equality.f32_threshold = FLAG_expected_f32_threshold;
-  equality.f64_threshold = FLAG_expected_f64_threshold;
-  equality.bf16_threshold = FLAG_expected_bf16_threshold;
+  equality.f16_atol = FLAG_expected_f16_threshold;
+  equality.f32_atol = FLAG_expected_f32_threshold;
+  equality.f64_atol = FLAG_expected_f64_threshold;
+  equality.bf16_atol = FLAG_expected_bf16_threshold;
+  equality.rtol = FLAG_expected_rtol;
   return equality;
 }
 
