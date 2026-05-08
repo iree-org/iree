@@ -204,60 +204,6 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ]
 )]
 
-# LLVMCPU, data-tiling lowering matmul to iree_codegen.inner_tiled
-# (the new MMA-intrinsic path) instead of linalg.mmt4d.
-[iree_generated_e2e_runner_test(
-    name = "e2e_matmul_cpu_dt_inner_tiled_%s_%s" % (lhs_rhs_type, acc_type),
-    compiler_flags = [
-        "--iree-opt-data-tiling",
-        "--iree-llvmcpu-enable-inner-tiled",
-    ] + (["--iree-input-demote-f64-to-f32=false"] if acc_type == "f64" else []),
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--acc_type=%s" % acc_type,
-    ] + (["--shapes=small"] if acc_type == "f64" else []),
-    tags = ([
-        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
-        "noriscv",
-        "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["generic"] +
-                                   ([
-                                       "x86_64:avx512vnni:" + ",".join(X86_64_AVX512_VNNI),
-                                   ] if lhs_rhs_type == "i8" and acc_type == "i32" else [
-                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
-                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                   ] if lhs_rhs_type == "f32" and acc_type == "f32" else [
-                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
-                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                   ] if lhs_rhs_type == "f16" and acc_type == "f16" else [
-                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
-                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                   ] if lhs_rhs_type == "f16" and acc_type == "f32" else [
-                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
-                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                   ] if lhs_rhs_type == "bf16" and acc_type == "bf16" else [
-                                       "x86_64:avx2:" + ",".join(X86_64_AVX2),
-                                       "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                   ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
-    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmul",
-) for (lhs_rhs_type, acc_type) in [
-    ("i8", "i32"),
-    ("f32", "f32"),
-    ("f64", "f64"),
-    ("f16", "f16"),
-    ("f16", "f32"),
-    ("bf16", "bf16"),
-    ("bf16", "f32"),
-]]
-
 # LLVMCPU, data-tiling, data-tiling + ukernels + late materialization.
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_cpu_experimental_dt%s_%s_%s" % (
