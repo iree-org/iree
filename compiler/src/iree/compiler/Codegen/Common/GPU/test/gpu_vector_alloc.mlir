@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-vector-alloc))" | FileCheck %s
 
-#translation = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #consumer_layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -37,7 +37,7 @@ func.func @promote_global_transfer_read(%src: memref<16x16xf16>) -> vector<16x16
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #consumer_layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
