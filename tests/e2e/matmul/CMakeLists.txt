@@ -714,6 +714,31 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cpu_dt_inner_tiled_ui8_i8_i32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs=ui8"
+    "--rhs=i8"
+    "--acc_type=i32"
+    "--shapes=easy_large_static"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-inner-tiled"
+  TARGET_CPU_FEATURES_VARIANTS
+    "generic"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cpu_experimental_dt_i8_i32
   TEST_TYPE
     matmul
