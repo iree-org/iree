@@ -317,6 +317,11 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
       blockArgReplacements[opArg.index()] = BlockArgument();
       continue;
     }
+    if (!closureOp.getOperandAccess(opArg.index()).isReadOnly()) {
+      // Writable operands may have slot identity even when they capture the
+      // same SSA value. Keep them distinct.
+      continue;
+    }
     auto existingIt = argToBlockMap.find(opArg.value());
     if (existingIt == argToBlockMap.end()) {
       // Not found - record for deduping.
