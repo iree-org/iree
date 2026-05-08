@@ -921,7 +921,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           target, lhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
-          /*skipUntunedFallback=*/false, dmaConstraintFn);
+          /*skipUntunedFallback=*/true, dmaConstraintFn);
       if (succeeded(lhsSwizzleAttr)) {
         lhsAttr = *lhsSwizzleAttr;
       }
@@ -931,7 +931,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           target, rhsElemType.getIntOrFloatBitWidth());
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
-          /*skipUntunedFallback=*/false, dmaConstraintFn);
+          /*skipUntunedFallback=*/true, dmaConstraintFn);
       if (succeeded(rhsSwizzleAttr)) {
         rhsAttr = *rhsSwizzleAttr;
       }
