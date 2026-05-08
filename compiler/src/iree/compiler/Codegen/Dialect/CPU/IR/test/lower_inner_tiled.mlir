@@ -261,3 +261,69 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
 //       CHECK:     vector.transpose {{.*}}, [0, 2, 1, 3] : vector<2x4x16x1xf32> to vector<2x16x4x1xf32>
 //       CHECK:     vector.shape_cast {{.*}} : vector<2x16x4x1xf32> to vector<32x4xf32>
+
+// -----
+
+// vpdpbusd is asymmetric (first byte source unsigned, second signed). The
+// natural variant lowers as `(acc, lhs, rhs)`; the swapped variant flips
+// the args at the call so the unsigned operand still lands first.
+
+#contraction_accesses_b = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_avx512vnni_1x16x4_vpdpbusd(
+    %lhs: vector<1x4xi8>, %rhs: vector<16x4xi8>, %acc: vector<1x16xi32>)
+    -> vector<1x16xi32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses_b,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<1x4xi8>, vector<16x4xi8> into vector<1x16xi32>
+  return %0 : vector<1x16xi32>
+}
+
+func.func @lower_avx512vnni_16x1x4_vpdpbusd(
+    %lhs: vector<16x4xi8>, %rhs: vector<1x4xi8>, %acc: vector<16x1xi32>)
+    -> vector<16x1xi32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses_b,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<16x4xi8>, vector<1x4xi8> into vector<16x1xi32>
+  return %0 : vector<16x1xi32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// Natural: LHS (ui8, narrow) is broadcast and routed into vpdpbusd's
+// first (unsigned) byte-source slot.
+// CHECK-LABEL: func @lower_avx512vnni_1x16x4_vpdpbusd(
+//  CHECK-SAME:   %[[N_LHS:[a-zA-Z0-9]+]]: vector<1x4xi8>
+//  CHECK-SAME:   %[[N_RHS:[a-zA-Z0-9]+]]: vector<16x4xi8>
+//       CHECK:   %[[N_RHS_FLAT:.+]] = vector.shape_cast %[[N_RHS]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   %[[N_BCAST:.+]] = vector.broadcast %[[N_LHS]] : vector<1x4xi8> to vector<16x4xi8>
+//       CHECK:   %[[N_LHS_FLAT:.+]] = vector.shape_cast %[[N_BCAST]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   llvm.call_intrinsic "llvm.x86.avx512.vpdpbusd.512"(%{{.+}}, %[[N_LHS_FLAT]], %[[N_RHS_FLAT]])
+
+// Swapped: RHS (ui8, narrow) is broadcast; the lowering swaps arg order at
+// the call so the broadcast result still lands in vpdpbusd's first slot.
+// CHECK-LABEL: func @lower_avx512vnni_16x1x4_vpdpbusd(
+//  CHECK-SAME:   %[[S_LHS:[a-zA-Z0-9]+]]: vector<16x4xi8>
+//  CHECK-SAME:   %[[S_RHS:[a-zA-Z0-9]+]]: vector<1x4xi8>
+//       CHECK:   %[[S_LHS_FLAT:.+]] = vector.shape_cast %[[S_LHS]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   %[[S_BCAST:.+]] = vector.broadcast %[[S_RHS]] : vector<1x4xi8> to vector<16x4xi8>
+//       CHECK:   %[[S_RHS_FLAT:.+]] = vector.shape_cast %[[S_BCAST]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   llvm.call_intrinsic "llvm.x86.avx512.vpdpbusd.512"(%{{.+}}, %[[S_RHS_FLAT]], %[[S_LHS_FLAT]])

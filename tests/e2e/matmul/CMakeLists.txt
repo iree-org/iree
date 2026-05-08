@@ -735,6 +735,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-inner-tiled"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
+    "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
 iree_generated_e2e_runner_test(

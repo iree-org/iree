@@ -85,6 +85,19 @@ bool isGenericScalar(MMAIntrinsic intr);
 // budget encoded in the enum case (8 or 16). Asserts otherwise.
 int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr);
 
+// Returns the (LHS, RHS, ACC) element types for `intrinsic`, with
+// signedness preserved (e.g. `ui8` for vpdpbusd) — used by the cost model
+// to match against an encoding's `element_types`. Tile types in IR are
+// signless; `DataTiledMMAAttr::getUndistributedTileTypes` strips the
+// signedness annotations.
+std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
+                                                MMAIntrinsic intrinsic);
+
+// Returns the (M, N, K) tile shape for a row-major-tile intrinsic, or
+// nullopt otherwise (e.g. SVE).
+std::optional<std::tuple<int64_t, int64_t, int64_t>>
+getRowMajorTilesMNKShape(MMAIntrinsic intrinsic);
+
 } // namespace mlir::iree_compiler::IREE::CPU
 
 // clang-format on

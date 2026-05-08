@@ -330,7 +330,7 @@ SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
 // If you're trying to add support for a new intrinsic that doesn't have a
 // row-major tile layout, don't look at this function, go directly to
 // getIntrinsicSwizzle.
-static std::optional<std::tuple<int64_t, int64_t, int64_t>>
+std::optional<std::tuple<int64_t, int64_t, int64_t>>
 getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   using Tuple = std::tuple<int64_t, int64_t, int64_t>;
   switch (intrinsic) {
@@ -366,6 +366,10 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
     return Tuple{16, 1, 2};
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
+    return Tuple{1, 16, 4};
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
+    return Tuple{16, 1, 4};
   default:
     if (isGenericScalar(intrinsic)) {
       return Tuple{1, 1, 1};
@@ -539,8 +543,8 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
   return swizzle;
 }
 
-static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
-                                                       MMAIntrinsic intrinsic) {
+std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
+                                                MMAIntrinsic intrinsic) {
   Type f64 = Float64Type::get(ctx);
   Type f32 = Float32Type::get(ctx);
   Type f16 = Float16Type::get(ctx);
@@ -579,6 +583,13 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
   case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
     return {i8, i8, i32};
+  // vpdpbusd: returned types preserve signedness for the cost model to
+  // match against the encoding's `element_types`; tile types in IR are
+  // signless and get stripped in `getUndistributedTileTypes` below.
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
+    return {IntegerType::get(ctx, 8, IntegerType::Unsigned), i8, i32};
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
+    return {i8, IntegerType::get(ctx, 8, IntegerType::Unsigned), i32};
   case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32:
   case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
     return {f32, f32, f32};
@@ -601,15 +612,7 @@ static std::tuple<Type, Type, Type>
 getABCElementTypes(MLIRContext *context, IREE::CPU::DataTiledMMAAttr attr) {
   MMAIntrinsic intrinsic = attr.getIntrinsic();
   if (isGenericScalar(intrinsic)) {
-    auto signless = [&](Type t) -> Type {
-      if (auto intTy = dyn_cast_if_present<IntegerType>(t);
-          intTy && !intTy.isSignless()) {
-        return IntegerType::get(context, intTy.getWidth());
-      }
-      return t;
-    };
-    return {signless(attr.getLhsType()), signless(attr.getRhsType()),
-            signless(attr.getAccType())};
+    return {attr.getLhsType(), attr.getRhsType(), attr.getAccType()};
   }
   return getABCElementTypes(context, intrinsic);
 }
@@ -651,6 +654,18 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
     return;
   }
   auto [aType, bType, cType] = getABCElementTypes(ctx, *this);
+  // Tile types in IR are signless (IREE convention); strip the signedness
+  // that `getABCElementTypes` carries for cost-model matching.
+  auto signless = [&](Type t) -> Type {
+    if (auto intTy = dyn_cast_if_present<IntegerType>(t);
+        intTy && !intTy.isSignless()) {
+      return IntegerType::get(ctx, intTy.getWidth());
+    }
+    return t;
+  };
+  aType = signless(aType);
+  bType = signless(bType);
+  cType = signless(cType);
   // Each operand's swizzle encodes its tile shape as (outer physical dim,
   // inner physical dim) in expandShape[0], expandShape[1]. This mirrors GPU's
   // DataTiledMMA, where the tile types encode the layout directly and no
@@ -769,11 +784,12 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   Type f32 = builder.getF32Type();
   Type i16 = builder.getI16Type();
   Type accType = acc.getType();
-  // The x86 MMAs supported here are LHS/RHS-symmetric (FMA, dpbf16ps,
-  // vpdpwssd, pmaddw), so natural and swapped orientations share the same
-  // LLVM intrinsic and arg order — after the broadcast above both operands
-  // have the same lane count. Asymmetric intrinsics (e.g. vpdpbusd) would
-  // need per-orientation arg-routing and aren't supported.
+  // The x86 MMAs supported here are mostly LHS/RHS-symmetric (FMA, dpbf16ps,
+  // vpdpwssd, pmaddw): natural and swapped orientations share the same LLVM
+  // intrinsic and arg order, since after the broadcast above both operands
+  // have the same lane count. The exception is vpdpbusd, which is asymmetric
+  // (first byte source is unsigned, second is signed); for its swapped
+  // sibling we route `rhs` (the unsigned operand) into the first slot.
   switch (intrinsic) {
   case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32:
@@ -816,6 +832,14 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
         call("llvm.x86.avx512.pmaddw.d.512", accType,
              ValueRange{widen(lhs, i16), widen(rhs, i16)}));
   }
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
+    // LHS unsigned, RHS signed — vpdpbusd takes (acc, unsigned, signed).
+    return call("llvm.x86.avx512.vpdpbusd.512", accType,
+                ValueRange{acc, lhs, rhs});
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
+    // LHS signed, RHS unsigned — swap to put the unsigned operand first.
+    return call("llvm.x86.avx512.vpdpbusd.512", accType,
+                ValueRange{acc, rhs, lhs});
   default:
     return {};
   }
