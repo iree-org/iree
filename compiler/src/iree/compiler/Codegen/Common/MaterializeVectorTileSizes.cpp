@@ -418,6 +418,11 @@ public:
     // so tile sizes go directly on the result lattice.
     if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
       OpBuilder builder(op);
+      // The dependent determines what reruns if the divisibility lattice for
+      // `val` changes below. Sparse forward analyses visit operations from the
+      // program point after the operation, so use `after(op)` to rerun this op.
+      // This dependency is not expected to affect convergence in practice:
+      // divisibility is solved to fixpoint before tile-size analysis starts.
       ProgramPoint *dependent = getProgramPointAfter(op);
       std::optional<SmallVector<int64_t>> maybeTileSizes =
           IREE::LinalgExt::computeIm2colVectorTileSizes(
