@@ -135,11 +135,17 @@ func.func @attention() attributes {hal.executable.target = #executable_target_ro
   %10 = iree_codegen.load_from_buffer %4 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
   %11 = tensor.empty() : tensor<20x4096x64xf32>
   %12 = tensor.empty() : tensor<20x4096xf32>
-  %13:3 = iree_linalg_ext.online_attention {decomposition_config = #decomposition_config, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5], lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 64, 0, 0, 64]}>} ins(%8, %9, %10, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%11, %12, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %13 = linalg.fill ins(%cst_0 : f32) outs(%11 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
+  %14 = linalg.fill ins(%cst_1 : f32) outs(%12 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %15 = linalg.fill ins(%cst_2 : f32) outs(%12 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %16:3 = iree_linalg_ext.online_attention {decomposition_config = #decomposition_config, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5], lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 64, 0, 0, 64]}>} ins(%8, %9, %10, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%13, %14, %15 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
-  iree_codegen.store_to_buffer %13#0, %6 : tensor<20x4096x64xf32> into memref<20x4096x64xf32, #hal.descriptor_type<storage_buffer>>
+  iree_codegen.store_to_buffer %16#0, %6 : tensor<20x4096x64xf32> into memref<20x4096x64xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
