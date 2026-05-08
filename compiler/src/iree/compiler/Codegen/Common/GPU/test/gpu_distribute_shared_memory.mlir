@@ -190,9 +190,11 @@ module {
 //       CHECK:   %[[TFLAT:.+]] = affine.linearize_index disjoint [{{.+}}] by (8, 32)
 //       CHECK:   %[[YX:.+]]:2 = affine.delinearize_index %[[TFLAT]] into (16, 16)
 //       CHECK:   %[[X:.+]] = affine.apply #[[$MAP]]()[%[[YX]]#1]
+//   CHECK-DAG:   %[[B_SUB:.+]] = memref.subview %[[B]][0, %[[X]]] [1, 8] [1, 1]
+//   CHECK-DAG:   %[[C_SUB:.+]] = memref.subview %[[C]][0, %[[X]]] [1, 8] [1, 1]
 //       CHECK:   %[[A0:.+]] = vector.transfer_read %[[A]][%[[C0]], %[[YX]]#0, %[[X]]], {{.+}} : memref<1x32x128xi4>, vector<1x1x8xi4>
-//       CHECK:   %[[B0:.+]] = vector.transfer_read %[[B]][%[[C0]], %[[X]]], {{.+}} : memref<1x128xf32>, vector<1x1x8xf32>
-//       CHECK:   %[[C0_VAL:.+]] = vector.transfer_read %[[C]][%[[C0]], %[[X]]], {{.+}} : memref<1x128xi4>, vector<1x1x8xi4>
+//       CHECK:   %[[B0:.+]] = vector.transfer_read %[[B_SUB]][%[[C0]], %[[C0]]], {{.+}} vector<1x1x8xf32>
+//       CHECK:   %[[C0_VAL:.+]] = vector.transfer_read %[[C_SUB]][%[[C0]], %[[C0]]], {{.+}} vector<1x1x8xi4>
 //       CHECK:   %[[A0E:.+]] = arith.extui %[[A0]] : vector<1x1x8xi4> to vector<1x1x8xi32>
 //       CHECK:   %[[C0E:.+]] = arith.extui %[[C0_VAL]] : vector<1x1x8xi4> to vector<1x1x8xi32>
 //       CHECK:   %[[SUB0:.+]] = arith.subi %[[A0E]], %[[C0E]] : vector<1x1x8xi32>
@@ -201,8 +203,8 @@ module {
 //       CHECK:   vector.transfer_write %[[MUL0]], %[[SM]][%[[C0]], %[[YX]]#0, %[[X]]]
 //       CHECK:   %[[Y1:.+]] = affine.apply #[[$MAP1]]()[%[[YX]]#0]
 //       CHECK:   %[[A1:.+]] = vector.transfer_read %[[A]][%[[C0]], %[[Y1]], %[[X]]], {{.+}} : memref<1x32x128xi4>, vector<1x1x8xi4>
-//       CHECK:   %[[B1:.+]] = vector.transfer_read %[[B]][%[[C0]], %[[X]]], {{.+}} : memref<1x128xf32>, vector<1x1x8xf32>
-//       CHECK:   %[[C1_VAL:.+]] = vector.transfer_read %[[C]][%[[C0]], %[[X]]], {{.+}} : memref<1x128xi4>, vector<1x1x8xi4>
+//       CHECK:   %[[B1:.+]] = vector.transfer_read %[[B_SUB]][%[[C0]], %[[C0]]], {{.+}} vector<1x1x8xf32>
+//       CHECK:   %[[C1_VAL:.+]] = vector.transfer_read %[[C_SUB]][%[[C0]], %[[C0]]], {{.+}} vector<1x1x8xi4>
 //       CHECK:   %[[A1E:.+]] = arith.extui %[[A1]] : vector<1x1x8xi4> to vector<1x1x8xi32>
 //       CHECK:   %[[C1E:.+]] = arith.extui %[[C1_VAL]] : vector<1x1x8xi4> to vector<1x1x8xi32>
 //       CHECK:   %[[SUB1:.+]] = arith.subi %[[A1E]], %[[C1E]] : vector<1x1x8xi32>
