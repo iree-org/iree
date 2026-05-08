@@ -27,6 +27,7 @@ iree_cc_library(
     "ROCMTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
+    LLVMSPIRVCodeGen
     LLVMAnalysis
     LLVMBitWriter
     LLVMCore
