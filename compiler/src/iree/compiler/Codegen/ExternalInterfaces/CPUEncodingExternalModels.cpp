@@ -356,6 +356,8 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
     return {"+avx512vnni"};
   default:
     return {};
@@ -422,22 +424,15 @@ static bool isMmaIntrinsicArrayValid(MLIRContext *ctx,
     }
   }
 
-  // For (3) and (4) we need shape + element types from `DataTiledMMAAttr`.
+  // (3) and (4) need types *with* signedness so e.g. vpdpbusd's natural
+  // `ui8` LHS visibly swaps with its sibling's `ui8` RHS. Read directly
+  // from `getABCElementTypes`; `getUndistributedTileTypes` would strip it.
   auto getShapeAndTypes = [&](MMAIntrinsic intr) {
-    auto attr = DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
-                                      /*intrinsics_n=*/1, /*intrinsics_k=*/1,
-                                      /*lhs_type=*/Type(),
-                                      /*rhs_type=*/Type(),
-                                      /*acc_type=*/Type());
-    SmallVector<VectorType> tiles;
-    attr.getUndistributedTileTypes(tiles);
-    assert(tiles.size() == 3);
-    return std::make_tuple(tiles[0].getShape()[0],     // M (LHS dim 0)
-                           tiles[1].getShape()[0],     // N (RHS dim 0)
-                           tiles[0].getShape()[1],     // K (LHS dim 1)
-                           tiles[0].getElementType(),  // LHS elem
-                           tiles[1].getElementType(),  // RHS elem
-                           tiles[2].getElementType()); // ACC elem
+    auto mnk = IREE::CPU::getRowMajorTilesMNKShape(intr);
+    assert(mnk && "validator only handles row-major-tile intrinsics");
+    auto [m, n, k] = *mnk;
+    auto [lhs, rhs, acc] = IREE::CPU::getABCElementTypes(ctx, intr);
+    return std::make_tuple(m, n, k, lhs, rhs, acc);
   };
 
   for (size_t i = 0; i < arr.size(); ++i) {
@@ -517,6 +512,8 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16,
         MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
         MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
+        MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8,
+        MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8,
     };
     for (MMAIntrinsic intr : kAllX86) {
       SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
@@ -564,27 +561,29 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
     info.intrinsicM = info.intrinsicN = info.intrinsicK = 1;
     return info;
   }
-  auto base = IREE::CPU::DataTiledMMAAttr::get(
-      ctx, intr, /*intrinsics_m=*/1, /*intrinsics_n=*/1,
-      /*intrinsics_k=*/1, /*lhs_type=*/Type(),
-      /*rhs_type=*/Type(), /*acc_type=*/Type());
-  SmallVector<VectorType> baseTiles;
-  base.getUndistributedTileTypes(baseTiles);
-  if (baseTiles.size() != 3) {
+  // Same as the validator above: match against the encoding's
+  // `element_types` *with* signedness — vpdpbusd's `ui8` is what
+  // distinguishes it from CASTI16 paths.
+  auto [lhsTy, rhsTy, accTy] = IREE::CPU::getABCElementTypes(ctx, intr);
+  if (!lhsTy || !rhsTy || !accTy) {
     return std::nullopt;
   }
-  if (baseTiles[0].getElementType() != elementTypes[0] ||
-      baseTiles[1].getElementType() != elementTypes[1] ||
-      baseTiles[2].getElementType() != elementTypes[2]) {
+  if (lhsTy != elementTypes[0] || rhsTy != elementTypes[1] ||
+      accTy != elementTypes[2]) {
     return std::nullopt;
   }
+  auto mnk = IREE::CPU::getRowMajorTilesMNKShape(intr);
+  if (!mnk) {
+    return std::nullopt;
+  }
+  auto [m, n, k] = *mnk;
   IntrinsicInfo info;
-  info.intrinsicM = baseTiles[0].getShape()[0];
-  info.intrinsicK = baseTiles[0].getShape()[1];
-  info.intrinsicN = baseTiles[1].getShape()[0];
-  info.lhsBits = baseTiles[0].getElementType().getIntOrFloatBitWidth();
-  info.rhsBits = baseTiles[1].getElementType().getIntOrFloatBitWidth();
-  info.accBits = baseTiles[2].getElementType().getIntOrFloatBitWidth();
+  info.intrinsicM = m;
+  info.intrinsicN = n;
+  info.intrinsicK = k;
+  info.lhsBits = lhsTy.getIntOrFloatBitWidth();
+  info.rhsBits = rhsTy.getIntOrFloatBitWidth();
+  info.accBits = accTy.getIntOrFloatBitWidth();
   return info;
 }
 
