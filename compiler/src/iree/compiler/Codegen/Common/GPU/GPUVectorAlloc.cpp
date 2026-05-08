@@ -40,12 +40,12 @@ namespace {
 using LayoutMap =
     llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface>;
 
-// Allocates a tensor to copy the vector into a la bufferization.alloc_tensor.
-// This allocation is always static as vectors are currently always static
-// where this is used.
-static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
-                                                Value vector,
-                                                ArrayRef<int64_t> shape) {
+// Allocates a tensor to copy the vector into a la bufferization.alloc_tensor
+// and then writes the vector into the allocated tensor. This allocation is
+// always static as vectors are currently always static where this is used.
+static FailureOr<Value> allocateTensorAndWriteVector(OpBuilder &b, Location loc,
+                                                     Value vector,
+                                                     ArrayRef<int64_t> shape) {
   VectorType vectorType = cast<VectorType>(vector.getType());
   if (vectorType.isScalable()) {
     return failure();
@@ -70,10 +70,10 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
   return copied;
 }
 
-static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
-                                                Value vector) {
+static FailureOr<Value> allocateTensorAndWriteVector(OpBuilder &b, Location loc,
+                                                     Value vector) {
   VectorType vectorType = cast<VectorType>(vector.getType());
-  return allocateTensorForVector(b, loc, vector, vectorType.getShape());
+  return allocateTensorAndWriteVector(b, loc, vector, vectorType.getShape());
 }
 
 static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
@@ -87,8 +87,8 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
       .getResult();
 }
 
-/// Materialize shared memory for all to_layout ops marked with
-/// shared_memory_conversion. Clears the attribute after materialization.
+/// Materialize shared memory roundtrip to resolve layout differences. Clears
+/// the shared_memory_conversion attribute after materialization.
 static LogicalResult
 materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
   SmallVector<IREE::VectorExt::ToLayoutOp> opsToPromote;
@@ -121,7 +121,7 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
     // TODO: Since we know the read/write layout for this memory, we can get
     // optimal swizzling here. Figure out how to do that.
     FailureOr<Value> ret =
-        allocateTensorForVector(builder, op->getLoc(), operand.get());
+        allocateTensorAndWriteVector(builder, op->getLoc(), operand.get());
     if (failed(ret)) {
       return failure();
     }
@@ -146,6 +146,8 @@ struct PromotionCandidate {
   Value vector;
 };
 
+/// Find promotion candidates, i.e., operations that load data from memory and
+/// were reached by a promotion type during analysis propagation.
 static std::optional<PromotionCandidate>
 getPromotionCandidate(Operation *op, const PromotionTypeMap &promotionTypes) {
   auto shouldPromoteCandidate =
@@ -155,6 +157,8 @@ getPromotionCandidate(Operation *op, const PromotionTypeMap &promotionTypes) {
       return std::nullopt;
     }
 
+    // TODO: Currently only handles derived_thread_config promotion types,
+    // extend to other promotion types.
     if (!isa<IREE::GPU::DerivedThreadConfigAttr>(promotionType->second)) {
       return std::nullopt;
     }
@@ -171,6 +175,7 @@ getPromotionCandidate(Operation *op, const PromotionTypeMap &promotionTypes) {
       .Default([](Operation *) { return std::nullopt; });
 }
 
+/// Materialize promotion of operands to LDS.
 static LogicalResult
 materializeSharedMemoryPromotions(FunctionOpInterface funcOp,
                                   const PromotionTypeMap &promotionTypes,
@@ -193,6 +198,20 @@ materializeSharedMemoryPromotions(FunctionOpInterface funcOp,
   if (!workgroupSize) {
     return funcOp.emitOpError("unable to query workgroup_size information");
   }
+  // Assume this candidate operation:
+  //
+  // %read = vector.transfer_read %global_memref ...
+  //
+  // This gets promoted by transforming the IR as follows:
+  //
+  // %read = vector.transfer_read %global_memref ...
+  // %global_layout = vector_ext.to_layout %read, #derived_thread_layout
+  // %alloc = bufferization.alloc_tensor <workgroup_memory>
+  // %lds_write = vector.transfer_write %global_layout, %alloc ...
+  // %barrier = iree_gpu.value_barrier %lds_write
+  // %lds_read = transfer_read %barrier
+  //
+  // All uses of %read except %global_layout will be replaced by %lds_read.
   for (PromotionCandidate candidate : readsToPromote) {
     Value vector = candidate.vector;
     IREE::VectorExt::VectorLayoutInterface allocationLayout =
@@ -219,9 +238,9 @@ materializeSharedMemoryPromotions(FunctionOpInterface funcOp,
     auto toLayout = IREE::VectorExt::ToLayoutOp::create(builder, op->getLoc(),
                                                         vector, *readLayout);
 
-    FailureOr<Value> copied =
-        allocateTensorForVector(builder, op->getLoc(), toLayout.getResult(),
-                                allocationLayout.getUndistributedShape());
+    FailureOr<Value> copied = allocateTensorAndWriteVector(
+        builder, op->getLoc(), toLayout.getResult(),
+        allocationLayout.getUndistributedShape());
     if (failed(copied)) {
       return failure();
     }
@@ -276,11 +295,13 @@ struct GPUVectorAllocPass final
       }
     });
 
+    // Materialize operand promotions based on the analysis.
     if (failed(materializeSharedMemoryPromotions(funcOp, promotionTypes,
                                                  layouts))) {
       return signalPassFailure();
     }
 
+    // Materialize LDS roundtrips for layout conflicts.
     if (failed(materializeSharedMemoryConversions(funcOp))) {
       return signalPassFailure();
     }
