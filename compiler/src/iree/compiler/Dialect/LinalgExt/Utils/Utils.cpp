@@ -655,6 +655,8 @@ static SmallVector<AffineExpr> buildExpandedInputGEMMResults(
       continue;
     }
 
+    // isaConvolutionOpInterface guarantees input map results without output
+    // image dims are affine dim expressions.
     unsigned dim = cast<AffineDimExpr>(inputExpr).getPosition();
     if (filterLoopDimSet.contains(dim) || !seenDims.insert(dim)) {
       continue;
@@ -673,8 +675,8 @@ static SmallVector<AffineExpr> buildExpandedInputGEMMResults(
 }
 
 // Permutes reduction dims in the loop space so their order matches the
-// image-side map. Since reduction dims are always at the end of the source
-// dims, this is just a permutation among the reduction positions.
+// image-side map. This only remaps among the existing reduction positions;
+// reduction dims do not need to be at the end of the loop space.
 static IGEMMGenericConvDetails
 canonicalizeReductionOrder(IGEMMGenericConvDetails details) {
   int64_t inputMapIndex = details.isOutputChannelFirst ? 1 : 0;
@@ -909,12 +911,15 @@ static SmallVector<ReassociationIndices> getCollapsibleIGEMMIterationGroups(
 /// order to enable subsequent collapsing.
 static FailureOr<IGEMMGenericConvDetails>
 getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
-  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-  MLIRContext *ctx = linalgOp->getContext();
-  if (failed(convDimsOrFailure)) {
+  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
   }
+
+  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+  assert(succeeded(convDimsOrFailure) &&
+         "expected to infer convolution dims after isaConvolutionOpInterface");
   const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
+  MLIRContext *ctx = linalgOp->getContext();
   LLVM_DEBUG({
     llvm::dbgs() << "conv: " << linalgOp;
     llvm::dbgs() << "\nconv batch dim: ";

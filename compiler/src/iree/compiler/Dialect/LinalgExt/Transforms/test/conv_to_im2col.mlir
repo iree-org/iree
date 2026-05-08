@@ -306,6 +306,7 @@ util.func public @conv_2d_chwn_chwf(%arg0: tensor<16x26x18x288xf32>, %arg1: tens
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d0)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d4, d1, d2, d3)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 // CHECK:      util.func public @conv_2d_chwn_chwf(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<16x26x18x288xf32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<16x24x16x288xf32>
