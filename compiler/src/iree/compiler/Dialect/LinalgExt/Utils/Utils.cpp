@@ -911,13 +911,15 @@ static SmallVector<ReassociationIndices> getCollapsibleIGEMMIterationGroups(
 /// order to enable subsequent collapsing.
 static FailureOr<IGEMMGenericConvDetails>
 getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
+  // The failure conditions for these checks differ slightly, so check both.
   if (!linalg::isaConvolutionOpInterface(linalgOp)) {
     return failure();
   }
 
   auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
-  assert(succeeded(convDimsOrFailure) &&
-         "expected to infer convolution dims after isaConvolutionOpInterface");
+  if (failed(convDimsOrFailure)) {
+    return failure();
+  }
   const mlir::linalg::ConvolutionDimensions &convDims = *convDimsOrFailure;
   MLIRContext *ctx = linalgOp->getContext();
   LLVM_DEBUG({
