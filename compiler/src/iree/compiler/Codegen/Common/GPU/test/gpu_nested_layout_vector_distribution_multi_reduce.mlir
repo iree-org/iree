@@ -252,34 +252,35 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// The source layout projects to a different layout than the
-// accumulator/result. Fixup should preserve reduction-dim tiling from the
-// source, but use the result layout for non-reduction dims.
-#source_batch_layout = #iree_vector_ext.nested_layout<
+// Reduced form of the masked multi_reduction emitted from online_attention for
+// flex_attention. The source/mask layout projects to the accumulator/result
+// layout after dropping the reduced score dimension.
+#online_attention_source_layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [2, 1, 1, 1],
+  batch_tile = [1, 1, 1, 2],
+  outer_tile = [1, 1, 1, 1],
+  thread_tile = [32, 1, 1, 1],
+  element_tile = [1, 1, 1, 8],
+  subgroup_strides = [1, 0, 0, 0],
+  thread_strides = [1, 0, 0, 0]
+>
+
+#online_attention_result_layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1, 1],
-  batch_tile = [1, 8, 4],
+  batch_tile = [1, 1, 2],
   outer_tile = [1, 1, 1],
   thread_tile = [1, 1, 1],
-  element_tile = [1, 1, 16],
+  element_tile = [1, 1, 8],
   subgroup_strides = [0, 0, 0],
   thread_strides = [0, 0, 0]
 >
 
-#result_outer_layout = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 8],
-  thread_tile = [1, 1],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 0]
->
-
-func.func @multi_reduction_result_layout_differs_from_source_projection_unmasked(%arg0: vector<1x8x64xf32>, %arg1: vector<1x8xf32>) -> vector<1x8xf32> {
-  %arg1l = iree_vector_ext.to_layout %arg1 to layout(#result_outer_layout) : vector<1x8xf32>
-  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#source_batch_layout) : vector<1x8x64xf32>
-  %0 = vector.multi_reduction <add>, %arg0l, %arg1l [2] : vector<1x8x64xf32> to vector<1x8xf32>
-  return %0 : vector<1x8xf32>
+func.func @masked_multi_reduction_keeps_source_layout(%arg0: vector<64x1x1x16xf32>, %arg1: vector<1x1x16xf32>, %mask: vector<64x1x1x16xi1>) -> vector<1x1x16xf32> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#online_attention_source_layout) : vector<64x1x1x16xf32>
+  %arg1l = iree_vector_ext.to_layout %arg1 to layout(#online_attention_result_layout) : vector<1x1x16xf32>
+  %maskl = iree_vector_ext.to_layout %mask to layout(#online_attention_source_layout) : vector<64x1x1x16xi1>
+  %0 = vector.mask %maskl { vector.multi_reduction <add>, %arg0l, %arg1l [0] : vector<64x1x1x16xf32> to vector<1x1x16xf32> } : vector<64x1x1x16xi1> -> vector<1x1x16xf32>
+  return %0 : vector<1x1x16xf32>
 }
 
 builtin.module attributes { transform.with_named_sequence } {
@@ -290,50 +291,9 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK-LABEL: func @multi_reduction_result_layout_differs_from_source_projection_unmasked
-// CHECK-NOT: arith.select
-// CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [2, 5, 8] : vector<1x1x4x1x8x1x1x1x16xf32> to vector<1x1x1x8x1x1xf32>
-// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1x1x1x8x1x1xf32>
-
-// -----
-
-#source_batch_layout = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1, 1],
-  batch_tile = [1, 8, 4],
-  outer_tile = [1, 1, 1],
-  thread_tile = [1, 1, 1],
-  element_tile = [1, 1, 16],
-  subgroup_strides = [0, 0, 0],
-  thread_strides = [0, 0, 0]
->
-
-#result_outer_layout = #iree_vector_ext.nested_layout<
-  subgroup_tile = [1, 1],
-  batch_tile = [1, 1],
-  outer_tile = [1, 8],
-  thread_tile = [1, 1],
-  element_tile = [1, 1],
-  subgroup_strides = [0, 0],
-  thread_strides = [0, 0]
->
-
-func.func @multi_reduction_result_layout_differs_from_source_projection_masked(%arg0: vector<1x8x64xf32>, %arg1: vector<1x8xf32>, %mask: vector<1x8x64xi1>) -> vector<1x8xf32> {
-  %arg1l = iree_vector_ext.to_layout %arg1 to layout(#result_outer_layout) : vector<1x8xf32>
-  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#source_batch_layout) : vector<1x8x64xf32>
-  %maskl = iree_vector_ext.to_layout %mask to layout(#source_batch_layout) : vector<1x8x64xi1>
-  %0 = vector.mask %maskl { vector.multi_reduction <add>, %arg0l, %arg1l [2] : vector<1x8x64xf32> to vector<1x8xf32> } : vector<1x8x64xi1> -> vector<1x8xf32>
-  return %0 : vector<1x8xf32>
-}
-
-builtin.module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
-    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
-    transform.yield
-  }
-}
-
-// CHECK-LABEL: func @multi_reduction_result_layout_differs_from_source_projection_masked
-// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : vector<1x1x4x1x8x1x1x1x16xi1>, vector<1x1x4x1x8x1x1x1x16xf32>
-// CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [2, 5, 8] : vector<1x1x4x1x8x1x1x1x16xf32> to vector<1x1x1x8x1x1xf32>
-// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1x1x1x8x1x1xf32>
+// CHECK-LABEL: func @masked_multi_reduction_keeps_source_layout
+// CHECK: iree_vector_ext.to_simt %{{.*}} : vector<64x1x1x16xf32> -> vector<1x1x1x2x1x1x1x1x1x1x1x8xf32>
+// CHECK: iree_vector_ext.to_simt %{{.*}} : vector<64x1x1x16xi1> -> vector<1x1x1x2x1x1x1x1x1x1x1x8xi1>
+// CHECK: arith.select %{{.*}}, %{{.*}}, %{{.*}} : vector<1x1x1x2x1x1x1x1x1x1x1x8xi1>, vector<1x1x1x2x1x1x1x1x1x1x1x8xf32>
+// CHECK: iree_vector_ext.to_simt %{{.*}} : vector<1x1x16xf32> -> vector<1x1x2x1x1x1x1x1x8xf32>
+// CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1x1x2x1x1x1x1x1x8xf32>
