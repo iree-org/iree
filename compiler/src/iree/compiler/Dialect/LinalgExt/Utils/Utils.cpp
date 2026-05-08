@@ -858,7 +858,7 @@ collapseAffineMaps(ArrayRef<AffineMap> maps,
 /// Updates convToIgemmDimMap to refer to collapsed iteration dims.
 static DenseMap<int64_t, AffineExpr> collapseConvToIgemmDimMap(
     const DenseMap<int64_t, AffineExpr> &convToIgemmDimMap,
-    ArrayRef<ReassociationIndices> reassociation) {
+    ArrayRef<ReassociationIndices> reassociation, MLIRContext *ctx) {
   SmallVector<int64_t> iterationToCollapsedDim;
   for (auto [collapsedDim, group] : llvm::enumerate(reassociation)) {
     iterationToCollapsedDim.resize(
@@ -870,7 +870,6 @@ static DenseMap<int64_t, AffineExpr> collapseConvToIgemmDimMap(
   }
 
   DenseMap<int64_t, AffineExpr> collapsedMap;
-  MLIRContext *ctx = convToIgemmDimMap.begin()->second.getContext();
   for (const auto &[convDim, igemmExpr] : convToIgemmDimMap) {
     int64_t expandedDim = cast<AffineDimExpr>(igemmExpr).getPosition();
     collapsedMap[convDim] =
@@ -916,7 +915,8 @@ getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
     return failure();
   }
 
-  auto convDimsOrFailure = linalg::inferConvolutionDims(linalgOp);
+  FailureOr<linalg::ConvolutionDimensions> convDimsOrFailure =
+      linalg::inferConvolutionDims(linalgOp);
   if (failed(convDimsOrFailure)) {
     return failure();
   }
@@ -962,8 +962,8 @@ getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   auto outputMap = indexingMaps[2];
 
   bool isOutputChannelFirst = false;
-  auto outputChannelPos = convDims.outputChannel;
-  auto outputImagePos = convDims.outputImage;
+  ArrayRef<unsigned> outputChannelPos = convDims.outputChannel;
+  ArrayRef<unsigned> outputImagePos = convDims.outputImage;
 
   std::optional<int64_t> outputChannelLastDim = outputMap.getResultPosition(
       getAffineDimExpr(outputChannelPos.back(), outputMap.getContext()));
@@ -1013,10 +1013,8 @@ getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 
   SmallVector<int64_t> igemmLoopBounds = linalgOp.getStaticLoopRanges();
 
-  SmallVector<utils::IteratorType> igemmLoopIterators;
-  for (utils::IteratorType iteratorType : linalgOp.getIteratorTypesArray()) {
-    igemmLoopIterators.push_back(iteratorType);
-  }
+  SmallVector<utils::IteratorType> igemmLoopIterators =
+      llvm::to_vector(linalgOp.getIteratorTypesArray());
 
   IGEMMGenericConvDetails igemmDetails;
   igemmDetails.igemmContractionMaps = indexingGEMMMaps;
@@ -1036,8 +1034,9 @@ getExpandedIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 /// Collapses adjacent same-kind dims in the expanded IGEMM details.
 /// Produces the final collapsed contraction maps, loop bounds, iterator
 /// types, filter reassociation indices, and im2col output permutation.
-static IGEMMGenericConvDetails collapseIGEMMGenericConvDetails(
-    const IGEMMGenericConvDetails &expandedDetails) {
+static IGEMMGenericConvDetails
+collapseIGEMMGenericConvDetails(const IGEMMGenericConvDetails &expandedDetails,
+                                MLIRContext *ctx) {
   SmallVector<ReassociationIndices> iterationReassociation =
       getCollapsibleIGEMMIterationGroups(expandedDetails.igemmContractionMaps,
                                          expandedDetails.igemmLoopIterators);
@@ -1060,7 +1059,7 @@ static IGEMMGenericConvDetails collapseIGEMMGenericConvDetails(
   collapsedDetails.igemmLoopIterators = collapseIteratorTypes(
       expandedDetails.igemmLoopIterators, iterationReassociation);
   collapsedDetails.convToIgemmDimMap = collapseConvToIgemmDimMap(
-      expandedDetails.convToIgemmDimMap, iterationReassociation);
+      expandedDetails.convToIgemmDimMap, iterationReassociation, ctx);
 
   AffineMap expandedFilterMap =
       expandedDetails
@@ -1084,7 +1083,8 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
   if (failed(expandedDetails)) {
     return failure();
   }
-  return collapseIGEMMGenericConvDetails(*expandedDetails);
+  return collapseIGEMMGenericConvDetails(*expandedDetails,
+                                         linalgOp->getContext());
 }
 
 //===---------------------------------------------------------------------===//
