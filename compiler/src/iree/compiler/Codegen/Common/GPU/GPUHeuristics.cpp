@@ -116,6 +116,32 @@ calculateResultSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
   return (numRes * tileM * tileN * resultBitwidth) / 8;
 }
 
+int64_t calculateTotalSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
+                                              const GPUMatmulShapeType &problem,
+                                              bool useDirectLoad,
+                                              int64_t prefetchNumStages,
+                                              bool doCPromotion) {
+  int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
+  int64_t rhsBitwidth = problem.bType.getIntOrFloatBitWidth();
+  int64_t lhsScaleBitwidth =
+      problem.aScaleType ? problem.aScaleType.getIntOrFloatBitWidth() : 0;
+  int64_t rhsScaleBitwidth =
+      problem.bScaleType ? problem.bScaleType.getIntOrFloatBitWidth() : 0;
+
+  int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
+      schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth, rhsScaleBitwidth,
+      problem.numHorizontallyFusedOps, useDirectLoad, prefetchNumStages);
+
+  if (doCPromotion) {
+    int64_t resultBitwidth = problem.cType.getIntOrFloatBitWidth();
+    sharedMemoryUsed += calculateResultSharedMemoryUsedInBytes(
+        schedule, resultBitwidth, problem.numHorizontallyFusedOps);
+  }
+
+  sharedMemoryUsed *= schedule.getTotalWorkgroupBatchSize();
+  return sharedMemoryUsed;
+}
+
 /// Check that a GPUMMASchedule fits alignment restrictions. To be aligned,
 /// the problem must be evenly divisible by the number of elements in the
 /// schedule for each dimension. If `mustBeAligned` is false, then the problem
@@ -995,33 +1021,11 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
     LDBG() << "Chosen MMA schedule:\n" << schedule;
 
     auto isValidSchedule = [&](const GPUMMASchedule &schedule) -> bool {
-      int64_t lhsBitwidth = problem.aType.getIntOrFloatBitWidth();
-      int64_t rhsBitwidth = problem.bType.getIntOrFloatBitWidth();
-      int64_t resultBitwidth = problem.cType.getIntOrFloatBitWidth();
-      int64_t lhsScaleBitwidth =
-          problem.aScaleType ? problem.aScaleType.getIntOrFloatBitWidth() : 0;
-      int64_t rhsScaleBitwidth =
-          problem.bScaleType ? problem.bScaleType.getIntOrFloatBitWidth() : 0;
       bool isAligned =
           isValidMMASchedule(problem, schedule, mustBeAligned, subgroupSize,
                              transposedLhs, transposedRhs);
-      int64_t sharedMemoryUsed = calculateOperandsSharedMemoryUsedInBytes(
-          schedule, lhsBitwidth, rhsBitwidth, lhsScaleBitwidth,
-          rhsScaleBitwidth, problem.numHorizontallyFusedOps, useDirectLoad,
-          prefetchNumStages);
-      // Add accumulator/result memory when it uses shared memory (LDS):
-      // - Result needs padding in shared memory, OR
-      // - matmul_accumulate loads accumulator from global memory via shared mem
-      // For zero-initialized GEMMs without C promotion, the accumulator stays
-      // in registers and doesn't need shared memory.
-      if (doCPromotion) {
-        sharedMemoryUsed += calculateResultSharedMemoryUsedInBytes(
-            schedule, resultBitwidth, problem.numHorizontallyFusedOps);
-      }
-
-      // Batch tiling multiplies the promoted operand sizes: each batch slice
-      // uses separate shared memory, so total usage scales linearly.
-      sharedMemoryUsed *= totalBatchTile;
+      int64_t sharedMemoryUsed = calculateTotalSharedMemoryUsedInBytes(
+          schedule, problem, useDirectLoad, prefetchNumStages, doCPromotion);
 
       LDBG() << "Available Shared Memory: " << sharedMemLimitInBytes << " bytes"
              << "Predicted Shared Memory Used by Schedule: " << sharedMemoryUsed

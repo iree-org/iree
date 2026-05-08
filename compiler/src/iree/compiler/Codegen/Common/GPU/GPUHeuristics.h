@@ -223,6 +223,15 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const GPUMMASchedule &schedule);
 
+/// Calculate total shared memory used by a schedule in bytes, combining
+/// operand LDS (with optional DMA multi-buffering), result/accumulator LDS
+/// (when C promotion is needed), and batch tiling.
+int64_t calculateTotalSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
+                                              const GPUMatmulShapeType &problem,
+                                              bool useDirectLoad,
+                                              int64_t prefetchNumStages,
+                                              bool doCPromotion);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPU_GPUHEURISTICS_H_

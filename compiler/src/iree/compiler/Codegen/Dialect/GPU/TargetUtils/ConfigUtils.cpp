@@ -585,6 +585,52 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+constexpr int64_t kMinWorkgroupsPerCU = 2;
+
+/// Rejects DMA when its extra LDS usage would drop occupancy (WGs/CU) below
+/// `kMinWorkgroupsPerCU` while non-DMA would still meet it. When chip info
+/// is available, the LDS-limited occupancy is capped by actual work
+/// (totalWorkgroups / numCUs) so that under-subscribed shapes are not
+/// penalized.
+static bool shouldRejectDMAForOccupancy(
+    const GPUMMASchedule &schedule, const GPUMatmulShapeType &problem,
+    IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
+    ArrayRef<int64_t> bounds, ArrayRef<int64_t> workgroupTileSizes) {
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  int64_t dmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/true, prefetchNumStages,
+      doCPromotion);
+  int64_t nonDmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/false, /*prefetchNumStages=*/0,
+      doCPromotion);
+
+  assert(dmaLdsBytes > 0 && nonDmaLdsBytes > 0 && "LDS usage must be positive");
+
+  int64_t dmaMaxWgsPerCU = maxSharedMemoryBytes / dmaLdsBytes;
+  int64_t nonDmaMaxWgsPerCU = maxSharedMemoryBytes / nonDmaLdsBytes;
+
+  // When chip info is available, cap effective WGs/CU by how many workgroups
+  // actually exist per CU. This avoids over-rejecting DMA for small shapes
+  // where the GPU is under-subscribed.
+  IREE::GPU::TargetChipAttr chip = target.getChip();
+  if (chip) {
+    int64_t numCUs = chip.getWgpCount();
+    int64_t totalWorkgroups = 1;
+    for (auto [dim, tileSize] : llvm::zip_equal(bounds, workgroupTileSizes)) {
+      if (tileSize > 0) {
+        totalWorkgroups *= llvm::divideCeil(dim, tileSize);
+      }
+    }
+    int64_t maxWgsPerCU = llvm::divideCeil(totalWorkgroups, numCUs);
+    dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
+    nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
+  }
+
+  return dmaMaxWgsPerCU < kMinWorkgroupsPerCU &&
+         nonDmaMaxWgsPerCU >= kMinWorkgroupsPerCU;
+}
+
 /// Returns true if direct load DMA should be rejected, and fall back to stream
 /// copies.
 ///
@@ -945,6 +991,16 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     if (GPU::isNvMmaSync(mmaAttr.getIntrinsic())) {
       GPU::appendConvertAccGemm(context, attrs);
     }
+  }
+
+  // After computing workgroup tile sizes, check whether DMA would cause an
+  // unacceptable occupancy drop.
+  if (useDirectLoad &&
+      shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
+                                  hasExistingAccumulator, bounds,
+                                  workgroupTileSizes)) {
+    LDBG() << "rejecting direct load DMA: LDS limits occupancy (WGs/CU)";
+    useDirectLoad = false;
   }
 
   // Use global load DMA attribute (subgroup sizes will be derived from

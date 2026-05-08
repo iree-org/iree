@@ -29,8 +29,14 @@
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi355x@hip \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=MI355X
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi355x@hip \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=MI355X-DIRECT-LOAD
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
@@ -622,3 +628,35 @@ func.func @conv_1x1_bf16_no_untuned_swizzle(
 // CHECK-DIRECT-LOAD-LABEL: func.func @conv_1x1_bf16_no_untuned_swizzle
 // CHECK-DIRECT-LOAD:       linalg.generic
 // CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]
+
+// -----
+
+// mi355x + direct load: prod 1x1 conv (n16 c2048 H8 W32 k576) after preprocessing to a
+// batched GEMM-like linalg.generic; occupancy guard rejects DMA (stream copies).
+func.func @conv_1x1_mi355x_dma_rejected_occ(
+    %arg0: tensor<16x8x32x2048xbf16>,
+    %arg1: tensor<576x2048xbf16>) -> tensor<16x8x32x576xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x8x32x576xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x8x32x576xf32>) -> tensor<16x8x32x576xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+  } ins(%arg0, %arg1 : tensor<16x8x32x2048xbf16>, tensor<576x2048xbf16>)
+    outs(%fill : tensor<16x8x32x576xf32>) {
+  ^bb0(%in: bf16, %in_1: bf16, %out: f32):
+    %0 = arith.extf %in : bf16 to f32
+    %1 = arith.extf %in_1 : bf16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %out, %2 : f32
+    linalg.yield %3 : f32
+  } -> tensor<16x8x32x576xf32>
+  return %result : tensor<16x8x32x576xf32>
+}
+
+// MI355X-DIRECT-LOAD-LABEL: func.func @conv_1x1_mi355x_dma_rejected_occ
+// MI355X-DIRECT-LOAD:       linalg.generic
+// MI355X-DIRECT-LOAD-SAME:   promote_operands = [0, 1]
+// MI355X-DIRECT-LOAD-NOT:   use_global_load_dma
