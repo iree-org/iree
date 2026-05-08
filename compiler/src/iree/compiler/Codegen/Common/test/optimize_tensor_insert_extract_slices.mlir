@@ -486,9 +486,10 @@ func.func @fold_raw_oob_write_same_mask(%val: vector<1x32x16xf16>, %sz: index, %
 
 // -----
 
-// Test for FoldTransferRAW with OOB on both — negative.
-// Both write and read have OOB, no masks: fold must NOT happen.
-func.func @negative_fold_raw_oob_both_no_masks(%val: vector<1x32x16xf16>, %sz: index) -> vector<1x32x16xf16> {
+// Test for FoldTransferRAW with OOB on both.
+// Both write and read have OOB, no masks: fold builds an in-bounds mask
+// from the tensor's actual dimensions and selects between val and pad.
+func.func @fold_raw_oob_both_no_masks(%val: vector<1x32x16xf16>, %sz: index) -> vector<1x32x16xf16> {
   %c0 = arith.constant 0 : index
   %pad = arith.constant 0.0 : f16
   %e = tensor.empty(%sz) : tensor<1x?x16xf16>
@@ -498,15 +499,22 @@ func.func @negative_fold_raw_oob_both_no_masks(%val: vector<1x32x16xf16>, %sz: i
      {in_bounds = [true, false, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
   return %r : vector<1x32x16xf16>
 }
-// CHECK-LABEL: func.func @negative_fold_raw_oob_both_no_masks
-// CHECK:         vector.transfer_write
-// CHECK:         vector.transfer_read
+// CHECK-LABEL: func.func @fold_raw_oob_both_no_masks
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ:[a-zA-Z0-9]+]]
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
+// CHECK:         %[[MASK:.*]] = vector.create_mask {{.*}}, %[[SZ]], {{.*}} : vector<1x32x16xi1>
+// CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[PAD]]
+// CHECK:         return %[[SEL]]
 
 // -----
 
-// Test for FoldTransferRAW with OOB on both — negative.
-// Both write and read have OOB dim with same mask: fold must NOT happen.
-func.func @negative_fold_raw_oob_both_same_mask(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+// Test for FoldTransferRAW with OOB on both.
+// Both write and read have OOB dim with same mask: fold builds an in-bounds
+// mask and selects. The rMask produces an outer select as well.
+func.func @fold_raw_oob_both_same_mask(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
   %c0 = arith.constant 0 : index
   %pad = arith.constant 0.0 : f16
   %e = tensor.empty(%sz) : tensor<1x?x16xf16>
@@ -516,9 +524,17 @@ func.func @negative_fold_raw_oob_both_same_mask(%val: vector<1x32x16xf16>, %sz: 
      {in_bounds = [true, false, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
   return %r : vector<1x32x16xf16>
 }
-// CHECK-LABEL: func.func @negative_fold_raw_oob_both_same_mask
-// CHECK:         vector.transfer_write
-// CHECK:         vector.transfer_read
+// CHECK-LABEL: func.func @fold_raw_oob_both_same_mask
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
+// CHECK:         %[[IB_MASK:.*]] = vector.create_mask {{.*}}, %[[SZ]], {{.*}} : vector<1x32x16xi1>
+// CHECK:         %[[IB_SEL:.*]] = arith.select %[[IB_MASK]], %[[VAL]], %[[PAD]]
+// CHECK:         %[[OUTER:.*]] = arith.select %[[MASK]], %[[IB_SEL]], %[[PAD]]
+// CHECK:         return %[[OUTER]]
 
 // -----
 
