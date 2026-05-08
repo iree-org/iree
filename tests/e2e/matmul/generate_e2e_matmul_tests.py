@@ -105,7 +105,8 @@ def get_test_shapes(shapes_id: ShapesId, accumulate=True):
 
 # Generates all output files' contents as strings.
 def generate(
-    lhs_rhs_type: MatrixElemTypeId,
+    lhs_type: MatrixElemTypeId,
+    rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     mx_scale_type: MatrixElemTypeId,
     mx_block_size: int,
@@ -118,12 +119,13 @@ def generate(
     calls = []
 
     for compilation_info in get_test_compilation_infos(
-        compilation_info_id, lhs_rhs_type, acc_type
+        compilation_info_id, lhs_type, acc_type
     ):
         for shape in get_test_shapes(shapes_id, accumulate):
             for dynamicities in get_dynamicities(shapes_id):
                 function = generate_function(
-                    lhs_rhs_type=lhs_rhs_type,
+                    lhs_type=lhs_type,
+                    rhs_type=rhs_type,
                     acc_type=acc_type,
                     mx_scale_type=mx_scale_type,
                     mx_block_size=mx_block_size,
@@ -142,7 +144,8 @@ def generate(
                 calls.append(
                     generate_call(
                         function=function,
-                        lhs_rhs_type=lhs_rhs_type,
+                        lhs_type=lhs_type,
+                        rhs_type=rhs_type,
                         acc_type=acc_type,
                         mx_scale_type=mx_scale_type,
                         mx_block_size=mx_block_size,
@@ -168,26 +171,45 @@ def parse_arguments():
         help="Path of output .mlir file containing the calls",
         required=True,
     )
+    elem_type_choices = [
+        "i32",
+        "i8",
+        "ui8",
+        "f64",
+        "f32",
+        "f16",
+        "bf16",
+        "f8E5M2",
+        "f8E4M3FN",
+        "f8E5M2FNUZ",
+        "f8E4M3FNUZ",
+        "f6E3M2FN",
+        "f6E2M3FN",
+        "f4E2M1FN",
+    ]
+    # Legacy single-flag form: same type for LHS and RHS. Mutually exclusive
+    # with the per-operand --lhs / --rhs pair below; exactly one set of flags
+    # must be provided.
     parser.add_argument(
         "--lhs_rhs_type",
         type=str,
-        choices=[
-            "i32",
-            "i8",
-            "f64",
-            "f32",
-            "f16",
-            "bf16",
-            "f8E5M2",
-            "f8E4M3FN",
-            "f8E5M2FNUZ",
-            "f8E4M3FNUZ",
-            "f6E3M2FN",
-            "f6E2M3FN",
-            "f4E2M1FN",
-        ],
-        help="Numeric type of input LHS and RHS matrices",
-        required=True,
+        choices=elem_type_choices,
+        help="Numeric type of input LHS and RHS matrices (when both are equal)",
+        required=False,
+    )
+    parser.add_argument(
+        "--lhs",
+        type=str,
+        choices=elem_type_choices,
+        help="Numeric type of the LHS matrix. Use with --rhs.",
+        required=False,
+    )
+    parser.add_argument(
+        "--rhs",
+        type=str,
+        choices=elem_type_choices,
+        help="Numeric type of the RHS matrix. Use with --lhs.",
+        required=False,
     )
     parser.add_argument(
         "--acc_type",
@@ -313,8 +335,25 @@ def main(args):
     ShapesId.set_custom_mnk(shapes_id, args.mnk)
     ShapesId.set_dynamicity(shapes_id, args.mnk_dynamicities)
 
+    # Resolve LHS/RHS types: exactly one of {--lhs_rhs_type} or {--lhs and --rhs}.
+    lhs_rhs_set = args.lhs_rhs_type is not None
+    per_op_set = args.lhs is not None or args.rhs is not None
+    if lhs_rhs_set == per_op_set:
+        raise ValueError(
+            "specify exactly one of --lhs_rhs_type or the (--lhs, --rhs) pair"
+        )
+    if per_op_set:
+        if args.lhs is None or args.rhs is None:
+            raise ValueError("--lhs and --rhs must be specified together")
+        lhs_type = MatrixElemTypeId(args.lhs)
+        rhs_type = MatrixElemTypeId(args.rhs)
+    else:
+        lhs_type = MatrixElemTypeId(args.lhs_rhs_type)
+        rhs_type = lhs_type
+
     (functions, calls) = generate(
-        lhs_rhs_type=MatrixElemTypeId(args.lhs_rhs_type),
+        lhs_type=lhs_type,
+        rhs_type=rhs_type,
         acc_type=MatrixElemTypeId(args.acc_type),
         mx_scale_type=args.mx_scale_type,
         mx_block_size=args.mx_block_size,

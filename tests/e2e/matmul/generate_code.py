@@ -16,16 +16,40 @@ from tests.e2e.matmul.compilation_info import *
 from tests.e2e.matmul.generate_code_mx import *
 
 
+# IR storage type for `t`: `ui8` → signless `i8` (the unsigned semantics
+# live on `arith.extui` in the linalg body and surface via encoding
+# inference).
+def _storage_type(t: MatrixElemTypeId) -> str:
+    if t == MatrixElemTypeId.UI8:
+        return "i8"
+    return t.value
+
+
+# True when the matmul must be expressed as `linalg.generic` (explicit
+# body) rather than named `linalg.matmul`: distinct LHS/RHS types, or an
+# unsigned operand.
+def _needs_linalg_generic(
+    lhs_type: MatrixElemTypeId, rhs_type: MatrixElemTypeId
+) -> bool:
+    if lhs_type != rhs_type:
+        return True
+    if lhs_type == MatrixElemTypeId.UI8:
+        return True
+    return False
+
+
 # Helper for generate_function.
 # Generates a name for a test function in the generated MLIR code.
 def generate_function_name(
-    lhs_rhs_type: MatrixElemTypeId,
+    lhs_type: MatrixElemTypeId,
+    rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shapes: TestInputMatricesShapes,
     accumulate: bool,
     compilation_info: typing.Optional[CompilationInfo] = None,
 ):
-    input_t = lhs_rhs_type.value
+    lhs_t = lhs_type.value
+    rhs_t = rhs_type.value
     acc_t = acc_type.value
     lhs_r = int_or_DYN(shapes.lhs_rows)
     lhs_c = int_or_DYN(shapes.lhs_cols)
@@ -45,8 +69,8 @@ def generate_function_name(
     matmul_kind = "matmul_accumulate" if accumulate else "matmul"
 
     return (
-        f"{matmul_kind}_{lhs_r}x{lhs_c}x{input_t}_times_"
-        + f"{rhs_r}x{rhs_c}x{input_t}_into_{acc_r}x{acc_c}x{acc_t}{info}"
+        f"{matmul_kind}_{lhs_r}x{lhs_c}x{lhs_t}_times_"
+        + f"{rhs_r}x{rhs_c}x{rhs_t}_into_{acc_r}x{acc_c}x{acc_t}{info}"
     )
 
 
@@ -54,7 +78,8 @@ def generate_function_name(
 # The generated function will take the same arguments as linalg.matmul variants
 # and will just call linalg.matmul variants with them, returning its result.
 def generate_function(
-    lhs_rhs_type: MatrixElemTypeId,
+    lhs_type: MatrixElemTypeId,
+    rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     mx_scale_type: MatrixElemTypeId,
     mx_block_size: int,
@@ -64,8 +89,10 @@ def generate_function(
     compilation_info: Optional[CompilationInfo] = None,
 ):
     if mx_scale_type:
+        # MX matmul currently only supports same-type inputs.
+        assert lhs_type == rhs_type, "MX matmul requires lhs_type == rhs_type"
         return generate_function_mx(
-            lhs_rhs_type=lhs_rhs_type,
+            lhs_rhs_type=lhs_type,
             acc_type=acc_type,
             mx_scale_type=mx_scale_type,
             mx_block_size=mx_block_size,
@@ -77,7 +104,8 @@ def generate_function(
 
     shapes = generate_shapes(shape, transpose_rhs, dynamicities)
     func_name = generate_function_name(
-        lhs_rhs_type=lhs_rhs_type,
+        lhs_type=lhs_type,
+        rhs_type=rhs_type,
         acc_type=acc_type,
         shapes=shapes,
         accumulate=shape.accumulate,
@@ -90,8 +118,11 @@ def generate_function(
     acc_r = int_or_question_mark(shapes.acc_rows)
     acc_c = int_or_question_mark(shapes.acc_cols)
 
-    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{lhs_rhs_type.value}>"
-    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
+    # Use signless storage in IR (`ui8` becomes `i8` here) — the unsigned
+    # semantics are expressed by `arith.extui` in the linalg body, which the
+    # encoding system's signedness inference picks up.
+    lhs_tensor_type = f"tensor<{lhs_r}x{lhs_c}x{_storage_type(lhs_type)}>"
+    rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{_storage_type(rhs_type)}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
     (
@@ -141,11 +172,52 @@ def generate_function(
     indexing_maps_attr = ""
     if transpose_rhs:
         indexing_maps_attr = "indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]"
-    func_definition += (
-        f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
-        f"  util.return %result: {acc_tensor_type}\n"
-        f"}}\n"
-    )
+
+    if _needs_linalg_generic(lhs_type, rhs_type):
+        # `linalg.generic` body widens each operand to the accumulator
+        # type. `arith.extui` for unsigned, `arith.extsi` for signed —
+        # the encoding system's signedness inference reads this to route
+        # `ui8` operands to the right MMA intrinsic (e.g. vpdpbusd).
+        lhs_storage = _storage_type(lhs_type)
+        rhs_storage = _storage_type(rhs_type)
+        acc_t = acc_type.value
+        lhs_ext = "arith.extui" if lhs_type == MatrixElemTypeId.UI8 else "arith.extsi"
+        rhs_ext = "arith.extui" if rhs_type == MatrixElemTypeId.UI8 else "arith.extsi"
+        # Iterators: M, N parallel; K reduction. Maps: (m,k), (k,n)/(n,k),
+        # (m,n) — RHS uses (n,k) when transpose_rhs is set.
+        if transpose_rhs:
+            maps = (
+                "affine_map<(d0, d1, d2) -> (d0, d2)>, "
+                "affine_map<(d0, d1, d2) -> (d1, d2)>, "
+                "affine_map<(d0, d1, d2) -> (d0, d1)>"
+            )
+        else:
+            maps = (
+                "affine_map<(d0, d1, d2) -> (d0, d2)>, "
+                "affine_map<(d0, d1, d2) -> (d2, d1)>, "
+                "affine_map<(d0, d1, d2) -> (d0, d1)>"
+            )
+        func_definition += (
+            f"  %result = linalg.generic {{indexing_maps = [{maps}], "
+            f'iterator_types = ["parallel", "parallel", "reduction"]}} '
+            f"{compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, "
+            f"{rhs_tensor_type}) outs(%acc: {acc_tensor_type}) {{\n"
+            f"  ^bb0(%a: {lhs_storage}, %b: {rhs_storage}, %c: {acc_t}):\n"
+            f"    %a_ext = {lhs_ext} %a : {lhs_storage} to {acc_t}\n"
+            f"    %b_ext = {rhs_ext} %b : {rhs_storage} to {acc_t}\n"
+            f"    %prod = arith.muli %a_ext, %b_ext : {acc_t}\n"
+            f"    %sum = arith.addi %c, %prod : {acc_t}\n"
+            f"    linalg.yield %sum : {acc_t}\n"
+            f"  }} -> {acc_tensor_type}\n"
+            f"  util.return %result: {acc_tensor_type}\n"
+            f"}}\n"
+        )
+    else:
+        func_definition += (
+            f"  %result = linalg.matmul {indexing_maps_attr} {compilation_info_attr} ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+            f"  util.return %result: {acc_tensor_type}\n"
+            f"}}\n"
+        )
 
     signature = ", ".join([ty for name, ty in args]) + " -> {acc_tensor_type}"
     import_declaration = (
@@ -168,7 +240,8 @@ call_id = 0
 # as a dictionary to be passed to yaml.dump.
 def generate_call(
     function: MLIRFunction,
-    lhs_rhs_type: MatrixElemTypeId,
+    lhs_type: MatrixElemTypeId,
+    rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     mx_scale_type: MatrixElemTypeId,
     mx_block_size: int,
@@ -178,7 +251,7 @@ def generate_call(
     if mx_scale_type:
         return generate_call_mx(
             function=function,
-            lhs_rhs_type=lhs_rhs_type,
+            lhs_rhs_type=lhs_type,
             acc_type=acc_type,
             mx_scale_type=mx_scale_type,
             mx_block_size=mx_block_size,
@@ -210,8 +283,8 @@ def generate_call(
         rhs_shape = [shape.k, shape.n]
         transpose_rhs = 0
     matmul_args = [
-        ("lhs", lhs_shape, lhs_rhs_type),
-        ("rhs", rhs_shape, lhs_rhs_type),
+        ("lhs", lhs_shape, lhs_type),
+        ("rhs", rhs_shape, rhs_type),
     ]
     check_args = matmul_args.copy()
 
