@@ -609,11 +609,11 @@ func.func @matmul_lowering_i8i4i32_aarch64_i8mm(
 //
 // FP4 register pressure: K=2 is the smallest power-of-two K that makes
 // K*4 a multiple of 8 (for byte-addressable packed groups). Inside the
-// 16-register budget the cost model lands on a square (im=2, in=2, ik=2)
-// tile (2*2 + 2*2 + 2*2 = 12 registers), which wins on arithmetic
-// intensity. Whether the lowering can actually densely pack f4E2M1FN
-// values into bytes today is orthogonal — the framework only insists
-// that the packed K-group be byte-aligned.
+// 16-register budget the cost model lands on (im=2, in=3, ik=2)
+// (2*3 + 2*2 + 3*2 = 16 registers, saturating the budget). Whether the
+// lowering can actually densely pack f4E2M1FN values into bytes today is
+// orthogonal — the framework only insists that the packed K-group be
+// byte-aligned.
 
 #map_g_fp4 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_g_fp4_1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -634,7 +634,7 @@ func.func @matmul_fp4_f32_aarch64_generic(
 }
 // CHECK-LABEL: func @matmul_fp4_f32_aarch64_generic(
 //       CHECK:   %[[INNER_FP4:.+]] = iree_codegen.inner_tiled
-//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 2, lhs_type = f4E2M1FN, rhs_type = f4E2M1FN, acc_type = f32>
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 3, intrinsics_k = 2, lhs_type = f4E2M1FN, rhs_type = f4E2M1FN, acc_type = f32>
 
 // -----
 
