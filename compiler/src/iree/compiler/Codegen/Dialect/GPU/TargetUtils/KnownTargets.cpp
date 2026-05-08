@@ -723,14 +723,63 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
                                             {ComputeBitwidths::FP8, 205.0f}}};
 
   // AMD RDNA3.
-  static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
-  static const ChipDetails rx7900xtChip = {84 / 2, "rx7900xt"};
-  static const ChipDetails rx7800xtChip = {60 / 2, "rx7800xt"};
-  static const ChipDetails rx7700xtChip = {54 / 2, "rx7700xt"};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xtx.html
+  static const ChipDetails rx7900xtxChip = {96 / 2,
+                                            "rx7900xtx",
+                                            0.96f,
+                                            {{ComputeBitwidths::FP32, 61.4f},
+                                             {ComputeBitwidths::FP16, 123.0f},
+                                             {ComputeBitwidths::Int8, 123.0f},
+                                             {ComputeBitwidths::Int4, 246.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xt.html
+  static const ChipDetails rx7900xtChip = {84 / 2,
+                                           "rx7900xt",
+                                           0.80f,
+                                           {{ComputeBitwidths::FP32, 51.6f},
+                                            {ComputeBitwidths::FP16, 103.0f},
+                                            {ComputeBitwidths::Int8, 103.0f},
+                                            {ComputeBitwidths::Int4, 206.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7800-xt.html
+  static const ChipDetails rx7800xtChip = {60 / 2,
+                                           "rx7800xt",
+                                           0.62f,
+                                           {{ComputeBitwidths::FP32, 37.3f},
+                                            {ComputeBitwidths::FP16, 74.6f},
+                                            {ComputeBitwidths::Int8, 74.6f},
+                                            {ComputeBitwidths::Int4, 149.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7700-xt.html
+  static const ChipDetails rx7700xtChip = {54 / 2,
+                                           "rx7700xt",
+                                           0.43f,
+                                           {{ComputeBitwidths::FP32, 35.2f},
+                                            {ComputeBitwidths::FP16, 70.3f},
+                                            {ComputeBitwidths::Int8, 70.3f},
+                                            {ComputeBitwidths::Int4, 141.0f}}};
   static const ChipDetails v710Chip = {54 / 2, "v710"};
-  static const ChipDetails w7900Chip = {96 / 2, "w7900"};
-  static const ChipDetails w7800Chip = {70 / 2, "w7800"};
-  static const ChipDetails w7700Chip = {48 / 2, "w7700"};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7900.html
+  static const ChipDetails w7900Chip = {96 / 2,
+                                        "w7900",
+                                        0.86f,
+                                        {{ComputeBitwidths::FP32, 61.3f},
+                                         {ComputeBitwidths::FP16, 123.0f},
+                                         {ComputeBitwidths::Int8, 123.0f},
+                                         {ComputeBitwidths::Int4, 245.0f}}};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7800.html
+  static const ChipDetails w7800Chip = {70 / 2,
+                                        "w7800",
+                                        0.58f,
+                                        {{ComputeBitwidths::FP32, 45.2f},
+                                         {ComputeBitwidths::FP16, 90.4f},
+                                         {ComputeBitwidths::Int8, 90.4f},
+                                         {ComputeBitwidths::Int4, 181.0f}}};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7700.html
+  static const ChipDetails w7700Chip = {48 / 2,
+                                        "w7700",
+                                        0.58f,
+                                        {{ComputeBitwidths::FP32, 28.3f},
+                                         {ComputeBitwidths::FP16, 56.6f},
+                                         {ComputeBitwidths::Int8, 56.6f},
+                                         {ComputeBitwidths::Int4, 113.0f}}};
   static const ChipDetails phoenixChip = {12 / 2, "phoenix"};
   static const ChipDetails strixPointChip = {16 / 2, "strix-point"};
   static const ChipDetails strixHaloChip = {40 / 2, "strix-halo"};
