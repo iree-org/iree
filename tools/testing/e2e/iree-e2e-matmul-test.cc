@@ -47,6 +47,7 @@
 REFERENCE_MATMUL(float, float, float, float)
 REFERENCE_MATMUL(double, double, double, double)
 REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
+REFERENCE_MATMUL(uint8_t, int8_t, int32_t, int32_t)
 REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
 
 // Reference mamtul for the f16 input, f16 accumulation, and f16 result.
@@ -164,6 +165,16 @@ static iree_status_t reference_matmul_element(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
         (const double*)lhs_data, (const double*)rhs_data,
         (const double*)acc_data, (double*)result_data, m, n);
+  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_UINT_8 &&
+             iree_hal_element_type_is_integer(rhs_type, 8) &&
+             iree_hal_element_type_is_integer(acc_type, 32)) {
+    // Mixed unsigned-LHS / signed-RHS i8 matmul (e.g. x86 vpdpbusd). IR
+    // storage is signless i8; the buffer-view's UINT_8 LHS carries the
+    // signedness.
+    reference_matmul_uint8_t_int8_t_int32_t_int32_t(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
+        (const uint8_t*)lhs_data, (const int8_t*)rhs_data,
+        (const int32_t*)acc_data, (int32_t*)result_data, m, n);
   } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
              iree_hal_element_type_is_integer(rhs_type, 8) &&
              iree_hal_element_type_is_integer(acc_type, 32)) {
