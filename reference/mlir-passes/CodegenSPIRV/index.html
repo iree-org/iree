@@ -6616,7 +6616,7 @@
 <h3 id="-iree-spirv-link-executables"><code>-iree-spirv-link-executables</code><a class="headerlink" href="#-iree-spirv-link-executables" title="Permanent link">link</a></h3>
 <p><em>Links SPIR-V HAL executables within the top-level program module.</em></p>
 <h3 id="-iree-spirv-lower-executable-target-pass"><code>-iree-spirv-lower-executable-target-pass</code><a class="headerlink" href="#-iree-spirv-lower-executable-target-pass" title="Permanent link">link</a></h3>
-<p><em>Lower the executable target to SPIR-V using one of the IREE::HAL::DispatchLoweringPassPipeline</em></p>
+<p><em>Lower the executable target to SPIR-V using a pipeline attribute</em></p>
 <p>Main pass to lower executables to scalar + vector code on SPIR-V path.
 Invokes one of the pass pipelines that translate the executable to
 scalar + vector code.</p>
@@ -6630,7 +6630,7 @@ extra spir-v passes that need to be run as well.</p>
 <h3 id="-iree-spirv-materialize-executable-conditions"><code>-iree-spirv-materialize-executable-conditions</code><a class="headerlink" href="#-iree-spirv-materialize-executable-conditions" title="Permanent link">link</a></h3>
 <p><em>Materialize SPIR-V target requirements of hal.executable.variant ops into hal.executable.condition regions</em></p>
 <h3 id="-iree-spirv-select-lowering-strategy-pass"><code>-iree-spirv-select-lowering-strategy-pass</code><a class="headerlink" href="#-iree-spirv-select-lowering-strategy-pass" title="Permanent link">link</a></h3>
-<p><em>Select the IREE::HAL::DispatchLoweringPassPipeline for loweringto SPIR-V</em></p>
+<p><em>Select the pipeline attribute for lowering to SPIR-V</em></p>
 <h3 id="-iree-spirv-tile-and-distribute"><code>-iree-spirv-tile-and-distribute</code><a class="headerlink" href="#-iree-spirv-tile-and-distribute" title="Permanent link">link</a></h3>
 <p><em>Tile and distribute Linalg ops with buffer semantics to invocations</em></p>
 <h3 id="-iree-spirv-tile-and-promote"><code>-iree-spirv-tile-and-promote</code><a class="headerlink" href="#-iree-spirv-tile-and-promote" title="Permanent link">link</a></h3>

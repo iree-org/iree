@@ -6713,7 +6713,7 @@ behind its own waitcount.</p>
 <div class="highlight"><pre><span></span><code>-target : Target backend name whose executables will be linked by this pass.
 </code></pre></div>
 <h3 id="-iree-llvmgpu-lower-executable-target"><code>-iree-llvmgpu-lower-executable-target</code><a class="headerlink" href="#-iree-llvmgpu-lower-executable-target" title="Permanent link">link</a></h3>
-<p><em>Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline</em></p>
+<p><em>Perform lowering of executable target using a pipeline attribute</em></p>
 <h4 id="options_1">Options<a class="headerlink" href="#options_1" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-for-rocdl : Enable features only supported on ROCDL such as delaying lowering of subgroup reduce.
 </code></pre></div>
@@ -6725,7 +6725,7 @@ behind its own waitcount.</p>
 <div class="highlight"><pre><span></span><code>-num-stages : Number of pipeline stages (1, 2, or 3+)
 </code></pre></div>
 <h3 id="-iree-llvmgpu-select-lowering-strategy"><code>-iree-llvmgpu-select-lowering-strategy</code><a class="headerlink" href="#-iree-llvmgpu-select-lowering-strategy" title="Permanent link">link</a></h3>
-<p><em>Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant</em></p>
+<p><em>Select a pipeline attribute for lowering the target variant</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-gpu-options : GPU codegen options consumed by this pass; see GPUCodegenOptions for the available and default settings.
 </code></pre></div>

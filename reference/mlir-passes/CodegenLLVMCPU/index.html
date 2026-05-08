@@ -7001,7 +7001,7 @@ Can handle more operations if required in future.</p>
 <div class="highlight"><pre><span></span><code>-target : Target backend name whose executables will be linked by this pass.
 </code></pre></div>
 <h3 id="-iree-llvmcpu-lower-executable-target"><code>-iree-llvmcpu-lower-executable-target</code><a class="headerlink" href="#-iree-llvmcpu-lower-executable-target" title="Permanent link">link</a></h3>
-<p><em>Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline</em></p>
+<p><em>Lower executable target using a pipeline attribute</em></p>
 <p>Pass to lower the module an hal.executable.variant operation to external
 dialect. Currently this pass lowers to LLVM dialect, but could be
 generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.</p>
@@ -7016,7 +7016,7 @@ generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.</p>
 <h3 id="-iree-llvmcpu-peel"><code>-iree-llvmcpu-peel</code><a class="headerlink" href="#-iree-llvmcpu-peel" title="Permanent link">link</a></h3>
 <p><em>Pass to perform peeling on non-distributed loops.</em></p>
 <h3 id="-iree-llvmcpu-select-lowering-strategy"><code>-iree-llvmcpu-select-lowering-strategy</code><a class="headerlink" href="#-iree-llvmcpu-select-lowering-strategy" title="Permanent link">link</a></h3>
-<p><em>Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant</em></p>
+<p><em>Select a pipeline attribute for lowering the variant</em></p>
 <p>Pass to select a lowering strategy for a hal.executable.variant operation.
 The variant is annotated with the selected strategies, which are
 subsequently ingested by LLVMCPULowerExecutableTargetPass.</p>
