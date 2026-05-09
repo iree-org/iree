@@ -542,6 +542,7 @@ static iree_status_t
 iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t device_coarse_memory_pool,
+    const hsa_amd_hdp_flush_t* hdp_flush,
     iree_hal_amdgpu_gfxip_version_t gfxip_version,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_cpu_visible_device_coarse_memory_t* out_memory) {
@@ -563,11 +564,7 @@ iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
   if (!iree_hal_amdgpu_gfxip_allows_hdp_kernarg_publication(gfxip_version)) {
     return iree_ok_status();
   }
-
-  const hsa_amd_hdp_flush_t hdp_flush =
-      iree_hal_amdgpu_physical_device_query_hdp_flush_registers(libhsa,
-                                                                device_agent);
-  if (!hdp_flush.HDP_MEM_FLUSH_CNTL || !hdp_flush.HDP_REG_FLUSH_CNTL) {
+  if (!hdp_flush->HDP_MEM_FLUSH_CNTL || !hdp_flush->HDP_REG_FLUSH_CNTL) {
     return iree_ok_status();
   }
 
@@ -591,7 +588,7 @@ iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
           },
       .hdp =
           {
-              .registers = hdp_flush,
+              .registers = *hdp_flush,
           },
       .flags =
           IREE_HAL_AMDGPU_CPU_VISIBLE_DEVICE_COARSE_MEMORY_SELECTION_FLAG_HOST_WRITE_PUBLICATION_SUPPORTED,
@@ -866,6 +863,8 @@ iree_hal_amdgpu_physical_device_initialize_device_library_and_blit_context(
         "%" PRIhsz " (expected 32 or 64)",
         wavefront_size, device_ordinal);
   }
+  out_physical_device->compute_unit_count = compute_unit_count;
+  out_physical_device->wavefront_size = wavefront_size;
   iree_hal_amdgpu_device_buffer_transfer_context_initialize(
       &out_physical_device->device_kernels, compute_unit_count, wavefront_size,
       &out_physical_device->buffer_transfer_context);
@@ -924,6 +923,11 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   iree_status_t status = iree_hal_amdgpu_physical_device_initialize_identity(
       system, options, host_ordinal, host_memory_pools, device_ordinal,
       out_physical_device);
+  if (iree_status_is_ok(status)) {
+    out_physical_device->hdp_flush =
+        iree_hal_amdgpu_physical_device_query_hdp_flush_registers(libhsa,
+                                                                  device_agent);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_physical_device_initialize_host_pools(
         options, host_allocator, out_physical_device);
@@ -1002,6 +1006,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     status =
         iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
             libhsa, device_agent, coarse_block_memory_pool,
+            &out_physical_device->hdp_flush,
             out_physical_device->isa.target_id.version, &system->topology,
             &out_physical_device->cpu_visible_device_coarse_memory);
   }

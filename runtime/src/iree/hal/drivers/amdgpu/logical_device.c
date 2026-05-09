@@ -1708,6 +1708,151 @@ static iree_status_t iree_hal_amdgpu_logical_device_trim(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_amdgpu_logical_device_query_physical_i64(
+    const iree_hal_amdgpu_physical_device_t* physical_device,
+    iree_string_view_t key, int64_t* out_value) {
+  if (iree_string_view_equal(key, IREE_SV("hsa.agent.handle"))) {
+    *out_value = (int64_t)physical_device->device_agent.handle;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("hsa.driver_uid"))) {
+    *out_value = (int64_t)physical_device->driver_uid;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("pci.domain"))) {
+    if (!physical_device->has_pci_identity) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "AMDGPU PCI identity is unavailable");
+    }
+    *out_value = (int64_t)physical_device->pci_domain;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("pci.bus"))) {
+    if (!physical_device->has_pci_identity) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "AMDGPU PCI identity is unavailable");
+    }
+    *out_value = (int64_t)physical_device->pci_bus;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("pci.device"))) {
+    if (!physical_device->has_pci_identity) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "AMDGPU PCI identity is unavailable");
+    }
+    *out_value = (int64_t)physical_device->pci_device;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("pci.function"))) {
+    if (!physical_device->has_pci_identity) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "AMDGPU PCI identity is unavailable");
+    }
+    *out_value = (int64_t)physical_device->pci_function;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("pci.bdfid"))) {
+    if (!physical_device->has_pci_identity) {
+      return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                              "AMDGPU PCI identity is unavailable");
+    }
+    *out_value = (int64_t)((physical_device->pci_bus << 8) |
+                           (physical_device->pci_device << 3) |
+                           physical_device->pci_function);
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("host.numa_node"))) {
+    *out_value = (int64_t)physical_device->host_numa_node;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("compute_unit_count"))) {
+    *out_value = (int64_t)physical_device->compute_unit_count;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("wavefront_size"))) {
+    *out_value = (int64_t)physical_device->wavefront_size;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.kind"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.kind;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.gfxip.major"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.version.major;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.gfxip.minor"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.version.minor;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.gfxip.stepping"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.version.stepping;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.generic_version"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.generic_version;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.sramecc"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.sramecc;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("target.xnack"))) {
+    *out_value = (int64_t)physical_device->isa.target_id.xnack;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("svm.supported"))) {
+    *out_value = physical_device->memory_system.svm.supported ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("svm.accessible_by_default"))) {
+    *out_value =
+        physical_device->memory_system.svm.accessible_by_default ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("svm.xnack_enabled"))) {
+    *out_value = physical_device->memory_system.svm.xnack_enabled ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("svm.direct_host_access"))) {
+    *out_value = physical_device->memory_system.svm.direct_host_access ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("device_local.fine_host_visible"))) {
+    *out_value =
+        physical_device->memory_system.device_local.fine_host_visible ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("device_local.coarse_cpu_visible"))) {
+    *out_value =
+        physical_device->memory_system.device_local.coarse_cpu_visible ? 1 : 0;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("hdp.mem_flush_control"))) {
+    if (!physical_device->hdp_flush.HDP_MEM_FLUSH_CNTL) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "AMDGPU HDP memory-flush control register is unavailable");
+    }
+    *out_value =
+        (int64_t)(intptr_t)physical_device->hdp_flush.HDP_MEM_FLUSH_CNTL;
+    return iree_ok_status();
+  }
+  if (iree_string_view_equal(key, IREE_SV("hdp.reg_flush_control"))) {
+    if (!physical_device->hdp_flush.HDP_REG_FLUSH_CNTL) {
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "AMDGPU HDP register-flush control register is unavailable");
+    }
+    *out_value =
+        (int64_t)(intptr_t)physical_device->hdp_flush.HDP_REG_FLUSH_CNTL;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "unknown AMDGPU physical device query key '%.*s'",
+                          (int)key.size, key.data);
+}
+
 static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
@@ -1740,14 +1885,25 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
                    system->topology.gpu_agent_queue_count;
       return iree_ok_status();
     }
+  } else if (iree_string_view_equal(category, IREE_SV("amdgpu.device"))) {
+    if (iree_string_view_equal(key, IREE_SV("physical_device.count"))) {
+      *out_value = (int64_t)logical_device->physical_device_count;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("dmabuf.supported"))) {
+      *out_value = logical_device->system->info.dmabuf_supported ? 1 : 0;
+      return iree_ok_status();
+    }
+
+    // Scalar physical-device queries report the representative first device.
+    // Composite AMDGPU logical devices are homogeneous for capability
+    // selection today; explicit per-device enumeration belongs in a dedicated
+    // topology/query surface instead of making every scalar query conditional.
+    return iree_hal_amdgpu_logical_device_query_physical_i64(
+        logical_device->physical_devices[0], key, out_value);
   } else if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
-      uint32_t compute_unit_count = 0;
-      IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
-          IREE_LIBHSA(&system->libhsa), system->topology.gpu_agents[0],
-          (hsa_agent_info_t)HSA_AMD_AGENT_INFO_COMPUTE_UNIT_COUNT,
-          &compute_unit_count));
-      *out_value = compute_unit_count;
+      *out_value = logical_device->physical_devices[0]->compute_unit_count;
       return iree_ok_status();
     }
   }

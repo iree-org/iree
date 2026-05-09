@@ -203,6 +203,12 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   uint32_t has_physical_device_uuid : 1;
   // NUMA node of the CPU agent nearest to |device_agent|.
   uint32_t host_numa_node;
+  // Number of compute units reported by HSA for this GPU agent.
+  uint32_t compute_unit_count;
+  // Native wavefront size reported by HSA for this GPU agent.
+  uint32_t wavefront_size;
+  // HDP flush register descriptor reported by HSA for this GPU agent.
+  hsa_amd_hdp_flush_t hdp_flush;
   // Host memory pools for the CPU agent nearest to |device_agent|.
   iree_hal_amdgpu_host_memory_pools_t host_memory_pools;
   // Cold memory-system facts used to derive conservative topology flags.

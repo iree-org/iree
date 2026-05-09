@@ -65,6 +65,8 @@ class AllocatorTest : public ::testing::Test {
       return iree_hal_device_allocator(base_device_);
     }
 
+    iree_hal_device_t* device() const { return base_device_; }
+
    private:
     // Creation context supplying the proactor pool and frontier tracker.
     iree::hal::cts::DeviceCreateContext create_context_;
@@ -228,6 +230,72 @@ TEST_F(AllocatorTest, UnsupportedExternalBufferImportsFailLoud) {
             iree_hal_buffer_release_callback_null(), &buffer));
     EXPECT_EQ(buffer, nullptr);
   }
+}
+
+TEST_F(AllocatorTest, AmdgpuDeviceQueriesExposeRepresentativePhysicalFacts) {
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(test_device.Initialize(&libhsa_, &topology_, host_allocator_));
+
+  int64_t value = 0;
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("physical_device.count"), &value));
+  EXPECT_EQ(value, (int64_t)topology_.gpu_agent_count);
+
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("dmabuf.supported"), &value));
+  EXPECT_TRUE(value == 0 || value == 1);
+
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("compute_unit_count"), &value));
+  EXPECT_GT(value, 0);
+
+  IREE_ASSERT_OK(iree_hal_device_query_i64(test_device.device(),
+                                           IREE_SV("amdgpu.device"),
+                                           IREE_SV("wavefront_size"), &value));
+  EXPECT_TRUE(value == 32 || value == 64);
+
+  IREE_ASSERT_OK(iree_hal_device_query_i64(test_device.device(),
+                                           IREE_SV("amdgpu.device"),
+                                           IREE_SV("pci.bdfid"), &value));
+  EXPECT_GE(value, 0);
+
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("target.gfxip.major"), &value));
+  EXPECT_GT(value, 0);
+
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("svm.direct_host_access"), &value));
+  EXPECT_TRUE(value == 0 || value == 1);
+}
+
+TEST_F(AllocatorTest, AmdgpuDeviceQueriesAllowCompositeDevices) {
+  if (topology_.gpu_agent_count < 2) {
+    GTEST_SKIP() << "requires a composite logical device";
+  }
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(test_device.Initialize(&libhsa_, &topology_, host_allocator_));
+
+  int64_t value = 0;
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("physical_device.count"), &value));
+  EXPECT_EQ(value, (int64_t)topology_.gpu_agent_count);
+
+  IREE_ASSERT_OK(iree_hal_device_query_i64(test_device.device(),
+                                           IREE_SV("amdgpu.device"),
+                                           IREE_SV("pci.bdfid"), &value));
+  EXPECT_GE(value, 0);
+
+  IREE_ASSERT_OK(
+      iree_hal_device_query_i64(test_device.device(), IREE_SV("amdgpu.device"),
+                                IREE_SV("hsa.agent.handle"), &value));
+  EXPECT_NE(value, 0);
 }
 
 TEST_F(AllocatorTest, ExternalBufferExportFailsLoud) {
