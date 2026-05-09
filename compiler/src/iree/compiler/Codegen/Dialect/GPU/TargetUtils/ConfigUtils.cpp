@@ -40,7 +40,6 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
-// constexpr int64_t kMinRedSizeVDMFMA = 5000;
 
 /// Helper to build a TranslationInfoAttr with a GPU pipeline.
 static IREE::Codegen::TranslationInfoAttr
