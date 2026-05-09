@@ -323,6 +323,7 @@ iree_cc_test(
     iree::hal
     iree::hal::cts::util::test_base
     iree::hal::drivers::amdgpu::util::topology
+    iree::hal::drivers::amdgpu::util::vmem
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

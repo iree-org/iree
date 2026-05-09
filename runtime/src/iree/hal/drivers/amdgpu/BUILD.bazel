@@ -323,6 +323,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/hal/drivers/amdgpu/util:topology",
+        "//runtime/src/iree/hal/drivers/amdgpu/util:vmem",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
