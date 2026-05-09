@@ -320,34 +320,6 @@ func.func @matmul_i4_i32_avx2_generic(
 
 // -----
 
-// Narrow-N: with `iteration_sizes = [_, 8, _]` the cost model picks the
-// M↔N-swapped orientation MMA_X86_AVX512_16x1x1_F32_F32 (rather than the
-// natural 1x16x1) — the static N=8 caps natural usefulOps to 8, while the
-// transposed orientation fully uses 16 lanes on the M side. Unrolling lands
-// on intrinsics_m=2, intrinsics_n=8 (M_inner=32, N_inner=8). Each operand's
-// pack inherits the intrinsic's natural (outer, inner) ordering — for the
-// 16x1x1 intrinsic, the LHS inner is (M=16, K=1), the RHS inner is (N=1, K=1),
-// and the ACC inner is (M=16, N=1). After cross-intrinsic unrolling, the ACC
-// is stored in physical (M=32, N=8) order, the way row-major matmul tiles are.
-
-#map_t = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map_t1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map_t2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding_t_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map_t, #map_t1, #map_t2], iteration_sizes = [127, 8, ?]>
-func.func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(%arg0: tensor<127x255xf32, #encoding_t_res>, %k: index) -> tensor<127x255xf32> attributes {
-   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
-} {
-  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k} : tensor<127x255xf32, #encoding_t_res> -> tensor<127x255xf32>
-  return %0 : tensor<127x255xf32>
-}
-// CHECK-LABEL: func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(
-//  CHECK-SAME:   %[[PACKED_T:[a-zA-Z0-9]+]]: tensor<4x32x32x8xf32>
-//       CHECK:   %[[UNPACK_T:.+]] = linalg.unpack %[[PACKED_T]]
-//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
-//       CHECK:   return %[[UNPACK_T]]
-
-// -----
-
 // It tests with bindings and checks that the reshape ops are folded into bindings.
 
 #executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>

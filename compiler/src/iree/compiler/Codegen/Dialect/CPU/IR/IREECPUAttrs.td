@@ -83,11 +83,11 @@ def IREECPU_DataTiledMMAAttr
     thread-distribution, no concept of subgroups and no interleaving of
     intrinsics' layout.
 
-    Each non-square hardware MMA appears as two `MMAIntrinsic` enum values —
-    one per orientation (e.g. `MMA_X86_AVX512_1x16x1_F32_F32` and its
-    M↔N-swapped sibling `MMA_X86_AVX512_16x1x1_F32_F32`). The cost model
-    treats them as distinct candidates and picks whichever fits the matmul
-    shape better.
+    The `transposed_intrinsic` boolean toggles between the intrinsic's natural
+    orientation and an M↔N-swapped orientation (same hardware instruction with
+    LHS/RHS roles exchanged, accumulator laid out column-major). Orthogonal to
+    the intrinsic itself: any intrinsic may be used transposed, including
+    square ones where the effect is only the accumulator layout change.
 
     For most `intrinsic` values the (LHS, RHS, ACC) element types are baked
     into the enum and `lhs_type` / `rhs_type` / `acc_type` are unused. The
@@ -116,6 +116,11 @@ def IREECPU_DataTiledMMAAttr
           DefaultValuedParameter<
               "int64_t", "1",
               "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "bool", "false",
+              "If true, the intrinsic is used in an M↔N-swapped orientation "
+              "(LHS/RHS roles exchanged, accumulator "
+              "column-major).">:$transposed_intrinsic,
           DefaultValuedParameter<
               "::mlir::Type", "::mlir::Type()",
               "LHS element type, used only by type-polymorphic intrinsics "

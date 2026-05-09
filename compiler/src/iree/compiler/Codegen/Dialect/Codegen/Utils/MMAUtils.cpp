@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
@@ -73,29 +72,23 @@ static SmallVector<int64_t> fullDistributedShape(const TileSwizzle &swizzle) {
   });
 }
 
-// Reshapes `value` from operand-natural (M, K)/(N, K)/(M, N) row-major to
-// the swizzle's distributed N-D form (with the swizzle's permutation applied).
+// Reshapes `value` to the swizzle's distributed N-D vector type if it is not
+// already in that form. "Distributed" here means every dim of the swizzle's
+// expand groups, with CrossThread dim sizes collapsed to 1 (those factors live
+// in the lane id, not the per-lane vector). CPU `getDistributedTileTypes`
+// produces a 2-D (outer × inner) collapsed form while GPU produces the
+// distributed N-D form; this reshape lets the shared lowering body operate
+// uniformly.
 static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
                                          Value value,
                                          const TileSwizzle &swizzle) {
   auto vecType = cast<VectorType>(value.getType());
-  ArrayRef<int64_t> perm = swizzle.permutation();
-  // Pre-transpose shape: distributed shape with the inverse permutation
-  // already applied, so that the subsequent transpose by `perm` lands in
-  // the distributed shape. For identity `perm` it's just the distributed
-  // shape and the transpose is a no-op.
-  SmallVector<int64_t> preTransposeShape = applyPermutation(
-      fullDistributedShape(swizzle), invertPermutationVector(perm));
-  Value reshaped = value;
-  if (vecType.getShape() != ArrayRef<int64_t>(preTransposeShape)) {
-    auto reshapedType =
-        VectorType::get(preTransposeShape, vecType.getElementType());
-    reshaped = vector::ShapeCastOp::create(builder, loc, reshapedType, value);
+  SmallVector<int64_t> fullShape = fullDistributedShape(swizzle);
+  if (vecType.getShape() == ArrayRef<int64_t>(fullShape)) {
+    return value;
   }
-  if (isIdentityPermutation(perm)) {
-    return reshaped;
-  }
-  return vector::TransposeOp::create(builder, loc, reshaped, perm);
+  auto fullType = VectorType::get(fullShape, vecType.getElementType());
+  return vector::ShapeCastOp::create(builder, loc, fullType, value);
 }
 
 LogicalResult buildDataTiledMMAUnderlyingOperations(
@@ -180,13 +173,6 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
           acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
                                                      indices, strides);
           incrementIndices(indices, accCrossIntrinsicShape);
-        }
-        // Inverse of the input-side reshape: undo the swizzle's permutation,
-        // then shape_cast back to the original (M, N) tile type.
-        ArrayRef<int64_t> perm = accSwizzle.permutation();
-        if (!isIdentityPermutation(perm)) {
-          acc = vector::TransposeOp::create(b, loc, acc,
-                                            invertPermutationVector(perm));
         }
         if (acc.getType() != origAccType) {
           acc = vector::ShapeCastOp::create(b, loc, origAccType, acc);

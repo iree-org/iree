@@ -303,8 +303,10 @@ static bool getEnableInnerTiledFromConfig(DictionaryAttr config) {
 }
 
 /// Returns the matmul {M, N, K} tile shape covered by a CPU DataTiledMMAAttr.
-/// Derived directly from `getUndistributedTileTypes`: LHS is M×K and RHS is
-/// N×K, so M comes from LHS dim 0 and N from RHS dim 0.
+/// Derived directly from `getUndistributedTileTypes`: LHS is M×K (always) and
+/// RHS is N×K (always), regardless of the `transposed_intrinsic` flag. The
+/// ACC layout varies (M×N row-major vs. N×M column-major for transposed
+/// intrinsics), so we derive M and N from the LHS and RHS tiles instead.
 static IREE::Codegen::TileMxNxK getTileMxNxK(IREE::CPU::DataTiledMMAAttr mma) {
   SmallVector<VectorType> tiles;
   mma.getUndistributedTileTypes(tiles);
@@ -324,29 +326,19 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   using IREE::CPU::MMAIntrinsic;
   switch (intr) {
   case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
-  case MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32:
     return {"+avx2", "+fma"};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
-  case MMAIntrinsic::MMA_X86_AVX512_8x1x1_F64_F64:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
-  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
-  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
-  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
-  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
     return {"+avx512f"};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
-  case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
     return {"+avx512fp16"};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
-  case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
     return {"+avx512bf16"};
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
-  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
-  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
     return {"+avx512vnni"};
   default:
     return {};
@@ -369,145 +361,39 @@ pickGenericScalarMMAForTarget(DictionaryAttr config) {
                  : MMAIntrinsic::MMA_GENERIC_SCALAR_1x1x1_REG8;
 }
 
-/// Validates `arr` per the conventions in IREECPUEnums.td. Used inside an
-/// `assert()` at the end of `getMmaIntrinsicsForTargetConfig` so it only
-/// runs in debug builds — it constructs `DataTiledMMAAttr` instances to
-/// inspect tile shapes/types, which would be too expensive to do
-/// unconditionally on every cost-model query.
-///
-/// Conditions:
-///   1. Strictly increasing in enum value (subsumes "no duplicates" and
-///      rules out misordered pairs).
-///   2. By the bit-0 convention from IREECPUEnums.td, every M↔N-swapped
-///      entry (bit 0 set) is immediately preceded by its natural sibling
-///      (`prev == v ^ 1`).
-///   3. For each (natural, swapped) sibling pair, the swapped entry's
-///      tile type has M↔N exchanged and LHS↔RHS element types exchanged
-///      vs the natural's; K and ACC element type are unchanged.
-///   4. A natural entry without a swapped sibling (singleton) must be
-///      self-symmetric: square shape AND identical LHS/RHS element types
-///      — otherwise the swapped orientation would be a distinct operation
-///      and the array would be incomplete.
-///
-/// The type-polymorphic generic-scalar 1×1×1 family is square and
-/// type-polymorphic, so it satisfies (4) vacuously. We skip the
-/// `DataTiledMMAAttr`-based extraction for it (passing null element types
-/// to the attr would invalidate the resulting vector types).
-static bool isMmaIntrinsicArrayValid(MLIRContext *ctx,
-                                     ArrayRef<IREE::CPU::MMAIntrinsic> arr) {
-  using IREE::CPU::DataTiledMMAAttr;
-  using IREE::CPU::MMAIntrinsic;
-
-  // Conventions (1) and (2): order, strict increase, swap-pair structure.
-  if (!arr.empty() && (static_cast<uint32_t>(arr[0]) & 1) != 0) {
-    return false;
-  }
-  for (size_t i = 1; i < arr.size(); ++i) {
-    uint32_t v = static_cast<uint32_t>(arr[i]);
-    uint32_t prev = static_cast<uint32_t>(arr[i - 1]);
-    if (prev >= v) {
-      return false;
-    }
-    if ((v & 1) != 0 && prev != (v ^ 1)) {
-      return false;
-    }
-  }
-
-  // For (3) and (4) we need shape + element types from `DataTiledMMAAttr`.
-  auto getShapeAndTypes = [&](MMAIntrinsic intr) {
-    auto attr = DataTiledMMAAttr::get(ctx, intr, /*intrinsics_m=*/1,
-                                      /*intrinsics_n=*/1, /*intrinsics_k=*/1,
-                                      /*lhs_type=*/Type(),
-                                      /*rhs_type=*/Type(),
-                                      /*acc_type=*/Type());
-    SmallVector<VectorType> tiles;
-    attr.getUndistributedTileTypes(tiles);
-    assert(tiles.size() == 3);
-    return std::make_tuple(tiles[0].getShape()[0],     // M (LHS dim 0)
-                           tiles[1].getShape()[0],     // N (RHS dim 0)
-                           tiles[0].getShape()[1],     // K (LHS dim 1)
-                           tiles[0].getElementType(),  // LHS elem
-                           tiles[1].getElementType(),  // RHS elem
-                           tiles[2].getElementType()); // ACC elem
-  };
-
-  for (size_t i = 0; i < arr.size(); ++i) {
-    if ((static_cast<uint32_t>(arr[i]) & 1) != 0) {
-      continue; // swapped entry — checked when we hit its natural sibling.
-    }
-    if (IREE::CPU::isGenericScalar(arr[i])) {
-      continue; // type-polymorphic 1×1×1: vacuously valid.
-    }
-    auto [mn, nn, kn, lhsn, rhsn, accn] = getShapeAndTypes(arr[i]);
-    bool hasSibling =
-        (i + 1 < arr.size()) && (static_cast<uint32_t>(arr[i + 1]) ==
-                                 (static_cast<uint32_t>(arr[i]) | 1));
-    if (hasSibling) {
-      auto [ms, ns, ks, lhss, rhss, accs] = getShapeAndTypes(arr[i + 1]);
-      // Condition (3): siblings have M↔N and LHS↔RHS exchanged; K and ACC
-      // element type are unchanged.
-      if (ms != nn || ns != mn || ks != kn) {
-        return false;
-      }
-      if (lhss != rhsn || rhss != lhsn || accs != accn) {
-        return false;
-      }
-    } else {
-      // Condition (4): singleton — must be self-symmetric.
-      if (mn != nn || lhsn != rhsn) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
 /// Returns the `MMAIntrinsic` cases potentially usable for `config`: the x86
 /// architecture-specific intrinsics whose required ISA extensions are all
-/// present (both natural and M↔N-swapped orientations enumerated as separate
-/// values), followed by one of the architecture-agnostic type-polymorphic
+/// present, plus one of the architecture-agnostic type-polymorphic
 /// `MMA_GENERIC_SCALAR_1x1x1_REG*` fallback variants (the one whose register
-/// budget matches `config`'s target). The 1×1×1 generic intrinsic naturally
+/// budget matches `config`'s target). Only the "natural" (M<=N) orientation
+/// is listed; the M↔N-swapped orientation is expressed by the
+/// `transposed_intrinsic` flag on DataTiledMMAAttr and is enumerated
+/// separately by the cost model. The 1×1×1 generic intrinsic naturally
 /// loses to any real intrinsic that fits, so it only wins as a fallback
 /// when no real MMA covers the requested element types.
-///
-/// There must be no early-return path that omits the trailing
-/// generic-scalar push — `out` is asserted to be non-empty / well-formed at
-/// the bottom and downstream callers rely on always seeing at least the
-/// generic fallback. Place the generic at the end (rather than the front)
-/// because: (a) its enum value sits above the architecture-specific ones,
-/// so trailing it keeps `out` strictly increasing, which the validator
-/// expects, and (b) trailing it lets the cost-model's tie-break (first
-/// wins on equal score) prefer real intrinsics over the generic fallback.
 static SmallVector<IREE::CPU::MMAIntrinsic>
 getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
   using IREE::CPU::MMAIntrinsic;
   if (!config) {
     return {};
   }
-  SmallVector<MMAIntrinsic> out;
+  // Always include the generic-scalar fallback first — it's the only
+  // intrinsic guaranteed to apply on any target, so anchoring the list
+  // with it means an early-return below can never accidentally produce
+  // an empty result for an otherwise-valid target.
+  SmallVector<MMAIntrinsic> out{pickGenericScalarMMAForTarget(config)};
   if (isX86(config)) {
     static const MMAIntrinsic kAllX86[] = {
         MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32,
-        MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32,
         MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64,
-        MMAIntrinsic::MMA_X86_AVX512_8x1x1_F64_F64,
         MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32,
-        MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32,
         MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32,
-        MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32,
         MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16,
-        MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16,
         MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16,
-        MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16,
         MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16,
-        MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16,
         MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16,
-        MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16,
         MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16,
-        MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16,
         MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
-        MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
     };
     for (MMAIntrinsic intr : kAllX86) {
       SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
@@ -520,32 +406,29 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
       }
     }
   }
-  out.push_back(pickGenericScalarMMAForTarget(config));
-  assert(isMmaIntrinsicArrayValid(config.getContext(), out) &&
-         "getMmaIntrinsicsForTargetConfig must return a list satisfying the "
-         "conventions in IREECPUEnums.td (strictly increasing, paired "
-         "natural/swapped entries, etc.)");
   return out;
 }
 
 /// Shape and element-bit-width summary of one intrinsic, with unroll factors
-/// all 1. The LHS is (M, K), the RHS is (N, K). Scalable dims (e.g. SVE) are
-/// treated as their 128-bit-minimum static shape here; `getRegisterSpaceBytes`
-/// applies the matching simplification on the capacity side.
+/// all 1, in a specific orientation. The LHS is (M, K), the RHS is (N, K) —
+/// the `transposed` flag has already swapped M↔N inside the base attr.
+/// Scalable dims (e.g. SVE) are treated as their 128-bit-minimum static
+/// shape here; `getRegisterSpaceBytes` applies the matching simplification
+/// on the capacity side.
 struct IntrinsicInfo {
   int64_t intrinsicM = 0, intrinsicN = 0, intrinsicK = 0;
   int64_t lhsBits = 0, rhsBits = 0, accBits = 0;
 };
 
-/// Returns the IntrinsicInfo for `intr` if its ABC element types match
-/// `elementTypes`. Returns nullopt otherwise. The
+/// Returns the IntrinsicInfo for `intr` in the given orientation, if its ABC
+/// element types match `elementTypes`. Returns nullopt otherwise. The
 /// `MMA_GENERIC_SCALAR_1x1x1_REG*` family is type-polymorphic — those
 /// values match any element-type triple by construction; their `lhsBits` /
 /// `rhsBits` / `accBits` stay at the struct's default 0 since the
 /// generic-scalar branch of `chooseUnrolling` doesn't read them.
 static std::optional<IntrinsicInfo>
 getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
-                 IREE::CPU::MMAIntrinsic intr) {
+                 IREE::CPU::MMAIntrinsic intr, bool transposed) {
   if (IREE::CPU::isGenericScalar(intr)) {
     if (elementTypes.size() != 3 || !elementTypes[0] || !elementTypes[1] ||
         !elementTypes[2]) {
@@ -557,7 +440,7 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   }
   auto base = IREE::CPU::DataTiledMMAAttr::get(
       ctx, intr, /*intrinsics_m=*/1, /*intrinsics_n=*/1,
-      /*intrinsics_k=*/1, /*lhs_type=*/Type(),
+      /*intrinsics_k=*/1, transposed, /*lhs_type=*/Type(),
       /*rhs_type=*/Type(), /*acc_type=*/Type());
   SmallVector<VectorType> baseTiles;
   base.getUndistributedTileTypes(baseTiles);
@@ -579,8 +462,9 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   return info;
 }
 
-/// Phase 1 of `chooseCpuInnerTiledMmaForEncoding`: pick the intrinsic. We
-/// maximize `usefulOps` per invocation,
+/// Phase 1 of `chooseCpuInnerTiledMmaForEncoding`: jointly pick the
+/// intrinsic and its orientation (`transposed_intrinsic`). We maximize
+/// `usefulOps` per invocation,
 ///   usefulOps = min(intrinsicM, M) * min(intrinsicN, N) * intrinsicK
 /// where the `min` clamps an intrinsicM/intrinsicN that exceeds a narrow
 /// static matmul dim — i.e. it charges the intrinsic for the padding it
@@ -588,14 +472,11 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
 /// intrinsic size counts toward usefulOps). Ties are broken by the raw
 /// intrinsic size `intrinsicM*intrinsicN*intrinsicK` (prefer the bigger
 /// intrinsic: it gives the Phase-2 register budget more tiles to play with)
-/// and, finally, by iteration order. The natural and M↔N-swapped
-/// orientations of each hardware MMA appear as distinct enum values in the
-/// candidate list, so the choice between them falls out of this same
-/// scoring loop. `K` is never narrow for optimization purposes, so it never
-/// enters the `min`.
+/// and, finally, by iteration order (non-transposed first). `K` is never
+/// narrow for optimization purposes, so it never enters the `min`.
 ///
 /// Returns nullopt if no compatible intrinsic exists.
-static IREE::CPU::MMAIntrinsic
+static std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>>
 chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
                 DictionaryAttr config,
                 const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
@@ -604,22 +485,24 @@ chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
                ? intrinsicSize
                : std::min(intrinsicSize, matmulSize);
   };
-  IREE::CPU::MMAIntrinsic best = IREE::CPU::MMAIntrinsic::None;
+  std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> best;
   std::pair<int64_t, int64_t> bestScore = {-1, -1};
   for (IREE::CPU::MMAIntrinsic intr : getMmaIntrinsicsForTargetConfig(config)) {
-    std::optional<IntrinsicInfo> info =
-        getIntrinsicInfo(ctx, elementTypes, intr);
-    if (!info) {
-      continue;
-    }
-    int64_t usefulOps = usefulSize(matmulSizes.M, info->intrinsicM) *
-                        usefulSize(matmulSizes.N, info->intrinsicN) *
-                        info->intrinsicK;
-    int64_t rawOps = info->intrinsicM * info->intrinsicN * info->intrinsicK;
-    std::pair<int64_t, int64_t> score = {usefulOps, rawOps};
-    if (score > bestScore) {
-      bestScore = score;
-      best = intr;
+    for (bool transposed : {false, true}) {
+      std::optional<IntrinsicInfo> info =
+          getIntrinsicInfo(ctx, elementTypes, intr, transposed);
+      if (!info) {
+        continue;
+      }
+      int64_t usefulOps = usefulSize(matmulSizes.M, info->intrinsicM) *
+                          usefulSize(matmulSizes.N, info->intrinsicN) *
+                          info->intrinsicK;
+      int64_t rawOps = info->intrinsicM * info->intrinsicN * info->intrinsicK;
+      std::pair<int64_t, int64_t> score = {usefulOps, rawOps};
+      if (score > bestScore) {
+        bestScore = score;
+        best = {intr, transposed};
+      }
     }
   }
   return best;
@@ -642,10 +525,11 @@ static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
 }
 
 // Phase 2 of `chooseCpuInnerTiledMmaForEncoding`: for an already-chosen
-// intrinsic, pick the largest power-of-two unroll factors (intrinsicsM,
-// intrinsicsN) such that the three tiles (ACC + LHS + RHS) still fit in
-// the target's register budget, breaking ties with arithmetic intensity
-// (effM*effN)/(effM+effN) so approximately-square tiles win.
+// (intrinsic, transposed) pair, pick the largest power-of-two unroll
+// factors (intrinsicsM, intrinsicsN) such that the three tiles
+// (ACC + LHS + RHS) still fit in the target's register budget,
+// breaking ties with arithmetic intensity (effM*effN)/(effM+effN) so
+// approximately-square tiles win.
 //
 // "Register budget" depends on what the lowering will use:
 //   * Architecture-specific SIMD intrinsics use the vector register file,
@@ -666,9 +550,10 @@ static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
 // tiling outright.
 static std::optional<std::tuple<int64_t, int64_t, int64_t>>
 chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
-                IREE::CPU::MMAIntrinsic intr,
+                IREE::CPU::MMAIntrinsic intr, bool transposed,
                 const IREE::Encoding::BxMxNxKxKb &matmulSizes) {
-  std::optional<IntrinsicInfo> info = getIntrinsicInfo(ctx, elementTypes, intr);
+  std::optional<IntrinsicInfo> info =
+      getIntrinsicInfo(ctx, elementTypes, intr, transposed);
   if (!info) {
     return std::nullopt;
   }
@@ -754,13 +639,14 @@ chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
   if (failed(matmulSizes)) {
     return {};
   }
-  IREE::CPU::MMAIntrinsic intr =
+  std::optional<std::pair<IREE::CPU::MMAIntrinsic, bool>> intrChoice =
       chooseIntrinsic(ctx, elementTypes, config, *matmulSizes);
-  if (intr == IREE::CPU::MMAIntrinsic::None) {
+  if (!intrChoice) {
     return {};
   }
+  auto [intr, transposed] = *intrChoice;
   std::optional<std::tuple<int64_t, int64_t, int64_t>> unroll =
-      chooseUnrolling(ctx, elementTypes, intr, *matmulSizes);
+      chooseUnrolling(ctx, elementTypes, intr, transposed, *matmulSizes);
   if (!unroll) {
     return {};
   }
@@ -775,8 +661,8 @@ chooseCpuInnerTiledMmaForEncoding(MLIRContext *ctx,
     accType = elementTypes[2];
   }
   return IREE::CPU::DataTiledMMAAttr::get(ctx, intr, intrinsicsM, intrinsicsN,
-                                          intrinsicsK, lhsType, rhsType,
-                                          accType);
+                                          intrinsicsK, transposed, lhsType,
+                                          rhsType, accType);
 }
 
 /// Lowers a contraction under a `CPUEncodingResolverAttr` with
