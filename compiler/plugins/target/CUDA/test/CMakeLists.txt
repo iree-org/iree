@@ -10,11 +10,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "sm89_target.mlir"
     "smoketest.mlir"
     "target_device_features.mlir"
   TOOLS
     FileCheck
-    iree-compile
     iree-opt
 )

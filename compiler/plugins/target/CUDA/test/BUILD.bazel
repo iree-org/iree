@@ -18,7 +18,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
-            "sm89_target.mlir",
             "smoketest.mlir",
             "target_device_features.mlir",
         ],
@@ -26,7 +25,6 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
-        "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
