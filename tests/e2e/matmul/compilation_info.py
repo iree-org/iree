@@ -296,7 +296,7 @@ def get_rocm_test_compilation_infos(
         ]
     elif intrinsic == "VDMFMA_CDNA3":
         # CDNA3 (gfx94x) VDMFMA: virtual dense MFMAs for skinny matmuls.
-        # F16/BF16: M=8, N=16, K=64 (x2 underlying MFMAs)
+        # F16/BF16: M=8, N=16, K=64 (x2 underlying SMFMACs)
         schedules = [
             MMASchedule("VDMFMA_F32_8x16x64x2_F16", 1, 1, 1, 1, 1),
             MMASchedule("VDMFMA_F32_8x16x64x2_F16", 1, 2, 1, 2, 2),
