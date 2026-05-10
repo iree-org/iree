@@ -1960,6 +1960,11 @@
           "golden_ids": [9707, 11, 1879, 0]
         },
         {
+          "name": "think_tags",
+          "input": "Hello <think> world",
+          "golden_ids": [9707, 220, 151667, 1879]
+        },
+        {
           "name": "unicode",
           "input": "Héllo wörld! café résumé",
           "golden_ids": [39, 18503, 385, 289, 9416, 507, 0, 51950, 9333, 1242, 963]
