@@ -431,11 +431,12 @@ func.func @not_vmt() {
   return
 }
 
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+// M=5 is just above the very skinny threshold, so avoid a unit M tile.
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 16, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 //       CHECK: func.func @not_vmt()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 8], thread = [1, 128, 0], workgroup = [1, 128, 1]}>
+//  CHECK-SAME:       lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 64], thread = [1, 8, 0], workgroup = [64, 128, 1]}>
 
 // -----
 
