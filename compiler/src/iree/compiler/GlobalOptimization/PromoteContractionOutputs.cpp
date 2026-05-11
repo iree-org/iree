@@ -118,22 +118,22 @@ struct PromoteContractionOutputsPattern
                        linalg::BatchMatvecOp, linalg::BatchVecmatOp,
                        linalg::MatmulTransposeAOp, linalg::MatmulTransposeBOp,
                        linalg::BatchMatmulTransposeAOp,
-                       linalg::BatchMatmulTransposeBOp>([&](auto T) {
+                       linalg::BatchMatmulTransposeBOp>([&](auto op) {
           if (!promoteMatmul) {
             return failure();
           }
-          replaceOpOutputs<decltype(T)>(linalgOp, rewriter, srcType, destType);
+          replaceOpOutputs<decltype(op)>(linalgOp, rewriter, srcType, destType);
           return success();
         })
         .template Case<linalg::Conv2DOp, linalg::Conv2DNchwFchwOp,
                        linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
                        linalg::Conv2DNgchwFgchwOp, linalg::Conv2DNgchwGfchwOp>(
-            [&](auto T) {
+            [&](auto op) {
               if (!promoteConv) {
                 return failure();
               }
-              replaceOpOutputs<decltype(T)>(linalgOp, rewriter, srcType,
-                                            destType);
+              replaceOpOutputs<decltype(op)>(linalgOp, rewriter, srcType,
+                                             destType);
               return success();
             })
         .Default(failure);
