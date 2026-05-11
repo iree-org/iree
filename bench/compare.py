@@ -187,10 +187,8 @@ def benchmark(vmfb_path, func_name, input_specs, reps=5):
 
 def get_jit_isa(vmfb_path, func_name, input_specs):
     """Run the SPIR-V vmfb once with AMD_COMGR_SAVE_TEMPS to get JIT ISA."""
-    import glob as globmod
-
     # Remove all existing comgr temps to avoid picking up stale results.
-    for d in globmod.glob("/tmp/comgr-*"):
+    for d in Path("/tmp").glob("comgr-*"):
         shutil.rmtree(d, ignore_errors=True)
 
     env = os.environ.copy()
@@ -207,18 +205,39 @@ def get_jit_isa(vmfb_path, func_name, input_specs):
     if result.returncode != 0:
         return None, result.stderr
 
-    # Find comgr temp with a.so in output/ (final linked code object).
-    temps = sorted(globmod.glob("/tmp/comgr-*"))
-    for d in reversed(temps):
-        so_path = os.path.join(d, "output", "a.so")
-        if os.path.exists(so_path):
-            return so_path, ""
-    return None, "No comgr output a.so found"
+    # HIP may produce several COMGR outputs during one run. Pick the final code
+    # object that contains the requested kernel symbol instead of relying on
+    # temp directory ordering.
+    candidates = list(Path("/tmp").glob("comgr-*/output/a.so"))
+    if not candidates:
+        return None, "No comgr output a.so found"
+
+    def mtime(path):
+        return path.stat().st_mtime
+
+    func_name_bytes = func_name.encode("utf-8")
+    matching_candidates = []
+    for so_path in candidates:
+        try:
+            if func_name_bytes in so_path.read_bytes():
+                matching_candidates.append(so_path)
+        except OSError:
+            pass
+    if matching_candidates:
+        return str(max(matching_candidates, key=mtime)), ""
+
+    # Fall back to the newest output so callers still get useful diagnostics
+    # when a symbol name changed in codegen.
+    return str(max(candidates, key=mtime)), (
+        f"No comgr output a.so contained symbol '{func_name}'; "
+        "using newest output"
+    )
 
 
 def disassemble(elf_path):
     """Disassemble an ELF with llvm-objdump, return text."""
     if not OBJDUMP.exists():
+        print("Failed to disassemble:", OBJDUMP, "does not exist.")
         return None
     result = run([str(OBJDUMP), "-d", str(elf_path)])
     if result.returncode == 0:
@@ -234,21 +253,95 @@ def find_aot_asm(intermediates_dir):
     return None
 
 
+def extract_aot_function_asm(asm_text, func_name):
+    """Extract one function body from LLVM's .rocmasm output."""
+    if not asm_text:
+        return None
+    lines = asm_text.splitlines()
+    start = None
+    end = None
+    label_re = re.compile(r"^([A-Za-z_.$][\w.$]*):\s*$")
+    for i, line in enumerate(lines):
+        m = label_re.match(line)
+        if not m:
+            continue
+        label = m.group(1)
+        if start is None:
+            if not label.startswith(".") and func_name in label:
+                start = i
+            continue
+        if line.startswith(".Lfunc_end"):
+            end = i
+            break
+    if start is None:
+        return None
+    return "\n".join(lines[start:end])
+
+
+def extract_jit_function_asm(asm_text, func_name):
+    """Extract one function body from llvm-objdump disassembly output."""
+    if not asm_text:
+        return None
+    lines = asm_text.splitlines()
+    start = None
+    end = None
+    symbol_re = re.compile(r"^[0-9a-fA-F]+ <([^>]+)>:")
+    for i, line in enumerate(lines):
+        m = symbol_re.match(line)
+        if not m:
+            continue
+        symbol = m.group(1)
+        if start is None:
+            if func_name in symbol:
+                start = i
+            continue
+        end = i
+        break
+    if start is None:
+        return None
+    return "\n".join(lines[start:end])
+
+
+INSTRUCTION_RE = re.compile(r"^\s*([A-Za-z_][\w.]*)\b", re.MULTILINE)
+INSTRUCTION_PREFIXES = (
+    "s_",
+    "v_",
+    "buffer_",
+    "global_",
+    "flat_",
+    "ds_",
+    "scratch_",
+    "image_",
+    "tbuffer_",
+)
+
+
+def is_instruction_mnemonic(mnemonic):
+    """Return true for AMDGPU ISA mnemonic lines."""
+    return mnemonic.startswith(INSTRUCTION_PREFIXES)
+
+
 def isa_stats(asm_text):
     """Count key instruction types in ISA text."""
     if not asm_text:
         return {}
+    mnemonics = [
+        m.group(1)
+        for m in INSTRUCTION_RE.finditer(asm_text)
+        if is_instruction_mnemonic(m.group(1)) and m.group(1) != "s_code_end"
+    ]
     return {
-        "buffer_load": len(re.findall(r"buffer_load", asm_text)),
-        "buffer_store": len(re.findall(r"buffer_store", asm_text)),
-        "global_load": len(re.findall(r"global_load", asm_text)),
-        "global_store": len(re.findall(r"global_store", asm_text)),
-        "scratch": len(re.findall(r"scratch_", asm_text)),
-        "v_fmac": len(re.findall(r"v_(dual_)?fmac", asm_text)),
-        "v_fma": len(re.findall(r"v_fma_f32", asm_text)),
-        "v_wmma": len(re.findall(r"v_wmma", asm_text)),
-        "s_wait": len(re.findall(r"s_wait", asm_text)),
-        "v_dual": len(re.findall(r"v_dual_", asm_text)),
+        "instructions": len(mnemonics),
+        "buffer_load": sum(1 for m in mnemonics if m.startswith("buffer_load")),
+        "buffer_store": sum(1 for m in mnemonics if m.startswith("buffer_store")),
+        "global_load": sum(1 for m in mnemonics if m.startswith("global_load")),
+        "global_store": sum(1 for m in mnemonics if m.startswith("global_store")),
+        "scratch": sum(1 for m in mnemonics if m.startswith("scratch_")),
+        "v_fmac": sum(1 for m in mnemonics if re.match(r"v_(dual_)?fmac", m)),
+        "v_fma": sum(1 for m in mnemonics if m.startswith("v_fma_f32")),
+        "v_wmma": sum(1 for m in mnemonics if m.startswith("v_wmma")),
+        "s_wait": sum(1 for m in mnemonics if m.startswith("s_wait")),
+        "v_dual": sum(1 for m in mnemonics if m.startswith("v_dual_")),
     }
 
 
@@ -307,21 +400,38 @@ def run_comparison(mlir_path, func_name, input_specs, args):
 
         # --- ISA ---
         aot_asm = find_aot_asm(hsaco_intermediates)
+        aot_function_asm = extract_aot_function_asm(aot_asm, func_name)
         jit_asm = None
+        jit_function_asm = None
 
         print("Extracting JIT ISA...", end=" ", flush=True)
         so_path, err = get_jit_isa(spirv_vmfb, func_name, input_specs)
         if so_path:
             jit_asm = disassemble(so_path)
-            print("ok")
+            jit_function_asm = extract_jit_function_asm(jit_asm, func_name)
+            if err:
+                print(f"ok ({err[:200]})")
+            else:
+                print("ok")
         else:
             print(f"FAILED ({err[:200]})")
 
-        aot_stats = isa_stats(aot_asm)
-        jit_stats = isa_stats(jit_asm)
+        if aot_asm and not aot_function_asm:
+            print(
+                f"Warning: could not isolate AOT ISA for {func_name}; "
+                "using full file"
+            )
+        if jit_asm and not jit_function_asm:
+            print(
+                f"Warning: could not isolate JIT ISA for {func_name}; "
+                "using full disassembly"
+            )
+
+        aot_stats = isa_stats(aot_function_asm or aot_asm)
+        jit_stats = isa_stats(jit_function_asm or jit_asm)
 
         if aot_stats or jit_stats:
-            print("\nISA instruction counts:")
+            print(f"\nISA instruction counts for function {func_name}:")
             all_keys = sorted(set(list(aot_stats.keys()) + list(jit_stats.keys())))
             headers = ["instruction", "AOT", "JIT", "delta"]
             rows = []
@@ -341,9 +451,13 @@ def run_comparison(mlir_path, func_name, input_specs, args):
             isa_dir.mkdir(exist_ok=True)
             safe_name = func_name.replace("/", "_")
             if aot_asm:
-                (isa_dir / f"{safe_name}_aot.s").write_text(aot_asm)
+                (isa_dir / f"{safe_name}_aot.s").write_text(
+                    aot_function_asm or aot_asm
+                )
             if jit_asm:
-                (isa_dir / f"{safe_name}_jit.s").write_text(jit_asm)
+                (isa_dir / f"{safe_name}_jit.s").write_text(
+                    jit_function_asm or jit_asm
+                )
             print(f"\nISA saved to {isa_dir}/")
 
         if args.isa_only:
