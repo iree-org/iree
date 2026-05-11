@@ -317,13 +317,16 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     TypedValue<VectorType> wMask = writeOp.getMask();
     TypedValue<VectorType> rMask = readOp.getMask();
 
-    // When at least one side has in_bounds=true on every dimension, any
-    // actual OOB access is UB, so the fold cannot introduce new
-    // incorrectness. When *both* have OOB dimensions, we build an
-    // in-bounds mask from the tensor's actual dimensions and select
-    // between valToStore and pad, replicating the read's OOB behavior.
-    // (Correctness verified with Z3, see fold_raw_z3.py.)
-    bool bothOOB = readOp.hasOutOfBoundsDim() && writeOp.hasOutOfBoundsDim();
+    // The fold diverges from the original write+read at positions that are
+    // out-of-bounds: the write does not store there and the read returns
+    // pad, but the fold returns valToStore. This is only a problem when
+    // *both* transfers have OOB dimensions (in_bounds=false). When at
+    // least one side has in_bounds=true, it asserts the position is within
+    // bounds; an actual OOB access is undefined behavior, so the fold
+    // cannot introduce new incorrectness. (Verified with Z3.)
+    if (readOp.hasOutOfBoundsDim() && writeOp.hasOutOfBoundsDim()) {
+      return failure();
+    }
 
     // Build the inner value: select(wMask, valToStore, original).
     // When wMask is absent (unmasked write) or wMask == rMask (original is
@@ -337,50 +340,6 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
           /*mask=*/Value(), readOp.getInBoundsAttr());
       inner = arith::SelectOp::create(rewriter, readOp.getLoc(), wMask,
                                       valToStore, originalRead);
-    }
-
-    // When both transfers have OOB dimensions, build
-    //   select(inBoundsMask, inner, broadcast(pad))
-    // to replicate the read's OOB-returns-pad semantics. The in-bounds
-    // mask is derived from the tensor's actual dimensions via
-    // vector.create_mask.
-    if (bothOOB) {
-      Location loc = readOp.getLoc();
-      VectorType vecTy = readOp.getType();
-      Value base = writeOp.getBase();
-      auto shapedTy = cast<ShapedType>(base.getType());
-      unsigned tensorRank = shapedTy.getRank();
-      unsigned vecRank = vecTy.getRank();
-      unsigned leadingRank = tensorRank - vecRank;
-
-      SmallVector<Value> maskDims;
-      for (unsigned i = 0; i < vecRank; ++i) {
-        if (readOp.isDimInBounds(i) && writeOp.isDimInBounds(i)) {
-          // Both in-bounds on this dim: mask extent = vector extent (all true).
-          maskDims.push_back(arith::ConstantIndexOp::create(
-              rewriter, loc, vecTy.getDimSize(i)));
-        } else {
-          // At least one side is OOB on this dim: use the actual tensor dim.
-          unsigned tensorDim = leadingRank + i;
-          if (shapedTy.isDynamicDim(tensorDim)) {
-            maskDims.push_back(
-                tensor::DimOp::create(rewriter, loc, base, tensorDim));
-          } else {
-            maskDims.push_back(arith::ConstantIndexOp::create(
-                rewriter, loc, shapedTy.getDimSize(tensorDim)));
-          }
-        }
-      }
-
-      auto maskTy = VectorType::get(vecTy.getShape(), rewriter.getI1Type());
-      Value inBoundsMask =
-          vector::CreateMaskOp::create(rewriter, loc, maskTy, maskDims);
-
-      Value rPad = readOp.getPadding();
-      Value padVal = vector::BroadcastOp::create(rewriter, rPad.getLoc(),
-                                                 valToStore.getType(), rPad);
-      inner =
-          arith::SelectOp::create(rewriter, loc, inBoundsMask, inner, padVal);
     }
 
     if (!rMask) {
