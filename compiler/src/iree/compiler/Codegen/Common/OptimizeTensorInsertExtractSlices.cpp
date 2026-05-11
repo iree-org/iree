@@ -225,6 +225,209 @@ void hoistSubsetWithLoopInvariantTensor(RewriterBase &rewriter,
   }
 }
 
+static bool
+hasOnlyLoopInvariantOperandsExcept(LoopLikeOpInterface loopLike, Operation *op,
+                                   ArrayRef<OpOperand *> allowedOperands) {
+  return llvm::all_of(op->getOpOperands(), [&](OpOperand &operand) {
+    if (llvm::is_contained(allowedOperands, &operand)) {
+      return true;
+    }
+    return loopLike.isDefinedOutsideOfLoop(operand.get());
+  });
+}
+
+static bool areEquivalentTransferReadWrite(vector::TransferReadOp readOp,
+                                           vector::TransferWriteOp writeOp) {
+  return readOp.getType() == writeOp.getVector().getType() &&
+         readOp.getIndices() == writeOp.getIndices() &&
+         readOp.getPermutationMap() == writeOp.getPermutationMap() &&
+         readOp.getMask() == writeOp.getMask();
+}
+
+static Value getLoopCarriedTransferValue(OpBuilder &builder,
+                                         vector::TransferReadOp readOp,
+                                         Value valueToStore) {
+  TypedValue<VectorType> mask = readOp.getMask();
+  if (!mask) {
+    return valueToStore;
+  }
+  Value pad = readOp.getPadding();
+  Value padVector = vector::BroadcastOp::create(
+      builder, pad.getLoc(), cast<VectorType>(valueToStore.getType()), pad);
+  return arith::SelectOp::create(builder, readOp.getLoc(), mask, valueToStore,
+                                 padVector);
+}
+
+/// Promote a tensor iter_arg to a vector iter_arg when the tensor is only
+/// accessed through equivalent transfer_read/transfer_write ops.
+///
+///   %loop = scf.for ... iter_args(%t = %init) -> tensor<...> {
+///     %old = vector.transfer_read %t[%c0], %pad, %mask
+///     %new = arith.addf %old, %step
+///     %next = vector.transfer_write %new, %t[%c0], %mask
+///     scf.yield %next
+///   }
+///
+/// becomes:
+///
+///   %init_vec = vector.transfer_read %init[%c0], %pad, %mask
+///   %loop = scf.for ... iter_args(%v = %init_vec) -> vector<...> {
+///     %new = arith.addf %v, %step
+///     %yield = arith.select %mask, %new, splat(%pad)
+///     scf.yield %yield
+///   }
+///
+/// The select is the important masked-transfer semantics. For masked-off
+/// lanes, transfer_read returns padding, while transfer_write preserves the
+/// tensor. A generic subset hoist would carry `%new` directly, which is only
+/// equivalent for unmasked transfers.
+struct PromoteLoopCarriedTransferIterArg final : OpRewritePattern<scf::ForOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                PatternRewriter &rewriter) const override {
+    for (unsigned i = 0, e = forOp.getNumRegionIterArgs(); i < e; ++i) {
+      auto candidate = getPromotableTransferIterArg(forOp, i);
+      if (candidate) {
+        return promoteLoopCarriedTransferIterArg(rewriter, forOp, *candidate);
+      }
+    }
+    return failure();
+  }
+
+private:
+  struct PromotableTransferIterArg {
+    unsigned index;
+    vector::TransferWriteOp write;
+    SmallVector<vector::TransferReadOp> reads;
+  };
+
+  std::optional<PromotableTransferIterArg>
+  getPromotableTransferIterArg(scf::ForOp forOp, unsigned index) const {
+    LoopLikeOpInterface loopLike =
+        cast<LoopLikeOpInterface>(forOp.getOperation());
+    BlockArgument iterArg = forOp.getRegionIterArg(index);
+    Value yielded = forOp.getYieldedValues()[index];
+    auto writeOp = yielded.getDefiningOp<vector::TransferWriteOp>();
+    if (!writeOp || !writeOp.hasPureTensorSemantics() ||
+        writeOp.getBase() != iterArg || writeOp.hasOutOfBoundsDim() ||
+        !writeOp->hasOneUse()) {
+      return std::nullopt;
+    }
+    if (!hasOnlyLoopInvariantOperandsExcept(
+            loopLike, writeOp,
+            {&writeOp.getValueToStoreMutable(), &writeOp.getBaseMutable()})) {
+      return std::nullopt;
+    }
+
+    SmallVector<vector::TransferReadOp> reads;
+    for (Operation *user : iterArg.getUsers()) {
+      if (user == writeOp.getOperation()) {
+        continue;
+      }
+      auto readOp = dyn_cast<vector::TransferReadOp>(user);
+      if (!readOp || !readOp.hasPureTensorSemantics() ||
+          readOp.getBase() != iterArg || readOp.hasOutOfBoundsDim()) {
+        return std::nullopt;
+      }
+      if (!areEquivalentTransferReadWrite(readOp, writeOp)) {
+        return std::nullopt;
+      }
+      if (!reads.empty() && readOp.getPadding() != reads.front().getPadding()) {
+        return std::nullopt;
+      }
+      if (!hasOnlyLoopInvariantOperandsExcept(loopLike, readOp,
+                                              {&readOp.getBaseMutable()})) {
+        return std::nullopt;
+      }
+      reads.push_back(readOp);
+    }
+
+    if (reads.empty()) {
+      return std::nullopt;
+    }
+    return PromotableTransferIterArg{index, writeOp, reads};
+  }
+
+  LogicalResult
+  promoteLoopCarriedTransferIterArg(PatternRewriter &rewriter, scf::ForOp forOp,
+                                    PromotableTransferIterArg candidate) const {
+    unsigned oldNumIterArgs = forOp.getNumRegionIterArgs();
+    unsigned oldNumResults = forOp.getNumResults();
+    Value originalInitArg = forOp.getInitArgs()[candidate.index];
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(forOp);
+
+    // Create a transfer_read before the loop to read the vector value from the
+    // tensor that was the loop argument so far.
+    vector::TransferReadOp readOp = candidate.reads.front();
+    Value initVector = vector::TransferReadOp::create(
+        rewriter, readOp.getLoc(), readOp.getVectorType(), originalInitArg,
+        readOp.getIndices(), readOp.getPermutationMap(), readOp.getPadding(),
+        readOp.getMask(), readOp.getInBoundsAttr());
+
+    // Inside the loop, build the new yield value by broadcasting the padding
+    // value and selecting based on the mask. This is only necessary if the
+    // reads and writes are masked.
+    NewYieldValuesFn newYieldValuesFn =
+        [&](OpBuilder &builder, Location,
+            ArrayRef<BlockArgument>) -> SmallVector<Value> {
+      vector::TransferReadOp readOp = candidate.reads.front();
+      return {getLoopCarriedTransferValue(builder, readOp,
+                                          candidate.write.getVector())};
+    };
+
+    // Build the new for-loop with an additional vector-typed loop-carried
+    // value. The original tensor-typed loop-carried value will be removed by
+    // canonicalization later on.
+    FailureOr<LoopLikeOpInterface> newLoopLike =
+        forOp.replaceWithAdditionalYields(
+            rewriter, ValueRange(initVector),
+            /*replaceInitOperandUsesInLoop=*/false, newYieldValuesFn);
+    if (failed(newLoopLike)) {
+      return failure();
+    }
+    scf::ForOp newForOp = cast<scf::ForOp>(newLoopLike->getOperation());
+
+    // The new vector-typed loop-carried value carries the semantics now.
+    // Rewrite the yield such that the original tensor-typed value stops
+    // evolving inside the loop and will be cleaned up by canonicalization.
+    auto yieldOp = cast<scf::YieldOp>(newForOp.getBody()->getTerminator());
+    rewriter.modifyOpInPlace(yieldOp, [&]() {
+      yieldOp->setOperand(candidate.index,
+                          newForOp.getRegionIterArg(candidate.index));
+    });
+
+    // If there are any uses of the original tensor-typed loop-carried value
+    // after the loop, insert a transfer_write with the new vector-typed value
+    // and replace all uses.
+    rewriter.setInsertionPointAfter(newForOp);
+    Value tensorLoopResult = newForOp.getResult(candidate.index);
+    if (!tensorLoopResult.use_empty()) {
+      vector::TransferWriteOp writeOp = candidate.write;
+      Value tensorReplacement =
+          vector::TransferWriteOp::create(
+              rewriter, writeOp.getLoc(), newForOp.getResult(oldNumResults),
+              originalInitArg, writeOp.getIndices(),
+              writeOp.getPermutationMapAttr(), writeOp.getMask(),
+              writeOp.getInBoundsAttr())
+              .getResult();
+      rewriter.replaceAllUsesWith(tensorLoopResult, tensorReplacement);
+    }
+
+    // Replace all uses of the transfer_read inside the loop with the new
+    // vector-typed loop-carried value.
+    BlockArgument promotedIterArg = newForOp.getRegionIterArg(oldNumIterArgs);
+    for (vector::TransferReadOp readOp : candidate.reads) {
+      rewriter.replaceOp(readOp, promotedIterArg);
+    }
+    // Remove the old write.
+    rewriter.eraseOp(candidate.write);
+
+    return success();
+  }
+};
+
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
@@ -474,6 +677,7 @@ static Operation *getEarliestInsertionPointInsideBlock(Block *block,
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
+  MLIRContext *context = &getContext();
 
   // TODO: This is a temporary hack enabled for bufferization to
   // get rid of empty buffers.
@@ -488,6 +692,15 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   moveLoopInvariantCodeFromGuaranteedLoops(funcOp);
   LDBG() << "after hoisting loop invariant code\n" << funcOp << "\n";
 
+  // Run the vector transfer-specific promotion before generic subset hoisting
+  // so masked transfer loops get the required per-iteration padding semantics.
+  RewritePatternSet promotionPatterns(context);
+  promotionPatterns.add<PromoteLoopCarriedTransferIterArg>(context);
+  if (failed(applyPatternsGreedily(funcOp, std::move(promotionPatterns)))) {
+    return signalPassFailure();
+  }
+  LDBG() << "after early promoting loop carried vector transfers" << funcOp;
+
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
   funcOp.walk(
@@ -499,9 +712,9 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
   LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
-  MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
+  patterns.add<PromoteLoopCarriedTransferIterArg>(context);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
   if (foldIdentitySlices) {
