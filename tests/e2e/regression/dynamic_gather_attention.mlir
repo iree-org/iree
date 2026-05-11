@@ -29,6 +29,20 @@ func.func @gather_attention() {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>
-  check.expect_almost_eq_const(%13#0, dense<1.500000e+00> : tensor<32x4x2x32xf32>) : tensor<32x4x2x32xf32>
+  %out_e = tensor.empty() : tensor<32x4x2x32xf32>
+  %cst_one = arith.constant 1.000000e+00 : f32
+  %normalized = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%13#0, %13#2 : tensor<32x4x2x32xf32>, tensor<32x4x2xf32>)
+    outs(%out_e : tensor<32x4x2x32xf32>) {
+  ^bb0(%a: f32, %s: f32, %_: f32):
+    %inv = arith.divf %cst_one, %s : f32
+    %v = arith.mulf %a, %inv : f32
+    linalg.yield %v : f32
+  } -> tensor<32x4x2x32xf32>
+  check.expect_almost_eq_const(%normalized, dense<1.500000e+00> : tensor<32x4x2x32xf32>) : tensor<32x4x2x32xf32>
   return
 }

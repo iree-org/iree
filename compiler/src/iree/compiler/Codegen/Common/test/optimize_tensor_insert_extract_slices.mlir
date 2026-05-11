@@ -581,16 +581,17 @@ func.func @fold_raw_oob_write_different_masks(%val: vector<1x32x16xf16>, %sz: in
      {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
   return %r : vector<1x32x16xf16>
 }
+// The originalRead from tensor.empty is folded to poison by
+// FoldReadFromEmpty, so select(wMask, val, poison) canonicalizes and
+// only the outer rMask select remains.
 // CHECK-LABEL: func.func @fold_raw_oob_write_different_masks
 // CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %{{[a-zA-Z0-9]+}}
-// CHECK-SAME:    %[[WMASK:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
 // CHECK-SAME:    %[[RMASK:[a-zA-Z0-9]+]]
-// CHECK:         %[[ORIG:.*]] = vector.transfer_read
-// CHECK:         %[[INNER:.*]] = arith.select %[[WMASK]], %[[VAL]], %[[ORIG]]
 // CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
-// CHECK:         %[[OUTER:.*]] = arith.select %[[RMASK]], %[[INNER]], %[[PAD]]
-// CHECK:         return %[[OUTER]]
+// CHECK:         %[[SEL:.*]] = arith.select %[[RMASK]], %[[VAL]], %[[PAD]]
+// CHECK:         return %[[SEL]]
 
 // -----
 
@@ -607,13 +608,14 @@ func.func @fold_raw_oob_write_only_write_masked(%val: vector<1x32x16xf16>, %sz: 
      {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
   return %r : vector<1x32x16xf16>
 }
+// The originalRead from tensor.empty is folded to poison by
+// FoldReadFromEmpty, so select(wMask, val, poison) canonicalizes to val.
+// No rMask, so the result is just val.
 // CHECK-LABEL: func.func @fold_raw_oob_write_only_write_masked
 // CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
-// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
-// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
-// CHECK:         %[[ORIG:.*]] = vector.transfer_read
-// CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[ORIG]]
-// CHECK:         return %[[SEL]]
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         return %[[VAL]]
 
 // -----
 
