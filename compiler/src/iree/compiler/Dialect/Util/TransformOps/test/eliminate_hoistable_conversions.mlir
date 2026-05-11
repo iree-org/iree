@@ -410,7 +410,6 @@ module attributes { transform.with_named_sequence } {
     %c1 = arith.constant 1 : index
     %c10 = arith.constant 10 : index
     %result = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init) -> vector<4xf32> {
-      // expected-remark @+1 {{hoistable_conversion was not hoisted or cancelled; inlining in place}}
       %0 = util.hoistable_conversion "orphan_tag" inverts("no_matching_inverse")
           (%a = %acc) : (vector<4xf32>) -> vector<2x2xf32> {
         %sc = vector.shape_cast %a : vector<4xf32> to vector<2x2xf32>
