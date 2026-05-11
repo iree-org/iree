@@ -364,8 +364,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
 
           const int64_t vdmfmaKTileSize = vmma.getIntrinsicsK() * vk;
           const int64_t problemKSize = llvm::product_of(problem.kSizes);
-          if (problemKSize < vdmfmaKTileSize ||
-              problemKSize % vdmfmaKTileSize != 0) {
+          if (problemKSize % vdmfmaKTileSize != 0) {
             continue;
           }
           auto [va, vb, vc] = vmma.getABCElementTypes();
