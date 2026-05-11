@@ -18,6 +18,24 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+namespace {
+
+SmallVector<NamedAttribute> filterSegmentSizeAttributes(Operation *op) {
+  SmallVector<NamedAttribute> attrs;
+  for (NamedAttribute attr : op->getAttrs()) {
+    // Don't copy segment attributes as these correspond to the number operands,
+    // which may be different.
+    if (attr.getName() == "operandSegmentSizes" ||
+        attr.getName() == "resultSegmentSizes") {
+      continue;
+    }
+    attrs.push_back(attr);
+  }
+  return attrs;
+}
+
+} // namespace
+
 #define GEN_PASS_DEF_PROMOTECONTRACTIONOUTPUTSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
@@ -51,7 +69,7 @@ void replaceOpOutputs(T op, PatternRewriter &rewriter, Type srcType,
           ->getResult(0);
   auto newLinalgOp =
       T::create(rewriter, loc, op.getDpsInputs(), ValueRange{promoteOutput},
-                linalg::getPrunedAttributeList(op));
+                filterSegmentSizeAttributes(op));
   Value truncEmpty =
       tensor::EmptyOp::create(rewriter, loc, mixedSizes, srcType);
   rewriter.replaceOpWithNewOp<linalg::GenericOp>(
