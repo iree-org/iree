@@ -202,3 +202,45 @@ func.func @vectorize_scan_masked_configured(
 // CHECK:         vector.scan <add>, {{.*}} {inclusive = true, reduction_dim = 1 : i64}
 // CHECK:         vector.transfer_write {{.*}} : vector<8x16xf32>, tensor<?x?xf32>
 // CHECK:         vector.transfer_write {{.*}} : vector<8xf32>, tensor<?xf32>
+
+// -----
+
+// This mirrors the flex_attention mask_mod shape emitted by Torch input
+// conversion. The callback indices are broadcastable tensors, and the mask
+// computation must vectorize instead of leaving a scalar tensor payload in the
+// attention path.
+
+#flex_mask_config = #iree_cpu.lowering_config<vector_common_parallel = [2, 4, 8, 8]>
+#flex_mask_b = affine_map<(b, h, q, kv) -> (b, 0, 0, 0)>
+#flex_mask_h = affine_map<(b, h, q, kv) -> (0, h, 0, 0)>
+#flex_mask_q = affine_map<(b, h, q, kv) -> (0, 0, q, 0)>
+#flex_mask_kv = affine_map<(b, h, q, kv) -> (0, 0, 0, kv)>
+#flex_mask_out = affine_map<(b, h, q, kv) -> (b, h, q, kv)>
+
+func.func @flex_attention_mask_mod_vectorizes(
+    %batch_idx: tensor<2x1x1x1xi32>,
+    %head_idx: tensor<1x4x1x1xi32>,
+    %query_idx: tensor<1x1x8x1xi32>,
+    %kv_idx: tensor<1x1x1x8xi32>,
+    %init: tensor<2x4x8x8xi1>) -> tensor<2x4x8x8xi1> {
+  %mask = linalg.generic {
+      indexing_maps = [#flex_mask_b, #flex_mask_h, #flex_mask_q, #flex_mask_kv, #flex_mask_out],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      {lowering_config = #flex_mask_config}
+      ins(%batch_idx, %head_idx, %query_idx, %kv_idx : tensor<2x1x1x1xi32>, tensor<1x4x1x1xi32>, tensor<1x1x8x1xi32>, tensor<1x1x1x8xi32>)
+      outs(%init : tensor<2x4x8x8xi1>) {
+  ^bb0(%b: i32, %h: i32, %q: i32, %kv: i32, %out: i1):
+    %keep = arith.cmpi sge, %q, %kv : i32
+    linalg.yield %keep : i1
+  } -> tensor<2x4x8x8xi1>
+  return %mask : tensor<2x4x8x8xi1>
+}
+// CHECK-LABEL: func.func @flex_attention_mask_mod_vectorizes
+// CHECK-NOT:     linalg.generic
+// CHECK:         %[[QUERY_READ:.+]] = vector.transfer_read {{.*}} tensor<1x1x8x1xi32>, vector<8x8xi32>
+// CHECK:         %[[QUERY_BCAST:.+]] = vector.broadcast %[[QUERY_READ]] : vector<8x8xi32> to vector<2x4x8x8xi32>
+// CHECK:         %[[KV_READ:.+]] = vector.transfer_read {{.*}} tensor<1x1x1x8xi32>, vector<8xi32>
+// CHECK:         %[[KV_BCAST:.+]] = vector.broadcast %[[KV_READ]] : vector<8xi32> to vector<2x4x8x8xi32>
+// CHECK:         %[[MASK:.+]] = arith.cmpi sge, %[[QUERY_BCAST]], %[[KV_BCAST]] : vector<2x4x8x8xi32>
+// CHECK:         vector.transfer_write %[[MASK]], {{.*}} : vector<2x4x8x8xi1>, tensor<2x4x8x8xi1>
+// CHECK-NEXT:    return
