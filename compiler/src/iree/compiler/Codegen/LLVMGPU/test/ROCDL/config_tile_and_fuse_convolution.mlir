@@ -13,6 +13,7 @@ func.func @generic_dynamic_nchw_fchw_conv(
   // CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
   // CHECK:       linalg.generic
   // CHECK-NOT:   promote_operands
+  // CHECK:       ^bb0
   %result = linalg.generic {
       indexing_maps = [#input_map, #filter_map, #output_map],
       iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}

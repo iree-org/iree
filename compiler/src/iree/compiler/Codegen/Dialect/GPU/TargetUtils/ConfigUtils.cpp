@@ -1140,10 +1140,10 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                             workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
-/// Helper to identify contraction like operations for operand promotiong.
+/// Helper to identify contraction-like operations for operand promotion.
 static bool isNonMatvecContraction(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return false;
   }
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -1604,13 +1604,7 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
       {"thread", b.getI64ArrayAttr(threadTileSizes)},
   };
 
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  bool isConvolution = linalgOp && linalg::isaConvolutionOpInterface(linalgOp);
-  // This generic promotion is meant for matmul-like contractions. Convolutions
-  // need their convolution-specific config path, which also attaches an
-  // `mma_kind` so filter loops are tiled to unit size before conversion to a
-  // matmul-like op.
-  if (isNonMatvecContraction(op) && !isConvolution) {
+  if (isNonMatvecContraction(op)) {
     GPU::appendPromotedOperandsList(context, attrs, {0, 1});
   }
 
