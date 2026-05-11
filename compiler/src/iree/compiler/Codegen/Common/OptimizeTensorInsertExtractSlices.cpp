@@ -317,13 +317,8 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     TypedValue<VectorType> wMask = writeOp.getMask();
     TypedValue<VectorType> rMask = readOp.getMask();
 
-    // The fold diverges from the original write+read at positions that are
-    // out-of-bounds: the write does not store there and the read returns
-    // pad, but the fold returns valToStore. This is only a problem when
-    // *both* transfers have OOB dimensions (in_bounds=false). When at
-    // least one side has in_bounds=true, it asserts the position is within
-    // bounds; an actual OOB access is undefined behavior, so the fold
-    // cannot introduce new incorrectness. (Verified with Z3.)
+    // If at least one operation claims that the position is in-bounds
+    // then we can fold.
     //
     // Case 1.1: w_ib = false, r_ib = true, position is actually in_bounds
     // We write val, we read val, we can fold RAW to val.
