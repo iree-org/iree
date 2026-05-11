@@ -180,12 +180,14 @@ iree_check_single_backend_test_suite(
     "dynamic_gather_attention.mlir"
     "linalg_ops_dynamic.mlir"
     "split_reduction_using_tiling.mlir"
+    "vector_distribute_64bit_amdgpu.mlir"
   TARGET_BACKEND
     "rocm"
   DRIVER
     "hip"
   COMPILER_FLAGS
     "--iree-opt-level=O3"
+    "--iree-input-demote-f64-to-f32=false"
   LABELS
     "noasan"
     "nomsan"

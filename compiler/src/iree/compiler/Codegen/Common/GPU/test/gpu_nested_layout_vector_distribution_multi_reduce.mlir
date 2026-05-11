@@ -1,4 +1,8 @@
-// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --canonicalize -mlir-print-local-scope --cse %s | FileCheck %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --iree-gpu-test-target=gfx942 --split-input-file --canonicalize -mlir-print-local-scope --cse %s | FileCheck %s
+
+// Runs under `--iree-gpu-test-target=gfx942` so 64-bit-element cases (which
+// rely on AMDGPU's decomposing `gpu.shuffle` lowering) reach the pattern.
+// All other test cases here use <=32-bit elements and are target-agnostic.
 
 #nested = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -249,3 +253,75 @@ builtin.module attributes { transform.with_named_sequence } {
 // enough threads on the reduction dimension to do a subgroup reduce.
 // CHECK: vector.transfer_read %{{.*}}[%{{.*}}, %[[C0]]]
 // CHECK-NOT: gpu.subgroup_reduce
+
+// -----
+
+// f64 vector.multi_reduction on AMDGPU: passes the bitwidth gate, so the
+// pattern fires and emits `gpu.subgroup_reduce ... : (f64) -> f64`.
+
+#nested_f64 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+func.func @reduce_f64_dim1(%arg0: vector<32x32xf64>, %arg1: vector<32xf64>) -> vector<32xf64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested_f64) : vector<32x32xf64>
+  %0 = vector.multi_reduction <maximumf>, %arg0l, %arg1 [1] : vector<32x32xf64> to vector<32xf64>
+  return %0 : vector<32xf64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @reduce_f64_dim1
+// Local reduction on the distributed batch shape.
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<2x2x1x1x1x4xf64> to vector<2x1x1xf64>
+// Global reduction across threads on the 64-bit element type.
+// CHECK: gpu.subgroup_reduce maximumf %{{.*}} cluster(size = 4, stride = 16) : (f64) -> f64
+
+// -----
+
+// i64 vector.multi_reduction on AMDGPU: parallel to @reduce_f64_dim1,
+// exercises the same 64-bit shuffle gate for an integer reduction kind.
+
+#nested_i64 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [16, 4],
+  element_tile = [1, 4],
+
+  subgroup_strides = [1, 1],
+  thread_strides = [1, 16]
+>
+
+func.func @reduce_i64_dim1(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested_i64) : vector<32x32xi64>
+  %0 = vector.multi_reduction <add>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @reduce_i64_dim1
+// Local reduction on the distributed batch shape.
+// CHECK: vector.multi_reduction <add>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<2x2x1x1x1x4xi64> to vector<2x1x1xi64>
+// Global reduction across threads on the 64-bit element type.
+// CHECK: gpu.subgroup_reduce add %{{.*}} cluster(size = 4, stride = 16) : (i64) -> i64

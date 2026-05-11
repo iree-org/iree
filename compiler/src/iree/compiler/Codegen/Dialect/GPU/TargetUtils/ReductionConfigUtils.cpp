@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/SliceUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -707,6 +708,9 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
 LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                  mlir::FunctionOpInterface entryPoint,
                                  Operation *op) {
+  if (!target) {
+    return failure();
+  }
   MLIRContext *context = op->getContext();
 
   if (!isa<linalg::LinalgOp>(op) && !isa<IREE::LinalgExt::ArgCompareOp>(op)) {
@@ -780,13 +784,27 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Reduction distribution only supports 4/8/16/32 bit types now.
-  if (!llvm::is_contained({4, 8, 16, 32}, *bitWidth)) {
+  // Accept power-of-two element widths >= 4; sub-byte element types take
+  // separate code paths. Widths above kShuffleNativeBits additionally
+  // require a backend with a decomposing `gpu.shuffle` lowering. The
+  // effective upper bound is constrained later by `largestLoadSizeInBits`,
+  // not here.
+  if (!llvm::isPowerOf2_64(*bitWidth) || *bitWidth < 4) {
+    return failure();
+  }
+  if (!targetSupportsShuffleBitwidth(target, *bitWidth)) {
     return failure();
   }
 
   const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
   const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
+
+  // Guard divide-by-zero: `threadLoads = largestLoadSizeInBits / *bitWidth`
+  // becomes 0 when the element is wider than a single load instruction,
+  // and is then used as a divisor in the subgroup-divisibility loop below.
+  if (*bitWidth > largestLoadSizeInBits) {
+    return failure();
+  }
 
   unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
   if (!hasDynamicReductionDim) {

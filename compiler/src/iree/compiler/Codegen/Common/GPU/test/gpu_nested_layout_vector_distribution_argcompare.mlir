@@ -1,6 +1,9 @@
-// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --canonicalize --cse %s | FileCheck %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --iree-gpu-test-target=gfx942 --split-input-file --canonicalize --cse %s | FileCheck %s
 
-// Tests for DistributeArgCompare pattern with explicit index mode.
+// Tests for DistributeArgCompare pattern with explicit index mode. Runs
+// under `--iree-gpu-test-target=gfx942` so 64-bit-element cases (which
+// rely on AMDGPU's decomposing `gpu.shuffle` lowering) reach the pattern.
+// All other test cases here use <=32-bit elements and are target-agnostic.
 
 #layout_2d_element_only = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -555,6 +558,121 @@ func.func @argmax_full_reduce_with_subgroup(
   %result_idx_layout = iree_vector_ext.to_layout %result#1 to layout(#layout_0d_subgroup) : vector<i32>
 
   func.return %result_val_layout, %result_idx_layout : vector<f16>, vector<i32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// i64 arg_compare on AMDGPU: passes the bitwidth gate. The commutative
+// comparator selects the ballot path: subgroup_reduce on i64 + a single
+// i32 shuffle for the winning lane index.
+
+#layout_1d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides   = [1]
+>
+
+#layout_0d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile = [],
+  outer_tile = [],
+  thread_tile = [],
+  element_tile = [],
+
+  subgroup_strides = [],
+  thread_strides   = []
+>
+
+// CHECK-LABEL: func @argcompare_i64
+// CHECK-NOT: iree_vector_ext.arg_compare
+// CHECK: gpu.subgroup_reduce maxsi {{.*}} : (i64) -> i64
+// CHECK: gpu.shuffle idx {{.*}} : i32
+func.func @argcompare_i64(
+    %input: vector<64xi64>,
+    %input_idx: vector<64xi32>,
+    %init_val: vector<i64>,
+    %init_idx: vector<i32>) -> (vector<i64>, vector<i32>) {
+  %v = iree_vector_ext.to_layout %input to layout(#layout_1d_thread_only) : vector<64xi64>
+  %i = iree_vector_ext.to_layout %input_idx to layout(#layout_1d_thread_only) : vector<64xi32>
+  %iv = iree_vector_ext.to_layout %init_val to layout(#layout_0d_thread_only) : vector<i64>
+  %ii = iree_vector_ext.to_layout %init_idx to layout(#layout_0d_thread_only) : vector<i32>
+  %res:2 = iree_vector_ext.arg_compare dimension(0)
+      ins(%v, %i : vector<64xi64>, vector<64xi32>)
+      inits(%iv, %ii : vector<i64>, vector<i32>) {
+    ^bb0(%a: i64, %b: i64):
+      %cmp = arith.cmpi sgt, %a, %b : i64
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<i64>, vector<i32>
+  return %res#0, %res#1 : vector<i64>, vector<i32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+// i64 *index* path: exempt from the bitwidth check (`gpu.shuffle idx`
+// handles wider types). Pins that behavior under the new plumbing.
+
+#layout_1d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides   = [1]
+>
+
+#layout_0d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile = [],
+  outer_tile = [],
+  thread_tile = [],
+  element_tile = [],
+
+  subgroup_strides = [],
+  thread_strides   = []
+>
+
+// CHECK-LABEL: func @argcompare_index_i64
+// CHECK: gpu.shuffle idx {{.*}} : i64
+func.func @argcompare_index_i64(
+    %input: vector<64xf32>,
+    %input_idx: vector<64xi64>,
+    %init_val: vector<f32>,
+    %init_idx: vector<i64>) -> (vector<f32>, vector<i64>) {
+  %v = iree_vector_ext.to_layout %input to layout(#layout_1d_thread_only) : vector<64xf32>
+  %i = iree_vector_ext.to_layout %input_idx to layout(#layout_1d_thread_only) : vector<64xi64>
+  %iv = iree_vector_ext.to_layout %init_val to layout(#layout_0d_thread_only) : vector<f32>
+  %ii = iree_vector_ext.to_layout %init_idx to layout(#layout_0d_thread_only) : vector<i64>
+  %res:2 = iree_vector_ext.arg_compare dimension(0)
+      ins(%v, %i : vector<64xf32>, vector<64xi64>)
+      inits(%iv, %ii : vector<f32>, vector<i64>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<f32>, vector<i64>
+  return %res#0, %res#1 : vector<f32>, vector<i64>
 }
 
 builtin.module attributes { transform.with_named_sequence } {
