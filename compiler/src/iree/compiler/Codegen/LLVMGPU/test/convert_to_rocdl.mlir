@@ -9,10 +9,12 @@
 ]>
 builtin.module {
   func.func @abs_ex_dispatch_0() attributes {
-    stream.binding_noalias_0 = [1 : i32, 2 : i32, 3 : i32],
-    stream.binding_noalias_1 = [0 : i32, 2 : i32, 3 : i32],
-    stream.binding_noalias_2 = [0 : i32, 1 : i32, 3 : i32],
-    stream.binding_noalias_3 = [0 : i32, 1 : i32, 2 : i32]
+    stream.binding_noalias = [
+      [1 : i32, 2 : i32, 3 : i32],
+      [0 : i32, 2 : i32, 3 : i32],
+      [0 : i32, 1 : i32, 3 : i32],
+      [0 : i32, 1 : i32, 2 : i32]
+    ]
   } {
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) flags(ReadOnly) : memref<16xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
@@ -253,9 +255,11 @@ module {
 ]>
 builtin.module {
   func.func @missing_ptr_dispatch_copy_idx_0() attributes {
-    stream.binding_noalias_0 = [1 : i32, 2 : i32],
-    stream.binding_noalias_1 = [0 : i32, 2 : i32],
-    stream.binding_noalias_2 = [0 : i32, 1 : i32]
+    stream.binding_noalias = [
+      [1 : i32, 2 : i32],
+      [0 : i32, 2 : i32],
+      [0 : i32, 1 : i32]
+    ]
   } {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32

@@ -354,25 +354,35 @@ public:
     // bindings. This allows us to determine which bindings are in the same
     // correlation group (i.e., point to the same resource but with different
     // offsets) and which bindings point to different resources (noalias).
+    //
+    // Two carriers are supported:
+    //   * In Stream dialect (`util.func`) the bindings are real arguments, so
+    //     we read per-arg attributes (`stream.binding_correlation` /
+    //     `stream.binding_noalias`).
+    //   * In HAL dialect (`func.func`) there are no arguments. The information
+    //     is carried as a single function-level array-of-arrays attribute,
+    //     where the outer index matches the HAL binding index and each inner
+    //     array lists the related binding indices.
     DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
     DenseMap<int64_t, SmallVector<int64_t>> bindingNoaliasMap;
+    auto correlationGroups =
+        funcOp->getAttrOfType<ArrayAttr>("stream.binding_correlation");
+    auto noaliasGroups =
+        funcOp->getAttrOfType<ArrayAttr>("stream.binding_noalias");
+    auto lookupGroupForBinding = [](ArrayAttr groups,
+                                    int64_t binding) -> ArrayAttr {
+      if (!groups || binding < 0 ||
+          static_cast<size_t>(binding) >= groups.size()) {
+        return nullptr;
+      }
+      return dyn_cast<ArrayAttr>(groups[binding]);
+    };
     for (IREE::HAL::InterfaceBindingSubspanOp subspan : subspans) {
       int64_t binding = subspan.getBinding().getSExtValue();
-      // Try to read correlation information from the original function.
-      // Note: This assumes the correlation attribute was preserved through
-      // Stream -> HAL conversion. If not, we'll need to preserve it explicitly.
-      // In HAL dialect, func.func has no arguments, so we try to read from
-      // arg_attrs first (for Stream dialect compatibility), and if that fails,
-      // we try to read from function-level attributes with a binding index
-      // suffix.
-      ArrayAttr correlationAttr;
-      if (auto attr = funcOp.getArgAttrOfType<ArrayAttr>(
-              binding, "stream.binding_correlation")) {
-        correlationAttr = attr;
-      } else if (auto attr = funcOp->getAttrOfType<ArrayAttr>(
-                     (Twine("stream.binding_correlation_") + Twine(binding))
-                         .str())) {
-        correlationAttr = attr;
+      ArrayAttr correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
+          binding, "stream.binding_correlation");
+      if (!correlationAttr) {
+        correlationAttr = lookupGroupForBinding(correlationGroups, binding);
       }
       if (correlationAttr) {
         auto correlatedBindings =
@@ -382,15 +392,10 @@ public:
           bindingCorrelationMap[binding] = std::move(correlatedBindings);
         }
       }
-      // Read noalias information (bindings pointing to different resources).
-      ArrayAttr noaliasAttr;
-      if (auto attr = funcOp.getArgAttrOfType<ArrayAttr>(
-              binding, "stream.binding_noalias")) {
-        noaliasAttr = attr;
-      } else if (auto attr = funcOp->getAttrOfType<ArrayAttr>(
-                     (Twine("stream.binding_noalias_") + Twine(binding))
-                         .str())) {
-        noaliasAttr = attr;
+      ArrayAttr noaliasAttr =
+          funcOp.getArgAttrOfType<ArrayAttr>(binding, "stream.binding_noalias");
+      if (!noaliasAttr) {
+        noaliasAttr = lookupGroupForBinding(noaliasGroups, binding);
       }
       if (noaliasAttr) {
         auto noaliasBindings =

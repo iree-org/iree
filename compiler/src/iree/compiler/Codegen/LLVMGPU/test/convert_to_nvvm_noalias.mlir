@@ -87,14 +87,14 @@ util.func public @test() {
 // func op attributes to LLVM noalias attributes.
 //
 // This test verifies that:
-// 1. stream.binding_noalias attributes on func.func op (as function-level attributes
-//    with binding index suffix, e.g., stream.binding_noalias_0) in HAL dialect
-//    are correctly read by ConvertToLLVM
+// 1. stream.binding_noalias attributes on func.func op (as a single
+//    function-level array-of-arrays attribute, with the outer index matching
+//    the HAL binding index) in HAL dialect are correctly read by ConvertToLLVM
 // 2. These attributes are converted to llvm.noalias attributes in LLVM IR
 // 3. Only bindings with explicit noalias relationships get llvm.noalias
 //
 // Note: In HAL dialect, func.func has no arguments, so stream.binding_noalias
-// attributes are stored as function-level attributes with binding index suffix.
+// is stored as a single function-level array-of-arrays attribute.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -105,8 +105,10 @@ hal.executable @test_noalias_propagation {
     hal.executable.export public @test_noalias_propagation layout(#pipeline_layout)
     builtin.module {
       func.func @test_noalias_propagation() attributes {
-        stream.binding_noalias_0 = [1 : i32],
-        stream.binding_noalias_1 = [0 : i32]
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
       } {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
@@ -138,8 +140,10 @@ hal.executable @test_partial_noalias {
     hal.executable.export public @test_partial_noalias layout(#pipeline_layout_partial)
     builtin.module {
       func.func @test_partial_noalias() attributes {
-        stream.binding_noalias_0 = [1 : i32],
-        stream.binding_noalias_1 = [0 : i32]
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
       } {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(0) : memref<16xi32>

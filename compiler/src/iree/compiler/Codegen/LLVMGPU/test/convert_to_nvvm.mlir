@@ -11,9 +11,11 @@ hal.executable @abs_ex_dispatch_0 {
     hal.executable.export public @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() attributes {
-        stream.binding_noalias_0 = [1 : i32, 2 : i32],
-        stream.binding_noalias_1 = [0 : i32, 2 : i32],
-        stream.binding_noalias_2 = [0 : i32, 1 : i32]
+        stream.binding_noalias = [
+          [1 : i32, 2 : i32],
+          [0 : i32, 2 : i32],
+          [0 : i32, 1 : i32]
+        ]
       } {
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
@@ -54,9 +56,11 @@ hal.executable @abs_dynamic {
     hal.executable.export public @abs_dynamic layout(#pipeline_layout)
     builtin.module {
       func.func @abs_dynamic() attributes {
-        stream.binding_noalias_0 = [1 : i32, 2 : i32],
-        stream.binding_noalias_1 = [0 : i32, 2 : i32],
-        stream.binding_noalias_2 = [0 : i32, 1 : i32]
+        stream.binding_noalias = [
+          [1 : i32, 2 : i32],
+          [0 : i32, 2 : i32],
+          [0 : i32, 1 : i32]
+        ]
       } {
         %c0 = arith.constant 0 : index
         %c3 = arith.constant 3 : index
@@ -142,8 +146,10 @@ hal.executable @dead_symbol {
     hal.executable.export public @dead_symbol layout(#pipeline_layout)
     builtin.module {
       func.func @dead_symbol() attributes {
-        stream.binding_noalias_0 = [1 : i32],
-        stream.binding_noalias_1 = [0 : i32]
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
       } {
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
@@ -179,8 +185,10 @@ hal.executable @mixed_type {
     hal.executable.export public @mixed_type layout(#pipeline_layout)
     builtin.module {
       func.func @mixed_type() attributes {
-        stream.binding_noalias_0 = [1 : i32],
-        stream.binding_noalias_1 = [0 : i32]
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
       } {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
@@ -323,10 +331,12 @@ hal.executable @check_not_readonly {
     hal.executable.export public @check_not_readonly layout(#pipeline_layout)
     builtin.module {
       func.func @check_not_readonly() attributes {
-        stream.binding_noalias_0 = [1 : i32, 2 : i32, 3 : i32],
-        stream.binding_noalias_1 = [0 : i32, 2 : i32, 3 : i32],
-        stream.binding_noalias_2 = [0 : i32, 1 : i32, 3 : i32],
-        stream.binding_noalias_3 = [0 : i32, 1 : i32, 2 : i32]
+        stream.binding_noalias = [
+          [1 : i32, 2 : i32, 3 : i32],
+          [0 : i32, 2 : i32, 3 : i32],
+          [0 : i32, 1 : i32, 3 : i32],
+          [0 : i32, 1 : i32, 2 : i32]
+        ]
       } {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
