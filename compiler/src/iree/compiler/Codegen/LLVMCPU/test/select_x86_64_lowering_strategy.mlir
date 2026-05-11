@@ -1768,7 +1768,7 @@ func.func @gather(%source: tensor<16x8x32x128xf16>, %indices: tensor<4xi64>, %ou
 // parallel iter dims to 1 and `vector_reduction` collapses the K
 // reduction iter dim to 1. Distribution is parallel-only (M, N).
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
-func.func @inner_tiled_avx512_1x16x1_f32(%lhs: tensor<2x4x2x1xf32>, %rhs: tensor<2x4x32x1xf32>, %acc: tensor<2x2x2x32xf32>) -> tensor<2x2x2x32xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+func.func @inner_tiled_avx512_1x16x1_f32(%lhs: tensor<2x4x2x1xf32>, %rhs: tensor<2x4x2x16xf32>, %acc: tensor<2x2x2x2x16xf32>) -> tensor<2x2x2x2x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
@@ -1780,8 +1780,8 @@ func.func @inner_tiled_avx512_1x16x1_f32(%lhs: tensor<2x4x2x1xf32>, %rhs: tensor
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2, intrinsics_n = 2>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<2x4x2x1xf32>, tensor<2x4x32x1xf32> into tensor<2x2x2x32xf32>
-  return %0 : tensor<2x2x2x32xf32>
+  } : tensor<2x4x2x1xf32>, tensor<2x4x2x16xf32> into tensor<2x2x2x2x16xf32>
+  return %0 : tensor<2x2x2x2x16xf32>
 }
 //   CHECK-DAG: #[[INNER_TILED_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 //   CHECK-DAG: #[[INNER_TILED_TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>

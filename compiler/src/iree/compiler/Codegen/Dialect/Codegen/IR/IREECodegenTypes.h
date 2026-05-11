@@ -218,6 +218,18 @@ SmallVector<int64_t>
 sliceSwizzledShape(const TileSwizzle &swizzle,
                    llvm::function_ref<bool(TileSwizzle::Dim)> predicate);
 
+/// Returns the VectorType corresponding to `swizzle` with element type
+/// `elemType`. The shape is `sliceSwizzledShape(swizzle, keepSize)` — i.e.
+/// every dim of `expandShape` in `swizzle.permutation()` order, with dims
+/// for which `keepSize` returns false collapsed to size 1. A dim with a
+/// non-`One` symbolic multiplier maps to a scalable axis.
+VectorType
+getTileVectorType(const TileSwizzle &swizzle, Type elemType,
+                  llvm::function_ref<bool(TileSwizzle::Dim)> keepSize);
+/// Convenience overload of the above for when every dim is kept at its
+/// full size.
+VectorType getTileVectorType(const TileSwizzle &swizzle, Type elemType);
+
 /// Pushes `dim` to the front of `swizzle.expandShape[srcIdx]`, and updates
 /// `swizzle.permutation` accordingly.
 void expand(TileSwizzle &swizzle, size_t srcIdx, TileSwizzle::Dim dim);
