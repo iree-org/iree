@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Traits.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -305,30 +304,6 @@ static Type expandRank0TorchTensorType(Type type,
                                          tensorType.getOptionalDtype());
 }
 
-/// Computes the static broadcast shape of Torch tensor operands.
-static FailureOr<SmallVector<int64_t>>
-computeStaticBroadcastShape(ValueRange operands) {
-  SmallVector<int64_t> resultShape;
-  for (Value operand : operands) {
-    auto tensorType =
-        dyn_cast<torch::Torch::ValueTensorType>(operand.getType());
-    if (!tensorType || !tensorType.hasSizes()) {
-      continue;
-    }
-    if (resultShape.empty()) {
-      llvm::append_range(resultShape, tensorType.getSizes());
-      continue;
-    }
-    SmallVector<int64_t> broadcastShape;
-    if (!OpTrait::util::getBroadcastedShape(resultShape, tensorType.getSizes(),
-                                            broadcastShape)) {
-      return failure();
-    }
-    resultShape = std::move(broadcastShape);
-  }
-  return resultShape;
-}
-
 /// Inlines mask_mod with tensor index operands.
 ///
 /// The callback is authored over scalar Torch tensors, but mask_mod is
@@ -361,16 +336,23 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
       operands.push_back(mapper.lookupOrDefault(operand));
     }
 
-    FailureOr<SmallVector<int64_t>> broadcastShape =
-        computeStaticBroadcastShape(operands);
-    if (failed(broadcastShape)) {
-      return failure();
+    SmallVector<Value> tensorOperands;
+    for (Value operand : operands) {
+      if (isa<torch::Torch::BaseTensorType>(operand.getType())) {
+        tensorOperands.push_back(operand);
+      }
+    }
+    SmallVector<int64_t> broadcastShape(tensorShape);
+    if (!tensorOperands.empty()) {
+      SmallVector<Value> broadcastShapeValues;
+      torch::Torch::computeBroadcastShape(rewriter, loc, tensorOperands,
+                                          broadcastShape, broadcastShapeValues);
     }
 
     SmallVector<Type> resultTypes;
     for (Type resultType : op.getResultTypes()) {
-      resultTypes.push_back(expandRank0TorchTensorType(
-          resultType, broadcastShape->empty() ? tensorShape : *broadcastShape));
+      resultTypes.push_back(
+          expandRank0TorchTensorType(resultType, broadcastShape));
     }
 
     OperationState state(op.getLoc(), op.getName(), operands, resultTypes,
