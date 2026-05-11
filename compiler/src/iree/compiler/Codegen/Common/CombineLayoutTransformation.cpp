@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -264,7 +265,7 @@ static void buildNestedDistributionLoops(
         SmallVector<Value> nestedUbVals =
             getValueOrCreateConstantIndexOp(b, nestedLoc, nestedUbs);
         Value one = arith::ConstantIndexOp::create(rewriter, nestedLoc, 1);
-        SmallVector<Value> unitSteps(nestedLbs.size(), one);
+        llvm::Repeated<Value> unitSteps(nestedLbs.size(), one);
         scf::buildLoopNest(rewriter, nestedLoc, nestedLbVals, nestedUbVals,
                            unitSteps, innerLoopBuilder);
         scf::InParallelOp::create(b, nestedLoc);
@@ -354,8 +355,7 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
     auto ubConstantBound = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::UB,
         ValueBoundsConstraintSet::Variable(diffMap, ValueRange{ub, lb}),
-        /*stopCondition=*/stopConditionFn,
-        /*addConservativeSemiAffineBounds=*/true);
+        /*stopCondition=*/stopConditionFn);
     return succeeded(ubConstantBound) && *ubConstantBound <= 0;
   };
 

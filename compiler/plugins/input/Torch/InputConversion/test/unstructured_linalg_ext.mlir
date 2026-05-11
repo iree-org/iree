@@ -229,6 +229,52 @@ func.func @flex_attn_return_lse_and_maxscores(%arg0: !torch.vtensor<[2,4,8,16],f
 
 // -----
 
+// Test flex_attention where enable_gqa is absent and head counts already match.
+// CHECK-LABEL: func.func @flex_attn_gqa_absent_matching_heads
+func.func @flex_attn_gqa_absent_matching_heads(%arg0: !torch.vtensor<[2,8,8,16],f32>, %arg1: !torch.vtensor<[2,8,8,16],f32>, %arg2: !torch.vtensor<[2,8,8,16],f32>) -> !torch.vtensor<[2,8,8,16],f32> {
+  %none = torch.constant.none
+  %false = torch.constant.bool false
+  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false : !torch.vtensor<[2,8,8,16],f32>, !torch.vtensor<[2,8,8,16],f32>, !torch.vtensor<[2,8,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,8,8,16],f32>, !torch.none, !torch.none
+  return %output : !torch.vtensor<[2,8,8,16],f32>
+}
+// CHECK-NOT:       torch.aten.broadcast_to
+// CHECK:           iree_linalg_ext.online_attention
+// CHECK-SAME:        ins({{.*}} : tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, f32)
+
+// -----
+
+// Test flex_attention with explicitly enabled GQA and independent key/value
+// head counts.
+// CHECK-LABEL: func.func @flex_attn_gqa_enabled_independent_kv_heads
+func.func @flex_attn_gqa_enabled_independent_kv_heads(%arg0: !torch.vtensor<[2,8,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,2,8,16],f32>) -> !torch.vtensor<[2,8,8,16],f32> {
+  %none = torch.constant.none
+  %false = torch.constant.bool false
+  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false {enable_gqa = true} : !torch.vtensor<[2,8,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,2,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,8,8,16],f32>, !torch.none, !torch.none
+  return %output : !torch.vtensor<[2,8,8,16],f32>
+}
+// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,4,2,8,16],f32>
+// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
+// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,2,4,8,16],f32>
+// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
+// CHECK:           iree_linalg_ext.online_attention
+// CHECK-SAME:        ins({{.*}} : tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, f32)
+
+// -----
+
+// Test flex_attention with explicitly disabled GQA and matching head counts.
+// CHECK-LABEL: func.func @flex_attn_gqa_disabled_matching_heads
+func.func @flex_attn_gqa_disabled_matching_heads(%arg0: !torch.vtensor<[2,4,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,4,8,16],f32>) -> !torch.vtensor<[2,4,8,16],f32> {
+  %none = torch.constant.none
+  %false = torch.constant.bool false
+  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false {enable_gqa = false} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.none
+  return %output : !torch.vtensor<[2,4,8,16],f32>
+}
+// CHECK-NOT:       torch.aten.broadcast_to
+// CHECK:           iree_linalg_ext.online_attention
+// CHECK-SAME:        ins({{.*}} : tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32)
+
+// -----
+
 // CHECK-LABEL: func.func @argmax_2d_dim1
 func.func @argmax_2d_dim1(%arg0: !torch.vtensor<[3,4],f32>) -> !torch.vtensor<[3],si64> {
   %int1 = torch.constant.int 1

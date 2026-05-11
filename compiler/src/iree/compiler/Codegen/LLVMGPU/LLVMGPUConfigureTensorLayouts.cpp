@@ -33,8 +33,8 @@ using IREE::VectorExt::VectorLayoutInterface;
 
 namespace {
 
-static SmallVector<bool> getPromotedOperands(Operation *op) {
-  SmallVector<bool> promotedOperands(op->getNumOperands(), false);
+static SmallVector<Attribute> getPromotedOperandAttrs(Operation *op) {
+  SmallVector<Attribute> promotedOperands(op->getNumOperands());
 
   auto config = getLoweringConfig<IREE::GPU::LoweringConfigAttr>(op);
   if (!config) {
@@ -47,8 +47,20 @@ static SmallVector<bool> getPromotedOperands(Operation *op) {
     return promotedOperands;
   }
 
-  for (int64_t operand : promoteConfig.value()) {
-    promotedOperands[operand] = true;
+  std::optional<ArrayRef<Attribute>> maybePromotionTypes =
+      getPromotionTypesList(config);
+
+  Attribute defaultPromotion =
+      IREE::GPU::DerivedThreadConfigAttr::get(op->getContext());
+  for (auto [index, operand] : llvm::enumerate(promoteConfig.value())) {
+    assert(operand >= 0 &&
+           operand < static_cast<int64_t>(op->getNumOperands()) &&
+           "promoted operand index out of bounds");
+    Attribute promotion =
+        maybePromotionTypes ? (*maybePromotionTypes)[index] : defaultPromotion;
+    assert(llvm::isa<IREE::GPU::PromotionAttr>(promotion) &&
+           "promotion types must implement promotion attr interface");
+    promotedOperands[operand] = promotion;
   }
 
   return promotedOperands;
@@ -300,8 +312,8 @@ SmallVector<int64_t> getIterationSpaceBounds(IndexingMapOpInterface candidate) {
 
 static LogicalResult
 setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                     SmallVector<bool> promotedOperands, RewriterBase &rewriter,
-                     linalg::LinalgOp contract) {
+                     ArrayRef<Attribute> promotedOperands,
+                     RewriterBase &rewriter, linalg::LinalgOp contract) {
   // This function should have only be called on a contraction op.
   assert(linalg::isaContractionOpInterface(contract) &&
          "cannot set contraction anchor on non contraction op");
@@ -330,15 +342,15 @@ setContractionAnchor(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
   // TODO: This is a hack until layout analysis is improved. The layout analysis
   // should decide where to put these shared memory conversions.
   if (promotedOperands[0]) {
-    layoutedLhs.setSharedMemoryConversion(true);
+    layoutedLhs.setSharedMemoryConversionAttr(promotedOperands[0]);
   }
 
   if (promotedOperands[1]) {
-    layoutedRhs.setSharedMemoryConversion(true);
+    layoutedRhs.setSharedMemoryConversionAttr(promotedOperands[1]);
   }
 
   if (promotedOperands[2]) {
-    layoutedAcc.setSharedMemoryConversion(true);
+    layoutedAcc.setSharedMemoryConversionAttr(promotedOperands[2]);
   }
 
   contract->setOperand(0, layoutedLhs.getResult());
@@ -439,7 +451,7 @@ static LogicalResult setIntrinsicLoweringConfigLayout(
     IREE::GPU::LoweringConfigAttr config, linalg::LinalgOp candidate,
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
 
-  SmallVector<bool> promotedOperands = getPromotedOperands(candidate);
+  SmallVector<Attribute> promotedOperands = getPromotedOperandAttrs(candidate);
   IREE::Codegen::InnerTileDescAttrInterface intrinsic = getIntrinsic(candidate);
 
   if (linalg::isaContractionOpInterface(candidate)) {
@@ -498,8 +510,8 @@ static LogicalResult setGPULoweringConfigLayout(
       context, subgroupSizes, batchTile, outerTile, threadSizes,
       elementTile.value(), subgroupStrides, threadStrides);
 
-  SmallVector<bool> promotedOperands =
-      getPromotedOperands(candidate.getOperation());
+  SmallVector<Attribute> promotedOperands =
+      getPromotedOperandAttrs(candidate.getOperation());
 
   rewriter.setInsertionPoint(candidate.getOperation());
   for (OpOperand &operand : candidate->getOpOperands()) {
@@ -508,8 +520,10 @@ static LogicalResult setGPULoweringConfigLayout(
     auto toLayout =
         ToLayoutOp::create(rewriter, loc, operand.get(), operandLayout);
     // Set shared memory promotion if requested.
-    toLayout.setSharedMemoryConversion(
-        promotedOperands[operand.getOperandNumber()]);
+    if (promotedOperands[operand.getOperandNumber()]) {
+      toLayout.setSharedMemoryConversionAttr(
+          promotedOperands[operand.getOperandNumber()]);
+    }
     operand.set(toLayout);
   }
 

@@ -66,13 +66,8 @@ verifyTranslationInfo(FunctionOpInterface funcOp,
   Attribute pipelineAttr = translationInfo.getPassPipeline();
 
   // Transform dialect encodes configuration into the schedule directly.
-  if (auto enumPipeline =
-          dyn_cast<IREE::Codegen::DispatchLoweringPassPipelineAttr>(
-              pipelineAttr)) {
-    if (enumPipeline.getValue() ==
-        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen) {
-      return success();
-    }
+  if (isa<IREE::Codegen::TransformDialectCodegenPipelineAttr>(pipelineAttr)) {
+    return success();
   }
 
   // Only SPIRV pipelines have additional verification. Other pipeline types

@@ -138,8 +138,6 @@ static llvm::cl::opt<bool> clEnableRiscvAggressiveDist(
         "set distConfig.maxTileSizes[i] to 2 * distConfig.minTileSizes[i]."),
     llvm::cl::init(false));
 
-using IREE::Codegen::DispatchLoweringPassPipeline;
-
 // Encodes the pre-processing strategy to be applied on a Linalg operation
 // before vectorization.
 enum class VectorPreProcStrategy {
@@ -2657,29 +2655,38 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   // TODO(dcaballe): The logic below is disconnected from the main tile size
   // selection logic in getMaxTileSize. We should either port it there or remove
   // it.
-  // Adjust the number of workload per workgroup to at least 4096. This
-  // prevents the runtime overheads domiating the execution time. The number is
-  // derived from experimients. We should be able to make it related to target.
+  // Adjust the number of workload per workgroup to at least 4096. This prevents
+  // the runtime overheads from dominating the execution time. The number is
+  // derived from experiments; see iree-org/iree#24012 for the latest analysis
+  // on AMD Zen4. We should be able to make it related to the target.
+  // Static dims are capped at the dim size; dynamic dims are treated as
+  // unbounded and grown freely until the workload threshold is met. The
+  // partial-dynamic rank-N case (e.g., tensor<4x?xf32>) should normally be
+  // collapsed into a single dim by DispatchCreation/CollapseDimensions before
+  // codegen sees it, but we still grow the dynamic dim here as a safety net
+  // for cases where the collapse did not run.
   constexpr int64_t kMinimumWorkload = 4096;
   SmallVector<int64_t> shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
   for (auto [index, size] : llvm::enumerate(shape)) {
-    if (ShapedType::isDynamic(size)) {
-      numWorkload = ShapedType::kDynamic;
-      break;
+    int64_t tile = distTileSizes[index];
+    if (tile != 0) {
+      numWorkload *= tile;
+    } else if (ShapedType::isStatic(size)) {
+      numWorkload *= size;
     }
-    numWorkload *= distTileSizes[index] ? distTileSizes[index] : size;
   }
   for (unsigned currDim = 0;
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
     int64_t currSize = distTileSizes[currDim];
-    if (currSize == shape[currDim] || currSize == 0 ||
-        ShapedType::isDynamic(shape[currDim]) ||
-        ShapedType::isDynamic(numWorkload)) {
+    int64_t dimSize = shape[currDim];
+    bool isDynamicDim = ShapedType::isDynamic(dimSize);
+    if (currSize == 0 || (!isDynamicDim && currSize == dimSize)) {
       currDim++;
       continue;
     }
-    int64_t newSize = std::min(currSize * 2, shape[currDim]);
+    int64_t newSize =
+        isDynamicDim ? currSize * 2 : std::min(currSize * 2, dimSize);
     numWorkload = numWorkload / currSize * newSize;
     distTileSizes[currDim] = newSize;
   }
@@ -4040,9 +4047,11 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
-  DispatchLoweringPassPipeline pipeline =
-      getTranslationInfo(entryPointFn).getDispatchLoweringPassPipeline();
-  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(entryPointFn);
+  if (!translationInfo ||
+      !isa<IREE::Codegen::TransformDialectCodegenPipelineAttr>(
+          translationInfo.getPassPipeline())) {
     if (failed(adjustTileSizesForRootUnPackOp(entryPointFn, rootOperation))) {
       return failure();
     }

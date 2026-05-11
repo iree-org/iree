@@ -11,9 +11,11 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -2829,6 +2831,12 @@ static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
   return getTileSizes(getAttributes(), GPU::TilingLevel::Workgroup);
+}
+
+LogicalResult
+LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr attributes) {
+  return verifyPromotedOperandsList(emitError, attributes);
 }
 
 SmallVector<int64_t>

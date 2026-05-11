@@ -120,6 +120,7 @@ func.func @matvec_dispatch_0_matmul_transpose_b_32000x2x4096_f16xf16xf32() attri
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">, #hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
 #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [128, 1, 1] subgroup_size = 32, {iree_codegen.denormal_fp_math_f32 = #iree_codegen.denormal_fp_math<"preserve-sign">}>
 func.func @attention() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation} {
@@ -128,19 +129,26 @@ func.func @attention() attributes {hal.executable.target = #executable_target_ro
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
-  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags(Indirect) : memref<20x4096x64xf32, #hal.descriptor_type<storage_buffer>>
   %8 = iree_codegen.load_from_buffer %0 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
   %9 = iree_codegen.load_from_buffer %2 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
   %10 = iree_codegen.load_from_buffer %4 : memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>> -> tensor<20x4096x64xf16>
-  %11 = tensor.empty() : tensor<20x4096x64xf16>
-  %12 = iree_linalg_ext.attention {decomposition_config = #decomposition_config, indexing_maps = [#map, #map1, #map2, #map3, #map4], lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 64, 0, 0, 64]}>} ins(%8, %9, %10, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%11 : tensor<20x4096x64xf16>) {
+  %11 = tensor.empty() : tensor<20x4096x64xf32>
+  %12 = tensor.empty() : tensor<20x4096xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %13 = linalg.fill ins(%cst_0 : f32) outs(%11 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
+  %14 = linalg.fill ins(%cst_1 : f32) outs(%12 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %15 = linalg.fill ins(%cst_2 : f32) outs(%12 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
+  %16:3 = iree_linalg_ext.online_attention {decomposition_config = #decomposition_config, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5], lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 64, 0, 0, 64]}>} ins(%8, %9, %10, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%13, %14, %15 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
-  } -> tensor<20x4096x64xf16>
-  iree_codegen.store_to_buffer %12, %6 : tensor<20x4096x64xf16> into memref<20x4096x64xf16, #hal.descriptor_type<storage_buffer>>
+  } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
+  iree_codegen.store_to_buffer %16#0, %6 : tensor<20x4096x64xf32> into memref<20x4096x64xf32, #hal.descriptor_type<storage_buffer>>
   return
 }
 
 // CHECK-LABEL: func.func @attention
-// CHECK-COUNT-3: memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
+// CHECK-COUNT-4: memref.alloc() : memref<1x64x68xf16, #gpu.address_space<workgroup>>
 // CHECK-NOT: memref.alloc()

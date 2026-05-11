@@ -2,11 +2,14 @@
 VER_0 {
   global:
     ireeAttributeIsACodegenCompilationInfoAttr;
-    ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
     ireeAttributeIsACodegenIntKnobAttr;
+    ireeAttributeIsACodegenNoPipelineAttr;
     ireeAttributeIsACodegenOneOfKnobAttr;
+    ireeAttributeIsACodegenPassPipelineAttr;
     ireeAttributeIsACodegenRootOpAttr;
+    ireeAttributeIsACodegenTransformDialectCodegenPipelineAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
+    ireeAttributeIsACodegenVMVXPipelineAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
@@ -19,9 +22,6 @@ VER_0 {
     ireeCodegenCompilationInfoAttrGetParameters;
     ireeCodegenCompilationInfoAttrGetTypeID;
     ireeCodegenConvertConstraintsOpToSMTLIB;
-    ireeCodegenDispatchLoweringPassPipelineAttrGet;
-    ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
-    ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
     ireeCodegenGetAttentionOpDetail;
     ireeCodegenGetExecutableVariantOps;
     ireeCodegenGetIGEMMGenericConvDetails;
@@ -32,15 +32,24 @@ VER_0 {
     ireeCodegenIntKnobAttrGetTypeID;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
+    ireeCodegenNoPipelineAttrGet;
+    ireeCodegenNoPipelineAttrGetTypeID;
     ireeCodegenOneOfKnobAttrGetName;
     ireeCodegenOneOfKnobAttrGetOptions;
     ireeCodegenOneOfKnobAttrGetTypeID;
+    ireeCodegenPassPipelineAttrGet;
+    ireeCodegenPassPipelineAttrGetPipeline;
+    ireeCodegenPassPipelineAttrGetTypeID;
     ireeCodegenRootOpAttrGet;
     ireeCodegenRootOpAttrGetSet;
     ireeCodegenRootOpAttrGetTypeID;
+    ireeCodegenTransformDialectCodegenPipelineAttrGet;
+    ireeCodegenTransformDialectCodegenPipelineAttrGetTypeID;
     ireeCodegenTranslationInfoAttrGet;
     ireeCodegenTranslationInfoAttrGetParameters;
     ireeCodegenTranslationInfoAttrGetTypeID;
+    ireeCodegenVMVXPipelineAttrGet;
+    ireeCodegenVMVXPipelineAttrGetTypeID;
     ireeCompilerEnumeratePlugins;
     ireeCompilerEnumerateRegisteredHALTargetBackends;
     ireeCompilerErrorDestroy;

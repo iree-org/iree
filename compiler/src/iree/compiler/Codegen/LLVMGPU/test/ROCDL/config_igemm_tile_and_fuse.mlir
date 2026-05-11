@@ -7,6 +7,30 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-igemm-pad-convolution=true --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=PAD-CONV-GFX942
 
+#map = affine_map<(d0, d1, d2, d3) -> (d0 + d2, d1 + d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> ()>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+func.func @conv_integer_like_extra_scalar_input(%arg0: tensor<5x5xi8>, %arg1: tensor<2x2xi8>, %arg2: i32, %arg3: tensor<4x4xi32>) -> tensor<4x4xi32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction", "reduction"]} ins(%arg0, %arg1, %arg2 : tensor<5x5xi8>, tensor<2x2xi8>, i32) outs(%arg3 : tensor<4x4xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %in_1: i32, %out: i32):
+    %1 = arith.extui %in : i8 to i32
+    %2 = arith.subi %1, %in_1 : i32
+    %3 = arith.extui %in_0 : i8 to i32
+    %4 = arith.muli %2, %3 : i32
+    %5 = arith.addi %out, %4 : i32
+    linalg.yield %5 : i32
+  } -> tensor<4x4xi32>
+  return %0 : tensor<4x4xi32>
+}
+
+// CHECK-LABEL: func.func @conv_integer_like_extra_scalar_input
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+//   CHECK-NOT:   use_igemm_convolution = true
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+
+// -----
+
 func.func @nhwc_conv_mfma(%3: tensor<2x34x34x128xf32>, %4: tensor<3x3x128x64xf32>) -> tensor<2x32x32x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %5 = tensor.empty() : tensor<2x32x32x64xf32>

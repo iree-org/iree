@@ -16,6 +16,7 @@
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -712,7 +713,7 @@ struct DistributeMapStore final
       // offsets.
       AffineMap permutationMap =
           rewriter.getMultiDimIdentityMap(input.getType().getRank());
-      SmallVector<Value> indices(input.getType().getRank(), zero);
+      llvm::Repeated<Value> indices(input.getType().getRank(), zero);
       SmallVector<Value> distributedOffsets =
           getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
                                              vectorLayout, permutationMap,
@@ -1374,7 +1375,7 @@ struct DistributeMultiReduction final
                                   ArrayRef<int64_t> reductionDims) const {
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     VectorType unDistributedType = valueToWrite.getType();
-    SmallVector<Value> indices(unDistributedType.getRank(), c0);
+    llvm::Repeated<Value> indices(unDistributedType.getRank(), c0);
     SmallVector<bool> inBounds(unDistributedType.getRank(), true);
     auto write = vector::TransferWriteOp::create(rewriter, loc, valueToWrite,
                                                  buffer, indices, inBounds);
@@ -1405,7 +1406,7 @@ struct DistributeMultiReduction final
         rewriter, loc,
         /*vectorType=*/readTy,
         /*source=*/buffer,
-        /*indices=*/SmallVector<Value>(readLayout.getRank(), zero),
+        /*indices=*/llvm::Repeated<Value>(readLayout.getRank(), zero),
         /*permMap=*/rewriter.getMultiDimIdentityMap(readLayout.getRank()),
         /*padding=*/padValue,
         /*mask=*/mask,
@@ -2037,7 +2038,7 @@ private:
       NestedLayoutAttr srcLayout, int64_t reductionDim) const {
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     VectorType valueType = valueToWrite.getType();
-    SmallVector<Value> indices(valueType.getRank(), c0);
+    llvm::Repeated<Value> indices(valueType.getRank(), c0);
     SmallVector<bool> inBounds(valueType.getRank(), true);
 
     auto valueWrite = vector::TransferWriteOp::create(
@@ -2092,13 +2093,13 @@ private:
 
     auto valueRead = vector::TransferReadOp::create(
         rewriter, loc, valueReadTy, valueBuffer,
-        SmallVector<Value>(readLayout.getRank(), zero),
+        llvm::Repeated<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), valuePad,
         /*mask=*/Value(), inBounds);
 
     auto indexRead = vector::TransferReadOp::create(
         rewriter, loc, indexReadTy, indexBuffer,
-        SmallVector<Value>(readLayout.getRank(), zero),
+        llvm::Repeated<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), indexPad,
         /*mask=*/Value(), inBounds);
 

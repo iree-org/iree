@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -1843,7 +1844,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // Compute total size and the offsets of all suballocated resources via the
   // pack op.
   auto indexType = builder.getIndexType();
-  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  llvm::Repeated<Type> packedOffsetTypes(sliceCount, indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
       builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
@@ -1949,7 +1950,7 @@ void ResourcePackOp::build(OpBuilder &builder, OperationState &state,
   size_t sliceCount = valueSizes.size();
   SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
   auto indexType = builder.getIndexType();
-  SmallVector<Type> indexTypes(sliceCount, indexType);
+  llvm::Repeated<Type> indexTypes(sliceCount, indexType);
   build(builder, state, indexType, indexTypes, offset,
         builder.getIndexArrayAttr(lifetimeIntervals), valueSizes, affinity);
 }

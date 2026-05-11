@@ -661,6 +661,104 @@ func.func @im2col_tile_sizes_non_contiguous(
 
 // -----
 
+// Im2col: offset produced by `arith.muli %k, %c4`, not by an `affine.apply`.
+// The static `affine.apply` pattern match cannot see through `arith.muli`, so
+// contiguity recognition here relies on `IntegerDivisibilityAnalysis` running
+// as stage 1 of the solver and reporting divisibility of 4 on the offset.
+// Without that analysis the tile size attribute would not be stamped.
+
+// CHECK-LABEL: @im2col_tile_sizes_divisibility_muli
+func.func @im2col_tile_sizes_divisibility_muli(
+    %input: tensor<2x34x34x640xf32>, %m_off: index, %k: index
+) -> tensor<2x2x4xf32> {
+  %0 = tensor.empty() : tensor<2x2x4xf32>
+  %c4 = arith.constant 4 : index
+  %k_off = arith.muli %k, %c4 : index
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4>
+  %1 = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, %m_off, %k_off] output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          ins(%input : tensor<2x34x34x640xf32>)
+          outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+  return %1 : tensor<2x2x4xf32>
+}
+
+// -----
+
+// Im2col: offset divisibility communicated via `util.assume.int`. This is the
+// canonical way a frontend or an earlier pass tells the compiler that a
+// dynamic value is a known multiple. `IntegerDivisibilityAnalysis` threads
+// the assumption through to the contiguity check.
+
+// CHECK-LABEL: @im2col_tile_sizes_divisibility_assume
+func.func @im2col_tile_sizes_divisibility_assume(
+    %input: tensor<2x34x34x640xf32>, %m_off: index, %k: index
+) -> tensor<2x2x4xf32> {
+  %0 = tensor.empty() : tensor<2x2x4xf32>
+  %k_off = util.assume.int %k<udiv = 4> : index
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4>
+  %1 = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, %m_off, %k_off] output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          ins(%input : tensor<2x34x34x640xf32>)
+          outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+  return %1 : tensor<2x2x4xf32>
+}
+
+// -----
+
+// Im2col: offset that `IntegerDivisibilityAnalysis` proves is exactly zero, which is always aligned.
+
+// CHECK-LABEL: @im2col_tile_sizes_divisibility_zero
+func.func @im2col_tile_sizes_divisibility_zero(
+    %input: tensor<2x34x34x640xf32>, %m_off: index, %k: index
+) -> tensor<2x2x4xf32> {
+  %0 = tensor.empty() : tensor<2x2x4xf32>
+  %c0 = arith.constant 0 : index
+  %k_off = arith.muli %k, %c0 : index
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4>
+  %1 = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, %m_off, %k_off] output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          ins(%input : tensor<2x34x34x640xf32>)
+          outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+  return %1 : tensor<2x2x4xf32>
+}
+
+// -----
+
+// Im2col: no divisibility information available (offset is an opaque function
+// argument). The analysis cannot prove contiguity, so no tile sizes attribute
+// is stamped. This is the negative control for the two preceding tests.
+
+// CHECK-LABEL: @negative_im2col_tile_sizes_divisibility_unknown
+func.func @negative_im2col_tile_sizes_divisibility_unknown(
+    %input: tensor<2x34x34x640xf32>, %m_off: index, %k_off: index
+) -> tensor<2x2x4xf32> {
+  %0 = tensor.empty() : tensor<2x2x4xf32>
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %1 = iree_linalg_ext.im2col
+          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+          offsets = [0, %m_off, %k_off] output_sizes = [[2], [32, 32], [3, 3, 640]]
+          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          ins(%input : tensor<2x34x34x640xf32>)
+          outs(%0 : tensor<2x2x4xf32>) -> tensor<2x2x4xf32>
+  return %1 : tensor<2x2x4xf32>
+}
+
+// -----
+
 // Im2col: wider vectorization. Vectorizes along the innermost channel dim
 // with width 8. Non-vectorized spatial dims are tiled to 1.
 

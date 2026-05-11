@@ -161,22 +161,35 @@ static const iree_hal_buffer_equality_t kExactEquality = ([]() {
 })();
 
 static const iree_hal_buffer_equality_t kApproximateAbsoluteEquality = ([]() {
-  iree_hal_buffer_equality_t equality;
-  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_ABSOLUTE;
-  equality.f16_threshold = 0.001f;
-  equality.f32_threshold = 0.0001f;
-  equality.f64_threshold = 0.0001;
-  equality.bf16_threshold = 0.01f;
+  iree_hal_buffer_equality_t equality = {};
+  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE;
+  equality.f16_atol = 0.001f;
+  equality.f32_atol = 0.0001f;
+  equality.f64_atol = 0.0001;
+  equality.bf16_atol = 0.01f;
+  equality.rtol = 0.0;
   return equality;
 })();
 
 static const iree_hal_buffer_equality_t kApproximateRelativeEquality = ([]() {
-  iree_hal_buffer_equality_t equality;
-  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_RELATIVE;
-  equality.f16_threshold = 0.001f;
-  equality.f32_threshold = 0.0001f;
-  equality.f64_threshold = 0.0001;
-  equality.bf16_threshold = 0.01f;
+  iree_hal_buffer_equality_t equality = {};
+  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE;
+  equality.f16_atol = 0.0f;
+  equality.f32_atol = 0.0f;
+  equality.f64_atol = 0.0;
+  equality.bf16_atol = 0.0f;
+  equality.rtol = 0.001;
+  return equality;
+})();
+
+static const iree_hal_buffer_equality_t kApproximateNumpyEquality = ([]() {
+  iree_hal_buffer_equality_t equality = {};
+  equality.mode = IREE_HAL_BUFFER_EQUALITY_APPROXIMATE;
+  equality.f16_atol = 1e-5f;
+  equality.f32_atol = 1e-5f;
+  equality.f64_atol = 1e-5;
+  equality.bf16_atol = 1e-5f;
+  equality.rtol = 1e-5;
   return equality;
 })();
 
@@ -546,6 +559,59 @@ TEST_F(BufferViewMatchersTest, CompareElementwiseF32EQ) {
       kApproximateAbsoluteEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
       iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST(BufferViewMatchersMathTest, FuzzyCompareF64HandlesFiniteAndNonFinite) {
+  EXPECT_TRUE(
+      iree_math_fuzzy_compare_f64(729.0, 729.0001220703125, 1e-5, 1e-5));
+  EXPECT_TRUE(iree_math_fuzzy_compare_f64(NAN, NAN, 0.0, 0.0));
+  EXPECT_TRUE(iree_math_fuzzy_compare_f64(INFINITY, INFINITY, 0.0, 0.0));
+  EXPECT_FALSE(iree_math_fuzzy_compare_f64(INFINITY, -INFINITY, 0.0, 0.0));
+}
+
+// 2-ULP drift at magnitude 729 fails an atol-only check at 1e-4 but passes
+// once the rtol*|expected| term is added.
+TEST_F(BufferViewMatchersTest, CompareElementwiseF32NumpyULPDrift) {
+  const float lhs[] = {729.0f, 32.0f, 1.0f};
+  const float rhs[] = {729.0001220703125f, 32.0f, 1.0f};
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateNumpyEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseF32NumpyRealDiff) {
+  const float lhs[] = {1.0f, 2.0f, 3.0f};
+  const float rhs[] = {1.0f, 2.5f, 3.0f};
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateNumpyEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+  EXPECT_EQ(index, 1);
+}
+
+TEST_F(BufferViewMatchersTest, CompareElementwiseF32NumpyNaNEq) {
+  const float lhs[] = {NAN, 1.0f};
+  const float rhs[] = {NAN, 1.0f};
+  iree_host_size_t index = 0;
+  EXPECT_TRUE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateNumpyEquality, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+}
+
+// Integer buffers ignore atol/rtol and use the byte-exact path.
+TEST_F(BufferViewMatchersTest, CompareElementwiseI32NumpyExactFallthrough) {
+  const int32_t lhs[] = {1, 2, 3};
+  const int32_t rhs[] = {1, 2, 4};
+  iree_host_size_t index = 0;
+  EXPECT_FALSE(iree_hal_compare_buffer_elements_elementwise(
+      kApproximateNumpyEquality, IREE_HAL_ELEMENT_TYPE_INT_32,
+      IREE_ARRAYSIZE(lhs), iree_make_const_byte_span(lhs, sizeof(lhs)),
+      iree_make_const_byte_span(rhs, sizeof(rhs)), &index));
+  EXPECT_EQ(index, 2);
 }
 
 TEST_F(BufferViewMatchersTest, CompareElementwiseF32NE) {

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -279,7 +280,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     // Build zero thread indices for dest (uniform across subgroup).
     Location loc = op.getLoc();
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    SmallVector<Value> zeroThreadIndices(destRank, c0);
+    llvm::Repeated<Value> zeroThreadIndices(destRank, c0);
 
     // Emit gather_to_lds for each batch/outer tile offset.
     for (SmallVector<int64_t> offsets :

@@ -4,7 +4,7 @@
 // Expects 2 shuffle steps for inclusive scan, then total shuffle from last
 // lane, then exclusive shift shuffle + select identity at lane 0.
 
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_f32(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info} {
   %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) cluster(size = 4) {
   ^bb0(%lhs: f32, %rhs: f32):
@@ -59,7 +59,7 @@ func.func @scan_add_f32(%x: f32, %zero: f32) -> (f32, f32) attributes {translati
 // Clustered scan with cluster_size=4, stride=16.
 // Expects shuffle offsets of 16, 32. lanePos = (laneId / 16) % 4.
 
-#translation_info2 = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info2 = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [64, 1, 1] subgroup_size = 64>
 func.func @scan_add_f32_stride16(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info2} {
   %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) cluster(size = 4, stride = 16) {
   ^bb0(%lhs: f32, %rhs: f32):
@@ -116,7 +116,7 @@ func.func @scan_add_f32_stride16(%x: f32, %zero: f32) -> (f32, f32) attributes {
 
 // i32 scan: no bitcast needed.
 
-#translation_info3 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info3 = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_i32(%x: i32, %zero: i32) -> (i32, i32) attributes {translation_info = #translation_info3} {
   %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : i32) cluster(size = 4) {
   ^bb0(%lhs: i32, %rhs: i32):
@@ -148,7 +148,7 @@ func.func @scan_add_i32(%x: i32, %zero: i32) -> (i32, i32) attributes {translati
 
 // f16 scan: requires bitcast to i32 for shuffle.
 
-#translation_info4 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info4 = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_add_f16(%x: f16, %zero: f16) -> (f16, f16) attributes {translation_info = #translation_info4} {
   %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f16) cluster(size = 4) {
   ^bb0(%lhs: f16, %rhs: f16):
@@ -187,7 +187,7 @@ func.func @scan_add_f16(%x: f16, %zero: f16) -> (f16, f16) attributes {translati
 // Expects 5 shuffle steps for inclusive scan (offsets 1, 2, 4, 8, 16),
 // then total shuffle + exclusive shift.
 
-#translation_info5 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info5 = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_full_subgroup(%x: f32, %zero: f32) -> (f32, f32) attributes {translation_info = #translation_info5} {
   %scan, %total = iree_gpu.subgroup_scan(%x, identity = %zero : f32) {
   ^bb0(%lhs: f32, %rhs: f32):
@@ -222,7 +222,7 @@ func.func @scan_full_subgroup(%x: f32, %zero: f32) -> (f32, f32) attributes {tra
 // Expects 2 shuffle steps for inclusive scan, then total shuffle from last
 // lane. No exclusive shift shuffle or identity select.
 
-#translation_info6 = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info6 = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 func.func @scan_inclusive_add_f32(%x: f32) -> (f32, f32) attributes {translation_info = #translation_info6} {
   %scan, %total = iree_gpu.subgroup_scan inclusive (%x) cluster(size = 4) {
   ^bb0(%lhs: f32, %rhs: f32):

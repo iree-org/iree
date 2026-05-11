@@ -317,6 +317,22 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     TypedValue<VectorType> wMask = writeOp.getMask();
     TypedValue<VectorType> rMask = readOp.getMask();
 
+    // If at least one operation claims that the position is in-bounds
+    // then we can fold.
+    //
+    // Case 1.1: w_ib = false, r_ib = true, position is actually in_bounds
+    // We write val, we read val, we can fold RAW to val.
+    // Case 1.2: w_ib = false, r_ib = true, position is NOT in_bounds
+    // We skip write, read says it is in_bounds, but that is false, which is UB
+    // therefore we can fold to val.
+    // Case 2.1: w_ib = true, r_ib = false, position is actually in_bounds
+    // We write val, we read val, we can fold RAW to val.
+    // Case 2.2: w_ib = true, r_ib = false, position is NOT in_bounds
+    // UB on the write, therefore we can fold.
+    if (readOp.hasOutOfBoundsDim() && writeOp.hasOutOfBoundsDim()) {
+      return failure();
+    }
+
     // Build the inner value: select(wMask, valToStore, original).
     // When wMask is absent (unmasked write) or wMask == rMask (original is
     // never accessed), this simplifies to just valToStore.

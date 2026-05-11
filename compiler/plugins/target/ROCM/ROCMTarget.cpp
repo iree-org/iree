@@ -581,6 +581,25 @@ public:
                              llvm::TargetMachine &targetMachine,
                              bool slpVectorization,
                              std::string &outPassesString) {
+    // Workaround for upstream LLVM PR llvm/llvm-project#194924 (commit
+    // b09174b41e7e, "[AMDGPU] Enable runtime loop unrolling") which set
+    //   UP.PartialThreshold = UP.Threshold / 4   (75 for AMDGPU)
+    // in AMDGPUTTIImpl::getUnrollingPreferences, regressing partial unrolling
+    // of small constant-trip-count reduction loops. Restore the prior
+    // un-overridden LLVM default (150) by bumping the cl::opt occurrence
+    // count, which makes LoopUnrollPass apply the override (see
+    // LoopUnrollPass.cpp gatherUnrollingPreferences). Skipped when the user
+    // already set --unroll-partial-threshold so an explicit override still
+    // wins. Safe to remove once the upstream regression is fixed.
+    auto &registeredCLOpts = llvm::cl::getRegisteredOptions();
+    auto unrollOptIt = registeredCLOpts.find("unroll-partial-threshold");
+    if (unrollOptIt != registeredCLOpts.end() &&
+        unrollOptIt->second->getNumOccurrences() == 0) {
+      unrollOptIt->second->addOccurrence(/*pos=*/0,
+                                         /*ArgName=*/"unroll-partial-threshold",
+                                         /*Value=*/"150");
+    }
+
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;

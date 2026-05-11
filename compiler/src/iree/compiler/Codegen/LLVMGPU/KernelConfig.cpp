@@ -80,6 +80,15 @@ static llvm::cl::opt<bool> clGPUEnableReductionVectorDistribution(
         "enable the usage of the reduction vector distribution pipeline"),
     llvm::cl::init(true));
 
+static void appendPromotedOperandsListWithDerivedThread(
+    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
+    ArrayRef<int64_t> operands) {
+  SmallVector<Attribute> promotionTypes(
+      operands.size(), IREE::GPU::DerivedThreadConfigAttr::get(context));
+  IREE::GPU::appendPromotedOperandsList(context, attrs, operands,
+                                        promotionTypes);
+}
+
 static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
     llvm::cl::desc(
@@ -106,7 +115,7 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(true));
+                    llvm::cl::Hidden, llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
@@ -692,7 +701,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   auto promotedOperands =
       llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
-  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
+  appendPromotedOperandsListWithDerivedThread(context, attrs, promotedOperands);
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(op.getNumLoops(), 1),
@@ -978,7 +987,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+  appendPromotedOperandsListWithDerivedThread(context, attrs, {0, 1, 2});
 
   // Check if transposing both intrinsics eliminates the layout conflict
   // between QK output and PV LHS input.
@@ -1015,14 +1024,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> pvConfig;
 
   // Configuring for qk matmul.
-  IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
+  appendPromotedOperandsListWithDerivedThread(context, qkConfig, {0, 1});
   IREE::GPU::setMmaKind(context, qkConfig,
                         getIntrinsic(qkSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
 
   // Configuring for pv matmul.
-  IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
+  appendPromotedOperandsListWithDerivedThread(context, pvConfig, {1});
   IREE::GPU::setMmaKind(context, pvConfig,
                         getIntrinsic(pvSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
@@ -2666,9 +2675,12 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   }
 
   if (!rootOperation) {
-    // No root operation found, set it to none.
+    // No root operation found, set it to no_pipeline.
+    MLIRContext *context = funcOp.getContext();
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+        context, IREE::Codegen::NoPipelineAttr::get(context),
+        /*codegenSpec=*/SymbolRefAttr(), /*workgroupSize=*/ArrayRef<int64_t>(),
+        /*subgroupSize=*/int64_t(), /*configuration=*/DictionaryAttr());
     if (failed(setTranslationInfo(funcOp, translationInfo))) {
       return failure();
     }

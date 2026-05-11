@@ -64,46 +64,48 @@ if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
 
-iree_cc_binary(
-  NAME
-    iree-benchmark-executable
-  SRCS
-    "iree-benchmark-executable-main.c"
-  DEPS
-    iree::async::util::proactor_pool
-    iree::base
-    iree::base::threading
-    iree::base::tooling::flags
-    iree::hal
-    iree::io::file_handle
-    iree::modules::hal::types
-    iree::testing::benchmark
-    iree::tooling::device_util
-    iree::tooling::function_io
-    iree::vm
-  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
-  INSTALL_COMPONENT IREETools-Runtime
-)
+if(IREE_BUILD_BENCHMARKS)
+  iree_cc_binary(
+    NAME
+      iree-benchmark-executable
+    SRCS
+      "iree-benchmark-executable-main.c"
+    DEPS
+      iree::async::util::proactor_pool
+      iree::base
+      iree::base::threading
+      iree::base::tooling::flags
+      iree::hal
+      iree::io::file_handle
+      iree::modules::hal::types
+      iree::testing::benchmark
+      iree::tooling::device_util
+      iree::tooling::function_io
+      iree::vm
+    COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+    INSTALL_COMPONENT IREETools-Runtime
+  )
 
-iree_cc_binary(
-  NAME
-    iree-benchmark-module
-  SRCS
-    "iree-benchmark-module-main.cc"
-  DEPS
-    benchmark
-    iree::base
-    iree::base::tooling::flags
-    iree::hal
-    iree::hal::replay::recorder
-    iree::modules::hal::types
-    iree::tooling::context_util
-    iree::tooling::device_util
-    iree::tooling::function_io
-    iree::vm
-  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
-  INSTALL_COMPONENT IREETools-Runtime
-)
+  iree_cc_binary(
+    NAME
+      iree-benchmark-module
+    SRCS
+      "iree-benchmark-module-main.cc"
+    DEPS
+      benchmark
+      iree::base
+      iree::base::tooling::flags
+      iree::hal
+      iree::hal::replay::recorder
+      iree::modules::hal::types
+      iree::tooling::context_util
+      iree::tooling::device_util
+      iree::tooling::function_io
+      iree::vm
+    COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+    INSTALL_COMPONENT IREETools-Runtime
+  )
+endif()
 
 iree_cc_binary(
   NAME
@@ -257,24 +259,26 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
-iree_cc_binary(
-  NAME
-    iree-benchmark-replay
-  SRCS
-    "iree-benchmark-replay-main.cc"
-  DEPS
-    benchmark
-    iree::async
-    iree::async::util::proactor_pool
-    iree::base
-    iree::base::tooling::flags
-    iree::hal
-    iree::hal::replay::execute
-    iree::io::file_handle
-    iree::tooling::device_util
-  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
-  INSTALL_COMPONENT IREETools-Runtime
-)
+if(IREE_BUILD_BENCHMARKS)
+  iree_cc_binary(
+    NAME
+      iree-benchmark-replay
+    SRCS
+      "iree-benchmark-replay-main.cc"
+    DEPS
+      benchmark
+      iree::async
+      iree::async::util::proactor_pool
+      iree::base
+      iree::base::tooling::flags
+      iree::hal
+      iree::hal::replay::execute
+      iree::io::file_handle
+      iree::tooling::device_util
+    COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+    INSTALL_COMPONENT IREETools-Runtime
+  )
+endif()
 
 iree_cc_binary(
   NAME

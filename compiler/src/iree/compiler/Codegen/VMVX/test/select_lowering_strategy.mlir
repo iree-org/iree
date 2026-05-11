@@ -10,7 +10,7 @@ func.func @matmul_static(%3: tensor<384x512xf32>, %4: tensor<512x128xf32>) -> te
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_cpu.lowering_config<distribution = [64, 64, 0]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @matmul_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
@@ -30,7 +30,7 @@ func.func @copy_op_dynamic(%0: index, %1: index, %4: index, %5: index, %6: memre
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @copy_op_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -48,7 +48,7 @@ func.func @static_1d_fft_stage2(%2: tensor<32xf32>, %3: tensor<32xf32>) -> (tens
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //       CHECK: func.func @static_1d_fft_stage2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   iree_linalg_ext.fft
@@ -87,7 +87,7 @@ func.func @fusion_quant_matmul_generic(%1: index, %7: tensor<?x3360xi8>, %8: ten
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //       CHECK: func.func @fusion_quant_matmul_generic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.matmul
@@ -103,7 +103,7 @@ func.func @unpack_outer_dynamic(%6: index, %7: index, %10: tensor<?x?x32x16xi32>
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @unpack_outer_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.unpack
@@ -132,7 +132,7 @@ func.func @elem_pack_ukernels(%5: tensor<1024x2048xf32>) -> tensor<?x?x?x?xf32> 
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @elem_pack_ukernels
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -159,7 +159,7 @@ func.func @copy_cst() attributes {hal.executable.target = #executable_target_vmv
   return
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @copy_cst
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 
@@ -200,7 +200,7 @@ func.func @already_distributed() attributes {hal.executable.target = #executable
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = VMVXDefault>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
 //      CHECK: func.func @already_distributed
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic

@@ -13,45 +13,6 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
 
 //===---------------------------------------------------------------------===//
-// Pass pipelines
-//===---------------------------------------------------------------------===//
-
-// List of pre-existing pipelines for translating executables.
-def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
-
-def Linalg_TransformDialectCodegen
-    : I32EnumAttrCase<"TransformDialectCodegen", 1000>;
-def Custom
-    : I32EnumAttrCase<"Custom", 1001>;
-
-def None : I32EnumAttrCase<"None", 0xffff>;
-
-// EnumAttrCase for all known lowerings for ops within dispatch region
-// to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum : I32EnumAttr<
-  "DispatchLoweringPassPipeline",
-  "identifier for pass pipeline use to lower dispatch region", [
-    VMVX_Default,
-
-    // Transform dialect based codegen
-    Linalg_TransformDialectCodegen,
-
-    // For out of tree pass-pipelines
-    Custom,
-
-    // None to specify no in-built pipelines to use.
-    None
-  ]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
-  // Don't generate a C++ class! We want to use the AttrDef
-  let genSpecializedAttr = 0;
-}
-
-// Define the AttrDef
-def DispatchLoweringPassPipelineAttr :
-    EnumAttr<IREECodegen_Dialect, DispatchLoweringPassPipelineEnum, "">;
-
-//===---------------------------------------------------------------------===//
 // IREE Codegen workgroup mapping attributes
 //===---------------------------------------------------------------------===//
 
@@ -190,8 +151,34 @@ def IREECodegen_SimpleTargetAttr :
 
 
 //===---------------------------------------------------------------------===//
-// iree_codegen.pass_pipeline
+// iree_codegen pipeline attributes
 //===---------------------------------------------------------------------===//
+
+class IREECodegen_UnitPipelineAttr<string name, string mnemonicStr,
+                                   string summaryStr> :
+    AttrDef<IREECodegen_Dialect, name, [
+      DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface, [
+        "buildPipeline"
+      ]>
+    ]> {
+  let mnemonic = mnemonicStr;
+  let summary = summaryStr;
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+def IREECodegen_VMVXPipelineAttr :
+    IREECodegen_UnitPipelineAttr<"VMVXPipeline", "vmvx_pipeline",
+                                 "The VMVX lowering pipeline.">;
+
+def IREECodegen_TransformDialectCodegenPipelineAttr :
+    IREECodegen_UnitPipelineAttr<
+        "TransformDialectCodegenPipeline", "transform_dialect_codegen",
+        "Transform dialect driven codegen pipeline marker.">;
+
+def IREECodegen_NoPipelineAttr :
+    IREECodegen_UnitPipelineAttr<"NoPipeline", "no_pipeline",
+                                 "No-op codegen pipeline marker.">;
 
 def IREECodegen_PassPipelineAttr :
     AttrDef<IREECodegen_Dialect, "PassPipeline", [
@@ -234,10 +221,9 @@ def IREECodegen_TranslationInfoAttr :
     dispatch region (like `linalg.matmul`/`linalg.*conv*`), this
     attribute gets propagated to the entry point function.
 
-    The `passPipeline` field can be either:
-    - A `DispatchLoweringPassPipelineAttr` (enum keyword like `CPUDefault`).
-    - Any attribute implementing `PipelineAttrInterface` (e.g.,
-      `#iree_codegen.pass_pipeline<"...">`).
+    The `passPipeline` field must be an attribute implementing
+    `PipelineAttrInterface` (e.g. `#iree_codegen.no_pipeline` or
+    `#iree_codegen.pass_pipeline<"...">`).
   }];
 
   let parameters = (ins
@@ -250,25 +236,9 @@ def IREECodegen_TranslationInfoAttr :
     OptionalParameter<"DictionaryAttr",
         "Pipeline specific configuration">:$configuration
   );
-  let builders = [
-    AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        CArg<"SymbolRefAttr", "{}">:$codegenSpec,
-        CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize,
-        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
-        CArg<"DictionaryAttr", "{}">:$configuration)>,
-    AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        "ArrayRef<int64_t>":$workgroupSize,
-        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
-        CArg<"DictionaryAttr", "{}">:$configuration)>
-  ];
-  let extraClassDeclaration = [{
-    // Returns the lowering pass pipeline enum value. Returns None if the
-    // pipeline is not a DispatchLoweringPassPipelineAttr.
-    DispatchLoweringPassPipeline getDispatchLoweringPassPipeline();
-  }];
 
   let assemblyFormat = [{
-    `<` `pipeline` `=` custom<PipelineAttr>($passPipeline)
+    `<` `pipeline` `=` $passPipeline
       (`codegen_spec` `=` $codegenSpec^)?
       (`workgroup_size` `=` `[` $workgroupSize^ `]`)?
       (`subgroup_size` `=` $subgroupSize^)?

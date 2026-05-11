@@ -462,6 +462,163 @@ func.func @fold_masked_transfer_raw_unmasked_write_masked_read(%t: tensor<128xf1
 
 // -----
 
+// Test for FoldTransferRAW with OOB.
+// Write has OOB dim, read claims in-bounds, same mask on both: fold is valid.
+func.func @fold_raw_oob_write_same_mask(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0], %mask
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad, %mask
+     {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// CHECK-LABEL: func.func @fold_raw_oob_write_same_mask
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[PAD]]
+// CHECK:         return %[[SEL]]
+
+// -----
+
+// Test for FoldTransferRAW with OOB on both — negative.
+// Both write and read have OOB, no masks: fold must NOT happen.
+func.func @negative_fold_raw_oob_both_no_masks(%val: vector<1x32x16xf16>, %sz: index) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0]
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad
+     {in_bounds = [true, false, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// CHECK-LABEL: func.func @negative_fold_raw_oob_both_no_masks
+// CHECK:         vector.transfer_write
+// CHECK:         vector.transfer_read
+
+// -----
+
+// Test for FoldTransferRAW with OOB on both — negative.
+// Both write and read have OOB dim with same mask: fold must NOT happen.
+func.func @negative_fold_raw_oob_both_same_mask(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0], %mask
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad, %mask
+     {in_bounds = [true, false, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// CHECK-LABEL: func.func @negative_fold_raw_oob_both_same_mask
+// CHECK:         vector.transfer_write
+// CHECK:         vector.transfer_read
+
+// -----
+
+// Test for FoldTransferRAW with OOB.
+// Only read has OOB dim, write claims in-bounds, same mask: fold is valid
+// because the write's in_bounds=true makes OOB positions UB.
+func.func @fold_raw_oob_read_only(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0], %mask
+     {in_bounds = [true, true, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad, %mask
+     {in_bounds = [true, false, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// CHECK-LABEL: func.func @fold_raw_oob_read_only
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         %[[SEL:.*]] = arith.select %[[MASK]], %[[VAL]], %[[PAD]]
+// CHECK:         return %[[SEL]]
+
+// -----
+
+// Test for FoldTransferRAW with OOB.
+// Write has OOB dim, read claims in-bounds, no masks: fold is valid because
+// the read's in_bounds=true makes OOB positions UB.
+func.func @fold_raw_oob_write_no_masks(%val: vector<1x32x16xf16>, %sz: index) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0]
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad
+     {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// CHECK-LABEL: func.func @fold_raw_oob_write_no_masks
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         return %[[VAL]]
+
+// -----
+
+// Test for FoldTransferRAW with OOB.
+// Write has OOB dim, read claims in-bounds, different masks: fold is valid.
+// The different masks are handled by the needsOriginal path.
+func.func @fold_raw_oob_write_different_masks(%val: vector<1x32x16xf16>, %sz: index, %wmask: vector<1x32x16xi1>, %rmask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0], %wmask
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad, %rmask
+     {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// The originalRead from tensor.empty is folded to poison by
+// FoldReadFromEmpty, so select(wMask, val, poison) canonicalizes and
+// only the outer rMask select remains.
+// CHECK-LABEL: func.func @fold_raw_oob_write_different_masks
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %{{[a-zA-Z0-9]+}}
+// CHECK-SAME:    %[[RMASK:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[PAD:.*]] = arith.constant dense<0.000000e+00> : vector<1x32x16xf16>
+// CHECK:         %[[SEL:.*]] = arith.select %[[RMASK]], %[[VAL]], %[[PAD]]
+// CHECK:         return %[[SEL]]
+
+// -----
+
+// Test for FoldTransferRAW with OOB.
+// Write has OOB dim, only write is masked, read claims in-bounds: fold is
+// valid. The write mask is handled by the needsOriginal path.
+func.func @fold_raw_oob_write_only_write_masked(%val: vector<1x32x16xf16>, %sz: index, %mask: vector<1x32x16xi1>) -> vector<1x32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f16
+  %e = tensor.empty(%sz) : tensor<1x?x16xf16>
+  %w = vector.transfer_write %val, %e[%c0, %c0, %c0], %mask
+     {in_bounds = [true, false, true]} : vector<1x32x16xf16>, tensor<1x?x16xf16>
+  %r = vector.transfer_read %w[%c0, %c0, %c0], %pad
+     {in_bounds = [true, true, true]} : tensor<1x?x16xf16>, vector<1x32x16xf16>
+  return %r : vector<1x32x16xf16>
+}
+// The originalRead from tensor.empty is folded to poison by
+// FoldReadFromEmpty, so select(wMask, val, poison) canonicalizes to val.
+// No rMask, so the result is just val.
+// CHECK-LABEL: func.func @fold_raw_oob_write_only_write_masked
+// CHECK-SAME:    %[[VAL:[a-zA-Z0-9]+]]
+// CHECK-NOT:     vector.transfer_write
+// CHECK-NOT:     vector.transfer_read
+// CHECK:         return %[[VAL]]
+
+// -----
+
 // transfer_read from a memref (not tensor semantics): pattern must not fire.
 func.func @negative_read_empty_not_tensor_semantics(%m: memref<128xf16>) -> vector<128xf16> {
   %c0 = arith.constant 0 : index

@@ -20,7 +20,7 @@ namespace mlir::iree_compiler {
 SmallVector<Value> getTransferIndicesFromNestedLayout(
     OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
     IREE::VectorExt::NestedLayoutAttr vectorLayout, AffineMap permutationMap,
-    ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices);
+    ValueRange warpIndices, ValueRange threadIndices);
 
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.

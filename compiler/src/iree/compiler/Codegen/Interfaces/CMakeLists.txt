@@ -172,6 +172,7 @@ iree_cc_library(
     "VectorizableOpInterface.cpp"
   DEPS
     ::VectorizableOpInterfaceGen
+    LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRAnalysis

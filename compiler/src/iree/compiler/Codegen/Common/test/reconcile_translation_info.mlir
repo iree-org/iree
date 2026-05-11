@@ -8,15 +8,15 @@ hal.executable private @reconcile_workgroup_size {
   hal.executable.variant public @reconcile_workgroup_size target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @entry_point() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
+      func.func @entry_point() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>}  {
         func.call @fn1() : () -> ()
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>} {
         return
       }
     }
@@ -40,7 +40,7 @@ hal.executable private @single_translation_info {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>}  {
         return
       }
       func.func @fn2()  {
@@ -68,10 +68,10 @@ hal.executable private @err_mismatched_workgroup_size {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4, 2]>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4, 2]>} {
         return
       }
     }
@@ -93,10 +93,10 @@ hal.executable private @err_mismatched_workgroup_size2 {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4]>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4]>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline>} {
         return
       }
     }
@@ -117,10 +117,10 @@ hal.executable private @reconcile_subgroup_size {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>} {
         return
       }
     }
@@ -145,10 +145,10 @@ hal.executable private @err_reconcile_subgroup_size {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 32>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = 64>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 64>} {
         return
       }
     }
@@ -173,10 +173,10 @@ hal.executable private @llvm_func_attrs {
         func.call @fn2() : () -> ()
         return
       }
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"some-llvm-attr" = "2"}}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline, {llvm_func_attrs = {"some-llvm-attr" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = None, {llvm_func_attrs = {"some-llvm-attr" = "4"}}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline, {llvm_func_attrs = {"some-llvm-attr" = "4"}}>} {
         return
       }
     }

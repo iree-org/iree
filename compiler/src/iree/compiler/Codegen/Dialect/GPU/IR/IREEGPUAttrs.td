@@ -33,6 +33,7 @@ def IREEGPU_LoweringConfigAttr :
         "getWorkgroupReorderingStrategy"
     ]>
     ]> {
+  let genVerifyDecl = 1;
   let mnemonic = "lowering_config";
   let summary = [{Drive lowering of an operation for gpu compilation.}];
   let description = [{

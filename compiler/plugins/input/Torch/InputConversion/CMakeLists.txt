@@ -77,6 +77,7 @@ iree_cc_library(
     iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR
     iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectIR
     iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectUtils
     iree::compiler::plugins::input::Torch::torch-mlir::TorchOnnxToTorchPasses
   PUBLIC
 )

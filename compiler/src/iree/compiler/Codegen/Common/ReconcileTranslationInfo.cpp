@@ -23,6 +23,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/CallGraph.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -874,7 +875,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
       configOp = IREE::Codegen::DispatchConfigOp::create(
           rewriter, loc, FlatSymbolRefAttr::get(rootFuncOp.getNameAttr()));
       IndexType indexType = rewriter.getIndexType();
-      SmallVector<Type> argTypes(numWorkloads, indexType);
+      llvm::Repeated<Type> argTypes(numWorkloads, indexType);
       SmallVector<Location> argLocs(numWorkloads, loc);
       Block *block = rewriter.createBlock(&configOp.getBody(), /*insertPt=*/{},
                                           argTypes, argLocs);

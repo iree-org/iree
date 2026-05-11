@@ -1,11 +1,11 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
 
@@ -36,6 +36,11 @@
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=IGEMM
 
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-llvmgpu-use-direct-load=true \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=IGEMM-DIRECT-LOAD
 
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
 #rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
@@ -593,32 +598,21 @@ func.func @matmul_bf16(
 
 // -----
 
-// BF16 1x1 conv (preprocessed to fold unit spatial dims) with DMA. The MMA intrinsic
-// (MFMA_F32_32x32x8_BF16) is not in the tuned swizzle table, so no XOR
-// swizzle should be applied -- only plain use_global_load_dma.
-func.func @conv_1x1_bf16_no_untuned_swizzle(
+// BF16 1x1 conv with DMA. The MMA intrinsic (MFMA_F32_32x32x8_BF16) is not in
+// the tuned swizzle table, so no XOR swizzle should be applied -- only plain
+// use_global_load_dma.
+func.func @conv_bf16_no_untuned_swizzle(
     %arg0: tensor<16x96x64x40xbf16>,
-    %arg1: tensor<40x40xbf16>) -> tensor<16x96x64x40xf32> {
+    %arg1: tensor<40x1x1x40xbf16>) -> tensor<16x96x64x40xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %empty = tensor.empty() : tensor<16x96x64x40xf32>
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x96x64x40xf32>) -> tensor<16x96x64x40xf32>
-  %result = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
-                       affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>,
-                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
-      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
-  } ins(%arg0, %arg1 : tensor<16x96x64x40xbf16>, tensor<40x40xbf16>)
-    outs(%fill : tensor<16x96x64x40xf32>) {
-  ^bb0(%in: bf16, %in_1: bf16, %out: f32):
-    %0 = arith.extf %in : bf16 to f32
-    %1 = arith.extf %in_1 : bf16 to f32
-    %2 = arith.mulf %0, %1 : f32
-    %3 = arith.addf %out, %2 : f32
-    linalg.yield %3 : f32
-  } -> tensor<16x96x64x40xf32>
+  %result = linalg.conv_2d_nhwc_fhwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+    ins(%arg0, %arg1 : tensor<16x96x64x40xbf16>, tensor<40x1x1x40xbf16>)
+    outs(%fill : tensor<16x96x64x40xf32>) -> tensor<16x96x64x40xf32>
   return %result : tensor<16x96x64x40xf32>
 }
 
-// CHECK-DIRECT-LOAD-LABEL: func.func @conv_1x1_bf16_no_untuned_swizzle
-// CHECK-DIRECT-LOAD:       linalg.generic
-// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]
+// IGEMM-DIRECT-LOAD-LABEL: func.func @conv_bf16_no_untuned_swizzle
+// IGEMM-DIRECT-LOAD:       linalg.conv_2d_nhwc_fhwc {
+// IGEMM-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]

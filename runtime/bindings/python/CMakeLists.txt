@@ -13,6 +13,14 @@ if(IREE_BUILD_TRACY)
   list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
 endif()
 
+if(IREE_BUILD_BENCHMARKS)
+  list(APPEND _EXTRA_INSTALL_TOOL_TARGETS
+    "iree-benchmark-executable"
+    "iree-benchmark-module"
+    "iree-benchmark-replay"
+  )
+endif()
+
 ################################################################################
 # Package
 ################################################################################
@@ -152,23 +160,25 @@ iree_symlink_tool(
   TO_EXE_NAME iree/_runtime_libs/iree-c-embed-data
 )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-executable
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
-)
+if(IREE_BUILD_BENCHMARKS)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-executable
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
+  )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-module
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-module
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
+  )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-replay
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-replay
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
+  )
+endif()
 
 iree_symlink_tool(
   TARGET runtime
@@ -405,9 +415,6 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   CALL install
   TARGETS
     iree-cpuinfo
-    iree-benchmark-executable
-    iree-benchmark-module
-    iree-benchmark-replay
     iree-c-embed-data
     iree-convert-parameters
     iree-create-parameters

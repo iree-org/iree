@@ -14,9 +14,16 @@
 // Im2colOp.
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+/// Callback returning the known divisibility (greatest N such that the value is
+/// guaranteed to be a multiple of N) for a given Value. A return value of 1
+/// means "no information". Typically backed by `IntegerDivisibilityAnalysis`
+/// results from the caller's dataflow solver.
+using OffsetDivisibilityFn = llvm::function_ref<uint64_t(Value)>;
 
 /// Holds the computed source indices for an im2col operation at a given
 /// output position. These indices describe where to read from the input tensor.
@@ -71,17 +78,28 @@ Value computeIm2colValidSize(OpBuilder &b, Location loc, Im2colOp im2colOp,
 /// \p offsets are the per-output-dim offsets from the im2col op's attributes.
 /// For K output dims, the offset of the specific dim being considered is used
 /// directly for the contiguity check (no linearization needed).
-std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
-                                            Im2colOp im2colOp,
-                                            ArrayRef<Range> iterationDomain,
-                                            ArrayRef<OpFoldResult> offsets);
+///
+/// When \p getOffsetDivisibility is set, the contiguity check queries it for
+/// runtime (non-constant) offset Values. Returning a factor that is a multiple
+/// of the tile size lets this helper recognize vectorizable cases that the
+/// static `affine.apply` pattern match cannot.
+std::optional<int64_t>
+chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
+                     ArrayRef<Range> iterationDomain,
+                     ArrayRef<OpFoldResult> offsets,
+                     OffsetDivisibilityFn getOffsetDivisibility = nullptr);
 
 /// Compute vector tile sizes for an im2col op. Returns a vector of tile sizes
 /// with one entry per output dimension. The vectorizable dimension (if any)
 /// gets its full iteration size; all other dimensions get 1. Returns nullopt
 /// if no vectorizable dimension is found (e.g. no contiguous slice exists).
-std::optional<SmallVector<int64_t>>
-computeIm2colVectorTileSizes(OpBuilder &b, Im2colOp im2colOp);
+///
+/// \p getOffsetDivisibility, when non-null, is forwarded to the contiguity
+/// check so that runtime offset divisibility (typically from
+/// `IntegerDivisibilityAnalysis`) can be used.
+std::optional<SmallVector<int64_t>> computeIm2colVectorTileSizes(
+    OpBuilder &b, Im2colOp im2colOp,
+    OffsetDivisibilityFn getOffsetDivisibility = nullptr);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 

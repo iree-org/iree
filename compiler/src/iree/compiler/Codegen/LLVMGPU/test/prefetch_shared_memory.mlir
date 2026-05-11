@@ -799,3 +799,95 @@ func.func @gather_to_lds_with_swizzle_attr(
   vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }
+
+// -----
+
+// Test that gather_to_lds ops before the loop (e.g., Q loads in attention) are
+// converted to async with explicit synchronization. This is intentionally two
+// pre-loop gathers to verify that they are grouped and drained before use.
+// CHECK-LABEL: @gather_to_lds_pre_loop_gets_explicit_wait
+func.func @gather_to_lds_pre_loop_gets_explicit_wait(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>) {
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %Q_lds = memref.alloc() : memref<2xf32, #gpu.address_space<workgroup>>
+  %K_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // Pre-loop gather_to_lds ops (e.g., loading Q) - async with explicit drain.
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c0], %Q_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<2xf32, #gpu.address_space<workgroup>>
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c1], %Q_lds[%c1] : vector<1xf32>, memref<128x128xf32>, memref<2xf32, #gpu.address_space<workgroup>>
+  // CHECK: rocdl.asyncmark
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
+  // CHECK: vector.transfer_read
+
+  // Barrier + read Q from LDS before the loop, mirroring the real attention
+  // pattern where Q is loaded, synchronized, and consumed before K/V pipelining.
+  gpu.barrier
+  %q_val = vector.transfer_read %Q_lds[%c0], %cst_0 : memref<2xf32, #gpu.address_space<workgroup>>, vector<2xf32>
+
+  // Pipelined loop with gather_to_lds - these should be async.
+  // CHECK: amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // CHECK: scf.for
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %q_val) -> (vector<2xf32>) {
+    amdgpu.gather_to_lds %B_global[%c0, %k], %K_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %k_val = vector.transfer_read %K_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %k_splat = vector.broadcast %k_val : vector<1xf32> to vector<2xf32>
+    %prod = arith.mulf %k_splat, %acc : vector<2xf32>
+    scf.yield %prod : vector<2xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%c0] {in_bounds = [true]} : vector<2xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// Test that the pre-loop async drain is inserted before the first barrier even
+// when the shared read is not immediately adjacent to that barrier.
+// CHECK-LABEL: @gather_to_lds_pre_loop_wait_before_non_adjacent_read
+func.func @gather_to_lds_pre_loop_wait_before_non_adjacent_read(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>,
+    %offset: index) {
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %Q_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %K_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c0], %Q_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: rocdl.asyncmark
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
+  // CHECK: arith.addi
+  // CHECK: vector.transfer_read
+  gpu.barrier
+  %write_idx = arith.addi %offset, %c1 : index
+  %q_val = vector.transfer_read %Q_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+
+  // CHECK: amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // CHECK: scf.for
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %q_val) -> (vector<1xf32>) {
+    amdgpu.gather_to_lds %B_global[%c0, %k], %K_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %k_val = vector.transfer_read %K_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %prod = arith.mulf %k_val, %acc : vector<1xf32>
+    scf.yield %prod : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%write_idx] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}

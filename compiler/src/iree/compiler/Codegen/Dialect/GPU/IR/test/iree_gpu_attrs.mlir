@@ -335,6 +335,15 @@ module {
 //  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{thread = [0, 4], workgroup = [16, 16]}>
 
 module {
+  func.func @test_lowering_config_promotion_types() attributes {
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_load_dma]}>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lowering_config_promotion_types
+//  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_load_dma]}>
+
+module {
   func.func @test_lowering_config_reordering() attributes {
       lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>} {
     return

@@ -1163,7 +1163,7 @@ FailureOr<int64_t> getDynamicUpperBound(Value value,
   // Fallback to ValueBoundsConstraintSet for complex cases.
   auto ub = ValueBoundsConstraintSet::computeConstantBound(
       presburger::BoundType::UB, {value, std::nullopt},
-      /*stopCondition=*/nullptr, /*closedUB=*/true);
+      /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
   if (succeeded(ub)) {
     return ub.value();
   }
@@ -1791,7 +1791,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
     FailureOr<int64_t> maybeDimBoundSize =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {shapedValue, dimNum},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (succeeded(maybeDimBoundSize)) {
       return DimBoundSize{/*baseSize=*/*maybeDimBoundSize,
                           /*scalable=*/false};
@@ -2124,7 +2124,7 @@ inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult) {
       FailureOr<int64_t> maybeDimBound =
           ValueBoundsConstraintSet::computeConstantBound(
               presburger::BoundType::UB, {opResult, static_cast<unsigned>(idx)},
-              /*stopCondition=*/nullptr, /*closedUB=*/true);
+              /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
       if (failed(maybeDimBound)) {
         LDBG() << "failed to infer bounds for dynamic dim";
         return std::nullopt;
@@ -2153,7 +2153,7 @@ std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
     FailureOr<int64_t> maybeDimBound =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, dim,
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(maybeDimBound)) {
       LDBG() << "failed to infer bounds for dim #" << dim;
       return std::nullopt;

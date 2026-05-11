@@ -1,5 +1,37 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics %s
 
+func.func @lowering_config_missing_promote_operands() attributes {
+    // expected-error @+1 {{promotion_types requires promote_operands to be specified}}
+    lowering_config = #iree_gpu.lowering_config<{promotion_types = [#iree_gpu.derived_thread_config]}>} {
+  return
+}
+
+// -----
+
+func.func @lowering_config_mismatched_promotion_types() attributes {
+    // expected-error @+1 {{promote_operands and promotion_types must have the same length}}
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.derived_thread_config]}>} {
+  return
+}
+
+// -----
+
+func.func @lowering_config_invalid_promotion_type() attributes {
+    // expected-error @+1 {{promotion_types elements must implement IREE::GPU::PromotionAttr}}
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0], promotion_types = ["invalid"]}>} {
+  return
+}
+
+// -----
+
+func.func @lowering_config_invalid_promotion_types_attr() attributes {
+    // expected-error @+1 {{promotion_types must be an array}}
+    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0], promotion_types = "invalid"}>} {
+  return
+}
+
+// -----
+
 func.func @mma_inner_tiled_invalid_num_inputs(%lhs: tensor<?x?x4xf16>, %acc: tensor<?x?x4xf32>) -> tensor<?x?x4xf32> {
   // expected-error @+1 {{number of inputs (1) doesn't match expected number from kind (2)}}
   %0 = iree_codegen.inner_tiled ins(%lhs) outs(%acc) {

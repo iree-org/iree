@@ -197,7 +197,8 @@ struct MaterializeUserConfigsPass final
       //      of the strategy, the variant needs to be annotated with:
       //      ```mlir
       //      "translation_info" =
-      //        #iree_codegen.translation_info<pipeline = None>
+      //        #iree_codegen.translation_info<
+      //          pipeline = #iree_codegen.no_pipeline>
       //      ```
       LDBG() << "MaterializeUserConfigsPass on function: " << funcOp;
       if (succeeded(userTransformLibrary)) {
@@ -252,9 +253,8 @@ struct MaterializeUserConfigsPass final
       /// We only need to resolve symbols for transform dialect based
       /// strategies.
       if (!translationInfo ||
-          translationInfo.getDispatchLoweringPassPipeline() !=
-              IREE::Codegen::DispatchLoweringPassPipeline::
-                  TransformDialectCodegen) {
+          !isa<IREE::Codegen::TransformDialectCodegenPipelineAttr>(
+              translationInfo.getPassPipeline())) {
         continue;
       }
 

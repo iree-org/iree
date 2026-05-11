@@ -132,6 +132,25 @@ def MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16
 def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
     : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32", 0x2210>;
 
+// Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
+// shape is 1×1×1, lowering is a single `vector.contract` over the
+// unrolled (`intrinsics_m`, `intrinsics_n`, `intrinsics_k`) tile. Unlike
+// every other `MMAIntrinsic` value this does *not* pin down (LHS, RHS,
+// ACC) element types; those live on the `DataTiledMMAAttr`'s
+// `lhs_type` / `rhs_type` / `acc_type` parameters. The cost model picks
+// it only when no element-type-specific intrinsic on the target matches
+// the encoding's element types.
+//
+// Two enum cases, one per cost-model register-budget: 8 (32-bit ISAs) or
+// 16 (64-bit ISAs). One element of any width occupies one register (a
+// GPR or lane 0 of a SIMD register, depending on what LLVM picks) — the
+// architectural register file isn't modeled. The budget is encoded in
+// the low byte: bits 8..15 = 0xF0 (generic), bits 0..7 = budget.
+def MMA_GENERIC_SCALAR_1x1x1_REG8
+    : I32EnumAttrCase<"MMA_GENERIC_SCALAR_1x1x1_REG8", 0xF008>;
+def MMA_GENERIC_SCALAR_1x1x1_REG16
+    : I32EnumAttrCase<"MMA_GENERIC_SCALAR_1x1x1_REG16", 0xF010>;
+
 def IREECPU_MMAIntrinsic
     : IREECPU_I32EnumAttr<
           "MMAIntrinsic", "Descriptor for different MMA intrinsics",
@@ -150,7 +169,10 @@ def IREECPU_MMAIntrinsic
            MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
 
            // Arm SVE
-           MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32]>;
+           MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32,
+
+           // Architecture-agnostic generic-scalar fallback (type-polymorphic).
+           MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;
 
 //===----------------------------------------------------------------------===//
 // CPU Lowering Pipelines

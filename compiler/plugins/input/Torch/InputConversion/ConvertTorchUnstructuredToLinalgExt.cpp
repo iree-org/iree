@@ -21,6 +21,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
+#include "torch-mlir/Dialect/Torch/Utils/Utils.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
@@ -183,6 +184,83 @@ static Value convertToBuiltinTensor(PatternRewriter &rewriter, Location loc,
       rewriter, loc, tensorType.toBuiltinTensor(), torchTensor);
 }
 
+static Value repeatTensorElementsForDim(PatternRewriter &rewriter,
+                                        Operation *op, Type resType, Value self,
+                                        int64_t repeats, int64_t dim) {
+  Location loc = op->getLoc();
+  auto selfType = cast<torch::Torch::ValueTensorType>(self.getType());
+
+  int64_t inputRank = selfType.getSizes().size();
+  dim = torch::Torch::toPositiveDim(dim, inputRank);
+
+  Value dimValue = torch::Torch::ConstantIntOp::create(rewriter, loc, dim);
+  Value dimValuePlusOne =
+      torch::Torch::ConstantIntOp::create(rewriter, loc, dim + 1);
+
+  self = torch::Torch::unsqueezeTensor(rewriter, op, self, dimValuePlusOne)
+             .value();
+
+  SmallVector<int64_t> expandShape(selfType.getSizes());
+  expandShape.insert(expandShape.begin() + dim + 1, repeats);
+  SmallVector<int64_t> expandShapeForBroadcast(expandShape.size(), -1);
+  expandShapeForBroadcast[dim + 1] = repeats;
+  Value expandShapeList =
+      torch::Torch::toIntListConstruct(rewriter, loc, expandShapeForBroadcast);
+
+  Type expandType =
+      selfType.getWithSizesAndDtype(expandShape, selfType.getOptionalDtype());
+  Value expanded = torch::Torch::AtenBroadcastToOp::create(
+      rewriter, loc, expandType, self, expandShapeList);
+
+  return torch::Torch::PrimsCollapseOp::create(rewriter, loc, resType, expanded,
+                                               dimValue, dimValuePlusOne)
+      .getResult();
+}
+
+static LogicalResult
+preProcessGroupQueryAttentionInputs(torch::Torch::HigherOrderFlexAttentionOp op,
+                                    PatternRewriter &rewriter, Value query,
+                                    Value &key, Value &value) {
+  auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
+  auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
+  auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
+
+  int64_t rank = queryType.getSizes().size();
+  int64_t qNumHeads = queryType.getSizes()[rank - 3];
+  int64_t kNumHeads = keyType.getSizes()[rank - 3];
+  int64_t vNumHeads = valueType.getSizes()[rank - 3];
+
+  if (llvm::any_of(ArrayRef<int64_t>{qNumHeads, kNumHeads, vNumHeads},
+                   [](int64_t d) { return d == torch::Torch::kUnknownSize; })) {
+    return rewriter.notifyMatchFailure(
+        op, "expected statically known attention head counts");
+  }
+
+  if (qNumHeads == kNumHeads && qNumHeads == vNumHeads) {
+    return success();
+  }
+
+  if (qNumHeads % kNumHeads != 0 || qNumHeads % vNumHeads != 0) {
+    return rewriter.notifyMatchFailure(
+        op, "expected query heads to be a multiple of key and value heads");
+  }
+
+  auto repeatToQueryHeadCount = [&](Value input,
+                                    torch::Torch::ValueTensorType inputType,
+                                    int64_t inputNumHeads) -> Value {
+    SmallVector<int64_t> resultShape(inputType.getSizes());
+    resultShape[rank - 3] = qNumHeads;
+    Type resultType = inputType.getWithSizesAndDtype(
+        resultShape, inputType.getOptionalDtype());
+    return repeatTensorElementsForDim(rewriter, op, resultType, input,
+                                      qNumHeads / inputNumHeads, rank - 3);
+  };
+
+  key = repeatToQueryHeadCount(key, keyType, kNumHeads);
+  value = repeatToQueryHeadCount(value, valueType, vNumHeads);
+  return success();
+}
+
 /// Inline a single-block torch function's body at the current insertion point.
 /// Falls back to func.call for multi-block or external functions.
 static SmallVector<Value> inlineTorchFunction(PatternRewriter &rewriter,
@@ -318,6 +396,7 @@ struct FlexAttentionOpConversion
     Value value = op.getValue();
     Value scaleVal = op.getScale();
 
+    bool enableGqa = op.getEnableGqa().value_or(false);
     auto scoreModSymbol = op.getScoreModFnAttr();
     auto maskModSymbol = op.getMaskModFnAttr();
 
@@ -333,8 +412,14 @@ struct FlexAttentionOpConversion
       return rewriter.notifyMatchFailure(
           op, "expected return_max_scores to be a constant bool");
     }
+    if (enableGqa) {
+      if (failed(preProcessGroupQueryAttentionInputs(op, rewriter, query, key,
+                                                     value))) {
+        return failure();
+      }
+    }
 
-    // Extract shapes from Q, K, V.
+    // Extract shapes from preprocessed Q, K, V.
     auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
     auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
 

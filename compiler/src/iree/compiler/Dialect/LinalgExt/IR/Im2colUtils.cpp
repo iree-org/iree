@@ -315,9 +315,14 @@ Value computeIm2colValidSize(OpBuilder &b, Location loc, Im2colOp im2colOp,
 
 /// Helper to check if a slice will be contiguous given the offset and
 /// slice size. Checks that `inputSize` and `offset` are both evenly
-/// divisible by `tileSize`.
+/// divisible by `tileSize`. When `getOffsetDivisibility` is non-null, it is
+/// consulted for runtime offset values — a returned factor that is a multiple
+/// of `tileSize` is enough to consider the slice contiguous. This is a
+/// strictly more general signal than the static `affine.apply` map match used
+/// as a fallback below.
 static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
-                                  OpFoldResult offset) {
+                                  OpFoldResult offset,
+                                  OffsetDivisibilityFn getOffsetDivisibility) {
   std::optional<int64_t> constInputSize = getConstantIntValue(inputSize);
   std::optional<int64_t> constTileSize = getConstantIntValue(tileSize);
   if (!constTileSize.has_value() || !constInputSize.has_value() ||
@@ -332,15 +337,26 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
   if (!val) {
     return false;
   }
+  uint64_t tile = static_cast<uint64_t>(constTileSize.value());
+  if (getOffsetDivisibility) {
+    uint64_t div = getOffsetDivisibility(val);
+    if (div == 0 || div % tile == 0) {
+      return true;
+    }
+  }
+  // Fallback for callers that can't (or don't) consult a divisibility analysis:
+  // recognize the common case where the offset is an `affine.apply` whose
+  // result expression is statically a multiple of the tile size.
   auto affineOp = val.getDefiningOp<affine::AffineApplyOp>();
   return affineOp &&
          affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
 }
 
-std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
-                                            Im2colOp im2colOp,
-                                            ArrayRef<Range> iterationDomain,
-                                            ArrayRef<OpFoldResult> offsets) {
+std::optional<int64_t>
+chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
+                     ArrayRef<Range> iterationDomain,
+                     ArrayRef<OpFoldResult> offsets,
+                     OffsetDivisibilityFn getOffsetDivisibility) {
   int64_t innerInputDim = im2colOp.getInputRank() - 1;
   SmallVector<OpFoldResult> inputSizes =
       tensor::getMixedSizes(b, loc, im2colOp.getInput());
@@ -426,7 +442,8 @@ std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
     }
 
     OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
-    if (!willBeContiguousSlice(innerSliceSize, outputDimSize, offset)) {
+    if (!willBeContiguousSlice(innerSliceSize, outputDimSize, offset,
+                               getOffsetDivisibility)) {
       continue;
     }
     return outputDimToVectorize;
@@ -435,12 +452,13 @@ std::optional<int64_t> chooseDimToVectorize(OpBuilder &b, Location loc,
 }
 
 std::optional<SmallVector<int64_t>>
-computeIm2colVectorTileSizes(OpBuilder &b, Im2colOp im2colOp) {
+computeIm2colVectorTileSizes(OpBuilder &b, Im2colOp im2colOp,
+                             OffsetDivisibilityFn getOffsetDivisibility) {
   Location loc = im2colOp.getLoc();
   SmallVector<Range> iterationDomain(im2colOp.getIterationDomain(b));
   SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  std::optional<int64_t> dimToVectorize =
-      chooseDimToVectorize(b, loc, im2colOp, iterationDomain, mixedOffsets);
+  std::optional<int64_t> dimToVectorize = chooseDimToVectorize(
+      b, loc, im2colOp, iterationDomain, mixedOffsets, getOffsetDivisibility);
 
   int64_t outputRank = im2colOp.getOutputRank();
   SmallVector<int64_t> tileSizes(outputRank, 1);

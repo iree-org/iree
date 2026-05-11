@@ -33,6 +33,7 @@ iree_cc_library(
     ::FlowExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
+    LLVMSupport
     MLIRAnalysis
     MLIRArithDialect
     MLIRBytecodeOpInterface

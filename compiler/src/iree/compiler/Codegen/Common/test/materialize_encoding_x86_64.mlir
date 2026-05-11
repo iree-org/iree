@@ -250,6 +250,76 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 
 // -----
 
+// AVX2 (`+avx2,+fma`) has no element-type-specific MMA intrinsic for
+// bf16/f32, so the cost model falls back to the type-polymorphic generic
+// scalar. x86_64 is 64-bit, so `pickGenericScalarMMAForTarget` picks
+// `_REG16`. The chosen `DataTiledMMAAttr` carries `lhs_type = bf16`,
+// `rhs_type = bf16`, `acc_type = f32` directly (the enum value alone
+// doesn't determine element types).
+
+#map_g = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_g1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_g2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_g_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map_g, #map_g1, #map_g2], iteration_sizes = [?, ?, ?]>
+#encoding_g_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map_g, #map_g1, #map_g2], iteration_sizes = [?, ?, ?]>
+#encoding_g_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map_g, #map_g1, #map_g2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_bf16_f32_avx2_generic(
+    %lhs: tensor<?x?xbf16, #encoding_g_lhs>,
+    %rhs: tensor<?x?xbf16, #encoding_g_rhs>,
+    %acc: tensor<?x?xf32, #encoding_g_res>
+) -> tensor<?x?xf32, #encoding_g_res> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx2,+fma", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul ins(%lhs, %rhs : tensor<?x?xbf16, #encoding_g_lhs>, tensor<?x?xbf16, #encoding_g_rhs>)
+      outs(%acc : tensor<?x?xf32, #encoding_g_res>) -> tensor<?x?xf32, #encoding_g_res>
+  return %0 : tensor<?x?xf32, #encoding_g_res>
+}
+// `chooseUnrolling` for the generic intrinsic uses the budget encoded in
+// the chosen `_REG*` enum case (16 here). One element per register, so the
+// register pressure is `intrinsics_m * intrinsics_n` (ACC) +
+// `intrinsics_m` (LHS) + `intrinsics_n` (RHS). Matmul dims are dynamic
+// here, so all three dims are free; arithmetic-intensity tie-breaking
+// favors approximately-square tiles. (im=2, in=4) and (im=4, in=2) tie at
+// intensity 8/6 — the search picks (im=2, in=4) (lower im first), packing
+// 8 + 2 + 4 = 14 registers within 16.
+// CHECK-LABEL: func @matmul_bf16_f32_avx2_generic(
+//       CHECK:   %[[INNER_G:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 4, lhs_type = bf16, rhs_type = bf16, acc_type = f32>
+
+// -----
+
+// Sub-byte LHS/RHS forces `chooseUnrolling` to also pick `intrinsics_k > 1`
+// for the generic intrinsic, so each contiguous K-group covers a whole
+// number of bytes (otherwise sub-byte elements aren't byte-addressable in
+// the packed layout). Smallest power-of-two K with K*4 % 8 == 0 is K = 2.
+// LHS pressure becomes `intrinsics_m * intrinsics_k`, RHS pressure
+// `intrinsics_n * intrinsics_k`, ACC `intrinsics_m * intrinsics_n`. Inside
+// `_REG16`'s budget, (m=2, n=2, k=2) packs 2·2 + 2·2 + 2·2 = 12 registers
+// and wins on arithmetic intensity (4/4 = 1.0).
+
+#map_g4 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_g4_1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_g4_2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_g4_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i4, i4, i32], user_indexing_maps = [#map_g4, #map_g4_1, #map_g4_2], iteration_sizes = [?, ?, ?]>
+#encoding_g4_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i4, i4, i32], user_indexing_maps = [#map_g4, #map_g4_1, #map_g4_2], iteration_sizes = [?, ?, ?]>
+#encoding_g4_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i4, i4, i32], user_indexing_maps = [#map_g4, #map_g4_1, #map_g4_2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_i4_i32_avx2_generic(
+    %lhs: tensor<?x?xi4, #encoding_g4_lhs>,
+    %rhs: tensor<?x?xi4, #encoding_g4_rhs>,
+    %acc: tensor<?x?xi32, #encoding_g4_res>
+) -> tensor<?x?xi32, #encoding_g4_res> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx2,+fma", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = linalg.matmul ins(%lhs, %rhs : tensor<?x?xi4, #encoding_g4_lhs>, tensor<?x?xi4, #encoding_g4_rhs>)
+      outs(%acc : tensor<?x?xi32, #encoding_g4_res>) -> tensor<?x?xi32, #encoding_g4_res>
+  return %0 : tensor<?x?xi32, #encoding_g4_res>
+}
+// CHECK-LABEL: func @matmul_i4_i32_avx2_generic(
+//       CHECK:   %[[INNER_G4:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 2, lhs_type = i4, rhs_type = i4, acc_type = i32>
+
+// -----
+
 // It tests with bindings and checks that the reshape ops are folded into bindings.
 
 #executable_target_xyz = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>

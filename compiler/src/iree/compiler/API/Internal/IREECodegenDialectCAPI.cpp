@@ -7,7 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <optional>
-#include <type_traits>
+
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
@@ -35,41 +35,71 @@
 
 using mlir::iree_compiler::IREE::Codegen::CompilationInfoAttr;
 using mlir::iree_compiler::IREE::Codegen::ConstraintsOp;
-using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipeline;
-using mlir::iree_compiler::IREE::Codegen::DispatchLoweringPassPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::IntKnobAttr;
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttrInterface;
+using mlir::iree_compiler::IREE::Codegen::NoPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::OneOfKnobAttr;
+using mlir::iree_compiler::IREE::Codegen::PassPipelineAttr;
+using mlir::iree_compiler::IREE::Codegen::PipelineAttrInterface;
 using mlir::iree_compiler::IREE::Codegen::RootOpAttr;
+using mlir::iree_compiler::IREE::Codegen::TransformDialectCodegenPipelineAttr;
 using mlir::iree_compiler::IREE::Codegen::TranslationInfoAttr;
+using mlir::iree_compiler::IREE::Codegen::VMVXPipelineAttr;
 using mlir::iree_compiler::IREE::HAL::ExecutableVariantOp;
 
-bool ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
+bool ireeAttributeIsACodegenVMVXPipelineAttr(MlirAttribute attr) {
+  return llvm::isa<VMVXPipelineAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenVMVXPipelineAttrGetTypeID() {
+  return wrap(VMVXPipelineAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenVMVXPipelineAttrGet(MlirContext mlirCtx) {
+  return wrap(VMVXPipelineAttr::get(unwrap(mlirCtx)));
+}
+
+bool ireeAttributeIsACodegenTransformDialectCodegenPipelineAttr(
     MlirAttribute attr) {
-  return llvm::isa<DispatchLoweringPassPipelineAttr>(unwrap(attr));
+  return llvm::isa<TransformDialectCodegenPipelineAttr>(unwrap(attr));
 }
 
-MlirTypeID ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID() {
-  return wrap(DispatchLoweringPassPipelineAttr::getTypeID());
+MlirTypeID ireeCodegenTransformDialectCodegenPipelineAttrGetTypeID() {
+  return wrap(TransformDialectCodegenPipelineAttr::getTypeID());
 }
-
-static_assert(
-    std::is_same_v<uint32_t,
-                   std::underlying_type_t<DispatchLoweringPassPipeline>>,
-    "Enum type changed");
 
 MlirAttribute
-ireeCodegenDispatchLoweringPassPipelineAttrGet(MlirContext mlirCtx,
-                                               uint32_t value) {
-  mlir::MLIRContext *ctx = unwrap(mlirCtx);
-  return wrap(DispatchLoweringPassPipelineAttr::get(
-      ctx, static_cast<DispatchLoweringPassPipeline>(value)));
+ireeCodegenTransformDialectCodegenPipelineAttrGet(MlirContext mlirCtx) {
+  return wrap(TransformDialectCodegenPipelineAttr::get(unwrap(mlirCtx)));
 }
 
-uint32_t
-ireeCodegenDispatchLoweringPassPipelineAttrGetValue(MlirAttribute attr) {
-  return static_cast<uint32_t>(
-      llvm::cast<DispatchLoweringPassPipelineAttr>(unwrap(attr)).getValue());
+bool ireeAttributeIsACodegenNoPipelineAttr(MlirAttribute attr) {
+  return llvm::isa<NoPipelineAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenNoPipelineAttrGetTypeID() {
+  return wrap(NoPipelineAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenNoPipelineAttrGet(MlirContext mlirCtx) {
+  return wrap(NoPipelineAttr::get(unwrap(mlirCtx)));
+}
+
+bool ireeAttributeIsACodegenPassPipelineAttr(MlirAttribute attr) {
+  return llvm::isa<PassPipelineAttr>(unwrap(attr));
+}
+
+MlirTypeID ireeCodegenPassPipelineAttrGetTypeID() {
+  return wrap(PassPipelineAttr::getTypeID());
+}
+
+MlirAttribute ireeCodegenPassPipelineAttrGet(MlirContext mlirCtx,
+                                             MlirStringRef pipeline) {
+  return wrap(PassPipelineAttr::get(unwrap(mlirCtx), unwrap(pipeline)));
+}
+
+MlirStringRef ireeCodegenPassPipelineAttrGetPipeline(MlirAttribute attr) {
+  return wrap(llvm::cast<PassPipelineAttr>(unwrap(attr)).getPipeline());
 }
 
 bool ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr) {
@@ -85,11 +115,10 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
   assert(!mlirAttributeIsNull(parameters.passPipeline) &&
          "Invalid pass pipeline attr: cannot be null");
 
+  mlir::Attribute pipelineAttr = unwrap(parameters.passPipeline);
   assert(
-      (ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(
-           parameters.passPipeline) ||
-       ireeAttributeIsAGPUPipelineAttr(parameters.passPipeline)) &&
-      "passPipeline must be DispatchLoweringPassPipelineAttr or PipelineAttr");
+      pipelineAttr.hasPromiseOrImplementsInterface<PipelineAttrInterface>() &&
+      "passPipeline must implement PipelineAttrInterface");
 
   assert((mlirAttributeIsNull(parameters.codegenSpec) ||
           mlirAttributeIsASymbolRef(parameters.codegenSpec)) &&
@@ -99,7 +128,6 @@ MlirAttribute ireeCodegenTranslationInfoAttrGet(
           mlirAttributeIsADictionary(parameters.configuration)) &&
          "Invalid configuration attr");
 
-  mlir::Attribute pipelineAttr = unwrap(parameters.passPipeline);
   auto codegenSpec = llvm::cast_if_present<mlir::SymbolRefAttr>(
       unwrap(parameters.codegenSpec));
 

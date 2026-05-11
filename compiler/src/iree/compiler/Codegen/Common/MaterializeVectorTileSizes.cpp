@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
@@ -338,6 +339,10 @@ class TileSizeForwardAnalysis
 public:
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeForwardAnalysis>();
+  }
+
   void setToEntryState(TileSizeLattice *lattice) override {
     // Entry state is uninitialized (identity for join).
     propagateIfChanged(lattice, lattice->join(TileSizes()));
@@ -413,8 +418,25 @@ public:
     // so tile sizes go directly on the result lattice.
     if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
       OpBuilder builder(op);
+      // The dependent determines what reruns if the divisibility lattice for
+      // `val` changes below. Sparse forward analyses visit operations from the
+      // program point after the operation, so use `after(op)` to rerun this op.
+      // This dependency is not expected to affect convergence in practice:
+      // divisibility is solved to fixpoint before tile-size analysis starts.
+      ProgramPoint *dependent = getProgramPointAfter(op);
       std::optional<SmallVector<int64_t>> maybeTileSizes =
-          IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
+          IREE::LinalgExt::computeIm2colVectorTileSizes(
+              builder, im2colOp, [this, dependent](Value val) {
+                const auto *lattice =
+                    getOrCreateFor<IREE::Util::IntegerDivisibilityLattice>(
+                        dependent, val);
+                if (!lattice || lattice->getValue().isUninitialized()) {
+                  return uint64_t{1};
+                }
+                const IREE::Util::ConstantIntDivisibility &div =
+                    lattice->getValue().getValue();
+                return div.sdiv();
+              });
       if (maybeTileSizes) {
         TileSizes tileSizes(*maybeTileSizes);
         propagateIfChanged(results[0], results[0]->join(tileSizes));
@@ -460,6 +482,10 @@ class TileSizeBackwardAnalysis
     : public dataflow::SparseBackwardDataFlowAnalysis<TileSizeLattice> {
 public:
   using SparseBackwardDataFlowAnalysis::SparseBackwardDataFlowAnalysis;
+
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeBackwardAnalysis>();
+  }
 
   void setToExitState(TileSizeLattice *lattice) override {
     // Exit state is uninitialized (identity for meet).
@@ -765,13 +791,26 @@ public:
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
+    // Stage 1: run baseline analyses and IntegerDivisibilityAnalysis to
+    // convergence. We need these results to be stable before the tile size
+    // analyses consult them, so we use the staged-solve pattern enabled by
+    // `DataFlowSolver::initializeAndRun`'s analysis filter.
     DataFlowSolver solver;
     dataflow::loadBaselineAnalyses(solver);
+    solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      return signalPassFailure();
+    }
+
+    // Stage 2: load the tile size analyses and initialize only those.
+    // The existing divisibility lattices are left initialized from stage 1 and
+    // can be queried by the vector size analyses when determining vector sizes.
     solver.load<TileSizeForwardAnalysis>();
     SymbolTableCollection symbolTable;
     solver.load<TileSizeBackwardAnalysis>(symbolTable);
-
-    if (failed(solver.initializeAndRun(funcOp))) {
+    if (failed(solver.initializeAndRun(
+            funcOp, llvm::IsaPred<TileSizeForwardAnalysis,
+                                  TileSizeBackwardAnalysis>))) {
       return signalPassFailure();
     }
 
