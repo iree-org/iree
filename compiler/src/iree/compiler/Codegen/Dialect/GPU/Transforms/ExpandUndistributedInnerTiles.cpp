@@ -89,8 +89,7 @@ static LogicalResult materializeOperandExpandedShape(
     isNonTrivial = true;
   }
   if (!isNonTrivial) {
-    // Three's nothing to expand. Note that this is always the case for
-    // DataTiledMMAAttr and VirtualMMAAttr.
+    // There is nothing to expand for this operand shape/kind combination.
     return failure();
   }
 

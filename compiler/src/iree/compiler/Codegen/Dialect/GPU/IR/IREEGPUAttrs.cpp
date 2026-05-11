@@ -1599,6 +1599,20 @@ void VirtualMMAAttr::getDistributedTileTypes(
   }
 }
 
+std::optional<SmallVector<int64_t, 2>>
+VirtualMMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                 int64_t dim) const {
+  assert(operandIndex <= 2 && "invalid operand index");
+  assert(dim < 3 && "invalid inner tile dim");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(*this, static_cast<int>(operandIndex));
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
+}
+
 int64_t VirtualMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
