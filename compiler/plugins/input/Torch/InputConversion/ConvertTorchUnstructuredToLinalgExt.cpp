@@ -314,6 +314,9 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
     PatternRewriter &rewriter, Location loc, FlatSymbolRefAttr funcSymbol,
     ValueRange args, ArrayRef<int64_t> tensorShape, Operation *contextOp) {
   auto module = contextOp->getParentOfType<ModuleOp>();
+  if (!module) {
+    return failure();
+  }
   auto funcOp = module.lookupSymbol<func::FuncOp>(funcSymbol);
   if (!funcOp || funcOp.isExternal() || !funcOp.getBody().hasOneBlock() ||
       funcOp.getNumArguments() != args.size()) {
@@ -321,6 +324,11 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
   }
 
   Block &entryBlock = funcOp.getBody().front();
+  auto returnOp = dyn_cast<func::ReturnOp>(entryBlock.getTerminator());
+  if (!returnOp) {
+    return failure();
+  }
+
   IRMapping mapper;
   for (auto [blockArg, callArg] : llvm::zip(entryBlock.getArguments(), args)) {
     mapper.map(blockArg, callArg);
@@ -364,11 +372,6 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
     }
   }
 
-  auto returnOp = dyn_cast<func::ReturnOp>(entryBlock.getTerminator());
-  if (!returnOp) {
-    return failure();
-  }
-
   SmallVector<Value> results;
   for (Value operand : returnOp.getOperands()) {
     results.push_back(mapper.lookupOrDefault(operand));
@@ -396,7 +399,7 @@ createTorchIndexTensors(PatternRewriter &rewriter, Location loc,
         torch::Torch::ValueTensorType::get(context, indexShape, signedI32);
     AffineMap identityMap =
         AffineMap::getMultiDimIdentityMap(indexShape.size(), context);
-    SmallVector<AffineMap> maps = {identityMap};
+    ArrayRef<AffineMap> maps(identityMap);
     SmallVector<utils::IteratorType> iterTypes(indexShape.size(),
                                                utils::IteratorType::parallel);
 
@@ -430,13 +433,12 @@ static FailureOr<Value> createFlexAttentionMask(PatternRewriter &rewriter,
     return failure();
   }
 
-  auto maskType =
-      dyn_cast<torch::Torch::ValueTensorType>((*maskResults)[0].getType());
+  Value maskValue = (*maskResults)[0];
+  auto maskType = dyn_cast<torch::Torch::ValueTensorType>(maskValue.getType());
   if (!maskType) {
     return failure();
   }
 
-  Value maskValue = (*maskResults)[0];
   if (maskType.hasSizes() && !llvm::equal(maskType.getSizes(), scoreShape)) {
     Type broadcastType =
         maskType.getWithSizesAndDtype(scoreShape, maskType.getOptionalDtype());
