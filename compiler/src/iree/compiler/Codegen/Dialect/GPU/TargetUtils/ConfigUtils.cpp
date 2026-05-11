@@ -592,6 +592,9 @@ constexpr int64_t kMinWorkgroupsPerCU = 2;
 /// is available, the LDS-limited occupancy is capped by actual work
 /// (totalWorkgroups / numCUs) so that under-subscribed shapes are not
 /// penalized.
+/// TODO(#24375): Remove this guard once the tile-size heuristic stops
+/// over-allocating LDS or 1-warp/SIMD codegen can recover the perf without
+/// requiring inter-SIMD latency hiding via WGs/CU >= 2.
 static bool shouldRejectDMAForOccupancy(
     const GPUMMASchedule &schedule, const GPUMatmulShapeType &problem,
     IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
@@ -861,6 +864,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              rhsScaleType};
 
   Location loc = operands[0].getLoc();
+  // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size)
+  // happens below via shouldRejectDMAForOccupancy after the schedule and
+  // workgroup tiles are computed.
   if (useDirectLoad &&
       shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
                                 transposedLhs, transposedRhs)) {
@@ -993,8 +999,9 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
-  // After computing workgroup tile sizes, check whether DMA would cause an
-  // unacceptable occupancy drop.
+  // Stage 2 (tile-size) DMA rejection: now that workgroup tiles are known,
+  // check whether DMA would cause an unacceptable occupancy drop. Stage 1
+  // (problem-size + target-arch) ran above via shouldRejectDirectLoadDMA.
   if (useDirectLoad &&
       shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
                                   hasExistingAccumulator, bounds,
