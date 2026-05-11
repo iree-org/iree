@@ -23,6 +23,8 @@ Building and running:
     ./bazel-bin/path/to/unicode_fuzz corpus/ -max_total_time=60
 """
 
+load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+
 def iree_cc_fuzz(
         name,
         srcs,
@@ -63,7 +65,7 @@ def iree_cc_fuzz(
     if "fuzz" not in tags:
         tags = tags + ["fuzz"]
 
-    native.cc_binary(
+    cc_binary(
         name = name,
         srcs = srcs,
         deps = deps,

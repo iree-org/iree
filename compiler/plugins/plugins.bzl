@@ -11,6 +11,7 @@ CMake uses global properties; Bazel uses select() with config_settings.
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 def _plugin_inc_select(plugin_id):
     """Returns a select() for conditionally including a plugin's .inc file."""
@@ -84,7 +85,7 @@ def iree_compiler_plugins(name, plugins, flag_name = "enabled_plugins", default_
     for plugin_id, registration_target in plugins.items():
         plugin_deps = plugin_deps + _plugin_dep_select(plugin_id, registration_target)
 
-    native.cc_library(
+    cc_library(
         name = name + "_deps",
         deps = plugin_deps,
         visibility = ["//visibility:public"],
