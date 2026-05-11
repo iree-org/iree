@@ -179,6 +179,7 @@ iree_check_single_backend_test_suite(
     "dynamic_batch_matmul_gfx1100.mlir"
     "dynamic_gather_attention.mlir"
     "linalg_ops_dynamic.mlir"
+    "reduction_inner_dim_unaligned.mlir"
     "split_reduction_using_tiling.mlir"
   TARGET_BACKEND
     "rocm"

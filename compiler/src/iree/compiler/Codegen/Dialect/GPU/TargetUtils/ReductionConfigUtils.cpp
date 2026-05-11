@@ -219,11 +219,15 @@ struct TileSizesConfig {
   }
 };
 
+/// `allowMaskedTail` says the lowering can mask off positions where the
+/// per-thread tile overshoots the iteration dim, so the per-op tile-size
+/// computation does not need to halve threadLoads or shrink to a divisor
+/// via GCD. ArgCompare passes false; ordinary linalg reductions pass true.
 static FailureOr<TileSizesConfig>
 getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
                                    SmallVector<int64_t> &localWgpTiles,
                                    int64_t workgroupSize, int64_t subgroupSize,
-                                   int64_t threadLoads) {
+                                   int64_t threadLoads, bool allowMaskedTail) {
   SmallVector<unsigned> parallelDims = getParallelDims(op);
   SmallVector<unsigned> reductionDims = getReductionDims(op);
 
@@ -263,9 +267,13 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
     if (ShapedType::isDynamic(parallelSize)) {
       parallelSize = kVectorDistributeReductionSizeToTargetIfDynamic;
     }
-    // Adjust threadLoads for this op's distribution dim.
-    while (threadLoads > 1 && parallelSize % threadLoads != 0) {
-      threadLoads /= 2;
+    // Adjust threadLoads for this op's distribution dim. With masking, an
+    // overshooting tile is fine - the lowering masks off the tail. Without
+    // masking, we have to halve threadLoads until it cleanly tiles.
+    if (!allowMaskedTail) {
+      while (threadLoads > 1 && parallelSize % threadLoads != 0) {
+        threadLoads /= 2;
+      }
     }
 
     int64_t lastDimReductionTileSize = workgroupSize * threadLoads;
@@ -274,11 +282,17 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
     int64_t subgroupBasis = 1;
     int64_t threadBasis = subgroupSize;
 
-    lastDimReductionTileSize =
-        llvm::APIntOps::GreatestCommonDivisor(
-            {64, static_cast<uint64_t>(parallelSize)},
-            {64, static_cast<uint64_t>(lastDimReductionTileSize)})
-            .getZExtValue();
+    // Without masking, shrink the tile to a divisor of parallelSize so the
+    // per-thread tile actually tiles cleanly. With masking, keep the full
+    // tile (workgroupSize * threadLoads) so every thread participates - the
+    // lowering masks any threads whose positions overshoot parallelSize.
+    if (!allowMaskedTail) {
+      lastDimReductionTileSize =
+          llvm::APIntOps::GreatestCommonDivisor(
+              {64, static_cast<uint64_t>(parallelSize)},
+              {64, static_cast<uint64_t>(lastDimReductionTileSize)})
+              .getZExtValue();
+    }
 
     bool allDimsCovered =
         llvm::none_of(localWgpTiles, [](int64_t t) { return t == 0; });
@@ -301,6 +315,10 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
       subgroupBasis = 1;
     }
 
+    // Note: with allowMaskedTail, lastDimReductionTileSize can exceed
+    // bounds[distributeDim] (e.g. 128 > 3 for a small channel dim). The
+    // LLVMGPUVectorDistribute pass masks the per-lane reads that fall past
+    // the actual bound.
     serialTileSizes[distributeDim] = lastDimReductionTileSize;
     threadTileSizes[distributeDim] = threadLoads;
     threadCounts[distributeDim] = threadBasis;
@@ -343,16 +361,30 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
   if (ShapedType::isDynamic(lastReductionDimSize)) {
     lastReductionDimSize = kVectorDistributeReductionSizeToTargetIfDynamic;
   }
-  // Adjust threadLoads for this op's reduction dim.
-  while (threadLoads > 1 && lastReductionDimSize % threadLoads != 0) {
-    threadLoads /= 2;
+  // Adjust threadLoads for this op's reduction dim. See the parallel-only
+  // branch above for the masking rationale.
+  if (!allowMaskedTail) {
+    while (threadLoads > 1 && lastReductionDimSize % threadLoads != 0) {
+      threadLoads /= 2;
+    }
   }
 
   int64_t partialReductionSize = workgroupSize * threadLoads;
-  partialReductionSize = llvm::APIntOps::GreatestCommonDivisor(
-                             {64, static_cast<uint64_t>(partialReductionSize)},
-                             {64, static_cast<uint64_t>(lastReductionDimSize)})
-                             .getZExtValue();
+  // Without masking, shrink to a divisor of lastReductionDimSize so the
+  // tile lines up exactly with the data and no tail iterations exist.
+  // With masking, keep the full `workgroup * threadLoads` tile: this
+  // preserves the invariant that `lane_basis = subgroupSize` and
+  // `subgroup_basis = workgroupSize / subgroupSize` divide cleanly.
+  // Tail positions beyond `lastReductionDimSize` are padded with the
+  // reduction's combiner identity by the materialize-vector-masking
+  // infrastructure (PRs #23679, #24044, #24187).
+  if (!allowMaskedTail) {
+    partialReductionSize =
+        llvm::APIntOps::GreatestCommonDivisor(
+            {64, static_cast<uint64_t>(partialReductionSize)},
+            {64, static_cast<uint64_t>(lastReductionDimSize)})
+            .getZExtValue();
+  }
 
   int64_t threadBasis = subgroupSize;
   int subgroupStride = threadBasis * threadLoads;
@@ -363,6 +395,9 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
   int subgroup = partialReductionSize / subgroupStride;
   int64_t subgroupBasis = (subgroup == 0) ? 1 : subgroup;
 
+  // Note: with allowMaskedTail, partialReductionSize can exceed
+  // lastReductionDimSize (e.g. 512 > 257). The LLVMGPUVectorDistribute pass
+  // masks the per-lane reads that fall past lastReductionDimSize.
   partialReductionTileSizes[lastReductionDim] = partialReductionSize;
   threadTileSizes[lastReductionDim] = threadLoads;
   threadCounts[lastReductionDim] = threadBasis;
@@ -390,11 +425,10 @@ getVectorDistributeReductionConfig(Operation *op, IREE::GPU::TargetAttr target,
 ///   are okay to be less optimized, but when used as a single operator compiler
 ///   (e.g. Fusilli) this is suboptimal and needs to be improved.
 ///   TODO: Remove this assumption.
-static LogicalResult
-populateConfigInfo(Operation *root,
-                   const llvm::SetVector<Operation *> &computeOps,
-                   IREE::GPU::TargetAttr target, int64_t workgroupSize,
-                   int64_t subgroupSize, int64_t threadLoads) {
+static LogicalResult populateConfigInfo(
+    Operation *root, const llvm::SetVector<Operation *> &computeOps,
+    IREE::GPU::TargetAttr target, int64_t workgroupSize, int64_t subgroupSize,
+    int64_t threadLoads, bool allowMaskedTail) {
   if (computeOps.empty()) {
     return failure();
   }
@@ -488,7 +522,7 @@ populateConfigInfo(Operation *root,
 
     auto config = getVectorDistributeReductionConfig(
         computeOp, target, localWgpTiles, workgroupSize, subgroupSize,
-        threadLoads);
+        threadLoads, allowMaskedTail);
     if (failed(config)) {
       return failure();
     }
@@ -673,6 +707,55 @@ checkDispatchForVectorDistribution(Operation *parentOp) {
   return computeOps;
 }
 
+/// Pick the subgroup size for an ArgCompare reduction. ArgCompare's
+/// lowering does not yet support tail masking, so the reduction dim must
+/// divide cleanly across the subgroup. Returns `std::nullopt` when no
+/// available subgroup-size choice divides a static `reductionSize`.
+static std::optional<int64_t>
+pickArgCompareSubgroupSize(IREE::GPU::TargetWgpAttr wgp, int64_t reductionSize,
+                           bool hasDynamicReductionDim) {
+  ArrayRef<int> choices = wgp.getSubgroupSizeChoices().asArrayRef();
+  const auto *it = llvm::find_if(choices, [&](int s) {
+    return reductionSize % s == 0 || hasDynamicReductionDim;
+  });
+  if (it == choices.end()) {
+    return std::nullopt;
+  }
+  return *it;
+}
+
+/// Pick `threadLoads` (number of elements each thread loads from the
+/// reduction dim). ArgCompare halves until perfect divisibility; linalg
+/// only halves until each workgroup is guaranteed to have at least one
+/// full subgroup of work, since masking handles non-divisible tails.
+///
+/// Preconditions: `initialThreadLoads >= 1` and `subgroupSize >= 1`.
+/// Postcondition: returned value is `>= 1`. Both branches use a
+/// `threadLoads > 1` guard, so the loops always terminate regardless of
+/// the divisibility relationship between `reductionSize` and
+/// `subgroupSize`.
+static unsigned pickThreadLoads(unsigned initialThreadLoads,
+                                int64_t reductionSize, int64_t subgroupSize,
+                                bool hasDynamicReductionDim,
+                                bool isArgCompare) {
+  unsigned threadLoads = initialThreadLoads;
+  if (hasDynamicReductionDim) {
+    return threadLoads;
+  }
+  if (isArgCompare) {
+    while (threadLoads > 1 &&
+           (reductionSize / threadLoads) % subgroupSize != 0) {
+      threadLoads /= 2;
+    }
+    return threadLoads;
+  }
+  while (threadLoads > 1 && static_cast<int64_t>(llvm::divideCeil(
+                                reductionSize, threadLoads)) < subgroupSize) {
+    threadLoads /= 2;
+  }
+  return threadLoads;
+}
+
 } // namespace
 
 /// The `setReductionConfig` attaches `lowering_config` to
@@ -717,6 +800,24 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
+  // Use strict alignment (no inner-dim fallback for non-divisible cases,
+  // strict divisibility-based subgroup selection, and strict threadLoads
+  // halving) when:
+  //   - The op is ArgCompare (its lowering does not yet support tail
+  //     masking).
+  //   - The op is a matmul-like contraction (uses the file-level
+  //     `isMatmulLike` helper). Matmul / batch-matmul / matvec have their
+  //     own dedicated selectors (`setMatmulLoweringConfig`,
+  //     `setContractConfig`) that run before us and use MMA instructions.
+  //     If those selectors decline a particular shape, we want the
+  //     dispatch to keep falling through to TileAndFuse, not get captured
+  //     here and routed through the generic VectorDistribute reduction
+  //     path which would lose MMA on real workloads.
+  const bool isArgCompare = isa<IREE::LinalgExt::ArgCompareOp>(op);
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  const bool useStrictAlignment =
+      isArgCompare || (linalgOp && isMatmulLike(linalgOp));
+
   FailureOr<SetVector<Operation *>> computeOps =
       checkDispatchForVectorDistribution<IREE::TensorExt::DispatchTensorStoreOp,
                                          IREE::Codegen::StoreToBufferOp>(
@@ -726,6 +827,23 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
+  // The VectorDistribute lowering pipeline cannot emit `vector.store` /
+  // `vector.maskedstore` to sub-byte (< 8 bit) memrefs - the EmulateBitWidth
+  // pass marks those ops illegal. Bail so the dispatch falls through to a
+  // pipeline that handles sub-byte stores.
+  for (Operation *computeOp : *computeOps) {
+    auto dpsOp = dyn_cast<DestinationStyleOpInterface>(computeOp);
+    if (!dpsOp) {
+      continue;
+    }
+    for (OpOperand &init : dpsOp.getDpsInitsMutable()) {
+      Type elemType = getElementTypeOrSelf(init.get().getType());
+      if (elemType.isIntOrFloat() && elemType.getIntOrFloatBitWidth() < 8) {
+        return failure();
+      }
+    }
+  }
+
   SmallVector<unsigned> parallelDims = getParallelDims(op);
   SmallVector<unsigned> reductionDims = getReductionDims(op);
 
@@ -733,15 +851,25 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
       cast<IndexingMapOpInterface>(op).getStaticLoopRanges();
   IREE::GPU::TargetWgpAttr wgp = target.getWgp();
 
-  // First consider the inner reduction dimension. If this is a multiple of a
-  // subgroup size choice, use this as the reduction dimension, and choose
-  // subgroup, thread loads etc based on it. Otherwise, consider the entire
-  // reduction dimension. This happens for example in case of multiple
-  // reductions in scaled matmul with the last dimension being the block size
-  // (32 for gfx950).
+  // Reduce-all-dims operations with a non-aligned inner reduction dim
+  // (i.e. no parallel iterators *and* the inner dim is not a multiple of
+  // the preferred subgroup size) hit a VectorDistribute lowering gap.
+  // After vectorization, the reduction shows up as a vector op of the
+  // full inner dim size - e.g., torch.aten.max over `tensor<1x100xf32>`
+  // First consider the inner reduction dimension. Fall back to the product
+  // of all reduction dims when:
+  //   - For ArgCompare (no masking support): the inner dim is not a multiple
+  //     of the preferred subgroup size.
+  //   - For linalg reductions: the inner dim is smaller than one subgroup,
+  //     so a single subgroup couldn't cover even one row (e.g. scaled matmul
+  //     with block size 32 on gfx950).
   int64_t reductionSize = bounds[reductionDims.back()];
-  if (ShapedType::isStatic(reductionSize) &&
-      reductionSize % target.getPreferredSubgroupSize() != 0) {
+  const int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
+  const bool needsInnerDimFallback =
+      ShapedType::isStatic(reductionSize) &&
+      (useStrictAlignment ? (reductionSize % preferredSubgroupSize != 0)
+                          : (reductionSize < preferredSubgroupSize));
+  if (needsInnerDimFallback) {
     reductionSize = 1;
     for (unsigned dim : reductionDims) {
       if (ShapedType::isDynamic(bounds[dim])) {
@@ -749,6 +877,22 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
         break;
       }
       reductionSize *= bounds[dim];
+    }
+  }
+
+  // Reduce-all-dims (no parallel iterator) with a non-aligned inner
+  // dim, e.g. `torch.aten.max` over `tensor<1x100xf32>` -> scalar. The
+  // dispatch contains fused ops (e.g. from torch.aten.index) producing
+  // vector<NxT> patterns that the distribute pass cannot lower
+  // alongside the reduction's distribution layout. Bail so the dispatch
+  // falls through. ArgCompare is unaffected (strict path above). Tiny
+  // reductions with `reductionSize <= subgroupSize` are handled via the
+  // tile-clamp in `getVectorDistributeReductionConfig` below.
+  if (!useStrictAlignment && parallelDims.empty()) {
+    int64_t innerRedDim = bounds[reductionDims.back()];
+    if (ShapedType::isStatic(innerRedDim) &&
+        innerRedDim % preferredSubgroupSize != 0) {
+      return failure();
     }
   }
 
@@ -763,17 +907,15 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  int64_t subgroupSize = 0;
-  for (int s : wgp.getSubgroupSizeChoices().asArrayRef()) {
-    if (reductionSize % s == 0 || hasDynamicReductionDim) {
-      subgroupSize = s;
-      break;
-    }
-  }
-
-  if (subgroupSize == 0) {
+  std::optional<int64_t> pickedSubgroupSize =
+      useStrictAlignment
+          ? pickArgCompareSubgroupSize(wgp, reductionSize,
+                                       hasDynamicReductionDim)
+          : std::optional<int64_t>{target.getPreferredSubgroupSize()};
+  if (!pickedSubgroupSize) {
     return failure();
   }
+  int64_t subgroupSize = *pickedSubgroupSize;
 
   FailureOr<int64_t> bitWidth = getBitWidth(op);
   if (failed(bitWidth)) {
@@ -788,12 +930,9 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   const std::optional<int64_t> maxLoadBits = wgp.getMaxLoadInstructionBits();
   const unsigned largestLoadSizeInBits = maxLoadBits.value_or(128);
 
-  unsigned threadLoads = largestLoadSizeInBits / *bitWidth;
-  if (!hasDynamicReductionDim) {
-    while ((reductionSize / threadLoads) % subgroupSize != 0) {
-      threadLoads /= 2;
-    }
-  }
+  unsigned threadLoads =
+      pickThreadLoads(largestLoadSizeInBits / *bitWidth, reductionSize,
+                      subgroupSize, hasDynamicReductionDim, useStrictAlignment);
 
   std::optional<int64_t> parallelSize = 1;
   for (int64_t dim : parallelDims) {
@@ -822,7 +961,11 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     maxWorkgroupSize = target.getPreferredSubgroupSize();
   }
 
-  int64_t workgroupSize = reductionSize / threadLoads;
+  int64_t workgroupSize = llvm::divideCeil(reductionSize, threadLoads);
+  // Round up to the next multiple of subgroupSize so every workgroup is a
+  // whole number of subgroups. Tail threads will mask their loads when
+  // reductionSize is not a multiple of (workgroupSize * threadLoads).
+  workgroupSize = llvm::divideCeil(workgroupSize, subgroupSize) * subgroupSize;
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
                         {64, static_cast<uint64_t>(workgroupSize)},
@@ -835,6 +978,13 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
+  // For non-aligned linalg reductions (where reductionSize is not a multiple
+  // of workgroupSize * threadLoads), the integer division below truncates
+  // toward zero, making this loop slightly more eager to halve workgroupSize
+  // than for aligned shapes. The (workgroupSize / 2) % subgroupSize guard
+  // still preserves the structural invariant that each workgroup is a whole
+  // number of subgroups, so the resulting config is always valid; it may
+  // just have fewer "vectors per thread" than the heuristic targets.
   while (parallelSize && *parallelSize > parallelThreshold &&
          (workgroupSize / 2) % subgroupSize == 0 &&
          reductionSize / (workgroupSize * threadLoads) < targetVectorCount) {
@@ -844,8 +994,40 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     *parallelSize /= 2;
   }
 
+  // Multi-reduction fusions (e.g. mean + variance for layer/group-norm)
+  // share the input via a private alloca. When the inner reduction dim
+  // is smaller than the workgroup size, `threadLoads` collapses to 1
+  // and the workgroup-level `vector.transfer_read` ends up
+  // `vector<1xN>` with N being the data shape (not the per-thread
+  // tile). Such a vector has no valid lane layout under
+  // `lane_basis = subgroupSize`, and the LLVMGPUVectorDistribute pass
+  // rejects with `'func.func' op failed to distribute`. Bail to
+  // TileAndFuse for these specific cases. Single-reduction overshoots
+  // (canonical masking case, e.g. `tensor<2x508xf16>`) are unaffected
+  // because they do not need the shared-input alloca pattern, and
+  // larger multi-reductions where each thread reads a contiguous
+  // `threadLoads`-tile are also unaffected because their per-thread
+  // vector matches the lane layout.
+  if (!useStrictAlignment) {
+    int64_t innerRedDim = bounds[reductionDims.back()];
+    if (ShapedType::isStatic(innerRedDim) && innerRedDim < workgroupSize) {
+      int reductionOpCount = 0;
+      for (Operation *computeOp : *computeOps) {
+        if (auto reductionLinalg = dyn_cast<linalg::LinalgOp>(computeOp)) {
+          if (reductionLinalg.getNumReductionLoops() > 0) {
+            ++reductionOpCount;
+          }
+        }
+      }
+      if (reductionOpCount > 1) {
+        return failure();
+      }
+    }
+  }
+
   if (failed(populateConfigInfo(op, *computeOps, target, workgroupSize,
-                                subgroupSize, threadLoads))) {
+                                subgroupSize, threadLoads,
+                                /*allowMaskedTail=*/!useStrictAlignment))) {
     return failure();
   }
 

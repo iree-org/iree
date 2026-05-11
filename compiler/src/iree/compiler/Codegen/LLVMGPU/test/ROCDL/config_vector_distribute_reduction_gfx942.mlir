@@ -240,16 +240,17 @@ func.func @nhwc_layernorm_small_channel() {
 }
 
 // Verify VectorDistribute is selected despite small channel dimension.
-// threadLoads is determined per-op: the reduction ops use threadLoads=8
-// (their last reduction dim 16384 divides by 8), while the parallel
-// elementwise falls back to threadLoads=1 (channel dim 3 doesn't divide by 8).
+// threadLoads = 8 is used by every op: the reduction ops along their
+// last reduction dim 16384 (divides by 8) and the parallel elementwise
+// along its inner dim 16384 too. Masking handles the channel dim 3 if
+// the lowering chooses to iterate it per-thread.
 
 // CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 // CHECK-LABEL: func.func @nhwc_layernorm_small_channel
 // CHECK:       linalg.generic {{.*}} iterator_types = ["parallel", "reduction", "reduction"]{{.*}} thread = [0, 1, 8]
 // CHECK:       linalg.generic {{.*}} iterator_types = ["parallel", "reduction", "reduction"]{{.*}} thread = [0, 1, 8]
-// CHECK:       linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel"]{{.*}} thread = [0, 0, 1]
+// CHECK:       linalg.generic {{.*}} iterator_types = ["parallel", "parallel", "parallel"]{{.*}} thread = [0, 0, 8]
 
 // -----
 

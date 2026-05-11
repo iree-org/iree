@@ -204,10 +204,13 @@ func.func @small_reduction() attributes {hal.executable.target = #executable_tar
   return
 }
 
-// Small reduction computes the whole reduction on a single thread.
+// Small reduction (inner dim 13 < subgroup size 32) routes through
+// VectorDistribute. The per-op tile is the full `workgroup * threadLoads`
+// (= 32), and the materialize-vector-masking infrastructure pads the 19
+// out-of-bounds lanes with the reduction's combiner identity. Each row
+// is reduced by a full-subgroup (32-lane) `gpu.subgroup_reduce` cluster.
 //   CHECK-LABEL: func.func @small_reduction
-//         CHECK:   %[[READ:.+]] = vector.transfer_read {{.*}} #hal.descriptor_type<storage_buffer>>, vector<4x13xf32>
-//         CHECK:   vector.multi_reduction <add>, %[[READ]], {{.*}} : vector<4x13xf32> to vector<4xf32>
+//         CHECK: gpu.subgroup_reduce add {{.*}} cluster(size = 32) : (f32) -> f32
 
 // -----
 
