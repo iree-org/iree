@@ -205,8 +205,7 @@ func.func @vectorize_scan_masked_configured(
 
 // -----
 
-// This mirrors the flex_attention mask_mod shape emitted by Torch input
-// conversion. The callback indices are broadcastable tensors, and the mask
+// The callback indices are broadcastable tensors, and the mask
 // computation must vectorize instead of leaving a scalar tensor payload in the
 // attention path.
 
