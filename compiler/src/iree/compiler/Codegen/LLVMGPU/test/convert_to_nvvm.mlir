@@ -10,7 +10,11 @@ hal.executable @abs_ex_dispatch_0 {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
-      func.func @abs_ex_dispatch_0() {
+      func.func @abs_ex_dispatch_0() attributes {
+        stream.binding_noalias_0 = [1 : i32, 2 : i32],
+        stream.binding_noalias_1 = [0 : i32, 2 : i32],
+        stream.binding_noalias_2 = [0 : i32, 1 : i32]
+      } {
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) offset(%c128) flags(ReadOnly) : memref<16xf32, strided<[1], offset: ?>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
@@ -31,9 +35,9 @@ hal.executable @abs_ex_dispatch_0 {
   }
 }
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
-//  CHECK-SAME:  %[[ARG2:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
+//  CHECK-SAME:  %[[ARG2:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
 //  CHECK: %[[FADD:.+]] = llvm.fadd %{{.*}}, %{{.*}}  : f32
 //  CHECK: %[[ADDR:.+]] = llvm.getelementptr inbounds|nuw %[[ARG2]][%{{.*}}] : (!llvm.ptr, i64) -> !llvm.ptr, f32
 //  CHECK: llvm.store %[[FADD]], %[[ADDR]] : f32, !llvm.ptr
@@ -49,7 +53,11 @@ hal.executable @abs_dynamic {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @abs_dynamic layout(#pipeline_layout)
     builtin.module {
-      func.func @abs_dynamic() {
+      func.func @abs_dynamic() attributes {
+        stream.binding_noalias_0 = [1 : i32, 2 : i32],
+        stream.binding_noalias_1 = [0 : i32, 2 : i32],
+        stream.binding_noalias_2 = [0 : i32, 1 : i32]
+      } {
         %c0 = arith.constant 0 : index
         %c3 = arith.constant 3 : index
         %c5 = arith.constant 5 : index
@@ -83,9 +91,9 @@ hal.executable @abs_dynamic {
   }
 }
 // CHECK-LABEL: llvm.func @abs_dynamic
-//  CHECK-SAME: (%[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME: (%[[ARG0:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME:  %[[ARG1:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME:  %[[ARG2:[a-zA-Z0-9]+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //  CHECK-SAME:  %[[ARG3:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG4:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
 //  CHECK-SAME:  %[[ARG5:[a-zA-Z0-9]+]]: i32 {llvm.noundef},
@@ -133,7 +141,10 @@ hal.executable @dead_symbol {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @dead_symbol layout(#pipeline_layout)
     builtin.module {
-      func.func @dead_symbol() {
+      func.func @dead_symbol() attributes {
+        stream.binding_noalias_0 = [1 : i32],
+        stream.binding_noalias_1 = [0 : i32]
+      } {
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
         %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
         %3 = gpu.block_id x
@@ -151,8 +162,8 @@ hal.executable @dead_symbol {
   }
 }
 // CHECK-LABEL: llvm.func @dead_symbol
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
 //      CHECK:    llvm.fadd
 
 // -----
@@ -167,7 +178,10 @@ hal.executable @mixed_type {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @mixed_type layout(#pipeline_layout)
     builtin.module {
-      func.func @mixed_type() {
+      func.func @mixed_type() attributes {
+        stream.binding_noalias_0 = [1 : i32],
+        stream.binding_noalias_1 = [0 : i32]
+      } {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%c128) : memref<16xf32, strided<[1], offset: ?>>
@@ -190,8 +204,8 @@ hal.executable @mixed_type {
 }
 
 // CHECK-LABEL: llvm.func @mixed_type
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
 //       CHECK:   %[[BYTES_PER_BIT:.+]] = llvm.mlir.constant(8 : i64) : i64
 //       CHECK:   %[[BITS_PER_ELEM:.+]] = llvm.mlir.constant(32 : i64) : i64
 //       CHECK:   %[[BYTE_OFFSET:.+]] = llvm.mlir.constant(128 : index) : i64
@@ -308,7 +322,12 @@ hal.executable @check_not_readonly {
   hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @check_not_readonly layout(#pipeline_layout)
     builtin.module {
-      func.func @check_not_readonly() {
+      func.func @check_not_readonly() attributes {
+        stream.binding_noalias_0 = [1 : i32, 2 : i32, 3 : i32],
+        stream.binding_noalias_1 = [0 : i32, 2 : i32, 3 : i32],
+        stream.binding_noalias_2 = [0 : i32, 1 : i32, 3 : i32],
+        stream.binding_noalias_3 = [0 : i32, 1 : i32, 2 : i32]
+      } {
         %c0 = arith.constant 0 : index
         %c128 = arith.constant 128 : index
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
@@ -334,7 +353,7 @@ hal.executable @check_not_readonly {
   }
 }
 // CHECK-LABEL: llvm.func @check_not_readonly
-//  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
+//  CHECK-NOT: (%[[ARG0:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
 
 // -----
 

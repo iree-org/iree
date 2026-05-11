@@ -8,7 +8,12 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 builtin.module {
-  func.func @abs_ex_dispatch_0() {
+  func.func @abs_ex_dispatch_0() attributes {
+    stream.binding_noalias_0 = [1 : i32, 2 : i32, 3 : i32],
+    stream.binding_noalias_1 = [0 : i32, 2 : i32, 3 : i32],
+    stream.binding_noalias_2 = [0 : i32, 1 : i32, 3 : i32],
+    stream.binding_noalias_3 = [0 : i32, 1 : i32, 2 : i32]
+  } {
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) flags(ReadOnly) : memref<16xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
     %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : memref<16xf32>
@@ -25,9 +30,9 @@ builtin.module {
   }
 }
 //   CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
-//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readnone})
 //         CHECK:    llvm.call @__ockl_get_local_size({{.*}}) : (i32) -> (i64
 //         CHECK:    llvm.getelementptr inbounds|nuw %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
@@ -247,7 +252,11 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 builtin.module {
-  func.func @missing_ptr_dispatch_copy_idx_0() {
+  func.func @missing_ptr_dispatch_copy_idx_0() attributes {
+    stream.binding_noalias_0 = [1 : i32, 2 : i32],
+    stream.binding_noalias_1 = [0 : i32, 2 : i32],
+    stream.binding_noalias_2 = [0 : i32, 1 : i32]
+  } {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
     %1 = arith.index_castui %0 : i32 to index
@@ -259,9 +268,9 @@ builtin.module {
   }
 }
 //   CHECK-LABEL: llvm.func @missing_ptr_dispatch_copy_idx_0
-//    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readonly},
+//    CHECK-SAME: (%[[arg0:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly},
 //    CHECK-SAME:  %[[arg1:.+]]: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef, llvm.readnone},
-//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef},
+//    CHECK-SAME:  %[[arg2:.+]]: !llvm.ptr<1> {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef},
 //    CHECK-SAME:  %[[arg3:.+]]: i32 {llvm.noundef})
 //         CHECK:   llvm.zext %[[arg3]] : i32 to i64
 //         CHECK:   llvm.insertvalue %[[arg0]]
