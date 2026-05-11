@@ -954,7 +954,9 @@ struct ScatterIndexedDimsFirst final
     auto nextWindowDim = reorderedWindowDims.begin();
     for (int64_t dim = 0; dim < updateRank; ++dim) {
       if (isUpdateWindowDim[dim]) {
-        updatePerm.push_back(windowOperandDimToUpdateDim[*nextWindowDim++]);
+        int64_t operandDim = *nextWindowDim;
+        ++nextWindowDim;
+        updatePerm.push_back(windowOperandDimToUpdateDim[operandDim]);
       } else {
         updatePerm.push_back(dim);
       }
