@@ -81,8 +81,15 @@ struct PromoteContractionOutputsPattern
     if (promoteOperation == PromoteOperation::None) {
       return failure();
     }
-    if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
-            linalgOp.getOperation())) {
+    bool promoteMatmul = (promoteOperation == PromoteOperation::All) ||
+                         (promoteOperation == PromoteOperation::Matmul);
+    bool promoteConv = (promoteOperation == PromoteOperation::All) ||
+                       (promoteOperation == PromoteOperation::Conv);
+    Operation *op = linalgOp.getOperation();
+    bool isContraction = isa<linalg::ContractionOpInterface>(op);
+    bool isConvolution = isa<linalg::ConvolutionOpInterface>(op);
+    if ((!isContraction && !isConvolution) ||
+        (isContraction && !promoteMatmul) || (isConvolution && !promoteConv)) {
       return failure();
     }
 
@@ -93,47 +100,28 @@ struct PromoteContractionOutputsPattern
         })) {
       return failure();
     }
-
-    bool promoteMatmul = (promoteOperation == PromoteOperation::All) ||
-                         (promoteOperation == PromoteOperation::Matmul);
-    bool promoteConv = (promoteOperation == PromoteOperation::All) ||
-                       (promoteOperation == PromoteOperation::Conv);
-    Operation *op = linalgOp.getOperation();
     Type destType = DestType::get(rewriter.getContext());
-    if (promoteMatmul) {
-      if (IREE::LinalgExt::isPureMatmul(op)) {
-        replaceOpOutputs(cast<linalg::MatmulOp>(op), rewriter, srcType,
-                         destType);
-        return success();
-      }
-      if (IREE::LinalgExt::isPureBatchMatmul(op)) {
-        replaceOpOutputs(cast<linalg::BatchMatmulOp>(op), rewriter, srcType,
-                         destType);
-        return success();
-      }
+    if (IREE::LinalgExt::isPureMatmul(op)) {
+      replaceOpOutputs(cast<linalg::MatmulOp>(op), rewriter, srcType, destType);
+      return success();
+    }
+    if (IREE::LinalgExt::isPureBatchMatmul(op)) {
+      replaceOpOutputs(cast<linalg::BatchMatmulOp>(op), rewriter, srcType,
+                       destType);
+      return success();
     }
     return llvm::TypeSwitch<Operation *, LogicalResult>(op)
         .template Case<linalg::MatvecOp, linalg::VecmatOp,
                        linalg::BatchMatvecOp, linalg::BatchVecmatOp,
                        linalg::MatmulTransposeAOp, linalg::MatmulTransposeBOp,
                        linalg::BatchMatmulTransposeAOp,
-                       linalg::BatchMatmulTransposeBOp>([&](auto op) {
-          if (!promoteMatmul) {
-            return failure();
-          }
+                       linalg::BatchMatmulTransposeBOp, linalg::Conv2DOp,
+                       linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp,
+                       linalg::Conv2DNhwcFhwcOp, linalg::Conv2DNgchwFgchwOp,
+                       linalg::Conv2DNgchwGfchwOp>([&](auto op) {
           replaceOpOutputs(op, rewriter, srcType, destType);
           return success();
         })
-        .template Case<linalg::Conv2DOp, linalg::Conv2DNchwFchwOp,
-                       linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
-                       linalg::Conv2DNgchwFgchwOp, linalg::Conv2DNgchwGfchwOp>(
-            [&](auto op) {
-              if (!promoteConv) {
-                return failure();
-              }
-              replaceOpOutputs(op, rewriter, srcType, destType);
-              return success();
-            })
         .Default(failure);
   }
 
