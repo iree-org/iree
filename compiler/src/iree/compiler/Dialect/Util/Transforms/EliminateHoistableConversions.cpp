@@ -6,10 +6,13 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-eliminate-hoistable-conversions"
 
 namespace mlir::iree_compiler::IREE::Util {
 
@@ -340,10 +343,9 @@ LogicalResult eliminateHoistableConversions(Operation *op) {
   IRRewriter rewriter(context);
   for (auto hc : toInline) {
     if (!hc->hasAttr(kWasHoistedAttr) && isPlausiblyHoistable(hc)) {
-      hc->emitRemark(
-          "hoistable_conversion was not hoisted or cancelled; inlining in "
-          "place")
-          << " " << hc.getTag() << " inverting " << hc.getInverseTag();
+      LDBG() << "hoistable_conversion was not hoisted or cancelled; inlining "
+                "in place "
+             << hc.getTag() << " inverting " << hc.getInverseTag();
     }
     rewriter.setInsertionPoint(hc);
     inlineConversionBody(rewriter, hc);
