@@ -126,6 +126,30 @@ util.func public @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : ten
 
 // -----
 
+// CHECK-LABEL: util.func public @keep_distinct_duplicate_writable_operands
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x4xf32>)
+util.func public @keep_distinct_duplicate_writable_operands(%arg0: tensor<4x4xf32>)
+    -> (tensor<4x4xf32>, tensor<4x4xf32>) {
+  %c1 = arith.constant 1 : index
+  //      CHECK: flow.dispatch.workgroups[%c1](%[[ARG0]], %[[ARG0]]) : (tensor<4x4xf32>, tensor<4x4xf32>) -> (%[[ARG0]], %[[ARG0]]) =
+  // CHECK-NEXT:   (%[[ARG0_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>, %[[ARG1_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>)
+  %0:2 = "flow.dispatch.workgroups"(%c1, %c1, %c1, %arg0, %arg0) <{operandSegmentSizes = array<i32: 3, 2, 0, 0>, tied_operands = [0 : index, 1 : index]}> ({
+  ^bb0(%arg0_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>,
+       %arg1_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>):
+    %cst0 = arith.constant dense<0.000000e+00> : tensor<4x4xf32>
+    %cst1 = arith.constant dense<1.000000e+00> : tensor<4x4xf32>
+    // CHECK: iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[ARG0_CAPTURE]]
+    iree_tensor_ext.dispatch.tensor.store %cst0, %arg0_capture, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>
+    // CHECK: iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[ARG1_CAPTURE]]
+    iree_tensor_ext.dispatch.tensor.store %cst1, %arg1_capture, offsets = [0, 0], sizes = [4, 4], strides = [1, 1] : tensor<4x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4x4xf32>>
+    flow.return
+  }, {
+  }) : (index, index, index, tensor<4x4xf32>, tensor<4x4xf32>) -> (tensor<4x4xf32>, tensor<4x4xf32>)
+  util.return %0#0, %0#1 : tensor<4x4xf32>, tensor<4x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @drop_unused_dispatch_region_result
 util.func public @drop_unused_dispatch_region_result(
     %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
