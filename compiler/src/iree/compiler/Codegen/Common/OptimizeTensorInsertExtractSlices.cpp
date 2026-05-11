@@ -324,6 +324,16 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     // least one side has in_bounds=true, it asserts the position is within
     // bounds; an actual OOB access is undefined behavior, so the fold
     // cannot introduce new incorrectness. (Verified with Z3.)
+    //
+    // Case 1.1: w_ib = false, r_ib = true, position is actually in_bounds
+    // We write val, we read val, we can fold RAW to val.
+    // Case 1.2: w_ib = false, r_ib = true, position is NOT in_bounds
+    // We skip write, read says it is in_bounds, but that is false, which is UB
+    // therefore we can fold to val.
+    // Case 2.1: w_ib = true, r_ib = false, position is actually in_bounds
+    // We write val, we read val, we can fold RAW to val.
+    // Case 2.2: w_ib = true, r_ib = false, position is NOT in_bounds
+    // UB on the write, therefore we can fold.
     if (readOp.hasOutOfBoundsDim() && writeOp.hasOutOfBoundsDim()) {
       return failure();
     }
