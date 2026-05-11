@@ -51,7 +51,6 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
-#include "SPIRVTargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -63,6 +62,9 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
+// LLVM private headers at lib/Target/SPIRV/
+#include "SPIRVTargetMachine.h"
+#include "SPIRVCommandLine.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
@@ -1104,8 +1106,9 @@ public:
         }
 
         // Currently unknown which extensions are actually supported
+        llvm::ExtensionSet hipJitCompatibleExtensions = llvm::SPIRVExtensionsParser::getValidExtensions(spirvTriple);
         // Known lack of support for SPV_ALTERA_arbitrary_precision_integers
-        llvm::ExtensionSet hipJitCompatibleExtensions = {};
+        hipJitCompatibleExtensions.erase(llvm::SPIRV::Extension::SPV_ALTERA_arbitrary_precision_integers);
 
         // Replace the default extensions list, which is based on the compilation target 
         const_cast<llvm::SPIRVSubtarget *>(

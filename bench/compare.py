@@ -291,7 +291,7 @@ def run_comparison(mlir_path, func_name, input_specs, args):
         ok, err = compile_variant(mlir_path, hsaco_vmfb, hsaco_intermediates)
         if not ok:
             print("FAILED")
-            print(f"  {err[:200]}")
+            print(f"  {err[:250]}")
             return
         print("ok")
 
@@ -301,7 +301,7 @@ def run_comparison(mlir_path, func_name, input_specs, args):
         )
         if not ok:
             print("FAILED")
-            print(f"  {err[:200]}")
+            print(f"  {err[:250]}")
             return
         print("ok")
 
@@ -315,7 +315,7 @@ def run_comparison(mlir_path, func_name, input_specs, args):
             jit_asm = disassemble(so_path)
             print("ok")
         else:
-            print(f"FAILED ({err[:100]})")
+            print(f"FAILED ({err[:200]})")
 
         aot_stats = isa_stats(aot_asm)
         jit_stats = isa_stats(jit_asm)
@@ -355,14 +355,14 @@ def run_comparison(mlir_path, func_name, input_specs, args):
         if hsaco_ms is not None:
             print(f"{hsaco_ms:.3f} ms")
         else:
-            print(f"FAILED ({err[:100]})")
+            print(f"FAILED ({err[:150]})")
 
         print(f"Benchmarking SPIR-V ({args.reps} reps)...", end=" ", flush=True)
         spirv_ms, err = benchmark(spirv_vmfb, func_name, input_specs, args.reps)
         if spirv_ms is not None:
             print(f"{spirv_ms:.3f} ms")
         else:
-            print(f"FAILED ({err[:100]})")
+            print(f"FAILED ({err[:150]})")
 
         # --- Summary ---
         if hsaco_ms is not None and spirv_ms is not None:
