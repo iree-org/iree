@@ -81,6 +81,15 @@ iree_cc_library(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+
+# Add the special dependency on  SPIRVTargetMachine.h to modify the available SPIRV extensions when generating for amdgcnspirv
+# SPV_ALTERA_arbitrary_precision_integers is known to be unavailable 
+target_include_directories(iree_compiler_plugins_target_ROCM_ROCM.objects
+  PRIVATE
+    "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/lib/Target/SPIRV"
+    "${IREE_BINARY_DIR}/llvm-project/lib/Target/SPIRV"
+)
+
 # We either use device bitcode files from a configurable path
 # or we download them from a fixed location and copy them from
 # there. We default to downloading as it is a better use experience

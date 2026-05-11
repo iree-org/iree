@@ -51,6 +51,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "SPIRVTargetMachine.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -1096,9 +1097,21 @@ public:
                 spirvTriple, /*CPU=*/"", /*Features=*/"", llvm::TargetOptions{},
                 llvm::Reloc::PIC_, std::nullopt,
                 llvm::CodeGenOptLevel::Default));
+
+
         if (!spirvTM) {
           return variantOp.emitError() << "cannot create SPIR-V target machine";
         }
+
+        // Currently unknown which extensions are actually supported
+        // Known lack of support for SPV_ALTERA_arbitrary_precision_integers
+        llvm::ExtensionSet hipJitCompatibleExtensions = {};
+
+        // Replace the default extensions list, which is based on the compilation target 
+        const_cast<llvm::SPIRVSubtarget *>(
+                static_cast<llvm::SPIRVTargetMachine *>(spirvTM.get())->
+                getSubtargetImpl())->initAvailableExtensions(hipJitCompatibleExtensions);
+
 
         // Unwrap [1 x T] aggregate types that trip up the SPIR-V backend
         // and amd-llvm-spirv reverse translator (PHI type mismatches).
