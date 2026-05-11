@@ -214,3 +214,70 @@ func.func @lower_async_dma_rejects_noncontiguous_source(
   gpu.barrier {addr_space = #gpu.address_space<workgroup>}
   return
 }
+
+// -----
+
+// Test: Swizzle-aware lowering. Dest traces through expand_shape to a
+// swizzle_hint on a flat LDS memref.
+// DMA layout computation for transferShape=[4,64], 64 threads, f16:
+//   128-bit DMA: elementsPerDMA=8, fails (can't distribute 64 threads over [4,8])
+//   32-bit DMA: elementsPerDMA=2, element=[1,2], thread=[2,32], batch=[2,1]
+// Dest indices use normal uniform path (2D). Source indices include xori from
+// the swizzle (self-inverse XOR applied to flat offset).
+
+#executable_target_swizzle = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none,
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    dma_sizes = [32, 128]>>}>
+
+#translation_swizzle = #iree_codegen.translation_info<
+  pipeline = #iree_gpu.pipeline<VectorDistribute>
+  workgroup_size = [64, 1, 1]
+  subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_async_dma_swizzled
+// CHECK-SAME:    %[[SRC:.+]]: memref<4x64xf16, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[I:.+]]: index, %[[J:.+]]: index
+// CHECK:         %[[HINT:.+]] = iree_codegen.swizzle_hint %{{.+}}[#iree_codegen.xor_shuffle<64, 8>]
+// CHECK:         %[[EXPANDED:.+]] = memref.expand_shape %[[HINT]]
+//   Batch 0: linearize tile offset -> xori (swizzle) -> delinearize -> add to source base.
+// CHECK:         %[[FLAT0:.+]] = affine.linearize_index disjoint {{.*}} by (4, 64)
+// CHECK:         %[[XORI0:.+]] = arith.xori
+// CHECK:         %[[DELIN0:.+]]:2 = affine.delinearize_index {{.*}} into (4, 64)
+// CHECK:         %[[SRC_D0_B0:.+]] = arith.addi %[[I]], %[[DELIN0]]#0
+// CHECK:         %[[SRC_D1_B0:.+]] = arith.addi %[[J]], %[[DELIN0]]#1
+//   Dest is uniform (no thread contribution, writes to expanded memref).
+// CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B0]], %[[SRC_D1_B0]]], %[[EXPANDED]][{{.+}}] : vector<2xf16>
+//   Batch 1: same swizzle pattern, dest includes batch offset.
+// CHECK:         %[[FLAT1:.+]] = affine.linearize_index disjoint {{.*}} by (4, 64)
+// CHECK:         %[[XORI1:.+]] = arith.xori
+// CHECK:         %[[DELIN1:.+]]:2 = affine.delinearize_index {{.*}} into (4, 64)
+// CHECK:         %[[SRC_D0_B1:.+]] = arith.addi %[[I]], %[[DELIN1]]#0
+// CHECK:         %[[SRC_D1_B1:.+]] = arith.addi %[[J]], %[[DELIN1]]#1
+// CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B1]], %[[SRC_D1_B1]]], %[[EXPANDED]][{{.+}}] : vector<2xf16>
+// CHECK-NOT:     iree_gpu.async_dma
+func.func @lower_async_dma_swizzled(
+    %source: memref<4x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
+    %i: index, %j: index)
+  attributes {
+    hal.executable.target = #executable_target_swizzle,
+    translation_info = #translation_swizzle} {
+  %alloc = memref.alloc() : memref<256xf16, #gpu.address_space<workgroup>>
+  %hint = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<64, 8>]
+      : memref<256xf16, #gpu.address_space<workgroup>>
+  %expanded = memref.expand_shape %hint [[0, 1]] output_shape [4, 64]
+      : memref<256xf16, #gpu.address_space<workgroup>>
+      into memref<4x64xf16, #gpu.address_space<workgroup>>
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  iree_gpu.async_dma %source[%i, %j] to %expanded[%i, %j], vector<4x64xf16>
+      : memref<4x64xf16, #amdgpu.address_space<fat_raw_buffer>>,
+        memref<4x64xf16, #gpu.address_space<workgroup>>
+  gpu.barrier {addr_space = #gpu.address_space<workgroup>}
+  return
+}
