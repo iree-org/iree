@@ -969,6 +969,10 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 // Returns virtual intrinsics that are composed from this concrete MMA op.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
+  case MMAIntrinsic::MFMA_F32_16x16x32_F16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
             VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
