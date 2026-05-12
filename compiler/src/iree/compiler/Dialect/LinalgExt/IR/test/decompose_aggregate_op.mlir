@@ -148,19 +148,19 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
 
-// Masked variant: clamp the sum denominator once per row so fully-masked rows
-// yield 0 instead of 0/0 == NaN.
+// Masked variant: detect fully-masked rows and zero them after P / sum so
+// fully-masked rows yield 0 instead of 0/0 == NaN.
 func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
                                 %key: tensor<192x1024x64xf16>,
                                 %value: tensor<192x1024x64xf16>,
-                                %mask: tensor<192x1024x1024xf16>,
+                                %mask: tensor<192x1024x1024xi1>,
                                 %output: tensor<192x1024x64xf32>)
                                 -> (tensor<192x1024x64xf32>) {
   %scale = arith.constant 1.0 : f16
 
   %out = iree_linalg_ext.attention
         { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapMask, #mapO] }
-        ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16, tensor<192x1024x1024xf16>)
+        ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16, tensor<192x1024x1024xi1>)
         outs(%output : tensor<192x1024x64xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score: f32
@@ -185,6 +185,11 @@ func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
+// masked_rows = rowAll(isneginf(S))
+// CHECK: linalg.generic
+// CHECK:   arith.cmpf oeq
+// CHECK:   arith.andi
+// CHECK:   linalg.yield
 // max = rowMax(S)
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
@@ -198,15 +203,14 @@ func.func @attention_f16_masked(%query: tensor<192x1024x64xf16>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// sum = max(sum, 1): mask is present, so fully-masked rows use a denominator
-// of 1 while non-fully-masked rows are unchanged.
-// CHECK: linalg.generic
-// CHECK:   arith.maximumf
-// CHECK:   linalg.yield
 // P = P / sum
 // CHECK: linalg.generic
 // CHECK-NOT: arith.addf
 // CHECK:   arith.divf
+// CHECK:   linalg.yield
+// P = select(masked_rows, 0, P)
+// CHECK: linalg.generic
+// CHECK:   arith.select
 // CHECK:   linalg.yield
 
 // -----

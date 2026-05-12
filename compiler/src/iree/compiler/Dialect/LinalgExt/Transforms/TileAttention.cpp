@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -123,31 +124,40 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   Value x = onlineAttn.getResult(0);
   Value sum = onlineAttn.getResult(2);
-  bool hasMask = static_cast<bool>(mask);
+  Value fullyMaskedRows;
+  if (mask) {
+    fullyMaskedRows = createFullyMaskedRowsFromMask(
+        rewriter, loc, *attnOp.getMaskMap(), sumMap, rowRedSize, *mask);
+  }
 
   // Finalize online attention. With a mask, fully-masked rows can have
-  // `sum == 0` and `x == 0`; guard that case to produce 0 instead of NaN. Keep
-  // this in the existing finalization loop to avoid an extra row pass.
+  // `sum == 0` and `x == 0`; zero those rows after normalization to produce 0
+  // instead of NaN.
 
   // Compress the indexing maps.
+  SmallVector<Value> inputs = {sum, x};
+  SmallVector<AffineMap> indexingMapsForFinalization = {sumMap, accMap};
+  if (fullyMaskedRows) {
+    inputs.push_back(fullyMaskedRows);
+    indexingMapsForFinalization.push_back(sumMap);
+  }
+  indexingMapsForFinalization.push_back(accMap);
   SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{sumMap, accMap, accMap});
+      compressUnusedDims(indexingMapsForFinalization);
 
   SmallVector<utils::IteratorType> iteratorTypes(compressedMaps[0].getNumDims(),
                                                  utils::IteratorType::parallel);
 
   auto genericOp = linalg::GenericOp::create(
-      rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
-      attnOp.getOutput(), compressedMaps, iteratorTypes,
+      rewriter, loc, attnOp.getOutput().getType(), inputs, attnOp.getOutput(),
+      compressedMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value result;
-        if (hasMask) {
+        if (fullyMaskedRows) {
           result = arith::DivFOp::create(b, loc, args[1], args[0]);
-          Value zero =
-              arith::ConstantOp::create(b, loc, b.getFloatAttr(f32Type, 0.0));
-          Value isZero = arith::CmpFOp::create(
-              b, loc, arith::CmpFPredicate::OEQ, args[0], zero);
-          result = arith::SelectOp::create(b, loc, isZero, zero, result);
+          Value zero = arith::ConstantOp::create(
+              b, loc, b.getFloatAttr(args[1].getType(), 0.0));
+          result = arith::SelectOp::create(b, loc, args[2], zero, result);
         } else {
           Value one = arith::ConstantOp::create(
               b, loc, b.getFloatAttr(args[0].getType(), 1.0));
@@ -157,7 +167,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
           result = arith::MulFOp::create(b, loc, reciprocal, args[1]);
         }
         // Cast result to the required type by attention output.
-        result = convertScalarToDtype(b, loc, result, args[2].getType(),
+        result = convertScalarToDtype(b, loc, result, args.back().getType(),
                                       /*isUnsignedCast=*/false);
         linalg::YieldOp::create(b, loc, result);
       });

@@ -25,6 +25,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Transforms/RegionUtils.h"
 
+#include <limits>
+
 #define DEBUG_TYPE "iree-linalgExt-utils"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -79,24 +81,106 @@ OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                                                {a, b, c});
 }
 
-Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc,
-                                   Value sum) {
-  auto sumType = cast<RankedTensorType>(sum.getType());
-  Type elementType = sumType.getElementType();
-  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(builder, loc, sum);
-  Value output = tensor::EmptyOp::create(builder, loc, sizes, elementType);
+static SmallVector<utils::IteratorType>
+getRowReductionIteratorTypes(AffineMap inputMap, AffineMap rowMap) {
+  SmallVector<utils::IteratorType> iteratorTypes(
+      inputMap.getNumDims(), utils::IteratorType::reduction);
+  for (AffineExpr dim : rowMap.getResults()) {
+    int pos = cast<AffineDimExpr>(dim).getPosition();
+    iteratorTypes[pos] = utils::IteratorType::parallel;
+  }
+  return iteratorTypes;
+}
 
-  SmallVector<AffineMap> maps = {
-      builder.getMultiDimIdentityMap(sumType.getRank()),
-      builder.getMultiDimIdentityMap(sumType.getRank())};
-  SmallVector<utils::IteratorType> iteratorTypes(sumType.getRank(),
+template <typename IsMaskedFn>
+static Value createFullyMaskedRows(OpBuilder &builder, Location loc,
+                                   AffineMap inputMap, AffineMap rowMap,
+                                   ArrayRef<OpFoldResult> rowSizes, Value input,
+                                   IsMaskedFn isMaskedFn) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, rowMap});
+  inputMap = compressedMaps[0];
+  rowMap = compressedMaps[1];
+
+  Value output =
+      tensor::EmptyOp::create(builder, loc, rowSizes, builder.getI1Type());
+  Value trueValue = arith::ConstantOp::create(
+      builder, loc, builder.getBoolAttr(/*value=*/true));
+  Value rowAllInit =
+      linalg::FillOp::create(builder, loc, ValueRange{trueValue}, output)
+          .getResult(0);
+
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, rowAllInit.getType(), input, rowAllInit,
+      SmallVector<AffineMap>{inputMap, rowMap},
+      getRowReductionIteratorTypes(inputMap, rowMap),
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value isMasked = isMaskedFn(b, loc, args[0]);
+        Value allMasked = arith::AndIOp::create(b, loc, isMasked, args[1]);
+        linalg::YieldOp::create(b, loc, allMasked);
+      });
+  return genericOp.getResult(0);
+}
+
+Value createFullyMaskedRowsFromScores(OpBuilder &builder, Location loc,
+                                      AffineMap scoreMap, AffineMap rowMap,
+                                      ArrayRef<OpFoldResult> rowSizes,
+                                      Value scores) {
+  return createFullyMaskedRows(
+      builder, loc, scoreMap, rowMap, rowSizes, scores,
+      [](OpBuilder &b, Location loc, Value score) {
+        Type scoreType = score.getType();
+        Value negInf = arith::ConstantOp::create(
+            b, loc,
+            b.getFloatAttr(scoreType,
+                           -std::numeric_limits<double>::infinity()));
+        return arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, score,
+                                     negInf);
+      });
+}
+
+Value createFullyMaskedRowsFromMask(OpBuilder &builder, Location loc,
+                                    AffineMap maskMap, AffineMap rowMap,
+                                    ArrayRef<OpFoldResult> rowSizes,
+                                    Value mask) {
+  return createFullyMaskedRows(
+      builder, loc, maskMap, rowMap, rowSizes, mask,
+      [](OpBuilder &b, Location loc, Value maskValue) -> Value {
+        Type maskType = maskValue.getType();
+        if (maskType.isInteger()) {
+          if (maskType.getIntOrFloatBitWidth() != 1) {
+            maskValue =
+                arith::TruncIOp::create(b, loc, b.getI1Type(), maskValue);
+          }
+          Value trueValue =
+              arith::ConstantOp::create(b, loc, b.getBoolAttr(/*value=*/true));
+          return arith::XOrIOp::create(b, loc, maskValue, trueValue);
+        }
+        Value negInf = arith::ConstantOp::create(
+            b, loc,
+            b.getFloatAttr(maskType, -std::numeric_limits<double>::infinity()));
+        return arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ,
+                                     maskValue, negInf);
+      });
+}
+
+Value zeroFullyMaskedRows(OpBuilder &builder, Location loc, AffineMap valueMap,
+                          AffineMap rowMap, Value value,
+                          Value fullyMaskedRows) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{rowMap, valueMap});
+  rowMap = compressedMaps[0];
+  valueMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(valueMap.getNumDims(),
                                                  utils::IteratorType::parallel);
   auto genericOp = linalg::GenericOp::create(
-      builder, loc, output.getType(), sum, output, maps, iteratorTypes,
+      builder, loc, value.getType(), fullyMaskedRows, value,
+      SmallVector<AffineMap>{rowMap, valueMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value one =
-            arith::ConstantOp::create(b, loc, b.getFloatAttr(elementType, 1.0));
-        Value result = arith::MaximumFOp::create(b, loc, args[0], one);
+        Value zero =
+            arith::ConstantOp::create(b, loc, b.getZeroAttr(args[1].getType()));
+        Value result = arith::SelectOp::create(b, loc, args[0], zero, args[1]);
         linalg::YieldOp::create(b, loc, result);
       });
   return genericOp.getResult(0);
