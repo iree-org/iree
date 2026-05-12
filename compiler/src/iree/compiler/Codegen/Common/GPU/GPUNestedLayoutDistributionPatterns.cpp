@@ -2374,15 +2374,18 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
                                          "expected nested layout for init");
     }
 
+    bool needsCrossThread = srcLayout.getThreadTile()[scanDim] > 1;
+    bool needsCrossSubgroup = srcLayout.getSubgroupTile()[scanDim] > 1;
     Type elemTy = source.getType().getElementType();
-    if (failed(checkBitwidthForShuffle(scanOp, elemTy, maxBitsPerShuffle,
+    if ((needsCrossThread || needsCrossSubgroup) &&
+        failed(checkBitwidthForShuffle(scanOp, elemTy, maxBitsPerShuffle,
                                        "element", rewriter))) {
       return failure();
     }
 
     // Reject multi-subgroup for now.
     // TODO: Support distribution across workgroups.
-    if (srcLayout.getSubgroupTile()[scanDim] > 1) {
+    if (needsCrossSubgroup) {
       return rewriter.notifyMatchFailure(
           scanOp, "multi-subgroup scan not yet supported");
     }
