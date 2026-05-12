@@ -244,7 +244,7 @@ struct MaterializeEncodingInfo {
   SmallVector<int64_t> innerTileSizes;
   SmallVector<int64_t> outerDimsPerm;
 
-  // The optional swizzle, see the comment on TileSwizzle. Only used on GPU.
+  // The optional swizzle, see the comment on TileSwizzle.
   std::optional<TileSwizzle> swizzle;
   // The optional scalable tiles array
   std::optional<ScalableTileFlags> scalableTiles;
