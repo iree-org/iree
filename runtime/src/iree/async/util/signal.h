@@ -124,7 +124,7 @@ void iree_async_signal_subscription_defer_unsubscribe(
 // POSIX signal number conversion
 //===----------------------------------------------------------------------===//
 
-#if !defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_GENERIC)
 
 // Converts an IREE signal enum to the corresponding POSIX signal number.
 // Returns 0 for IREE_ASYNC_SIGNAL_NONE or invalid signals.
@@ -138,7 +138,7 @@ iree_async_signal_t iree_async_signal_from_posix(int signo);
 // This is used by signalfd and pthread_sigmask.
 void iree_async_signal_build_sigset(sigset_t* mask);
 
-#endif  // !IREE_PLATFORM_WINDOWS
+#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_GENERIC
 
 #ifdef __cplusplus
 }  // extern "C"

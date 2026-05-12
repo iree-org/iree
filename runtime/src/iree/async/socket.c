@@ -9,6 +9,86 @@
 #include "iree/async/proactor.h"
 
 //===----------------------------------------------------------------------===//
+// Platforms without socket support (generic bare-metal).
+//===----------------------------------------------------------------------===//
+
+#if defined(IREE_PLATFORM_GENERIC)
+
+IREE_API_EXPORT iree_status_t iree_async_socket_create(
+    iree_async_proactor_t* proactor, iree_async_socket_type_t type,
+    iree_async_socket_options_t options, iree_async_socket_t** out_socket) {
+  (void)proactor;
+  (void)type;
+  (void)options;
+  (void)out_socket;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_import(
+    iree_async_proactor_t* proactor, iree_async_primitive_t primitive,
+    iree_async_socket_type_t type, iree_async_socket_flags_t flags,
+    iree_async_socket_t** out_socket) {
+  (void)proactor;
+  (void)primitive;
+  (void)type;
+  (void)flags;
+  (void)out_socket;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT void iree_async_socket_retain(iree_async_socket_t* socket) {
+  (void)socket;
+}
+
+IREE_API_EXPORT void iree_async_socket_release(iree_async_socket_t* socket) {
+  (void)socket;
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_bind(
+    iree_async_socket_t* socket, const iree_async_address_t* address) {
+  (void)socket;
+  (void)address;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_listen(
+    iree_async_socket_t* socket, iree_host_size_t backlog) {
+  (void)socket;
+  (void)backlog;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_query_local_address(
+    const iree_async_socket_t* socket, iree_async_address_t* out_address) {
+  (void)socket;
+  (void)out_address;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_shutdown(
+    iree_async_socket_t* socket, iree_async_socket_shutdown_mode_t mode) {
+  (void)socket;
+  (void)mode;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
+    iree_async_socket_t* socket, iree_host_size_t* out_space) {
+  (void)socket;
+  (void)out_space;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "sockets not supported on this platform");
+}
+
+#else  // !IREE_PLATFORM_GENERIC
+
+//===----------------------------------------------------------------------===//
 // Platform abstractions
 //===----------------------------------------------------------------------===//
 
@@ -345,3 +425,5 @@ IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
   // out_space is already set to IREE_HOST_SIZE_MAX.
   return iree_ok_status();
 }
+
+#endif  // !IREE_PLATFORM_GENERIC
