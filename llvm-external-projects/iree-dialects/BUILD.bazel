@@ -237,9 +237,6 @@ cc_library(
 
 cc_library(
     name = "IREEDialectsTest",
-    srcs = glob([
-        "test/lib/**/*.cpp",
-    ], allow_empty = True),
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgTransformDialect",
