@@ -11,7 +11,7 @@ iterations of them every time you try to run tests. So we create these as
 binaries and then invoke them as tests with `--benchmark_min_time=0s`.
 """
 
-load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load(":native_binary.bzl", "native_test")
 
 def cc_binary_benchmark(
