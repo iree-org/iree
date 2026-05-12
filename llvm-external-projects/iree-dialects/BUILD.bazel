@@ -7,7 +7,9 @@ package(
     licenses = ["notice"],
 )
 
-exports_files(glob(["python/*.cpp"]))
+exports_files(glob(["include/iree-dialects/Dialect/Input/*.td"], allow_empty = True))
+
+exports_files(glob(["python/*.cpp"], allow_empty = True))
 
 ################################################################################
 # Package-by-package filegroup exports.
@@ -16,20 +18,27 @@ exports_files(glob(["python/*.cpp"]))
 
 filegroup(
     name = "python_dialects",
-    srcs = glob(["python/iree/compiler/dialects/**/*.py"]),
+    srcs = glob(["python/iree/compiler/dialects/**/*.py"], allow_empty = True),
 )
 
 ################################################################################
 # Tablegen exports
 ################################################################################
 
+filegroup(
+    name = "TdFilegroup",
+    srcs = glob([
+        "include/iree-dialects/Dialect/Input/*.td",
+    ], allow_empty = True),
+)
 
 td_library(
     name = "TdFiles",
     srcs = glob([
+        "include/iree-dialects/Dialect/Input/*.td",
         "include/iree-dialects/Dialect/LinalgTransform/*.td",
         "python/iree/compiler/dialects/*.td",
-    ]),
+    ], allow_empty = True),
     includes = ["include"],
     deps = [
         "@llvm-project//mlir:BuiltinDialectTdFiles",
@@ -47,9 +56,12 @@ td_library(
 
 cc_library(
     name = "IREEDialectsTransforms",
+    srcs = glob([
+        "lib/Transforms/*.cpp",
+    ], allow_empty = True),
     hdrs = glob([
         "include/iree-dialects/Transforms/*.h",
-    ]),
+    ], allow_empty = True),
     includes = ["include"],
     deps = [
         "@llvm-project//llvm:Support",
@@ -96,10 +108,11 @@ cc_library(
     name = "IREELinalgTransformDialect",
     srcs = glob([
         "lib/Dialect/LinalgTransform/IR/*.cpp",
-    ]),
+        "lib/Dialect/LinalgTransform/IR/*.h",
+    ], allow_empty = True),
     hdrs = glob([
         "include/iree-dialects/Dialect/LinalgTransform/*.h",
-    ]),
+    ], allow_empty = True),
     includes = ["include"],
     deps = [
         ":IREEDialectsTransforms",
@@ -168,7 +181,7 @@ cc_library(
     name = "IREELinalgTransformDialectPasses",
     srcs = glob([
         "lib/Dialect/LinalgTransform/Passes/*.cpp",
-    ]),
+    ], allow_empty = True),
     deps = [
         ":IREEDialectsTransforms",
         ":IREELinalgTransformDialect",
@@ -217,8 +230,8 @@ cc_library(
 
 cc_library(
     name = "CAPI",
-    srcs = glob(["lib/CAPI/*.cpp"]),
-    hdrs = glob(["include/iree-dialects-c/*.h"]),
+    srcs = glob(["lib/CAPI/*.cpp"], allow_empty = True),
+    hdrs = glob(["include/iree-dialects-c/*.h"], allow_empty = True),
     includes = ["include"],
     deps = [
         ":IREELinalgTransformDialect",
