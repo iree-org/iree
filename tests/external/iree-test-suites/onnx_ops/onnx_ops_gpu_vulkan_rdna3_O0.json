@@ -1,5 +1,5 @@
 {
-  "config_name": "gpu_vulkan",
+  "config_name": "gpu_vulkan_rdna3",
   "iree_compile_flags": [
     "--iree-hal-target-device=vulkan",
     "--iree-input-demote-f64-to-f32",
