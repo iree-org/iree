@@ -721,10 +721,10 @@ static void setSplitGroup(Operation *op, int64_t groupId) {
 }
 
 // Duplicate all duplicatable operations. If a duplicatable operation has more
-// than one user, it will be duplicated (via clone) and each user will receiver
+// than one user, it will be duplicated (via clone) and each user will receive
 // their own copy of the duplicatable operation. By attaching a split-group to
-// the clones of the same operation as (discardable) attribute, we can later on
-// deduplicated clones of the same operation that received the same tile size
+// the clones of the same operation as (discardable) attribute, we can later
+// deduplicate clones of the same operation that received the same tile size
 // from the analysis.
 static void splitDuplicatableTensorProducers(FunctionOpInterface funcOp) {
   int64_t nextGroupId = 0;
@@ -773,7 +773,13 @@ static void dedupSplitGroup(ArrayRef<Operation *> group) {
     auto tileSizesAttr = dyn_cast_or_null<DenseI64ArrayAttr>(
         op->getAttr(kVectorTileSizesAttrName));
     if (!tileSizesAttr) {
-      continue;
+      // Deduplicate operations that were not assigned a tile size during
+      // analysis. It is safe to assume a single result with tensor type here,
+      // as all operations that end up here must match
+      // `isDuplicatableTensorProducer` earlier.
+      TensorType resTy = cast<TensorType>(op->getResult(0).getType());
+      SmallVector<int64_t> minusOne(resTy.getRank(), -1);
+      tileSizesAttr = DenseI64ArrayAttr::get(op->getContext(), minusOne);
     }
     auto it = llvm::find_if(representatives, [&](auto &entry) {
       return entry.first == tileSizesAttr;
@@ -822,7 +828,7 @@ public:
     FunctionOpInterface funcOp = getOperation();
 
     // Duplicate all duplicatable operations before running the analysis. This
-    // avoid cross-polluting the result of unrelated operations via CSE'd edges
+    // avoids cross-polluting the result of unrelated operations via CSE'd edges
     // such as linalg.fill used as DPS init. Duplicating preemptively instead of
     // on-demand after the analysis has two advantages: It makes the analysis
     // code simpler, as we don't need special case handling for duplicatable
