@@ -585,6 +585,91 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
+constexpr int64_t kMinWorkgroupsPerCU = 2;
+
+/// Rejects DMA when its extra LDS usage would drop occupancy (WGs/CU) below
+/// `kMinWorkgroupsPerCU` while non-DMA would still meet it. When chip info
+/// is available, the LDS-limited occupancy is capped by actual work
+/// (totalWorkgroups / numCUs) so that under-subscribed shapes are not
+/// penalized.
+/// TODO(#24375): Remove this guard once the tile-size heuristic stops
+/// over-allocating LDS or 1-warp/SIMD codegen can recover the perf without
+/// requiring inter-SIMD latency hiding via WGs/CU >= 2.
+static bool shouldRejectDMAForOccupancy(
+    const GPUMMASchedule &schedule, const GPUMatmulShapeType &problem,
+    IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
+    ArrayRef<int64_t> bounds, ArrayRef<int64_t> workgroupTileSizes) {
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  int64_t dmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/true, prefetchNumStages,
+      doCPromotion);
+  int64_t nonDmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/false, /*prefetchNumStages=*/0,
+      doCPromotion);
+
+  assert(dmaLdsBytes > 0 && nonDmaLdsBytes > 0 && "LDS usage must be positive");
+
+  int64_t dmaMaxWgsPerCU = maxSharedMemoryBytes / dmaLdsBytes;
+  int64_t nonDmaMaxWgsPerCU = maxSharedMemoryBytes / nonDmaLdsBytes;
+
+  // When chip info is available, cap effective WGs/CU by how many workgroups
+  // actually exist per CU. This avoids over-rejecting DMA for small shapes
+  // where the GPU is under-subscribed.
+  IREE::GPU::TargetChipAttr chip = target.getChip();
+  if (chip) {
+    int64_t numCUs = chip.getWgpCount();
+    int64_t totalWorkgroups = 1;
+    for (auto [dim, tileSize] : llvm::zip_equal(bounds, workgroupTileSizes)) {
+      if (tileSize > 0) {
+        totalWorkgroups *= llvm::divideCeil(dim, tileSize);
+      }
+    }
+    int64_t maxWgsPerCU = llvm::divideCeil(totalWorkgroups, numCUs);
+    dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
+    nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
+  }
+
+  return dmaMaxWgsPerCU < kMinWorkgroupsPerCU &&
+         nonDmaMaxWgsPerCU >= kMinWorkgroupsPerCU;
+}
+
+/// Returns true if direct load DMA should be rejected, and fall back to stream
+/// copies.
+///
+/// Rejection cases:
+///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
+///   2. Not a GEMM. TODO(#23907): support convolution.
+///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
+///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
+                                      Type lhsElemType, Type rhsElemType,
+                                      bool transposedLhs, bool transposedRhs) {
+  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+
+  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
+  if (!targetSupportsGlobalLoadDMA(target)) {
+    return true;
+  }
+
+  // Case 2: Only GEMM are supported currently.
+  if (!isGemm) {
+    return true;
+  }
+
+  // Case 3: Only f16/bf16 are supported currently.
+  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+    return true;
+  }
+
+  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
+  if (transposedLhs && !transposedRhs) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Create a lowering config for matmul or IGEMM convolution based on iteration
 /// bounds and indexing maps for a given target. This function computes
 /// contraction dimensions and deduces an MMA intrinsic schedule to choose tile
@@ -600,7 +685,7 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
-    bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
+    bool scaled, bool &useDirectLoad, int64_t prefetchNumStages,
     int64_t splitReductionTripCnt, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
@@ -778,13 +863,14 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-  // compilation doesn't support it. Once this is fixed, we should use global
-  // load DMA here when possible.
   Location loc = operands[0].getLoc();
-  if (scaled && useDirectLoad) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
-                              "supported for scaled matmuls, ignoring";
+  // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size)
+  // happens below via shouldRejectDMAForOccupancy after the schedule and
+  // workgroup tiles are computed.
+  if (useDirectLoad &&
+      shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
+                                transposedLhs, transposedRhs)) {
+    LDBG() << "overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
 
@@ -913,6 +999,17 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
+  // Stage 2 (tile-size) DMA rejection: now that workgroup tiles are known,
+  // check whether DMA would cause an unacceptable occupancy drop. Stage 1
+  // (problem-size + target-arch) ran above via shouldRejectDirectLoadDMA.
+  if (useDirectLoad &&
+      shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
+                                  hasExistingAccumulator, bounds,
+                                  workgroupTileSizes)) {
+    LDBG() << "rejecting direct load DMA: LDS limits occupancy (WGs/CU)";
+    useDirectLoad = false;
+  }
+
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   SmallVector<Attribute> promotionArray;
@@ -922,7 +1019,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid LDS bank conflicts.
     // TODO(#24255): Fix untuned swizzle logic for DMA.
-    if (lhsElemType.isBF16() && !transposedLhs) {
+    if (!transposedLhs) {
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
           context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
           /*skipUntunedFallback=*/true);
@@ -930,7 +1027,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         lhsAttr = *lhsSwizzleAttr;
       }
     }
-    if (rhsElemType.isBF16() && transposedRhs) {
+    if (transposedRhs) {
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
           context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
           /*skipUntunedFallback=*/true);

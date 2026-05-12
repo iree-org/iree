@@ -45,13 +45,7 @@ void InsertSMTConstraintsPass::runOnOperation() {
   }
 
   // Collect pre-annotated root ops and group by set number.
-  SmallVector<Operation *> rootOps;
-  funcOp.walk([&](Operation *op) {
-    if (hasRootOpInfo(op)) {
-      rootOps.push_back(op);
-    }
-  });
-
+  SmallVector<Operation *> rootOps = getTunerRootOps(funcOp.getOperation());
   if (rootOps.empty()) {
     return;
   }

@@ -509,5 +509,108 @@ TEST_F(ByteLevelDecoderTest, HF_MultipleTokens) {
                         /*expect_pending_after_process=*/false);
 }
 
+//===----------------------------------------------------------------------===//
+// Cross-Token UTF-8 with Shifted Bytes
+//===----------------------------------------------------------------------===//
+// These test multi-byte UTF-8 reconstruction where continuation bytes fall in
+// the shifted range (0x80-0x9F -> U+0122-U+0141). This is the common case for
+// non-ASCII characters like accented letters, CJK, and emoji in GPT-2.
+
+TEST_F(ByteLevelDecoderTest, CrossTokenNTilde) {
+  // "Ñ" = U+00D1, UTF-8: C3 91.
+  // GPT-2 tokens: "Ã" (U+00C3 -> byte C3) + "ĳ" (U+0133 -> byte 91).
+  // Byte 0x91 is in shifted range (0x80-0x9F -> U+0122-U+0141).
+  std::vector<std::string> tokens = {"\xC3\x83", "\xC4\xB3"};  // Ã, ĳ
+  TestWithAllBatchSizes(decoder(), tokens, "\xC3\x91",         // Ñ
+                        /*expect_pending_after_process=*/false);
+}
+
+TEST_F(ByteLevelDecoderTest, CrossTokenNTildeInWord) {
+  // "Ñoño" = Ñ + o + ñ + o.
+  // "Ñ" (C3 91): Ã (C3 83) + ĳ (C4 B3)
+  // "o" (6F): identity
+  // "ñ" (C3 B1): Ã (C3 83) + ± (C2 B1) [both identity range]
+  // "o" (6F): identity
+  // In GPT-2, BPE may merge these differently, but at the byte-level decoder
+  // layer we test the worst case: each byte-level char as a separate token.
+  std::vector<std::string> tokens = {
+      "\xC3\x83",  // Ã -> byte C3
+      "\xC4\xB3",  // ĳ -> byte 91
+      "o",         // identity
+      "\xC3\x83",  // Ã -> byte C3
+      "\xC2\xB1",  // ± -> byte B1
+      "o",         // identity
+  };
+  TestWithAllBatchSizes(decoder(), tokens,
+                        "\xC3\x91"  // Ñ
+                        "o"         //
+                        "\xC3\xB1"  // ñ
+                        "o",        //
+                        /*expect_pending_after_process=*/false);
+}
+
+TEST_F(ByteLevelDecoderTest, CrossTokenChinese) {
+  // "你好" = U+4F60 U+597D.
+  // "你" UTF-8: E4 BD A0.
+  //   byte E4 -> U+00E4 (identity, ä, C3 A4)
+  //   byte BD -> U+00BD (identity, ½, C2 BD)
+  //   byte A0 -> U+0142 (shifted, ł, C5 82)
+  // "好" UTF-8: E5 A5 BD.
+  //   byte E5 -> U+00E5 (identity, å, C3 A5)
+  //   byte A5 -> U+00A5 (identity, ¥, C2 A5)
+  //   byte BD -> U+00BD (identity, ½, C2 BD)
+  std::vector<std::string> tokens = {
+      "\xC3\xA4",  // ä -> byte E4
+      "\xC2\xBD",  // ½ -> byte BD
+      "\xC5\x82",  // ł -> byte A0
+      "\xC3\xA5",  // å -> byte E5
+      "\xC2\xA5",  // ¥ -> byte A5
+      "\xC2\xBD",  // ½ -> byte BD
+  };
+  TestWithAllBatchSizes(decoder(), tokens,
+                        "\xE4\xBD\xA0"   // 你
+                        "\xE5\xA5\xBD",  // 好
+                        /*expect_pending_after_process=*/false);
+}
+
+TEST_F(ByteLevelDecoderTest, CrossTokenEmoji) {
+  // "😀" = U+1F600, UTF-8: F0 9F 98 80.
+  //   byte F0 -> U+00F0 (identity, ð, C3 B0)
+  //   byte 9F -> U+0141 (shifted, Ł, C5 81)
+  //   byte 98 -> U+013A (shifted, ĺ, C4 BA)
+  //   byte 80 -> U+0122 (shifted, Ģ, C4 A2)
+  // Test: "hello 😀 world" with space encoded as Ġ (U+0120).
+  std::vector<std::string> tokens = {
+      "hello",
+      "\xC4\xA0",  // Ġ -> space
+      "\xC3\xB0",  // ð -> byte F0
+      "\xC5\x81",  // Ł -> byte 9F
+      "\xC4\xBA",  // ĺ -> byte 98
+      "\xC4\xA2",  // Ģ -> byte 80
+      "\xC4\xA0",  // Ġ -> space
+      "world",
+  };
+  TestWithAllBatchSizes(decoder(), tokens,
+                        "hello \xF0\x9F\x98\x80 world",  // hello 😀 world
+                        /*expect_pending_after_process=*/false);
+}
+
+TEST_F(ByteLevelDecoderTest, NotStateless) {
+  // ByteLevel must NOT be declared STATELESS because cross-token UTF-8
+  // sequences require the pending bytes accumulator to span token boundaries.
+  // Pre-decoding each token in isolation would finalize incomplete sequences
+  // as U+FFFD replacement characters.
+  iree_tokenizer_decoder_capability_t caps =
+      iree_tokenizer_decoder_capabilities(decoder());
+  EXPECT_FALSE(caps & IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS)
+      << "ByteLevel must not be STATELESS; cross-token UTF-8 requires state";
+  // ByteLevel SHOULD be declared STATELESS_EXCEPT_PARTIAL_UTF8 so the tokenizer
+  // can pre-decode non-partial tokens and use the byte accumulator only for
+  // tokens that produce incomplete UTF-8 sequences.
+  EXPECT_TRUE(caps &
+              IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8)
+      << "ByteLevel should be STATELESS_EXCEPT_PARTIAL_UTF8 for pre-decode";
+}
+
 }  // namespace
 }  // namespace iree::tokenizer

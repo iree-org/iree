@@ -690,6 +690,15 @@ def IREECodegen_OneOfKnobAttr : AttrDef<IREECodegen_Dialect, "OneOfKnob"> {
   }];
   let parameters = (ins "StringAttr":$name, "ArrayAttr":$options);
   let assemblyFormat = "`<` $name `,` $options `>`";
+  let builders = [
+    AttrBuilder<(ins "StringRef":$name, "ArrayAttr":$options), [{
+      return $_get($_ctxt, StringAttr::get($_ctxt, name), options);
+    }]>,
+    AttrBuilder<(ins "StringRef":$name, "ArrayRef<Attribute>":$options), [{
+      return $_get($_ctxt, StringAttr::get($_ctxt, name),
+                   ArrayAttr::get($_ctxt, options));
+    }]>
+  ];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS

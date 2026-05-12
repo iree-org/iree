@@ -91,6 +91,7 @@ iree_status_t iree_tokenizer_decoder_sequence_allocate(
   //     provided all other children are STATELESS. At most one child may have
   //     this capability (ByteFallback); if any child has NONE, the result is
   //     NONE.
+  //   STATELESS_EXCEPT_PARTIAL_UTF8 = same promotion rule as BYTE_TOKENS.
   //   POSITION_SENSITIVE = union (any child position-sensitive).
   iree_tokenizer_decoder_capability_t capabilities =
       IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS;
@@ -104,12 +105,32 @@ iree_status_t iree_tokenizer_decoder_sequence_allocate(
         iree_any_bit_set(
             child_capabilities,
             IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_BYTE_TOKENS)) {
-      // Promote sequence to STATELESS_EXCEPT_BYTE_TOKENS. This replaces
-      // STATELESS (non-byte tokens still pre-decodable) and is only valid
-      // if no other child already contributed this capability.
+      // Promote sequence to STATELESS_EXCEPT_BYTE_TOKENS. Incompatible with
+      // PARTIAL_UTF8 (different decode-time dispatch mechanisms).
+      if (iree_any_bit_set(
+              capabilities,
+              IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8)) {
+        capabilities = IREE_TOKENIZER_DECODER_CAPABILITY_NONE;
+        break;
+      }
       capabilities &= ~IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS;
       capabilities |=
           IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_BYTE_TOKENS;
+    } else if (
+        iree_any_bit_set(
+            child_capabilities,
+            IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8)) {
+      // Promote sequence to STATELESS_EXCEPT_PARTIAL_UTF8 (ByteLevel).
+      // Incompatible with BYTE_TOKENS.
+      if (iree_any_bit_set(
+              capabilities,
+              IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_BYTE_TOKENS)) {
+        capabilities = IREE_TOKENIZER_DECODER_CAPABILITY_NONE;
+        break;
+      }
+      capabilities &= ~IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS;
+      capabilities |=
+          IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8;
     } else {
       // Child has NONE — entire sequence is not pre-decodable.
       capabilities = IREE_TOKENIZER_DECODER_CAPABILITY_NONE;
@@ -120,6 +141,17 @@ iree_status_t iree_tokenizer_decoder_sequence_allocate(
             IREE_TOKENIZER_DECODER_CAPABILITY_POSITION_SENSITIVE)) {
       capabilities |= IREE_TOKENIZER_DECODER_CAPABILITY_POSITION_SENSITIVE;
     }
+  }
+
+  // POSITION_SENSITIVE + PARTIAL_UTF8 is unsupported: the first-token handler
+  // uses direct memcpy (position-sensitive space stripping) before byte-token
+  // dispatch, so a partial-UTF8 first token would bypass the accumulator.
+  // Degrade to NONE (streaming decode) for safety.
+  if (iree_all_bits_set(
+          capabilities,
+          IREE_TOKENIZER_DECODER_CAPABILITY_POSITION_SENSITIVE |
+              IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8)) {
+    capabilities = IREE_TOKENIZER_DECODER_CAPABILITY_NONE;
   }
 
   iree_tokenizer_decoder_initialize(&decoder->base,

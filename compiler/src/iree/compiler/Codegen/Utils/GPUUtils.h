@@ -330,6 +330,10 @@ IREE::GPU::TargetAttr getGPUTargetAttr(MLIRContext *context,
                                        IREE::HAL::ExecutableTargetAttr attr);
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
+/// Check if the target architecture supports global load DMA.
+/// Returns true only for CDNA4+ (gfx950+) architectures.
+bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
+
 // Methods to retrieve information association with `configuration` field
 // of `hal.executable.target` attribute used commonly in GPU codegen pipelines.
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);
@@ -350,10 +354,6 @@ std::optional<int> getGPUSubgroupSize(mlir::FunctionOpInterface func);
 /// given `moduleOp`, ensuring they are returned in their original IR order.
 SmallVector<IREE::HAL::ExecutableVariantOp>
 getExecutableVariantOps(mlir::ModuleOp moduleOp);
-
-// Returns all operations within the given module that are marked with the
-// tuner root op attribute (i.e., have the `root_op` UnitAttr).
-SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp);
 
 } // namespace mlir::iree_compiler
 

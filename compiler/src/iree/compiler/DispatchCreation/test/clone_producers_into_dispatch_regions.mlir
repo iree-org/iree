@@ -806,6 +806,37 @@ util.func @never_clone_scatter_outs_tensor_constant(
 
 // -----
 
+// A tensor.insert_slice dest use outside of the dispatch should not prevent
+// cloning the producer into the dispatch.
+util.func @clone_with_external_insert_slice_dest_use(%source : tensor<16x16xf32>)
+    -> (tensor<16x16xf32>, tensor<16x16xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x16xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x16xf32>)
+      -> tensor<16x16xf32>
+  %0 = flow.dispatch.region -> (tensor<16x16xf32>) {
+    %1 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel"]}
+        outs(%fill : tensor<16x16xf32>) {
+    ^bb0(%out: f32):
+      linalg.yield %out : f32
+    } -> tensor<16x16xf32>
+    flow.return %1 : tensor<16x16xf32>
+  }
+  %1 = tensor.insert_slice %source into %fill[0, 0] [16, 16] [1, 1]
+      : tensor<16x16xf32> into tensor<16x16xf32>
+  util.return %0, %1 : tensor<16x16xf32>, tensor<16x16xf32>
+}
+// CHECK-LABEL: @clone_with_external_insert_slice_dest_use
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     linalg.fill
+//       CHECK:     linalg.generic
+//       CHECK:   tensor.insert_slice
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
 util.func @clone_gather_elementwise(%source : tensor<2x2x2048xi32>,
                                    %indices : tensor<2xi32>) -> tensor<2048xi32> {
   %empty = tensor.empty() : tensor<2048xi32>

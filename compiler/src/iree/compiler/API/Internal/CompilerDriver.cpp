@@ -36,9 +36,11 @@
 #endif
 
 #include <atomic>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <utility>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
 #include "iree/compiler/ConstEval/Passes.h"
@@ -54,10 +56,14 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
@@ -77,6 +83,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/Remarks.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Parser/Parser.h"
@@ -178,6 +185,152 @@ private:
     OS.append(Ptr, Size);
   }
 };
+
+class CompilerOutputResourceBuilder : public AsmResourceBuilder {
+public:
+  using ValueFn = llvm::function_ref<void(llvm::raw_ostream &)>;
+  using PrintFn = llvm::function_ref<void(StringRef, ValueFn)>;
+
+  explicit CompilerOutputResourceBuilder(PrintFn printFn) : printFn(printFn) {}
+
+  void buildBool(StringRef key, bool data) override {
+    printFn(key,
+            [&](llvm::raw_ostream &os) { os << (data ? "true" : "false"); });
+  }
+
+  void buildString(StringRef key, StringRef data) override {
+    printFn(key, [&](llvm::raw_ostream &os) {
+      os << "\"";
+      llvm::printEscapedString(data, os);
+      os << "\"";
+    });
+  }
+
+  void buildBlob(StringRef key, ArrayRef<char> data,
+                 uint32_t dataAlignment) override {
+    printFn(key, [&](llvm::raw_ostream &os) {
+      llvm::support::ulittle32_t dataAlignmentLE(dataAlignment);
+      os << "\"0x"
+         << llvm::toHex(StringRef(reinterpret_cast<char *>(&dataAlignmentLE),
+                                  sizeof(dataAlignment)))
+         << llvm::toHex(StringRef(data.data(), data.size())) << "\"";
+    });
+  }
+
+private:
+  PrintFn printFn;
+};
+
+bool isBareResourceKey(StringRef key) {
+  if (key.empty() || (!std::isalpha(static_cast<unsigned char>(key.front())) &&
+                      key.front() != '_')) {
+    return false;
+  }
+  return llvm::all_of(key.drop_front(), [](unsigned char c) {
+    return std::isalnum(c) || c == '_' || c == '$' || c == '.';
+  });
+}
+
+void printResourceKey(StringRef key, llvm::raw_ostream &os) {
+  if (isBareResourceKey(key)) {
+    os << key;
+    return;
+  }
+  os << "\"";
+  llvm::printEscapedString(key, os);
+  os << "\"";
+}
+
+void appendReferencedDialectResources(Operation *op, AsmState &state,
+                                      llvm::raw_ostream &os) {
+  auto &dialectResources = state.getDialectResources();
+  if (dialectResources.empty()) {
+    return;
+  }
+
+  llvm::SmallVector<Dialect *> dialects;
+  for (auto &it : dialectResources) {
+    if (!it.second.empty()) {
+      dialects.push_back(it.first);
+    }
+  }
+  if (dialects.empty()) {
+    return;
+  }
+  llvm::sort(dialects, [](Dialect *lhs, Dialect *rhs) {
+    return lhs->getNamespace() < rhs->getNamespace();
+  });
+
+  bool hadResource = false;
+  bool needDialectComma = false;
+  for (Dialect *dialect : dialects) {
+    const auto *interface = dyn_cast<OpAsmDialectInterface>(dialect);
+    if (!interface) {
+      llvm::report_fatal_error(
+          "referenced dialect resource has no assembly printer");
+    }
+
+    bool hadEntry = false;
+    bool needEntryComma = false;
+    std::string bodyStorage;
+    llvm::raw_string_ostream bodyStream(bodyStorage);
+    auto printEntry = [&](StringRef key,
+                          CompilerOutputResourceBuilder::ValueFn valueFn) {
+      std::string resourceString;
+      bool useCachedValue = false;
+      if (std::optional<uint64_t> characterLimit =
+              state.getPrinterFlags().getLargeResourceStringLimit()) {
+        if (characterLimit.value() == 0) {
+          return;
+        }
+
+        llvm::raw_string_ostream resourceStream(resourceString);
+        valueFn(resourceStream);
+        if (resourceString.size() > characterLimit.value()) {
+          return;
+        }
+        useCachedValue = true;
+      }
+
+      if (needEntryComma) {
+        bodyStream << "," << "\n";
+      }
+      bodyStream << "      ";
+      printResourceKey(key, bodyStream);
+      bodyStream << ": ";
+      if (useCachedValue) {
+        bodyStream << resourceString;
+      } else {
+        valueFn(bodyStream);
+      }
+      hadEntry = true;
+      needEntryComma = true;
+    };
+
+    CompilerOutputResourceBuilder builder(printEntry);
+    interface->buildResources(op, dialectResources[dialect], builder);
+    if (!hadEntry) {
+      continue;
+    }
+
+    if (!std::exchange(hadResource, true)) {
+      os << "\n{-#\n  dialect_resources: {\n";
+    }
+    if (needDialectComma) {
+      os << "," << "\n";
+    }
+    os << "    ";
+    printResourceKey(dialect->getNamespace(), os);
+    os << ": {\n";
+    os << bodyStream.str();
+    os << "\n    }";
+    needDialectComma = true;
+  }
+
+  if (hadResource) {
+    os << "\n  }\n#-}\n";
+  }
+}
 
 llvm::ThreadPoolStrategy getGlobalThreadPoolStrategy() {
   // We allow environment variables to control the compiler thread pool.
@@ -1103,7 +1256,11 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
 }
 
 Error *Invocation::outputIR(Output &output) {
-  (*output.outputStream) << *parsedModule;
+  OpPrintingFlags flags;
+  flags.useLocalScope();
+  AsmState state(parsedModule, flags);
+  parsedModule->print(*output.outputStream, state);
+  appendReferencedDialectResources(parsedModule, state, *output.outputStream);
   return output.getWriteError();
 }
 
