@@ -62,9 +62,6 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
-// LLVM private headers at lib/Target/SPIRV/
-#include "SPIRVTargetMachine.h"
-#include "SPIRVCommandLine.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
@@ -1100,21 +1097,9 @@ public:
                 llvm::Reloc::PIC_, std::nullopt,
                 llvm::CodeGenOptLevel::Default));
 
-
         if (!spirvTM) {
           return variantOp.emitError() << "cannot create SPIR-V target machine";
         }
-
-        // Currently unknown which extensions are actually supported
-        llvm::ExtensionSet hipJitCompatibleExtensions = llvm::SPIRVExtensionsParser::getValidExtensions(spirvTriple);
-        // Known lack of support for SPV_ALTERA_arbitrary_precision_integers
-        hipJitCompatibleExtensions.erase(llvm::SPIRV::Extension::SPV_ALTERA_arbitrary_precision_integers);
-
-        // Replace the default extensions list, which is based on the compilation target 
-        const_cast<llvm::SPIRVSubtarget *>(
-                static_cast<llvm::SPIRVTargetMachine *>(spirvTM.get())->
-                getSubtargetImpl())->initAvailableExtensions(hipJitCompatibleExtensions);
-
 
         // Unwrap [1 x T] aggregate types that trip up the SPIR-V backend
         // and amd-llvm-spirv reverse translator (PHI type mismatches).
