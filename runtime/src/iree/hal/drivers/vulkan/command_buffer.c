@@ -446,24 +446,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_validate_recording_state(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_command_buffer_validate_buffer_ref(
-    iree_hal_vulkan_command_buffer_t* command_buffer,
-    iree_hal_buffer_ref_t buffer_ref) {
-  if (buffer_ref.buffer) {
-    return iree_hal_buffer_validate_memory_type(
-        iree_hal_buffer_memory_type(buffer_ref.buffer),
-        IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
-  }
-  if (buffer_ref.buffer_slot >= command_buffer->base.binding_capacity) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "indirect buffer reference slot %u is out range of the declared "
-        "binding capacity of the Vulkan command buffer %u",
-        buffer_ref.buffer_slot, command_buffer->base.binding_capacity);
-  }
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_command_buffer_retain_resource(
     iree_hal_vulkan_command_buffer_t* command_buffer, void* resource) {
   if (!resource || !command_buffer->resource_set) {
@@ -617,8 +599,6 @@ iree_hal_vulkan_command_buffer_validate_indirect_parameters_ref(
         "Vulkan indirect workgroup parameter buffer must contain at least "
         "uint32_t[3]");
   }
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-      command_buffer, workgroup_count_ref));
   if (!workgroup_count_ref.buffer) return iree_ok_status();
 
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
@@ -2599,10 +2579,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
         "(got %" PRIhsz ")",
         pattern_length);
   }
-  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-        command_buffer, target_ref));
-  }
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_track_buffer_ref(
       command_buffer, target_ref));
@@ -2662,10 +2638,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
         IREE_STATUS_OUT_OF_RANGE,
         "Vulkan command buffer update source range exceeds host size");
   }
-  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-        command_buffer, target_ref));
-  }
 
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_track_buffer_ref(
       command_buffer, target_ref));
@@ -2722,12 +2694,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
                             "(source_length=%" PRIdsz ", target_length=%" PRIdsz
                             ")",
                             source_ref.length, target_ref.length);
-  }
-  if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-        command_buffer, source_ref));
-    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-        command_buffer, target_ref));
   }
 
   const iree_hal_buffer_ref_t buffer_refs[2] = {source_ref, target_ref};
@@ -2895,10 +2861,6 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
       IREE_RETURN_IF_ERROR(
           iree_hal_vulkan_command_buffer_validate_indirect_parameters_ref(
               command_buffer, config.workgroup_count_ref));
-    }
-    for (iree_host_size_t i = 0; i < bindings.count; ++i) {
-      IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_buffer_ref(
-          command_buffer, bindings.values[i]));
     }
   }
 
