@@ -566,7 +566,7 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsCdnaBarrierValueCapabilities) {
   EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
 }
 
-TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx94xCapabilities) {
+TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx942Capabilities) {
   const iree_hal_amdgpu_vendor_packet_capability_flags_t expected_capabilities =
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE |
@@ -575,20 +575,12 @@ TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx94xCapabilities) {
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
-  const iree_hal_amdgpu_gfxip_version_t versions[] = {
-      GfxIp(9, 4, 0),
-      GfxIp(9, 4, 1),
-      GfxIp(9, 4, 2),
-      GfxIp(9, 5, 0),
-  };
-  for (iree_hal_amdgpu_gfxip_version_t version : versions) {
-    iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
-        iree_hal_amdgpu_select_vendor_packet_capabilities(version);
-    EXPECT_TRUE(iree_all_bits_set(capabilities, expected_capabilities));
-    EXPECT_TRUE(
-        iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
-            capabilities));
-  }
+  iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 4, 2));
+  EXPECT_TRUE(iree_all_bits_set(capabilities, expected_capabilities));
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
 }
 
 TEST_F(PhysicalDeviceCapabilitiesTest, SelectsValidatedGfx1100Capabilities) {
@@ -621,6 +613,18 @@ TEST_F(PhysicalDeviceCapabilitiesTest,
   EXPECT_EQ(iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(8, 0, 0)),
             0u);
   iree_hal_amdgpu_vendor_packet_capability_flags_t capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 4, 0));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+
+  capabilities =
+      iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(9, 5, 0));
+  EXPECT_FALSE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          capabilities));
+
+  capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(GfxIp(10, 3, 0));
   EXPECT_EQ(capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB);
   EXPECT_FALSE(
@@ -680,6 +684,33 @@ TEST_F(PhysicalDeviceCapabilitiesTest,
         capabilities, IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB));
     EXPECT_FALSE(iree_any_bit_set(capabilities, direct_pm4_families));
   }
+}
+
+TEST_F(PhysicalDeviceCapabilitiesTest,
+       SelectsExperimentalPm4CommandBufferCapabilities) {
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t gfx9_capabilities =
+      iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+          GfxIp(9, 4, 0));
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          gfx9_capabilities));
+  EXPECT_TRUE(iree_any_bit_set(
+      gfx9_capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9));
+
+  const iree_hal_amdgpu_vendor_packet_capability_flags_t gfx12_capabilities =
+      iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+          GfxIp(12, 0, 0));
+  EXPECT_TRUE(
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          gfx12_capabilities));
+  EXPECT_TRUE(iree_any_bit_set(
+      gfx12_capabilities,
+      IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10));
+
+  EXPECT_EQ(iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+                GfxIp(13, 0, 0)),
+            0u);
 }
 
 TEST_F(PhysicalDeviceCapabilitiesTest, SelectsPm4TimestampStrategy) {

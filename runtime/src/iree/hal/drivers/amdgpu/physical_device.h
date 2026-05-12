@@ -155,6 +155,10 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   // Forces cross-queue wait barriers to use software deferral instead of the
   // optimal device-side strategy for the GPU ISA.
   uint32_t force_wait_barrier_defer : 1;
+
+  // Enables PM4 dispatch command-buffer capabilities on unvalidated gfx9-gfx12
+  // targets for hardware bring-up experiments.
+  uint32_t enable_experimental_pm4_command_buffers : 1;
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.

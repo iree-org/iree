@@ -51,8 +51,8 @@ enum {
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10 |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT,
-  // Packet families validated on gfx94x/CDNA3 through AQL-submitted PM4 IBs.
-  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_GFX94X_VALIDATED =
+  // Packet families validated on gfx942/CDNA3 through AQL-submitted PM4 IBs.
+  IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_GFX942_VALIDATED =
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE |
       IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
@@ -516,7 +516,18 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
                   .stepping = {0, 2},
               },
           .capabilities =
-              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_GFX94X_VALIDATED,
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_BARRIER_VALUE,
+      },
+      {
+          .version =
+              {
+                  .major = {9, 9},
+                  .minor = {4, 4},
+                  .stepping = {2, 2},
+              },
+          .capabilities =
+              IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_GFX942_VALIDATED,
       },
       {
           .version =
@@ -541,6 +552,31 @@ iree_hal_amdgpu_select_vendor_packet_capabilities(
     }
   }
   return capabilities;
+}
+
+iree_hal_amdgpu_vendor_packet_capability_flags_t
+iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+    iree_hal_amdgpu_gfxip_version_t version) {
+  switch (version.major) {
+    case 9:
+      return IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX9 |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
+    case 10:
+    case 11:
+    case 12:
+      return IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_AQL_PM4_IB |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_EVENT_WRITE |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_SET_SH_REG |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_ACQUIRE_MEM_GFX10 |
+             IREE_HAL_AMDGPU_VENDOR_PACKET_CAPABILITY_PM4_COMPUTE_DISPATCH_DIRECT;
+    default:
+      return 0;
+  }
 }
 
 iree_hal_amdgpu_pm4_timestamp_strategy_t

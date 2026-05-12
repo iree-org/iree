@@ -1342,6 +1342,8 @@ static void iree_hal_amdgpu_logical_device_translate_physical_options(
   out_options->host_queue_upload_capacity =
       options->host_queues.upload_capacity;
   out_options->force_wait_barrier_defer = options->force_wait_barrier_defer;
+  out_options->enable_experimental_pm4_command_buffers =
+      options->enable_experimental_pm4_command_buffers;
 }
 
 static iree_status_t iree_hal_amdgpu_logical_device_verify_physical_options(

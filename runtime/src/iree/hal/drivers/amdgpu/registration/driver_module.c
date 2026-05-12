@@ -75,6 +75,12 @@ IREE_FLAG(
     "Forces cross-queue wait barriers through the software deferral path "
     "instead of using the device-side strategy selected from the GPU ISA.");
 
+IREE_FLAG(bool, amdgpu_experimental_pm4_command_buffers, false,
+          "Enables PM4 dispatch command-buffer capabilities on unvalidated "
+          "gfx9-gfx12 "
+          "targets. This is for hardware bring-up only; default automatic PM4 "
+          "selection remains limited to validated GPU ISAs.");
+
 IREE_FLAG(int64_t, amdgpu_wait_active_for_ns, 0,
           "Reserved for future HSA active-wait tuning. Must be 0 today.");
 
@@ -252,6 +258,9 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
 
   device_options->force_wait_barrier_defer =
       FLAG_amdgpu_force_wait_barrier_defer;
+
+  device_options->enable_experimental_pm4_command_buffers =
+      FLAG_amdgpu_experimental_pm4_command_buffers;
 
   if (FLAG_amdgpu_wait_active_for_ns < 0) {
     return iree_make_status(

@@ -886,6 +886,11 @@ iree_hal_amdgpu_physical_device_initialize_vendor_packet_strategy(
 
   iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(gfxip_version);
+  if (options->enable_experimental_pm4_command_buffers) {
+    vendor_packet_capabilities |=
+        iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+            gfxip_version);
+  }
   iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy =
       iree_hal_amdgpu_select_pm4_timestamp_strategy(gfxip_version);
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy =
