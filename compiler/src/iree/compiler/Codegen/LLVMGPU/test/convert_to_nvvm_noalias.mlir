@@ -164,3 +164,47 @@ hal.executable @test_partial_noalias {
 // LLVM-SAME: llvm.noalias
 // LLVM-SAME: llvm.noalias
 // LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef}
+
+// -----
+
+// Test case: Multiple subspans of the SAME read-only binding still result in a
+// single deduplicated kernarg, and that kernarg keeps both `llvm.noalias` and
+// `llvm.readonly`. Mirrors the rustc -O behavior where two `&T` references to
+// the same readonly memory are both annotated `noalias readonly`.
+#pipeline_layout_same_ro = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @same_binding_readonly_multi_subspan {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @same_binding_readonly_multi_subspan layout(#pipeline_layout_same_ro)
+    builtin.module {
+      func.func @same_binding_readonly_multi_subspan() attributes {
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
+      } {
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
+        // Two subspans on the same read-only binding(0), different offsets/types.
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(0) offset(%c0)   flags(ReadOnly) : memref<16xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(0) offset(%c128) flags(ReadOnly) : memref<16xi32, strided<[1], offset: ?>>
+        // Writeable output binding.
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(1) : memref<16xf32>
+        %3 = memref.load %0[%c0] : memref<16xf32>
+        %4 = memref.load %1[%c0] : memref<16xi32, strided<[1], offset: ?>>
+        %5 = arith.sitofp %4 : i32 to f32
+        %6 = arith.addf %3, %5 : f32
+        memref.store %6, %2[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @same_binding_readonly_multi_subspan
+// The two subspans of binding(0) collapse into a single kernarg that keeps
+// both llvm.noalias and llvm.readonly. The writeable binding(1) keeps its
+// llvm.noalias as well (no readonly).
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly}
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef}
