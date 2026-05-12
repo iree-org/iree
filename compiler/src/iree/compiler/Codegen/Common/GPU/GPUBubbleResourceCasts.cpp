@@ -110,6 +110,13 @@ struct BubbleResourceCastPattern
     if (castOp.getCacheSwizzleStride()) {
       return failure();
     }
+    // Skip ops with explicit valid_bytes. The byte-count is computed for the
+    // subview the cast wraps; bubbling would attach it to a larger tensor and
+    // make it nonsensical. The cast simply bufferizes in place so the
+    // resulting amdgpu.fat_raw_buffer_cast carries the override.
+    if (castOp.getValidBytes()) {
+      return failure();
+    }
 
     auto producer = castOp.getInput().getDefiningOp();
     if (!producer) {
@@ -127,7 +134,8 @@ struct BubbleResourceCastPattern
               rewriter.setInsertionPoint(extract);
               auto newCast = IREE::GPU::BufferResourceCastOp::create(
                   rewriter, loc, extract.getSource().getType(),
-                  extract.getSource());
+                  extract.getSource(), /*cache_swizzle_stride=*/Value{},
+                  /*valid_bytes=*/Value{});
               extract.getSourceMutable().assign(newCast);
               return true;
             })
@@ -138,7 +146,9 @@ struct BubbleResourceCastPattern
 
               rewriter.setInsertionPoint(expand);
               auto newCast = IREE::GPU::BufferResourceCastOp::create(
-                  rewriter, loc, expand.getSrcType(), expand.getSrc());
+                  rewriter, loc, expand.getSrcType(), expand.getSrc(),
+                  /*cache_swizzle_stride=*/Value{},
+                  /*valid_bytes=*/Value{});
               expand.getSrcMutable().assign(newCast);
               return true;
             })
@@ -149,7 +159,9 @@ struct BubbleResourceCastPattern
 
               rewriter.setInsertionPoint(collapse);
               auto newCast = IREE::GPU::BufferResourceCastOp::create(
-                  rewriter, loc, collapse.getSrcType(), collapse.getSrc());
+                  rewriter, loc, collapse.getSrcType(), collapse.getSrc(),
+                  /*cache_swizzle_stride=*/Value{},
+                  /*valid_bytes=*/Value{});
               collapse.getSrcMutable().assign(newCast);
               return true;
             })
@@ -160,7 +172,9 @@ struct BubbleResourceCastPattern
 
               rewriter.setInsertionPoint(pad);
               auto newCast = IREE::GPU::BufferResourceCastOp::create(
-                  rewriter, loc, pad.getSourceType(), pad.getSource());
+                  rewriter, loc, pad.getSourceType(), pad.getSource(),
+                  /*cache_swizzle_stride=*/Value{},
+                  /*valid_bytes=*/Value{});
               pad.getSourceMutable().assign(newCast);
               return true;
             })
@@ -174,7 +188,8 @@ struct BubbleResourceCastPattern
               for (auto inputOperand : linalgOp.getDpsInputOperands()) {
                 auto newCast = IREE::GPU::BufferResourceCastOp::create(
                     rewriter, loc, inputOperand->get().getType(),
-                    inputOperand->get());
+                    inputOperand->get(), /*cache_swizzle_stride=*/Value{},
+                    /*valid_bytes=*/Value{});
                 inputOperand->assign(newCast);
               }
               return true;

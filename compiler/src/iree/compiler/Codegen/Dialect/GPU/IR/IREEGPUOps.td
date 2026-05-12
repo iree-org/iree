@@ -273,6 +273,7 @@ def IREEGPU_SubgroupScanOp : Op<IREEGPU_Dialect, "subgroup_scan", [
 
 def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
   Pure,
+  AttrSizedOperandSegments,
   AllTypesMatch<["input", "result"]>]> {
   let summary = [{Represents a cast to addr_space<7> (buffer resource) before bufferization.}];
   let description = [{
@@ -286,15 +287,22 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
     and user (i.e. trivially no alias). In all other cases this op is best
     effort and has no verification or failure modes.
 
+    If |valid_bytes| is present, it overrides the default `validBytes` of the
+    underlying `amdgpu.fat_raw_buffer_cast` after bufferization. This is used
+    to widen the buffer descriptor's bounds (e.g. round up to a DWORD boundary)
+    so partial-DWORD straddle reads at the buffer end do not get HW-zeroed.
+
     // TODO: Add other parameters for casting as needed.
   }];
 
   let arguments = (ins  AnyRankedTensor:$input,
-                        Optional<Index>:$cache_swizzle_stride);
+                        Optional<Index>:$cache_swizzle_stride,
+                        Optional<Index>:$valid_bytes);
   let results   = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
+    $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)`
+                  | `validBytes` `(` $valid_bytes `)` )
     attr-dict `:` type($result)
   }];
 

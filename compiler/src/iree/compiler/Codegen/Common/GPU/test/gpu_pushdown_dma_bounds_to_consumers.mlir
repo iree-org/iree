@@ -26,6 +26,7 @@ func.func @no_op_all_in_bounds(
   return %filled : tensor<64x16xf16>
 }
 // CHECK-LABEL: func.func @no_op_all_in_bounds
+// CHECK-NOT:   iree_gpu.buffer_resource_cast
 // CHECK-NOT:   tensor.pad
 // CHECK-NOT:   tensor.extract_slice
 
@@ -58,6 +59,7 @@ func.func @no_op_outer_oob_only(
   return %filled : tensor<64x16xf16>
 }
 // CHECK-LABEL: func.func @no_op_outer_oob_only
+// CHECK-NOT:   iree_gpu.buffer_resource_cast
 // CHECK-NOT:   tensor.pad
 // CHECK-NOT:   tensor.extract_slice
 
@@ -94,11 +96,13 @@ func.func @pushdown_innermost_oob(
 // result that has external consumers. It inserts the slice+pad after that
 // forall and RAUWs uses to the padded result.
 // CHECK-LABEL: func.func @pushdown_innermost_oob
-// CHECK-NOT:     iree_gpu.buffer_resource_cast
+// CHECK:         %[[VB:.+]] = affine.apply
+// CHECK:         %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0 validBytes(%[[VB]])
+// CHECK-SAME:        : tensor<64x?xf16>
 // CHECK:         %[[OUTER:.+]] = scf.forall
-// CHECK:           iree_gpu.coalesced_gather_dma %arg0
+// CHECK:           iree_gpu.coalesced_gather_dma %[[CAST]]
 // CHECK:         %[[C1:.+]] = arith.constant 1 : index
-// CHECK:         %[[DIM:.+]] = tensor.dim %arg0, %[[C1]]
+// CHECK:         %[[DIM:.+]] = tensor.dim %[[CAST]], %[[C1]]
 // CHECK:         %[[C16:.+]] = arith.constant 16 : index
 // CHECK:         %[[PAD_AMT:.+]] = arith.subi %[[C16]], %[[DIM]]
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[OUTER]][0, 0] [64, %[[DIM]]] [1, 1]
@@ -135,7 +139,7 @@ func.func @pushdown_both_oob(
   return %filled : tensor<64x16xf16>
 }
 // CHECK-LABEL: func.func @pushdown_both_oob
-// CHECK-NOT:   iree_gpu.buffer_resource_cast
+// CHECK:       iree_gpu.buffer_resource_cast %arg0 validBytes(%{{.+}}) : tensor<?x?xf16>
 // CHECK:       tensor.extract_slice
 // CHECK-SAME:      [0, 0] [64, %{{.*}}] [1, 1]
 // CHECK:       tensor.pad
@@ -168,6 +172,7 @@ func.func @no_op_no_in_bounds(
   return %filled : tensor<64x16xf16>
 }
 // CHECK-LABEL: func.func @no_op_no_in_bounds
+// CHECK-NOT:   iree_gpu.buffer_resource_cast
 // CHECK-NOT:   tensor.pad
 
 // -----
@@ -195,18 +200,58 @@ func.func @single_forall_matmul_consumer(
   return %result : tensor<4x8xf32>
 }
 // CHECK-LABEL: func.func @single_forall_matmul_consumer
-// CHECK-NOT:   iree_gpu.buffer_resource_cast
+// CHECK:       %[[VB:.+]] = affine.apply
+// CHECK:       %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0 validBytes(%[[VB]])
+// CHECK-SAME:      : tensor<4x?xf16>
 // CHECK:       %[[LHS:.+]] = scf.forall
-// CHECK:         iree_gpu.coalesced_gather_dma %arg0
+// CHECK:         iree_gpu.coalesced_gather_dma %[[CAST]]
 // CHECK:       %[[C1:.+]] = arith.constant 1 : index
-// CHECK:       %[[DIM:.+]] = tensor.dim %arg0, %[[C1]]
+// CHECK:       %[[DIM:.+]] = tensor.dim %[[CAST]], %[[C1]]
 // CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[LHS]][0, 0] [4, %[[DIM]]] [1, 1]
 // CHECK:       %[[PADDED:.+]] = tensor.pad %[[SLICE]] low[0, 0] high[0, %{{.+}}]
 // CHECK:       linalg.matmul ins(%[[PADDED]], %arg2
 
 // -----
 
-// Test 7: dynamic-shape source whose innermost extent's static UB matches
+// Test 7: dynamic-shape source whose ROOT's innermost row is statically
+// DWORD-aligned. The pass must skip the validBytes wrap because the
+// underlying buffer's end is naturally DWORD-aligned (no partial-DWORD
+// straddle is possible). Models the 4000x4000 f16 matmul case where the
+// K-block tile produces tensor<32x?xf16> from a tensor<4000x4000xf16>
+// root: dynamic source dim, but the root's 4000-element row * 2 bytes =
+// 8000 bytes is divisible by 4.
+
+func.func @skip_validbytes_when_root_innermost_aligned(
+    %root : tensor<4000x4000xf16>,
+    %init : tensor<32x16xf16>,
+    %dyn  : index,
+    %lane : index) -> tensor<32x16xf16> {
+  %c0 = arith.constant 0 : index
+  %src = tensor.extract_slice %root[%c0, %c0] [32, %dyn] [1, 1]
+      : tensor<4000x4000xf16> to tensor<32x?xf16>
+  %filled = scf.forall (%w) in (1) shared_outs(%outer = %init)
+      -> tensor<32x16xf16> {
+    %inner = scf.forall (%l) in (32) shared_outs(%inn = %outer)
+        -> tensor<32x16xf16> {
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src into %inn lane(%l)
+            in_bounds [true, false]
+          : tensor<32x?xf16>, tensor<32x16xf16>, index
+      }
+    } {mapping = [#gpu.thread<linear_dim_0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %inner into %outer [0, 0] [32, 16] [1, 1]
+        : tensor<32x16xf16> into tensor<32x16xf16>
+    }
+  } {mapping = [#gpu.warp<linear_dim_0>]}
+  return %filled : tensor<32x16xf16>
+}
+// CHECK-LABEL: func.func @skip_validbytes_when_root_innermost_aligned
+// CHECK-NOT:   iree_gpu.buffer_resource_cast
+
+// -----
+
+// Test 8: dynamic-shape source whose innermost extent's static UB matches
 // the LDS inner tile size. The pass must skip the consumer-side
 // extract_slice + tensor.pad chain. AMDGPULowerCoalescedDMA's OOB clamping
 // zeros LDS positions for OOB lanes, so the pad would only redundantly
@@ -243,4 +288,46 @@ func.func @skip_consumer_pad_when_inner_ub_matches_tile(
   return %filled : tensor<32x128xf16>
 }
 // CHECK-LABEL: func.func @skip_consumer_pad_when_inner_ub_matches_tile
+// Skip #1 fires here too (root 4000 * 2 = 8000 is DWORD-aligned), so no
+// validBytes wrap. Skip #2 fires for the consumer-side pad chain.
+// CHECK-NOT:   iree_gpu.buffer_resource_cast
+// CHECK-NOT:   tensor.pad
+
+// -----
+
+// Test 9: same as Test 8 but with a DWORD-misaligned root (4000*2=8000
+// aligned -> swap to 4001 to break alignment). Skip #1 must NOT fire
+// (validBytes wrap is needed to guard against the partial-DWORD straddle
+// at the buffer end), but Skip #2 must still fire because the inner
+// extent's UB still matches the LDS tile.
+
+#min128b = affine_map<(d0) -> (-d0 + 4001, 128)>
+func.func @consumer_pad_skipped_even_when_root_misaligned(
+    %root : tensor<4000x4001xf16>,
+    %init : tensor<32x128xf16>,
+    %off  : index,
+    %lane : index) -> tensor<32x128xf16> {
+  %c0 = arith.constant 0 : index
+  %dyn = affine.min #min128b(%off)
+  %src = tensor.extract_slice %root[%c0, %off] [32, %dyn] [1, 1]
+      : tensor<4000x4001xf16> to tensor<32x?xf16>
+  %filled = scf.forall (%w) in (1) shared_outs(%outer = %init)
+      -> tensor<32x128xf16> {
+    %inner = scf.forall (%l) in (32) shared_outs(%inn = %outer)
+        -> tensor<32x128xf16> {
+      scf.forall.in_parallel {
+        iree_gpu.coalesced_gather_dma %src into %inn lane(%l)
+            in_bounds [true, false]
+          : tensor<32x?xf16>, tensor<32x128xf16>, index
+      }
+    } {mapping = [#gpu.thread<linear_dim_0>]}
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %inner into %outer [0, 0] [32, 128] [1, 1]
+        : tensor<32x128xf16> into tensor<32x128xf16>
+    }
+  } {mapping = [#gpu.warp<linear_dim_0>]}
+  return %filled : tensor<32x128xf16>
+}
+// CHECK-LABEL: func.func @consumer_pad_skipped_even_when_root_misaligned
+// CHECK:       iree_gpu.buffer_resource_cast %arg0 validBytes
 // CHECK-NOT:   tensor.pad

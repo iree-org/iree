@@ -606,7 +606,21 @@ struct BufferResourceCastOpBufferizationInterface
     }
 
     // This operation either bufferizes in place or with a cast.
-    if (hasStorageBufferMemSpace(cast<MemRefType>(buffer.value().getType()))) {
+    auto bufferMemrefType = cast<MemRefType>(buffer.value().getType());
+    bool isStorageBuffer = hasStorageBufferMemSpace(bufferMemrefType);
+    bool isFatRawBuffer = false;
+    if (auto fatAddr = dyn_cast_if_present<amdgpu::AddressSpaceAttr>(
+            bufferMemrefType.getMemorySpace())) {
+      isFatRawBuffer = fatAddr.getValue() == amdgpu::AddressSpace::FatRawBuffer;
+    }
+    // Only emit a fat_raw_buffer_cast when:
+    //   - input is in storage_buffer space (the original case), OR
+    //   - input is already in fat_raw_buffer space AND the cast carries a
+    //     validBytes override that needs to take effect (we route the new
+    //     cast around the existing one to install our descriptor).
+    bool needsNewCast =
+        isStorageBuffer || (isFatRawBuffer && castOp.getValidBytes());
+    if (needsNewCast) {
       Location loc = castOp.getLoc();
       Value cacheSwizzleStride = Value{};
       if (auto maybeIndexCacheSwizzle = castOp.getCacheSwizzleStride()) {
@@ -623,8 +637,30 @@ struct BufferResourceCastOpBufferizationInterface
         cacheSwizzleStride = arith::IndexCastOp::create(rewriter, loc, i14Type,
                                                         maybeIndexCacheSwizzle);
       }
+      Value validBytes = Value{};
+      if (Value maybeValidBytes = castOp.getValidBytes()) {
+        Type i64Type = rewriter.getI64Type();
+        validBytes =
+            arith::IndexCastOp::create(rewriter, loc, i64Type, maybeValidBytes);
+      }
+      // If the input is already a fat_raw_buffer (e.g. the binding was
+      // pre-cast), peel one fat_raw_buffer_cast layer off so the new cast
+      // wraps the underlying storage_buffer memref. This avoids
+      // fat-on-fat casting, which is invalid.
+      Value source = buffer.value();
+      if (isFatRawBuffer) {
+        if (auto existing =
+                source.getDefiningOp<amdgpu::FatRawBufferCastOp>()) {
+          source = existing.getSource();
+        } else {
+          // Fall back to in-place forwarding if we cannot peel.
+          bufferization::replaceOpWithBufferizedValues(rewriter, op,
+                                                       buffer.value());
+          return success();
+        }
+      }
       buffer = amdgpu::FatRawBufferCastOp::create(
-                   rewriter, loc, buffer.value(), /*validBytes=*/Value{},
+                   rewriter, loc, source, /*validBytes=*/validBytes,
                    /*cacheSwizzleStride=*/cacheSwizzleStride,
                    /*boundsCheck=*/true,
                    /*resetOffset=*/true)
