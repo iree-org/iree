@@ -96,7 +96,7 @@ def PromoteContractionOutputsPass
        Option<"promoteOperation", "operation",
               "mlir::iree_compiler::GlobalOptimization::PromoteOperation",
               /*default=*/
-              "mlir::iree_compiler::GlobalOptimization::PromoteOperation::All",
+              "mlir::iree_compiler::GlobalOptimization::PromoteOperation::None",
               "Select the type of contraction ops to promote.",
               [{::llvm::cl::values(
              clEnumValN(mlir::iree_compiler::GlobalOptimization::PromoteOperation::All,
