@@ -142,7 +142,7 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
 }
 
 struct PromotionCandidate {
-  Operation *op;
+  Operation *op = nullptr;
   Value vector;
 };
 
