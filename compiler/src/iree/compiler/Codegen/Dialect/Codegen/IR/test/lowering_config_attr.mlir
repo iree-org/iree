@@ -96,7 +96,7 @@ module {
   /// translation info cannot have more than 3 entries for workgroup size
   func.func @workgroup_size_more_than_3_err() attributes {
     // expected-error @+1 {{workgroup size cannot have more than 3 entries}}
-    translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4, 1, 1, 1]> {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4, 1, 1, 1]> {
       return
     }
   }
@@ -108,7 +108,7 @@ module {
   /// translation info workgroup_size values needs to have non-negative values.
   func.func @workgroup_size_neg_err() attributes {
     // expected-error @+1 {{workgroup size value has to be greater than zero}}
-    translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [4, -1, 1]> {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [4, -1, 1]> {
       return
     }
   }
@@ -120,7 +120,7 @@ module {
   /// translation info workgroup_size values needs to have non-negative values.
   func.func @subgroup_size_neg_err() attributes {
     // expected-error @+1 {{subgroup size value cannot be negative}}
-    translation_info = #iree_codegen.translation_info<pipeline = None subgroup_size = -1> {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = -1> {
       return
     }
   }
@@ -151,9 +151,11 @@ module {
 // -----
 
 module {
-  /// Invalid pass pipeline string should be caught at verify time.
+  /// Invalid pass pipeline string should be caught while parsing the nested
+  /// pass pipeline attr.
   func.func @invalid_pass_pipeline() attributes {
-    // expected-error @+1 {{invalid pass pipeline specification: 'not_a_real_pass'}}
+    // expected-error @+2 {{invalid pass pipeline specification: 'not_a_real_pass'}}
+    // expected-error @+1 {{failed to parse IREECodegen_TranslationInfoAttr parameter 'passPipeline'}}
     translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.pass_pipeline<"not_a_real_pass">>
   } {
     return

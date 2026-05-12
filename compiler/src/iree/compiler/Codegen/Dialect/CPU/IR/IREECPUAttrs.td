@@ -83,6 +83,22 @@ def IREECPU_DataTiledMMAAttr
     thread-distribution, no concept of subgroups and no interleaving of
     intrinsics' layout.
 
+    The `transposed_intrinsic` boolean toggles between the intrinsic's natural
+    orientation and an M↔N-swapped orientation (same hardware instruction with
+    LHS/RHS roles exchanged, accumulator laid out column-major). Orthogonal to
+    the intrinsic itself: any intrinsic may be used transposed, including
+    square ones where the effect is only the accumulator layout change.
+
+    For most `intrinsic` values the (LHS, RHS, ACC) element types are baked
+    into the enum and `lhs_type` / `rhs_type` / `acc_type` are unused. The
+    one exception is `MMA_GENERIC_SCALAR_1x1x1`: it is a type-polymorphic
+    fallback used when no element-type-specific intrinsic matches the
+    target, and it carries its element types in those three optional
+    parameters instead. This deliberately breaks the otherwise-strong
+    invariant that an `MMAIntrinsic` enum value pins down a specific element
+    type triple, in exchange for not having to add one enum value per
+    supported (LHS, RHS, ACC) combination.
+
     Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
     here but are unused.
   }];
@@ -99,7 +115,24 @@ def IREECPU_DataTiledMMAAttr
               "Intrinsic count along the N dimension.">:$intrinsics_n,
           DefaultValuedParameter<
               "int64_t", "1",
-              "Intrinsic count along the K dimension.">:$intrinsics_k);
+              "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "bool", "false",
+              "If true, the intrinsic is used in an M↔N-swapped orientation "
+              "(LHS/RHS roles exchanged, accumulator "
+              "column-major).">:$transposed_intrinsic,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "LHS element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$lhs_type,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "RHS element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$rhs_type,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "ACC element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$acc_type);
 }
 
 //===----------------------------------------------------------------------===//

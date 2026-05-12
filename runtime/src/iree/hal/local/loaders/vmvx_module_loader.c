@@ -641,6 +641,17 @@ static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
       (int)name.size, name.data);
 }
 
+static iree_status_t iree_hal_vmvx_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  (void)base_executable;
+  (void)name;
+  (void)queue_affinity;
+  *out_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "VMVX executable global lookup not implemented");
+}
+
 static const iree_hal_local_executable_vtable_t
     iree_hal_vmvx_executable_vtable = {
         .base =
@@ -651,6 +662,8 @@ static const iree_hal_local_executable_vtable_t
                 .export_parameters = iree_hal_vmvx_executable_export_parameters,
                 .lookup_export_by_name =
                     iree_hal_vmvx_executable_lookup_export_by_name,
+                .lookup_global_by_name =
+                    iree_hal_vmvx_executable_lookup_global_by_name,
             },
         .issue_call = iree_hal_vmvx_executable_issue_call,
 };
@@ -796,33 +809,27 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
       (iree_hal_vmvx_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // The VM bytecode module stores pointers into its archive contents and may be
+  // destroyed after queue completion has already been signaled. Own a private
+  // copy so executable teardown never depends on the caller's module rodata.
   iree_const_byte_span_t bytecode_module_data =
       executable_params->executable_data;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_clone(executable_loader->host_allocator,
+                               executable_params->executable_data,
+                               (void**)&bytecode_module_data.data));
 
-  // If the caching mode allows for aliasing the existing FlatBuffer data then
-  // we avoid allocations and just pass the pointer on through. The caller
-  // ensures that the data remains valid for the duration the executable is
-  // loaded. Otherwise, we clone it and let the bytecode module take ownership.
-  iree_allocator_t bytecode_module_allocator;
-  if (iree_all_bits_set(executable_params->caching_mode,
-                        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA)) {
-    // Zero-copy route.
-    bytecode_module_allocator = iree_allocator_null();
-  } else {
-    bytecode_module_allocator = executable_loader->host_allocator;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_clone(executable_loader->host_allocator,
-                                 executable_params->executable_data,
-                                 (void**)&bytecode_module_data.data));
-  }
-
-  // Load the user-provided bytecode module. We pass ownership of the data (if
-  // we have it) to the module to manage.
+  // Load the user-provided bytecode module and pass ownership of the cloned
+  // data to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
       executable_loader->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
-      executable_params->executable_data, bytecode_module_allocator,
+      bytecode_module_data, executable_loader->host_allocator,
       executable_loader->host_allocator, &bytecode_module);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(executable_loader->host_allocator,
+                        (void*)bytecode_module_data.data);
+  }
 
   // Executable takes ownership of the entire context (including the bytecode
   // module, which itself may own the underlying allocation).

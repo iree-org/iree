@@ -1,0 +1,37 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load(":targets.bzl", "iree_hal_amdgpu_device_binaries")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],
+)
+
+BITCODE_SRCS = [
+    "//runtime/src/iree/hal/drivers/amdgpu/device:bitcode_srcs",
+]
+
+ABI_HDRS = [
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:command_buffer.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:common.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:kernel_args.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:profile.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:queue.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:signal.h",
+    "//runtime/src/iree/hal/drivers/amdgpu/abi:timestamp.h",
+]
+
+BITCODE_HDRS = [
+    "//runtime/src/iree/hal/drivers/amdgpu/device:bitcode_hdrs",
+] + ABI_HDRS
+
+iree_hal_amdgpu_device_binaries(
+    name = "toc",
+    srcs = BITCODE_SRCS,
+    internal_hdrs = BITCODE_HDRS,
+)

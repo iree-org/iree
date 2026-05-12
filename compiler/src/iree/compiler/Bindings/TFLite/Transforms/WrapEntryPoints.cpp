@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -475,8 +476,8 @@ private:
     // async behavior or cancellation.
     auto entryFuncType = entryFuncOp.getFunctionType();
     auto bufferType = moduleBuilder.getType<IREE::HAL::BufferType>();
-    SmallVector<Type> inputTypes(entryFuncType.getNumInputs(), bufferType);
-    SmallVector<Type> outputTypes(entryFuncType.getNumResults(), bufferType);
+    llvm::Repeated<Type> inputTypes(entryFuncType.getNumInputs(), bufferType);
+    llvm::Repeated<Type> outputTypes(entryFuncType.getNumResults(), bufferType);
     auto wrapperFuncType =
         moduleBuilder.getFunctionType(inputTypes, outputTypes);
 

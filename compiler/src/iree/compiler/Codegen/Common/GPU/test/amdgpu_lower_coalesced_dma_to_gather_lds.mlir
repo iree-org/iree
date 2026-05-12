@@ -1278,6 +1278,74 @@ func.func @gather_dma_inner_dim_oob_64x62(
 
 // -----
 
+// Test: OOB check when source is a subview of a larger fat_raw_buffer.
+// Parent: 8x128, subview at [2, 0]: 4x128. in_bounds = [false, true].
+// Because the source is a view of a larger buffer, dim 0 must also be
+// bounds-checked: an OOB dim-0 index in the subview still lands in valid
+// parent memory. The sentinel index uses the root buffer's dim-0 size (8),
+// not the subview's (4), to guarantee the linearized offset exceeds the
+// total buffer size.
+
+#executable_target_rocm_hsaco_fb_subview = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_32_subview = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// CHECK-LABEL: func.func @gather_dma_subview_oob
+// CHECK-SAME:    %[[PARENT:[a-zA-Z0-9]+]]: memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<4x128xf32, #gpu.address_space<workgroup>>
+func.func @gather_dma_subview_oob(
+    %parent: memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<4x128xf32, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_subview,
+    translation_info = #translation_32_subview} {
+  // CHECK: %[[SUBVIEW:.+]] = memref.subview %[[PARENT]]
+  %subview = memref.subview %parent[2, 0][4, 128][1, 1]
+    : memref<8x128xf32, #amdgpu.address_space<fat_raw_buffer>>
+      to memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (32)
+  scf.forall (%lane) in (32) {
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // Transfer 1: linearOffset = 0
+    // CHECK: %[[C0:.+]] = arith.constant 0 : index
+    // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
+    // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SRC_LIN0]] into (4, 128)
+    // CHECK: %[[DST_DELIN0:.+]]:2 = affine.delinearize_index %[[C0]] into (4, 128)
+    //
+    // Dim 0 is checked because source is a subview of a larger buffer.
+    // CHECK: %[[FALSE:.+]] = arith.constant false
+    // CHECK: %[[C4_DIM:.+]] = arith.constant 4 : index
+    // CHECK: %[[CMP:.+]] = arith.cmpi uge, %[[SRC_DELIN0]]#0, %[[C4_DIM]] : index
+    // CHECK: %[[OOB:.+]] = arith.ori %[[FALSE]], %[[CMP]] : i1
+    // Sentinel uses root buffer dim-0 size (8), not subview dim-0 (4).
+    // CHECK: %[[C8_OOB:.+]] = arith.constant 8 : index
+    // CHECK: %[[FIXED:.+]] = arith.select %[[OOB]], %[[C8_OOB]], %[[SRC_DELIN0]]#0
+    // CHECK: amdgpu.gather_to_lds %[[SUBVIEW]][%[[FIXED]], %[[SRC_DELIN0]]#1], %[[DST]][%[[DST_DELIN0]]#0, %[[DST_DELIN0]]#1] : vector<4xf32>
+    //
+    // Transfers 2-4: same pattern
+    // CHECK-COUNT-3: amdgpu.gather_to_lds {{.+}} : vector<4xf32>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %subview into %dest lane(%lane) in_bounds [false, true] :
+      memref<4x128xf32, strided<[128, 1], offset: 256>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}
+
+// -----
+
 // Fallback tests: these use dma_sizes = [128] (128-bit only) with f32 elements,
 // meaning the fast path (gather_to_lds) needs 128 elements per transfer
 // (32 lanes * 4 elements/lane). All tests below have fewer contiguous elements,
@@ -1590,7 +1658,7 @@ func.func @no_lower_oob_without_fat_raw_buffer(
 //
 // Shape: 4x128 f32 dest. With 64 lanes, 128-bit DMA = 4 elements/lane.
 // 256 elements/transfer, 512 total = 2 transfers.
-// XOR swizzle with row_width=128, access_width=16 permutes source offsets.
+// XOR swizzle with row_width=128, access_width=4 permutes source offsets.
 
 #executable_target_rocm_hsaco_fb_swizzle = #hal.executable.target<"rocm",
   "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
@@ -1614,7 +1682,7 @@ func.func @lower_dma_with_dest_swizzle(
     hal.executable.target = #executable_target_rocm_hsaco_fb_swizzle,
     translation_info = #translation_swizzle} {
   %alloc = memref.alloc() : memref<512xf32, #gpu.address_space<workgroup>>
-  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 16>]
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<128, 4>]
       : memref<512xf32, #gpu.address_space<workgroup>>
   %dest = memref.expand_shape %swizzled [[0, 1]]
       output_shape [4, 128]
@@ -1628,12 +1696,15 @@ func.func @lower_dma_with_dest_swizzle(
     // Transfer 1: linearOffset = 0, source gets XOR-swizzled offset.
     // CHECK: %[[C0:.+]] = arith.constant 0 : index
     // CHECK: %[[SRC_LIN0:.+]] = arith.addi %[[C0]], %[[LANE_OFFSET]]
-    // XOR swizzle: extractCol, extractRow, xori, updateCol, diff, add.
+    // Access-width alignment: strip remainder, swizzle, apply diff to original.
+    // CHECK: %[[REM0:.+]] = arith.remui %[[SRC_LIN0]], %[[C4]]
+    // CHECK: %[[ALIGNED0:.+]] = arith.subi %[[SRC_LIN0]], %[[REM0]]
+    // XOR swizzle: extractCol, extractRow, xori, updateCol.
     // CHECK: %[[COL0:.+]] = affine.apply
     // CHECK: %[[ROW0:.+]] = affine.apply
     // CHECK: %[[XOR0:.+]] = arith.xori %[[ROW0]], %[[COL0]]
     // CHECK: %[[UCOL0:.+]] = affine.apply
-    // CHECK: %[[DIFF0:.+]] = arith.subi %[[UCOL0]], %[[SRC_LIN0]]
+    // CHECK: %[[DIFF0:.+]] = arith.subi %[[UCOL0]], %[[ALIGNED0]]
     // CHECK: %[[SWIZZLED0:.+]] = arith.addi %[[SRC_LIN0]], %[[DIFF0]]
     // Source delinearized from swizzled offset.
     // CHECK: %[[SRC_DELIN0:.+]]:2 = affine.delinearize_index %[[SWIZZLED0]] into (4, 128)
@@ -1741,6 +1812,215 @@ func.func @lower_dma_with_incompatible_swizzle(
     iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
         : memref<4x128xf32, #amdgpu.address_space<fat_raw_buffer>>,
           memref<4x128xf32, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
+
+// -----
+
+// Test: Subgroup base offset adjustment for swizzled DMA.
+// The dest subview has offset 256 with 256 elements, which is less than
+// the swizzle period (64*64/8 = 512). The base offset must be added before
+// swizzling and subtracted after.
+
+#executable_target_base_offset = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+
+#translation_base_offset = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_swizzle_base_offset
+func.func @lower_dma_swizzle_base_offset(
+    %source: memref<4x64xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_base_offset,
+    translation_info = #translation_base_offset} {
+  %alloc = memref.alloc() : memref<512xbf16, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<64, 8>]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+  %expanded = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [8, 64]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+      into memref<8x64xbf16, #gpu.address_space<workgroup>>
+  %dest = memref.subview %expanded[4, 0] [4, 64] [1, 1]
+      : memref<8x64xbf16, #gpu.address_space<workgroup>>
+      to memref<4x64xbf16, strided<[64, 1], offset: 256>, #gpu.address_space<workgroup>>
+  // CHECK: scf.forall (%[[LANE:.+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // Base offset 256 added before swizzle, subtracted after.
+    // CHECK-DAG: %[[C256:.+]] = arith.constant 256 : index
+    // CHECK: arith.addi %[[C256]],
+    // CHECK: arith.xori
+    // CHECK: arith.subi {{.*}}, %[[C256]]
+    // CHECK: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<4x64xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<4x64xbf16, strided<[64, 1], offset: 256>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
+
+// -----
+
+// Test: Access-width alignment for swizzled DMA.
+// With dma_sizes=[32] and bf16, elementsPerLane = 32/16 = 2.
+// accessWidth = 8 (from xor_shuffle<64, 8>), so 2 < 8 and the sub-group
+// remainder must be stripped before swizzling and restored after.
+
+#executable_target_access_align = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+
+#translation_access_align = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_swizzle_access_width_align
+func.func @lower_dma_swizzle_access_width_align(
+    %source: memref<8x64xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_access_align,
+    translation_info = #translation_access_align} {
+  %alloc = memref.alloc() : memref<512xbf16, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<64, 8>]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+  %dest = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [8, 64]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+      into memref<8x64xbf16, #gpu.address_space<workgroup>>
+  // CHECK: scf.forall (%[[LANE:.+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // elementsPerLane=2 < accessWidth=8: remainder stripped and restored.
+    // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+    // CHECK: %[[REM:.+]] = arith.remui %[[SRC_LIN:.+]], %[[C8]]
+    // CHECK: %[[ALIGNED:.+]] = arith.subi %[[SRC_LIN]], %[[REM]]
+    // CHECK: arith.xori
+    // CHECK: %[[DIFF:.+]] = arith.subi {{.*}}, %[[ALIGNED]]
+    // CHECK: arith.addi %[[SRC_LIN]], %[[DIFF]]
+    // CHECK: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<8x64xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<8x64xbf16, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
+
+// -----
+
+// Test: Combined subgroup base offset AND access-width alignment for swizzled DMA.
+
+#executable_target_combined = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32]>>}>
+
+#translation_combined = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_swizzle_combined_base_and_access_width
+func.func @lower_dma_swizzle_combined_base_and_access_width(
+    %source: memref<4x64xbf16, #amdgpu.address_space<fat_raw_buffer>>)
+  attributes {
+    hal.executable.target = #executable_target_combined,
+    translation_info = #translation_combined} {
+  %alloc = memref.alloc() : memref<512xbf16, #gpu.address_space<workgroup>>
+  %swizzled = iree_codegen.swizzle_hint %alloc[#iree_codegen.xor_shuffle<64, 8>]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+  %expanded = memref.expand_shape %swizzled [[0, 1]]
+      output_shape [8, 64]
+      : memref<512xbf16, #gpu.address_space<workgroup>>
+      into memref<8x64xbf16, #gpu.address_space<workgroup>>
+  %dest = memref.subview %expanded[4, 0] [4, 64] [1, 1]
+      : memref<8x64xbf16, #gpu.address_space<workgroup>>
+      to memref<4x64xbf16, strided<[64, 1], offset: 256>, #gpu.address_space<workgroup>>
+  // CHECK: scf.forall (%[[LANE:.+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // Base offset 256 added, then access-width remainder stripped/restored.
+    // CHECK: %[[C256:.+]] = arith.constant 256 : index
+    // CHECK: %[[SRC_LIN:.+]] = arith.addi %[[C256]],
+    // CHECK: %[[C8:.+]] = arith.constant 8 : index
+    // CHECK: %[[REM:.+]] = arith.remui %[[SRC_LIN]], %[[C8]]
+    // CHECK: %[[ALIGNED:.+]] = arith.subi %[[SRC_LIN]], %[[REM]]
+    // CHECK: arith.xori
+    // CHECK: %[[DIFF:.+]] = arith.subi {{.*}}, %[[ALIGNED]]
+    // CHECK: arith.addi %[[SRC_LIN]], %[[DIFF]]
+    // CHECK: arith.subi {{.*}}, %[[C256]]
+    // CHECK: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane)
+        : memref<4x64xbf16, #amdgpu.address_space<fat_raw_buffer>>,
+          memref<4x64xbf16, strided<[64, 1], offset: 256>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#iree_gpu.lane_id<0>]}
+  return
+}
+
+// -----
+
+// Test: Strided source caps per-lane DMA width.
+// Source is memref<256x4xf8E8M0FNU, strided<[256, 1]>>.
+// Inner contiguous dimension is only 4 elements. 128-bit DMA would read
+// 16 elements/lane, crossing row boundaries. The pass must cap to 32-bit
+// DMA (4 elements/lane = 4 bytes).
+//
+// Dest: memref<256x4xf8E8M0FNU> fully contiguous, linearSize = 1024.
+// Source contiguous trailing size = 4, so maxElementsPerLane = min(4, 1024) = 4.
+// With 32-bit DMA (4 bytes = 4 f8 elements/lane), 64 lanes:
+//   elementsPerTransfer = 64 * 4 = 256, numTransfers = 1024 / 256 = 4.
+
+#executable_target_rocm_hsaco_fb_strided = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [],
+    subgroup_size_choices = [64, 64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_strided = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+// CHECK-LABEL: func.func @lower_dma_strided_source_caps_width
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>
+func.func @lower_dma_strided_source_caps_width(
+    %source: memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_strided,
+    translation_info = #translation_strided} {
+  // CHECK: scf.forall (%[[LANE_ID:[a-zA-Z0-9]+]]) in (64)
+  scf.forall (%lane) in (64) {
+    // 32-bit DMA: 4 elements/lane (not 16 from 128-bit).
+    // CHECK: %[[C4:[a-zA-Z0-9_]+]] = arith.constant 4 : index
+    // CHECK: %[[LANE_OFFSET:[a-zA-Z0-9_]+]] = arith.muli %[[LANE_ID]], %[[C4]]
+    //
+    // 4 transfers (1024 elements / 256 elements per transfer).
+    // CHECK-COUNT-4: amdgpu.gather_to_lds %[[SRC]]{{.*}}, %[[DST]]{{.*}} : vector<4xf8E8M0FNU>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane) :
+      memref<256x4xf8E8M0FNU, strided<[256, 1]>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<256x4xf8E8M0FNU, #gpu.address_space<workgroup>>, index
   } {mapping = [#iree_gpu.lane_id<0>]}
   return
 }

@@ -50,6 +50,13 @@ Builds the IREE compiler. Defaults to `ON`.
 
 Builds IREE unit tests. Defaults to `ON`.
 
+### `IREE_BUILD_BENCHMARKS`
+
+* type: BOOL
+
+Builds IREE benchmarks. Defaults to `ON`. Forced `ON` when
+`IREE_BUILD_TESTS=ON`.
+
 ### `IREE_BUILD_DOCS`
 
 * type: BOOL

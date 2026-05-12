@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -85,7 +86,8 @@ FailureOr<SmallVector<OpFoldResult>> getInnerTileSizesOfrImpl(
   if (!vmvxLayoutAttr || !hasUkernel(vmvxLayoutAttr.getConfiguration())) {
     return failure();
   }
-  SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
+  llvm::Repeated<Type> resultTypes(tensorType.getRank(),
+                                   rewriter.getIndexType());
   auto op = IREE::Codegen::QueryTileSizesOp::create(rewriter, loc, resultTypes,
                                                     TypeAttr::get(tensorType));
   SmallVector<Value> innerTileSizeValues = op.getResults();

@@ -19,6 +19,13 @@ namespace mlir::iree_compiler {
 
 constexpr int kDefaultDistTileSize = 64;
 
+static IREE::Codegen::TranslationInfoAttr
+getVMVXDefaultTranslationInfo(MLIRContext *context) {
+  return IREE::Codegen::TranslationInfoAttr::get(
+      context, IREE::Codegen::VMVXPipelineAttr::get(context), SymbolRefAttr(),
+      /*workgroupSize=*/{}, /*subgroupSize=*/0, DictionaryAttr());
+}
+
 /// Returns true if the operation is nested inside a tiled and distributed loop.
 static bool isInsideDistributedLoop(Operation *op) {
   for (Operation *parent = op->getParentOp(); parent;
@@ -85,7 +92,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getLoweringConfigWithDistributionTiles(fftOp.getContext(), distTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
+      getVMVXDefaultTranslationInfo(fftOp.getContext()));
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -100,7 +107,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                              distTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, tilingInterfaceOp, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
+      getVMVXDefaultTranslationInfo(tilingInterfaceOp.getContext()));
 }
 
 static LogicalResult
@@ -119,10 +126,7 @@ setVMVXRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op) {
 
 static LogicalResult
 lowerUsingVMVXDefaultPipeline(mlir::FunctionOpInterface op) {
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      op.getContext(),
-      IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
-  return setTranslationInfo(op, translationInfo);
+  return setTranslationInfo(op, getVMVXDefaultTranslationInfo(op.getContext()));
 }
 
 /// Sets the translation information to use for a dispatch region.

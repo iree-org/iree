@@ -14,8 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_lower_async_dma.mlir"
     "amdgpu_lower_coalesced_dma_to_gather_lds.mlir"
     "decompose_horizontally_fused_gemms.mlir"
+    "expand_gpu_ops_scan.mlir"
     "flatten_swizzle_hint_allocs.mlir"
     "gpu_alloc_private_memory_for_dps_ops.mlir"
     "gpu_apply_derived_thread_config.mlir"
@@ -52,6 +54,7 @@ iree_lit_test_suite(
     "gpu_pad_operands.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
+    "gpu_promotion_analysis.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
     "gpu_reuse_shared_memory_allocs.mlir"

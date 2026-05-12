@@ -33,6 +33,7 @@ def IREEGPU_LoweringConfigAttr :
         "getWorkgroupReorderingStrategy"
     ]>
     ]> {
+  let genVerifyDecl = 1;
   let mnemonic = "lowering_config";
   let summary = [{Drive lowering of an operation for gpu compilation.}];
   let description = [{
@@ -320,7 +321,6 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
         "getUndistributedTileTypes",
         "getDistributedTileTypes",
         "getUndistributedTileDimExpansion",
-        "populateOperandOffsetsSizesStrides",
         "getDistributionMappingKind",
         "getDistributionWorkerCount",
         "getOperandIteratorTypes",
@@ -360,17 +360,6 @@ class IREEGPU_DataTiledMMAInnerTileDescAttr<string mnemonic, list<Trait> traits 
           .getUndistributedTileDimExpansion(operandIndex, logicalDim);
     }
 
-    LogicalResult $cppClass::populateOperandOffsetsSizesStrides(
-        OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
-        ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
-        SmallVectorImpl<OpFoldResult> &sizes,
-        SmallVectorImpl<OpFoldResult> &strides) const {
-      return cast<DataTiledMMAInterfaceAttr>(*this)
-          .populateOperandOffsetsSizesStrides(builder, loc, operandIndex,
-                                              laneId, permutation, offsets,
-                                              sizes, strides);
-    }
-
     Attribute $cppClass::getDistributionMappingKind() const {
       return cast<DataTiledMMAInterfaceAttr>(*this)
           .getDistributionMappingKind();
@@ -393,6 +382,7 @@ def IREEGPU_DataTiledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "populateOperandOffsetsSizesStrides",
     "getOperandIteratorTypes",
     "buildUnderlyingOperations",
   ]>
@@ -466,6 +456,7 @@ def IREEGPU_DataTiledScaledMMAAttr :
     "getExpectedNumInputs",
     "getExpectedNumOutputs",
     "verifyIndexingMaps",
+    "populateOperandOffsetsSizesStrides",
     "buildUnderlyingOperations"
   ]>
 ]> {
@@ -481,6 +472,12 @@ def IREEGPU_DataTiledScaledMMAAttr :
     element types of the LHS, RHS, and ACC operands respectively. The element
     types for the scales operands are always Float8E8M0FNUType, so they are not
     specified on the attribute.
+
+    The optional |unswizzled_operands| field lists operand indices whose data
+    layout is unswizzled (pack and expand only, no transpose). When set, those
+    operands get an identity permutation in the swizzle and use a distribution
+    swizzle for thread ID delinearization. Other operands are fully swizzled as
+    usual. When empty (default), all operands are fully data-tiled.
 
     The other fields are similar to DataTiledMMAAttr, refer to its documentation.
   }];
@@ -513,7 +510,15 @@ def IREEGPU_DataTiledScaledMMAAttr :
           OptionalParameter<
               "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_n,
           OptionalParameter<
-              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k);
+              "DenseI64ArrayAttr">:$operands_interleaving_intrinsics_k,
+          OptionalParameter<
+              "DenseI64ArrayAttr",
+              "Operand indices with row-major (unswizzled) layout.">:$unswizzled_operands);
+
+  let extraClassDeclaration = [{
+    bool isUnswizzledOperand(unsigned idx) const;
+    bool hasUnswizzledOperands() const;
+  }];
 }
 
 def IREEGPU_VirtualMMAIntrinsicAttr

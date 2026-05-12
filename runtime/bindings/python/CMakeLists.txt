@@ -13,6 +13,14 @@ if(IREE_BUILD_TRACY)
   list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
 endif()
 
+if(IREE_BUILD_BENCHMARKS)
+  list(APPEND _EXTRA_INSTALL_TOOL_TARGETS
+    "iree-benchmark-executable"
+    "iree-benchmark-module"
+    "iree-benchmark-replay"
+  )
+endif()
+
 ################################################################################
 # Package
 ################################################################################
@@ -128,14 +136,19 @@ iree_py_library(
     "iree/_runtime/libs.py"
     "iree/_runtime/scripts/iree_benchmark_executable/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
+    "iree/_runtime/scripts/iree_benchmark_replay/__main__.py"
     "iree/_runtime/scripts/iree_c_embed_data/__main__.py"
     "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
     "iree/_runtime/scripts/iree_convert_parameters/__main__.py"
     "iree/_runtime/scripts/iree_create_parameters/__main__.py"
     "iree/_runtime/scripts/iree_dump_module/__main__.py"
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
+    "iree/_runtime/scripts/iree_dump_replay/__main__.py"
     "iree/_runtime/scripts/iree_flatcc_cli/__main__.py"
+    "iree/_runtime/scripts/iree_profile/__main__.py"
+    "iree/_runtime/scripts/iree_profile_render/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
+    "iree/_runtime/scripts/iree_run_replay/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
@@ -147,17 +160,25 @@ iree_symlink_tool(
   TO_EXE_NAME iree/_runtime_libs/iree-c-embed-data
 )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-executable
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
-)
+if(IREE_BUILD_BENCHMARKS)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-executable
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
+  )
 
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-module
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
-)
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-module
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
+  )
+
+  iree_symlink_tool(
+    TARGET runtime
+    FROM_TOOL_TARGET iree-benchmark-replay
+    TO_EXE_NAME iree/_runtime_libs/iree-benchmark-replay
+  )
+endif()
 
 iree_symlink_tool(
   TARGET runtime
@@ -185,6 +206,12 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree-dump-replay
+  TO_EXE_NAME iree/_runtime_libs/iree-dump-replay
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree-dump-parameters
   TO_EXE_NAME iree/_runtime_libs/iree-dump-parameters
 )
@@ -197,8 +224,49 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
+  FROM_TOOL_TARGET iree-profile
+  TO_EXE_NAME iree/_runtime_libs/iree-profile
+)
+
+iree_symlink_tool(
+  TARGET runtime
   FROM_TOOL_TARGET iree-run-module
   TO_EXE_NAME iree/_runtime_libs/iree-run-module
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-run-replay
+  TO_EXE_NAME iree/_runtime_libs/iree-run-replay
+)
+
+set(_PROFILE_RENDER_SOURCE_DIR "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render")
+set(_PROFILE_RENDER_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/iree/_runtime_libs/share/iree/profile/render")
+add_custom_command(
+  TARGET iree_runtime_bindings_python_runtime
+  POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E make_directory "${_PROFILE_RENDER_BINARY_DIR}"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/__init__.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/__init__.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/backends.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/backends.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/cli.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/cli.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/common.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/common.py"
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+      "${_PROFILE_RENDER_SOURCE_DIR}/perfetto.py"
+      "${_PROFILE_RENDER_BINARY_DIR}/perfetto.py"
 )
 
 if(_TRACY_ENABLED)
@@ -328,6 +396,13 @@ install(
   COMPONENT "${_INSTALL_COMPONENT}"
 )
 
+install(
+  DIRECTORY "${IREE_SOURCE_DIR}/runtime/src/iree/tooling/profile/render"
+  DESTINATION "${_INSTALL_DIR}/iree/_runtime_libs/share/iree/profile"
+  COMPONENT "${_INSTALL_COMPONENT}"
+  FILES_MATCHING PATTERN "*.py"
+)
+
 # Install tools into python_packages/iree_runtime/iree/runtime
 #
 # Our runtime/... directory is included by the root CMakeLists before the
@@ -340,15 +415,16 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   CALL install
   TARGETS
     iree-cpuinfo
-    iree-benchmark-executable
-    iree-benchmark-module
     iree-c-embed-data
     iree-convert-parameters
     iree-create-parameters
     iree-dump-module
     iree-dump-parameters
+    iree-dump-replay
     iree-flatcc-cli
+    iree-profile
     iree-run-module
+    iree-run-replay
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
   COMPONENT \"${_INSTALL_COMPONENT}\"

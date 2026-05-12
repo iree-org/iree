@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -573,7 +574,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
 
-  SmallVector<Type> resultTypes(tensorType.getRank(), rewriter.getIndexType());
+  llvm::Repeated<Type> resultTypes(tensorType.getRank(),
+                                   rewriter.getIndexType());
   SmallVector<Value> inputValues;
   Location loc = op.getLoc();
   for (int64_t i : tensorType.getShape()) {

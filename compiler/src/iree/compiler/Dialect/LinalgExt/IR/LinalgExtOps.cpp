@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -703,7 +704,7 @@ void MapLoadOp::insertTransformationAtStart(
     int64_t numOutputIndices) {
   Block &transformBody = getTransformationRegion().front();
   SmallVector<BlockArgument> oldOutputIndices(transformBody.getArguments());
-  SmallVector<Type> indexTypes(numOutputIndices, builder.getIndexType());
+  llvm::Repeated<Type> indexTypes(numOutputIndices, builder.getIndexType());
   SmallVector<Location> locs(numOutputIndices, getLoc());
 
   // Create the new block arguments for the new output indices, and transform
@@ -812,7 +813,7 @@ MapLoadOp MapLoadOp::createIdentityMapLoad(OpBuilder &builder, Location loc,
   Region &region = mapLoadOp.getTransformationRegion();
   auto outputType = cast<ShapedType>(output.getType());
   SmallVector<Location> blockArgLocs(outputType.getRank(), loc);
-  SmallVector<Type> indexTypes(outputType.getRank(), builder.getIndexType());
+  llvm::Repeated<Type> indexTypes(outputType.getRank(), builder.getIndexType());
   OpBuilder::InsertionGuard guard(builder);
   Block *block =
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
@@ -847,7 +848,7 @@ MapStoreOp MapStoreOp::createIdentityMapStore(OpBuilder &builder, Location loc,
   Region &region = mapStoreOp.getTransformationRegion();
   auto inputType = cast<ShapedType>(input.getType());
   SmallVector<Location> blockArgLocs(inputType.getRank(), loc);
-  SmallVector<Type> indexTypes(inputType.getRank(), builder.getIndexType());
+  llvm::Repeated<Type> indexTypes(inputType.getRank(), builder.getIndexType());
   OpBuilder::InsertionGuard guard(builder);
   Block *block =
       builder.createBlock(&region, region.end(), indexTypes, blockArgLocs);
@@ -928,7 +929,7 @@ void MapStoreOp::insertTransformationAtStart(
     int64_t numSourceIndices) {
   Block &transformBody = getTransformationRegion().front();
   SmallVector<BlockArgument> oldSourceIndices(transformBody.getArguments());
-  SmallVector<Type> indexTypes(numSourceIndices, builder.getIndexType());
+  llvm::Repeated<Type> indexTypes(numSourceIndices, builder.getIndexType());
   SmallVector<Location> locs(numSourceIndices, getLoc());
 
   // Create the new block arguments for the new source indices, and transform
@@ -1240,6 +1241,27 @@ ScanOp::reifyResultShapes(OpBuilder &b,
                           ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+ArrayAttr ScanOp::getIndexingMaps() {
+  MLIRContext *ctx = getContext();
+  int64_t rank = getOperandRank();
+
+  AffineMap inputOutputMap = AffineMap::getMultiDimIdentityMap(rank, ctx);
+
+  SmallVector<AffineExpr> accumulatorResults;
+  accumulatorResults.reserve(rank - 1);
+  for (int64_t dim = 0; dim < rank; ++dim) {
+    if (dim == getDimension()) {
+      continue;
+    }
+    accumulatorResults.push_back(getAffineDimExpr(dim, ctx));
+  }
+  AffineMap accumulatorMap = AffineMap::get(rank, 0, accumulatorResults, ctx);
+
+  Builder b(ctx);
+  return b.getAffineMapArrayAttr(
+      {inputOutputMap, inputOutputMap, accumulatorMap});
 }
 
 MutableOperandRange ScanOp::getDpsInitsMutable() {
@@ -2122,8 +2144,19 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               Value sum, ArrayAttr indexingMaps,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
-  build(odsBuilder, odsState, results, query, key, value, maskIn, scale, output,
+  build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
         max, sum, indexingMaps, DictionaryAttr());
+}
+
+void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                              TypeRange results, ValueRange inputOperands,
+                              ValueRange initOperands, ArrayAttr indexingMaps) {
+  assert(inputOperands.size() < 6);
+  assert(initOperands.size() == 3);
+  Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
+  build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
+        inputOperands[2], inputOperands[3], mask, initOperands[0],
+        initOperands[1], initOperands[2], indexingMaps, DictionaryAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {
@@ -3300,19 +3333,23 @@ CustomOp::reifyResultShapes(OpBuilder &builder,
 
 LogicalResult IREE::LinalgExt::IndexOp::verify() {
   auto parentOp = getOperation()->getParentOp();
-  if (!isa<CustomOp, AttentionOp>(parentOp)) {
+  if (!isa<CustomOp, AttentionOp, OnlineAttentionOp>(parentOp)) {
     return emitOpError(
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
-        "`iree_linalg_ext.attention`");
+        "`iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`");
   }
-  auto customOp = dyn_cast<CustomOp>(parentOp);
-  auto attentionOp = dyn_cast<AttentionOp>(parentOp);
-  int64_t numLoops =
-      customOp ? customOp.getNumLoops() : attentionOp.getNumLoops();
+  int64_t numLoops;
+  if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
+    numLoops = customOp.getNumLoops();
+  } else if (auto attentionOp = dyn_cast<AttentionOp>(parentOp)) {
+    numLoops = attentionOp.getIterationDomainRank();
+  } else {
+    numLoops = cast<OnlineAttentionOp>(parentOp).getIterationDomainRank();
+  }
   if (numLoops <= getDim()) {
     return emitOpError("expected dim (")
            << getDim() << ") to be lower than the number of loops (" << numLoops
-           << ") of the enclosing CustomOp/AttentionOp";
+           << ") of the enclosing operation";
   }
   return success();
 }

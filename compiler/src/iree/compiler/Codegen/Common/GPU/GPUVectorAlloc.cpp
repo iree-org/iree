@@ -7,11 +7,13 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -53,7 +55,7 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
   allocTensorOp.setMemorySpaceAttr(sharedMemoryAddrSpace);
 
   Value c0 = arith::ConstantIndexOp::create(b, loc, 0);
-  SmallVector<Value> indices(vectorType.getRank(), c0);
+  llvm::Repeated<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   Value copied = vector::TransferWriteOp::create(b, loc, vector, allocTensorOp,
                                                  indices, inBounds)
@@ -64,7 +66,7 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
 static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
                                   Value tensor) {
   Value c0 = arith::ConstantIndexOp::create(b, tensor.getLoc(), 0);
-  SmallVector<Value> indices(vectorType.getRank(), c0);
+  llvm::Repeated<Value> indices(vectorType.getRank(), c0);
   SmallVector<bool> inBounds(vectorType.getRank(), true);
   return vector::TransferReadOp::create(b, tensor.getLoc(), vectorType, tensor,
                                         indices, /*padding=*/std::nullopt,
@@ -85,6 +87,13 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
 
   OpBuilder builder(funcOp);
   for (IREE::VectorExt::ToLayoutOp op : opsToPromote) {
+    if (!llvm::isa<IREE::GPU::PromotionAttr>(
+            op.getSharedMemoryConversionAttr())) {
+      op.emitOpError("shared_memory_conversion attribute must implement "
+                     "IREE::GPU::PromotionAttr");
+      return failure();
+    }
+
     // HACK: Until proper barrier placement is handled later we have to
     // synchronize explicitly in this pass.
 
@@ -114,7 +123,7 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
 
     // Remove the shared_memory_conversion attribute from the to_layout
     // operation.
-    op.setSharedMemoryConversion(false);
+    op.removeSharedMemoryConversionAttr();
   }
   return success();
 }
@@ -145,7 +154,8 @@ struct GPUVectorAllocPass final
       auto outputLayout = layouts.lookup(op.getResult());
       if (inputLayout && outputLayout &&
           inputLayout.needsSharedMemoryForConversion(outputLayout)) {
-        op.setSharedMemoryConversion(true);
+        op.setSharedMemoryConversionAttr(
+            IREE::GPU::DerivedThreadConfigAttr::get(op.getContext()));
       }
     });
 

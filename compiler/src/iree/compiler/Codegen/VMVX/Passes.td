@@ -21,7 +21,7 @@ def VMVXAssignConstantOrdinalsPass :
 def VMVXSelectLoweringStrategyPass :
     Pass<"iree-vmvx-select-lowering-strategy", "ModuleOp"> {
   let summary =
-      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+      "Select a pipeline attribute for lowering the variant";
 }
 
 def VMVXLinkExecutablesPass :
@@ -32,7 +32,7 @@ def VMVXLinkExecutablesPass :
 def VMVXLowerExecutableTargetPass :
     InterfacePass<"iree-vmvx-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
-      "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+      "Lower executable target using a pipeline attribute";
 }
 
 def VMVXLowerLinalgMicrokernelsPass :

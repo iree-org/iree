@@ -91,6 +91,22 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+# TODO(24342): Merge the test suite into the main e2e reverse coverage in
+# tests/e2e/stablehlo_ops/reverse.mlir once the RISC-V vector miscompile of
+# fused slice + reverse is fixed.
+iree_check_single_backend_test_suite(
+    name = "check_regression_xla_reverse_after_slice_llvm-cpu",
+    srcs = [
+        "xla_reverse_after_slice.mlir",
+    ],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        "noriscv",
+    ],
+    target_backend = "llvm-cpu",
+)
+
 iree_check_single_backend_test_suite(
     name = "check_regression_tosa_llvm-cpu",
     srcs = [

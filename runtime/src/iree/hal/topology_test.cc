@@ -33,9 +33,13 @@ TEST(TopologyEdge, SchedulingWordBitfieldOverlap) {
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
   lo = iree_hal_topology_edge_set_signal_mode(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  lo = iree_hal_topology_edge_set_buffer_read_mode(
+  lo = iree_hal_topology_edge_set_buffer_read_mode_noncoherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  lo = iree_hal_topology_edge_set_buffer_write_mode(
+  lo = iree_hal_topology_edge_set_buffer_write_mode_noncoherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_buffer_read_mode_coherent(
+      lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  lo = iree_hal_topology_edge_set_buffer_write_mode_coherent(
       lo, IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
   lo = iree_hal_topology_edge_set_capability_flags(lo, 0xFFFF);  // 16 bits
   lo = iree_hal_topology_edge_set_wait_cost(lo, 15);
@@ -50,9 +54,13 @@ TEST(TopologyEdge, SchedulingWordBitfieldOverlap) {
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
   EXPECT_EQ(iree_hal_topology_edge_signal_mode(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_noncoherent(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_noncoherent(lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_coherent(lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_coherent(lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NONE);
   EXPECT_EQ(iree_hal_topology_edge_capability_flags(lo), 0xFFFF);
   EXPECT_EQ(iree_hal_topology_edge_wait_cost(lo), 15);
@@ -137,9 +145,13 @@ TEST(TopologyEdge, CreateSelf) {
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
   EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_noncoherent(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_noncoherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_coherent(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
 
   // Self-edges should have zero cost.
@@ -159,7 +171,8 @@ TEST(TopologyEdge, CreateSelf) {
       IREE_HAL_TOPOLOGY_CAPABILITY_CONCURRENT_SAFE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_DEVICE |
       IREE_HAL_TOPOLOGY_CAPABILITY_ATOMIC_SYSTEM |
-      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE;
+      IREE_HAL_TOPOLOGY_CAPABILITY_TIMELINE_SEMAPHORE |
+      IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
   EXPECT_EQ(iree_hal_topology_edge_capability_flags(edge.lo), expected_caps);
 
   // Self-edges use SAME_DIE link class.
@@ -186,9 +199,13 @@ TEST(TopologyEdge, CreateCrossDriver) {
             IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
   EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_IMPORT);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_noncoherent(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode(edge.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_noncoherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_coherent(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 
   // Cross-driver has moderate costs.
@@ -230,7 +247,7 @@ TEST(TopologyEdge, AliasedDeviceDetection) {
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
   EXPECT_EQ(iree_hal_topology_edge_signal_mode(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
-  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode(edge.lo),
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_noncoherent(edge.lo),
             IREE_HAL_TOPOLOGY_INTEROP_MODE_NATIVE);
   EXPECT_EQ(iree_hal_topology_edge_copy_cost(edge.lo), 0);
   EXPECT_EQ(iree_hal_topology_edge_link_class(edge.lo),
@@ -264,6 +281,25 @@ TEST(TopologyEdge, ZeroHandleNoAliasing) {
   // Zero handle → no aliasing detection.
   // Same driver but no UUID or P2P → non-zero copy cost.
   EXPECT_NE(iree_hal_topology_edge_copy_cost(edge.lo), 0);
+}
+
+TEST(TopologyEdge, SharedVirtualAddressDoesNotImplyUnifiedMemory) {
+  iree_hal_device_capabilities_t caps = {0};
+  caps.flags = IREE_HAL_DEVICE_CAPABILITY_SHARED_VIRTUAL_ADDRESS;
+
+  iree_hal_topology_edge_t edge = iree_hal_topology_edge_from_capabilities(
+      &caps, &caps, IREE_SV("amdgpu"), IREE_SV("amdgpu"));
+  iree_hal_topology_capability_t topology_caps =
+      iree_hal_topology_edge_capability_flags(edge.lo);
+
+  EXPECT_TRUE(topology_caps &
+              IREE_HAL_TOPOLOGY_CAPABILITY_SHARED_VIRTUAL_ADDRESS);
+  EXPECT_FALSE(topology_caps & IREE_HAL_TOPOLOGY_CAPABILITY_UNIFIED_MEMORY);
+  EXPECT_FALSE(topology_caps & IREE_HAL_TOPOLOGY_CAPABILITY_PEER_COHERENT);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_read_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
+  EXPECT_EQ(iree_hal_topology_edge_buffer_write_mode_coherent(edge.lo),
+            IREE_HAL_TOPOLOGY_INTEROP_MODE_COPY);
 }
 
 //===----------------------------------------------------------------------===//

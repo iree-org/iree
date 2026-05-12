@@ -284,7 +284,7 @@ module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.w
     transform.iree.match.dims_equal %m_dims, [32] : !transform.param<i64>
     transform.iree.match.dims_equal %n_dims, [2048] : !transform.param<i64>
     transform.iree.match.dims_equal %k_dims, [1024] : !transform.param<i64>
-    %0 = transform.param.constant #iree_codegen.compilation_info<lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}>, translation_info = <pipeline = LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>> -> !transform.any_param
+    %0 = transform.param.constant #iree_codegen.compilation_info<lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}>, translation_info = <pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_shared_memory = true>, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>> -> !transform.any_param
     transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -> !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {

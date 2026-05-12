@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
@@ -338,6 +339,10 @@ class TileSizeForwardAnalysis
 public:
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
 
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeForwardAnalysis>();
+  }
+
   void setToEntryState(TileSizeLattice *lattice) override {
     // Entry state is uninitialized (identity for join).
     propagateIfChanged(lattice, lattice->join(TileSizes()));
@@ -413,8 +418,25 @@ public:
     // so tile sizes go directly on the result lattice.
     if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
       OpBuilder builder(op);
+      // The dependent determines what reruns if the divisibility lattice for
+      // `val` changes below. Sparse forward analyses visit operations from the
+      // program point after the operation, so use `after(op)` to rerun this op.
+      // This dependency is not expected to affect convergence in practice:
+      // divisibility is solved to fixpoint before tile-size analysis starts.
+      ProgramPoint *dependent = getProgramPointAfter(op);
       std::optional<SmallVector<int64_t>> maybeTileSizes =
-          IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
+          IREE::LinalgExt::computeIm2colVectorTileSizes(
+              builder, im2colOp, [this, dependent](Value val) {
+                const auto *lattice =
+                    getOrCreateFor<IREE::Util::IntegerDivisibilityLattice>(
+                        dependent, val);
+                if (!lattice || lattice->getValue().isUninitialized()) {
+                  return uint64_t{1};
+                }
+                const IREE::Util::ConstantIntDivisibility &div =
+                    lattice->getValue().getValue();
+                return div.sdiv();
+              });
       if (maybeTileSizes) {
         TileSizes tileSizes(*maybeTileSizes);
         propagateIfChanged(results[0], results[0]->join(tileSizes));
@@ -460,6 +482,10 @@ class TileSizeBackwardAnalysis
     : public dataflow::SparseBackwardDataFlowAnalysis<TileSizeLattice> {
 public:
   using SparseBackwardDataFlowAnalysis::SparseBackwardDataFlowAnalysis;
+
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeBackwardAnalysis>();
+  }
 
   void setToExitState(TileSizeLattice *lattice) override {
     // Exit state is uninitialized (identity for meet).
@@ -637,6 +663,27 @@ static TileSizes getIterationSpaceTileSizes(Operation *op, unsigned numLoops,
   return iterTileSizes;
 }
 
+/// Gather tile sizes into the iteration space of a linalg op by looking up
+/// both operand and result lattice states in the solver.
+static TileSizes
+getLinalgIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
+                                 const DataFlowSolver &solver) {
+  TileSizes iterTileSizes =
+      getIterationSpaceTileSizes(linalgOp, linalgOp.getNumLoops(),
+                                 linalgOp.getIndexingMapsArray(), solver);
+
+  for (auto [idx, result] : llvm::enumerate(linalgOp->getResults())) {
+    const TileSizeLattice *lattice =
+        solver.lookupState<TileSizeLattice>(result);
+    TileSizes tileSizes = getTileSizesFor(result, lattice);
+    OpOperand *init = linalgOp.getDpsInitOperand(idx);
+    AffineMap map = linalgOp.getMatchingIndexingMap(init);
+    iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
+  }
+
+  return iterTileSizes;
+}
+
 /// Get tile sizes for an im2col op from its result lattice. Im2col's output
 /// dimensions are the iteration domain, so the result lattice directly holds
 /// the iteration-space tile sizes.
@@ -645,6 +692,90 @@ static TileSizes getIm2colTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   Value result = im2colOp.getResult(0);
   const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(result);
   return getTileSizesFor(result, lattice);
+}
+
+static std::optional<TileSizes>
+getUseOperandTileSizes(OpOperand &use, const DataFlowSolver &solver) {
+  Operation *user = use.getOwner();
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(user)) {
+    TileSizes iterTileSizes =
+        getLinalgIterationSpaceTileSizes(linalgOp, solver);
+    AffineMap map = linalgOp.getMatchingIndexingMap(&use);
+    TileSizes operandTileSizes = iterTileSizes.mapFromIterationSpace(map);
+    if (!operandTileSizes.isDefined()) {
+      return std::nullopt;
+    }
+    return operandTileSizes;
+  }
+
+  if (auto toLayoutOp = dyn_cast<ToLayoutOp>(user)) {
+    Value result = toLayoutOp.getResult();
+    const TileSizeLattice *lattice =
+        solver.lookupState<TileSizeLattice>(result);
+    TileSizes tileSizes = getTileSizesFor(result, lattice);
+    if (!tileSizes.isDefined()) {
+      return std::nullopt;
+    }
+    return tileSizes;
+  }
+
+  return std::nullopt;
+}
+
+static LogicalResult
+materializeDuplicatableLinalgOp(linalg::LinalgOp linalgOp,
+                                const DataFlowSolver &solver) {
+  if (linalgOp->getNumResults() != 1) {
+    return failure();
+  }
+  if (linalgOp->hasAttr(kVectorTileSizesAttrName)) {
+    return success();
+  }
+  Value result = linalgOp->getResult(0);
+  if (!isDuplicatable(result)) {
+    return failure();
+  }
+
+  SmallVector<std::pair<TileSizes, SmallVector<OpOperand *>>> useGroups;
+  for (OpOperand &use : result.getUses()) {
+    std::optional<TileSizes> maybeTileSizes =
+        getUseOperandTileSizes(use, solver);
+    if (!maybeTileSizes || !maybeTileSizes->isDefined()) {
+      continue;
+    }
+    auto it = llvm::find_if(
+        useGroups, [&](auto &entry) { return entry.first == *maybeTileSizes; });
+    if (it == useGroups.end()) {
+      useGroups.emplace_back(*maybeTileSizes, SmallVector<OpOperand *>{&use});
+    } else {
+      it->second.push_back(&use);
+    }
+  }
+
+  if (useGroups.empty()) {
+    return success();
+  }
+
+  auto setTileSizeAttr = [](Operation *op, TileSizes tileSizes) {
+    op->setAttr(kVectorTileSizesAttrName,
+                DenseI64ArrayAttr::get(op->getContext(), tileSizes.getDims()));
+  };
+
+  OpBuilder builder(linalgOp);
+  builder.setInsertionPointAfter(linalgOp);
+  for (auto &useGroup : useGroups) {
+    Operation *cloned = builder.clone(*linalgOp.getOperation());
+    setTileSizeAttr(cloned, useGroup.first);
+    Value clonedResult = cloned->getResult(0);
+    for (OpOperand *use : useGroup.second) {
+      use->set(clonedResult);
+    }
+  }
+  if (result.use_empty()) {
+    linalgOp->erase();
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -660,18 +791,47 @@ public:
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
+    // Stage 1: run baseline analyses and IntegerDivisibilityAnalysis to
+    // convergence. We need these results to be stable before the tile size
+    // analyses consult them, so we use the staged-solve pattern enabled by
+    // `DataFlowSolver::initializeAndRun`'s analysis filter.
     DataFlowSolver solver;
     dataflow::loadBaselineAnalyses(solver);
-    solver.load<TileSizeForwardAnalysis>();
-    SymbolTableCollection symbolTable;
-    solver.load<TileSizeBackwardAnalysis>(symbolTable);
-
+    solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
     if (failed(solver.initializeAndRun(funcOp))) {
       return signalPassFailure();
     }
 
+    // Stage 2: load the tile size analyses and initialize only those.
+    // The existing divisibility lattices are left initialized from stage 1 and
+    // can be queried by the vector size analyses when determining vector sizes.
+    solver.load<TileSizeForwardAnalysis>();
+    SymbolTableCollection symbolTable;
+    solver.load<TileSizeBackwardAnalysis>(symbolTable);
+    if (failed(solver.initializeAndRun(
+            funcOp, llvm::IsaPred<TileSizeForwardAnalysis,
+                                  TileSizeBackwardAnalysis>))) {
+      return signalPassFailure();
+    }
+
+    SmallVector<linalg::LinalgOp> duplicatableLinalgOps;
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (linalgOp->getNumResults() == 1 &&
+          isDuplicatable(linalgOp->getResult(0))) {
+        duplicatableLinalgOps.push_back(linalgOp);
+      }
+    });
+    for (linalg::LinalgOp linalgOp : duplicatableLinalgOps) {
+      if (failed(materializeDuplicatableLinalgOp(linalgOp, solver))) {
+        return signalPassFailure();
+      }
+    }
+
     auto materialize = [](Operation *op, TileSizes tileSizes) -> LogicalResult {
       if (tileSizes.isOverdefined()) {
+        if (op->hasAttr(kVectorTileSizesAttrName)) {
+          return success();
+        }
         op->emitOpError()
             << "tile size analysis did not determine a valid tile size";
         return failure();
@@ -706,9 +866,8 @@ public:
         return WalkResult(materialize(op, tileSizes));
       }
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-        SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
-        TileSizes tileSizes = getIterationSpaceTileSizes(
-            op, linalgOp.getNumLoops(), indexingMaps, solver);
+        TileSizes tileSizes =
+            getLinalgIterationSpaceTileSizes(linalgOp, solver);
         assert(!tileSizes.isDefined() ||
                tileSizes.rank() == linalgOp.getNumLoops());
         return WalkResult(materialize(op, tileSizes));

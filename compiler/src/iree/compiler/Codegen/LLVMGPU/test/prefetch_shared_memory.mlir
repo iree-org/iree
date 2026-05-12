@@ -481,8 +481,11 @@ func.func @prefetch_gather_to_lds_two_operands(
 
 // -----
 
-// CHECK-LABEL: @gather_to_lds_inside_if_not_multibuffered
-func.func @gather_to_lds_inside_if_not_multibuffered(
+// Verify that gather_to_lds inside scf.if IS pipelined with async copy mode.
+// The scf.if is treated as a load root unit, enabling multi-buffering and
+// async mark insertion.
+// CHECK-LABEL: @gather_to_lds_inside_if_pipelined
+func.func @gather_to_lds_inside_if_pipelined(
     %global: memref<128x128xf32>,
     %output: memref<128xf32>,
     %bound: index) {
@@ -492,26 +495,37 @@ func.func @gather_to_lds_inside_if_not_multibuffered(
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
 
-  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
-  // CHECK-NOT: memref<2x1xf32
+  // Multi-buffered to double-buffer.
+  // CHECK: memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
   %lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
+  // Prologue: scf.if wrapping async gather + asyncmark.
+  // CHECK: scf.if
+  // CHECK:   amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // CHECK: scf.for
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
-    // CHECK: scf.if
     %in_bounds = arith.cmpi slt, %k, %bound : index
-    // CHECK: amdgpu.gather_to_lds
-    // CHECK-NOT: rocdl.asyncmark
-    // CHECK-NOT: rocdl.wait.asyncmark
     scf.if %in_bounds {
       amdgpu.gather_to_lds %global[%c0, %k], %lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     }
-    // CHECK: vector.transfer_read
+    // Loop body: barrier, next-iteration load (in if), asyncmark, wait, barrier, compute.
+    // CHECK: gpu.barrier
+    // CHECK: scf.if
+    // CHECK:   amdgpu.gather_to_lds async
+    // CHECK: rocdl.asyncmark
+    // CHECK: rocdl.wait.asyncmark 1
+    // CHECK: gpu.barrier
     %val = vector.transfer_read %lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    // CHECK: vector.transfer_read
     // CHECK: arith.addf
     %sum = arith.addf %val, %acc : vector<1xf32>
     // CHECK: scf.yield
     scf.yield %sum : vector<1xf32>
   }
+  // Epilogue: wait for all, barrier, compute.
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
 
   vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
@@ -520,8 +534,8 @@ func.func @gather_to_lds_inside_if_not_multibuffered(
 // -----
 
 // Test: gather_to_lds with two operands where one is inside scf.if.
-// The scf.if blocks pipelining in async copy mode. The pre-flight guard
-// should skip both multi-buffering and pipelining, leaving the IR untouched.
+// Both the unconditional and predicated DMAs are pipelined together. The
+// scf.if wrapping the predicated DMA is treated as a load root unit.
 // CHECK-LABEL: @gather_to_lds_two_operands_one_predicated
 func.func @gather_to_lds_two_operands_one_predicated(
     %A_global: memref<128x128xf32>,
@@ -534,29 +548,34 @@ func.func @gather_to_lds_two_operands_one_predicated(
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
 
-  // No multi-buffering: both allocs stay as memref<1xf32, ...>.
-  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
-  // CHECK: memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
-  // CHECK-NOT: memref<2x1xf32
+  // Both allocs are multi-buffered (double-buffered for 2-stage).
+  // CHECK-DAG: memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
+  // CHECK-DAG: memref.alloc() : memref<2x1xf32, #gpu.address_space<workgroup>>
   %A_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
   %B_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
 
+  // Prologue: unconditional DMA + predicated DMA in scf.if + asyncmark.
+  // CHECK: amdgpu.gather_to_lds async
+  // CHECK: scf.if
+  // CHECK:   amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
   // CHECK: scf.for
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst) -> (vector<1xf32>) {
-    // First DMA is unconditional.
-    // CHECK: amdgpu.gather_to_lds
     amdgpu.gather_to_lds %A_global[%c0, %k], %A_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
 
-    // Second DMA is predicated — blocks pipelining.
     %in_bounds = arith.cmpi slt, %k, %bound : index
-    // CHECK: scf.if
-    // CHECK: amdgpu.gather_to_lds
     scf.if %in_bounds {
       amdgpu.gather_to_lds %B_global[%k, %c0], %B_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
     }
 
-    // CHECK-NOT: rocdl.asyncmark
-    // CHECK-NOT: rocdl.wait.asyncmark
+    // Loop body: barrier, next-iteration loads, asyncmark, wait, barrier, compute.
+    // CHECK: gpu.barrier
+    // CHECK: amdgpu.gather_to_lds async
+    // CHECK: scf.if
+    // CHECK:   amdgpu.gather_to_lds async
+    // CHECK: rocdl.asyncmark
+    // CHECK: rocdl.wait.asyncmark 1
+    // CHECK: gpu.barrier
     %a_val = vector.transfer_read %A_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     %b_val = vector.transfer_read %B_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
     %prod = arith.mulf %a_val, %b_val : vector<1xf32>
@@ -564,6 +583,9 @@ func.func @gather_to_lds_two_operands_one_predicated(
     // CHECK: scf.yield
     scf.yield %sum : vector<1xf32>
   }
+  // Epilogue: wait for all, barrier, compute.
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
 
   vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
@@ -775,5 +797,97 @@ func.func @gather_to_lds_with_swizzle_attr(
     scf.yield %sum : vector<1xf32>
   }
   vector.transfer_write %result, %output[%c0] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// Test that gather_to_lds ops before the loop (e.g., Q loads in attention) are
+// converted to async with explicit synchronization. This is intentionally two
+// pre-loop gathers to verify that they are grouped and drained before use.
+// CHECK-LABEL: @gather_to_lds_pre_loop_gets_explicit_wait
+func.func @gather_to_lds_pre_loop_gets_explicit_wait(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>) {
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %Q_lds = memref.alloc() : memref<2xf32, #gpu.address_space<workgroup>>
+  %K_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // Pre-loop gather_to_lds ops (e.g., loading Q) - async with explicit drain.
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c0], %Q_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<2xf32, #gpu.address_space<workgroup>>
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c1], %Q_lds[%c1] : vector<1xf32>, memref<128x128xf32>, memref<2xf32, #gpu.address_space<workgroup>>
+  // CHECK: rocdl.asyncmark
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
+  // CHECK: vector.transfer_read
+
+  // Barrier + read Q from LDS before the loop, mirroring the real attention
+  // pattern where Q is loaded, synchronized, and consumed before K/V pipelining.
+  gpu.barrier
+  %q_val = vector.transfer_read %Q_lds[%c0], %cst_0 : memref<2xf32, #gpu.address_space<workgroup>>, vector<2xf32>
+
+  // Pipelined loop with gather_to_lds - these should be async.
+  // CHECK: amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // CHECK: scf.for
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %q_val) -> (vector<2xf32>) {
+    amdgpu.gather_to_lds %B_global[%c0, %k], %K_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %k_val = vector.transfer_read %K_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %k_splat = vector.broadcast %k_val : vector<1xf32> to vector<2xf32>
+    %prod = arith.mulf %k_splat, %acc : vector<2xf32>
+    scf.yield %prod : vector<2xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%c0] {in_bounds = [true]} : vector<2xf32>, memref<128xf32>
+  return
+}
+
+// -----
+
+// Test that the pre-loop async drain is inserted before the first barrier even
+// when the shared read is not immediately adjacent to that barrier.
+// CHECK-LABEL: @gather_to_lds_pre_loop_wait_before_non_adjacent_read
+func.func @gather_to_lds_pre_loop_wait_before_non_adjacent_read(
+    %A_global: memref<128x128xf32>,
+    %B_global: memref<128x128xf32>,
+    %C_global: memref<128xf32>,
+    %offset: index) {
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c128 = arith.constant 128 : index
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+
+  %Q_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+  %K_lds = memref.alloc() : memref<1xf32, #gpu.address_space<workgroup>>
+
+  // CHECK: amdgpu.gather_to_lds async
+  amdgpu.gather_to_lds %A_global[%c0, %c0], %Q_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+  // CHECK: rocdl.asyncmark
+  // CHECK: rocdl.wait.asyncmark 0
+  // CHECK: gpu.barrier
+  // CHECK: arith.addi
+  // CHECK: vector.transfer_read
+  gpu.barrier
+  %write_idx = arith.addi %offset, %c1 : index
+  %q_val = vector.transfer_read %Q_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+
+  // CHECK: amdgpu.gather_to_lds async
+  // CHECK: rocdl.asyncmark
+  // CHECK: scf.for
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %q_val) -> (vector<1xf32>) {
+    amdgpu.gather_to_lds %B_global[%c0, %k], %K_lds[%c0] : vector<1xf32>, memref<128x128xf32>, memref<1xf32, #gpu.address_space<workgroup>>
+    %k_val = vector.transfer_read %K_lds[%c0], %cst_0 : memref<1xf32, #gpu.address_space<workgroup>>, vector<1xf32>
+    %prod = arith.mulf %k_val, %acc : vector<1xf32>
+    scf.yield %prod : vector<1xf32>
+  }
+
+  vector.transfer_write %result, %C_global[%write_idx] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }

@@ -48,6 +48,51 @@ def LLVMGPUConfigureTensorLayoutsPass :
   let summary = "Pass to set layouts on tensors for later vector distribution";
 }
 
+def LLVMGPUGroupGlobalLoadsPass :
+    InterfacePass<"iree-llvmgpu-group-global-loads", "mlir::FunctionOpInterface"> {
+  let summary = "Group adjacent global loads to improve GPU instruction scheduling";
+  let description = [{
+    Moves vector.load and memref.load operations from global-memory memrefs next
+    to each other when they are separated only by operations that do not depend
+    on the preceding load's result. This enables the GPU backend to issue
+    multiple global loads before waiting, instead of serializing each load
+    behind its own waitcount.
+  }];
+}
+
+def LLVMGPU1DVectorCanonicalizationsPass :
+    InterfacePass<"iree-llvmgpu-1d-vector-canonicalizations", "mlir::FunctionOpInterface"> {
+  let summary = "Canonicalization patterns for 1-D vectors after legalization.";
+}
+
+def LLVMGPULegalizeNDVectorsPass :
+    InterfacePass<"iree-llvmgpu-legalize-nd-vectors", "mlir::FunctionOpInterface"> {
+  let summary = "Legalize n-D vectors to 1-D vectors using type conversion.";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "nvgpu::NVGPUDialect",
+    "scf::SCFDialect",
+    "ub::UBDialect",
+    "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPUVectorFlatteningPass :
+    InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
+  let summary = "Flatten n-D vectors.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPUVectorMultiReductionLoweringPass :
+    InterfacePass<"iree-llvmgpu-vector-multi-reduction-lowering", "mlir::FunctionOpInterface"> {
+  let summary = "Lower vector.multi_reduction ops.";
+  let dependentDialects = [
+    "vector::VectorDialect",
+  ];
+}
+
 def LLVMGPULinkExecutablesPass :
     Pass<"iree-llvmgpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMGPU HAL executables within the top-level program module.";
@@ -62,7 +107,7 @@ def LLVMGPULinkExecutablesPass :
 
 def LLVMGPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
-  let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
+  let summary = "Perform lowering of executable target using a pipeline attribute";
   let options = [
     Option<"forROCDL", "for-rocdl", "bool",
            /*default=*/"false",
@@ -93,11 +138,12 @@ def ROCDLPrefetchSharedMemoryPass :
 
 def LLVMGPUSelectLoweringStrategyPass :
     Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
-  let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
+  let summary = "Select a pipeline attribute for lowering the target variant";
   let options = [
     Option<"gpuOptions", "gpu-options", "GPUCodegenOptions",
-      /*default=*/"GPUCodegenOptions::FromFlags::get()",
-      "Session-scoped GPU codegen options (tuning spec, etc.).">,
+      /*default=*/"GPUCodegenOptions()",
+      "GPU codegen options consumed by this pass; see GPUCodegenOptions for "
+      "the available and default settings.">,
   ];
 }
 

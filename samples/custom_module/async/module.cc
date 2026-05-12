@@ -158,6 +158,13 @@ class AsyncOp {
     fprintf(stdout, "ASYNC: BEFORE SIGNAL\n");
     fflush(stdout);
 
+    // Completion is the caller-visible teardown point. Release async-owned
+    // references before signaling so device teardown cannot race this thread's
+    // final buffer releases after the fence is observed.
+    source_view_.reset();
+    target_view_.reset();
+    wait_fence_.reset();
+
     // Try to signal completion so that downstream consumers of the result
     // can get scheduled.
     if (status.ok()) {
@@ -231,7 +238,7 @@ class CustomModuleState final {
         device_.get(), IREE_HAL_QUEUE_AFFINITY_ANY,
         iree_hal_fence_semaphore_list(wait_fence),
         iree_hal_fence_semaphore_list(alloca_fence.get()),
-        IREE_HAL_ALLOCATOR_POOL_DEFAULT, buffer_params,
+        /*pool=*/NULL, buffer_params,
         iree_hal_buffer_view_byte_length(arg_view), IREE_HAL_ALLOCA_FLAG_NONE,
         &result_buffer));
 

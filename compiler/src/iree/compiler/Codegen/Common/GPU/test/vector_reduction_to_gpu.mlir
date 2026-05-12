@@ -6,7 +6,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_reduce() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -79,7 +79,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info_forall = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info_forall = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @reduce_forall() attributes {translation_info = #translation_info_forall} {
     %c0 = arith.constant 0 : index
@@ -133,7 +133,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<uniform_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 module {
   func.func @reduce_uniform_buffer_offset() attributes {translation_info = #translation_info} {
@@ -192,7 +192,7 @@ module {
   #hal.pipeline.binding<storage_buffer>
 ]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @reduce_storage_buffer_offset() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -246,7 +246,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @shared_memory_copy() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
@@ -282,7 +282,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [64, 1, 1] subgroup_size = 64>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 module {
@@ -333,7 +333,7 @@ module {
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
-#translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [32, 1, 1] subgroup_size = 32>
 module {
   func.func @simple_nd_write() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index

@@ -9,10 +9,13 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPUTileSwizzleUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -47,22 +50,19 @@
 
 #define DEBUG_TYPE "iree-gpu-attrs"
 
-// Tag constants for HoistableConversionOp pairs.
-static constexpr llvm::StringLiteral kRdna3InterleaveAcc =
-    "rdna3_interleave_acc";
-static constexpr llvm::StringLiteral kRdna3DeinterleaveAcc =
-    "rdna3_deinterleave_acc";
-static constexpr llvm::StringLiteral kDataTiledAccDistribute =
-    "data_tiled_acc_distribute";
-static constexpr llvm::StringLiteral kDataTiledAccReassemble =
-    "data_tiled_acc_reassemble";
-static constexpr llvm::StringLiteral kVDMFMAInterleaveAcc =
-    "vdmfma_interleave_acc";
-static constexpr llvm::StringLiteral kVDMFMADeinterleaveAcc =
-    "vdmfma_deinterleave_acc";
-
 namespace mlir::iree_compiler::IREE::GPU {
 
+// HoistableConversionOp tag constants — definitions live in
+// `Codegen/Utils/MMAUtils.h` so paired tags (which match by string) can't
+// silently drift between translation units.
+using ::mlir::iree_compiler::IREE::Codegen::distributeMmaFragmentToIntrinsics;
+using ::mlir::iree_compiler::IREE::Codegen::incrementIndices;
+using ::mlir::iree_compiler::IREE::Codegen::kDataTiledAccDistribute;
+using ::mlir::iree_compiler::IREE::Codegen::kDataTiledAccReassemble;
+using ::mlir::iree_compiler::IREE::Codegen::kRdna3DeinterleaveAcc;
+using ::mlir::iree_compiler::IREE::Codegen::kRdna3InterleaveAcc;
+using ::mlir::iree_compiler::IREE::Codegen::kVDMFMADeinterleaveAcc;
+using ::mlir::iree_compiler::IREE::Codegen::kVDMFMAInterleaveAcc;
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 
 //===----------------------------------------------------------------------===//
@@ -970,9 +970,12 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
-    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16};
+    return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
+            VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
   case MMAIntrinsic::MFMA_F32_32x32x8_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_32x32x16_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x16_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x32_F8E4M3FNUZ:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ};
   case MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ:
@@ -1349,6 +1352,16 @@ int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 
 int64_t DataTiledMMAAttr::getExpectedNumOutputs() const { return 1; }
 
+LogicalResult DataTiledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  return cast<DataTiledMMAInterfaceAttr>(*this)
+      .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
+                                          permutation, offsets, sizes, strides);
+}
+
 LogicalResult
 DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return verifyMmaIndexingMaps(maps);
@@ -1370,159 +1383,30 @@ DataTiledMMAAttr::getOperandIteratorTypes() const {
           {utils::IteratorType::parallel, utils::IteratorType::parallel}};
 }
 
-/// Increment the mutable vector `indices` to traverse the index space below
-/// `sizes`, with the last dimension moving fastest, or returns false if that
-/// index space was exhausted.
-static bool incrementIndices(MutableArrayRef<int64_t> indices,
-                             ArrayRef<int64_t> sizes) {
-  for (int i = indices.size() - 1; i >= 0; --i) {
-    if (++indices[i] == sizes[i]) {
-      indices[i] = 0;
-    } else {
-      return true; // Found an index that we could increment without wrapping.
-    }
-  }
-  return false; // All indices wrapped around.
-}
-
-/// Flattens the input vector `value` to 1-D if the rank is greater than 1. Note
-/// that it returns the value directly if it is a 0-D vector.
-static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
-  Type type = value.getType();
-  VectorType vectorType = dyn_cast<VectorType>(type);
-  assert(vectorType);
-  if (vectorType.getRank() <= 1) {
-    return value;
-  }
-  auto flatVectorType = VectorType::get({vectorType.getNumElements()},
-                                        vectorType.getElementType());
-  return vector::ShapeCastOp::create(builder, loc, flatVectorType, value);
-}
-
-/// Returns intrinsic-level slices tiling the input multi-MMA-level tile
-/// `value`.
-static SmallVector<Value>
-distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
-                                  const TileSwizzle &swizzle) {
-  auto internalShape =
-      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
-      });
-  auto crossIntrinsicShape =
-      Codegen::sliceSwizzledShape(swizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
-      });
-  LDBG() << "crossIntrinsicShape: " << llvm::interleaved(crossIntrinsicShape);
-  int rank = internalShape.size();
-  SmallVector<int64_t> indices(rank, 0);
-  SmallVector<int64_t> strides(rank, 1);
-  SmallVector<Value> distributedValues;
-  do {
-    Value extract = vector::ExtractStridedSliceOp::create(
-        builder, loc, value, indices, internalShape, strides);
-    distributedValues.push_back(flattenVector(builder, loc, extract));
-  } while (incrementIndices(indices, crossIntrinsicShape));
-  return distributedValues;
-}
-
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
-  // Validation. Similar to MMAAttr::buildMmaOperation.
-  if (inputs.size() != 2) {
-    return failure();
-  }
-  if (outputs.size() != 1) {
-    return failure();
-  }
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
-  if (!llvm::equal(regTypes,
+  if (inputs.size() != 2 || outputs.size() != 1 ||
+      !llvm::equal(regTypes,
                    llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
     return failure();
   }
 
-  // Prepare Lhs/Rhs/Acc operand slices to feed the intrinsic.
-  TileSwizzle lhsSwizzle = getSwizzle(*this, kMMAOperandLhs);
-  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
-  LDBG() << "    lhsSwizzle: " << lhsSwizzle;
-  SmallVector<Value> intrinsicsLhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, inputs[0], lhsSwizzle);
-
-  TileSwizzle rhsSwizzle = getSwizzle(*this, kMMAOperandRhs);
-  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
-  LDBG() << "    rhsSwizzle: " << rhsSwizzle;
-  SmallVector<Value> intrinsicsRhs =
-      distributeMmaFragmentToIntrinsics(builder, loc, inputs[1], rhsSwizzle);
-
-  TileSwizzle accSwizzle = getSwizzle(*this, kMMAOperandAcc);
-  LDBG() << "DataTiledMMAAttr::buildMmaOperation";
-  LDBG() << "    accSwizzle: " << accSwizzle;
-
-  // Distribute the accumulator into per-intrinsic slices; the reassembly
-  // conversion will be hoisted out of the reduction loop.
-  auto distributeAccOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, /*tag=*/kDataTiledAccDistribute,
-      /*inverseTag=*/kDataTiledAccReassemble, ValueRange{outputs[0]},
-      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
-        return distributeMmaFragmentToIntrinsics(b, loc, args[0], accSwizzle);
-      });
-  SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
-
   MMAIntrinsic intrinsic = getIntrinsic();
-  VectorType intrinCType =
-      getThreadVectorType(builder.getContext(), intrinsic, kMMAOperandAcc);
-
-  // Loop over the 3 unroll_{m,n,k} dimensions to create the intrinsics.
-  for (int mu = 0; mu < getIntrinsicsM(); ++mu) {
-    for (int nu = 0; nu < getIntrinsicsN(); ++nu) {
-      for (int ku = 0; ku < getIntrinsicsK(); ++ku) {
-        Value lhs = intrinsicsLhs[mu * getIntrinsicsK() + ku];
-        Value rhs = intrinsicsRhs[nu * getIntrinsicsK() + ku];
-        Value &acc = intrinsicsAcc[mu * getIntrinsicsN() + nu];
-        acc = createMmaOp(builder, loc, intrinsic, intrinCType, lhs, rhs, acc);
-      }
-    }
-  }
-
-  // Insert the results into the destination accumulator.
-  SmallVector<int64_t> accCrossIntrinsicShape =
-      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
-      });
-  SmallVector<int64_t> accInternalShape =
-      Codegen::sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
-      });
-
-  LDBG() << "accCrossIntrinsicShape: "
-         << llvm::interleaved(accCrossIntrinsicShape);
-  LDBG() << "accInternalShape: " << llvm::interleaved(accInternalShape);
-
-  auto reassembleOp = IREE::Util::HoistableConversionOp::create(
-      builder, loc, /*tag=*/kDataTiledAccReassemble,
-      /*inverseTag=*/kDataTiledAccDistribute, intrinsicsAcc,
-      [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
-        int64_t dstRank = accCrossIntrinsicShape.size();
-        SmallVector<int64_t> strides(dstRank, 1);
-        SmallVector<int64_t> indices(dstRank, 0);
-        Value acc = arith::ConstantOp::create(
-            b, loc, b.getZeroAttr(outputs[0].getType()));
-        for (Value intrAcc : args) {
-          auto expandedAcc = vector::ShapeCastOp::create(
-              b, loc,
-              VectorType::get(
-                  accInternalShape,
-                  cast<VectorType>(outputs[0].getType()).getElementType()),
-              intrAcc);
-          acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
-                                                     indices, strides);
-          incrementIndices(indices, accCrossIntrinsicShape);
-        }
-        return {acc};
-      });
-  results.push_back(reassembleOp.getResult(0));
-  return success();
+  auto emitIntrinsic = [&](OpBuilder &b, Location loc, Value lhs, Value rhs,
+                           Value acc) -> Value {
+    // For GPU, the per-intrinsic acc type matches `getThreadVectorType` for
+    // the ACC operand; createMmaOp uses it to broadcast a scalar mfma result
+    // back to the per-intrinsic vector if the acc happens to be 1-element.
+    return createMmaOp(b, loc, intrinsic, acc.getType(), lhs, rhs, acc);
+  };
+  return Codegen::buildDataTiledMMAUnderlyingOperations(
+      builder, loc, getSwizzle(*this, kMMAOperandLhs),
+      getSwizzle(*this, kMMAOperandRhs), getSwizzle(*this, kMMAOperandAcc),
+      getIntrinsicsM(), getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
+      emitIntrinsic, results);
 }
 
 TileSwizzle DataTiledMMAAttr::getTileSwizzle(unsigned operandIndex) const {
@@ -1788,27 +1672,32 @@ static Value createLaneParityPredicate(OpBuilder &builder, Location loc) {
                                zero);
 }
 
-// Creates a constant sparse index vector for SMFMAC operations.
+// Creates a constant sparse index for SMFMAC operations.
 //
 // The sparse index encodes which 2 positions out of each group of 4
 // K-elements are selected for 2:4 structured sparsity. Each 4-bit
 // field within selectorBits selects positions for one K-group:
 //   0x4 (0100b) -> positions {0,1};  0xE (1110b) -> positions {2,3}.
 //
-// For 16-bit source data (f16/bf16): vector<4xi8>, 2 groups per i8.
-// For 8-bit source data (i8/f8*): vector<2xi16>, 4 groups per i16.
+// gfx942 16-bit (k=32): vector<4xi8>, 2 groups per i8.
+// gfx950 16-bit / gfx942 8-bit (k=64): vector<2xi16>, 4 groups per i16.
+// gfx950 8-bit (k=128): i32 scalar, 8 groups packed into 32 bits.
 //
-// Only the first element carries active selector bits; remaining
-// elements are padding zeros.
+// For vector types, only the first element carries active selector bits;
+// remaining elements are padding zeros.
 static Value createConstSparseIndex(OpBuilder &builder, Location loc,
-                                    VectorType sparseIndexVectorType,
-                                    int64_t selectorBits) {
-  Type elemTy = sparseIndexVectorType.getElementType();
-  Value zero = arith::ConstantOp::create(
-      builder, loc, builder.getZeroAttr(sparseIndexVectorType));
-  Value selector = arith::ConstantOp::create(
-      builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
-  return vector::InsertOp::create(builder, loc, selector, zero, 0);
+                                    Type sparseIndexType,
+                                    uint32_t selectorBits) {
+  if (auto vecTy = dyn_cast<VectorType>(sparseIndexType)) {
+    Type elemTy = vecTy.getElementType();
+    Value zero =
+        arith::ConstantOp::create(builder, loc, builder.getZeroAttr(vecTy));
+    Value selector = arith::ConstantOp::create(
+        builder, loc, builder.getIntegerAttr(elemTy, selectorBits));
+    return vector::InsertOp::create(builder, loc, selector, zero, 0);
+  }
+  return arith::ConstantOp::create(
+      builder, loc, builder.getIntegerAttr(sparseIndexType, selectorBits));
 }
 
 // Returns the number of native intrinsics chained along K per virtual
@@ -1859,9 +1748,9 @@ int64_t VirtualMMAAttr::getIntrinsicsK() const {
 struct VDMFMAConfig {
   int64_t m, n, nativeK;
   int64_t unrollFactor;
-  VectorType sparseIndexVectorType;
-  int64_t evenSparseIndex;
-  int64_t oddSparseIndex;
+  Type sparseIndexType;
+  uint32_t evenSparseIndex;
+  uint32_t oddSparseIndex;
   int64_t aSliceWidth;
 };
 
@@ -1977,9 +1866,9 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
 
   Value sparseIndex = arith::SelectOp::create(
       builder, loc, isOddLane,
-      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+      createConstSparseIndex(builder, loc, config.sparseIndexType,
                              config.oddSparseIndex),
-      createConstSparseIndex(builder, loc, config.sparseIndexVectorType,
+      createConstSparseIndex(builder, loc, config.sparseIndexType,
                              config.evenSparseIndex));
 
   Value lhs = inputs[0];
@@ -2094,7 +1983,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/32,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
+                        /*sparseIndexType=*/
                         VectorType::get({4}, builder.getIntegerType(8)),
                         /*evenSparseIndex=*/0x44,
                         /*oddSparseIndex=*/0xEE,
@@ -2113,7 +2002,7 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/64,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
+                        /*sparseIndexType=*/
                         VectorType::get({2}, builder.getIntegerType(16)),
                         /*evenSparseIndex=*/0x4444,
                         /*oddSparseIndex=*/0xEEEE,
@@ -2130,10 +2019,10 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/64,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({4}, builder.getIntegerType(8)),
-                        /*evenSparseIndex=*/0x44,
-                        /*oddSparseIndex=*/0xEE,
+                        /*sparseIndexType=*/
+                        VectorType::get({2}, builder.getIntegerType(16)),
+                        /*evenSparseIndex=*/0x4444,
+                        /*oddSparseIndex=*/0xEEEE,
                         /*aSliceWidth=*/8};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
@@ -2150,10 +2039,9 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*n=*/16,
                         /*nativeK=*/128,
                         /*unrollFactor=*/getIntrinsicsK(),
-                        /*sparseIndexVectorType=*/
-                        VectorType::get({2}, builder.getIntegerType(16)),
-                        /*evenSparseIndex=*/0x4444,
-                        /*oddSparseIndex=*/0xEEEE,
+                        /*sparseIndexType=*/builder.getI32Type(),
+                        /*evenSparseIndex=*/0x44444444,
+                        /*oddSparseIndex=*/0xEEEEEEEE,
                         /*aSliceWidth=*/16};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
@@ -2794,6 +2682,29 @@ int64_t DataTiledScaledMMAAttr::getExpectedNumInputs() const { return 4; }
 
 int64_t DataTiledScaledMMAAttr::getExpectedNumOutputs() const { return 1; }
 
+LogicalResult DataTiledScaledMMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, uint32_t operandIndex, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) const {
+  if (!isUnswizzledOperand(operandIndex)) {
+    return cast<DataTiledMMAInterfaceAttr>(*this)
+        .populateOperandOffsetsSizesStrides(builder, loc, operandIndex, laneId,
+                                            permutation, offsets, sizes,
+                                            strides);
+  }
+  // For unswizzled operands, getTileSwizzle returns an identity permutation,
+  // but populateSwizzleBasedOffsetsSizesStrides uses the swizzle's permutation
+  // to order the delinearization basis, it must reflect the MMA tstrides. Use
+  // the non-identity-reset swizzle for both the delinearization and the output
+  // reordering so the two cancel out, yielding source-order offsets that match
+  // the identity layout.
+  TileSwizzle dtSwizzle = getDistributionSwizzle(*this, operandIndex);
+  return populateSwizzleBasedOffsetsSizesStrides(
+      builder, loc, dtSwizzle, laneId, dtSwizzle.permutation(), offsets, sizes,
+      strides);
+}
+
 int64_t DataTiledScaledMMAAttr::getSubgroupSize() const {
   return getIntrinsicSubgroupSize(getIntrinsic());
 }
@@ -2817,6 +2728,18 @@ DataTiledScaledMMAAttr::getOperandIteratorTypes() const {
           {utils::IteratorType::parallel, utils::IteratorType::reduction},
           {utils::IteratorType::reduction, utils::IteratorType::parallel},
           {utils::IteratorType::parallel, utils::IteratorType::parallel}};
+}
+
+bool DataTiledScaledMMAAttr::isUnswizzledOperand(unsigned idx) const {
+  assert(idx < (unsigned)(getExpectedNumInputs() + getExpectedNumOutputs()) &&
+         "operand index out of range for scaled MMA");
+  auto attr = getUnswizzledOperands();
+  return attr && llvm::is_contained(attr.asArrayRef(), idx);
+}
+
+bool DataTiledScaledMMAAttr::hasUnswizzledOperands() const {
+  auto attr = getUnswizzledOperands();
+  return attr && !attr.empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2911,6 +2834,12 @@ static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
   return getTileSizes(getAttributes(), GPU::TilingLevel::Workgroup);
+}
+
+LogicalResult
+LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr attributes) {
+  return verifyPromotedOperandsList(emitError, attributes);
 }
 
 SmallVector<int64_t>

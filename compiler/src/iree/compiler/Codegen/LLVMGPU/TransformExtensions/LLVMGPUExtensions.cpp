@@ -99,12 +99,14 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   IREE::Codegen::TranslationInfoAttr updatedTranslationInfo =
       IREE::Codegen::TranslationInfoAttr::get(
           rewriter.getContext(),
-          IREE::Codegen::DispatchLoweringPassPipeline::None, getWorkgroupDims(),
-          getSubgroupSize());
+          IREE::Codegen::NoPipelineAttr::get(rewriter.getContext()),
+          /*codegenSpec=*/SymbolRefAttr(), getWorkgroupDims(),
+          static_cast<int64_t>(getSubgroupSize()),
+          /*configuration=*/DictionaryAttr());
 
   // Set config dictionary.
   // Transform Dialect pipeline requires translation_info pass pipeline to
-  // be set to None here.
+  // be set to no_pipeline here.
   if (translationInfo) {
     updatedTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
         rewriter.getContext(), updatedTranslationInfo.getPassPipeline(),

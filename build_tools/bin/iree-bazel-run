@@ -30,6 +30,9 @@ OPTIONS
     -v, --verbose    Show the bazel command before executing
     -w, --watch      Watch mode: rebuild and restart on file changes
     -h, --help       Show this help
+    --trace          Capture the run with Tracy; implies --config=perf --config=tracy
+    --trace_name NAME, --trace-name NAME
+                    Override the sanitized trace artifact name
 
     NOTE: Short flags can be combined: -nv is equivalent to -n -v
 
@@ -45,6 +48,8 @@ EXAMPLES
     iree-bazel-run --config=debug //tools:iree-compile -- model.mlir
     iree-bazel-run -w //tools:iree-opt -- input.mlir  # Watch and restart on changes
     iree-bazel-run -nv //tools:iree-compile -- --help   # Show command only
+    iree-bazel-run --trace //tools:iree-run-module -- --module=model.vmfb --device=local-task
+    iree-bazel-run --trace --trace_name=run-module-sample //tools:iree-run-module -- --module=model.vmfb --device=local-task
 
 WORKING DIRECTORY
     Unlike raw "bazel run", this tool runs the binary from your current
@@ -68,6 +73,15 @@ CONFIGURATIONS
     --config=asan            Address Sanitizer
     --config=msan            Memory Sanitizer
     --config=tsan            Thread Sanitizer
+    --config=perf            Opt/NDEBUG/O3/thin-LTO/native-codegen run
+    --config=tracy           Runtime Tracy instrumentation
+
+TRACY CAPTURE
+    --trace composes the normal build/run flow with a Tracy capture wrapper.
+    The Bazel build shape comes from --config=perf and --config=tracy; the
+    capture wrapper only starts tracy-capture and runs the already-built binary.
+    Trace artifacts are written to .tracy/<timestamp>-<name>.tracy. By default
+    the name is derived from the Bazel target; use --trace_name to override it.
 
 SEE ALSO
     iree-bazel-build, iree-bazel-test, iree-bazel-query, iree-bazel-cquery
@@ -76,6 +90,8 @@ EOF
 
 # Parse arguments.
 WATCH_MODE=0
+TRACE_MODE=0
+TRACE_NAME=""
 TARGET=""
 BAZEL_ARGS=()
 PROGRAM_ARGS=()
@@ -109,6 +125,26 @@ while [[ $# -gt 0 ]]; do
             WATCH_MODE=1
             shift
             ;;
+        --trace)
+            TRACE_MODE=1
+            shift
+            ;;
+        --trace_name|--trace-name)
+            if [[ $# -lt 2 ]] || [[ -z "${2}" ]] || [[ "${2}" == -* ]]; then
+                iree_error "${1} requires a non-empty name"
+                exit 1
+            fi
+            TRACE_NAME="${2}"
+            shift 2
+            ;;
+        --trace_name=*|--trace-name=*)
+            TRACE_NAME="${1#*=}"
+            if [[ -z "${TRACE_NAME}" ]]; then
+                iree_error "${1%%=*} requires a non-empty name"
+                exit 1
+            fi
+            shift
+            ;;
         --)
             PARSING_PROGRAM_ARGS=1
             shift
@@ -139,9 +175,23 @@ fi
 # Set up worktree (after arg parsing so --help works anywhere).
 iree_setup_worktree
 
+if [[ "${TRACE_MODE}" == "1" && "${WATCH_MODE}" == "1" ]]; then
+    iree_error "--trace is not supported with watch mode"
+    exit 1
+fi
+
+if [[ -n "${TRACE_NAME}" && "${TRACE_MODE}" != "1" ]]; then
+    iree_error "--trace_name requires --trace"
+    exit 1
+fi
+
 # Prepend default configs to bazel args.
 iree_bazel_build_default_configs
-BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
+if [[ "${TRACE_MODE}" == "1" ]]; then
+    BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" --config=perf --config=tracy "${BAZEL_ARGS[@]}")
+else
+    BAZEL_ARGS=("${IREE_BAZEL_DEFAULT_CONFIGS[@]}" "${BAZEL_ARGS[@]}")
+fi
 
 # Dry run: show what would be run and exit.
 if iree_is_verbose || iree_is_dry_run; then
@@ -153,7 +203,10 @@ if iree_is_verbose || iree_is_dry_run; then
             iree_info "Command: ${BAZEL_BIN} run --run_under=\"cd ${IREE_BAZEL_ORIG_CWD} && \" ${BAZEL_ARGS[*]} ${TARGET}"
         fi
     else
-        if [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
+        if [[ "${TRACE_MODE}" == "1" ]]; then
+            TRACE_CAPTURE_NAME="${TRACE_NAME:-${TARGET}}"
+            iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && iree_tracy_capture.py --output-dir ${IREE_BAZEL_WORKTREE_DIR}/.tracy --name ${TRACE_CAPTURE_NAME} -- <binary> ${PROGRAM_ARGS[*]}"
+        elif [[ ${#PROGRAM_ARGS[@]} -gt 0 ]]; then
             iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary> ${PROGRAM_ARGS[*]}"
         else
             iree_info "Command: bazel build ${TARGET} ${BAZEL_ARGS[*]} && <binary>"
@@ -183,5 +236,21 @@ if [[ "${WATCH_MODE}" == "1" ]]; then
 else
     # Normal mode: build and execute from original working directory.
     # This releases the Bazel server lock before execution, allowing parallel builds.
-    iree_bazel_build_and_exec "${TARGET}" "${IREE_BAZEL_ORIG_CWD}" "${BAZEL_ARGS[@]}" -- "${PROGRAM_ARGS[@]}"
+    if [[ "${TRACE_MODE}" == "1" ]]; then
+        iree_bazel_build_quiet "${TARGET}" "${BAZEL_ARGS[@]}" || exit $?
+        BINARY_PATH=$(iree_bazel_get_binary_path "${TARGET}" "${BAZEL_ARGS[@]}")
+        if [[ -z "${BINARY_PATH}" ]] || [[ ! -x "${BINARY_PATH}" ]]; then
+            iree_error "Could not find built binary for ${TARGET}"
+            exit 1
+        fi
+
+        cd "${IREE_BAZEL_ORIG_CWD}"
+        TRACE_CAPTURE_NAME="${TRACE_NAME:-${TARGET}}"
+        exec "${IREE_BAZEL_WORKTREE_DIR}/build_tools/tracing/iree_tracy_capture.py" \
+            --output-dir "${IREE_BAZEL_WORKTREE_DIR}/.tracy" \
+            --name "${TRACE_CAPTURE_NAME}" \
+            -- "${BINARY_PATH}" "${PROGRAM_ARGS[@]}"
+    else
+        iree_bazel_build_and_exec "${TARGET}" "${IREE_BAZEL_ORIG_CWD}" "${BAZEL_ARGS[@]}" -- "${PROGRAM_ARGS[@]}"
+    fi
 fi

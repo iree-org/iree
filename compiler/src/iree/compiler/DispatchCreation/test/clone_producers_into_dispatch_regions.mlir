@@ -662,6 +662,150 @@ util.func @never_clone_insert_slice_ops(%arg0 : tensor<?xi32>, %arg1 : tensor<?x
 //   CHECK-NOT:   tensor.insert_slice
 //       CHECK:   return %[[DISPATCH]]
 
+// -----
+
+// fill -> scatter.outs: fill stays out.
+util.func @never_clone_scatter_outs_fill(%updates : tensor<8x1x6x128xf32>,
+    %indices : tensor<8x1x6x128x4xi64>) -> tensor<1x8x127x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<1x8x127x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x8x127x128xf32>) -> tensor<1x8x127x128xf32>
+  %0 = flow.dispatch.region -> (tensor<1x8x127x128xf32>) {
+    %1 = iree_linalg_ext.scatter dimension_map = [0, 1, 2, 3] unique_indices(true)
+        ins(%updates, %indices : tensor<8x1x6x128xf32>, tensor<8x1x6x128x4xi64>)
+        outs(%fill : tensor<1x8x127x128xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        iree_linalg_ext.yield %b0 : f32
+    } -> tensor<1x8x127x128xf32>
+    flow.return %1 : tensor<1x8x127x128xf32>
+  }
+  util.return %0 : tensor<1x8x127x128xf32>
+}
+// CHECK-LABEL: @never_clone_scatter_outs_fill
+//       CHECK:   linalg.fill
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:   linalg.fill
+//       CHECK:     iree_linalg_ext.scatter
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// fill -> extract_slice -> scatter.outs: slice clones in, fill stays out.
+util.func @never_clone_scatter_outs_fill_through_slice(
+    %updates : tensor<1x1x6x128xf32>,
+    %indices : tensor<1x1x6x128x4xi64>) -> tensor<1x8x127x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x8x127x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x8x127x128xf32>) -> tensor<2x8x127x128xf32>
+  %slice = tensor.extract_slice %fill[0, 0, 0, 0] [1, 8, 127, 128] [1, 1, 1, 1]
+      : tensor<2x8x127x128xf32> to tensor<1x8x127x128xf32>
+  %0 = flow.dispatch.region -> (tensor<1x8x127x128xf32>) {
+    %1 = iree_linalg_ext.scatter dimension_map = [0, 1, 2, 3] unique_indices(true)
+        ins(%updates, %indices : tensor<1x1x6x128xf32>, tensor<1x1x6x128x4xi64>)
+        outs(%slice : tensor<1x8x127x128xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        iree_linalg_ext.yield %b0 : f32
+    } -> tensor<1x8x127x128xf32>
+    flow.return %1 : tensor<1x8x127x128xf32>
+  }
+  util.return %0 : tensor<1x8x127x128xf32>
+}
+// CHECK-LABEL: @never_clone_scatter_outs_fill_through_slice
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:     linalg.fill
+//       CHECK:     %[[SLICE:.+]] = tensor.extract_slice %[[FILL]]
+//       CHECK:     iree_linalg_ext.scatter
+//  CHECK-SAME:       outs(%[[SLICE]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// fill -> insert_slice.dest: fill stays out.
+util.func @never_clone_insert_slice_dest_fill(%source : tensor<16x16xf32>,
+    %offset : index) -> tensor<64x64xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<64x64xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %0 = flow.dispatch.region -> (tensor<64x64xf32>) {
+    %1 = tensor.insert_slice %source into %fill[%offset, %offset] [16, 16] [1, 1]
+        : tensor<16x16xf32> into tensor<64x64xf32>
+    flow.return %1 : tensor<64x64xf32>
+  }
+  util.return %0 : tensor<64x64xf32>
+}
+// CHECK-LABEL: @never_clone_insert_slice_dest_fill
+//       CHECK:   linalg.fill
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:     linalg.fill
+//       CHECK:     tensor.insert_slice
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+// bit-extend generic -> scatter.outs: generic stays out.
+util.func @never_clone_scatter_outs_bitextend(%in : tensor<1x8x127x128xf16>,
+    %updates : tensor<8x1x6x128xf32>,
+    %indices : tensor<8x1x6x128x4xi64>) -> tensor<1x8x127x128xf32> {
+  %empty = tensor.empty() : tensor<1x8x127x128xf32>
+  %extended = linalg.generic {
+      indexing_maps = [affine_map<(d0,d1,d2,d3) -> (d0,d1,d2,d3)>,
+                       affine_map<(d0,d1,d2,d3) -> (d0,d1,d2,d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%in : tensor<1x8x127x128xf16>)
+      outs(%empty : tensor<1x8x127x128xf32>) {
+    ^bb0(%a: f16, %b: f32):
+      %ext = arith.extf %a : f16 to f32
+      linalg.yield %ext : f32
+  } -> tensor<1x8x127x128xf32>
+  %0 = flow.dispatch.region -> (tensor<1x8x127x128xf32>) {
+    %1 = iree_linalg_ext.scatter dimension_map = [0, 1, 2, 3] unique_indices(true)
+        ins(%updates, %indices : tensor<8x1x6x128xf32>, tensor<8x1x6x128x4xi64>)
+        outs(%extended : tensor<1x8x127x128xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        iree_linalg_ext.yield %b0 : f32
+    } -> tensor<1x8x127x128xf32>
+    flow.return %1 : tensor<1x8x127x128xf32>
+  }
+  util.return %0 : tensor<1x8x127x128xf32>
+}
+// CHECK-LABEL: @never_clone_scatter_outs_bitextend
+//       CHECK:   %[[EXT_DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     linalg.generic
+//       CHECK:   %[[SCATTER_DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:     linalg.generic
+//       CHECK:     iree_linalg_ext.scatter
+//  CHECK-SAME:       outs(%[[EXT_DISPATCH]]
+//       CHECK:   util.return %[[SCATTER_DISPATCH]]
+
+// -----
+
+// tensor-typed arith.constant -> scatter.outs: constant stays out.
+util.func @never_clone_scatter_outs_tensor_constant(
+    %updates : tensor<4x1x4xf32>,
+    %indices : tensor<4x1x4x2xi64>) -> tensor<4x4xf32> {
+  %cst = arith.constant dense<0.000000e+00> : tensor<4x4xf32>
+  %0 = flow.dispatch.region -> (tensor<4x4xf32>) {
+    %1 = iree_linalg_ext.scatter dimension_map = [0, 1] unique_indices(true)
+        ins(%updates, %indices : tensor<4x1x4xf32>, tensor<4x1x4x2xi64>)
+        outs(%cst : tensor<4x4xf32>) {
+      ^bb0(%b0: f32, %b1: f32):
+        iree_linalg_ext.yield %b0 : f32
+    } -> tensor<4x4xf32>
+    flow.return %1 : tensor<4x4xf32>
+  }
+  util.return %0 : tensor<4x4xf32>
+}
+// CHECK-LABEL: @never_clone_scatter_outs_tensor_constant
+//       CHECK:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : tensor<4x4xf32>
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//   CHECK-NOT:     arith.constant dense
+//       CHECK:     iree_linalg_ext.scatter
+//  CHECK-SAME:       outs(%[[CST]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
 util.func @clone_gather_elementwise(%source : tensor<2x2x2048xi32>,
                                    %indices : tensor<2xi32>) -> tensor<2048xi32> {
   %empty = tensor.empty() : tensor<2048xi32>

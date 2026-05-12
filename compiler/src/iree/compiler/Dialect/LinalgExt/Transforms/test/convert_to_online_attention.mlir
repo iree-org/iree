@@ -47,6 +47,7 @@ func.func @attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x128xf16
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d3)>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+<<<<<<< HEAD
 #mapMask = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
 #map4 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
 
@@ -57,7 +58,7 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
   %out = iree_linalg_ext.attention
          {indexing_maps = [#map, #map1, #map2, #map3, #mapMask, #map4]}
          ins(%q, %k, %v, %scale, %mask : tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>, f16, tensor<2x10x4096x4096xf16>)
-         outs(%acc : tensor<2x10x4096x128xf16>) {
+        outs(%acc : tensor<2x10x4096x128xf16>) {
               ^bb0(%score: f32):
                 iree_linalg_ext.yield %score : f32
          } -> tensor<2x10x4096x128xf16>
@@ -65,6 +66,7 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 }
 
 // CHECK-LABEL: func.func @masked_attention
+<<<<<<< HEAD
 // Masked: finalization guards fully-masked rows so `sum == 0` yields 0 instead
 // of `0/0 == NaN`.
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
@@ -75,3 +77,4 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 // CHECK: arith.select
 // CHECK: arith.truncf
 // CHECK: linalg.yield
+

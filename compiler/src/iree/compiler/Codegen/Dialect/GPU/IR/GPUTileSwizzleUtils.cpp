@@ -250,6 +250,20 @@ static TileSwizzle getSwizzleImpl(MMAAttrTy mma, unsigned operandIdx) {
 
 TileSwizzle getSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
                        unsigned operandIdx) {
+  TileSwizzle swizzle = getSwizzleImpl(scaledMma, operandIdx);
+  if (scaledMma.isUnswizzledOperand(operandIdx)) {
+    // Reset permutation to identity, the expand dims are preserved so the
+    // tile shape matches the MMA layout, but no transpose is applied.
+    auto &perm = swizzle.permutation();
+    std::iota(perm.begin(), perm.end(), 0);
+  }
+  return swizzle;
+}
+
+TileSwizzle getDistributionSwizzle(IREE::GPU::DataTiledScaledMMAAttr scaledMma,
+                                   unsigned operandIdx) {
+  assert(scaledMma.isUnswizzledOperand(operandIdx) &&
+         "getDistributionSwizzle is only meaningful for unswizzled operands");
   return getSwizzleImpl(scaledMma, operandIdx);
 }
 

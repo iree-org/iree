@@ -199,12 +199,25 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
                                 value, indexingMaps, iteratorTypes);
   auto &dstRegion = genericOp.getRegion();
   builder.cloneRegionBefore(region, dstRegion, dstRegion.end());
+
+  // Convert iree_linalg_ext.index -> linalg.index in the cloned region.
+  Block &block = dstRegion.back();
+  for (auto &op : llvm::make_early_inc_range(block)) {
+    if (auto indexOp = dyn_cast<IREE::LinalgExt::IndexOp>(&op)) {
+      OpBuilder::InsertionGuard g(builder);
+      builder.setInsertionPoint(&op);
+      Value replacement =
+          linalg::IndexOp::create(builder, op.getLoc(), indexOp.getDim());
+      indexOp.replaceAllUsesWith(replacement);
+      op.erase();
+    }
+  }
+
   {
     OpBuilder::InsertionGuard withinRegion(builder);
-    builder.setInsertionPoint(dstRegion.back().getTerminator());
-    linalg::YieldOp::create(builder, loc,
-                            dstRegion.back().getTerminator()->getOperands());
-    dstRegion.back().getTerminator()->erase();
+    builder.setInsertionPoint(block.getTerminator());
+    linalg::YieldOp::create(builder, loc, block.getTerminator()->getOperands());
+    block.getTerminator()->erase();
   }
   return genericOp.getResult(0);
 }

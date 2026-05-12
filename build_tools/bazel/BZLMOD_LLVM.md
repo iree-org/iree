@@ -1,7 +1,8 @@
-# Using IREE with a Custom LLVM via Bzlmod
+# Using IREE with Custom MLIR-Adjacent Dependencies via Bzlmod
 
-This document explains how projects that depend on IREE can provide their own LLVM
-instead of using IREE's bundled version.
+This document explains how projects that depend on IREE can provide their own
+LLVM, StableHLO, torch-mlir, and compiler plugin registry instead of using
+IREE's bundled defaults.
 
 ## Terminology
 
@@ -38,9 +39,11 @@ use_repo(ext, "repo_a", "repo_b")
 Imports a repository rule from another module so it can be called directly in
 MODULE.bazel to create a repository.
 
-### `llvm-raw`
-A repository containing the raw LLVM source code. This is the input to the LLVM
-build configuration.
+### Raw source repositories
+Repositories such as `llvm-raw` and `torch-mlir-raw` contain unconfigured
+upstream source trees. They are inputs to repository rules that overlay Bazel
+BUILD files and produce configured repositories such as `llvm-project` and
+`torch-mlir`.
 
 ### `llvm-project`
 The configured LLVM repository created by `llvm_configure`. It overlays Bazel BUILD
@@ -53,8 +56,8 @@ The bzlmod module name for LLVM's Bazel integration (located at
 
 ## How It Works
 
-IREE's module extension (`iree_extension`) creates the `llvm-raw` repository
-**only when IREE is the root module**:
+IREE's module extension (`iree_extension`) creates MLIR-adjacent source
+repositories **only when IREE is the root module**:
 
 ```python
 # In build_tools/bazel/extensions.bzl
@@ -65,11 +68,21 @@ def _iree_extension_impl(module_ctx):
             build_file_content = "# empty",
             path = "third_party/llvm-project",
         )
+        local_repository(
+            name = "stablehlo",
+            path = "third_party/stablehlo",
+        )
+        new_local_repository(
+            name = "torch-mlir-raw",
+            build_file_content = "# empty - BUILD files overlaid by torch_mlir_configure",
+            path = "third_party/torch-mlir",
+        )
     # ... other repos
 ```
 
 When your project depends on IREE, IREE is **not** the root module - your project is.
-Therefore, IREE's extension will not create `llvm-raw`, and you must provide it yourself.
+Therefore, IREE's extension will not create these MLIR-adjacent repositories,
+and you must provide the ones needed by the compiler plugins you enable.
 
 ## MODULE.bazel Ordering
 
@@ -82,7 +95,7 @@ The order of statements in MODULE.bazel matters:
 5. `use_repo()` - must come after its corresponding `use_extension()`
 6. `use_repo_rule()` + invocation - can reference repos created by earlier extensions
 
-## Example: Using Your Own LLVM
+## Example: Using Your Own LLVM, StableHLO, and torch-mlir
 
 ```python
 # my_project/MODULE.bazel
@@ -114,7 +127,7 @@ local_path_override(
     path = "my/custom/llvm-project/utils/bazel",
 )
 
-# Create your own llvm-raw repository pointing to your LLVM
+# Create your own raw repositories pointing to the upstream projects you want.
 new_local_repository = use_repo_rule(
     "@bazel_tools//tools/build_defs/repo:local.bzl",
     "new_local_repository",
@@ -123,6 +136,19 @@ new_local_repository(
     name = "llvm-raw",
     path = "my/custom/llvm-project",
     build_file_content = "# empty",
+)
+new_local_repository(
+    name = "torch-mlir-raw",
+    path = "my/custom/torch-mlir",
+    build_file_content = "# empty",
+)
+local_repository = use_repo_rule(
+    "@bazel_tools//tools/build_defs/repo:local.bzl",
+    "local_repository",
+)
+local_repository(
+    name = "stablehlo",
+    path = "my/custom/stablehlo",
 )
 
 # Use LLVM's extension for third-party deps (gmp, mpfr, etc.)
@@ -161,7 +187,33 @@ llvm_configure = use_repo_rule(
     "llvm_configure",
 )
 llvm_configure(name = "llvm-project")
+
+# Configure torch-mlir from your raw source repository if you enable the Torch
+# input plugin.
+torch_mlir_configure = use_repo_rule(
+    "@torch-mlir-raw//utils/bazel:configure.bzl",
+    "torch_mlir_configure",
+)
+torch_mlir_configure(
+    name = "torch-mlir",
+    src_workspace = "@torch-mlir-raw//:CMakeLists.txt",
+)
 ```
+
+## Custom Compiler Plugin Registry
+
+IREE's `//compiler/plugins` package loads the plugin registry from the root
+workspace:
+
+```python
+load("@//build_tools/bazel:default_compiler_plugins.bzl", ...)
+```
+
+When IREE is the root module, this resolves to IREE's default registry. A
+downstream root workspace can provide a file at the same path to register
+additional compiler plugins, replace registration targets, or change the
+default enabled plugin IDs. In-tree IREE plugin labels should be qualified with
+`@iree_core//...` from such a downstream file.
 
 ## Using LLVM from an HTTP Archive
 
@@ -204,7 +256,15 @@ When providing your own LLVM, ensure compatibility with IREE:
 
 ### "repository 'llvm-raw' is not defined"
 You haven't created the `llvm-raw` repository. As the root module, you must
-define it yourself (see examples above).
+define it yourself if you configure LLVM (see examples above).
+
+### "repository 'stablehlo' is not defined"
+You enabled the StableHLO input plugin without providing a `stablehlo`
+repository from your root module.
+
+### "repository 'torch-mlir' is not defined"
+You enabled the Torch input plugin without configuring a `torch-mlir` repository
+from your root module.
 
 ### Build errors in LLVM code
 Your LLVM version may be incompatible with IREE. Check that your LLVM commit

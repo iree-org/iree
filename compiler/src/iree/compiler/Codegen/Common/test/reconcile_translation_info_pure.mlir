@@ -14,7 +14,7 @@
 //  CHECK-NEXT:   %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice()
 //  CHECK-NEXT:   iree_codegen.yield %[[X]], %[[Y]], %[[Z]]
 func.func @no_workload_ordinals() attributes {
-  translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [64]>
+  translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [64]>
 } {
   return
 }
@@ -34,7 +34,7 @@ func.func @no_workload_ordinals() attributes {
 //  CHECK-NEXT:   %[[X:.+]], %[[Y:.+]], %[[Z:.+]] = iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[A0]], %[[A1]], %[[A2]], %[[A3]])
 //  CHECK-NEXT:   iree_codegen.yield %[[X]], %[[Y]], %[[Z]]
 func.func @with_workload_ordinals() attributes {
-  translation_info = #iree_codegen.translation_info<pipeline = None workgroup_size = [128]>
+  translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline workgroup_size = [128]>
 } {
   %p0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
   %p1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32

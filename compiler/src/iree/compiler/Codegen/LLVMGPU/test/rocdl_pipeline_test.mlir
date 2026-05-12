@@ -1,3 +1,6 @@
+// TODO: Once --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false is removed,
+// merge ROCDL/pipeline_rocdl_lowering_gfx950.mlir into this file as a CDNA4
+// target (that test requires TileAndFuse for scaled MFMA matmul lowering).
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=CDNA1
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=CDNA3
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=false %s | FileCheck %s --check-prefix=RDNA3
@@ -143,11 +146,11 @@ func.func @matmul_map_store() {
 // Verify that the map_store indexing arithmetic has been optimized to i32
 
 // CDNA3-LABEL: llvm.func @matmul_map_store
-//   CDNA3-NOT:     llvm.add {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.mul {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.urem {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-NOT:     llvm.udiv {{.*}} : vector<{{[0-9x]*}}xi64>
-//   CDNA3-DAG:     llvm.add {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.mul {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.urem {{.*}} : vector<{{[0-9x]*}}xi32>
-//   CDNA3-DAG:     llvm.udiv {{.*}} : vector<{{[0-9x]*}}xi32>
+//   CDNA3-NOT:     llvm.add {{.*}} : i64
+//   CDNA3-NOT:     llvm.mul {{.*}} : i64
+//   CDNA3-NOT:     llvm.urem {{.*}} : i64
+//   CDNA3-NOT:     llvm.udiv {{.*}} : i64
+//   CDNA3-DAG:     llvm.add {{.*}} : i32
+//   CDNA3-DAG:     llvm.mul {{.*}} : i32
+//   CDNA3-DAG:     llvm.urem {{.*}} : i32
+//   CDNA3-DAG:     llvm.udiv {{.*}} : i32

@@ -320,6 +320,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
+    MLIRContext *ctx = target.getContext();
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
@@ -342,6 +343,33 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
       } else {
         auto [mSize, nSize, kSize] = mma.getMNKShape();
         intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+
+        // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
+        // use the sparse trick (smfmac) and are only efficient when the
+        // problem's total M size fits within the VDMFMA's M tile size (8)
+        // and the problem's K size is at least the size of the VDMFMA
+        // intrinsic.
+        //
+        // Note: VMFMA intrinsics are intentionally excluded here. Adding
+        // them would change MMA selection for all problems.
+        for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
+          if (!isVDMFMAIntrinsic(vi)) {
+            continue;
+          }
+          auto vmma = VirtualMMAAttr::get(ctx, vi);
+          auto [vm, vn, vk] = vmma.getMNKShape();
+          if (llvm::product_of(problem.mSizes) > vm) {
+            continue;
+          }
+
+          const int64_t vdmfmaKTileSize = vmma.getIntrinsicsK() * vk;
+          const int64_t problemKSize = llvm::product_of(problem.kSizes);
+          if (problemKSize % vdmfmaKTileSize != 0) {
+            continue;
+          }
+          auto [va, vb, vc] = vmma.getABCElementTypes();
+          intrinsics.emplace_back(vm, vn, vk, va, vb, vc, vmma);
+        }
       }
     }
   }
@@ -851,6 +879,18 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Similarly the reduction tile size is just the post-packing tile count.
   for (auto [i, kDim] : llvm::enumerate(kDims)) {
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
+
+    // VDMFMA (smfmac sparse trick) compresses the compute phase to roughly half
+    // the cycles of an equivalent MFMA sequence. In a software-pipelined loop
+    // this can cause the compute to finish before the next tile's loads arrive,
+    // turning latency-hiding overlap into vmcnt stalls. Scale the K tile count
+    // by the virtual intrinsic K unroll factor to restore the compute-to-memory
+    // ratio.
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(schedule->mmaKind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        reductionTileSizes[kDim] *= vmma.getIntrinsicsK();
+      }
+    }
   }
 
   IREE::Codegen::InnerTileDescAttrInterface kind = schedule->mmaKind;
@@ -881,16 +921,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid LDS bank conflicts.
+    // TODO(#24255): Fix untuned swizzle logic for DMA.
     if (lhsElemType.isBF16() && !transposedLhs) {
       FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
-          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs);
+          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
+          /*skipUntunedFallback=*/true);
       if (succeeded(lhsSwizzleAttr)) {
         lhsAttr = *lhsSwizzleAttr;
       }
     }
     if (rhsElemType.isBF16() && transposedRhs) {
       FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
-          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs);
+          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
+          /*skipUntunedFallback=*/true);
       if (succeeded(rhsSwizzleAttr)) {
         rhsAttr = *rhsSwizzleAttr;
       }
@@ -1137,10 +1180,10 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                             workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
-/// Helper to identify contraction like operations for operand promotiong.
+/// Helper to identify contraction-like operations for operand promotion.
 static bool isNonMatvecContraction(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return false;
   }
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -2062,6 +2105,111 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       workgroupTileSizes[depth] = residualWorkgroupSize;
       break;
     }
+  }
+
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      createLoweringConfig(workgroupTileSizes, threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, subgroupSize));
+}
+
+//====---------------------------------------------------------------------===//
+// ArgCompare Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+LogicalResult setArgCompareConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op) {
+  auto argCompareOp = cast<IREE::LinalgExt::ArgCompareOp>(op);
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+  SmallVector<unsigned> partitionedLoops =
+      interfaceOp.getPartitionableLoops(std::nullopt);
+
+  auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
+                                  ArrayRef<int64_t> threadSizes) {
+    NamedAttribute attrs[2] = {{"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+                               {"thread", b.getI64ArrayAttr(threadSizes)}};
+    return IREE::GPU::LoweringConfigAttr::get(context,
+                                              b.getDictionaryAttr(attrs));
+  };
+
+  // No parallel dims (e.g. rank-1 input reducing to a scalar) means there is
+  // nothing to distribute across threads. Emit a degenerate single-thread
+  // TileAndFuse config instead of bailing: the per-loop tile size is 0 for
+  // every reduction loop, so a single thread walks the full reduction once
+  // without racing.
+  if (partitionedLoops.empty()) {
+    int64_t numLoops = argCompareOp.getInputRank();
+    SmallVector<int64_t> zeroTileSizes(numLoops, 0);
+    IREE::GPU::LoweringConfigAttr loweringConfig =
+        createLoweringConfig(zeroTileSizes, zeroTileSizes);
+    std::array<int64_t, 3> singleThread = {1, 1, 1};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig,
+        getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                              singleThread, subgroupSize));
+  }
+
+  // arg_compare's iteration domain has one loop per input dim; the single
+  // reduction dim is `getDimension()` and the rest are parallel.
+  int64_t numLoops = argCompareOp.getInputRank();
+
+  // Starting point pending tuning data: two warps per workgroup mirrors
+  // setSortConfig and gives reasonable occupancy without over-subscribing
+  // for the small parallel iteration spaces typical of arg_compare fallbacks.
+  std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> threadTileSizes(numLoops, 1);
+
+  // Set non-parallel loops (the single reduction dim) to zero tile size so
+  // each thread runs the full reduction on its parallel slice.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(llvm::from_range,
+                                               partitionedLoops);
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
+    }
+  }
+
+  // Pack as many parallel-dim iterations as possible into the workgroup tile
+  // (innermost dim first), matching the setSortConfig packing strategy.
+  ArrayRef<int64_t> loopBounds = argCompareOp.getInputType().getShape();
+  int64_t residualWorkgroupSize = workgroupSize[0];
+  for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
+      continue;
+    }
+    if (residualWorkgroupSize % loopBounds[depth] == 0) {
+      workgroupTileSizes[depth] = loopBounds[depth];
+      residualWorkgroupSize /= loopBounds[depth];
+      continue;
+    }
+    if (loopBounds[depth] % residualWorkgroupSize == 0) {
+      workgroupTileSizes[depth] = residualWorkgroupSize;
+      break;
+    }
+  }
+
+  // If the parallel iterations actually packed into the workgroup tile fit in
+  // a single subgroup, drop to one warp so we don't launch idle threads.
+  int64_t cumulativeWorkgroupTile = 1;
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (partitionedLoopsSet.contains(depth) && workgroupTileSizes[depth] > 0) {
+      cumulativeWorkgroupTile *= workgroupTileSizes[depth];
+    }
+  }
+  if (cumulativeWorkgroupTile <= subgroupSize) {
+    workgroupSize[0] = subgroupSize;
   }
 
   IREE::GPU::LoweringConfigAttr loweringConfig =

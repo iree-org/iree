@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
@@ -136,8 +137,6 @@ static llvm::cl::opt<bool> clEnableRiscvAggressiveDist(
         "If distConfig.minTileSizes[i] >= distConfig.maxTileSizes[i], "
         "set distConfig.maxTileSizes[i] to 2 * distConfig.minTileSizes[i]."),
     llvm::cl::init(false));
-
-using IREE::Codegen::DispatchLoweringPassPipeline;
 
 // Encodes the pre-processing strategy to be applied on a Linalg operation
 // before vectorization.
@@ -2656,29 +2655,38 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   // TODO(dcaballe): The logic below is disconnected from the main tile size
   // selection logic in getMaxTileSize. We should either port it there or remove
   // it.
-  // Adjust the number of workload per workgroup to at least 4096. This
-  // prevents the runtime overheads domiating the execution time. The number is
-  // derived from experimients. We should be able to make it related to target.
+  // Adjust the number of workload per workgroup to at least 4096. This prevents
+  // the runtime overheads from dominating the execution time. The number is
+  // derived from experiments; see iree-org/iree#24012 for the latest analysis
+  // on AMD Zen4. We should be able to make it related to the target.
+  // Static dims are capped at the dim size; dynamic dims are treated as
+  // unbounded and grown freely until the workload threshold is met. The
+  // partial-dynamic rank-N case (e.g., tensor<4x?xf32>) should normally be
+  // collapsed into a single dim by DispatchCreation/CollapseDimensions before
+  // codegen sees it, but we still grow the dynamic dim here as a safety net
+  // for cases where the collapse did not run.
   constexpr int64_t kMinimumWorkload = 4096;
   SmallVector<int64_t> shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
   for (auto [index, size] : llvm::enumerate(shape)) {
-    if (ShapedType::isDynamic(size)) {
-      numWorkload = ShapedType::kDynamic;
-      break;
+    int64_t tile = distTileSizes[index];
+    if (tile != 0) {
+      numWorkload *= tile;
+    } else if (ShapedType::isStatic(size)) {
+      numWorkload *= size;
     }
-    numWorkload *= distTileSizes[index] ? distTileSizes[index] : size;
   }
   for (unsigned currDim = 0;
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
     int64_t currSize = distTileSizes[currDim];
-    if (currSize == shape[currDim] || currSize == 0 ||
-        ShapedType::isDynamic(shape[currDim]) ||
-        ShapedType::isDynamic(numWorkload)) {
+    int64_t dimSize = shape[currDim];
+    bool isDynamicDim = ShapedType::isDynamic(dimSize);
+    if (currSize == 0 || (!isDynamicDim && currSize == dimSize)) {
       currDim++;
       continue;
     }
-    int64_t newSize = std::min(currSize * 2, shape[currDim]);
+    int64_t newSize =
+        isDynamicDim ? currSize * 2 : std::min(currSize * 2, dimSize);
     numWorkload = numWorkload / currSize * newSize;
     distTileSizes[currDim] = newSize;
   }
@@ -3019,6 +3027,69 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Default));
 }
 
+/// Sets the lowering configuration for a dispatch region rooted at an
+/// `iree_codegen.inner_tiled` op. The op already has the inner-tile shape
+/// baked into the operand layout (one inner tile per iteration of its
+/// iter domain), so each iter dim should be tiled to a single iteration:
+///   * `vector_common_parallel` tiles the M and N parallel iter dims to 1,
+///     turning the outer parallel loops into a single forall body.
+///   * `vector_reduction` tiles the K reduction iter dim to 1, leaving an
+///     scf.for around the inner_tiled body.
+/// With all iter bounds collapsed to 1, the unit-iter-dim drop and per-
+/// intrinsic lower patterns in `LLVMCPUVirtualVectorLoweringPass` fire on
+/// a single-tile op rather than getting fully unrolled over K. Distribution
+/// is parallel-only (M, N).
+///
+/// We route through `Mmt4dTilingExpert` rather than `DataTiling` because
+/// the former has the modern lowerings (tile-and-fuse, vectorization via
+/// the `VectorizableOpInterface` external model, generic vector lowering
+/// after bufferize) that data-tiled MMA dispatches need; `DataTiling` was
+/// designed for pack/unpack ops and not all of those passes kick in there.
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::Codegen::InnerTiledOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+  SmallVector<int64_t> bounds;
+  op.getIterationBounds(bounds);
+  unsigned numLoops = bounds.size();
+  assert(numLoops >= 2 && "inner_tiled iter domain must have at least M, N");
+
+  SmallVector<utils::IteratorType> iteratorTypes;
+  for (Attribute it : op.getIteratorTypes()) {
+    iteratorTypes.push_back(cast<linalg::IteratorTypeAttr>(it).getValue());
+  }
+  assert(iteratorTypes.size() == numLoops);
+
+  // Distribution: one inner tile per workgroup along each parallel iter
+  // dim; reduction dims are not distributed. The same constant 1 works for
+  // static and dynamic outer extents — for static, it caps the workgroup
+  // tile at one inner tile (smaller than the matmul); for dynamic, it lets
+  // the workgroup count scale with the runtime extent. Larger workgroup
+  // tiles are a perf optimization; the mmt4d cost model is the template
+  // for porting that to inner_tiled in a follow-up.
+  SmallVector<int64_t> distTileSizes(numLoops, 0);
+  for (auto [i, kind] : llvm::enumerate(iteratorTypes)) {
+    if (kind == utils::IteratorType::parallel) {
+      distTileSizes[i] = 1;
+    }
+  }
+
+  // Vector tiling: every iter dim down to a single inner tile. The
+  // generator's `splitParallelAndReductionTiles` lifts the parallel entries
+  // into `vector_common_parallel` and the reduction entries into
+  // `vector_reduction`.
+  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+
+  LoweringConfigGenerator generator(op);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+  LDBG() << "Set lowering_config for inner_tiled op: " << loweringConfig;
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, loweringConfig,
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
+}
+
 /// Redirects to methods that set the configuration based on operation type.
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
@@ -3032,7 +3103,8 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           })
           .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
                 IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
-                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp,
+                IREE::Codegen::InnerTiledOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,
                 IREE::LinalgExt::WinogradInputTransformOp,
@@ -3975,9 +4047,11 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // The transform dialect codegen has different logics and codegen flow.
   // Ignore the tile sizes adjustment.
-  DispatchLoweringPassPipeline pipeline =
-      getTranslationInfo(entryPointFn).getDispatchLoweringPassPipeline();
-  if (pipeline != DispatchLoweringPassPipeline::TransformDialectCodegen) {
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(entryPointFn);
+  if (!translationInfo ||
+      !isa<IREE::Codegen::TransformDialectCodegenPipelineAttr>(
+          translationInfo.getPassPipeline())) {
     if (failed(adjustTileSizesForRootUnPackOp(entryPointFn, rootOperation))) {
       return failure();
     }

@@ -40,20 +40,14 @@ bool shouldEmitPipelineConstraints();
 
 namespace mlir::iree_compiler::IREE::Codegen {
 
-/// Parses either a DispatchLoweringPassPipeline enum keyword or a generic
-/// attribute implementing PipelineAttrInterface.
-ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result);
-inline ParseResult parsePipelineAttr(OpAsmParser &parser, Attribute &result) {
-  return parsePipelineAttr(static_cast<AsmParser &>(parser), result);
-}
+/// Callback type for VMVX pipeline builders.
+using VMVXPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
 
-/// Prints DispatchLoweringPassPipelineAttr as a bare keyword and other
-/// attributes via the generic printer.
-void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr);
-inline void printPipelineAttr(OpAsmPrinter &printer, Operation *,
-                              Attribute pipelineAttr) {
-  printPipelineAttr(printer, pipelineAttr);
-}
+/// Registers the VMVX pipeline builder callback. Must be called before
+/// any compilation that uses #iree_codegen.vmvx_pipeline.
+void registerVMVXPipelineBuilder(VMVXPipelineBuilder builder);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 
@@ -176,58 +170,6 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     (void)setTranslationInfo(entryPointFn, translationInfo);
   }
   return success();
-}
-
-/// Convenience function that sets the lowering configuration on the operation
-/// and translation info for a generic lowering config, lowering pipeline,
-/// and optional workgroup/subgroup size.
-inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    mlir::FunctionOpInterface entryPointFn, Operation *op,
-    IREE::Codegen::LoweringConfigAttrInterface config,
-    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {},
-    std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
-  MLIRContext *context = entryPointFn.getContext();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      context, passPipeline, SymbolRefAttr(), workgroupSize, subgroupSize,
-      pipelineConfig);
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
-                                               translationInfo);
-}
-
-/// Convenience function that sets the lowering configuration on the operation
-/// and translation info on the entry point op for the common case of specifying
-/// tile sizes to use for the operation, and pass pipeline to use for the
-/// translation.
-inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    mlir::FunctionOpInterface entryPointFn, Operation *op,
-    TileSizesListTypeRef tileSizes,
-    ScalableTileFlagsListTypeRef scalableTileFlags,
-    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {},
-    std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
-  MLIRContext *context = entryPointFn.getContext();
-  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
-                                                       scalableTileFlags);
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
-                                               passPipeline, workgroupSize,
-                                               subgroupSize, pipelineConfig);
-}
-
-/// Overload of setOpConfigAndEntryPointFnTranslation() for the "no scalable
-/// flags" case.
-inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    mlir::FunctionOpInterface entryPointFn, Operation *op,
-    TileSizesListTypeRef tileSizes,
-    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {},
-    std::optional<int64_t> subgroupSize = {},
-    DictionaryAttr pipelineConfig = DictionaryAttr()) {
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizes, {},
-                                               passPipeline, workgroupSize,
-                                               subgroupSize, pipelineConfig);
 }
 
 /// Function to erase lowering configs that are set on an operation.

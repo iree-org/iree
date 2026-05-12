@@ -8,7 +8,7 @@
 
 iree_add_all_subdirs()
 
-if(IREE_ENABLE_THREADING)
+if(IREE_ENABLE_THREADING AND IREE_BUILD_BENCHMARKS)
   iree_cc_library(
     NAME
       benchmark
@@ -72,6 +72,20 @@ iree_cc_library(
     gtest
     iree::base
     iree::base::tooling::flags
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    temp_file
+  HDRS
+    "temp_file.h"
+  SRCS
+    "temp_file.cc"
+  DEPS
+    ::gtest
+    iree::base
   TESTONLY
   PUBLIC
 )

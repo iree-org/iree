@@ -69,6 +69,8 @@ IREE_CU_PFN_DECL(cuMemAllocFromPoolAsync, CUdeviceptr*, size_t, CUmemoryPool,
                  CUstream)
 IREE_CU_PFN_DECL(cuMemFreeAsync, CUdeviceptr dptr, CUstream hStream)
 IREE_CU_PFN_DECL(cuModuleGetFunction, CUfunction*, CUmodule, const char*)
+IREE_CU_PFN_DECL(cuModuleGetGlobal, CUdeviceptr*, size_t*, CUmodule,
+                 const char*)
 IREE_CU_PFN_DECL(cuModuleLoadDataEx, CUmodule*, const void*, unsigned int,
                  CUjit_option*, void**)
 IREE_CU_PFN_DECL(cuModuleUnload, CUmodule)

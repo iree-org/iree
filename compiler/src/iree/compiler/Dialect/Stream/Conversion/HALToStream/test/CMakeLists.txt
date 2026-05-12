@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "abi_ops.mlir"
+    "import_dims.mlir"
   TOOLS
     FileCheck
     iree-opt

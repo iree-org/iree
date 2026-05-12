@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/utils/elf_format.h"
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -46,9 +47,6 @@ static iree_status_t iree_hal_executable_write_executable_format(
 // ELF
 //===----------------------------------------------------------------------===//
 
-// ELF magic bytes: 0x7F 'E' 'L' 'F'.
-static const uint8_t kElfMagic[4] = {0x7F, 'E', 'L', 'F'};
-
 typedef enum {
   IREE_ELF_EM_386 = 0x03,      // Intel 80386
   IREE_ELF_EM_ARM = 0x28,      // ARM
@@ -64,152 +62,9 @@ typedef struct {
   uint32_t e_version;
 } iree_elf_ehdr_common_t;
 
-typedef struct {
-  iree_elf_ehdr_common_t common;
-  uint32_t e_entry;
-  uint32_t e_phoff;
-  uint32_t e_shoff;
-  uint32_t e_flags;
-  uint16_t e_ehsize;
-  uint16_t e_phentsize;
-  uint16_t e_phnum;
-  uint16_t e_shentsize;
-  uint16_t e_shnum;
-  uint16_t e_shstrndx;
-} iree_elf32_ehdr_t;
-
-typedef struct {
-  iree_elf_ehdr_common_t common;
-  uint64_t e_entry;
-  uint64_t e_phoff;
-  uint64_t e_shoff;
-  uint32_t e_flags;
-  uint16_t e_ehsize;
-  uint16_t e_phentsize;
-  uint16_t e_phnum;
-  uint16_t e_shentsize;
-  uint16_t e_shnum;
-  uint16_t e_shstrndx;
-} iree_elf64_ehdr_t;
-
-typedef struct {
-  uint32_t sh_name;
-  uint32_t sh_type;
-  uint32_t sh_flags;
-  uint32_t sh_addr;
-  uint32_t sh_offset;
-  uint32_t sh_size;
-} iree_elf32_shdr_t;
-
-typedef struct {
-  uint32_t sh_name;
-  uint32_t sh_type;
-  uint64_t sh_flags;
-  uint64_t sh_addr;
-  uint64_t sh_offset;
-  uint64_t sh_size;
-} iree_elf64_shdr_t;
-
 static bool iree_hal_executable_is_elf_file(
     iree_const_byte_span_t executable_data) {
-  const bool size_unknown = executable_data.data_length == 0;
-  if (!size_unknown && executable_data.data_length < sizeof(kElfMagic)) {
-    return false;  // too small
-  }
-  return memcmp(executable_data.data, kElfMagic, sizeof(kElfMagic)) == 0;
-}
-
-// Finds the maximum extent by checking section headers (32-bit ELF).
-static iree_status_t iree_hal_executable_calculate_elf_size_32(
-    const iree_elf32_ehdr_t* ehdr, iree_const_byte_span_t executable_data,
-    iree_host_size_t* out_size) {
-  const bool size_unknown = executable_data.data_length == 0;
-  uint32_t max_offset = sizeof(*ehdr);
-
-  // Check program header table.
-  if (ehdr->e_phoff != 0) {
-    const uint32_t ph_end = ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize);
-    if (ph_end > max_offset) {
-      max_offset = ph_end;  // bump extent
-    }
-  }
-
-  // Check section header table and sections.
-  if (ehdr->e_shoff != 0) {
-    const uint32_t sh_table_end =
-        ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize);
-    if (sh_table_end > max_offset) {
-      max_offset = sh_table_end;  // bump extent
-    }
-    if (size_unknown || executable_data.data_length >= sh_table_end) {
-      const uint8_t* sh_table = executable_data.data + ehdr->e_shoff;
-      for (uint16_t i = 0; i < ehdr->e_shnum; ++i) {
-        const iree_elf32_shdr_t* shdr =
-            (const iree_elf32_shdr_t*)(sh_table + i * ehdr->e_shentsize);
-        uint32_t section_end = shdr->sh_offset + shdr->sh_size;
-        if (section_end > max_offset) {
-          max_offset = section_end;  // bump extent
-        }
-      }
-    }
-  }
-
-  *out_size = (iree_host_size_t)max_offset;
-  return iree_ok_status();
-}
-
-// Finds the maximum extent by checking section headers (64-bit ELF).
-static iree_status_t iree_hal_executable_calculate_elf_size_64(
-    const iree_elf64_ehdr_t* ehdr, iree_const_byte_span_t executable_data,
-    iree_host_size_t* out_size) {
-  const bool size_unknown = executable_data.data_length == 0;
-  uint64_t max_offset = sizeof(*ehdr);
-
-  // Check program header table.
-  if (ehdr->e_phoff != 0) {
-    const uint64_t ph_end = ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize);
-    if (ph_end > max_offset) {
-      max_offset = ph_end;  // bump extent
-    }
-  }
-
-  // Check section header table and sections.
-  if (ehdr->e_shoff != 0) {
-    const uint64_t sh_table_end =
-        ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize);
-    if (sh_table_end > max_offset) {
-      max_offset = sh_table_end;  // bump extent
-    }
-    if (size_unknown || executable_data.data_length >= sh_table_end) {
-      const uint8_t* sh_table = executable_data.data + ehdr->e_shoff;
-      for (uint16_t i = 0; i < ehdr->e_shnum; ++i) {
-        const iree_elf64_shdr_t* shdr =
-            (const iree_elf64_shdr_t*)(sh_table + i * ehdr->e_shentsize);
-        const uint64_t section_end = shdr->sh_offset + shdr->sh_size;
-        if (section_end > max_offset) {
-          max_offset = section_end;  // bump extent
-        }
-      }
-    }
-  }
-
-  *out_size = (iree_host_size_t)max_offset;
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_executable_calculate_elf_size(
-    const iree_elf_ehdr_common_t* ehdr, iree_const_byte_span_t executable_data,
-    iree_host_size_t* out_size) {
-  // Check ELF class (32-bit vs 64-bit) as they use different structures and
-  // we need to interpret the contents (beyond common) differently.
-  const bool is_64bit = ehdr->e_ident[4] == 2;  // EI_CLASS = ELFCLASS64
-  if (is_64bit) {
-    return iree_hal_executable_calculate_elf_size_64(
-        (const iree_elf64_ehdr_t*)ehdr, executable_data, out_size);
-  } else {
-    return iree_hal_executable_calculate_elf_size_32(
-        (const iree_elf32_ehdr_t*)ehdr, executable_data, out_size);
-  }
+  return iree_hal_elf_data_starts_with_magic(executable_data);
 }
 
 // Returns strings like "x86_64", "arm_64", "riscv_32", "unknown".
@@ -268,7 +123,10 @@ static bool iree_hal_executable_is_fatelf_file(
   if (!size_unknown && executable_data.data_length < sizeof(kFatElfMagic)) {
     return false;  // too small
   }
-  return memcmp(executable_data.data, kFatElfMagic, sizeof(kFatElfMagic)) == 0;
+  iree_const_byte_span_t magic_data =
+      iree_make_const_byte_span(executable_data.data, sizeof(kFatElfMagic));
+  if (iree_const_byte_span_is_empty(magic_data)) return false;
+  return memcmp(magic_data.data, kFatElfMagic, magic_data.data_length) == 0;
 }
 
 static iree_status_t iree_hal_executable_calculate_fatelf_size(
@@ -333,33 +191,23 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_infer_elf_format(
                             "executable data too small to identify format");
   }
 
-  // When size is unknown we create a temporary span with max size for the
-  // format detection and size calculation functions.
-  iree_const_byte_span_t detection_data = executable_data;
-  if (size_unknown) {
-    detection_data.data_length = IREE_HOST_SIZE_MAX;
-  }
-
-  if ((size_unknown || executable_data.data_length >= sizeof(kFatElfMagic)) &&
-      memcmp(executable_data.data, kFatElfMagic, sizeof(kFatElfMagic)) == 0) {
+  if (iree_hal_executable_is_fatelf_file(executable_data)) {
     if (size_unknown) {
       IREE_RETURN_IF_ERROR(iree_hal_executable_calculate_fatelf_size(
-                               detection_data, out_inferred_size),
+                               executable_data, out_inferred_size),
                            "calculating FatELF size");
     } else {
       *out_inferred_size = executable_data.data_length;
     }
     return iree_hal_executable_write_executable_format(
         "embedded-", "fatelf", executable_format, executable_format_capacity);
-  } else if ((size_unknown ||
-              executable_data.data_length >= sizeof(kElfMagic)) &&
-             memcmp(executable_data.data, kElfMagic, sizeof(kElfMagic)) == 0) {
+  } else if (iree_hal_elf_data_starts_with_magic(executable_data)) {
     const iree_elf_ehdr_common_t* ehdr =
         (const iree_elf_ehdr_common_t*)executable_data.data;
     if (size_unknown) {
-      IREE_RETURN_IF_ERROR(iree_hal_executable_calculate_elf_size(
-                               ehdr, detection_data, out_inferred_size),
-                           "calculating ELF size");
+      IREE_RETURN_IF_ERROR(
+          iree_hal_elf_calculate_size(executable_data, out_inferred_size),
+          "calculating ELF size");
     } else {
       *out_inferred_size = executable_data.data_length;
     }
@@ -981,8 +829,8 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_infer_system_format(
     const iree_elf_ehdr_common_t* ehdr =
         (const iree_elf_ehdr_common_t*)executable_data.data;
     if (size_unknown) {
-      IREE_RETURN_IF_ERROR(iree_hal_executable_calculate_elf_size(
-          ehdr, executable_data, out_inferred_size));
+      IREE_RETURN_IF_ERROR(
+          iree_hal_elf_calculate_size(executable_data, out_inferred_size));
     } else {
       *out_inferred_size = executable_data.data_length;
     }

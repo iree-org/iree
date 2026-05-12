@@ -31,4 +31,22 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    MMAUtils
+  HDRS
+    "MMAUtils.h"
+  SRCS
+    "MMAUtils.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    MLIRSupport
+    MLIRVectorDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Dialect::Util::IR
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

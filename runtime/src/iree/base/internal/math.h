@@ -35,6 +35,21 @@
 #define iree_shr(value, shamt) \
   (((shamt) < sizeof(value) * 8) ? ((value) >> (shamt)) : 0)
 
+// Returns true if |actual - expected| is within NumPy-style tolerance:
+//   |actual - expected| <= atol + rtol * |expected|
+// This follows NumPy's isclose() contract:
+// https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449
+// The rtol term scales with the expected (reference) operand, so this check is
+// intentionally asymmetric. NaN compares equal to NaN. Non-finite expected is
+// only considered equal when it is bit-equal to actual.
+static inline bool iree_math_fuzzy_compare_f64(double actual, double expected,
+                                               double atol, double rtol) {
+  if (actual == expected) return true;
+  if (isnan(actual) && isnan(expected)) return true;
+  if (!isfinite(expected)) return false;
+  return fabs(actual - expected) <= atol + rtol * fabs(expected);
+}
+
 //==============================================================================
 // Bitwise rotation (aka circular shifts)
 //==============================================================================

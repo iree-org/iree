@@ -19,17 +19,40 @@ extern "C" {
 // It mirrors the IREE Codegen Dialect which is not stable itself.
 
 MLIR_CAPI_EXPORTED bool
-ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr(MlirAttribute attr);
+ireeAttributeIsACodegenVMVXPipelineAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenVMVXPipelineAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenVMVXPipelineAttrGet(MlirContext mlirCtx);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenTransformDialectCodegenPipelineAttr(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED MlirTypeID
-ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID(void);
+ireeCodegenTransformDialectCodegenPipelineAttrGetTypeID(void);
 
-MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenDispatchLoweringPassPipelineAttrGet(
-    MlirContext mlirCtx, uint32_t value);
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenTransformDialectCodegenPipelineAttrGet(MlirContext mlirCtx);
 
-MLIR_CAPI_EXPORTED
-uint32_t
-ireeCodegenDispatchLoweringPassPipelineAttrGetValue(MlirAttribute attr);
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenNoPipelineAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenNoPipelineAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenNoPipelineAttrGet(MlirContext mlirCtx);
+
+MLIR_CAPI_EXPORTED bool
+ireeAttributeIsACodegenPassPipelineAttr(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenPassPipelineAttrGetTypeID(void);
+
+MLIR_CAPI_EXPORTED MlirAttribute
+ireeCodegenPassPipelineAttrGet(MlirContext mlirCtx, MlirStringRef pipeline);
+
+MLIR_CAPI_EXPORTED MlirStringRef
+ireeCodegenPassPipelineAttrGetPipeline(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED bool
 ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr);
@@ -37,8 +60,8 @@ ireeAttributeIsACodegenTranslationInfoAttr(MlirAttribute attr);
 MLIR_CAPI_EXPORTED MlirTypeID ireeCodegenTranslationInfoAttrGetTypeID(void);
 
 struct ireeCodegenTranslationInfoParameters {
-  // DispatchLoweringPassPipelineAttr or any attribute implementing
-  // PipelineAttrInterface (e.g., #iree_gpu.pipeline<...>).
+  // Attribute implementing PipelineAttrInterface (e.g.,
+  // #iree_gpu.pipeline<...>).
   MlirAttribute passPipeline;
   MlirAttribute codegenSpec;       // Optional SymbolRefAttr.
   const int64_t *workgroupSize;    // Optional ArrayRef<int64_t>.
