@@ -236,12 +236,43 @@ hasOnlyLoopInvariantOperandsExcept(LoopLikeOpInterface loopLike, Operation *op,
   });
 }
 
+static bool areEquivalentMasks(Value lhs, Value rhs) {
+  if (lhs == rhs) {
+    return true;
+  }
+  if (!lhs || !rhs || lhs.getType() != rhs.getType()) {
+    return false;
+  }
+  auto lhsCreateMask = lhs.getDefiningOp<vector::CreateMaskOp>();
+  auto rhsCreateMask = rhs.getDefiningOp<vector::CreateMaskOp>();
+  return lhsCreateMask && rhsCreateMask &&
+         lhsCreateMask.getOperands() == rhsCreateMask.getOperands();
+}
+
+static bool
+areEquivalentTransferAccesses(Type lhsVectorType, ValueRange lhsIndices,
+                              AffineMap lhsPermutationMap, Value lhsMask,
+                              Type rhsVectorType, ValueRange rhsIndices,
+                              AffineMap rhsPermutationMap, Value rhsMask) {
+  return lhsVectorType == rhsVectorType && lhsIndices == rhsIndices &&
+         lhsPermutationMap == rhsPermutationMap &&
+         areEquivalentMasks(lhsMask, rhsMask);
+}
+
 static bool areEquivalentTransferReadWrite(vector::TransferReadOp readOp,
                                            vector::TransferWriteOp writeOp) {
-  return readOp.getType() == writeOp.getVector().getType() &&
-         readOp.getIndices() == writeOp.getIndices() &&
-         readOp.getPermutationMap() == writeOp.getPermutationMap() &&
-         readOp.getMask() == writeOp.getMask();
+  return areEquivalentTransferAccesses(
+      readOp.getType(), readOp.getIndices(), readOp.getPermutationMap(),
+      readOp.getMask(), writeOp.getVector().getType(), writeOp.getIndices(),
+      writeOp.getPermutationMap(), writeOp.getMask());
+}
+
+static bool areEquivalentTransferWrites(vector::TransferWriteOp lhs,
+                                        vector::TransferWriteOp rhs) {
+  return areEquivalentTransferAccesses(
+      lhs.getVector().getType(), lhs.getIndices(), lhs.getPermutationMap(),
+      lhs.getMask(), rhs.getVector().getType(), rhs.getIndices(),
+      rhs.getPermutationMap(), rhs.getMask());
 }
 
 static Value getLoopCarriedTransferValue(OpBuilder &builder,
@@ -428,6 +459,128 @@ private:
   }
 };
 
+/// Fold tensor.dim of a loop-carried tensor iter_arg back to the loop init
+/// tensor when the yielded value is only a chain of shape-preserving
+/// vector.transfer_write ops.
+///
+/// This normalizes masks built from loop-carried tensor dims before transfer
+/// folding runs. Without this, equivalent masks may remain structurally
+/// different because one is based on the init tensor and another is based on
+/// the iter_arg.
+///
+/// ```mlir
+/// %r = scf.for ... iter_args(%acc = %init) -> tensor<?xf32> {
+///   %d = tensor.dim %acc, %c0 : tensor<?xf32>
+///   %m = vector.create_mask %d : vector<4xi1>
+///   %next = vector.transfer_write %v, %acc[%c0], %m
+///   scf.yield %next : tensor<?xf32>
+/// }
+/// ```
+///
+/// becomes:
+///
+/// ```mlir
+/// %r = scf.for ... iter_args(%acc = %init) -> tensor<?xf32> {
+///   %d = tensor.dim %init, %c0 : tensor<?xf32>
+///   %m = vector.create_mask %d : vector<4xi1>
+///   %next = vector.transfer_write %v, %acc[%c0], %m
+///   scf.yield %next : tensor<?xf32>
+/// }
+/// ```
+struct FoldDimOfShapePreservingTransferIterArg final
+    : OpRewritePattern<tensor::DimOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(tensor::DimOp dimOp,
+                                PatternRewriter &rewriter) const override {
+    auto iterArg = dyn_cast<BlockArgument>(dimOp.getSource());
+    if (!iterArg) {
+      return failure();
+    }
+    auto forOp = dyn_cast<scf::ForOp>(iterArg.getOwner()->getParentOp());
+    if (!forOp) {
+      return failure();
+    }
+    OpOperand *initArg = forOp.getTiedLoopInit(iterArg);
+    if (!initArg || !isShapePreservingTransferWriteChain(forOp, iterArg)) {
+      return failure();
+    }
+
+    rewriter.modifyOpInPlace(
+        dimOp, [&]() { dimOp.getSourceMutable().assign(initArg->get()); });
+    return success();
+  }
+
+private:
+  bool isShapePreservingTransferWriteChain(scf::ForOp forOp,
+                                           BlockArgument iterArg) const {
+    OpOperand *yieldedValue = forOp.getTiedLoopYieldedValue(iterArg);
+    if (!yieldedValue) {
+      return false;
+    }
+    Value value = yieldedValue->get();
+    while (true) {
+      if (value == iterArg) {
+        return true;
+      }
+      auto writeOp = value.getDefiningOp<vector::TransferWriteOp>();
+      if (!writeOp || !writeOp.hasPureTensorSemantics()) {
+        return false;
+      }
+      value = writeOp.getBase();
+    }
+  }
+};
+
+/// Fold transfer_write chains where a later write overwrites the same tensor
+/// slice as an earlier write. For equal masks, masked-off lanes are preserved
+/// from the original base by both writes, so the earlier write is not needed
+/// for the later result.
+///
+/// This handles structurally equivalent masks that upstream WAW folding does
+/// not recognize after CSE/canonicalization fail to make the mask SSA value the
+/// same.
+///
+/// ```mlir
+/// %m0 = vector.create_mask %d : vector<4xi1>
+/// %w0 = vector.transfer_write %v0, %t[%c0], %m0
+/// %m1 = vector.create_mask %d : vector<4xi1>
+/// %w1 = vector.transfer_write %v1, %w0[%c0], %m1
+/// ```
+///
+/// becomes:
+///
+/// ```mlir
+/// %m1 = vector.create_mask %d : vector<4xi1>
+/// %w1 = vector.transfer_write %v1, %t[%c0], %m1
+/// ```
+struct FoldTransferWriteChain final
+    : OpRewritePattern<vector::TransferWriteOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!writeOp.hasPureTensorSemantics() || writeOp.hasOutOfBoundsDim()) {
+      return failure();
+    }
+    auto previousWriteOp =
+        writeOp.getBase().getDefiningOp<vector::TransferWriteOp>();
+    if (!previousWriteOp || !previousWriteOp.hasPureTensorSemantics() ||
+        previousWriteOp.hasOutOfBoundsDim() ||
+        !areEquivalentTransferWrites(writeOp, previousWriteOp)) {
+      return failure();
+    }
+
+    rewriter.modifyOpInPlace(writeOp, [&]() {
+      writeOp.getBaseMutable().assign(previousWriteOp.getBase());
+    });
+    if (previousWriteOp->use_empty()) {
+      rewriter.eraseOp(previousWriteOp);
+    }
+    return success();
+  }
+};
+
 namespace {
 struct CastLikeExtractSliceOpFolder final
     : OpRewritePattern<tensor::ExtractSliceOp> {
@@ -456,6 +609,78 @@ struct CastLikeInsertSliceOpFolder final
     }
     rewriter.replaceOp(sliceOp, sliceOp.getSource());
     return success();
+  }
+};
+
+/// Retarget vector.transfer_read through an identity tensor slice.
+///
+/// This is narrower than the general identity-slice folder: it only updates the
+/// transfer_read base and only for zero-offset, unit-stride slices with
+/// identical source/result types. The purpose is to unblock transfer folding in
+/// cleanup phases that intentionally do not run the general
+/// fold-identity-slices patterns.
+///
+/// ```mlir
+/// %slice = tensor.extract_slice %t[0] [%d] [1]
+///     : tensor<?xf32> to tensor<?xf32>
+/// %r = vector.transfer_read %slice[%c0], %pad
+///     : tensor<?xf32>, vector<4xf32>
+/// ```
+///
+/// becomes:
+///
+/// ```mlir
+/// %r = vector.transfer_read %t[%c0], %pad
+///     : tensor<?xf32>, vector<4xf32>
+/// ```
+///
+/// The same rewrite applies to identity tensor.insert_slice results, replacing
+/// the read base with the inserted source tensor.
+struct FoldTransferReadOfIdentitySlice final
+    : OpRewritePattern<vector::TransferReadOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
+                                PatternRewriter &rewriter) const override {
+    if (!readOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+    Value source = getIdentitySliceSource(readOp.getBase());
+    if (!source) {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(readOp,
+                             [&]() { readOp.getBaseMutable().assign(source); });
+    return success();
+  }
+
+private:
+  bool isIdentityExtractSliceOp(tensor::ExtractSliceOp extractSliceOp) const {
+    return tensor::isCastLikeExtractSliceOp(extractSliceOp) &&
+           extractSliceOp.getSourceType() == extractSliceOp.getResultType() &&
+           extractSliceOp.hasZeroOffset() && extractSliceOp.hasUnitStride();
+  }
+
+  bool isIdentityInsertSliceOp(tensor::InsertSliceOp insertSliceOp) const {
+    return tensor::isCastLikeInsertSliceOp(insertSliceOp) &&
+           insertSliceOp.getSourceType() == insertSliceOp.getResultType() &&
+           insertSliceOp.hasZeroOffset() && insertSliceOp.hasUnitStride();
+  }
+
+  Value getIdentitySliceSource(Value value) const {
+    if (auto extractSliceOp = value.getDefiningOp<tensor::ExtractSliceOp>()) {
+      if (isIdentityExtractSliceOp(extractSliceOp)) {
+        return extractSliceOp.getSource();
+      }
+      return {};
+    }
+    if (auto insertSliceOp = value.getDefiningOp<tensor::InsertSliceOp>()) {
+      if (isIdentityInsertSliceOp(insertSliceOp)) {
+        return insertSliceOp.getSource();
+      }
+      return {};
+    }
+    return {};
   }
 };
 
@@ -540,7 +765,7 @@ struct FoldTransferRAW : OpRewritePattern<vector::TransferReadOp> {
     // When wMask is absent (unmasked write) or wMask == rMask (original is
     // never accessed), this simplifies to just valToStore.
     Value inner = valToStore;
-    bool needsOriginal = wMask && wMask != rMask;
+    bool needsOriginal = wMask && !areEquivalentMasks(wMask, rMask);
     if (needsOriginal) {
       Value originalRead = vector::TransferReadOp::create(
           rewriter, readOp.getLoc(), readOp.getType(), writeOp.getBase(),
@@ -655,6 +880,50 @@ struct FoldTransferReadOfEmptyTensor
 };
 } // namespace
 
+static LogicalResult
+canonicalizeLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
+                                     MLIRContext *context) {
+  // Keep dim/shape cleanup separate from transfer cleanup. FoldTransferRAW is
+  // not reversible: if it runs before masks based on loop-carried tensor dims
+  // are normalized to the loop init shape, it may conservatively materialize an
+  // extra read of the original tensor and block later iter_arg promotion.
+  {
+    RewritePatternSet patterns(context);
+    patterns.add<FoldDimOfShapePreservingTransferIterArg>(context);
+    tensor::DimOp::getCanonicalizationPatterns(patterns, context);
+    tensor::EmptyOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return failure();
+    }
+  }
+  {
+    RewritePatternSet patterns(context);
+    // This intentionally runs independent of fold-identity-slices: it only
+    // retargets transfer reads through identity slices to unblock transfer
+    // folding and does not generally erase identity slice ops.
+    patterns.add<FoldTransferWriteChain, FoldTransferReadOfIdentitySlice,
+                 FoldTransferRAW, FoldTransferReadOfEmptyTensor>(context);
+    vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+static LogicalResult
+canonicalizeAndPromoteLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
+                                               MLIRContext *context) {
+  if (failed(canonicalizeLoopCarriedTransferState(funcOp, context))) {
+    return failure();
+  }
+  moveLoopInvariantCodeFromGuaranteedLoops(funcOp);
+
+  RewritePatternSet promotionPatterns(context);
+  promotionPatterns.add<PromoteLoopCarriedTransferIterArg>(context);
+  return applyPatternsGreedily(funcOp, std::move(promotionPatterns));
+}
+
 // Find the earliest insertion point in the block for the given operation.
 static Operation *getEarliestInsertionPointInsideBlock(Block *block,
                                                        Operation *op) {
@@ -689,14 +958,9 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     extractSliceOp->moveAfter(latestInsertionPoint);
   });
 
-  moveLoopInvariantCodeFromGuaranteedLoops(funcOp);
-  LDBG() << "after hoisting loop invariant code\n" << funcOp << "\n";
-
   // Run the vector transfer-specific promotion before generic subset hoisting
   // so masked transfer loops get the required per-iteration padding semantics.
-  RewritePatternSet promotionPatterns(context);
-  promotionPatterns.add<PromoteLoopCarriedTransferIterArg>(context);
-  if (failed(applyPatternsGreedily(funcOp, std::move(promotionPatterns)))) {
+  if (failed(canonicalizeAndPromoteLoopCarriedTransferState(funcOp, context))) {
     return signalPassFailure();
   }
   LDBG() << "after early promoting loop carried vector transfers" << funcOp;
@@ -712,8 +976,15 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
   LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
+  if (failed(canonicalizeAndPromoteLoopCarriedTransferState(funcOp, context))) {
+    return signalPassFailure();
+  }
+  LDBG() << "after late promoting loop carried vector transfers" << funcOp;
+
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
+  // Keep the final promotion pattern in this general cleanup because its
+  // transfer/slice folds can expose additional loop-carried transfers.
   patterns.add<PromoteLoopCarriedTransferIterArg>(context);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
