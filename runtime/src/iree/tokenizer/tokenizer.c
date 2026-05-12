@@ -1913,12 +1913,21 @@ iree_host_size_t iree_tokenizer_encode_state_pending_token_bound(
         state->postprocessor.active_template;
     switch (state->postprocessor.phase) {
       case IREE_TOKENIZER_POSTPROCESSOR_PHASE_PREFIX:
-        // Remaining prefix tokens + all suffix tokens.
-        bound +=
-            (t->prefix_count - state->postprocessor.position) + t->suffix_count;
+        // Remaining prefix tokens + all later special-token phases.
+        bound += (t->prefix_count - state->postprocessor.position) +
+                 t->infix_count + t->suffix_count;
         break;
       case IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_A:
-        // Prefix already emitted; suffix not yet started.
+        // Prefix already emitted; infix and suffix not yet started.
+        bound += t->infix_count + t->suffix_count;
+        break;
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_INFIX:
+        // Remaining infix tokens + all suffix tokens.
+        bound +=
+            (t->infix_count - state->postprocessor.position) + t->suffix_count;
+        break;
+      case IREE_TOKENIZER_POSTPROCESSOR_PHASE_SEQUENCE_B:
+        // Infix already emitted; suffix not yet started.
         bound += t->suffix_count;
         break;
       case IREE_TOKENIZER_POSTPROCESSOR_PHASE_SUFFIX:
