@@ -37,9 +37,6 @@ class OptimizeTensorInsertExtractSlicesPass final
       OptimizeTensorInsertExtractSlicesPassBase;
 
 public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect, vector::VectorDialect>();
-  }
   void runOnOperation() override;
 };
 
@@ -245,8 +242,13 @@ static bool areEquivalentMasks(Value lhs, Value rhs) {
   }
   auto lhsCreateMask = lhs.getDefiningOp<vector::CreateMaskOp>();
   auto rhsCreateMask = rhs.getDefiningOp<vector::CreateMaskOp>();
-  return lhsCreateMask && rhsCreateMask &&
-         lhsCreateMask.getOperands() == rhsCreateMask.getOperands();
+  if (lhsCreateMask && rhsCreateMask) {
+    return lhsCreateMask.getOperands() == rhsCreateMask.getOperands();
+  }
+  auto lhsConstantMask = lhs.getDefiningOp<vector::ConstantMaskOp>();
+  auto rhsConstantMask = rhs.getDefiningOp<vector::ConstantMaskOp>();
+  return lhsConstantMask && rhsConstantMask &&
+         lhsConstantMask.getMaskDimSizes() == rhsConstantMask.getMaskDimSizes();
 }
 
 static bool
@@ -261,6 +263,9 @@ areEquivalentTransferAccesses(Type lhsVectorType, ValueRange lhsIndices,
 
 static bool areEquivalentTransferReadWrite(vector::TransferReadOp readOp,
                                            vector::TransferWriteOp writeOp) {
+  if (readOp.isMasked() || writeOp.isMasked()) {
+    return false;
+  }
   return areEquivalentTransferAccesses(
       readOp.getType(), readOp.getIndices(), readOp.getPermutationMap(),
       readOp.getMask(), writeOp.getVector().getType(), writeOp.getIndices(),
@@ -269,6 +274,9 @@ static bool areEquivalentTransferReadWrite(vector::TransferReadOp readOp,
 
 static bool areEquivalentTransferWrites(vector::TransferWriteOp lhs,
                                         vector::TransferWriteOp rhs) {
+  if (lhs.isMasked() || rhs.isMasked()) {
+    return false;
+  }
   return areEquivalentTransferAccesses(
       lhs.getVector().getType(), lhs.getIndices(), lhs.getPermutationMap(),
       lhs.getMask(), rhs.getVector().getType(), rhs.getIndices(),
@@ -312,29 +320,30 @@ static Value getLoopCarriedTransferValue(OpBuilder &builder,
 /// lanes, transfer_read returns padding, while transfer_write preserves the
 /// tensor. A generic subset hoist would carry `%new` directly, which is only
 /// equivalent for unmasked transfers.
-struct PromoteLoopCarriedTransferIterArg final : OpRewritePattern<scf::ForOp> {
+struct HoistLoopCarriedTransferIterArg final : OpRewritePattern<scf::ForOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter &rewriter) const override {
     for (unsigned i = 0, e = forOp.getNumRegionIterArgs(); i < e; ++i) {
-      auto candidate = getPromotableTransferIterArg(forOp, i);
+      std::optional<HoistableTransferIterArg> candidate =
+          getHoistableTransferIterArg(forOp, i);
       if (candidate) {
-        return promoteLoopCarriedTransferIterArg(rewriter, forOp, *candidate);
+        return hoistLoopCarriedTransferIterArg(rewriter, forOp, *candidate);
       }
     }
     return failure();
   }
 
 private:
-  struct PromotableTransferIterArg {
+  struct HoistableTransferIterArg {
     unsigned index;
     vector::TransferWriteOp write;
     SmallVector<vector::TransferReadOp> reads;
   };
 
-  std::optional<PromotableTransferIterArg>
-  getPromotableTransferIterArg(scf::ForOp forOp, unsigned index) const {
+  std::optional<HoistableTransferIterArg>
+  getHoistableTransferIterArg(scf::ForOp forOp, unsigned index) const {
     LoopLikeOpInterface loopLike =
         cast<LoopLikeOpInterface>(forOp.getOperation());
     BlockArgument iterArg = forOp.getRegionIterArg(index);
@@ -377,12 +386,12 @@ private:
     if (reads.empty()) {
       return std::nullopt;
     }
-    return PromotableTransferIterArg{index, writeOp, reads};
+    return HoistableTransferIterArg{index, writeOp, reads};
   }
 
   LogicalResult
-  promoteLoopCarriedTransferIterArg(PatternRewriter &rewriter, scf::ForOp forOp,
-                                    PromotableTransferIterArg candidate) const {
+  hoistLoopCarriedTransferIterArg(PatternRewriter &rewriter, scf::ForOp forOp,
+                                  HoistableTransferIterArg candidate) const {
     unsigned oldNumIterArgs = forOp.getNumRegionIterArgs();
     unsigned oldNumResults = forOp.getNumResults();
     Value originalInitArg = forOp.getInitArgs()[candidate.index];
@@ -909,16 +918,16 @@ canonicalizeLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
 }
 
 static LogicalResult
-canonicalizeAndPromoteLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
-                                               MLIRContext *context) {
+canonicalizeAndHoistLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
+                                             MLIRContext *context) {
   if (failed(canonicalizeLoopCarriedTransferState(funcOp, context))) {
     return failure();
   }
   moveLoopInvariantCodeFromGuaranteedLoops(funcOp);
 
-  RewritePatternSet promotionPatterns(context);
-  promotionPatterns.add<PromoteLoopCarriedTransferIterArg>(context);
-  return applyPatternsGreedily(funcOp, std::move(promotionPatterns));
+  RewritePatternSet hoistingPatterns(context);
+  hoistingPatterns.add<HoistLoopCarriedTransferIterArg>(context);
+  return applyPatternsGreedily(funcOp, std::move(hoistingPatterns));
 }
 
 // Find the earliest insertion point in the block for the given operation.
@@ -955,12 +964,12 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
     extractSliceOp->moveAfter(latestInsertionPoint);
   });
 
-  // Run the vector transfer-specific promotion before generic subset hoisting
+  // Run the vector transfer-specific hoisting before generic subset hoisting
   // so masked transfer loops get the required per-iteration padding semantics.
-  if (failed(canonicalizeAndPromoteLoopCarriedTransferState(funcOp, context))) {
+  if (failed(canonicalizeAndHoistLoopCarriedTransferState(funcOp, context))) {
     return signalPassFailure();
   }
-  LDBG() << "after early promoting loop carried vector transfers" << funcOp;
+  LDBG() << "after early hoisting loop carried vector transfers" << funcOp;
 
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
@@ -973,16 +982,16 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   });
   LDBG() << "after hoisting subset loop invariant tensors" << funcOp;
 
-  if (failed(canonicalizeAndPromoteLoopCarriedTransferState(funcOp, context))) {
+  if (failed(canonicalizeAndHoistLoopCarriedTransferState(funcOp, context))) {
     return signalPassFailure();
   }
-  LDBG() << "after late promoting loop carried vector transfers" << funcOp;
+  LDBG() << "after late hoisting loop carried vector transfers" << funcOp;
 
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
-  // Keep the final promotion pattern in this general cleanup because its
+  // Keep the final hoisting pattern in this general cleanup because its
   // transfer/slice folds can expose additional loop-carried transfers.
-  patterns.add<PromoteLoopCarriedTransferIterArg>(context);
+  patterns.add<HoistLoopCarriedTransferIterArg>(context);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
   // Run after subset hoisting so retargeting reads through identity slices

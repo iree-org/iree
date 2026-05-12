@@ -663,6 +663,10 @@ def OptimizeTensorInsertExtractSlicesPass
     Option<"foldIdentitySlices", "fold-identity-slices", "bool", "false",
            "Enable folding of identity tensor.*_slice ops.">
   ];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::ub::UBDialect"
+  ];
 }
 
 def HoistInnerTiledAccReshapesPass :
