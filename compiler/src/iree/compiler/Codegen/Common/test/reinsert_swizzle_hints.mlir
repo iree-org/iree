@@ -118,3 +118,40 @@ func.func @trace_through_scf_for() -> vector<8xbf16> {
 //       CHECK:   %[[H2:.+]] = iree_codegen.swizzle_hint %[[C2]][#iree_codegen.xor_shuffle<128, 8>]
 //       CHECK:   %[[E2:.+]] = memref.expand_shape %[[H2]] {{\[\[}}0, 1{{\]\]}}
 //       CHECK:   vector.load %[[E2]]
+
+// -----
+
+func.func @maskedload_2d(%mask: vector<8xi1>, %pass: vector<8xbf16>) -> vector<8xbf16> {
+  %alloc = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>}
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %v = vector.maskedload %alloc[%c0, %c0], %mask, %pass
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>, vector<8xi1>, vector<8xbf16>
+    into vector<8xbf16>
+  return %v : vector<8xbf16>
+}
+
+// CHECK-LABEL: func @maskedload_2d
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<8x128xbf16, #gpu.address_space<workgroup>>
+//       CHECK:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[ALLOC]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   %[[HINT:.+]] = iree_codegen.swizzle_hint %[[COLLAPSED]][#iree_codegen.xor_shuffle<128, 8>]
+//       CHECK:   %[[EXPANDED:.+]] = memref.expand_shape %[[HINT]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   vector.maskedload %[[EXPANDED]][%{{.+}}, %{{.+}}]
+
+// -----
+
+func.func @maskedstore_2d(%mask: vector<8xi1>, %v: vector<8xbf16>) {
+  %alloc = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>}
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  vector.maskedstore %alloc[%c0, %c0], %mask, %v
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>, vector<8xi1>, vector<8xbf16>
+  return
+}
+
+// CHECK-LABEL: func @maskedstore_2d
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<8x128xbf16, #gpu.address_space<workgroup>>
+//       CHECK:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[ALLOC]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   %[[HINT:.+]] = iree_codegen.swizzle_hint %[[COLLAPSED]][#iree_codegen.xor_shuffle<128, 8>]
+//       CHECK:   %[[EXPANDED:.+]] = memref.expand_shape %[[HINT]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   vector.maskedstore %[[EXPANDED]][%{{.+}}, %{{.+}}]

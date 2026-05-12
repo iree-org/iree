@@ -661,7 +661,9 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 
 // -----
 
-// Negative test: Dynamic innermost dimension fails DWORD alignment check.
+// Dynamic innermost dimension is now allowed: GPUPushDownDMABoundsToConsumers
+// inserts a consumer-side mask + buffer_resource_cast(validBytes) to cover
+// the partial-DWORD straddle, so the DMA can fire on non-DWORD-aligned rows.
 
 #gpu_target_pad_dynamic_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -695,10 +697,12 @@ func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %
     ins(%padded : tensor<4x256xi8>)
     outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
 
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
-  // CHECK: tensor.pad
-  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  // The pad is consumed and a coalesced DMA fires with in_bounds=[false,false].
+  // Consumer-side mask + validBytes hack are added by the later pushdown pass.
+  // CHECK-NOT: tensor.pad
+  // CHECK-NOT: linalg.copy
+  // CHECK: iree_gpu.coalesced_gather_dma {{.*}} in_bounds [false, false]
+  // CHECK-SAME: tensor<?x?xi8>
 
   return %result : tensor<4x256xi8>
 }

@@ -486,6 +486,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   // decomposition. DecomposePackUnPackOps introduces linalg.transpose which
   // breaks the source tracing in the coalesced DMA conversion.
   funcPassManager.addPass(createGPUConvertToCoalescedDMAPass());
+  funcPassManager.addPass(createGPUPushDownDMABoundsToConsumersPass());
 
   // Step 3. Decompose pack and unpack ops and propagate the resulting reshapes.
   funcPassManager.addPass(createDecomposePackUnPackOpsPass(

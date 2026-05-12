@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -38,9 +39,22 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
   // An allocation can be inferred as shared if it is the destination of a
   // thread distributed `scf.forall` op. All other shared allocations are
   // expected to be properly indicated in advance.
-  for (auto user : alloc->getUsers()) {
+  //
+  // `iree_codegen.swizzle_hint` is a pure value-level hint with the same type
+  // as its source (see IREECodegenOps.td); it does not introduce a new buffer
+  // and is transparent to memory-space inference. Look through it to its
+  // own users so the underlying forall destination is recognized.
+  SmallVector<Operation *> worklist(alloc->user_begin(), alloc->user_end());
+  while (!worklist.empty()) {
+    Operation *user = worklist.pop_back_val();
+
     if (isa<linalg::CopyOp>(user) &&
         getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(user)) {
+      continue;
+    }
+
+    if (isa<IREE::Codegen::SwizzleHintOp>(user)) {
+      worklist.append(user->user_begin(), user->user_end());
       continue;
     }
 

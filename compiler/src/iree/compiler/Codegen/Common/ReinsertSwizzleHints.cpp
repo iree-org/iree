@@ -112,14 +112,19 @@ void ReinsertSwizzleHintsPass::runOnOperation() {
   IRRewriter rewriter(funcOp->getContext());
   DenseMap<Value, IREE::Codegen::SwizzleAttrInterface> swizzleCache;
 
-  // For each vector.load/store whose base traces to a swizzled alloc, wrap the
-  // base with collapse_shape -> swizzle_hint -> expand_shape.
+  // For each vector.load/store/maskedload/maskedstore whose base traces to a
+  // swizzled alloc, wrap the base with collapse_shape -> swizzle_hint ->
+  // expand_shape.
   funcOp.walk([&](Operation *op) {
     Value base;
     if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
       base = loadOp.getBase();
     } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
       base = storeOp.getBase();
+    } else if (auto mLoadOp = dyn_cast<vector::MaskedLoadOp>(op)) {
+      base = mLoadOp.getBase();
+    } else if (auto mStoreOp = dyn_cast<vector::MaskedStoreOp>(op)) {
+      base = mStoreOp.getBase();
     } else {
       return;
     }
@@ -134,6 +139,10 @@ void ReinsertSwizzleHintsPass::runOnOperation() {
       loadOp.getBaseMutable().assign(wrapped);
     } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
       storeOp.getBaseMutable().assign(wrapped);
+    } else if (auto mLoadOp = dyn_cast<vector::MaskedLoadOp>(op)) {
+      mLoadOp.getBaseMutable().assign(wrapped);
+    } else if (auto mStoreOp = dyn_cast<vector::MaskedStoreOp>(op)) {
+      mStoreOp.getBaseMutable().assign(wrapped);
     }
   });
 

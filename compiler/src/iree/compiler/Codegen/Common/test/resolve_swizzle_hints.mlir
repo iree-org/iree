@@ -353,3 +353,42 @@ func.func @swizzle_hint_non_contiguous_memref_error() -> vector<4xf32> {
   %1 = vector.load %0[%offset, %offset] : memref<32x64xf32, strided<[2, 1], offset: 0>>, vector<4xf32>
   return %1: vector<4xf32>
 }
+
+// -----
+
+func.func @swizzle_maskedload(%src: memref<?xf32>, %mask: vector<4xi1>,
+                              %pass: vector<4xf32>) -> vector<4xf32> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
+  // 68 = (1 x 64, 4) -> (1, 8) = 72
+  %offset = arith.constant 68 : index
+  %1 = vector.maskedload %0[%offset], %mask, %pass
+    : memref<?xf32>, vector<4xi1>, vector<4xf32> into vector<4xf32>
+  return %1 : vector<4xf32>
+}
+
+// CHECK-LABEL: func @swizzle_maskedload
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xf32>
+//  CHECK-SAME:   %[[MASK:[A-Za-z0-9]+]]: vector<4xi1>
+//  CHECK-SAME:   %[[PASS:[A-Za-z0-9]+]]: vector<4xf32>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 72 : index
+//       CHECK:   %[[V:.+]] = vector.maskedload %[[SRC]][%[[SWOFF]]], %[[MASK]], %[[PASS]]
+//       CHECK:   return %[[V]]
+
+// -----
+
+func.func @swizzle_maskedstore(%dst: memref<?xf32>, %mask: vector<4xi1>,
+                               %src: vector<4xf32>) {
+  %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
+  // 124 = (1 x 64, 60) -> (1, 64 % 64) = 64
+  %offset = arith.constant 124 : index
+  vector.maskedstore %0[%offset], %mask, %src
+    : memref<?xf32>, vector<4xi1>, vector<4xf32>
+  return
+}
+
+// CHECK-LABEL: func @swizzle_maskedstore
+//  CHECK-SAME:   %[[DST:[A-Za-z0-9]+]]: memref<?xf32>
+//  CHECK-SAME:   %[[MASK:[A-Za-z0-9]+]]: vector<4xi1>
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: vector<4xf32>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 64 : index
+//       CHECK:   vector.maskedstore %[[DST]][%[[SWOFF]]], %[[MASK]], %[[SRC]]

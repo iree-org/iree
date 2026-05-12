@@ -100,6 +100,78 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   rewriter.replaceOp(load, replacement);
 }
 
+/// Swizzles vector.maskedload(iree_codegen.swizzle_hint, offset, mask,
+/// passThru). Mirrors swizzleLoad but splits mask/passThru along the access
+/// width and emits per-chunk vector.maskedload ops.
+static void swizzleMaskedLoad(RewriterBase &rewriter, vector::MaskedLoadOp load,
+                              IREE::Codegen::SwizzleHintOp hintOp) {
+  Location hintLoc = hintOp.getLoc();
+  int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
+  VectorType type = load.getVectorType();
+  int64_t loadWidth = type.getShape()[0];
+  Value memrefOffset = load.getIndices()[0];
+  Value mask = load.getMask();
+  Value passThru = load.getPassThru();
+  VectorType swizzledLoadType =
+      VectorType::get({accessWidth}, type.getElementType());
+
+  Value replacement = arith::ConstantOp::create(rewriter, hintLoc, type,
+                                                rewriter.getZeroAttr(type));
+
+  for (int64_t i = 0; i < loadWidth; i += accessWidth) {
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
+    Value newOffset = getValueOrCreateConstantIndexOp(
+        rewriter, hintLoc,
+        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
+                                          newBaseOffset, hintOp.getOperand()));
+    Value subMask = vector::ExtractStridedSliceOp::create(
+        rewriter, load.getLoc(), mask, ArrayRef<int64_t>{i},
+        ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
+    Value subPass = vector::ExtractStridedSliceOp::create(
+        rewriter, load.getLoc(), passThru, ArrayRef<int64_t>{i},
+        ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
+    auto subLoad = vector::MaskedLoadOp::create(
+        rewriter, load.getLoc(), swizzledLoadType, load.getBase(),
+        ValueRange{newOffset}, subMask, subPass);
+
+    replacement = vector::InsertStridedSliceOp::create(
+        rewriter, load.getLoc(), subLoad.getResult(), replacement,
+        ArrayRef<int64_t>{i}, ArrayRef<int64_t>{1});
+  }
+  rewriter.replaceOp(load, replacement);
+}
+
+/// Swizzles vector.maskedstore(iree_codegen.swizzle_hint, offset, mask,
+/// value). Mirrors swizzleStore but splits mask along the access width.
+static void swizzleMaskedStore(RewriterBase &rewriter,
+                               vector::MaskedStoreOp store,
+                               IREE::Codegen::SwizzleHintOp hintOp) {
+  Location hintLoc = hintOp.getLoc();
+  int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
+  VectorType type = store.getVectorType();
+  int64_t storeWidth = type.getShape()[0];
+  Value memrefOffset = store.getIndices()[0];
+  Value mask = store.getMask();
+  Value value = store.getValueToStore();
+
+  for (int64_t i = 0; i < storeWidth; i += accessWidth) {
+    Value subVec = vector::ExtractStridedSliceOp::create(
+        rewriter, store.getLoc(), value, ArrayRef<int64_t>{i},
+        ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
+    Value subMask = vector::ExtractStridedSliceOp::create(
+        rewriter, store.getLoc(), mask, ArrayRef<int64_t>{i},
+        ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
+    Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
+    Value newOffset = getValueOrCreateConstantIndexOp(
+        rewriter, hintLoc,
+        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
+                                          newBaseOffset, hintOp.getOperand()));
+    vector::MaskedStoreOp::create(rewriter, store.getLoc(), store.getBase(),
+                                  ValueRange{newOffset}, subMask, subVec);
+  }
+  rewriter.eraseOp(store);
+}
+
 /// Swizzles vector.store(iree_codegen.swizzle_hint, offset).
 ///
 /// For a 1-d store of type `vector<C x !eltype>`, the store is unrolled into
@@ -162,6 +234,8 @@ static void resolveHintOp(RewriterBase &rewriter,
                           IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
+  SmallVector<vector::MaskedLoadOp> maskedLoads;
+  SmallVector<vector::MaskedStoreOp> maskedStores;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
@@ -184,6 +258,24 @@ static void resolveHintOp(RewriterBase &rewriter,
       stores.push_back(store);
       continue;
     }
+    if (auto mLoad = dyn_cast<vector::MaskedLoadOp>(user)) {
+      VectorType loadType = mLoad.getVectorType();
+      if (loadType.getRank() != 1 ||
+          loadType.getShape()[0] % accessWidth != 0) {
+        return;
+      }
+      maskedLoads.push_back(mLoad);
+      continue;
+    }
+    if (auto mStore = dyn_cast<vector::MaskedStoreOp>(user)) {
+      VectorType storeType = mStore.getVectorType();
+      if (storeType.getRank() != 1 ||
+          storeType.getShape()[0] % accessWidth != 0) {
+        return;
+      }
+      maskedStores.push_back(mStore);
+      continue;
+    }
     // Gather_to_lds destination-side swizzle is handled by
     // AMDGPULowerCoalescedDMAToGatherLDS, which applies the inverse swizzle
     // to source indices. Treat gather_to_lds and view-like ops as transparent
@@ -203,6 +295,14 @@ static void resolveHintOp(RewriterBase &rewriter,
   for (vector::StoreOp store : stores) {
     rewriter.setInsertionPoint(store);
     swizzleStore(rewriter, store, hintOp);
+  }
+  for (vector::MaskedLoadOp load : maskedLoads) {
+    rewriter.setInsertionPoint(load);
+    swizzleMaskedLoad(rewriter, load, hintOp);
+  }
+  for (vector::MaskedStoreOp store : maskedStores) {
+    rewriter.setInsertionPoint(store);
+    swizzleMaskedStore(rewriter, store, hintOp);
   }
 }
 

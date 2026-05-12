@@ -293,19 +293,40 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
     return false;
   }
 
-  // Check if source tensor's innermost row size is DWORD (4-byte) aligned. On
-  // AMD CDNA, per-component range checking is performed for each DWORD. If a
-  // DWORD is partially out-of-bounds, the entire DWORD returns zero, causing
-  // incorrect results. Additionally, partial OOB triggers the slow path with
-  // multi-cycling and instruction issue penalties.
-  auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
-  int64_t innermostDim = sourceType.getShape().back();
-  if (ShapedType::isDynamic(innermostDim)) {
+  // AMD CDNA HW does per-DWORD range checking on buffer loads, with two
+  // failure modes when source rows are not DWORD-aligned:
+  //   1. Per-lane straddle DWORDs read from the *next* source row.
+  //   2. The trailing partial DWORD crosses the buffer end and HW zeros it.
+  // GPUPushDownDMABoundsToConsumers handles both via a consumer-side pad
+  // and an iree_gpu.buffer_resource_cast validBytes override, which makes
+  // DMA correct on non-aligned rows.
+  //
+  // Performance gating: DMA's per-lane gather lowering wins on K-block
+  // boundary tiles (partial K-rows) thanks to HW bounds-checked loads;
+  // it loses on K-aligned shapes because the per-lane scalar copies are
+  // pure overhead vs the non-DMA wide vector loads. Opt in only when the
+  // matmul's K is *not* a multiple of K-tile (i.e. a K-block boundary
+  // actually exists at runtime).
+  //
+  // Detection: the pad result is the workgroup LDS tile. For a matmul
+  // operand the K-tile direction is the smaller of the two result dims
+  // (K-tile is typically 16-32 elements; M-tile / N-tile is 64-256). The
+  // source slice is dynamic in that K-direction iff the matmul's K isn't
+  // K-tile-divisible — exactly the boundary case we want DMA for.
+  auto resultType = dyn_cast<RankedTensorType>(pad.getResult().getType());
+  auto sourceType = dyn_cast<RankedTensorType>(pad.getSource().getType());
+  if (!resultType || !sourceType || resultType.getRank() != 2 ||
+      sourceType.getRank() != 2) {
     return false;
   }
-  Type elemType = sourceType.getElementType();
-  int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
-  return rowBytes % 4 == 0;
+  int64_t r0 = resultType.getDimSize(0);
+  int64_t r1 = resultType.getDimSize(1);
+  if (ShapedType::isDynamic(r0) || ShapedType::isDynamic(r1) || r0 == r1) {
+    // Need both result dims static and unequal to identify K-tile direction.
+    return false;
+  }
+  unsigned kDim = (r0 < r1) ? 0 : 1;
+  return sourceType.isDynamicDim(kDim);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
