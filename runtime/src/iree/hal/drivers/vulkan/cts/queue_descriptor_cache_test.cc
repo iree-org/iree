@@ -11,6 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
+#include "iree/hal/drivers/vulkan/executable.h"
 
 namespace iree::hal::cts {
 
@@ -227,10 +228,18 @@ TEST_P(VulkanQueueDescriptorCacheTest,
   IREE_ASSERT_OK(
       iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
           command_buffer, &requirements));
-  EXPECT_EQ(requirements.set_count, 5u);
+  const iree_hal_vulkan_pipeline_t* pipeline = nullptr;
+  IREE_ASSERT_OK(iree_hal_vulkan_executable_lookup_pipeline(
+      executable_, /*export_ordinal=*/0, &pipeline));
+  const uint32_t dispatch_set_count =
+      pipeline->push_descriptors.enabled ? 0u : 1u;
+  const uint32_t dispatch_storage_buffer_count =
+      pipeline->push_descriptors.enabled ? 0u : 2u;
+  EXPECT_EQ(requirements.set_count, 4u + dispatch_set_count);
   EXPECT_EQ(requirements.sampler_count, 0u);
   EXPECT_EQ(requirements.uniform_buffer_count, 0u);
-  EXPECT_EQ(requirements.storage_buffer_count, 6u);
+  EXPECT_EQ(requirements.storage_buffer_count,
+            4u + dispatch_storage_buffer_count);
 
   iree_device_size_t bda_publication_length = 1;
   IREE_ASSERT_OK(iree_hal_vulkan_command_buffer_native_bda_publication_length(

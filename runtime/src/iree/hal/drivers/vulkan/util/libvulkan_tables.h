@@ -443,6 +443,14 @@ IREE_HAL_VULKAN_DEVICE_PFN(
     ARGS(commandBuffer, pipelineBindPoint, layout, firstSet, descriptorSetCount,
          pDescriptorSets, dynamicOffsetCount, pDynamicOffsets))
 
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
+    void, vkCmdPushDescriptorSetKHR,
+    DECL(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
+         VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
+         const VkWriteDescriptorSet* pDescriptorWrites),
+    ARGS(commandBuffer, pipelineBindPoint, layout, set, descriptorWriteCount,
+         pDescriptorWrites))
+
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdPushConstants,
                            DECL(VkCommandBuffer commandBuffer,
                                 VkPipelineLayout layout,

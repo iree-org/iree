@@ -33,6 +33,9 @@ typedef struct iree_hal_vulkan_executable_cache_t {
   // HAL feature bits enabled on the logical device.
   iree_hal_vulkan_features_t enabled_features;
 
+  // Recognized Vulkan device extension bits enabled on the logical device.
+  iree_hal_vulkan_device_extensions_t enabled_extensions;
+
   // Executable dispatch ABI bits enabled on the logical device.
   iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis;
 
@@ -52,7 +55,9 @@ iree_hal_vulkan_executable_cache_cast(iree_hal_executable_cache_t* base_value) {
 iree_status_t iree_hal_vulkan_executable_cache_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    iree_hal_vulkan_features_t enabled_features, iree_string_view_t identifier,
+    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_device_extensions_t enabled_extensions,
+    iree_string_view_t identifier,
     iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
@@ -76,6 +81,7 @@ iree_status_t iree_hal_vulkan_executable_cache_create(
   executable_cache->logical_device = logical_device;
   executable_cache->physical_device = physical_device;
   executable_cache->enabled_features = enabled_features;
+  executable_cache->enabled_extensions = enabled_extensions;
   executable_cache->enabled_dispatch_abis = enabled_dispatch_abis;
 
   VkPipelineCacheCreateInfo create_info = {
@@ -159,8 +165,9 @@ static iree_status_t iree_hal_vulkan_executable_cache_prepare_executable(
   return iree_hal_vulkan_executable_create(
       executable_cache->syms, executable_cache->logical_device,
       executable_cache->physical_device, executable_cache->enabled_features,
-      executable_cache->pipeline_cache, executable_cache->enabled_dispatch_abis,
-      executable_params, executable_cache->host_allocator, out_executable);
+      executable_cache->enabled_extensions, executable_cache->pipeline_cache,
+      executable_cache->enabled_dispatch_abis, executable_params,
+      executable_cache->host_allocator, out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t

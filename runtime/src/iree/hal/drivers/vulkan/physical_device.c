@@ -123,6 +123,11 @@ iree_hal_vulkan_available_device_extensions_from_list(
     available_extensions |=
         IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS;
   }
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR;
+  }
   return available_extensions;
 }
 
@@ -521,6 +526,21 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
     VkPhysicalDeviceProperties2 properties2 = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
         .pNext = &out_snapshot->external_memory_host_properties,
+    };
+    iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
+                                        handle, &properties2);
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_physical_device_has_extension(
+          out_snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR)) {
+    out_snapshot->push_descriptor_properties =
+        (VkPhysicalDevicePushDescriptorPropertiesKHR){
+            .sType =
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PUSH_DESCRIPTOR_PROPERTIES_KHR,
+        };
+    VkPhysicalDeviceProperties2 properties2 = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+        .pNext = &out_snapshot->push_descriptor_properties,
     };
     iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
                                         handle, &properties2);

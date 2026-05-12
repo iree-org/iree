@@ -88,6 +88,21 @@ typedef struct iree_hal_vulkan_pipeline_t {
   // HAL dispatch binding mappings in binding ordinal order.
   iree_hal_vulkan_descriptor_binding_t* descriptor_bindings;
 
+  // Descriptor pool requirements for one descriptor ABI dispatch.
+  struct {
+    // Number of descriptor sets required.
+    uint32_t set_count;
+
+    // Number of sampler descriptors required.
+    uint32_t sampler_count;
+
+    // Number of uniform-buffer descriptors required.
+    uint32_t uniform_buffer_count;
+
+    // Number of storage-buffer descriptors required.
+    uint32_t storage_buffer_count;
+  } descriptor_requirements;
+
   // Buffer-device-address dispatch layout, zeroed for descriptor pipelines.
   struct {
     // Push-constant byte offset of iree_hal_vulkan_bda_dispatch_root_v1_t.
@@ -113,6 +128,15 @@ typedef struct iree_hal_vulkan_pipeline_t {
     // unconstrained beyond device-visible storage-buffer validity.
     iree_hal_vulkan_bda_binding_requirement_t* binding_requirements;
   } bda;
+
+  // Push descriptor recording state for descriptor ABI pipelines.
+  struct {
+    // Whether vkCmdPushDescriptorSetKHR replaces descriptor pool allocation.
+    bool enabled;
+
+    // Pipeline-layout set ordinal passed to vkCmdPushDescriptorSetKHR.
+    uint32_t set_ordinal;
+  } push_descriptors;
 
   // Export name stored in executable-owned host memory.
   iree_string_view_t name;
@@ -149,7 +173,9 @@ bool iree_hal_vulkan_executable_format_supported(
 iree_status_t iree_hal_vulkan_executable_create(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    iree_hal_vulkan_features_t enabled_features, VkPipelineCache pipeline_cache,
+    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_device_extensions_t enabled_extensions,
+    VkPipelineCache pipeline_cache,
     iree_hal_vulkan_dispatch_abis_t enabled_dispatch_abis,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);

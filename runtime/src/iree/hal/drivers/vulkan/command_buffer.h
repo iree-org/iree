@@ -67,6 +67,11 @@ iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_vulkan_command_buffer_descriptor_requirements_t* out_requirements);
 
+// Returns true if replaying |command_buffer| embeds binding-table-dependent
+// descriptor state into the native VkCommandBuffer.
+bool iree_hal_vulkan_command_buffer_has_descriptor_dispatches(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Host-published BDA table storage used while replaying a command buffer once
 // into a native VkCommandBuffer.
 typedef struct iree_hal_vulkan_command_buffer_bda_publication_t {

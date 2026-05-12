@@ -399,8 +399,9 @@ static iree_status_t CreateWrappedVulkanExecutableForValidation(
   iree_hal_executable_t* executable = nullptr;
   iree_status_t status = iree_hal_vulkan_executable_create(
       &syms, reinterpret_cast<VkDevice>(uintptr_t{1}), &physical_device,
-      enabled_features, VK_NULL_HANDLE, enabled_dispatch_abis,
-      &executable_params, iree_allocator_system(), &executable);
+      enabled_features, IREE_HAL_VULKAN_DEVICE_EXTENSION_NONE, VK_NULL_HANDLE,
+      enabled_dispatch_abis, &executable_params, iree_allocator_system(),
+      &executable);
   iree_hal_executable_release(executable);
   return status;
 }

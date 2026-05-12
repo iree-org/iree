@@ -97,6 +97,9 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
   VkPhysicalDeviceExternalMemoryHostPropertiesEXT
       external_memory_host_properties;
 
+  // VK_KHR_push_descriptor properties, if the extension is available.
+  VkPhysicalDevicePushDescriptorPropertiesKHR push_descriptor_properties;
+
   // Stable identity properties.
   VkPhysicalDeviceIDProperties id_properties;
 

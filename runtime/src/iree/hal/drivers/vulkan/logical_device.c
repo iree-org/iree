@@ -566,6 +566,10 @@ static iree_status_t iree_hal_vulkan_create_logical_device_handle(
       snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS,
       VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME, enabled_extensions,
       &enabled_extension_count, out_enabled_extensions);
+  iree_hal_vulkan_enable_extension_if_available(
+      snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR,
+      VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME, enabled_extensions,
+      &enabled_extension_count, out_enabled_extensions);
 
   float queue_priorities[3] = {1.0f, 1.0f, 1.0f};
   VkDeviceQueueCreateInfo queue_create_infos[3] = {0};
@@ -1476,8 +1480,9 @@ static iree_status_t iree_hal_vulkan_logical_device_create_executable_cache(
       iree_hal_vulkan_logical_device_cast(base_device);
   return iree_hal_vulkan_executable_cache_create(
       &device->syms, device->logical_device, &device->physical_device,
-      device->enabled_features, identifier, device->enabled_dispatch_abis,
-      device->host_allocator, out_executable_cache);
+      device->enabled_features, device->enabled_extensions, identifier,
+      device->enabled_dispatch_abis, device->host_allocator,
+      out_executable_cache);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_import_file(
