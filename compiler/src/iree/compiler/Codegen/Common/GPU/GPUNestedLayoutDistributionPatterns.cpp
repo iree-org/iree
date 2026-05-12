@@ -794,6 +794,7 @@ static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
 static Value broadcastFromProjected(RewriterBase &rewriter, Location loc,
                                     Value source, ArrayRef<int64_t> targetShape,
                                     ArrayRef<bool> projectedDims) {
+  assert(targetShape.size() == projectedDims.size());
   SmallVector<int64_t> expandedShape(targetShape);
   for (int64_t i = 0, expandedNumDims = expandedShape.size();
        i < expandedNumDims; ++i) {
@@ -812,13 +813,11 @@ static Value broadcastFromProjected(RewriterBase &rewriter, Location loc,
 /// Converts a linearized element number into vector indices in row-major order.
 static SmallVector<int64_t> getVectorElementIndices(VectorType vectorType,
                                                     int64_t linearIndex) {
-  SmallVector<int64_t> indices;
-  indices.reserve(vectorType.getRank());
+  SmallVector<int64_t> indices(vectorType.getRank());
   for (int64_t d = vectorType.getRank() - 1; d >= 0; --d) {
-    indices.push_back(linearIndex % vectorType.getDimSize(d));
+    indices[d] = linearIndex % vectorType.getDimSize(d);
     linearIndex /= vectorType.getDimSize(d);
   }
-  std::reverse(indices.begin(), indices.end());
   return indices;
 }
 
@@ -2242,12 +2241,17 @@ static Value broadcastFromLastClusterLane(RewriterBase &rewriter, Location loc,
   return result;
 }
 
-/// Helper to create a `iree_gpu.subgroup_scan` op for a scalar value, using
-/// `vector::CombiningKind` to build the combiner region.
-static std::pair<Value, Value>
-createSubgroupScan(PatternRewriter &rewriter, Location loc, Value value,
-                   Value identity, vector::CombiningKind kind,
-                   int64_t clusterSize, int64_t clusterStride) {
+struct SubgroupScanResult {
+  Value scan;
+  Value total;
+};
+
+/// Helper to create an exclusive `iree_gpu.subgroup_scan` op for a scalar
+/// value, using `vector::CombiningKind` to build the combiner region.
+static SubgroupScanResult
+createExclusiveSubgroupScan(RewriterBase &rewriter, Location loc, Value value,
+                            Value identity, vector::CombiningKind kind,
+                            int64_t clusterSize, int64_t clusterStride) {
   auto scanOp = IREE::GPU::SubgroupScanOp::create(
       rewriter, loc, value.getType(), value.getType(), value, identity,
       /*inclusive=*/nullptr, rewriter.getI32IntegerAttr(clusterSize),
@@ -2383,9 +2387,8 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
           scanOp, "multi-subgroup scan not yet supported");
     }
 
-    // Get distributed operands.
+    // Get distributed source.
     VectorValue disSrc = getDistributed(rewriter, source, sig[source]);
-    VectorValue disInit = getDistributed(rewriter, init, sig[init]);
 
     // Layout tile sizes along scan dimension.
     int64_t batchSize = srcLayout.getBatchTile()[scanDim];
@@ -2420,7 +2423,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     VectorType distType = disSrc.getType();
     Value result = getCombiningIdentityValue(loc, rewriter, kind, distType);
 
-    // Initialize subgroupRunning to identity with localAccType shape.
+    // Initialize batchOuterRunning to identity with localAccType shape.
     // This matches the accumulated_value shape from the local scan, which
     // has the scan-dim element removed from chunkShape.
     Value batchOuterRunning =
@@ -2437,7 +2440,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
           rewriter, loc, disSrc, offsets, chunkShape, strides);
 
       // Stage 1: local scan over element tile with identity init.
-      // Using identity (not user init) keeps chunkTotal pure for stage 2.
+      // Using identity (not user init) keeps localTotal pure for stage 2.
       // The user init is applied once at the end for exclusive mode.
       auto localScanOp = vector::ScanOp::create(
           rewriter, loc, kind, srcChunk, localIdentityInit, elemIdx, inclusive);
@@ -2475,8 +2478,8 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
           Value scalar =
               vector::ExtractOp::create(rewriter, loc, localTotal, idx);
           auto [scanResult, scanTotal] =
-              createSubgroupScan(rewriter, loc, scalar, scalarIdentity, kind,
-                                 threadSize, clusterStride);
+              createExclusiveSubgroupScan(rewriter, loc, scalar, scalarIdentity,
+                                          kind, threadSize, clusterStride);
           subgroupScan = vector::InsertOp::create(rewriter, loc, scanResult,
                                                   subgroupScan, idx);
           subgroupTotal = vector::InsertOp::create(rewriter, loc, scanTotal,
@@ -2488,7 +2491,8 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
         subgroupTotal = localTotal;
       }
 
-      // Carry composition: chunkBase = combine(subgroupRunning, threadIncr).
+      // Carry composition:
+      // blockIncrement = combine(batchOuterRunning, subgroupScan).
       Value blockIncrement = vector::makeArithReduction(
           rewriter, loc, kind, batchOuterRunning, subgroupScan);
 
@@ -2509,7 +2513,8 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
           rewriter, loc, kind, batchOuterRunning, subgroupTotal);
     }
 
-    VectorType initDistType = disInit.getType();
+    VectorType initDistType = VectorType::get(initLayout.getDistributedShape(),
+                                              init.getType().getElementType());
     // For the inclusive case we're done.
     if (inclusive) {
       Value accumulatedValue = vector::ShapeCastOp::create(
@@ -2536,6 +2541,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     scanDimMask[batchIdx] = true;
     scanDimMask[outerIdx] = true;
     scanDimMask[elemIdx] = true;
+    VectorValue disInit = getDistributed(rewriter, init, sig[init]);
     Value broadcastedInit =
         broadcastFromProjected(rewriter, loc, disInit, distShape, scanDimMask);
     result = vector::makeArithReduction(rewriter, loc, kind, broadcastedInit,

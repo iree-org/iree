@@ -84,7 +84,6 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16xf32> -> vector<1x1x4xf32>
-// CHECK-DAG: %[[INIT_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f32> -> vector<f32>
 // Local exclusive scan with identity init.
 // CHECK: %[[LOCAL_SCAN:.*]], %[[ACC_VAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] {inclusive = false, reduction_dim = 2 : i64}
 // Fix up localTotal: combine accumulated_value with last source element.
@@ -100,6 +99,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[BLOCK_INCR_BCAST:.*]] = vector.broadcast %[[BLOCK_INCR]] : vector<1x1xf32> to vector<1x1x4xf32>
 // CHECK: %[[LOCAL_RESULT:.*]] = arith.addf %[[BLOCK_INCR_BCAST]], %[[LOCAL_SCAN]] : vector<1x1x4xf32>
 // Application of user init via broadcast + combine.
+// CHECK: %[[INIT_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f32> -> vector<f32>
 // CHECK: %[[INIT_BCAST:.*]] = vector.broadcast %[[INIT_DIST]] : vector<f32> to vector<1x1x4xf32>
 // CHECK: %[[RESULT:.*]] = arith.addf %[[INIT_BCAST]], %[[LOCAL_RESULT]] : vector<1x1x4xf32>
 // Accumulated value: extract last element from result, broadcast from last thread.
@@ -212,7 +212,6 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x4xf32>
-// CHECK-DAG: %[[INIT_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f32> -> vector<f32>
 // First (b=0): extract srcChunk, local exclusive scan.
 // CHECK: %[[CHUNK0:.*]] = vector.extract %[[SRC_DIST]][0, 0] : vector<4xf32> from vector<2x1x4xf32>
 // CHECK: %[[CHUNK0_RS:.*]] = vector.shape_cast %[[CHUNK0]] : vector<4xf32> to vector<1x1x4xf32>
@@ -252,6 +251,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[LOCAL_RESULT1:.*]] = arith.addf %[[BLOCK_INCR1_BCAST]], %[[SCAN1]] : vector<1x1x4xf32>
 // CHECK: %[[PRE_INIT:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT1]], %[[RES0]] {offsets = [1, 0, 0], strides = [1, 1, 1]}
 // Application of user init.
+// CHECK: %[[INIT_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f32> -> vector<f32>
 // CHECK: %[[INIT_BCAST:.*]] = vector.broadcast %[[INIT_DIST]] : vector<f32> to vector<2x1x4xf32>
 // CHECK: %[[RESULT:.*]] = arith.addf %[[INIT_BCAST]], %[[PRE_INIT]] : vector<2x1x4xf32>
 // Accumulated value: extract last element from result, broadcast from last thread.
