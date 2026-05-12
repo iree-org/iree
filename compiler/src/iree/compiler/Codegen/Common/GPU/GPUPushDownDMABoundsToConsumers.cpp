@@ -148,12 +148,13 @@ static Value walkUpSharedOuts(Value v) {
 
 // When the DMA source's innermost row size in bytes is not DWORD (4-byte)
 // aligned, the AMD HW partial-DWORD OOB clamp zeroes valid bytes at the
-// buffer end. Wrap the source with an iree_gpu.buffer_resource_cast that
-// declares validBytes rounded up to the next multiple of 4. After
-// bufferization this becomes amdgpu.fat_raw_buffer_cast with the explicit
-// validBytes, which keeps the trailing partial DWORD in-bounds. The garbage
-// in bytes [naturalBytes, roundedBytes) lands in masked LDS columns and is
-// discarded by the consumer-side tensor.pad inserted below.
+// buffer end. Wrap the source with an iree_gpu.buffer_resource_cast carrying
+// the `pad_to_dword` attribute. Bufferization will lower this to an
+// amdgpu.fat_raw_buffer_cast whose validBytes is rounded up to the next
+// DWORD (with a 3-byte safety margin), keeping the trailing partial DWORD
+// in-bounds. The garbage in bytes [naturalBytes, roundedBytes) lands in
+// masked LDS columns and is discarded by the consumer-side tensor.pad
+// inserted below.
 //
 // Returns failure when no rewrite is needed (already aligned, dynamic
 // element bit width, etc.). Source is mutated in place.
@@ -200,10 +201,10 @@ padSourceBufferDescriptorToDWORD(IRRewriter &rewriter,
   unsigned rootRank = rootTy.getRank();
 
   // Skip when the root buffer's innermost row is statically DWORD-aligned.
-  // The validBytes wrap exists to guard against the HW partial-DWORD clamp
-  // zeroing valid bytes at the buffer END; if the buffer end is naturally
-  // DWORD-aligned (which holds whenever the root's innermost row in bytes
-  // is divisible by 4 in row-major layout), no straddle is possible and the
+  // The wrap exists to guard against the HW partial-DWORD clamp zeroing
+  // valid bytes at the buffer END; if the buffer end is naturally DWORD-
+  // aligned (which holds whenever the root's innermost row in bytes is
+  // divisible by 4 in row-major layout), no straddle is possible and the
   // wrap is unnecessary. Catches the common "shape-dynamic but root-aligned"
   // case (e.g. NxN f16 with N even, K-block tiling produces tensor<32x?xf16>
   // but the root is tensor<NxNxf16> with N*2 % 4 == 0).
@@ -213,19 +214,15 @@ padSourceBufferDescriptorToDWORD(IRRewriter &rewriter,
     return failure();
   }
 
-  // If a buffer_resource_cast with valid_bytes already wraps the root, skip.
-  if (auto existing = root.getDefiningOp<IREE::GPU::BufferResourceCastOp>()) {
-    if (existing.getValidBytes()) {
-      return failure();
-    }
+  // If a plain buffer_resource_cast already wraps the root, skip — re-wrapping
+  // would just be redundant.
+  if (root.getDefiningOp<IREE::GPU::BufferResourceCastOp>()) {
+    return failure();
   }
 
-  // Compute valid_bytes = roundUp(naturalBytes + 4, 4) where
-  //   naturalBytes = prod(rootDim_i) * elemBytes.
-  // Implemented as `(naturalBytes + 7) / 4 * 4` (the "+ 7" is "+ 4 safety
-  // margin" composed with the standard "+ (align - 1)" round-up trick).
   // Place the cast in a scope that dominates the DMA but lives outside any
-  // enclosing forall so the validBytes computation is hoisted out of loops.
+  // enclosing forall so the bufferized validBytes computation is hoisted out
+  // of loops.
   if (auto *rootOp = root.getDefiningOp()) {
     rewriter.setInsertionPointAfter(rootOp);
   } else {
@@ -235,47 +232,11 @@ padSourceBufferDescriptorToDWORD(IRRewriter &rewriter,
   }
   Location loc = dma.getLoc();
 
-  MLIRContext *ctx = rewriter.getContext();
-  SmallVector<OpFoldResult> dims;
-  // Track ops we create that legitimately need to keep reading `root` (so
-  // they don't get redirected to the cast we're about to insert, which would
-  // then violate dominance — the cast lives below them in the block).
-  SmallPtrSet<Operation *, 4> preserveRootUsers;
-  AffineExpr prod = getAffineConstantExpr(elemBytes, ctx);
-  for (unsigned d = 0; d < rootRank; ++d) {
-    int64_t s = rootTy.getDimSize(d);
-    if (ShapedType::isDynamic(s)) {
-      auto dimOp = tensor::DimOp::create(rewriter, loc, root, d);
-      preserveRootUsers.insert(dimOp);
-      dims.push_back(OpFoldResult(dimOp.getResult()));
-      prod = prod * getAffineSymbolExpr(dims.size() - 1, ctx);
-    } else {
-      prod = prod * getAffineConstantExpr(s, ctx);
-    }
-  }
-  // We must guarantee the *final* DWORD a lane reads past the natural end is
-  // covered. Adding 4 then rounding up to DWORD ensures at least a 4-byte
-  // safety margin even when naturalBytes happens to be DWORD-aligned (e.g.
-  // 64x43 f16 = 5504 bytes; the last lane's straddle reads bytes 5502..5505,
-  // requiring validBytes >= 5508).
-  AffineExpr rounded = (prod + getAffineConstantExpr(7, ctx)).floorDiv(4) * 4;
-  AffineMap map = AffineMap::get(/*dimCount=*/0,
-                                 /*symbolCount=*/dims.size(), rounded);
-  OpFoldResult validBytesOFR =
-      affine::makeComposedFoldedAffineApply(rewriter, loc, map, dims);
-  Value validBytes =
-      getValueOrCreateConstantIndexOp(rewriter, loc, validBytesOFR);
+  auto castOp = IREE::GPU::BufferResourceCastOp::create(
+      rewriter, loc, rootTy, root, /*cache_swizzle_stride=*/Value{});
 
-  auto castOp =
-      IREE::GPU::BufferResourceCastOp::create(rewriter, loc, rootTy, root,
-                                              /*cache_swizzle_stride=*/Value{},
-                                              /*valid_bytes=*/validBytes);
-
-  // Re-route uses of `root` to the cast. Keep the cast itself plus any
-  // tensor.dim ops we created above (they were emitted *before* the cast and
-  // need the original `root`; redirecting them would violate dominance).
-  preserveRootUsers.insert(castOp);
-  rewriter.replaceAllUsesExcept(root, castOp.getResult(), preserveRootUsers);
+  // Re-route uses of `root` to the cast.
+  rewriter.replaceAllUsesExcept(root, castOp.getResult(), castOp);
   return success();
 }
 

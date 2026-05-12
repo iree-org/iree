@@ -252,7 +252,7 @@ struct FoldBufferCastOfTensorCast final
     }
     auto newBufferCast = IREE::GPU::BufferResourceCastOp::create(
         rewriter, castOp.getLoc(), maxStaticType, newSource,
-        castOp.getCacheSwizzleStride(), castOp.getValidBytes());
+        castOp.getCacheSwizzleStride());
     newBufferCast->setDiscardableAttrs(castOp->getDiscardableAttrDictionary());
 
     // Cast back to the original result type.

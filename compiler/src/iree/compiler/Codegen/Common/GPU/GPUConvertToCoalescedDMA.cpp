@@ -308,11 +308,15 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
   // matmul's K is *not* a multiple of K-tile (i.e. a K-block boundary
   // actually exists at runtime).
   //
-  // Detection: the pad result is the workgroup LDS tile. For a matmul
-  // operand the K-tile direction is the smaller of the two result dims
-  // (K-tile is typically 16-32 elements; M-tile / N-tile is 64-256). The
-  // source slice is dynamic in that K-direction iff the matmul's K isn't
-  // K-tile-divisible — exactly the boundary case we want DMA for.
+  // Detection: the pad result is the workgroup LDS tile. The K direction is
+  // identified one of two ways:
+  //   1. Result dims unequal — K-tile direction is the smaller dim (K-tile is
+  //      typically 16-32 elements; M-tile / N-tile is 64-256).
+  //   2. Result dims equal (square workgroup tile, e.g. 64x64 LHS) — K
+  //      direction is whichever source dim is dynamic, since the K-block
+  //      boundary slice is the only source of dynamism.
+  // In both cases the K-direction source dim must be dynamic (the K-block
+  // boundary case where DMA wins).
   auto resultType = dyn_cast<RankedTensorType>(pad.getResult().getType());
   auto sourceType = dyn_cast<RankedTensorType>(pad.getSource().getType());
   if (!resultType || !sourceType || resultType.getRank() != 2 ||
@@ -321,12 +325,18 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
   }
   int64_t r0 = resultType.getDimSize(0);
   int64_t r1 = resultType.getDimSize(1);
-  if (ShapedType::isDynamic(r0) || ShapedType::isDynamic(r1) || r0 == r1) {
-    // Need both result dims static and unequal to identify K-tile direction.
+  if (ShapedType::isDynamic(r0) || ShapedType::isDynamic(r1)) {
     return false;
   }
-  unsigned kDim = (r0 < r1) ? 0 : 1;
-  return sourceType.isDynamicDim(kDim);
+  if (r0 != r1) {
+    unsigned kDim = (r0 < r1) ? 0 : 1;
+    return sourceType.isDynamicDim(kDim);
+  }
+  // Square: infer K from which source dim is dynamic. Both static or both
+  // dynamic → can't disambiguate, bail.
+  bool dyn0 = sourceType.isDynamicDim(0);
+  bool dyn1 = sourceType.isDynamicDim(1);
+  return dyn0 != dyn1;
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,

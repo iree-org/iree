@@ -225,8 +225,7 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
   // (e.g. another producer) later patterns will drop it anyway as it is treated
   // like a hint.
   auto resourceCast = IREE::GPU::BufferResourceCastOp::create(
-      builder, loc, tensorType, bufferCastValue, cacheSwizzleVal,
-      /*valid_bytes=*/Value{});
+      builder, loc, tensorType, bufferCastValue, cacheSwizzleVal);
   bufferCastOperand->assign(resourceCast);
 
   return promotedValue;

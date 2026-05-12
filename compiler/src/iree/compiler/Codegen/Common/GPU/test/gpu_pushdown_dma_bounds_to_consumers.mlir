@@ -96,8 +96,7 @@ func.func @pushdown_innermost_oob(
 // result that has external consumers. It inserts the slice+pad after that
 // forall and RAUWs uses to the padded result.
 // CHECK-LABEL: func.func @pushdown_innermost_oob
-// CHECK:         %[[VB:.+]] = affine.apply
-// CHECK:         %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0 validBytes(%[[VB]])
+// CHECK:         %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0
 // CHECK-SAME:        : tensor<64x?xf16>
 // CHECK:         %[[OUTER:.+]] = scf.forall
 // CHECK:           iree_gpu.coalesced_gather_dma %[[CAST]]
@@ -139,7 +138,7 @@ func.func @pushdown_both_oob(
   return %filled : tensor<64x16xf16>
 }
 // CHECK-LABEL: func.func @pushdown_both_oob
-// CHECK:       iree_gpu.buffer_resource_cast %arg0 validBytes(%{{.+}}) : tensor<?x?xf16>
+// CHECK:       iree_gpu.buffer_resource_cast %arg0 : tensor<?x?xf16>
 // CHECK:       tensor.extract_slice
 // CHECK-SAME:      [0, 0] [64, %{{.*}}] [1, 1]
 // CHECK:       tensor.pad
@@ -200,8 +199,7 @@ func.func @single_forall_matmul_consumer(
   return %result : tensor<4x8xf32>
 }
 // CHECK-LABEL: func.func @single_forall_matmul_consumer
-// CHECK:       %[[VB:.+]] = affine.apply
-// CHECK:       %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0 validBytes(%[[VB]])
+// CHECK:       %[[CAST:.+]] = iree_gpu.buffer_resource_cast %arg0
 // CHECK-SAME:      : tensor<4x?xf16>
 // CHECK:       %[[LHS:.+]] = scf.forall
 // CHECK:         iree_gpu.coalesced_gather_dma %[[CAST]]
@@ -329,5 +327,5 @@ func.func @consumer_pad_skipped_even_when_root_misaligned(
   return %filled : tensor<32x128xf16>
 }
 // CHECK-LABEL: func.func @consumer_pad_skipped_even_when_root_misaligned
-// CHECK:       iree_gpu.buffer_resource_cast %arg0 validBytes
+// CHECK:       iree_gpu.buffer_resource_cast %arg0
 // CHECK-NOT:   tensor.pad
