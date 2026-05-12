@@ -289,6 +289,64 @@ func.func @attention_20x4096x64x4096x64() {
 // CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 
+// CHECK-LABEL: func.func @attention_1x16x32x16x24_unaligned_head()
+
+// Based on https://github.com/iree-org/iree/issues/24221, where Q/K have head
+// dimension 32 and V/O have unaligned head dimension 24.
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#map3 = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @attention_1x16x32x16x24_unaligned_head() {
+  %cst = arith.constant 1.767767e-01 : f16
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x32xf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x32xf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x24xf16>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x16x24xf32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1, 16, 32], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x32xf16>> -> tensor<1x16x32xf16>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [1, 16, 32], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x32xf16>> -> tensor<1x16x32xf16>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [1, 16, 24], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x16x24xf16>> -> tensor<1x16x24xf16>
+  %7 = tensor.empty() : tensor<1x16x24xf32>
+  %8 = tensor.empty() : tensor<1x16xf32>
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %cst_2 = arith.constant 0.000000e+00 : f32
+  %9 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<1x16x24xf32>) -> tensor<1x16x24xf32>
+  %10 = linalg.fill ins(%cst_1 : f32) outs(%8 : tensor<1x16xf32>) -> tensor<1x16xf32>
+  %11 = linalg.fill ins(%cst_2 : f32) outs(%8 : tensor<1x16xf32>) -> tensor<1x16xf32>
+  %12:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<1x16x32xf16>, tensor<1x16x32xf16>, tensor<1x16x24xf16>, f16) outs(%9, %10, %11 : tensor<1x16x24xf32>, tensor<1x16xf32>, tensor<1x16xf32>) {
+  ^bb0(%arg0: f32):
+    iree_linalg_ext.yield %arg0 : f32
+  } -> tensor<1x16x24xf32>, tensor<1x16xf32>, tensor<1x16xf32>
+  iree_tensor_ext.dispatch.tensor.store %12#0, %3, offsets = [0, 0, 0], sizes = [1, 16, 24], strides = [1, 1, 1] : tensor<1x16x24xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x16x24xf32>>
+  return
+}
+
+// CHECK:                #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 1, 1, 1], [0, 1, 3, 4]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:                           mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16
+// CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 1, 1, 1], [0, 1, 2, 3]]
+// CHECK-SAME:           #iree_gpu.lowering_config
+// CHECK-SAME:                           reduction =  [0, 0, 0, 16, 0]
+// CHECK-SAME:                           workgroup =  [1, 16, 0, 0, 32]
+
+// -----
+
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+// CHECK-NOT:   prefetch_num_stages = 2
+
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64_f8()
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
