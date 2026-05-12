@@ -50,14 +50,6 @@ Value createFullyMaskedRowsFromScores(OpBuilder &builder, Location loc,
                                       ArrayRef<OpFoldResult> rowSizes,
                                       Value scores);
 
-/// Compute a row predicate for safe masked-softmax finalization directly from
-/// an attention mask. Integer masks are normalized to i1 and use `false`/0 as
-/// masked; floating-point masks use `-inf` as masked.
-Value createFullyMaskedRowsFromMask(OpBuilder &builder, Location loc,
-                                    AffineMap maskMap, AffineMap rowMap,
-                                    ArrayRef<OpFoldResult> rowSizes,
-                                    Value mask);
-
 /// Zero every element in rows whose row predicate is true.
 Value zeroFullyMaskedRows(OpBuilder &builder, Location loc, AffineMap valueMap,
                           AffineMap rowMap, Value value, Value fullyMaskedRows);

@@ -139,31 +139,6 @@ Value createFullyMaskedRowsFromScores(OpBuilder &builder, Location loc,
       });
 }
 
-Value createFullyMaskedRowsFromMask(OpBuilder &builder, Location loc,
-                                    AffineMap maskMap, AffineMap rowMap,
-                                    ArrayRef<OpFoldResult> rowSizes,
-                                    Value mask) {
-  return createFullyMaskedRows(
-      builder, loc, maskMap, rowMap, rowSizes, mask,
-      [](OpBuilder &b, Location loc, Value maskValue) -> Value {
-        Type maskType = maskValue.getType();
-        if (maskType.isInteger()) {
-          if (maskType.getIntOrFloatBitWidth() != 1) {
-            maskValue =
-                arith::TruncIOp::create(b, loc, b.getI1Type(), maskValue);
-          }
-          Value trueValue =
-              arith::ConstantOp::create(b, loc, b.getBoolAttr(/*value=*/true));
-          return arith::XOrIOp::create(b, loc, maskValue, trueValue);
-        }
-        Value negInf = arith::ConstantOp::create(
-            b, loc,
-            b.getFloatAttr(maskType, -std::numeric_limits<double>::infinity()));
-        return arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ,
-                                     maskValue, negInf);
-      });
-}
-
 Value zeroFullyMaskedRows(OpBuilder &builder, Location loc, AffineMap valueMap,
                           AffineMap rowMap, Value value,
                           Value fullyMaskedRows) {

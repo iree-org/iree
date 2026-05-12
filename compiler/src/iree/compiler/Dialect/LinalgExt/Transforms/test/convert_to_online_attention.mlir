@@ -66,17 +66,12 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 
 // CHECK-LABEL: func.func @masked_attention
 // CHECK-SAME: %[[MASK:.+]]: tensor<2x10x4096x4096xi1>
-// Masked: compute the fully-masked row predicate from the mask and use it to
-// zero those rows after normalization.
+// Masked: keep the fully-masked row guard fused with finalization.
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
-// CHECK: %[[FULLY_MASKED:.+]] = linalg.generic
-// CHECK-SAME: ins(%[[MASK]]
-// CHECK: arith.xori
-// CHECK: arith.andi
-// CHECK: linalg.yield
 // CHECK: linalg.generic
-// CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0, %[[FULLY_MASKED]]
+// CHECK-SAME: ins(%[[OUT]]#2, %[[OUT]]#0
 // CHECK: arith.divf
+// CHECK: arith.cmpf oeq
 // CHECK: arith.select
 // CHECK: arith.truncf
 // CHECK: linalg.yield
