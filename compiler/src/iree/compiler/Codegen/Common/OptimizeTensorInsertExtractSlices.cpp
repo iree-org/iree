@@ -898,11 +898,8 @@ canonicalizeLoopCarriedTransferState(mlir::FunctionOpInterface funcOp,
   }
   {
     RewritePatternSet patterns(context);
-    // This intentionally runs independent of fold-identity-slices: it only
-    // retargets transfer reads through identity slices to unblock transfer
-    // folding and does not generally erase identity slice ops.
-    patterns.add<FoldTransferWriteChain, FoldTransferReadOfIdentitySlice,
-                 FoldTransferRAW, FoldTransferReadOfEmptyTensor>(context);
+    patterns.add<FoldTransferWriteChain, FoldTransferRAW,
+                 FoldTransferReadOfEmptyTensor>(context);
     vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return failure();
@@ -988,6 +985,9 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   patterns.add<PromoteLoopCarriedTransferIterArg>(context);
   scf::ForOp::getCanonicalizationPatterns(patterns, context);
   vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+  // Run after subset hoisting so retargeting reads through identity slices
+  // does not create direct tensor iter_arg uses that block subset matching.
+  patterns.add<FoldTransferReadOfIdentitySlice>(context);
   if (foldIdentitySlices) {
     patterns.add<CastLikeExtractSliceOpFolder>(context);
     patterns.add<CastLikeInsertSliceOpFolder>(context);
