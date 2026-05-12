@@ -164,18 +164,14 @@ getGlobalLoadDMALayout(MLIRContext *context, ArrayRef<int64_t> shape,
   return failure();
 }
 
-static std::optional<IREE::Codegen::XORShuffleAttr>
-getDestXorSwizzleAttr(Value dest) {
+static IREE::Codegen::XORShuffleAttr getDestXorSwizzleAttr(Value dest) {
   while (auto viewOp = dest.getDefiningOp<ViewLikeOpInterface>()) {
     dest = viewOp.getViewSource();
   }
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
-    if (auto xorSwizzle =
-            dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle())) {
-      return xorSwizzle;
-    }
+    return dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle());
   }
-  return std::nullopt;
+  return {};
 }
 
 struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
@@ -227,8 +223,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
       return rewriter.notifyMatchFailure(
           op, "dest does not have workgroup address space");
     }
-    std::optional<IREE::Codegen::XORShuffleAttr> destSwizzle =
-        getDestXorSwizzleAttr(op.getDest());
+
     // For now, only support contiguous memrefs.
     // TODO(#23782): Relax this constraint.
     if (!destType.areTrailingDimsContiguous(destType.getRank())) {
@@ -261,15 +256,23 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     int64_t destRank = destType.getRank();
     MLIRContext *context = op.getContext();
 
+    IREE::Codegen::XORShuffleAttr destSwizzle =
+        getDestXorSwizzleAttr(op.getDest());
     // When dest has a swizzle_hint, filter DMA sizes to those where
     // elementsPerDMA fits within one swizzle access block. This ensures
     // gather_to_lds writes contiguous dest elements that all map to contiguous
     // source elements under the XOR permutation.
     SmallVector<int64_t> filteredDmaSizes(dmaSizes);
     if (destSwizzle) {
-      int64_t accessElems = destSwizzle->getAccessElementCount();
+      int64_t accessElems = destSwizzle.getAccessElementCount();
       llvm::erase_if(filteredDmaSizes, [&](int64_t dmaSize) {
+        if (dmaSize % elementBitWidth != 0) {
+          return true;
+        }
         int64_t elemsPerDMA = dmaSize / elementBitWidth;
+        if (elemsPerDMA == 0) {
+          return true;
+        }
         return accessElems % elemsPerDMA != 0;
       });
     }
@@ -346,7 +349,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
       Value flatLane = affine::AffineLinearizeIndexOp::create(
           rewriter, loc, multiDimLane, transferShape, /*disjoint=*/true);
       Value swizzledFlat = applyInverseXorSwizzleToDMASourceOffset(
-          rewriter, loc, flatLane, *destSwizzle, op.getDest());
+          rewriter, loc, flatLane, destSwizzle, op.getDest());
 
       auto coords = affine::AffineDelinearizeIndexOp::create(
           rewriter, loc, swizzledFlat, transferShape);
