@@ -377,10 +377,17 @@ public:
       }
       return dyn_cast<ArrayAttr>(groups[binding]);
     };
+    unsigned numFuncArgs = funcOp.getNumArguments();
+    auto lookupPerArgAttr = [&](int64_t binding, StringRef name) -> ArrayAttr {
+      if (binding < 0 || static_cast<unsigned>(binding) >= numFuncArgs) {
+        return nullptr;
+      }
+      return funcOp.getArgAttrOfType<ArrayAttr>(binding, name);
+    };
     for (IREE::HAL::InterfaceBindingSubspanOp subspan : subspans) {
       int64_t binding = subspan.getBinding().getSExtValue();
-      ArrayAttr correlationAttr = funcOp.getArgAttrOfType<ArrayAttr>(
-          binding, "stream.binding_correlation");
+      ArrayAttr correlationAttr =
+          lookupPerArgAttr(binding, "stream.binding_correlation");
       if (!correlationAttr) {
         correlationAttr = lookupGroupForBinding(correlationGroups, binding);
       }
@@ -393,7 +400,7 @@ public:
         }
       }
       ArrayAttr noaliasAttr =
-          funcOp.getArgAttrOfType<ArrayAttr>(binding, "stream.binding_noalias");
+          lookupPerArgAttr(binding, "stream.binding_noalias");
       if (!noaliasAttr) {
         noaliasAttr = lookupGroupForBinding(noaliasGroups, binding);
       }
