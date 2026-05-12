@@ -51,6 +51,7 @@
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
+#include "iree/compiler/Utils/PassDebugBreak.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
@@ -800,6 +801,16 @@ std::unique_ptr<PassManager> Invocation::createPassManager() {
     mlir::applyDefaultTimingPassManagerCLOptions(*passManager);
   }
   passManager->addInstrumentation(std::make_unique<PassTracing>());
+  if (auto breakInstrumentation = createPassDebugBreakInstrumentationFromFlags(
+          passManager->getContext())) {
+    // The instrumentation's ctor/dtor toggles MLIRContext multithreading
+    // for its own lifetime, so nested op pipelines that MLIR may run in
+    // parallel don't race on stdin or the exchange file while a break is
+    // active. Scoping lives there so long-lived sessions (e.g. Python
+    // bindings) that reuse the context aren't silently left
+    // single-threaded after this invocation.
+    passManager->addInstrumentation(std::move(breakInstrumentation));
+  }
   passManager->enableVerifier(enableVerifier);
 
   for (auto &init : passManagerInitializers) {
