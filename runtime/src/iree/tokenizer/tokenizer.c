@@ -2780,16 +2780,28 @@ iree_status_t iree_tokenizer_encode_state_feed(
   *out_bytes_consumed = original_chunk_size - chunk.size;
   *out_token_count = total_tokens;
 
-  // Detect deadlock: input remains but no progress was made. With partial
-  // segment handling this should not happen in practice — the pump enters
-  // partial mode when the ring is full with no segment boundaries, and BPE's
-  // frozen token theorem guarantees progress. This can only fire if the ring
-  // buffer is smaller than max_token_length (configuration error).
+  // Detect no-progress: input remains but feed() produced nothing.
+  // Disambiguate by the caller-supplied output capacity:
+  //   - capacity 0: the outer iree_tokenizer_encode loop has filled
+  //     the parent buffer; sub_output.capacity = output.capacity -
+  //     total_tokens reached 0 with input still pending. Caller
+  //     needs a bigger buffer (RESOURCE_EXHAUSTED).
+  //   - capacity > 0: pump had room and still didn't advance. A
+  //     real pump-invariant violation (ring smaller than
+  //     max_token_length, or a regression in partial-segment
+  //     handling). Surface as INTERNAL so the bug is loud.
   if (iree_status_is_ok(status) && chunk.size > 0 && *out_bytes_consumed == 0 &&
       total_tokens == 0) {
+    if (output.capacity == 0) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "encode: output buffer full with input remaining "
+                              "(pending_input=%" PRIhsz " bytes)",
+                              chunk.size);
+    }
     return iree_make_status(
         IREE_STATUS_INTERNAL,
-        "encode deadlock: no progress despite partial segment handling "
+        "encode pump invariant violated: no progress with output room "
+        "and no pending pipeline data "
         "(logical_capacity=%" PRIhsz " bytes, used=%" PRIhsz
         " bytes, pending_input=%" PRIhsz " bytes, has_partial=%" PRIu32 ")",
         state->capacity_mask + 1, state->write_position - state->read_position,
