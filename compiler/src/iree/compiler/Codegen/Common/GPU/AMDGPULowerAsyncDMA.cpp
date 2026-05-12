@@ -170,7 +170,10 @@ getDestXorSwizzleAttr(Value dest) {
     dest = viewOp.getViewSource();
   }
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
-    return dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle());
+    if (auto xorSwizzle =
+            dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle())) {
+      return xorSwizzle;
+    }
   }
   return std::nullopt;
 }
@@ -314,44 +317,46 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distributedShape, tileShape)) {
 
-      SmallVector<Value> srcIndices;
-      if (destSwizzle) {
-        // Swizzled source indices: compute per-lane tile-relative offset,
-        // apply swizzle (self-inverse), delinearize, map to source coords.
-        // Zero base because the swizzle operates on tile-relative positions;
-        // source base indices are added via the permutation map loop below.
-        SmallVector<Value> zeroBase(destRank, c0);
-        SmallVector<Value> multiDimLane = getTransferIndicesFromNestedLayout(
-            rewriter, zeroBase, offsets, dmaLayout, destIdentityMap,
-            warpIndices, threadIndices);
-        Value flatLane = affine::AffineLinearizeIndexOp::create(
-            rewriter, loc, multiDimLane, transferShape, /*disjoint=*/true);
-        Value swizzledFlat = applyInverseXorSwizzleToDMASourceOffset(
-            rewriter, loc, flatLane, *destSwizzle, op.getDest());
-
-        auto coords = affine::AffineDelinearizeIndexOp::create(
-            rewriter, loc, swizzledFlat, transferShape);
-
-        srcIndices = SmallVector<Value>(op.getSourceIndices());
-        for (auto [i, dim] : llvm::enumerate(permutationMap.getResults())) {
-          unsigned pos = cast<AffineDimExpr>(dim).getPosition();
-          srcIndices[pos] = arith::AddIOp::create(
-              rewriter, loc, srcIndices[pos], coords.getResult(i));
-        }
-      } else {
-        // Source indices: divergent (include thread contribution).
-        SmallVector<Value> srcBaseIndices(op.getSourceIndices());
-        srcIndices = getTransferIndicesFromNestedLayout(
-            rewriter, srcBaseIndices, offsets, dmaLayout, permutationMap,
-            warpIndices, threadIndices);
-      }
-
       // Dest indices: uniform (zero thread contribution).
       SmallVector<Value> destBaseIndices(op.getDestIndices());
       SmallVector<Value> dstIndices = getTransferIndicesFromNestedLayout(
           rewriter, destBaseIndices, offsets, dmaLayout, destIdentityMap,
           warpIndices, zeroThreadIndices);
 
+      if (!destSwizzle) {
+        // Source indices: divergent (include thread contribution).
+        SmallVector<Value> srcBaseIndices(op.getSourceIndices());
+        SmallVector<Value> srcIndices = getTransferIndicesFromNestedLayout(
+            rewriter, srcBaseIndices, offsets, dmaLayout, permutationMap,
+            warpIndices, threadIndices);
+
+        amdgpu::GatherToLDSOp::create(rewriter, loc, op.getSource(), srcIndices,
+                                      op.getDest(), dstIndices,
+                                      TypeAttr::get(transferType));
+        continue;
+      }
+      // Swizzled source indices: compute per-lane tile-relative offset,
+      // apply swizzle (self-inverse), delinearize, map to source coords.
+      // Zero base because the swizzle operates on tile-relative positions;
+      // source base indices are added via the permutation map loop below.
+      llvm::Repeated<Value> zeroBase(destRank, c0);
+      SmallVector<Value> multiDimLane = getTransferIndicesFromNestedLayout(
+          rewriter, zeroBase, offsets, dmaLayout, destIdentityMap, warpIndices,
+          threadIndices);
+      Value flatLane = affine::AffineLinearizeIndexOp::create(
+          rewriter, loc, multiDimLane, transferShape, /*disjoint=*/true);
+      Value swizzledFlat = applyInverseXorSwizzleToDMASourceOffset(
+          rewriter, loc, flatLane, *destSwizzle, op.getDest());
+
+      auto coords = affine::AffineDelinearizeIndexOp::create(
+          rewriter, loc, swizzledFlat, transferShape);
+
+      SmallVector<Value> srcIndices(op.getSourceIndices());
+      for (auto [i, dim] : llvm::enumerate(permutationMap.getResults())) {
+        unsigned pos = cast<AffineDimExpr>(dim).getPosition();
+        srcIndices[pos] = arith::AddIOp::create(rewriter, loc, srcIndices[pos],
+                                                coords.getResult(i));
+      }
       amdgpu::GatherToLDSOp::create(rewriter, loc, op.getSource(), srcIndices,
                                     op.getDest(), dstIndices,
                                     TypeAttr::get(transferType));

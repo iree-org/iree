@@ -32,8 +32,8 @@
 // CHECK:         %[[SRC_D1:.+]] = affine.linearize_index [%[[DELIN]]#2, %[[J]]] by (8, 8)
 // CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B0]], %[[SRC_D1]]], %[[DST]][%[[I]], %[[J]]] : vector<8xf16>
 //   Batch 1: source dim0 includes batch offset + thread, dest dim0 includes batch offset only.
-// CHECK:         %[[SRC_D0_B1:.+]] = affine.linearize_index [%[[C1]], %[[DELIN]]#1, %[[I]]] by (2, 8, 1)
 // CHECK:         %[[DST_D0_B1:.+]] = affine.linearize_index [%[[C1]], %[[C0]], %[[I]]] by (2, 8, 1)
+// CHECK:         %[[SRC_D0_B1:.+]] = affine.linearize_index [%[[C1]], %[[DELIN]]#1, %[[I]]] by (2, 8, 1)
 // CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B1]], %[[SRC_D1]]], %[[DST]][%[[DST_D0_B1]], %[[J]]] : vector<8xf16>
 // CHECK-NOT:     amdgpu.gather_to_lds
 // CHECK-NOT:     iree_gpu.async_dma
@@ -81,15 +81,15 @@ func.func @lower_async_dma_basic(
 // CHECK:         %[[SG_DELIN:.+]]:3 = affine.delinearize_index %[[TID]] into (4, 64)
 //   Thread delinearization: tid -> (_, thread_d0, thread_d1).
 // CHECK:         %[[TH_DELIN:.+]]:3 = affine.delinearize_index %[[TID]] into (8, 8)
+//   Batch 0: dst dim0 = subgroup*batch*thread + i (uniform, no thread offset).
+// CHECK:         %[[DST_D0_B0:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C0]], %[[C0]], %[[I]]] by (4, 2, 8, 1)
 //   Batch 0: src dim0 = subgroup*batch*thread + thread_d0 + i (divergent).
 // CHECK:         %[[SRC_D0_B0:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C0]], %[[TH_DELIN]]#1, %[[I]]] by (4, 2, 8, 1)
 // CHECK:         %[[SRC_D1:.+]] = affine.linearize_index [%[[TH_DELIN]]#2, %[[J]]] by (8, 8)
-//   Batch 0: dst dim0 = subgroup*batch*thread + i (uniform, no thread offset).
-// CHECK:         %[[DST_D0_B0:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C0]], %[[C0]], %[[I]]] by (4, 2, 8, 1)
 // CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B0]], %[[SRC_D1]]], %[[DST]][%[[DST_D0_B0]], %[[J]]] : vector<8xf16>
 //   Batch 1: batch index advances by 1 in the batch dimension.
-// CHECK:         %[[SRC_D0_B1:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C1]], %[[TH_DELIN]]#1, %[[I]]] by (4, 2, 8, 1)
 // CHECK:         %[[DST_D0_B1:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C1]], %[[C0]], %[[I]]] by (4, 2, 8, 1)
+// CHECK:         %[[SRC_D0_B1:.+]] = affine.linearize_index [%[[SG_DELIN]]#1, %[[C1]], %[[TH_DELIN]]#1, %[[I]]] by (4, 2, 8, 1)
 // CHECK:         amdgpu.gather_to_lds %[[SRC]][%[[SRC_D0_B1]], %[[SRC_D1]]], %[[DST]][%[[DST_D0_B1]], %[[J]]] : vector<8xf16>
 // CHECK-NOT:     amdgpu.gather_to_lds
 // CHECK-NOT:     iree_gpu.async_dma
