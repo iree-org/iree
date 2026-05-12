@@ -49,6 +49,7 @@ iree_cc_library(
   SRCS
     "thread.c"
     "thread_darwin.c"
+    "thread_generic.c"
     "thread_pthreads.c"
     "thread_win32.c"
   DEPS

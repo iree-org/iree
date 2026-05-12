@@ -69,6 +69,19 @@ macro(iree_setup_toolchain)
   # Supports dynamic library loading.
   #-----------------------------------------------------------------------------
 
+  # Bare-metal "Generic" targets (such as riscv*-unknown-elf) typically don't
+  # ship libdl in their sysroots. In those environments we don't support
+  # dynamic library loading anyway, and attempting to link against -ldl causes
+  # link failures. We cannot rely on setting CMAKE_DL_LIBS only from a
+  # toolchain file, as CMake's Platform modules (for example Platform/GNU.cmake
+  # for GNU-style compilers) may later reset CMAKE_DL_LIBS back to "dl".
+  # Clear it here so that libraries which depend on CMAKE_DL_LIBS (for example
+  # iree_base_threading::thread and iree_base_internal::dynamic_library) don't
+  # propagate an unusable -ldl into targets on Generic platforms.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
+    set(CMAKE_DL_LIBS "")
+  endif()
+
   set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
   check_symbol_exists(dlopen dlfcn.h IREE_HAVE_DLOPEN)
   unset(CMAKE_REQUIRED_LIBRARIES)
