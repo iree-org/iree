@@ -7,7 +7,9 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -347,6 +349,22 @@ struct LLVMGPULower1DVectorOpsPass final
         patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
+    }
+
+    {
+      // Any other transfer-op that didn't get lowered to vector.load
+      // or vector.store directly.
+      RewritePatternSet vectorToLoopsPatterns(&getContext());
+      VectorTransferToSCFOptions vectorToSCFOptions;
+      vectorToSCFOptions.enableFullUnroll();
+      populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
+                                            vectorToSCFOptions);
+      memref::populateFoldMemRefAliasOpPatterns(vectorToLoopsPatterns);
+      vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
+      if (failed(applyPatternsGreedily(getOperation(),
+                                       std::move(vectorToLoopsPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };
