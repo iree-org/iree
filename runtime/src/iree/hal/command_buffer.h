@@ -172,6 +172,17 @@ static inline iree_hal_buffer_ref_list_t iree_hal_buffer_ref_list_empty(void) {
   return list;
 }
 
+/// @brief Normalize buffer reference
+///
+/// If a buffer reference uses a subspan buffer, change it to a reference
+/// to the underlying allocated buffer instead and update the offset.
+/// If the reference uses IREE_HAL_WHOLE_BUFFER, replace it with the actual
+/// length in bytes.
+///
+/// @param[in,out] buffer_ref buffer reference being normalized
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_ref_normalize(iree_hal_buffer_ref_t* buffer_ref);
+
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
@@ -693,6 +704,17 @@ static inline bool iree_hal_buffer_binding_table_is_empty(
     iree_hal_buffer_binding_table_t binding_table) {
   return binding_table.count == 0;
 }
+
+/// @brief Normalize buffer binding
+///
+/// If a buffer binding uses a subspan buffer, change it to a binding
+/// to the underlying allocated buffer instead and update the offset.
+/// If the binding uses IREE_HAL_WHOLE_BUFFER, replace it with the actual
+/// length in bytes.
+///
+/// @param[in,out] binding buffer binding being normalized
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_binding_normalize(iree_hal_buffer_binding_t* binding);
 
 // Returns an unretained buffer specified in |buffer_ref| or from
 // |binding_table| with the slot specified if indirect. If the caller needs to
