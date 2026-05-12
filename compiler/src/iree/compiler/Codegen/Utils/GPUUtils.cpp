@@ -1372,18 +1372,6 @@ getExecutableVariantOps(mlir::ModuleOp moduleOp) {
   return executableVariantOps;
 }
 
-SmallVector<Operation *> getTunerRootOps(mlir::ModuleOp moduleOp) {
-  SmallVector<Operation *> rootOps;
-
-  moduleOp.walk([&](Operation *op) {
-    if (hasRootOpInfo(op)) {
-      rootOps.push_back(op);
-    }
-  });
-
-  return rootOps;
-}
-
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
     IREE::Codegen::XORShuffleAttr swizzle, Value dest) {

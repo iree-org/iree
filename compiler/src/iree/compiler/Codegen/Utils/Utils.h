@@ -59,6 +59,10 @@ getConfigTargetInfo(DictionaryAttr targetConfig);
 std::optional<StringRef> getConfigTargetTriple(DictionaryAttr targetConfig);
 std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig);
 
+/// Returns all operations within the given operation that are marked with the
+// tuner root op attribute (i.e., have the `root_op` UnitAttr).
+SmallVector<Operation *> getTunerRootOps(Operation *scopeOp);
+
 /// Methods to add attributes to the `config` list.
 void addConfigCpuFeatures(MLIRContext *context, StringRef cpuFeatures,
                           SmallVectorImpl<NamedAttribute> &config);

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -245,7 +246,7 @@ void ireeCodegenGetTunerRootOps(MlirModule module, size_t *numOps,
 
   mlir::ModuleOp moduleOp = unwrap(module);
   llvm::SmallVector<mlir::Operation *> tunerRootOps =
-      mlir::iree_compiler::getTunerRootOps(moduleOp);
+      mlir::iree_compiler::getTunerRootOps(moduleOp.getOperation());
 
   if (!rootOps) {
     *numOps = tunerRootOps.size();
