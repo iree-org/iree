@@ -172,7 +172,7 @@ getPromotionCandidate(Operation *op, const PromotionTypeMap &promotionTypes) {
         return shouldPromoteCandidate(gather.getOperation(),
                                       gather.getResult());
       })
-      .Default([](Operation *) { return std::nullopt; });
+      .Default(std::nullopt);
 }
 
 /// Materialize promotion of operands to LDS.
