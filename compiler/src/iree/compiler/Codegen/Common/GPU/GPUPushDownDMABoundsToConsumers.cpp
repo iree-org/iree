@@ -146,15 +146,12 @@ static Value walkUpSharedOuts(Value v) {
   }
 }
 
-// When the DMA source's innermost row size in bytes is not DWORD (4-byte)
-// aligned, the AMD HW partial-DWORD OOB clamp zeroes valid bytes at the
-// buffer end. Wrap the source with an iree_gpu.buffer_resource_cast carrying
-// the `pad_to_dword` attribute. Bufferization will lower this to an
-// amdgpu.fat_raw_buffer_cast whose validBytes is rounded up to the next
-// DWORD (with a 3-byte safety margin), keeping the trailing partial DWORD
-// in-bounds. The garbage in bytes [naturalBytes, roundedBytes) lands in
-// masked LDS columns and is discarded by the consumer-side tensor.pad
-// inserted below.
+// Wrap the DMA source's root tensor with a plain iree_gpu.buffer_resource_cast.
+// Bufferization detects the misaligned innermost row from the bufferized
+// memref's shape and emits the corresponding amdgpu.fat_raw_buffer_cast with
+// a DWORD-rounded validBytes, keeping the trailing partial DWORD in-bounds.
+// Garbage in the rounded tail lands in masked LDS columns and is discarded
+// by the consumer-side tensor.pad inserted below.
 //
 // Returns failure when no rewrite is needed (already aligned, dynamic
 // element bit width, etc.). Source is mutated in place.
@@ -200,22 +197,17 @@ padSourceBufferDescriptorToDWORD(IRRewriter &rewriter,
   }
   unsigned rootRank = rootTy.getRank();
 
-  // Skip when the root buffer's innermost row is statically DWORD-aligned.
-  // The wrap exists to guard against the HW partial-DWORD clamp zeroing
-  // valid bytes at the buffer END; if the buffer end is naturally DWORD-
-  // aligned (which holds whenever the root's innermost row in bytes is
-  // divisible by 4 in row-major layout), no straddle is possible and the
-  // wrap is unnecessary. Catches the common "shape-dynamic but root-aligned"
-  // case (e.g. NxN f16 with N even, K-block tiling produces tensor<32x?xf16>
-  // but the root is tensor<NxNxf16> with N*2 % 4 == 0).
+  // Skip when the root's innermost row is statically DWORD-aligned — no
+  // straddle is possible at the buffer end. Catches the "shape-dynamic but
+  // root-aligned" case (e.g. K-block slice tensor<32x?xf16> of an even-N
+  // root tensor<NxNxf16>).
   int64_t rootInnermost = rootTy.getDimSize(rootRank - 1);
   if (!ShapedType::isDynamic(rootInnermost) &&
       (rootInnermost * elemBytes) % 4 == 0) {
     return failure();
   }
 
-  // If a plain buffer_resource_cast already wraps the root, skip — re-wrapping
-  // would just be redundant.
+  // Skip if the root is already wrapped — re-wrapping would be redundant.
   if (root.getDefiningOp<IREE::GPU::BufferResourceCastOp>()) {
     return failure();
   }

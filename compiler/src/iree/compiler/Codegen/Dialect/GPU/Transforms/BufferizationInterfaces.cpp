@@ -614,22 +614,18 @@ struct BufferResourceCastOpBufferizationInterface
             bufferMemrefType.getMemorySpace())) {
       isFatRawBuffer = fatAddr.getValue() == amdgpu::AddressSpace::FatRawBuffer;
     }
-    // Decide if we need a DWORD-padded validBytes override. We need one when
-    // the bufferized memref's innermost dim's byte count is dynamic or
-    // statically not DWORD-aligned: in that case the per-lane DMA can issue a
-    // DWORD load that straddles past the buffer end, which AMD CDNA's per-
-    // DWORD OOB clamp would zero. A widened validBytes keeps the straddle
-    // in-bounds. For statically DWORD-aligned innermost rows the lane
-    // accesses align cleanly to DWORD boundaries and no override is needed
-    // (preserves the original behavior for cache-swizzle and other plain
-    // resource casts on aligned tensors).
-    Value validBytes =
-        computeDwordPadValidBytesIfNeeded(rewriter, castOp, buffer.value());
+    // Compute a DWORD-padded validBytes only for memrefs we may re-cast.
+    // Keeps the helper from emitting arith ops that would be dropped on the
+    // floor when the cast bufferizes in place (e.g., workgroup space).
+    Value validBytes;
+    if (isStorageBuffer || isFatRawBuffer) {
+      validBytes =
+          computeDwordPadValidBytesIfNeeded(rewriter, castOp, buffer.value());
+    }
 
-    // Only emit a fat_raw_buffer_cast when:
-    //   - input is in storage_buffer space (the original case), OR
-    //   - input is already in fat_raw_buffer space AND we want to install a
-    //     widened validBytes (we route the new cast around the existing one).
+    // Re-cast when the input is in storage_buffer space, or when it is
+    // already a fat_raw_buffer but the override widens the bounds (route the
+    // new cast around the existing one).
     bool needsNewCast = isStorageBuffer || (isFatRawBuffer && validBytes);
     if (needsNewCast) {
       Location loc = castOp.getLoc();
@@ -729,7 +725,6 @@ private:
       naturalBytes = arith::MulIOp::create(rewriter, loc, naturalBytes, dynI64);
     }
 
-    // roundUp(N + 3, 4) = ((N + 3 + 3) / 4) * 4 = ((N + 6) >> 2) << 2.
     Value six =
         arith::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(6));
     Value four =
