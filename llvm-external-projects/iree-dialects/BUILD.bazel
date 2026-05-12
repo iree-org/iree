@@ -7,8 +7,6 @@ package(
     licenses = ["notice"],
 )
 
-exports_files(glob(["include/iree-dialects/Dialect/Input/*.td"], allow_empty = True))
-
 exports_files(glob(["python/*.cpp"], allow_empty = True))
 
 ################################################################################
@@ -24,13 +22,6 @@ filegroup(
 ################################################################################
 # Tablegen exports
 ################################################################################
-
-filegroup(
-    name = "TdFilegroup",
-    srcs = glob([
-        "include/iree-dialects/Dialect/Input/*.td",
-    ], allow_empty = True),
-)
 
 td_library(
     name = "TdFiles",
