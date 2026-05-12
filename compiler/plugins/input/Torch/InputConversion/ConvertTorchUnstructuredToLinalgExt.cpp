@@ -304,15 +304,18 @@ static Type expandRank0TorchTensorType(Type type,
                                          tensorType.getOptionalDtype());
 }
 
-/// Inlines mask_mod with tensor index operands.
+/// Inlines a simple single-block function while letting callers recompute each
+/// cloned op's result types from its remapped operands.
 ///
-/// The callback is authored over scalar Torch tensors, but mask_mod is
-/// independent of the score value. Calling it with broadcastable index tensors
-/// lets normal Torch-to-linalg lowering produce a tensor mask instead of a
-/// rank-0 tensor payload inside the online_attention score region.
-static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
-    PatternRewriter &rewriter, Location loc, FlatSymbolRefAttr funcSymbol,
-    ValueRange args, ArrayRef<int64_t> tensorShape, Operation *contextOp) {
+/// This handles the generic symbol lookup, argument mapping, operand remapping,
+/// and result mapping mechanics. The result type callback keeps clones
+/// type-consistent when the replacement arguments have different shapes than
+/// the original scalar function arguments.
+static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
+    PatternRewriter &rewriter, FlatSymbolRefAttr funcSymbol, ValueRange args,
+    Operation *contextOp,
+    llvm::function_ref<SmallVector<Type>(Operation &, ValueRange)>
+        getResultTypes) {
   auto module = contextOp->getParentOfType<ModuleOp>();
   if (!module) {
     return failure();
@@ -344,6 +347,32 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
       operands.push_back(mapper.lookupOrDefault(operand));
     }
 
+    OperationState state(op.getLoc(), op.getName(), operands,
+                         getResultTypes(op, operands), op.getAttrs());
+    Operation *clonedOp = rewriter.create(state);
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapper.map(oldResult, newResult);
+    }
+  }
+
+  SmallVector<Value> results;
+  for (Value operand : returnOp.getOperands()) {
+    results.push_back(mapper.lookupOrDefault(operand));
+  }
+  return results;
+}
+
+/// Inlines mask_mod with tensor index operands.
+///
+/// The callback is authored over scalar Torch tensors, but mask_mod is
+/// independent of the score value. Calling it with broadcastable index tensors
+/// lets normal Torch-to-linalg lowering produce a tensor mask instead of a
+/// rank-0 tensor payload inside the online_attention score region.
+static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
+    PatternRewriter &rewriter, Location loc, FlatSymbolRefAttr funcSymbol,
+    ValueRange args, ArrayRef<int64_t> tensorShape, Operation *contextOp) {
+  auto getExpandedResultTypes = [&](Operation &op, ValueRange operands) {
     SmallVector<Value> tensorOperands;
     for (Value operand : operands) {
       if (isa<torch::Torch::BaseTensorType>(operand.getType())) {
@@ -363,20 +392,11 @@ static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
           expandRank0TorchTensorType(resultType, broadcastShape));
     }
 
-    OperationState state(op.getLoc(), op.getName(), operands, resultTypes,
-                         op.getAttrs());
-    Operation *clonedOp = rewriter.create(state);
-    for (auto [oldResult, newResult] :
-         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
-      mapper.map(oldResult, newResult);
-    }
-  }
+    return resultTypes;
+  };
 
-  SmallVector<Value> results;
-  for (Value operand : returnOp.getOperands()) {
-    results.push_back(mapper.lookupOrDefault(operand));
-  }
-  return results;
+  return inlineSingleBlockFunctionWithResultTypes(
+      rewriter, funcSymbol, args, contextOp, getExpandedResultTypes);
 }
 
 /// Builds the four callback index tensors: batch, head, query, and key/value.
@@ -429,14 +449,20 @@ static FailureOr<Value> createFlexAttentionMask(PatternRewriter &rewriter,
                                                 Operation *contextOp) {
   FailureOr<SmallVector<Value>> maskResults = inlineFlexAttentionMaskFunction(
       rewriter, loc, maskModSymbol, torchIndices, scoreShape, contextOp);
-  if (failed(maskResults) || maskResults->size() != 1) {
-    return failure();
+  if (failed(maskResults)) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "failed to inline flex_attention mask_mod");
+  }
+  if (maskResults->size() != 1) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected flex_attention mask_mod to return one result");
   }
 
   Value maskValue = (*maskResults)[0];
   auto maskType = dyn_cast<torch::Torch::ValueTensorType>(maskValue.getType());
   if (!maskType) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected flex_attention mask_mod to return a Torch tensor");
   }
 
   if (maskType.hasSizes() && !llvm::equal(maskType.getSizes(), scoreShape)) {
@@ -616,8 +642,7 @@ struct FlexAttentionOpConversion
       FailureOr<Value> mask = createFlexAttentionMask(
           rewriter, loc, maskModSymbol, torchIndices, scoreShape, op);
       if (failed(mask)) {
-        return rewriter.notifyMatchFailure(
-            op, "failed to lower flex_attention mask_mod");
+        return failure();
       }
       maskOperand = *mask;
     }
