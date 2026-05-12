@@ -94,19 +94,24 @@ struct TransferSegment {
                                // (subgroupSize * elementsPerLane).
 };
 
-/// Computes transfer segments for a given number of elements.
+/// Computes transfer segments for a subgroup-level DMA transfer.
+/// |subgroupTotalElements| is the total element count the subgroup must
+/// collectively copy (determined by the destination's contiguous region).
+/// |maxElementsPerLane| caps the per-lane element count to avoid reading
+/// or writing past contiguous stride boundaries in source or destination.
 /// Prioritizes larger DMA sizes to minimize the number of transfers.
 /// Returns failure if the elements cannot be fully covered by the available
 /// DMA sizes.
 static FailureOr<SmallVector<TransferSegment>>
-computeTransferSegments(int64_t totalElements, int64_t elementBits,
-                        int64_t subgroupSize, ArrayRef<int64_t> dmaSizes) {
+computeTransferSegments(int64_t subgroupTotalElements, int64_t elementBits,
+                        int64_t subgroupSize, ArrayRef<int64_t> dmaSizes,
+                        int64_t maxElementsPerLane) {
   // Sort DMA sizes in descending order to prioritize larger transfers.
   SmallVector<int64_t> sortedDmaSizes(dmaSizes);
   llvm::sort(sortedDmaSizes, std::greater<>());
 
   SmallVector<TransferSegment> segments;
-  int64_t remainingElements = totalElements;
+  int64_t remainingElements = subgroupTotalElements;
   int64_t currentOffset = 0;
 
   for (int64_t dmaSize : sortedDmaSizes) {
@@ -115,6 +120,10 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
       continue;
     }
     int64_t elementsPerLane = dmaSize / elementBits;
+
+    if (elementsPerLane > maxElementsPerLane) {
+      continue;
+    }
 
     // Calculate total elements per transfer (all lanes combined).
     int64_t elementsPerTransfer = subgroupSize * elementsPerLane;
@@ -148,7 +157,7 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
 
 /// Walk a memref value through ViewLikeOpInterface ops to find the root
 /// buffer that backs it.
-static Value getRootSource(Value val) {
+static Value traceThroughViewLikeOps(Value val) {
   while (auto viewOp = val.getDefiningOp<ViewLikeOpInterface>()) {
     val = viewOp.getViewSource();
   }
@@ -174,7 +183,7 @@ static void applyOOBClamping(OpBuilder &builder, Location loc, Value source,
     return;
   }
 
-  Value rootSource = getRootSource(source);
+  Value rootSource = traceThroughViewLikeOps(source);
   ArrayRef<int64_t> sourceShape = sourceType.getShape();
   Value anyOOB =
       arith::ConstantOp::create(builder, loc, builder.getBoolAttr(false));
@@ -220,7 +229,7 @@ static void applyOOBClamping(OpBuilder &builder, Location loc, Value source,
 /// self-inverse), std::nullopt otherwise.
 static std::optional<IREE::Codegen::XORShuffleAttr>
 getDestSwizzleAttr(Value dest) {
-  dest = getRootSource(dest);
+  dest = traceThroughViewLikeOps(dest);
   if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
     // Only XOR swizzle is self-inverse (swizzle(swizzle(x)) = x), so it can
     // be applied to source addresses as the inverse transformation. Other
@@ -262,6 +271,27 @@ findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
     }
   }
   return std::nullopt;
+}
+
+/// Returns {numStaticContiguous, linearSize} for the trailing contiguous
+/// portion of a memref type. At least 1 trailing dimension is always
+/// considered. Stops accumulating if a dynamic dimension is encountered.
+static std::pair<int64_t, int64_t>
+getContiguousTrailingLinearSize(MemRefType type) {
+  int64_t rank = type.getRank();
+  int64_t numContiguous = type.getNumContiguousTrailingDims();
+  numContiguous = std::max<int64_t>(numContiguous, 1);
+  ArrayRef<int64_t> shape = type.getShape();
+  int64_t linearSize = 1;
+  int64_t numStaticContiguous = 0;
+  for (int64_t i = rank - 1; i >= rank - numContiguous; --i) {
+    if (ShapedType::isDynamic(shape[i])) {
+      break;
+    }
+    linearSize *= shape[i];
+    ++numStaticContiguous;
+  }
+  return {numStaticContiguous, linearSize};
 }
 
 /// Generates source and destination indices for a GatherToLDS operation.
@@ -375,35 +405,25 @@ struct LowerCoalescedGatherDMAPattern final
     // linearize.
     //
     // Example: For dest <2x4x128> fully contiguous:
-    //   - numLinearDims = 3 -> linearize all dims (1024 elements)
+    //   - destNumLinear = 3 -> linearize all dims (1024 elements)
     // Example: For dest <2x4x128> with only dims 1-2 contiguous:
-    //   - numLinearDims = 2 -> linearize dims 1-2 (512 elements)
-    int64_t destRank = destShape.size();
-    int64_t numLinearDims = destType.getNumContiguousTrailingDims();
-    // Always linearize at least the innermost dimension.
-    numLinearDims = std::max<int64_t>(numLinearDims, 1);
-    LDBG() << "  Number of linear dims: " << numLinearDims;
+    //   - destNumLinear = 2 -> linearize dims 1-2 (512 elements)
+    auto [destNumLinear, destLinearSize] =
+        getContiguousTrailingLinearSize(destType);
+    LDBG() << "  Dest contiguous trailing dims: " << destNumLinear
+           << ", linear size: " << destLinearSize;
 
-    // Verify all linearized dimensions are static.
-    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
-      if (ShapedType::isDynamic(destShape[i])) {
-        return rewriter.notifyMatchFailure(
-            dmaOp, "dynamic dimension in linearized portion");
-      }
-    }
-
-    // Compute total elements in the linearized portion (last numLinearDims
-    // dims).
-    int64_t linearSize = 1;
-    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
-      linearSize *= destShape[i];
-    }
-    LDBG() << "  Linear size for segmentation: " << linearSize;
+    // Cap per-lane width to the minimum contiguous trailing size of source
+    // and destination, so gather_to_lds does not read/write past stride
+    // boundaries.
+    int64_t srcLinearSize = getContiguousTrailingLinearSize(sourceType).second;
+    int64_t maxElementsPerLane = std::min(srcLinearSize, destLinearSize);
+    LDBG() << "  Max elements per lane: " << maxElementsPerLane;
 
     // Compute transfer segments using the helper function.
     FailureOr<SmallVector<TransferSegment>> segmentsOrFailure =
-        computeTransferSegments(linearSize, elementBits, *subgroupSize,
-                                targetDmaSizes);
+        computeTransferSegments(destLinearSize, elementBits, *subgroupSize,
+                                targetDmaSizes, maxElementsPerLane);
     if (failed(segmentsOrFailure)) {
       return rewriter.notifyMatchFailure(
           dmaOp, "cannot cover elements with any combination "
@@ -452,7 +472,7 @@ struct LowerCoalescedGatherDMAPattern final
       segmentLaneOffsets.push_back(laneOffset);
     }
 
-    emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
+    emitTransfers(rewriter, loc, source, dest, destShape, destNumLinear,
                   elementType, indices, segments, segmentLaneOffsets,
                   dmaOp.getInBounds(), destSwizzle);
 

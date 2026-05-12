@@ -2408,4 +2408,20 @@ bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// Utility functions to collect root ops.
+//===----------------------------------------------------------------------===//
+
+SmallVector<Operation *> getTunerRootOps(Operation *scopeOp) {
+  SmallVector<Operation *> rootOps;
+
+  scopeOp->walk([&](Operation *op) {
+    if (hasRootOpInfo(op)) {
+      rootOps.push_back(op);
+    }
+  });
+
+  return rootOps;
+}
+
 } // namespace mlir::iree_compiler

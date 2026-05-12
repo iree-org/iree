@@ -17,6 +17,9 @@
 
 namespace mlir::iree_compiler {
 
+// Name prefix for problem size dimensions in diagnostics.
+constexpr StringLiteral kLoopRangePrefix = "dim_";
+
 /// Result of creating a ConstraintsOp shell with common constraints.
 struct ConstraintsOpShell {
   IREE::Codegen::ConstraintsOp op;

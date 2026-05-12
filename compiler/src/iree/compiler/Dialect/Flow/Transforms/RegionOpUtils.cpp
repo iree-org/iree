@@ -927,6 +927,16 @@ hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
       return true;
     }
 
+    Operation *ownerWorkgroupsOp =
+        user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>();
+    Operation *ownerRegionOp =
+        user->getParentOfType<IREE::Flow::DispatchRegionOp>();
+    Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
+
+    if (owner != dispatchOp) {
+      continue;
+    }
+
     if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(user);
         insertSlice && use.get() == insertSlice.getDest()) {
       return true;

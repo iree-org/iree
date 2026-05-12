@@ -773,6 +773,23 @@ static bool isFusableWithProducer(OpOperand &operand,
   return true;
 }
 
+static bool areAllFusionGroupUsesFusableWithProducer(
+    Operation *producer, const FusionGroup &fusionGroup,
+    const FusionTracker &tracker, FormDispatchRegionsPassOptions const &options,
+    bool fuseWithTruncate) {
+  return llvm::all_of(producer->getUses(), [&](OpOperand &use) {
+    Operation *useOwner = use.getOwner();
+    Operation *useOwnerAtProducerLevel =
+        producer->getBlock()->findAncestorOpInBlock(*useOwner);
+    if (!useOwnerAtProducerLevel ||
+        !fusionGroup.contains(useOwnerAtProducerLevel)) {
+      return true;
+    }
+    return useOwnerAtProducerLevel == useOwner &&
+           isFusableWithProducer(use, tracker, options, fuseWithTruncate);
+  });
+}
+
 /// Starting from the `root` op, traverse the operand use-def chain
 /// in reverse to fuse with producers.
 static void
@@ -802,7 +819,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      if (!isFusableWithProducer(operand, tracker, options, fuseWithTruncate)) {
+      if (!areAllFusionGroupUsesFusableWithProducer(
+              producer, fusionGroup, tracker, options, fuseWithTruncate)) {
         continue;
       }
 

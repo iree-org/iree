@@ -129,6 +129,7 @@ iree_cc_library(
   SRCS
     "tokenizer.c"
   DEPS
+    ::byte_level_tables
     ::decoder
     ::model
     ::normalizer

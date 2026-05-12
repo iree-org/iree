@@ -91,7 +91,7 @@ func.func @cpu_inner_tiled_f32_avx512_missing_intrinsics_m(
 ]
 func.func @cpu_inner_tiled_element_type_mismatch(
     %lhs: tensor<1x1x16x1xf16>, %rhs: tensor<1x1x16x1xf16>, %acc: tensor<1x1x16x16xf32>) -> tensor<1x1x16x16xf32> {
-  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<16x1xf16>' is incompatible with expected MMA tile type 'vector<16x1xf32>'}}
+  // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<16x1xf16>' is incompatible with expected MMA tile type 'vector<16x1x1xf32>'}}
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],

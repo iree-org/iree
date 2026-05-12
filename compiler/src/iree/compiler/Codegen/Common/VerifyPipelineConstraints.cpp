@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Matchers.h"
@@ -23,70 +24,73 @@ namespace mlir::iree_compiler {
 /// Walk a knobs template dictionary and extract concrete values from the
 /// corresponding lowering config. Returns failure if any knob has no
 /// matching value in the config (caller should skip verification).
+static LogicalResult extractKnobValue(Attribute templateAttr,
+                                      Attribute configAttr,
+                                      DenseMap<StringAttr, int64_t> &result) {
+  return llvm::TypeSwitch<Attribute, LogicalResult>(templateAttr)
+      .Case([&](DictionaryAttr nestedTemplate) -> LogicalResult {
+        auto nestedConfig = dyn_cast_or_null<DictionaryAttr>(configAttr);
+        if (!nestedConfig) {
+          return failure();
+        }
+        for (NamedAttribute entry : nestedTemplate) {
+          if (failed(extractKnobValue(entry.getValue(),
+                                      nestedConfig.get(entry.getName()),
+                                      result))) {
+            return failure();
+          }
+        }
+        return success();
+      })
+      .Case([&](ArrayAttr templateArr) -> LogicalResult {
+        auto configArr = dyn_cast_or_null<ArrayAttr>(configAttr);
+        if (!configArr || configArr.size() != templateArr.size()) {
+          return failure();
+        }
+        for (auto [tmpl, actual] :
+             llvm::zip_equal(templateArr.getValue(), configArr.getValue())) {
+          if (failed(extractKnobValue(tmpl, actual, result))) {
+            return failure();
+          }
+        }
+        return success();
+      })
+      .Case([&](IREE::Codegen::IntKnobAttr knob) -> LogicalResult {
+        auto intVal = dyn_cast_or_null<IntegerAttr>(configAttr);
+        if (!intVal) {
+          return failure();
+        }
+        result[knob.getName()] = intVal.getInt();
+        return success();
+      })
+      .Case([&](IREE::Codegen::OneOfKnobAttr knob) -> LogicalResult {
+        if (!configAttr) {
+          return failure();
+        }
+        ArrayAttr options = knob.getOptions();
+        const auto *it = llvm::find(options, configAttr);
+        if (it == options.end()) {
+          return failure();
+        }
+        result[knob.getName()] = std::distance(options.begin(), it);
+        return success();
+      })
+      .Case([&](IntegerAttr templateInt) -> LogicalResult {
+        auto configInt = dyn_cast_or_null<IntegerAttr>(configAttr);
+        if (!configInt || configInt.getInt() != templateInt.getInt()) {
+          return failure();
+        }
+        return success();
+      })
+      .Default(failure());
+}
+
 static LogicalResult extractKnobValues(DictionaryAttr knobsTemplate,
                                        DictionaryAttr configAttrs,
                                        DenseMap<StringAttr, int64_t> &result) {
   for (NamedAttribute entry : knobsTemplate) {
-    Attribute configVal = configAttrs.get(entry.getName());
-    LogicalResult ok =
-        llvm::TypeSwitch<Attribute, LogicalResult>(entry.getValue())
-            .Case([&](DictionaryAttr nestedTemplate) -> LogicalResult {
-              auto nestedConfig = dyn_cast_or_null<DictionaryAttr>(configVal);
-              if (!nestedConfig) {
-                return failure();
-              }
-              return extractKnobValues(nestedTemplate, nestedConfig, result);
-            })
-            .Case([&](ArrayAttr templateArr) -> LogicalResult {
-              auto configArr = dyn_cast_or_null<ArrayAttr>(configVal);
-              if (!configArr || configArr.size() != templateArr.size()) {
-                return failure();
-              }
-              for (auto [tmpl, actual] : llvm::zip_equal(
-                       templateArr.getValue(), configArr.getValue())) {
-                if (auto knob = dyn_cast<IREE::Codegen::IntKnobAttr>(tmpl)) {
-                  auto intVal = dyn_cast<IntegerAttr>(actual);
-                  if (!intVal) {
-                    return failure();
-                  }
-                  result[knob.getName()] = intVal.getInt();
-                  continue;
-                }
-                auto oneOf = dyn_cast<IREE::Codegen::OneOfKnobAttr>(tmpl);
-                if (!oneOf) {
-                  continue;
-                }
-                ArrayAttr options = oneOf.getOptions();
-                auto it = llvm::find(options, actual);
-                if (it == options.end()) {
-                  return failure();
-                }
-                result[oneOf.getName()] = std::distance(options.begin(), it);
-              }
-              return success();
-            })
-            .Case([&](IREE::Codegen::IntKnobAttr knob) -> LogicalResult {
-              auto intVal = dyn_cast_or_null<IntegerAttr>(configVal);
-              if (!intVal) {
-                return failure();
-              }
-              result[knob.getName()] = intVal.getInt();
-              return success();
-            })
-            .Case([&](IREE::Codegen::OneOfKnobAttr knob) -> LogicalResult {
-              if (!configVal) {
-                return failure();
-              }
-              ArrayAttr options = knob.getOptions();
-              auto it = llvm::find(options, configVal);
-              if (it == options.end()) {
-                return failure();
-              }
-              result[knob.getName()] = std::distance(options.begin(), it);
-              return success();
-            })
-            .Default(failure());
-    if (failed(ok)) {
+    if (failed(extractKnobValue(entry.getValue(),
+                                configAttrs.get(entry.getName()), result))) {
       return failure();
     }
   }
@@ -421,6 +425,21 @@ void VerifySMTConstraintsPass::runOnOperation() {
   }
 
   Attribute chosenPipeline = translationInfo.getPassPipeline();
+  DenseMap<IREE::Codegen::RootOpAttr,
+           IREE::Codegen::LoweringConfigAttrInterface>
+      configsByRootSet;
+  for (Operation *rootOp : getTunerRootOps(funcOp.getOperation())) {
+    IREE::Codegen::RootOpAttr rootAttr = getRootOpInfo(rootOp);
+    if (configsByRootSet.contains(rootAttr)) {
+      continue;
+    }
+    IREE::Codegen::LoweringConfigAttrInterface config =
+        getLoweringConfig(rootOp);
+    if (!config) {
+      continue;
+    }
+    configsByRootSet[rootAttr] = config;
+  }
 
   for (IREE::Codegen::ConstraintsOp constraintsOp : constraintsOps) {
     // Only evaluate constraints for the pipeline chosen by strategy selection.
@@ -437,21 +456,13 @@ void VerifySMTConstraintsPass::runOnOperation() {
     evaluator.initBlockArgs(body.front(), constraintsOp);
 
     // Extract knob values by matching the knobs template against the
-    // lowering config on the target root op. Skip if not all knobs resolve.
+    // lowering config on the target root-op set. Skip if not all knobs resolve.
     DenseMap<StringAttr, int64_t> knobValues;
     DictionaryAttr knobsTemplate = constraintsOp.getKnobs();
     if (!knobsTemplate.empty()) {
-      IREE::Codegen::RootOpAttr targetAttr = constraintsOp.getTarget();
-      Operation *rootOp = nullptr;
-      funcOp.walk([&](Operation *op) {
-        if (op->getAttrOfType<IREE::Codegen::RootOpAttr>("root_op") !=
-            targetAttr) {
-          return WalkResult::advance();
-        }
-        rootOp = op;
-        return WalkResult::interrupt();
-      });
-      if (!rootOp) {
+      IREE::Codegen::LoweringConfigAttrInterface config;
+      config = configsByRootSet.lookup(constraintsOp.getTarget());
+      if (!config) {
         continue;
       }
       // TODO(#23535): The config dict extraction and translation info
@@ -459,11 +470,6 @@ void VerifySMTConstraintsPass::runOnOperation() {
       // this should go behind LoweringConfigAttrInterface (e.g., an
       // extractKnobValues() method) so each backend provides its own
       // knob resolution logic.
-      IREE::Codegen::LoweringConfigAttrInterface config =
-          getLoweringConfig(rootOp);
-      if (!config) {
-        continue;
-      }
       auto gpuConfig =
           dyn_cast<IREE::GPU::LoweringConfigAttr>(Attribute(config));
       if (!gpuConfig) {

@@ -213,8 +213,9 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read(
   // Open the file for reading.
   iree_io_file_handle_t* handle = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_io_file_handle_open(IREE_IO_FILE_MODE_READ, path, host_allocator,
-                                   &handle));
+      z0, iree_io_file_handle_open(
+              IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_SHARE_READ, path,
+              host_allocator, &handle));
 
   // Get an stdio FILE* for the handle.
   // This will need to be closed as its lifetime is separate from our file
@@ -300,7 +301,8 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_map(
   *out_contents = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_io_file_mode_t mode = IREE_IO_FILE_MODE_READ;
+  iree_io_file_mode_t mode =
+      IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_SHARE_READ;
   if (iree_all_bits_set(access, IREE_IO_FILE_ACCESS_WRITE)) {
     mode |= IREE_IO_FILE_MODE_WRITE;
   }

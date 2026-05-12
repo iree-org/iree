@@ -609,21 +609,6 @@ DataTiledMMAAttr::verifyIndexingMaps(ArrayRef<AffineMap> maps) const {
   return linalg::inferContractionDims(maps);
 }
 
-/// Returns a pair where the first element is the element count of the group and
-/// the second element is whether the group contains a scalable dimension.
-static std::pair<int64_t, bool>
-getVectorAxisSizeAndScalability(ArrayRef<Codegen::TileSwizzle::Dim> group) {
-  using Dim = Codegen::TileSwizzle::Dim;
-  int64_t size = 1;
-  bool scalable = false;
-  for (const Dim &d : group) {
-    size *= d.size();
-    scalable |= d.kind() == Dim::Kind::Internal &&
-                d.symbolicMultiplier() != Dim::SymbolicMultiplier::One;
-  }
-  return {size, scalable};
-}
-
 void DataTiledMMAAttr::getUndistributedTileTypes(
     SmallVectorImpl<VectorType> &result) const {
   MLIRContext *ctx = getContext();
@@ -633,25 +618,9 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
     return;
   }
   auto [aType, bType, cType] = getABCElementTypes(ctx, *this);
-  // Each operand's swizzle encodes its tile shape as (outer physical dim,
-  // inner physical dim) in expandShape[0], expandShape[1]. This mirrors GPU's
-  // DataTiledMMA, where the tile types encode the layout directly and no
-  // separate `permutations` attribute is needed on `inner_tiled`. LHS is
-  // (M, K), RHS is (N, K), and ACC is (M, N) for non-transposed intrinsics
-  // and (N, M) for transposed ones; that transposition is baked into the ACC
-  // swizzle itself (see getIntrinsicSwizzle), so we can query all three
-  // operands uniformly here.
-  auto tileType = [&](Codegen::TileSwizzle swizzle, Type elemType) {
-    auto [outer, outerScalable] =
-        getVectorAxisSizeAndScalability(swizzle.expandShape()[0]);
-    auto [inner, innerScalable] =
-        getVectorAxisSizeAndScalability(swizzle.expandShape()[1]);
-    bool scalable[] = {outerScalable, innerScalable};
-    return VectorType::get({outer, inner}, elemType, scalable);
-  };
-  result.assign({tileType(getSwizzle(*this, 0), aType),
-                 tileType(getSwizzle(*this, 1), bType),
-                 tileType(getSwizzle(*this, 2), cType)});
+  result.assign({Codegen::getTileVectorType(getSwizzle(*this, 0), aType),
+                 Codegen::getTileVectorType(getSwizzle(*this, 1), bType),
+                 Codegen::getTileVectorType(getSwizzle(*this, 2), cType)});
 }
 
 void DataTiledMMAAttr::getDistributedTileTypes(
@@ -778,6 +747,24 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   }
 }
 
+/// Returns `v` with trailing unit dims stripped, down to but not below
+/// rank `minRank`. Emits a `vector.shape_cast` if any dim is stripped;
+/// returns `v` unchanged otherwise.
+static Value dropTrailingUnitDims(OpBuilder &builder, Location loc, Value v,
+                                  int64_t minRank) {
+  auto vt = cast<VectorType>(v.getType());
+  ArrayRef<int64_t> shape = vt.getShape();
+  int64_t newRank = shape.size();
+  while (newRank > minRank && shape[newRank - 1] == 1) {
+    --newRank;
+  }
+  if (newRank == static_cast<int64_t>(shape.size())) {
+    return v;
+  }
+  auto flatTy = VectorType::get(shape.take_front(newRank), vt.getElementType());
+  return vector::ShapeCastOp::create(builder, loc, flatTy, v);
+}
+
 /// Lowers a `DataTiledMMAAttr` whose intrinsic is one of the
 /// `MMA_GENERIC_SCALAR_1x1x1_REG*` cases directly to a single
 /// `vector.contract`. Since the intrinsic's tile shape is 1×1×1, the
@@ -790,9 +777,15 @@ static LogicalResult lowerGenericScalarToVectorContract(
   assert(isGenericScalar(attr.getIntrinsic()) &&
          "lowerGenericScalarToVectorContract only handles "
          "MMA_GENERIC_SCALAR_1x1x1_REG* intrinsics");
-  Value lhs = inputs[0];
-  Value rhs = inputs[1];
-  Value acc = outputs[0];
+  // The 1×1×1 base intrinsic means every non-unit dim in the operand tile
+  // came from `intrinsics_{m,n,k}` and is a `Codegen::TileSwizzle`
+  // `CrossIntrinsic` dim, which `Codegen::expand` placed at the start of
+  // its `expandShape` group and at memory slot 0. So all the unit dims end
+  // up at trailing positions of the per-operand tile; drop them to get the
+  // rank-2 (M, K)/(N, K)/(M, N) shape `vector.contract` expects below.
+  Value lhs = dropTrailingUnitDims(builder, loc, inputs[0], /*minRank=*/2);
+  Value rhs = dropTrailingUnitDims(builder, loc, inputs[1], /*minRank=*/2);
+  Value acc = dropTrailingUnitDims(builder, loc, outputs[0], /*minRank=*/2);
   Type accElem = cast<VectorType>(acc.getType()).getElementType();
   // For the generic intrinsic, ACC is always at least as wide as LHS/RHS,
   // and they're either all float or all integer (the cost model only picks

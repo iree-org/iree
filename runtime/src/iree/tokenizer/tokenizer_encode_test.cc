@@ -6418,6 +6418,53 @@ TEST_F(TokenizerEncodeOverflowTest,
   iree_tokenizer_free(tokenizer);
 }
 
+// Regression: feed() must return RESOURCE_EXHAUSTED (not INTERNAL) when its
+// caller-provided output capacity is exhausted with input still pending.
+//
+// Coverage gap this fills: BatchEncodeOutputBufferTooSmall ("abcde" → 2-token
+// buffer) drains all 5 bytes in ONE feed() call (small enough that the pump
+// consumes the whole segment in one pass); the outer loop then exits because
+// text.size == 0 and the exhaustion fires from finalize(), not feed(). To
+// reach feed()'s no-progress check the input must be long enough that the
+// outer loop iterates multiple times — bytes still pending after the caller's
+// output capacity is reached. 1000 chars × 100-token buffer guarantees that.
+TEST_F(TokenizerEncodeOverflowTest, BatchEncodeReportsExhaustedOnFullOutput) {
+  ScopedVocabBuilder vocab_builder;
+  for (int i = 0; i < 26; ++i) {
+    char token_str[2] = {(char)('a' + i), '\0'};
+    vocab_builder.AddToken(i, token_str);
+  }
+  ScopedVocab vocab = vocab_builder.Build();
+
+  ScopedBuilder builder;
+  iree_tokenizer_builder_set_segmenter(builder.get(),
+                                       CreateWhitespaceSegmenter());
+  iree_tokenizer_builder_set_model(builder.get(),
+                                   CreateBPEModelIgnoreMerges(vocab.get()));
+  iree_tokenizer_builder_set_vocab(builder.get(), vocab.release());
+  iree_tokenizer_t* tokenizer = BuildTokenizer(builder.get());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Long input (each char is a separate token after whitespace segmentation).
+  std::string input(1000, 'a');
+  // Output capacity smaller than required token count - mid-stream the
+  // outer encode() loop will give feed() a sub_output with capacity == 0
+  // and the deadlock check would previously fire as INTERNAL.
+  std::vector<iree_tokenizer_token_id_t> token_ids(100);
+  iree_host_size_t token_count = 0;
+  iree_status_t status = iree_tokenizer_encode(
+      tokenizer,
+      iree_make_string_view(input.data(),
+                            static_cast<iree_host_size_t>(input.size())),
+      IREE_TOKENIZER_ENCODE_FLAG_NONE,
+      iree_tokenizer_make_token_output(token_ids.data(), NULL, NULL,
+                                       token_ids.size()),
+      iree_allocator_system(), &token_count);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+
+  iree_tokenizer_free(tokenizer);
+}
+
 // Streaming encode finalize with insufficient capacity for suffix.
 // Feed "ab" (produces [BOS, 0, 1]), then finalize with capacity 0 for EOS.
 TEST_F(TokenizerEncodeOverflowTest, FinalizeOutputBufferTooSmallForSuffix) {

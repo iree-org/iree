@@ -82,7 +82,7 @@ enum iree_tokenizer_decoder_capability_e {
   IREE_TOKENIZER_DECODER_CAPABILITY_NONE = 0,
   // Output for each token depends only on that token's text, not on adjacent
   // tokens or stream position. Enables full pre-decode at build time.
-  // Examples: ByteLevel, Replace, Strip.
+  // Examples: Replace, Strip, Passthrough.
   IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS = 1u << 0,
   // Output for the first token in a stream differs from subsequent tokens.
   // Typically the first token omits a leading space that "rest" tokens include.
@@ -96,6 +96,14 @@ enum iree_tokenizer_decoder_capability_e {
   // with an inline accumulator at decode time.
   // Examples: ByteFallback.
   IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_BYTE_TOKENS = 1u << 2,
+  // Stateless for most tokens (99.3% of GPT-2 vocab), but some produce
+  // partial UTF-8 bytes that must accumulate across token boundaries.
+  // Unlike BYTE_TOKENS where byte tokens are identifiable by <0xHH> syntax,
+  // partial UTF-8 tokens look like normal tokens (e.g., GPT-2's "Ã" maps to
+  // byte 0xC3 which is a UTF-8 lead byte). The build step trial-decodes each
+  // token and marks partial ones in a slab-embedded bitmap.
+  // Examples: ByteLevel (GPT-2 family).
+  IREE_TOKENIZER_DECODER_CAPABILITY_STATELESS_EXCEPT_PARTIAL_UTF8 = 1u << 3,
 };
 
 //===----------------------------------------------------------------------===//

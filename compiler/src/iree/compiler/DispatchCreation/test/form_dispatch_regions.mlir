@@ -2510,6 +2510,50 @@ util.func public @no_producer_fusion_with_extract_use_from_above(
 
 // -----
 
+// Producer blocked: it is used both as a normal linalg input and by a
+// tensor.extract nested inside the same root.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @no_producer_fusion_with_nested_extract_and_ins_use(
+    %arg0: tensor<4x8xf32>, %arg1: tensor<4x8xf32>)
+    -> tensor<4x8xf32> {
+  %empty = tensor.empty() : tensor<4x8xf32>
+  %producer = linalg.generic {
+      indexing_maps = [#map, #map],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<4x8xf32>) outs(%empty : tensor<4x8xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %0 = arith.mulf %in, %in : f32
+      linalg.yield %0 : f32
+  } -> tensor<4x8xf32>
+  %root = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%producer, %arg1 : tensor<4x8xf32>, tensor<4x8xf32>)
+      outs(%empty : tensor<4x8xf32>) {
+    ^bb0(%in: f32, %in_1: f32, %out: f32):
+      %idx0 = linalg.index 0 : index
+      %idx1 = linalg.index 1 : index
+      %extracted = tensor.extract %producer[%idx0, %idx1]
+          : tensor<4x8xf32>
+      %0 = arith.addf %in, %in_1 : f32
+      %1 = arith.addf %0, %extracted : f32
+      linalg.yield %1 : f32
+  } -> tensor<4x8xf32>
+  util.return %root : tensor<4x8xf32>
+}
+// CHECK-LABEL: util.func public @no_producer_fusion_with_nested_extract_and_ins_use
+//       CHECK:   %[[PRODUCER:.+]] = flow.dispatch.region
+//       CHECK:     linalg.generic
+//       CHECK:       arith.mulf
+//       CHECK:     flow.return
+//       CHECK:   flow.dispatch.region
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%[[PRODUCER]]
+//       CHECK:       tensor.extract %[[PRODUCER]]
+//       CHECK:     flow.return
+
+// -----
+
 // Producer blocked: multi-level capture chain (extract → opA → root).
 #map = affine_map<(d0, d1) -> (d0, d1)>
 util.func public @no_fusion_multilevel_region_capture(
