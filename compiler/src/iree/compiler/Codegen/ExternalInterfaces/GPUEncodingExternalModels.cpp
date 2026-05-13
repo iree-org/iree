@@ -272,7 +272,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
     // Empirically, for 1 wave per simd, using all available VGPRs for tile
     // data leads to register spilling, so we impose a safety margin by
     // dividing available VGPRs by at least 2 even for 1 wave per simd.
-    int64_t perWaveVgpr = vgprSpaceBits / std::max(2LL, wps);
+    int64_t perWaveVgpr = vgprSpaceBits / std::max(int64_t(2), wps);
     int64_t maxSubgroups = simdsPerWgp * wps;
     for (int64_t sm = 1; sm <= maxSubgroups; sm <<= 1) {
       for (int64_t sn = 1; sn <= maxSubgroups / sm; sn <<= 1) {
@@ -296,7 +296,7 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
           if (in <= 0) {
             continue;
           }
-          in = 1LL << llvm::Log2_64(in);
+          in = int64_t(1) << llvm::Log2_64(in);
           double score = computeArithmeticIntensity(sm * im, sn * in);
           bool accepted =
               score > bestScore || (score == bestScore && numWaves > bestWaves);
