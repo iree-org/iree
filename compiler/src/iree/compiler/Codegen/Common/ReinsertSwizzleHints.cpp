@@ -107,6 +107,24 @@ static Value insertSwizzleHint(IRRewriter &rewriter, Location loc, Value source,
   return hintOp.getResult();
 }
 
+/// Returns the base-memref OpOperand for vector load/store/maskedload/
+/// maskedstore ops, or nullptr otherwise.
+static OpOperand *getVectorBaseOperand(Operation *op) {
+  if (auto load = dyn_cast<vector::LoadOp>(op)) {
+    return &load.getBaseMutable();
+  }
+  if (auto store = dyn_cast<vector::StoreOp>(op)) {
+    return &store.getBaseMutable();
+  }
+  if (auto mLoad = dyn_cast<vector::MaskedLoadOp>(op)) {
+    return &mLoad.getBaseMutable();
+  }
+  if (auto mStore = dyn_cast<vector::MaskedStoreOp>(op)) {
+    return &mStore.getBaseMutable();
+  }
+  return nullptr;
+}
+
 void ReinsertSwizzleHintsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
@@ -116,34 +134,19 @@ void ReinsertSwizzleHintsPass::runOnOperation() {
   // swizzled alloc, wrap the base with collapse_shape -> swizzle_hint ->
   // expand_shape.
   funcOp.walk([&](Operation *op) {
-    Value base;
-    if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
-      base = loadOp.getBase();
-    } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
-      base = storeOp.getBase();
-    } else if (auto mLoadOp = dyn_cast<vector::MaskedLoadOp>(op)) {
-      base = mLoadOp.getBase();
-    } else if (auto mStoreOp = dyn_cast<vector::MaskedStoreOp>(op)) {
-      base = mStoreOp.getBase();
-    } else {
+    OpOperand *baseOperand = getVectorBaseOperand(op);
+    if (!baseOperand) {
       return;
     }
+    Value base = baseOperand->get();
     IREE::Codegen::SwizzleAttrInterface swizzle =
         lookupSwizzleAttr(base, swizzleCache);
     if (!swizzle) {
       return;
     }
     rewriter.setInsertionPoint(op);
-    Value wrapped = insertSwizzleHint(rewriter, op->getLoc(), base, swizzle);
-    if (auto loadOp = dyn_cast<vector::LoadOp>(op)) {
-      loadOp.getBaseMutable().assign(wrapped);
-    } else if (auto storeOp = dyn_cast<vector::StoreOp>(op)) {
-      storeOp.getBaseMutable().assign(wrapped);
-    } else if (auto mLoadOp = dyn_cast<vector::MaskedLoadOp>(op)) {
-      mLoadOp.getBaseMutable().assign(wrapped);
-    } else if (auto mStoreOp = dyn_cast<vector::MaskedStoreOp>(op)) {
-      mStoreOp.getBaseMutable().assign(wrapped);
-    }
+    baseOperand->assign(
+        insertSwizzleHint(rewriter, op->getLoc(), base, swizzle));
   });
 
   // Clean up the swizzle attributes from allocs now that hints are inserted.

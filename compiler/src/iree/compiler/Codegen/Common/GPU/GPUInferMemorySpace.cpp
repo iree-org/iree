@@ -45,8 +45,12 @@ bool isDefinitelyShared(bufferization::AllocTensorOp alloc) {
   // and is transparent to memory-space inference. Look through it to its
   // own users so the underlying forall destination is recognized.
   SmallVector<Operation *> worklist(alloc->user_begin(), alloc->user_end());
+  SmallPtrSet<Operation *, 8> visited;
   while (!worklist.empty()) {
     Operation *user = worklist.pop_back_val();
+    if (!visited.insert(user).second) {
+      continue;
+    }
 
     if (isa<linalg::CopyOp>(user) &&
         getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(user)) {

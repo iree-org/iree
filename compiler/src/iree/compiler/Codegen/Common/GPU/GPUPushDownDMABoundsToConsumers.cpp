@@ -92,14 +92,10 @@ static std::optional<int64_t> getInnermostStaticUpperBound(Value src,
 // consumer. That result is the SSA value the matmul (or other consumer) sees.
 //
 // Two link types are followed:
-//   1. BlockArgument (forall sharedOut) -> forall.getResult(idx)
-//      (existing nested-forall handling)
-//   2. forall result that is the source of a tensor.parallel_insert_slice
+//   1. BlockArgument (forall sharedOut) -> forall.getResult(idx).
+//   2. scf.forall result that is the source of a tensor.parallel_insert_slice
 //      in a parent forall's terminator -> the parent forall's destination
 //      sharedOut (a BlockArgument), which feeds back into case (1).
-//
-// The walk stops as soon as we hit a value whose only forward chain breaks
-// (no enclosing forall, no propagating parallel_insert_slice, etc.).
 static Value walkUpSharedOuts(Value v) {
   while (true) {
     if (auto bbarg = dyn_cast<BlockArgument>(v)) {
@@ -116,9 +112,6 @@ static Value walkUpSharedOuts(Value v) {
       continue;
     }
 
-    // v is an SSA value (typically an scf.forall result). If it's only
-    // consumed by a parallel_insert_slice inside a parent forall, follow
-    // that link to the parent forall's sharedOut BlockArg.
     auto definingForall = v.getDefiningOp<scf::ForallOp>();
     if (!definingForall) {
       return v;
@@ -232,7 +225,6 @@ padSourceBufferDescriptorToDWORD(IRRewriter &rewriter,
   return success();
 }
 
-// Insert extract_slice + tensor.pad after the outermost forall for one DMA.
 // Returns failure if the DMA doesn't match the expected pattern (no-op).
 static LogicalResult rewriteOneDMA(IRRewriter &rewriter,
                                    IREE::GPU::CoalescedGatherDMAOp dma) {
@@ -310,11 +302,9 @@ static LogicalResult rewriteOneDMA(IRRewriter &rewriter,
     }
   }
 
-  // Insert after the outermost forall.
   rewriter.setInsertionPointAfter(outerForall);
   Location loc = dma.getLoc();
 
-  // tensor.dim of the workgroup-tile source slice for the innermost dim.
   Value innerExtent =
       tensor::DimOp::create(rewriter, loc, extentSrc, innermost);
   Value innerTileV =
@@ -322,7 +312,8 @@ static LogicalResult rewriteOneDMA(IRRewriter &rewriter,
   Value padAmount =
       arith::SubIOp::create(rewriter, loc, innerTileV, innerExtent);
 
-  // tensor.extract_slice: cut the valid columns out of the LDS tile.
+  // Cut the valid columns out of the LDS tile, then re-expand to the full
+  // tile shape with zero padding on the OOB tail.
   SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
   SmallVector<OpFoldResult> validSizes;
@@ -336,7 +327,6 @@ static LogicalResult rewriteOneDMA(IRRewriter &rewriter,
   Value valid = tensor::ExtractSliceOp::create(rewriter, loc, outerResult,
                                                offsets, validSizes, strides);
 
-  // tensor.pad: re-expand to the full tile shape with zero padding.
   SmallVector<OpFoldResult> lowPad(rank, rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> highPad(rank, rewriter.getIndexAttr(0));
   highPad[innermost] = OpFoldResult(padAmount);
@@ -352,8 +342,8 @@ static LogicalResult rewriteOneDMA(IRRewriter &rewriter,
 
   // Replace all uses of the forall result with the re-padded tensor, except
   // for the extract_slice we just created which must read the original.
-  outerResult.replaceAllUsesExcept(
-      padOp.getResult(), valid.getDefiningOp<tensor::ExtractSliceOp>());
+  rewriter.replaceAllUsesExcept(outerResult, padOp.getResult(),
+                                valid.getDefiningOp<tensor::ExtractSliceOp>());
   return success();
 }
 
@@ -369,9 +359,6 @@ struct GPUPushDownDMABoundsToConsumersPass final
     SmallVector<IREE::GPU::CoalescedGatherDMAOp> dmas;
     funcOp.walk(
         [&](IREE::GPU::CoalescedGatherDMAOp dma) { dmas.push_back(dma); });
-    if (dmas.empty()) {
-      return;
-    }
 
     for (auto dma : dmas) {
       // Best-effort buffer-descriptor padding for non-DWORD-aligned sources.

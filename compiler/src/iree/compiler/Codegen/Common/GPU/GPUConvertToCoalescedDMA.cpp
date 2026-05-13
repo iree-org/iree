@@ -329,14 +329,9 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
     return false;
   }
   if (r0 != r1) {
-    unsigned kDim = (r0 < r1) ? 0 : 1;
-    return sourceType.isDynamicDim(kDim);
+    return sourceType.isDynamicDim((r0 < r1) ? 0 : 1);
   }
-  // Square: infer K from which source dim is dynamic. Both static or both
-  // dynamic → can't disambiguate, bail.
-  bool dyn0 = sourceType.isDynamicDim(0);
-  bool dyn1 = sourceType.isDynamicDim(1);
-  return dyn0 != dyn1;
+  return sourceType.isDynamicDim(0) != sourceType.isDynamicDim(1);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
