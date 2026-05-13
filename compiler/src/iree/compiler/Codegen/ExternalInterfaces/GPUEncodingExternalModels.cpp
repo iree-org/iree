@@ -252,11 +252,11 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
   //   - Per-wave VGPR: im*iK*L + in*iK*R + im*in*A <= vgprSpaceBits/wps
   //   - Total tile limits: sm*im <= maxTotalUnrollM, sn*in <= maxTotalUnrollN
   //   - Workgroup utilization: sm*im*sn*in <= maxTotalUnrollMN
-  //   - LDS: sm*im*iK*L + sn*in*iK*R <= maxLDSBits
+  //   - Shared memory: sm*im*iK*L + sn*in*iK*R <= maxSharedMemoryBits
   //
   int64_t vgprSpaceBits = *wgp.getVgprSpaceBits();
   int64_t simdsPerWgp = *wgp.getSimdsPerWgp();
-  int64_t maxLDSBits = wgp.getMaxWorkgroupMemoryBytes() * 8;
+  int64_t maxSharedMemoryBits = wgp.getMaxWorkgroupMemoryBytes() * 8;
   int64_t maxWavesPerSimd = 2;
   int64_t subgroupsM = 1;
   int64_t subgroupsN = 1;
@@ -286,11 +286,13 @@ chooseDataTiledMMAAttr(TypeRange eTypes, TargetAttr target,
           int64_t maxInVgpr =
               (perWaveVgpr - im * intrinsicsK * intrinsicSizeBitsLHS) /
               (intrinsicsK * intrinsicSizeBitsRHS + im * intrinsicSizeBitsACC);
-          int64_t maxInLDS =
-              (maxLDSBits - sm * im * intrinsicsK * intrinsicSizeBitsLHS) /
+          int64_t maxInSharedMemory =
+              (maxSharedMemoryBits -
+               sm * im * intrinsicsK * intrinsicSizeBitsLHS) /
               (sn * intrinsicsK * intrinsicSizeBitsRHS);
           int64_t maxInBudget = maxTotalUnrollMN / (sm * im * sn);
-          int64_t in = std::min({maxInVgpr, maxIn, maxInBudget, maxInLDS});
+          int64_t in =
+              std::min({maxInVgpr, maxIn, maxInBudget, maxInSharedMemory});
           if (in <= 0) {
             continue;
           }
