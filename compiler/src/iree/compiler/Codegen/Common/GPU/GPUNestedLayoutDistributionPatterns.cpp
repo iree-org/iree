@@ -2451,11 +2451,9 @@ static CrossSubgroupScanResult doCrossSubgroupScan(
       totalType);
   Value buffer = memref::AllocOp::create(rewriter, loc, bufferType);
   Value accumulatedBuffer;
-  auto accumulatedType =
-      subgroupLocalAccumulatedValue
-          ? cast<VectorType>(subgroupLocalAccumulatedValue.getType())
-          : VectorType();
   if (subgroupLocalAccumulatedValue) {
+    auto accumulatedType =
+        cast<VectorType>(subgroupLocalAccumulatedValue.getType());
     MemRefType accumulatedBufferType = getWorkgroupBufferTypeForVectorPayload(
         rewriter.getContext(), {coordInfo.numParallelCoords}, accumulatedType);
     accumulatedBuffer =
@@ -2523,6 +2521,8 @@ static CrossSubgroupScanResult doCrossSubgroupScan(
       rewriter, loc, kind, broadcastedCarry, subgroupLocalResult);
   Value exclusiveAccumulatedValue;
   if (subgroupLocalAccumulatedValue) {
+    auto accumulatedType =
+        cast<VectorType>(subgroupLocalAccumulatedValue.getType());
     Value accumulatedPadScalar = getCombiningIdentityValue(
         loc, rewriter, kind, accumulatedType.getElementType());
     exclusiveAccumulatedValue = readVectorPayloadFromScalarBuffer(
@@ -2542,14 +2542,15 @@ static CrossSubgroupScanResult doCrossSubgroupScan(
 
 /// Distributes `vector.scan` across GPU threads.
 ///
-/// The lowering proceeds in two stages:
+/// The lowering proceeds in stages:
 ///   1. Thread-local scan: Each thread performs `vector.scan` on its local
 ///      element tile chunks.
 ///   2. Cross-thread scan: Thread chunk totals are scanned across threads
 ///      within the subgroup using `iree_gpu.subgroup_scan`.
-///
-/// Cross-subgroup distribution (stages 3-4) is deferred — this pattern
-/// rejects `subgroupTile[scanDim] > 1`.
+///   3. Cross-subgroup scan: Subgroup totals are exchanged through workgroup
+///      memory and scanned to compute each subgroup's carry.
+///   4. Carry application: The subgroup-local result is adjusted by the carry
+///      from all previous subgroups.
 ///
 /// To distribute and parallelize the scan computation, we use an approach by
 /// Blelloch. The general idea is that we can break the computation into N

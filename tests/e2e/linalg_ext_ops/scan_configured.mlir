@@ -9,7 +9,7 @@
     lowering_config = #config,
     translation_info = #translation>
 
-func.func @scan_dim0_inclusive_sum_configured_rocm() {
+func.func @scan_dim0_inclusive_sum_configured_vector_distribute() {
   %c1 = arith.constant 1 : index
   %input_empty = tensor.empty() : tensor<256xf32>
   %input_init = linalg.generic {
@@ -62,7 +62,7 @@ func.func @scan_dim0_inclusive_sum_configured_rocm() {
     lowering_config = #config_exclusive,
     translation_info = #translation_exclusive>
 
-func.func @scan_dim0_exclusive_sum_configured_rocm() {
+func.func @scan_dim0_exclusive_sum_configured_vector_distribute() {
   %c1 = arith.constant 1 : index
   %input_empty = tensor.empty() : tensor<256xf32>
   %input_init = linalg.generic {
@@ -122,7 +122,7 @@ func.func @scan_dim0_exclusive_sum_configured_rocm() {
     lowering_config = #config_large,
     translation_info = #translation_large>
 
-func.func @scan_dim1_inclusive_sum_large_configured_rocm() {
+func.func @scan_dim1_inclusive_sum_large_configured_vector_distribute() {
   %c1 = arith.constant 1 : index
   %c1000 = arith.constant 1000 : index
   %input_empty = tensor.empty() : tensor<64x256xf32>
@@ -202,7 +202,7 @@ func.func @scan_dim1_inclusive_sum_large_configured_rocm() {
     lowering_config = #config_cross_subgroup,
     translation_info = #translation_cross_subgroup>
 
-func.func @scan_dim0_inclusive_sum_cross_subgroup_configured_rocm() {
+func.func @scan_dim0_inclusive_sum_cross_subgroup_configured_vector_distribute() {
   %c1 = arith.constant 1 : index
   %input_empty = tensor.empty() : tensor<128xf32>
   %input_init = linalg.generic {
@@ -251,7 +251,7 @@ func.func @scan_dim0_inclusive_sum_cross_subgroup_configured_rocm() {
   return
 }
 
-func.func @scan_dim0_exclusive_sum_cross_subgroup_configured_rocm() {
+func.func @scan_dim0_exclusive_sum_cross_subgroup_configured_vector_distribute() {
   %c1 = arith.constant 1 : index
   %input_empty = tensor.empty() : tensor<128xf32>
   %input_init = linalg.generic {

@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --canonicalize --cse %s | FileCheck %s
 
-// Test 1: Single (b,o) inclusive scan.
+// Single (b,o) inclusive scan.
 // Layout: subgroup=1, batch=1, outer=1, thread=4, element=4 along scan dim.
 // Full vector is 16 elements along scan dim (1*1*1*4*4).
 
@@ -53,7 +53,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 2: Single (b,o) exclusive scan.
+// Single (b,o) exclusive scan.
 
 #layout_scan_1d_excl = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
@@ -111,7 +111,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 5: Cross-subgroup inclusive scan.
+// Cross-subgroup inclusive scan.
 
 #layout_scan_cross = #iree_vector_ext.nested_layout<
   subgroup_tile = [2],
@@ -171,7 +171,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 6: Cross-subgroup exclusive scan.
+// Cross-subgroup exclusive scan.
 
 #layout_scan_cross_excl = #iree_vector_ext.nested_layout<
   subgroup_tile = [2],
@@ -247,7 +247,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 3: Multi (b,o) inclusive scan.
+// Multi (b,o) inclusive scan.
 // Layout: batch=2 along scan dim -> two (b,o) iterations.
 
 #layout_scan_multi = #iree_vector_ext.nested_layout<
@@ -317,7 +317,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 4: Multi (b,o) exclusive scan.
+// Multi (b,o) exclusive scan.
 
 #layout_scan_multi_excl = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
@@ -399,7 +399,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 5: 2D inclusive scan along dim 1.
+// 2D inclusive scan along dim 1.
 
 #layout_scan_2d_dim1 = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
@@ -440,7 +440,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 6: Exclusive f16 scan exercises shuffle pack/unpack for sub-32-bit types.
+// Exclusive f16 scan exercises shuffle pack/unpack for sub-32-bit types.
 
 #layout_scan_1d_f16_excl = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
@@ -484,7 +484,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-// Test 7: thread_tile = [1] covers the single-thread scan path.
+// thread_tile = [1] covers the single-thread scan path.
 
 #layout_scan_1d_thread_tile_1 = #iree_vector_ext.nested_layout<
   subgroup_tile = [1],
