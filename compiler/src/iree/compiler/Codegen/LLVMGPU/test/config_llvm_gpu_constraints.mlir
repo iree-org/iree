@@ -59,10 +59,10 @@ func.func @matmul_and_fill() attributes {hal.executable.target = #exec_target} {
 // CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
-// CHECK:       "dim_0 must be divisible by wg_0 ({} % {} == 0)"
-// CHECK:       "dim_1 must be divisible by wg_1 ({} % {} == 0)"
-// CHECK:       "dim_2 must be divisible by red_2 ({} % {} == 0)"
-// CHECK-NOT:   "dim_{{[0-9]+}} must be divisible by {{.*}}"
+// CHECK:       "dim_0{{.*}}wg_0{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_1{{.*}}wg_1{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_2{{.*}}red_2{{.*}} ({} % {} == 0)"
+// CHECK-NOT:   "dim_{{[0-9]+}}{{.*}} ({} % {} == 0)"
 
 func.func @conv_pooling_nhwc_sum_root_op()
     attributes {hal.executable.target = #exec_target} {
@@ -117,10 +117,10 @@ func.func @conv_2d_nhwc_hwcf()
 // CHECK-DAG:   workgroup = [1, 1, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0, 0, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
-// CHECK:       "dim_2 must be divisible by wg_2 ({} % {} == 0)"
-// CHECK:       "dim_3 must be divisible by wg_3 ({} % {} == 0)"
-// CHECK:       "dim_6 must be divisible by red_6 ({} % {} == 0)"
-// CHECK-NOT:   "dim_{{[0-9]+}} must be divisible by {{.*}}"
+// CHECK:       "dim_2{{.*}}wg_2{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_3{{.*}}wg_3{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_6{{.*}}red_6{{.*}} ({} % {} == 0)"
+// CHECK-NOT:   "dim_{{[0-9]+}}{{.*}} ({} % {} == 0)"
 
 #map_lhs = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map_rhs = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
@@ -161,10 +161,10 @@ func.func @expanded_matmul()
 // CHECK-DAG:   workgroup = [1, 1, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
-// CHECK:       "dim_2 must be divisible by wg_2 ({} % {} == 0)"
-// CHECK:       "dim_3 must be divisible by wg_3 ({} % {} == 0)"
-// CHECK:       "dim_4 must be divisible by red_4 ({} % {} == 0)"
-// CHECK-NOT:   "dim_{{[0-9]+}} must be divisible by {{.*}}"
+// CHECK:       "dim_2{{.*}}wg_2{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_3{{.*}}wg_3{{.*}} ({} % {} == 0)"
+// CHECK:       "dim_4{{.*}}red_4{{.*}} ({} % {} == 0)"
+// CHECK-NOT:   "dim_{{[0-9]+}}{{.*}} ({} % {} == 0)"
 
 func.func @matmul_dynamic_shapes(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>,
                           %empty: tensor<?x?xf32>) -> tensor<?x?xf32>

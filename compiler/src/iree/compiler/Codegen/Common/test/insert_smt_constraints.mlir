@@ -59,9 +59,9 @@ hal.executable @matmul_f32_ex {
 // CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2 ({}) == 64", %[[K]]
 //
 // Divisibility: dim % tile == 0.
-// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_0 must be divisible by wg_0 ({} % {} == 0)"
-// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_1 must be divisible by wg_1 ({} % {} == 0)"
-// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2 must be divisible by red_2 ({} % {} == 0)"
+// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_0{{.*}}wg_0{{.*}} ({} % {} == 0)"
+// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_1{{.*}}wg_1{{.*}} ({} % {} == 0)"
+// CHECK:             iree_codegen.smt.assert {{.*}}, "dim_2{{.*}}red_2{{.*}} ({} % {} == 0)"
 
 // -----
 
