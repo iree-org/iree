@@ -415,8 +415,19 @@ struct LowerCoalescedGatherDMAPattern final
 
     // Cap per-lane width to the minimum contiguous trailing size of source
     // and destination, so gather_to_lds does not read/write past stride
-    // boundaries.
+    // boundaries. When the source's innermost extent is dynamic but its
+    // innermost stride is statically 1 (so trailing reads remain
+    // contiguous) and the source lives in fat_raw_buffer address space,
+    // GPUPushDownDMABoundsToConsumers has installed a validBytes-aware
+    // buffer descriptor plus a consumer-side pad: HW returns 0 for OOB
+    // DWORDs and the pad masks the corresponding LDS columns away. In
+    // that case derive the cap from the destination layout instead of
+    // bailing on srcLinearSize=1.
     int64_t srcLinearSize = getContiguousTrailingLinearSize(sourceType).second;
+    if (srcLinearSize == 1 && sourceType.getNumContiguousTrailingDims() >= 1 &&
+        hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+      srcLinearSize = destLinearSize;
+    }
     int64_t maxElementsPerLane = std::min(srcLinearSize, destLinearSize);
     LDBG() << "  Max elements per lane: " << maxElementsPerLane;
 
