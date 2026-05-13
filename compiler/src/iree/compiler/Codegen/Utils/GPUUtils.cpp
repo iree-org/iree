@@ -964,8 +964,8 @@ static LogicalResult hasNoBankConflicts(
     if (!phases) {
       return failure();
     }
-    int64_t banksUsedPerThread =
-        std::max<int64_t>(1, readWidth / IREE::GPU::kSharedMemBankWidth);
+    int64_t bankWidth = IREE::GPU::getSharedMemBankWidth(sharedMemModel);
+    int64_t banksUsedPerThread = std::max<int64_t>(1, readWidth / bankWidth);
     // Map each bank to the address that first accessed it.
     // Same bank + different address = conflict.
     // Same bank + same address = broadcast.
@@ -974,11 +974,10 @@ static LogicalResult hasNoBankConflicts(
       bankToAddress.clear();
       for (int64_t t : phase) {
         int64_t byteOffset = applySwizzle(getThreadByteOffset(t));
-        int64_t startBank =
-            (byteOffset / IREE::GPU::kSharedMemBankWidth) % numBanks;
+        int64_t startBank = (byteOffset / bankWidth) % numBanks;
         for (int64_t b = 0; b < banksUsedPerThread; ++b) {
           int64_t bank = (startBank + b) % numBanks;
-          int64_t addr = byteOffset + b * IREE::GPU::kSharedMemBankWidth;
+          int64_t addr = byteOffset + b * bankWidth;
           auto [it, inserted] = bankToAddress.try_emplace(bank, addr);
           if (!inserted && it->second != addr) {
             return failure();
@@ -992,12 +991,12 @@ static LogicalResult hasNoBankConflicts(
       std::max<int64_t>(1, layout.element[rank - 1] * elemBits / 8);
   int64_t numThreads = llvm::product_of(layout.thread);
   int64_t largestPowerOf2 = llvm::bit_floor(static_cast<uint64_t>(readBytes));
+  int64_t bankWidth = IREE::GPU::getSharedMemBankWidth(sharedMemModel);
   // Decompose the total read into power-of-2 sub-reads (largest first) and
-  // check each for bank conflicts.  Widths at or below kSharedMemBankWidth
-  // all touch a single bank and share identical phase groupings, so we stop
+  // check each for bank conflicts. Widths at or below the bank width all
+  // touch a single bank and share identical phase groupings, so we stop
   // there to avoid redundant checks.
-  for (int64_t w = largestPowerOf2;
-       w >= IREE::GPU::kSharedMemBankWidth && readBytes > 0; w /= 2) {
+  for (int64_t w = largestPowerOf2; w >= bankWidth && readBytes > 0; w /= 2) {
     if (w > readBytes) {
       continue;
     }
