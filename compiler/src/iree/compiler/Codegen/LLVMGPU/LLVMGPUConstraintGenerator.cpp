@@ -79,14 +79,18 @@ constexpr int64_t kUnitTileDimVal = 1;
 // alignment, subgroup counts, shared memory, load distribution, etc.)
 // will be added in follow-up patches.
 
-/// Assert: lhs % rhs == 0, with format args for diagnostics.
+/// Assert: lhs % rhs == 0.
 static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
                             Value rhs, StringRef msg) {
   Value zero = mkIntConst(builder, loc, 0);
   Value rem = smt::IntModOp::create(builder, loc, lhs, rhs);
   Value eq = smt::EqOp::create(builder, loc, rem, zero);
-  std::string fmtMsg = (msg + " ({} % {} == 0)").str();
-  AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
+  AssertOp::create(builder, loc, eq, msg, ValueRange{lhs, rhs});
+}
+
+template <typename... Args>
+static std::string joinStr(const Args &...args) {
+  return (Twine(args) + ...).str();
 }
 
 /// Assert: lhs <pred> rhs
@@ -98,21 +102,12 @@ static void assertCmp(OpBuilder &builder, Location loc, smt::IntPredicate pred,
 
 /// Assert: val >= lo && val <= hi.
 static void assertBounds(OpBuilder &builder, Location loc, Value val,
-                         StringRef name, int64_t lo, int64_t hi) {
-  assertCmp(builder, loc, smt::IntPredicate::ge, val,
-            mkIntConst(builder, loc, lo), (name + " >= " + Twine(lo)).str());
-  assertCmp(builder, loc, smt::IntPredicate::le, val,
-            mkIntConst(builder, loc, hi), (name + " <= " + Twine(hi)).str());
-}
-
-/// Assert: val >= lo && val <= hi.
-static void assertBounds(OpBuilder &builder, Location loc, Value val,
                          StringRef name, Value lo, StringRef loName, Value hi,
                          StringRef hiName) {
   assertCmp(builder, loc, smt::IntPredicate::ge, val, lo,
-            (name + " >= " + loName).str());
+            joinStr(name, " >= ", loName));
   assertCmp(builder, loc, smt::IntPredicate::le, val, hi,
-            (name + " <= " + hiName).str());
+            joinStr(name, " <= ", hiName));
 }
 
 /// Helper to build a knob variable name from a prefix.
@@ -316,9 +311,13 @@ static MMALookup emitMMALookup(OpBuilder &builder, Location loc,
                                ArrayRef<Attribute> mmaAttrs) {
 
   Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
+  Value minMmaIdxVal = mkIntConst(builder, loc, 0);
+  int64_t maxMmaIdx = static_cast<int64_t>(mmaAttrs.size()) - 1;
+  Value maxMmaIdxVal = mkIntConst(builder, loc, maxMmaIdx);
+  std::string maxMmaIdxName = Twine(maxMmaIdx).str();
   // Assert bounds: 0 <= mma_idx <= N-1.
-  assertBounds(builder, loc, mmaIdx, kKnobMmaIdxName, 0,
-               static_cast<int64_t>(mmaAttrs.size()) - 1);
+  assertBounds(builder, loc, mmaIdx, kKnobMmaIdxName, minMmaIdxVal, "0",
+               maxMmaIdxVal, maxMmaIdxName);
 
   // Build lookup tables for m, n, k.
   SmallVector<int64_t> keys, mVals, nVals, kVals;
@@ -344,29 +343,29 @@ static LogicalResult emitVectorDistributeConstraints(
   Location loc = linalgOp.getLoc();
 
   // Hardware constants.
-  constexpr int64_t maxVGPRs = 512;
   Value subgroupSizeVal =
       mkIntConst(builder, loc, gpuTarget.getPreferredSubgroupSize());
   Value maxThreadsVal = mkIntConst(
       builder, loc, gpuTarget.getWgp().getMaxThreadCountPerWorkgroup());
   Value maxSharedMemVal =
       mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
-  Value maxVGPRsVal = mkIntConst(builder, loc, maxVGPRs);
+  Value maxVGPRsVal = mkIntConst(builder, loc, 512);
 
   // Create name strings.
-  std::string wgTileMName = makeVarName(kKnobWgPrefix, dims.m.back());
-  std::string wgTileNName = makeVarName(kKnobWgPrefix, dims.n.back());
-  std::string redTileKName = makeVarName(kKnobRedPrefix, dims.k.back());
+  unsigned mDim = dims.m.back();
+  unsigned nDim = dims.n.back();
+  unsigned kDim = dims.k.back();
+  std::string wgMName = makeVarName(kKnobWgPrefix, mDim);
+  std::string wgNName = makeVarName(kKnobWgPrefix, nDim);
+  std::string redKName = makeVarName(kKnobRedPrefix, kDim);
   constexpr StringLiteral mmaMName = "mma_m";
   constexpr StringLiteral mmaNName = "mma_n";
   constexpr StringLiteral mmaKName = "mma_k";
-  std::string maxVGPRsName = ("max VGPRs " + Twine(maxVGPRs)).str();
 
   // Create knobs.
-  Value wgTileM = mkKnob(builder, loc, wgTileMName);
-  Value wgTileN = mkKnob(builder, loc, wgTileNName);
-  Value redTileK = mkKnob(builder, loc, redTileKName);
-  Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
+  Value wgM = mkKnob(builder, loc, wgMName);
+  Value wgN = mkKnob(builder, loc, wgNName);
+  Value redK = mkKnob(builder, loc, redKName);
   Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
   Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
   Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
@@ -376,84 +375,72 @@ static LogicalResult emitVectorDistributeConstraints(
   (void)subgroupSizeVal;
   (void)maxThreadsVal;
   (void)maxSharedMemVal;
-  (void)mmaIdx;
   (void)sgSize;
   (void)wgSizeX;
   (void)wgSizeY;
   (void)wgSizeZ;
 
-  // Helper to create a human readable message for divisible by constraint.
-  auto divisibleByMsg = [&](StringRef lhsName, StringRef rhsName) {
-    return (Twine(lhsName) + " must be divisible by " + rhsName).str();
-  };
-
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
-  assertDivisible(
-      builder, loc, smtDimArgs[dims.m.back()], wgTileM,
-      divisibleByMsg((kLoopRangePrefix + Twine(dims.m.back())).str(),
-                     wgTileMName));
-  assertDivisible(
-      builder, loc, smtDimArgs[dims.n.back()], wgTileN,
-      divisibleByMsg((kLoopRangePrefix + Twine(dims.n.back())).str(),
-                     wgTileNName));
-  assertDivisible(
-      builder, loc, smtDimArgs[dims.k.back()], redTileK,
-      divisibleByMsg((kLoopRangePrefix + Twine(dims.k.back())).str(),
-                     redTileKName));
+  assertDivisible(builder, loc, smtDimArgs[mDim], wgM,
+                  joinStr(makeVarName(kLoopRangePrefix, mDim),
+                          " must be divisible by ", wgMName));
+  assertDivisible(builder, loc, smtDimArgs[nDim], wgN,
+                  joinStr(makeVarName(kLoopRangePrefix, nDim),
+                          " must be divisible by ", wgNName));
+  assertDivisible(builder, loc, smtDimArgs[kDim], redK,
+                  joinStr(makeVarName(kLoopRangePrefix, kDim),
+                          " must be divisible by ", redKName));
 
   // Constraint 2: Tile size bounds.
-  // Intrinsic size <= Workgroup tile size <= Max available VGPRs.
-  // wg_tile >= mma && wg_tile <= 512
+  // mma <= wg_tile <= dim
   MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
-  assertBounds(builder, loc, wgTileM, wgTileMName, mmaLookup.mmaMLookup,
-               mmaMName, maxVGPRsVal, maxVGPRsName);
-  assertBounds(builder, loc, wgTileN, wgTileNName, mmaLookup.mmaNLookup,
-               mmaNName, maxVGPRsVal, maxVGPRsName);
-  assertBounds(builder, loc, redTileK, redTileKName, mmaLookup.mmaKLookup,
-               mmaKName, maxVGPRsVal, maxVGPRsName);
-  // wg_tile <= dim
-  assertCmp(builder, loc, smt::IntPredicate::le, wgTileM,
-            smtDimArgs[dims.m.back()],
-            (Twine(wgTileMName) + " must be <= " + kLoopRangePrefix +
-             Twine(dims.m.back()))
-                .str());
-  assertCmp(builder, loc, smt::IntPredicate::le, wgTileN,
-            smtDimArgs[dims.n.back()],
-            (Twine(wgTileNName) + " must be <= " + kLoopRangePrefix +
-             Twine(dims.n.back()))
-                .str());
-  assertCmp(builder, loc, smt::IntPredicate::le, redTileK,
-            smtDimArgs[dims.k.back()],
-            (Twine(redTileKName) + " must be <= " + kLoopRangePrefix +
-             Twine(dims.k.back()))
-                .str());
+  assertBounds(builder, loc, wgM, wgMName, mmaLookup.mmaMLookup, mmaMName,
+               smtDimArgs[mDim], makeVarName(kLoopRangePrefix, mDim));
+  assertBounds(builder, loc, wgN, wgNName, mmaLookup.mmaNLookup, mmaNName,
+               smtDimArgs[nDim], makeVarName(kLoopRangePrefix, nDim));
+  assertBounds(builder, loc, redK, redKName, mmaLookup.mmaKLookup, mmaKName,
+               smtDimArgs[kDim], makeVarName(kLoopRangePrefix, kDim));
+  // wg_tile <= 512 (max VGPRs)
+  assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
+            joinStr(wgMName, " must be <= 512 (max VGPRs)"));
+  assertCmp(builder, loc, smt::IntPredicate::le, wgN, maxVGPRsVal,
+            joinStr(wgNName, " must be <= 512 (max VGPRs)"));
+  assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
+            joinStr(redKName, " must be <= 512 (max VGPRs)"));
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
-  assertDivisible(builder, loc, wgTileM, mmaLookup.mmaMLookup,
-                  divisibleByMsg(wgTileMName, mmaMName));
-  assertDivisible(builder, loc, wgTileN, mmaLookup.mmaNLookup,
-                  divisibleByMsg(wgTileNName, mmaNName));
-  assertDivisible(builder, loc, redTileK, mmaLookup.mmaKLookup,
-                  divisibleByMsg(redTileKName, mmaKName));
+  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup,
+                  joinStr(wgMName, " must be divisible by ", mmaMName));
+  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup,
+                  joinStr(wgNName, " must be divisible by ", mmaNName));
+  assertDivisible(builder, loc, redK, mmaLookup.mmaKLookup,
+                  joinStr(redKName, " must be divisible by ", mmaKName));
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   Value mulResultM = smt::IntMulOp::create(
       builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
   Value mulResultN = smt::IntMulOp::create(
       builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
-  assertDivisible(builder, loc, wgTileM, mulResultM,
-                  divisibleByMsg(wgTileMName, mmaMName));
-  assertDivisible(builder, loc, wgTileN, mulResultN,
-                  divisibleByMsg(wgTileNName, mmaNName));
+  assertDivisible(
+      builder, loc, wgM, mulResultM,
+      joinStr(wgMName, " must be divisible by ", "sg_m_cnt * ", mmaMName));
+  assertDivisible(
+      builder, loc, wgN, mulResultN,
+      joinStr(wgNName, " must be divisible by ", "sg_n_cnt * ", mmaNName));
 
   // Constraint 4: Subgroup count bounds.
   // Max workgroup tile size / Min(Intrinsic size * Subgroup tile size *
-  // Subgroup count) = 512 / (16 * 1 * 1) = 32. 1 <= sg_m_cnt <= 32. 1 <=
-  // sg_n_cnt <= 32.
-  assertBounds(builder, loc, sgMCnt, kKnobSgMCntName, 1, 32);
-  assertBounds(builder, loc, sgNCnt, kKnobSgNCntName, 1, 32);
+  // Subgroup count) = 512 / (16 * 1 * 1) = 32.
+  // 1 <= sg_m_cnt <= 32.
+  // 1 <= sg_n_cnt <= 32.
+  Value minSubgroupCntVal = mkIntConst(builder, loc, 1);
+  Value maxSubgroupCntVal = mkIntConst(builder, loc, 32);
+  assertBounds(builder, loc, sgMCnt, kKnobSgMCntName, minSubgroupCntVal, "1",
+               maxSubgroupCntVal, "32");
+  assertBounds(builder, loc, sgNCnt, kKnobSgNCntName, minSubgroupCntVal, "1",
+               maxSubgroupCntVal, "32");
 
   // Constraint 5:
 
