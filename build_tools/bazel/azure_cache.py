@@ -138,8 +138,9 @@ def save(cache_dir: str, max_bytes: int = DEFAULT_MAX_BYTES) -> None:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="action", required=True)
 
     dl = sub.add_parser("download", help="Download cache blob")
@@ -150,13 +151,21 @@ def _parse_args() -> argparse.Namespace:
 
     pr = sub.add_parser("prune", help="Prune cache directory by LRU")
     pr.add_argument("cache_dir", help="Path to the Bazel disk cache directory")
-    pr.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES,
-                     help="Maximum cache size in bytes (default: 10 GiB)")
+    pr.add_argument(
+        "--max-bytes",
+        type=int,
+        default=DEFAULT_MAX_BYTES,
+        help="Maximum cache size in bytes (default: 10 GiB)",
+    )
 
     sv = sub.add_parser("save", help="Prune + pack + upload")
     sv.add_argument("cache_dir", help="Path to the Bazel disk cache directory")
-    sv.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES,
-                     help="Maximum cache size in bytes (default: 10 GiB)")
+    sv.add_argument(
+        "--max-bytes",
+        type=int,
+        default=DEFAULT_MAX_BYTES,
+        help="Maximum cache size in bytes (default: 10 GiB)",
+    )
 
     return parser.parse_args()
 
