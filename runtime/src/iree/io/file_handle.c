@@ -219,6 +219,9 @@ static iree_status_t iree_io_file_handle_platform_open(
   if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_TEMPORARY)) {
     flags |= FILE_FLAG_DELETE_ON_CLOSE;
   }
+  if (iree_all_bits_set(mode, IREE_IO_FILE_MODE_ASYNC)) {
+    flags |= FILE_FLAG_OVERLAPPED;
+  }
 
   // Create or open the file.
   HANDLE handle = CreateFileA(path_str, desired_access, share_mode, NULL,

@@ -44,7 +44,7 @@ class VulkanFileTest : public CtsTestBase<> {
     IREE_ASSERT_OK(iree_io_file_handle_open(
         IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
             IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
-            IREE_IO_FILE_MODE_SHARE_WRITE,
+            IREE_IO_FILE_MODE_SHARE_WRITE | IREE_IO_FILE_MODE_ASYNC,
         path.path_view(), iree_allocator_system(), &raw_handle));
     FileHandlePtr handle(raw_handle);
 
@@ -120,7 +120,7 @@ TEST_P(VulkanFileTest, NativeFileShortReadExceedsStagingRingFails) {
   IREE_ASSERT_OK(iree_io_file_handle_open(
       IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
           IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
-          IREE_IO_FILE_MODE_SHARE_WRITE,
+          IREE_IO_FILE_MODE_SHARE_WRITE | IREE_IO_FILE_MODE_ASYNC,
       path.path_view(), iree_allocator_system(), &raw_handle));
   FileHandlePtr handle(raw_handle);
 

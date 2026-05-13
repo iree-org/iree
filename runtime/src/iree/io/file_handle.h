@@ -191,6 +191,9 @@ enum iree_io_file_mode_bits_t {
   IREE_IO_FILE_MODE_SHARE_WRITE = 1ull << 7,
   // If the file exists during an open operation it is truncated for overwrite.
   IREE_IO_FILE_MODE_OVERWRITE = 1ull << 8,
+  // Opens the file for platform asynchronous I/O.
+  // On Windows this maps to FILE_FLAG_OVERLAPPED.
+  IREE_IO_FILE_MODE_ASYNC = 1ull << 9,
 };
 
 // Creates a new platform file at |path| for usage as defined by |mode|.
