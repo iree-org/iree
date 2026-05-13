@@ -16,6 +16,7 @@ iree_cc_test(
   SRCS
     "KnownTargetsTest.cpp"
   DEPS
+    gmock
     gtest
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::Utils
