@@ -66,13 +66,21 @@ func.func @transfer_not_inbounds(%mem : memref<8x8xf32>, %idx : index) -> vector
 
 // -----
 
-// Non-identity permutation map should NOT be lowered.
+// Non-identity permutation map is unrolled to scf.for with memref.load.
 // CHECK-LABEL: func @transfer_perm_map(
 // CHECK-SAME:    %[[MEM:.*]]: memref<8x8xf32>,
 // CHECK-SAME:    %[[IDX:.*]]: index) -> vector<4xf32> {
-// CHECK-NEXT:    %[[CF0:.*]] = arith.constant 0.000000e+00 : f32
-// CHECK-NEXT:    %[[RES:.*]] = vector.transfer_read %[[MEM]][%[[IDX]], %[[IDX]]], %[[CF0]] {in_bounds = [true], permutation_map = #{{.*}}} : memref<8x8xf32>, vector<4xf32>
-// CHECK-NEXT:    return %[[RES]] : vector<4xf32>
+// CHECK-DAG:     %[[C0:.*]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C4:.*]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG:     %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK:         %[[FOR:.*]] = scf.for %[[IV:.*]] = %[[C0]] to %[[C4]] step %[[C1]] iter_args(%[[ACC:.*]] = %[[CST]]) -> (vector<4xf32>) {
+// CHECK:           %[[ADDR:.*]] = affine.apply {{.*}}(%[[IV]])[%[[IDX]]]
+// CHECK:           %[[LOAD:.*]] = memref.load %[[MEM]][%[[ADDR]], %[[IDX]]] : memref<8x8xf32>
+// CHECK:           %[[INS:.*]] = vector.insert %[[LOAD]], %[[ACC]] [%[[IV]]] : f32 into vector<4xf32>
+// CHECK:           scf.yield %[[INS]] : vector<4xf32>
+// CHECK:         }
+// CHECK:         return %[[FOR]] : vector<4xf32>
 func.func @transfer_perm_map(%mem : memref<8x8xf32>, %idx : index) -> vector<4xf32> {
   %cf0 = arith.constant 0.0 : f32
   %res = vector.transfer_read %mem[%idx, %idx], %cf0 {in_bounds = [true], permutation_map = affine_map<(d0, d1) -> (d0)>} : memref<8x8xf32>, vector<4xf32>
