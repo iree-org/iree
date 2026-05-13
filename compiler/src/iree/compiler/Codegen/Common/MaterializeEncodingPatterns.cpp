@@ -507,6 +507,94 @@ getReassociationIndices(int outerDims,
   return result;
 }
 
+/// Returns true when the swizzle's `permutation` only reorders unit dims
+/// relative to non-unit dims, i.e. it preserves the relative order of all
+/// non-unit dims. In that case the unpermuted and permuted inner-tile shapes
+/// have the same linearized memory layout, so the `linalg.transpose` that the
+/// pack/unpack lowering would otherwise emit moves no data.
+static bool isSwizzlePermutationLayoutNoOp(const TileSwizzle &swizzle) {
+  SmallVector<int64_t> expandedTileShape =
+      IREE::Codegen::getExpandedTileShape(swizzle.expandShape());
+  // `swizzle.permutation()[i]` is the unpermuted `expandedTileShape` index of
+  // the dim landing at permuted position `i`. Unit dims span no memory, so
+  // only the non-unit dims matter: the layout is preserved iff they keep
+  // their source order, i.e. `srcDim` increases across just the non-unit dims.
+  int64_t prevNonUnitSrc = -1;
+  for (int64_t srcDim : swizzle.permutation()) {
+    if (expandedTileShape[srcDim] == 1) {
+      continue;
+    }
+    if (srcDim < prevNonUnitSrc) {
+      return false;
+    }
+    prevNonUnitSrc = srcDim;
+  }
+  return true;
+}
+
+/// Tries to build the reassociation for the single reshape that replaces the
+/// swizzle's expand_shape + transpose when the transpose is a layout no-op:
+/// from the packed shape (outer + `innerTileSizes`) to the permuted-inner
+/// shape (outer + `applyPermutation(expandedTileShape, permutation)`).
+///
+/// The permuted-inner shape keeps the swizzle's unit dims: it is the
+/// materialized encoding type fixed by `getEncodingInfo`, which the reshape
+/// must match exactly for dialect conversion. Dropping unit dims is not a
+/// choice this lowering can make locally.
+///
+/// Intended to be called only when `isSwizzlePermutationLayoutNoOp(swizzle)`,
+/// but that predicate is not sufficient: it guarantees the linearized layout
+/// is preserved, but a layout-no-op transpose isn't always expressible as a
+/// single reshape. Specifically, a later group's non-unit dim can land
+/// positionally before an earlier (all-unit) group's content, leaving no
+/// valid ascending-order reassociation. Returns `failure()` in that case so
+/// the caller falls back to the general expand + transpose lowering.
+static FailureOr<SmallVector<ReassociationIndices>>
+getSwizzleFoldedReassociation(int outerDims, ArrayRef<int64_t> innerTileSizes,
+                              const TileSwizzle &swizzle) {
+  SmallVector<int64_t> permutedInnerShape =
+      IREE::Codegen::getExpandedTileShape(swizzle.expandShape());
+  applyPermutationToVector(permutedInnerShape, swizzle.permutation());
+
+  SmallVector<ReassociationIndices> result;
+  for (int i = 0; i < outerDims; ++i) {
+    result.push_back({i});
+  }
+  int targetIdx = 0;
+  for (int64_t innerSize : innerTileSizes) {
+    ReassociationIndices group;
+    int64_t accum = 1;
+    // Grow the slice until its product reaches `innerSize`. `do/while` (not
+    // `while`) consumes at least one dim, so `innerSize == 1` slices aren't
+    // empty. Fail if a single dim overshoots `innerSize` (a later group's
+    // non-unit dim positioned before this group's content) or we run out of
+    // dims.
+    do {
+      if (targetIdx >= static_cast<int>(permutedInnerShape.size())) {
+        return failure();
+      }
+      group.push_back(outerDims + targetIdx);
+      accum *= permutedInnerShape[targetIdx];
+      ++targetIdx;
+    } while (accum < innerSize);
+    if (accum != innerSize) {
+      return failure();
+    }
+    result.push_back(std::move(group));
+  }
+  // Trailing unit dims (after the last non-unit dim) go to the last slice.
+  // Absorbing them per-slice instead would let an earlier slice eat unit dims
+  // that a later, all-unit packed dim still needs.
+  while (targetIdx < static_cast<int>(permutedInnerShape.size())) {
+    if (permutedInnerShape[targetIdx] != 1) {
+      return failure();
+    }
+    result.back().push_back(outerDims + targetIdx);
+    ++targetIdx;
+  }
+  return result;
+}
+
 /// Convert iree_linalg_ext.set_encoding op to pack + tile swizzling ops. We use
 /// expand_shape + linalg.transpose to represent a tile swizzling op.
 struct SetEncodingOpLoweringConversion
@@ -536,9 +624,38 @@ struct SetEncodingOpLoweringConversion
     }
 
     Location loc = encodingOp.getLoc();
-
-    // Create expand_shape op to tile the innermost two dimensions.
     int origRank = encodingOp.getSourceType().getRank();
+
+    // Final shape after the swizzle is applied: outer dims + permuted
+    // expand-shape inner tile.
+    SmallVector<int64_t> permutedInnerShape =
+        getExpandedTileShape(encodingInfo.swizzle->expandShape());
+    applyPermutationToVector(permutedInnerShape,
+                             encodingInfo.swizzle->permutation());
+    SmallVector<int64_t> finalShape(cast<ShapedType>(packedValue->getType())
+                                        .getShape()
+                                        .take_front(origRank));
+    finalShape.append(permutedInnerShape);
+    RankedTensorType finalType = encodingOp.getSourceType().clone(finalShape);
+
+    // Fast path: when the permutation is a layout no-op and the fold is
+    // expressible as a single reshape, replace expand_shape + transpose with
+    // one expand_shape straight to the permuted shape. This drops the
+    // intermediate buffer that, under dynamic shapes, gets hoisted to a stack
+    // alloca with a bogus index-umax-derived static size.
+    if (isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
+      if (auto reassoc = getSwizzleFoldedReassociation(
+              origRank, encodingInfo.innerTileSizes, *encodingInfo.swizzle);
+          succeeded(reassoc)) {
+        auto expandShapeOp = tensor::ExpandShapeOp::create(
+            rewriter, loc, finalType, packedValue.value(), *reassoc);
+        rewriter.replaceOp(encodingOp, expandShapeOp.getResult());
+        return success();
+      }
+    }
+
+    // General case: expand_shape to the unpermuted inner tile, then
+    // linalg.transpose to apply the swizzle permutation.
     SmallVector<int64_t> expandShapeShape(
         cast<ShapedType>(packedValue->getType())
             .getShape()
@@ -596,37 +713,53 @@ struct UnsetEncodingOpLoweringConversion
       int targetRank = unsetEncodingOp.getResultType().getRank();
       auto srcConvertedType =
           cast<RankedTensorType>(adaptor.getSource().getType());
-      SmallVector<OpFoldResult> emptyShape =
-          tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
-      emptyShape.resize(targetRank);
-      for (auto i : getExpandedTileShape(encodingInfo.swizzle->expandShape())) {
-        emptyShape.push_back(rewriter.getIndexAttr(i));
-      }
-      auto emptyTensor = tensor::EmptyOp::create(
-          rewriter, loc, emptyShape,
-          unsetEncodingOp.getSourceType().getElementType());
-
-      SmallVector<int64_t> transposePerm =
-          llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
-      for (auto perm : encodingInfo.swizzle->permutation()) {
-        transposePerm.push_back(targetRank + perm);
-      }
-      auto invertedTransposePerm = invertPermutationVector(transposePerm);
-      auto transposeOp =
-          linalg::TransposeOp::create(rewriter, loc, adaptor.getSource(),
-                                      emptyTensor, invertedTransposePerm);
-
-      SmallVector<ReassociationIndices> reassociation = getReassociationIndices(
-          targetRank, encodingInfo.swizzle->expandShape());
       SmallVector<int64_t> unpackSrcShape(
           srcConvertedType.getShape().take_front(targetRank));
       unpackSrcShape.append(encodingInfo.innerTileSizes.begin(),
                             encodingInfo.innerTileSizes.end());
       RankedTensorType unpackSrcType =
           unsetEncodingOp.getResultType().clone(unpackSrcShape);
-      unpackSrc = tensor::CollapseShapeOp::create(rewriter, loc, unpackSrcType,
-                                                  transposeOp->getResult(0),
-                                                  reassociation);
+
+      // Fast path mirroring the SetEncoding side: fold the inverse transpose +
+      // collapse_shape into a single collapse_shape when the permutation is a
+      // layout no-op and the fold is a single reshape.
+      FailureOr<SmallVector<ReassociationIndices>> foldedReassoc = failure();
+      if (isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
+        foldedReassoc = getSwizzleFoldedReassociation(
+            targetRank, encodingInfo.innerTileSizes, *encodingInfo.swizzle);
+      }
+      if (succeeded(foldedReassoc)) {
+        unpackSrc = tensor::CollapseShapeOp::create(
+            rewriter, loc, unpackSrcType, adaptor.getSource(), *foldedReassoc);
+      } else {
+        SmallVector<OpFoldResult> emptyShape =
+            tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
+        emptyShape.resize(targetRank);
+        for (auto i :
+             getExpandedTileShape(encodingInfo.swizzle->expandShape())) {
+          emptyShape.push_back(rewriter.getIndexAttr(i));
+        }
+        auto emptyTensor = tensor::EmptyOp::create(
+            rewriter, loc, emptyShape,
+            unsetEncodingOp.getSourceType().getElementType());
+
+        SmallVector<int64_t> transposePerm =
+            llvm::to_vector(llvm::seq<int64_t>(0, targetRank));
+        for (auto perm : encodingInfo.swizzle->permutation()) {
+          transposePerm.push_back(targetRank + perm);
+        }
+        auto invertedTransposePerm = invertPermutationVector(transposePerm);
+        auto transposeOp =
+            linalg::TransposeOp::create(rewriter, loc, adaptor.getSource(),
+                                        emptyTensor, invertedTransposePerm);
+
+        SmallVector<ReassociationIndices> reassociation =
+            getReassociationIndices(targetRank,
+                                    encodingInfo.swizzle->expandShape());
+        unpackSrc = tensor::CollapseShapeOp::create(
+            rewriter, loc, unpackSrcType, transposeOp->getResult(0),
+            reassociation);
+      }
     }
 
     auto unpackedValue = lowerUnsetEncodingToUnpackOp(rewriter, unsetEncodingOp,
