@@ -3194,6 +3194,33 @@ bool UseGlobalLoadDMAAttr::hasTilingLevel(unsigned level) const {
 }
 
 //===----------------------------------------------------------------------===//
+// UseGlobalTransposeLoadAttr - LoweringConfigAttrInterface
+//===----------------------------------------------------------------------===//
+
+SmallVector<int64_t>
+UseGlobalTransposeLoadAttr::getStaticTilingLevelSizes(unsigned level,
+                                                      Operation *op) const {
+  if (level == llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return globalTransposeLoadTileSizes(op);
+  }
+  return {};
+}
+
+SmallVector<OpFoldResult>
+UseGlobalTransposeLoadAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
+                                                Operation *op) const {
+  if (level == llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    SmallVector<int64_t> sizes = globalTransposeLoadTileSizes(op);
+    return getAsIndexOpFoldResult(b.getContext(), sizes);
+  }
+  return {};
+}
+
+bool UseGlobalTransposeLoadAttr::hasTilingLevel(unsigned level) const {
+  return level == llvm::to_underlying(GPU::TilingLevel::Thread);
+}
+
+//===----------------------------------------------------------------------===//
 // PromoteWithCacheSwizzleAttr
 //===----------------------------------------------------------------------===//
 
