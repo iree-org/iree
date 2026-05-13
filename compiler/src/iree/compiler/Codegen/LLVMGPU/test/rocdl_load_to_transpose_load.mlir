@@ -163,6 +163,43 @@ func.func @no_transform_row_group_size_not_multiple() -> vector<4x1xf16> {
 
 // -----
 
+// Test: gfx950 VDMFMA functions skip transpose_load conversion
+// CHECK-LABEL: func.func @no_transform_gfx950_vdmfma
+// CHECK-NOT: amdgpu.transpose_load
+// CHECK: vector.transfer_read
+// CHECK-NOT: amdgpu.transpose_load
+// CHECK: iree_codegen.inner_tiled
+// CHECK-NOT: amdgpu.transpose_load
+// CHECK: return
+func.func @no_transform_gfx950_vdmfma() -> vector<4x1xf16> {
+  %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %tid = gpu.thread_id x
+  %row = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
+  %col = iree_codegen.index_hint %tid(#iree_gpu.lane_increment<16, aligned>) : index
+  %cst = arith.constant 0.0 : f16
+  %0 = vector.transfer_read %src[%row, %col], %cst
+       {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d0, d1)>}
+       : memref<128x256xf16, #gpu.address_space<workgroup>>, vector<4x1xf16>
+
+  %a = arith.constant dense<0.0> : vector<1x2x4xf16>
+  %b = arith.constant dense<0.0> : vector<1x2x8xf16>
+  %acc = arith.constant dense<0.0> : vector<2x1xf32>
+  %1 = iree_codegen.inner_tiled ins(%a, %b) outs(%acc) {
+      indexing_maps = [
+        affine_map<() -> ()>,
+        affine_map<() -> ()>,
+        affine_map<() -> ()>
+      ],
+      iterator_types = [],
+      kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>,
+      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = true>
+    } : vector<1x2x4xf16>, vector<1x2x8xf16> into vector<2x1xf32>
+  return %0 : vector<4x1xf16>
+}
+
+// -----
+
 //===----------------------------------------------------------------------===//
 // Tests for row index validation - row index must be uniform across 16 lanes
 //===----------------------------------------------------------------------===//

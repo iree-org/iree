@@ -36,6 +36,17 @@ constexpr int64_t kTransposeLoadLaneGroupSize = 16;
 constexpr amdgpu::Chipset kGfx950 = amdgpu::Chipset(9, 5, 0);
 constexpr llvm::StringLiteral kPassLocalHintAttr = "__pass_local_hint";
 
+static bool hasVDMFMAOperation(FunctionOpInterface funcOp) {
+  WalkResult result = funcOp.walk([&](IREE::Codegen::InnerTiledOp tiledOp) {
+    auto virtualMMA = dyn_cast<IREE::GPU::VirtualMMAAttr>(tiledOp.getKind());
+    if (virtualMMA && IREE::GPU::isVDMFMAIntrinsic(virtualMMA.getIntrinsic())) {
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return result.wasInterrupted();
+}
+
 //===----------------------------------------------------------------------===//
 // Validation Helpers
 //===----------------------------------------------------------------------===//
@@ -776,6 +787,10 @@ struct ROCDLLoadToTransposeLoadPass final
     FailureOr<amdgpu::Chipset> chipset =
         amdgpu::Chipset::parse(target.getArch());
     if (failed(chipset) || *chipset != kGfx950) {
+      return;
+    }
+    if (hasVDMFMAOperation(funcOp)) {
+      LDBG() << "Skipping transpose_load conversion for gfx950 VDMFMA\n";
       return;
     }
 

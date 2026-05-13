@@ -535,6 +535,7 @@ def IREEGPU_VirtualMMAAttr :
     "verifyIndexingMaps",
     "getUndistributedTileTypes",
     "getDistributedTileTypes",
+    "getUndistributedTileDimExpansion",
     "getDistributionMappingKind",
     "getDistributionWorkerCount",
     "getOperandIteratorTypes",
