@@ -491,14 +491,14 @@ static LogicalResult emitVectorDistributeConstraints(
   Value sgCntEq = smt::EqOp::create(builder, loc, sgCntMulResult, sgNum);
   AssertOp::create(builder, loc, sgCntEq, "sg_m_cnt * sg_n_cnt == sg_num");
 
-  // Constraint 5: Thread count limit
+  // Constraint 5: Thread count limit.
   // sg_m_cnt * sg_n_cnt * sg_size <= max_threads
   Value totalThreadsMulResult =
       smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt, sgSize});
   assertCmp(builder, loc, smt::IntPredicate::le, totalThreadsMulResult,
             maxThreadsVal, "total_threads <= max_threads");
 
-  // Constraint 6: Load distribution
+  // Constraint 6: Load distribution.
   // (red_k * wg_m) % (sg_m_cnt * sg_n_cnt * sg_size) == 0
   // (red_k * wg_n) % (sg_m_cnt * sg_n_cnt * sg_size) == 0
   auto emitLoadDistForWg = [&](Value wg, StringRef name) -> void {
