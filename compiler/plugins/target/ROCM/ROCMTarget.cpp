@@ -807,6 +807,12 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     bool useSPIRV = targetAttr.getFormat() == "rocm-spirv-fb";
+    if (targetOptions.useAmdgcnSpirv && !useSPIRV) {
+      return variantOp.emitError()
+             << "--iree-rocm-use-spirv requires ROCm executable target format "
+                "'rocm-spirv-fb', but got '"
+             << targetAttr.getFormat() << "'";
+    }
     StringRef targetArch = targetOptions.target;
     StringRef targetFeatures = targetOptions.targetFeatures;
     if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
