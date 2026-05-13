@@ -891,3 +891,38 @@ func.func @gather_to_lds_pre_loop_wait_before_non_adjacent_read(
   vector.transfer_write %result, %C_global[%write_idx] {in_bounds = [true]} : vector<1xf32>, memref<128xf32>
   return
 }
+
+// -----
+
+// CHECK-ALL-LABEL: @prefetch_global_transpose_load
+// CHECK: amdgpu.global_transpose_load
+// CHECK: vector.transfer_write
+// CHECK: scf.for
+// CHECK:   amdgpu.global_transpose_load
+// CHECK:   gpu.barrier
+// CHECK:   vector.transfer_read
+// CHECK:   gpu.barrier
+// CHECK:   vector.transfer_write
+func.func @prefetch_global_transpose_load(
+    %src: memref<128x8xbf16>,
+    %out: memref<f32>) {
+  %cst_f32 = arith.constant 0.0 : f32
+  %cst_bf16 = arith.constant 0.0 : bf16
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %alloc = memref.alloc() : memref<8xbf16, #gpu.address_space<workgroup>>
+  %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst_f32) -> f32 {
+    %tr = amdgpu.global_transpose_load %src[%k, %c0] : memref<128x8xbf16> -> vector<8xbf16>
+    vector.transfer_write %tr, %alloc[%c0] {in_bounds = [true]}
+        : vector<8xbf16>, memref<8xbf16, #gpu.address_space<workgroup>>
+    %v = vector.transfer_read %alloc[%c0], %cst_bf16
+        : memref<8xbf16, #gpu.address_space<workgroup>>, vector<8xbf16>
+    %reduced = vector.reduction <add>, %v : vector<8xbf16> into bf16
+    %ext = arith.extf %reduced : bf16 to f32
+    %new_acc = arith.addf %acc, %ext : f32
+    scf.yield %new_acc : f32
+  }
+  memref.store %result, %out[] : memref<f32>
+  return
+}
