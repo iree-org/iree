@@ -41,6 +41,7 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
