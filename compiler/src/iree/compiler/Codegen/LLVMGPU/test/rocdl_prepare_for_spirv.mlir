@@ -1,4 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-rocdl-prepare-for-spirv %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-rocdl-prepare-for-spirv --iree-rocdl-prepare-for-spirv %s | FileCheck %s --check-prefix=IDEMPOTENT
+
+// IDEMPOTENT: llvm.mlir.global private constant @llvm.cmdline
 
 // Test triple, data layout, calling conventions, attributes, and address spaces.
 
@@ -135,6 +138,41 @@ module {
     llvm.return
   }
   // CHECK: llvm.mlir.global private constant @llvm.cmdline("-O3\00")
+  // CHECK-SAME: addr_space = 1
+  // CHECK-SAME: section = ".llvmcmd"
+}
+
+// -----
+
+// Test that an existing @llvm.cmdline has its optimization flag replaced.
+
+module {
+  llvm.mlir.global private constant @llvm.cmdline("-cc1\00-O2\00foo\00")
+      {addr_space = 1 : i32, alignment = 1 : i64, section = ".llvmcmd"} : !llvm.array<13 x i8>
+
+  llvm.func @kernel_with_existing_cmdline() {
+    llvm.return
+  }
+
+  // CHECK: llvm.mlir.global private constant @llvm.cmdline("-cc1\00-O3\00foo\00")
+  // CHECK-SAME: addr_space = 1
+  // CHECK-SAME: section = ".llvmcmd"
+}
+
+// -----
+
+// Test that an existing @llvm.cmdline without an optimization flag has -O3
+// appended.
+
+module {
+  llvm.mlir.global private constant @llvm.cmdline("-cc1\00")
+      {addr_space = 1 : i32, alignment = 1 : i64, section = ".llvmcmd"} : !llvm.array<5 x i8>
+
+  llvm.func @kernel_with_existing_cmdline_without_opt() {
+    llvm.return
+  }
+
+  // CHECK: llvm.mlir.global private constant @llvm.cmdline("-cc1\00-O3\00")
   // CHECK-SAME: addr_space = 1
   // CHECK-SAME: section = ".llvmcmd"
 }

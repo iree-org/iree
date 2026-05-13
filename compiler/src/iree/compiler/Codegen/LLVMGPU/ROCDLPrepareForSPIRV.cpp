@@ -112,6 +112,37 @@ static constexpr llvm::StringLiteral kAMDGPUAttrsToRemove[] = {
     "rocdl.max_flat_work_group_size",
 };
 
+static bool isOptimizationLevelFlag(StringRef arg) {
+  return arg == "-O0" || arg == "-O1" || arg == "-O2" || arg == "-O3" ||
+         arg == "-Os" || arg == "-Oz";
+}
+
+static std::string ensureO3InCmdline(StringRef cmdline) {
+  SmallVector<StringRef> args;
+  cmdline.split(args, '\0', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+
+  std::string result;
+  bool hasOptLevel = false;
+  for (StringRef arg : args) {
+    if (isOptimizationLevelFlag(arg)) {
+      if (hasOptLevel) {
+        continue;
+      }
+      arg = "-O3";
+      hasOptLevel = true;
+    }
+    result.append(arg.data(), arg.size());
+    result.push_back('\0');
+  }
+
+  if (!hasOptLevel) {
+    result.append("-O3", 3);
+    result.push_back('\0');
+  }
+
+  return result;
+}
+
 struct ROCDLPrepareForSPIRVPass final
     : impl::ROCDLPrepareForSPIRVPassBase<ROCDLPrepareForSPIRVPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -269,13 +300,30 @@ struct ROCDLPrepareForSPIRVPass final
     // See amd/comgr/src/comgr-compiler.cpp: extractSpirvFlags().
     // Must be at addrspace(1) (CrossWorkgroup) so the SPIR-V backend emits it
     // as a module-level global that survives the round-trip.
-    {
-      auto i8Type = IntegerType::get(moduleOp.getContext(), 8);
+    auto i8Type = IntegerType::get(moduleOp.getContext(), 8);
+    auto cmdlineGlobal = moduleOp.lookupSymbol<LLVM::GlobalOp>("llvm.cmdline");
+    if (cmdlineGlobal) {
+      auto valueAttr = dyn_cast_if_present<StringAttr>(
+          cmdlineGlobal.getValueAttr());
+      if (!valueAttr) {
+        cmdlineGlobal.emitOpError()
+            << "expected @llvm.cmdline to have a string initializer";
+        return signalPassFailure();
+      }
+      std::string flags = ensureO3InCmdline(valueAttr.getValue());
+      cmdlineGlobal.setValueAttr(StringAttr::get(moduleOp.getContext(), flags));
+      cmdlineGlobal.setGlobalType(
+          LLVM::LLVMArrayType::get(i8Type, flags.size()));
+      cmdlineGlobal.setSection(".llvmcmd");
+      cmdlineGlobal.setAlignment(1);
+      cmdlineGlobal.setAddrSpace(1);
+    } else {
       StringRef flags("-O3\0", 4);
-      auto arrayType = LLVM::LLVMArrayType::get(i8Type, flags.size());
       OpBuilder builder(moduleOp.getBody(), moduleOp.getBody()->end());
       auto globalOp = LLVM::GlobalOp::create(
-          builder, moduleOp.getLoc(), arrayType, /*isConstant=*/true,
+          builder, moduleOp.getLoc(),
+          LLVM::LLVMArrayType::get(i8Type, flags.size()),
+          /*isConstant=*/true,
           LLVM::Linkage::Private, "llvm.cmdline", builder.getStringAttr(flags));
       globalOp.setSection(".llvmcmd");
       globalOp.setAlignment(1);

@@ -4,7 +4,8 @@
 // RUN: ls %t | FileCheck %s --check-prefix=FILES --implicit-check-not=.hsaco
 
 // Verify that ROCm serialization derives SPIR-V mode from the target attr
-// format. This intentionally does not pass --iree-rocm-use-spirv.
+// format when passed a configured HAL executable.
+// This intentionally does not pass --iree-rocm-use-spirv.
 // This should not be possible to encounter from normal iree CLI entry points,
 // but preconfigured or programmatically created HAL executable variants should
 // still be serialized according to their target attr.
