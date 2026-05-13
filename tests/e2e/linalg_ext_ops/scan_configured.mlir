@@ -153,21 +153,33 @@ func.func @scan_dim1_inclusive_sum_large_configured_rocm() {
              iree_linalg_ext.yield %sum : f32
          } -> tensor<64x256xf32>, tensor<64xf32>
 
-  %prefix = tensor.extract_slice %0#0[0, 0] [2, 4] [1, 1]
-      : tensor<64x256xf32> to tensor<2x4xf32>
+  %prefix_row0 = tensor.extract_slice %0#0[0, 0] [1, 4] [1, 1]
+      : tensor<64x256xf32> to tensor<4xf32>
   check.expect_almost_eq_const(
-      %prefix,
-      dense<[[1.0, 3.0, 6.0, 10.0],
-             [1001.0, 2003.0, 3006.0, 4010.0]]> : tensor<2x4xf32>
-  ) : tensor<2x4xf32>
+      %prefix_row0,
+      dense<[1.0, 3.0, 6.0, 10.0]> : tensor<4xf32>
+  ) : tensor<4xf32>
 
-  %boundary = tensor.extract_slice %0#0[0, 14] [2, 4] [1, 1]
-      : tensor<64x256xf32> to tensor<2x4xf32>
+  %prefix_row1 = tensor.extract_slice %0#0[1, 0] [1, 4] [1, 1]
+      : tensor<64x256xf32> to tensor<4xf32>
   check.expect_almost_eq_const(
-      %boundary,
-      dense<[[120.0, 136.0, 153.0, 171.0],
-             [15120.0, 16136.0, 17153.0, 18171.0]]> : tensor<2x4xf32>
-  ) : tensor<2x4xf32>
+      %prefix_row1,
+      dense<[1001.0, 2003.0, 3006.0, 4010.0]> : tensor<4xf32>
+  ) : tensor<4xf32>
+
+  %boundary_row0 = tensor.extract_slice %0#0[0, 14] [1, 4] [1, 1]
+      : tensor<64x256xf32> to tensor<4xf32>
+  check.expect_almost_eq_const(
+      %boundary_row0,
+      dense<[120.0, 136.0, 153.0, 171.0]> : tensor<4xf32>
+  ) : tensor<4xf32>
+
+  %boundary_row1 = tensor.extract_slice %0#0[1, 14] [1, 4] [1, 1]
+      : tensor<64x256xf32> to tensor<4xf32>
+  check.expect_almost_eq_const(
+      %boundary_row1,
+      dense<[15120.0, 16136.0, 17153.0, 18171.0]> : tensor<4xf32>
+  ) : tensor<4xf32>
 
   %acc_prefix = tensor.extract_slice %0#1[0] [2] [1]
       : tensor<64xf32> to tensor<2xf32>

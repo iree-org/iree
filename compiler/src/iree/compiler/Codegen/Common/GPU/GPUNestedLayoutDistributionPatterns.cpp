@@ -372,10 +372,12 @@ struct DistributeTransferWrite final
     }
     // Make the outer bound numThreadsInWorkgroup / prod(basis) to remove
     // redundant checks.
+    bool hasOuterBound = false;
     if (numThreadsInWorkgroup.has_value()) {
       int64_t basisProduct = llvm::product_of(basis);
       int64_t outerBound = numThreadsInWorkgroup.value() / basisProduct;
-      if (outerBound > 0) {
+      hasOuterBound = outerBound > 0;
+      if (hasOuterBound) {
         basis.insert(basis.begin(), outerBound);
       }
     }
@@ -383,9 +385,7 @@ struct DistributeTransferWrite final
     // dimToResult are 0.
     SmallVector<Value> delinearized;
     b.createOrFold<affine::AffineDelinearizeIndexOp>(
-        delinearized, loc, threadId, basis,
-        /*hasOuterbound=*/numThreadsInWorkgroup.has_value() &&
-            numThreadsInWorkgroup.value() >= llvm::product_of(basis));
+        delinearized, loc, threadId, basis, /*hasOuterbound=*/hasOuterBound);
     // Get all results which are not in dimToResult and check they are 0.
     Value condition = arith::ConstantOp::create(b, loc, b.getBoolAttr(true));
     for (auto [idx, result] : llvm::enumerate(delinearized)) {
@@ -2295,54 +2295,61 @@ static SmallVector<Value> getPayloadBufferIndices(RewriterBase &rewriter,
   return indices;
 }
 
+struct VectorPayloadTransferInfo {
+  SmallVector<Value> indices;
+  AffineMapAttr permutationMap;
+  ArrayAttr inBounds;
+};
+
+static VectorPayloadTransferInfo
+getVectorPayloadTransferInfo(RewriterBase &rewriter, Location loc,
+                             VectorType payloadType, Value buffer,
+                             ValueRange prefixIndices) {
+  auto bufferType = cast<MemRefType>(buffer.getType());
+  auto inBounds =
+      rewriter.getBoolArrayAttr(SmallVector<bool>(payloadType.getRank(), true));
+  auto results = llvm::to_vector(llvm::seq<unsigned>(
+      prefixIndices.size(), prefixIndices.size() + payloadType.getRank()));
+  auto permutationMap = AffineMap::getMultiDimMapWithTargets(
+      bufferType.getRank(), results, rewriter.getContext());
+  return {getPayloadBufferIndices(rewriter, loc, prefixIndices,
+                                  payloadType.getRank()),
+          AffineMapAttr::get(permutationMap), inBounds};
+}
+
 static void writeVectorPayloadToScalarBuffer(RewriterBase &rewriter,
                                              Location loc, Value payload,
                                              Value buffer,
                                              ValueRange prefixIndices) {
   auto payloadType = cast<VectorType>(payload.getType());
-  auto bufferType = cast<MemRefType>(buffer.getType());
   if (payloadType.getRank() == 0) {
     Value scalar =
         vector::ExtractOp::create(rewriter, loc, payload, ArrayRef<int64_t>{});
     memref::StoreOp::create(rewriter, loc, scalar, buffer, prefixIndices);
     return;
   }
-  auto inBounds =
-      rewriter.getBoolArrayAttr(SmallVector<bool>(payloadType.getRank(), true));
-  auto results = llvm::to_vector(llvm::seq<unsigned>(
-      prefixIndices.size(), prefixIndices.size() + payloadType.getRank()));
-  auto permutationMap = AffineMap::getMultiDimMapWithTargets(
-      bufferType.getRank(), results, rewriter.getContext());
+  auto transferInfo = getVectorPayloadTransferInfo(rewriter, loc, payloadType,
+                                                   buffer, prefixIndices);
   vector::TransferWriteOp::create(
-      rewriter, loc, payload, buffer,
-      getPayloadBufferIndices(rewriter, loc, prefixIndices,
-                              payloadType.getRank()),
-      AffineMapAttr::get(permutationMap), /*mask=*/Value(), inBounds);
+      rewriter, loc, payload, buffer, transferInfo.indices,
+      transferInfo.permutationMap, /*mask=*/Value(), transferInfo.inBounds);
 }
 
 static Value
 readVectorPayloadFromScalarBuffer(RewriterBase &rewriter, Location loc,
                                   VectorType payloadType, Value buffer,
                                   ValueRange prefixIndices, Value padScalar) {
-  auto bufferType = cast<MemRefType>(buffer.getType());
   if (payloadType.getRank() == 0) {
     Value scalar = memref::LoadOp::create(rewriter, loc, buffer, prefixIndices);
     return vector::BroadcastOp::create(rewriter, loc, payloadType, scalar);
   }
 
-  auto inBounds =
-      rewriter.getBoolArrayAttr(SmallVector<bool>(payloadType.getRank(), true));
-  auto results = llvm::to_vector(llvm::seq<unsigned>(
-      prefixIndices.size(), prefixIndices.size() + payloadType.getRank()));
-  auto permutationMap = AffineMap::getMultiDimMapWithTargets(
-      bufferType.getRank(), results, rewriter.getContext());
-
+  auto transferInfo = getVectorPayloadTransferInfo(rewriter, loc, payloadType,
+                                                   buffer, prefixIndices);
   return vector::TransferReadOp::create(
-      rewriter, loc, payloadType, buffer,
-      getPayloadBufferIndices(rewriter, loc, prefixIndices,
-                              payloadType.getRank()),
-      AffineMapAttr::get(permutationMap), padScalar, /*mask=*/Value(),
-      inBounds);
+      rewriter, loc, payloadType, buffer, transferInfo.indices,
+      transferInfo.permutationMap, padScalar, /*mask=*/Value(),
+      transferInfo.inBounds);
 }
 
 static Value extractLastScanElement(RewriterBase &rewriter, Location loc,
@@ -2400,26 +2407,6 @@ getCrossSubgroupCoordInfo(RewriterBase &rewriter, Location loc,
 
   return {warpIndices[scanDim], threadIndices[scanDim], parallelCoord,
           numParallelCoords};
-}
-
-static Value broadcastPayloadFromWorkgroupMemory(
-    RewriterBase &rewriter, Location loc, Value isWriter,
-    VectorType payloadType, Value payload, Value parallelCoord,
-    int64_t numParallelCoords, Value padScalar) {
-  MemRefType bufferType = getWorkgroupBufferTypeForVectorPayload(
-      rewriter.getContext(), {numParallelCoords}, payloadType);
-  Value buffer = memref::AllocOp::create(rewriter, loc, bufferType);
-
-  auto ifOp = scf::IfOp::create(rewriter, loc, isWriter);
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(ifOp.thenYield());
-    writeVectorPayloadToScalarBuffer(rewriter, loc, payload, buffer,
-                                     ValueRange{parallelCoord});
-  }
-  gpu::BarrierOp::create(rewriter, loc, buffer);
-  return readVectorPayloadFromScalarBuffer(
-      rewriter, loc, payloadType, buffer, ValueRange{parallelCoord}, padScalar);
 }
 
 struct CrossSubgroupScanResult {
