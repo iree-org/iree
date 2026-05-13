@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -110,12 +111,26 @@ TEST(AmdgpuDriverOptionsTest, RejectsInvalidQueuePlacementBeforeLoadingHsa) {
                         CreateDriverWithDefaultDeviceOptions(&options));
 }
 
-TEST(AmdgpuDriverOptionsTest, AcceptsAutoCommandBufferModeBeforeLoadingHsa) {
+TEST(AmdgpuDriverOptionsTest, AcceptsCommandBufferModesBeforeLoadingHsa) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AQL;
+
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
+
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
+
   options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
 
-  IREE_EXPECT_OK(CreateDriverWithDefaultDeviceOptions(&options));
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
 }
 
 TEST(AmdgpuDriverOptionsTest, RejectsInvalidCommandBufferModeBeforeLoadingHsa) {

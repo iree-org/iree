@@ -425,6 +425,7 @@ iree_cc_test(
     "driver_options_test.cc"
   DEPS
     ::amdgpu
+    ::headers
     iree::base
     iree::hal
     iree::testing::gtest
