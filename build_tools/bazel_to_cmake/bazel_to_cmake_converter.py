@@ -444,7 +444,7 @@ class BuildFileFunctions(object):
         mapped_target = self._convert_single_target(target)
         return self._convert_string_arg_block(name, mapped_target, quote=False)
 
-    def _convert_target_list_block(self, list_name, targets):
+    def _convert_target_list_block(self, list_name, targets, omit_empty=False):
         if targets is None:
             return ""
 
@@ -458,11 +458,54 @@ class BuildFileFunctions(object):
         # Remove duplicates
         targets = set(targets)
         # Remove Falsey (None and empty string) values
-        targets = filter(None, targets)
+        targets = list(filter(None, targets))
+        if omit_empty and not targets:
+            return ""
 
         return self._convert_string_list_block(
             list_name, targets, sort=True, quote=False
         )
+
+    def _local_cts_testdata_lib_deps(self, deps):
+        if isinstance(deps, MixedDeps):
+            deps = deps.unconditional
+        if not deps:
+            return []
+        return [
+            dep
+            for dep in deps
+            if isinstance(dep, str)
+            and dep.startswith(":testdata_")
+            and dep.endswith("_lib")
+        ]
+
+    def _emit_optional_local_cts_testdata_guard_begin(self, deps):
+        testdata_deps = self._local_cts_testdata_lib_deps(deps)
+        if not testdata_deps:
+            return False
+
+        optional_targets = []
+        for dep in testdata_deps:
+            for target in self._convert_target(dep):
+                if target.startswith("::"):
+                    target = "${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}" + target
+                optional_targets.append(target)
+
+        if not optional_targets:
+            return False
+
+        conditions = " AND ".join(
+            f"TARGET {target}" for target in sorted(set(optional_targets))
+        )
+        self._converter.body += (
+            f"iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)\n"
+            f"if({conditions})\n"
+        )
+        return True
+
+    def _emit_optional_local_cts_testdata_guard_end(self, did_emit_guard):
+        if did_emit_guard:
+            self._converter.body += "endif()\n\n"
 
     def _convert_includes_block(self, includes):
         if not includes:
@@ -936,7 +979,7 @@ class BuildFileFunctions(object):
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
-        data_block = self._convert_target_list_block("DATA", data)
+        data_block = self._convert_target_list_block("DATA", data, omit_empty=True)
         deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
@@ -948,6 +991,9 @@ class BuildFileFunctions(object):
         )
 
         self._emit_platform_guard_begin(target_compatible_with)
+        did_emit_testdata_guard = self._emit_optional_local_cts_testdata_guard_begin(
+            deps
+        )
         if platform_deps_block:
             self._converter.body += platform_deps_block
         self._converter.body += (
@@ -967,6 +1013,7 @@ class BuildFileFunctions(object):
             f"{resource_group_block}"
             f")\n\n"
         )
+        self._emit_optional_local_cts_testdata_guard_end(did_emit_testdata_guard)
         self._emit_platform_guard_end(target_compatible_with)
 
     def cc_binary(

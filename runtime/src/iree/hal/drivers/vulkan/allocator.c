@@ -1859,15 +1859,17 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
 static void iree_hal_vulkan_allocator_deallocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
-  iree_hal_vulkan_allocator_t* allocator =
-      iree_hal_vulkan_allocator_cast(base_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(
       z0, (int64_t)iree_hal_buffer_allocation_size(base_buffer));
 
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
-      iree_hal_buffer_byte_length(base_buffer)));
+  IREE_STATISTICS({
+    iree_hal_vulkan_allocator_t* allocator =
+        iree_hal_vulkan_allocator_cast(base_allocator);
+    iree_hal_allocator_statistics_record_free(
+        &allocator->statistics, iree_hal_buffer_memory_type(base_buffer),
+        iree_hal_buffer_byte_length(base_buffer));
+  });
 
   iree_hal_buffer_destroy(base_buffer);
   IREE_TRACE_ZONE_END(z0);

@@ -90,8 +90,6 @@ iree_cc_test(
     core_driver_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -109,8 +107,6 @@ iree_cc_test(
     core_semaphore_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -128,8 +124,6 @@ iree_cc_test(
     core_semaphore_thread_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -147,8 +141,6 @@ iree_cc_test(
     buffer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -167,8 +159,6 @@ iree_cc_test(
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "allocator_guardrail_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -187,8 +177,6 @@ iree_cc_test(
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "allocator_virtual_memory_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -201,14 +189,14 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     profiling_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "profiling_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -223,13 +211,13 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
 iree_cc_test(
   NAME
     command_buffer_basic_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -247,8 +235,6 @@ iree_cc_test(
     command_buffer_fill_buffer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -266,8 +252,6 @@ iree_cc_test(
     command_buffer_update_buffer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -285,8 +269,6 @@ iree_cc_test(
     command_buffer_copy_buffer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -304,8 +286,6 @@ iree_cc_test(
     command_buffer_transient_buffer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -318,13 +298,13 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -338,13 +318,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -359,13 +341,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_pipeline_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -379,13 +363,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_pipeline_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -400,13 +386,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_reuse_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -420,13 +408,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_reuse_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -441,13 +431,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_constants_bindings_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -461,13 +453,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_constants_bindings_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -482,13 +476,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_constants_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -502,13 +498,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_constants_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -523,13 +521,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_indirect_parameters_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -543,13 +543,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_indirect_parameters_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -564,13 +566,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_multi_entrypoint_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -584,13 +588,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_multi_entrypoint_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -605,13 +611,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     command_buffer_dispatch_multi_workgroup_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -625,13 +633,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_command_buffer_dispatch_multi_workgroup_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -645,14 +655,14 @@ iree_cc_test(
     "requires-gpu-vulkan"
     "vulkan_uses_vk_khr_buffer_device_address"
 )
+
+endif()
 
 iree_cc_test(
   NAME
     command_buffer_stress_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -665,13 +675,13 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     executable_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -685,13 +695,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_executable_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -706,14 +718,16 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_dispatch_validation_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "bda_dispatch_validation_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -731,14 +745,14 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
 iree_cc_test(
   NAME
     bda_raw_spirv_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "bda_raw_spirv_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     iree::base::tooling::flags
@@ -760,8 +774,6 @@ iree_cc_test(
     file_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::vulkan_file_test
@@ -780,8 +792,6 @@ iree_cc_test(
     queue_alloca_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -799,8 +809,6 @@ iree_cc_test(
     queue_host_call_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -813,13 +821,13 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     queue_dispatch_direct_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -836,13 +844,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     queue_dispatch_indirect_parameters_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -859,13 +869,15 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_queue_dispatch_direct_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -883,13 +895,15 @@ iree_cc_test(
     "vulkan_uses_vk_khr_buffer_device_address"
 )
 
+endif()
+
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_bda_lib)
 iree_cc_test(
   NAME
     bda_queue_dispatch_indirect_parameters_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::bda_backends
     ::testdata_vulkan_spirv_bda_lib
@@ -906,14 +920,14 @@ iree_cc_test(
     "requires-gpu-vulkan"
     "vulkan_uses_vk_khr_buffer_device_address"
 )
+
+endif()
 
 iree_cc_test(
   NAME
     queue_transfer_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
@@ -927,14 +941,14 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)
+if(TARGET ${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}::testdata_vulkan_spirv_lib)
 iree_cc_test(
   NAME
     queue_descriptor_cache_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
     "queue_descriptor_cache_test.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     ::testdata_vulkan_spirv_lib
@@ -950,13 +964,13 @@ iree_cc_test(
     "requires-gpu-vulkan"
 )
 
+endif()
+
 iree_cc_test(
   NAME
     semaphore_submission_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
-  DATA
-    iree::build_tools::sanitizer::lsan_suppressions_vulkan.txt
   DEPS
     ::backends
     iree::base::tooling::flags
