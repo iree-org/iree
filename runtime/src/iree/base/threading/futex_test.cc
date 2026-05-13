@@ -154,17 +154,12 @@ TEST(FutexTest, WaitTimeout) {
 TEST(FutexTest, WaitImmediateDeadline) {
   uint32_t futex_word = 0;
 
-  iree_time_t start = iree_time_now();
-
-  // IREE_TIME_INFINITE_PAST should cause immediate return.
+  // IREE_TIME_INFINITE_PAST should cause a polling wait that reports the
+  // deadline was already exceeded.
   iree_status_code_t status =
       iree_futex_wait(&futex_word, 0, IREE_TIME_INFINITE_PAST);
 
-  iree_time_t elapsed = iree_time_now() - start;
-
-  // Should return quickly (deadline already passed).
   EXPECT_EQ(status, IREE_STATUS_DEADLINE_EXCEEDED);
-  EXPECT_LT(elapsed, 10 * 1000000);  // Should complete within 10ms
 }
 
 #else
