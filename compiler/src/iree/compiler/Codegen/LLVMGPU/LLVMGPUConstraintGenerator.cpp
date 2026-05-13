@@ -351,84 +351,61 @@ static LogicalResult emitVectorDistributeConstraints(
       mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
   Value maxVGPRsVal = mkIntConst(builder, loc, 512);
 
-  // Create name strings.
+  // Only innermost M, N, and K dims get constrained.
   unsigned mDim = dims.m.back();
   unsigned nDim = dims.n.back();
   unsigned kDim = dims.k.back();
-  std::string wgMName = makeVarName(kKnobWgPrefix, mDim);
-  std::string wgNName = makeVarName(kKnobWgPrefix, nDim);
-  std::string redKName = makeVarName(kKnobRedPrefix, kDim);
-  constexpr StringLiteral mmaMName = "mma_m";
-  constexpr StringLiteral mmaNName = "mma_n";
-  constexpr StringLiteral mmaKName = "mma_k";
 
   // Create knobs.
-  Value wgM = mkKnob(builder, loc, wgMName);
-  Value wgN = mkKnob(builder, loc, wgNName);
-  Value redK = mkKnob(builder, loc, redKName);
+  Value wgM = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, mDim));
+  Value wgN = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, nDim));
+  Value redK = mkKnob(builder, loc, makeVarName(kKnobRedPrefix, kDim));
   Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
   Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
-  Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
+  // Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
   Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
-  (void)subgroupSizeVal;
-  (void)maxThreadsVal;
-  (void)maxSharedMemVal;
-  (void)sgSize;
-  (void)wgSizeX;
-  (void)wgSizeY;
-  (void)wgSizeZ;
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
-  assertDivisible(builder, loc, smtDimArgs[mDim], wgM,
-                  joinStr(makeVarName(kLoopRangePrefix, mDim),
-                          " must be divisible by ", wgMName));
-  assertDivisible(builder, loc, smtDimArgs[nDim], wgN,
-                  joinStr(makeVarName(kLoopRangePrefix, nDim),
-                          " must be divisible by ", wgNName));
-  assertDivisible(builder, loc, smtDimArgs[kDim], redK,
-                  joinStr(makeVarName(kLoopRangePrefix, kDim),
-                          " must be divisible by ", redKName));
+  assertDivisible(builder, loc, smtDimArgs[mDim], wgM, "dim_m % wg_m == 0");
+  assertDivisible(builder, loc, smtDimArgs[nDim], wgN, "dim_n % wg_n == 0");
+  assertDivisible(builder, loc, smtDimArgs[kDim], redK, "dim_k % red_k == 0");
 
   // Constraint 2: Tile size bounds.
   // mma <= wg_tile <= dim
   MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
-  assertBounds(builder, loc, wgM, wgMName, mmaLookup.mmaMLookup, mmaMName,
-               smtDimArgs[mDim], makeVarName(kLoopRangePrefix, mDim));
-  assertBounds(builder, loc, wgN, wgNName, mmaLookup.mmaNLookup, mmaNName,
-               smtDimArgs[nDim], makeVarName(kLoopRangePrefix, nDim));
-  assertBounds(builder, loc, redK, redKName, mmaLookup.mmaKLookup, mmaKName,
-               smtDimArgs[kDim], makeVarName(kLoopRangePrefix, kDim));
+  assertBounds(builder, loc, wgM, "wg_m", mmaLookup.mmaMLookup, "mma_m",
+               smtDimArgs[mDim], "dim_m");
+  assertBounds(builder, loc, wgN, "wg_n", mmaLookup.mmaNLookup, "mma_n",
+               smtDimArgs[nDim], "dim_n");
+  assertBounds(builder, loc, redK, "red_k", mmaLookup.mmaKLookup, "mma_k",
+               smtDimArgs[kDim], "dim_k");
   // wg_tile <= 512 (max VGPRs)
   assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
-            joinStr(wgMName, " must be <= 512 (max VGPRs)"));
+            "wg_m <= 512 (max VGPRs)");
   assertCmp(builder, loc, smt::IntPredicate::le, wgN, maxVGPRsVal,
-            joinStr(wgNName, " must be <= 512 (max VGPRs)"));
+            "wg_n <= 512 (max VGPRs)");
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
-            joinStr(redKName, " must be <= 512 (max VGPRs)"));
+            "red_k <= 512 (max VGPRs)");
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
-  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup,
-                  joinStr(wgMName, " must be divisible by ", mmaMName));
-  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup,
-                  joinStr(wgNName, " must be divisible by ", mmaNName));
+  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup, "wg_m % mma_m == 0");
+  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup, "wg_n % mma_n == 0");
   assertDivisible(builder, loc, redK, mmaLookup.mmaKLookup,
-                  joinStr(redKName, " must be divisible by ", mmaKName));
+                  "red_k % mma_k == 0");
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   Value mulResultM = smt::IntMulOp::create(
       builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
   Value mulResultN = smt::IntMulOp::create(
       builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
-  assertDivisible(
-      builder, loc, wgM, mulResultM,
-      joinStr(wgMName, " must be divisible by ", "sg_m_cnt * ", mmaMName));
-  assertDivisible(
-      builder, loc, wgN, mulResultN,
-      joinStr(wgNName, " must be divisible by ", "sg_n_cnt * ", mmaNName));
+  assertDivisible(builder, loc, wgM, mulResultM,
+                  "wg_m % (sg_m_cnt * mma_m) == 0");
+  assertDivisible(builder, loc, wgN, mulResultN,
+                  "wg_n % (sg_n_cnt * mma_n) == 0");
 
   // Constraint 4: Subgroup count bounds.
   // Max workgroup tile size / Min(Intrinsic size * Subgroup tile size *
@@ -442,7 +419,27 @@ static LogicalResult emitVectorDistributeConstraints(
   assertBounds(builder, loc, sgNCnt, kKnobSgNCntName, minSubgroupCntVal, "1",
                maxSubgroupCntVal, "32");
 
-  // Constraint 5:
+  // Constraint 5: Thread count limit
+  // sg_m_cnt * sg_n_cnt * subgroup_size <= max_threads
+  Value mulResult = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgMCnt, sgNCnt, subgroupSizeVal});
+  assertCmp(builder, loc, smt::IntPredicate::le, mulResult, maxThreadsVal,
+            "total threads <= max_threads");
+
+  // Constraint 6: Load distribution
+  // (red_k * wg_m) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
+  // (red_k * wg_n) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
+  auto emitLoadDistForWg = [&](Value wg, StringRef wgName) -> void {
+    Value lhsMulResult =
+        smt::IntMulOp::create(builder, loc, ValueRange{redK, wg});
+    Value rhsMulResult = smt::IntMulOp::create(
+        builder, loc, ValueRange{sgMCnt, sgNCnt, subgroupSizeVal});
+    assertDivisible(builder, loc, lhsMulResult, rhsMulResult,
+                    joinStr("(red_k * ", wgName,
+                            ") % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0"));
+  };
+  emitLoadDistForWg(wgM, "wg_m");
+  emitLoadDistForWg(wgN, "wg_n");
 
   return success();
 }
