@@ -164,11 +164,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<Pass>
-createPromoteContractionOutputsPass(PromoteType type,
-                                    PromoteOperation operation) {
-  return std::make_unique<PromoteContractionOutputsPass>(
-      PromoteContractionOutputsPassOptions{type, operation});
-}
-
 } // namespace mlir::iree_compiler::GlobalOptimization

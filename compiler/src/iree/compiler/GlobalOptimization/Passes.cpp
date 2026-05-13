@@ -190,9 +190,10 @@ void buildGlobalOptimizationPassPipeline(
             clDemoteContractionInputsType, clDemoteContractionInputsOperations);
       })
       .addPass([&]() {
-        return createPromoteContractionOutputsPass(
-            clPromoteContractionOutputsType,
-            clPromoteContractionOutputsOperations);
+        PromoteContractionOutputsPassOptions options;
+        options.promoteType = clPromoteContractionOutputsType;
+        options.promoteOperation = clPromoteContractionOutputsOperations;
+        return createPromoteContractionOutputsPass(options);
       })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
