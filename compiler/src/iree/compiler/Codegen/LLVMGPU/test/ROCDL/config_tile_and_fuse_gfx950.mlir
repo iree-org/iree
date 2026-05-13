@@ -405,8 +405,8 @@ func.func @matmul_f16_compute_bound(
 
 // -----
 
-// Skinny GEMM (M=8): should select VDMFMA_F32_8x16x64x1_F16 via the smfmac
-// sparse trick, derived from the CDNA4 MFMA_F32_16x16x32_F16.
+// Skinny GEMM (M=8): temporarily select the CDNA3-style
+// VDMFMA_F32_8x16x64x2_F16 path via the smfmac sparse trick.
 func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf16>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<8x4096xf32>
@@ -430,10 +430,10 @@ func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf
 // CHECK-LABEL: func.func @skinny_gemm_m8_f16(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
 // CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m8_f16(
 //  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
 //  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
@@ -462,15 +462,15 @@ func.func @skinny_gemm_m6_f16(%lhs: tensor<6x4096xf16>, %rhs: tensor<4096x4096xf
 // CHECK-LABEL: func.func @skinny_gemm_m6_f16(
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
 // CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m6_f16(
 //  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
 //  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
 
-// Skinny GEMM (M=8, BF16): should select VDMFMA_F32_8x16x64x1_BF16.
+// Skinny GEMM (M=8, BF16): temporarily select VDMFMA_F32_8x16x64x2_BF16.
 func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096xbf16>) -> tensor<8x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<8x4096xf32>
@@ -493,10 +493,10 @@ func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096
 
 // CHECK-LABEL: func.func @skinny_gemm_m8_bf16(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_BF16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_BF16>
 // CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m8_bf16(
 //  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_BF16>
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_BF16>
 //  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
