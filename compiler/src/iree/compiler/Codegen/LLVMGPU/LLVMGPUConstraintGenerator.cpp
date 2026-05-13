@@ -85,7 +85,8 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   Value zero = mkIntConst(builder, loc, 0);
   Value rem = smt::IntModOp::create(builder, loc, lhs, rhs);
   Value eq = smt::EqOp::create(builder, loc, rem, zero);
-  AssertOp::create(builder, loc, eq, msg, ValueRange{lhs, rhs});
+  std::string fmtMsg = (msg + " ({} % {} == 0)").str();
+  AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
 }
 
 template <typename... Args>
@@ -355,11 +356,17 @@ static LogicalResult emitVectorDistributeConstraints(
   unsigned mDim = dims.m.back();
   unsigned nDim = dims.n.back();
   unsigned kDim = dims.k.back();
+  std::string wgMName = makeVarName(kKnobWgPrefix, mDim);
+  std::string wgNName = makeVarName(kKnobWgPrefix, nDim);
+  std::string redKName = makeVarName(kKnobRedPrefix, kDim);
+  std::string mDimName = makeVarName(kLoopRangePrefix, mDim);
+  std::string nDimName = makeVarName(kLoopRangePrefix, nDim);
+  std::string kDimName = makeVarName(kLoopRangePrefix, kDim);
 
   // Create top-level knobs.
-  Value wgM = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, mDim));
-  Value wgN = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, nDim));
-  Value redK = mkKnob(builder, loc, makeVarName(kKnobRedPrefix, kDim));
+  Value wgM = mkKnob(builder, loc, wgMName);
+  Value wgN = mkKnob(builder, loc, wgNName);
+  Value redK = mkKnob(builder, loc, redKName);
   Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
   Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
   Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
@@ -367,11 +374,20 @@ static LogicalResult emitVectorDistributeConstraints(
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
 
-  // Create intermediate knobs.
-  Value sgM = mkKnob(builder, loc, "sg_m");
-  Value sgN = mkKnob(builder, loc, "sg_n");
-  Value sgK = mkKnob(builder, loc, "sg_k");
-  Value sgNum = mkKnob(builder, loc, "sg_num");
+  // Create intermediate values.
+  MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
+  // sg_m = wg_m / (sg_m_cnt * mma_m)
+  Value sgNum = smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
+  Value sgMDenom = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
+  // sgM = wg_m / sg_m_cnt * mma_m
+  Value sgM = smt::IntDivOp::create(builder, loc, wgM, sgMDenom);
+  Value sgNDenom = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
+  // sgN = wg_n / sg_n_cnt * mma_n
+  Value sgN = smt::IntDivOp::create(builder, loc, wgN, sgNDenom);
+  // sgK = red_k / mma_k
+  Value sgK = smt::IntDivOp::create(builder, loc, redK, mmaLookup.mmaKLookup);
 
   // Constraint 0: Set concrete values for knobs.
   // sg_size == preferred_subgroup_size
@@ -386,26 +402,28 @@ static LogicalResult emitVectorDistributeConstraints(
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
-  assertDivisible(builder, loc, smtDimArgs[mDim], wgM, "dim_m % wg_m == 0");
-  assertDivisible(builder, loc, smtDimArgs[nDim], wgN, "dim_n % wg_n == 0");
-  assertDivisible(builder, loc, smtDimArgs[kDim], redK, "dim_k % red_k == 0");
+  assertDivisible(builder, loc, smtDimArgs[mDim], wgM,
+                  joinStr(mDimName, " % ", wgMName, " == 0"));
+  assertDivisible(builder, loc, smtDimArgs[nDim], wgN,
+                  joinStr(nDimName, " % ", wgNName, " == 0"));
+  assertDivisible(builder, loc, smtDimArgs[kDim], redK,
+                  joinStr(kDimName, " % ", redKName, " == 0"));
 
   // Constraint 2: Tile size bounds.
   // mma <= wg_tile <= dim
-  MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
-  assertBounds(builder, loc, wgM, "wg_m", mmaLookup.mmaMLookup, "mma_m",
-               smtDimArgs[mDim], "dim_m");
-  assertBounds(builder, loc, wgN, "wg_n", mmaLookup.mmaNLookup, "mma_n",
-               smtDimArgs[nDim], "dim_n");
-  assertBounds(builder, loc, redK, "red_k", mmaLookup.mmaKLookup, "mma_k",
-               smtDimArgs[kDim], "dim_k");
+  assertBounds(builder, loc, wgM, wgMName, mmaLookup.mmaMLookup, "mma_m",
+               smtDimArgs[mDim], mDimName);
+  assertBounds(builder, loc, wgN, wgNName, mmaLookup.mmaNLookup, "mma_n",
+               smtDimArgs[nDim], nDimName);
+  assertBounds(builder, loc, redK, redKName, mmaLookup.mmaKLookup, "mma_k",
+               smtDimArgs[kDim], kDimName);
   // wg_tile <= 512 (max VGPRs)
   assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
-            "wg_m <= 512 (max VGPRs)");
+            joinStr(wgMName, " <= 512 (max VGPRs)"));
   assertCmp(builder, loc, smt::IntPredicate::le, wgN, maxVGPRsVal,
-            "wg_n <= 512 (max VGPRs)");
+            joinStr(wgNName, " <= 512 (max VGPRs)"));
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
-            "red_k <= 512 (max VGPRs)");
+            joinStr(redKName, " <= 512 (max VGPRs)"));
   // TODO(#23535): This is from Tuner Python constraints. Revisit.
   // wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt
   Value mulResult =
@@ -416,14 +434,17 @@ static LogicalResult emitVectorDistributeConstraints(
                                     mulResult);
   Value orCond = smt::OrOp::create(builder, loc, ValueRange{geM, geN});
   AssertOp::create(builder, loc, orCond,
-                   "wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt");
+                   joinStr(wgMName, " >= sg_size * sg_n_cnt OR ", wgNName,
+                           " >= sg_size * sg_n_cnt"));
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
-  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup, "wg_m % mma_m == 0");
-  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup, "wg_n % mma_n == 0");
+  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup,
+                  joinStr(wgMName, " % mma_m == 0"));
+  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup,
+                  joinStr(wgNName, " % mma_n == 0"));
   assertDivisible(builder, loc, redK, mmaLookup.mmaKLookup,
-                  "red_k % mma_k == 0");
+                  joinStr(redKName, " % mma_k == 0"));
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   Value mulResultM = smt::IntMulOp::create(
@@ -431,18 +452,18 @@ static LogicalResult emitVectorDistributeConstraints(
   Value mulResultN = smt::IntMulOp::create(
       builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup, sgN});
   assertDivisible(builder, loc, wgM, mulResultM,
-                  "wg_m % (sg_m_cnt * mma_m * sg_m) == 0");
+                  joinStr(wgMName, " % (sg_m_cnt * mma_m * sg_m) == 0"));
   assertDivisible(builder, loc, wgN, mulResultN,
-                  "wg_n % (sg_n_cnt * mma_n * sg_n) == 0");
+                  joinStr(wgNName, " % (sg_n_cnt * mma_n * sg_n) == 0"));
   // TODO(#23535): This is from Tuner Python constraints. Revisit.
   // red_k == sg_k * mma_k
   Value mulResultK = smt::IntMulOp::create(
       builder, loc, ValueRange{sgK, mmaLookup.mmaKLookup});
   Value redKEq = smt::EqOp::create(builder, loc, redK, mulResultK);
-  AssertOp::create(builder, loc, redKEq, "red_k == sg_k * mma_k");
+  AssertOp::create(builder, loc, redKEq, joinStr(redKName, " == sg_k * mma_k"));
   // red_k % mma_m == 0
   assertDivisible(builder, loc, redK, mmaLookup.mmaMLookup,
-                  "red_k % mma_m == 0");
+                  joinStr(redKName, " % mma_m == 0"));
 
   // Constraint 4: Subgroup count bounds.
   // wg_tile = mma * sg_tile * sg_cnt
