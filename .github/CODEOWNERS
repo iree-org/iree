@@ -83,6 +83,7 @@
 
 # Compiler Plugins
 /compiler/plugins/input/StableHLO/ @MaheshRavishankar @rsuderman
+/compiler/plugins/input/Torch/ @keshavvinayak01 @rsuderman @zjgarvey
 /compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
 /compiler/plugins/target/ROCM/ @kuhar @krzysz00 @jtuyls @Yu-Zhewen
 
