@@ -429,17 +429,37 @@ static LogicalResult emitVectorDistributeConstraints(
   // Constraint 6: Load distribution
   // (red_k * wg_m) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
   // (red_k * wg_n) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
-  auto emitLoadDistForWg = [&](Value wg, StringRef wgName) -> void {
+  auto emitLoadDistForWg = [&](Value wg, StringRef Name) -> void {
     Value lhsMulResult =
         smt::IntMulOp::create(builder, loc, ValueRange{redK, wg});
     Value rhsMulResult = smt::IntMulOp::create(
         builder, loc, ValueRange{sgMCnt, sgNCnt, subgroupSizeVal});
     assertDivisible(builder, loc, lhsMulResult, rhsMulResult,
-                    joinStr("(red_k * ", wgName,
-                            ") % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0"));
+                    joinStr(Name, " % thread_count == 0"));
   };
-  emitLoadDistForWg(wgM, "wg_m");
-  emitLoadDistForWg(wgN, "wg_n");
+  emitLoadDistForWg(wgM, "lhs_tile_elements");
+  emitLoadDistForWg(wgN, "rhs_tile_elements");
+
+  // Constraint 7: Shared memory limit.
+  // Approximate formula: (lhs_bytes * wg_m * red_k) + (rhs_bytes * wg_n *
+  // red_k) Get element type bitwidths from operands.
+  auto lhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
+  auto rhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType());
+  int64_t lhsBytes = lhsType.getElementTypeBitWidth() / 8;
+  int64_t rhsBytes = rhsType.getElementTypeBitWidth() / 8;
+  Value lhsBytesVal = mkIntConst(builder, loc, lhsBytes);
+  Value rhsBytesVal = mkIntConst(builder, loc, rhsBytes);
+
+  Value lhsMulResult =
+      smt::IntMulOp::create(builder, loc, ValueRange{lhsBytesVal, wgM, redK});
+  Value rhsMulResult =
+      smt::IntMulOp::create(builder, loc, ValueRange{rhsBytesVal, wgN, redK});
+  Value totalSharedMem = smt::IntAddOp::create(
+      builder, loc, ValueRange{lhsMulResult, rhsMulResult});
+  assertCmp(builder, loc, smt::IntPredicate::le, totalSharedMem,
+            maxSharedMemVal, "shared memory must fit in workgroup memory");
 
   return success();
 }
