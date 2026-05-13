@@ -1,9 +1,9 @@
 // Negative test: targets without phase data should not get XOR swizzles.
 //
 // This constructs a synthetic target with gfx950's architecture (so DMA
-// hardware support checks pass) but overrides shared_mem_model to cdna,
+// hardware support checks pass) but overrides shared_mem_model to cdna3,
 // which has no empirical phase group data. getPhaseGroups returns nullopt
-// for SharedMemoryModel::CDNA, causing hasNoBankConflicts to return failure,
+// for SharedMemoryModel::CDNA3, causing hasNoBankConflicts to return failure,
 // and thus getXorShuffleParams returns nullopt — no XOR swizzle is applied.
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file \
@@ -14,7 +14,7 @@
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
 // RUN:   | FileCheck %s
 
-// Synthetic gfx950 target with SharedMemoryModel::CDNA (no phase data).
+// Synthetic gfx950 target with SharedMemoryModel::CDNA3 (no phase data).
 #gpu_target_no_phases = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8,
   storage = b64|b32|b16|b8,
@@ -29,13 +29,13 @@
   simds_per_wgp = 4,
   vgpr_space_bits = 16384,
   dma_sizes = [32, 128],
-  shared_mem_model = cdna
+  shared_mem_model = cdna3
 >>
 #exec_target_no_phases = #hal.executable.target<"rocm", "rocm-hsaco-fb",
     {iree_codegen.target_info = #gpu_target_no_phases}>
 
 // The DMA path is entered (arch is gfx950), but getXorShuffleParams fails
-// because getPhaseGroups(CDNA, ...) returns nullopt. Verify no xor_shuffle.
+// because getPhaseGroups(CDNA3, ...) returns nullopt. Verify no xor_shuffle.
 //
 // CHECK-LABEL: func.func @matmul_f16_no_swizzle_cdna_model
 // CHECK:         promotion_types =
