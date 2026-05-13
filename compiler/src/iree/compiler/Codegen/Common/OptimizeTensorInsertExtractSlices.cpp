@@ -443,13 +443,13 @@ private:
           return SmallVector<Value>{read};
         });
 
+    TypedValue<VectorType> mask = readOp.getMask();
+    Value pad = readOp.getPadding();
     for (vector::TransferReadOp read : candidate.reads) {
       rewriter.replaceOp(read, readConversion.getResult(0));
     }
 
     vector::TransferWriteOp writeOp = candidate.write;
-    TypedValue<VectorType> mask = readOp.getMask();
-    Value pad = readOp.getPadding();
     rewriter.setInsertionPoint(writeOp);
     Value carriedValue = getLoopCarriedTransferValue(
         rewriter, writeOp.getLoc(), mask, pad, writeOp.getVector());
