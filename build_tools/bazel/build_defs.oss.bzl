@@ -8,6 +8,7 @@ load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library", "gentbl_filegroup", 
 
 # All load statements must come first in Starlark.
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(
     "//build_tools/bazel:iree_cc_fuzz.bzl",
     _iree_cc_fuzz = "iree_cc_fuzz",
@@ -218,7 +219,7 @@ def iree_assert_no_dependency(name, target, dependency, message = "", tags = [],
         tags = ["manual"],
         **kwargs
     )
-    native.sh_test(
+    sh_test(
         name = name,
         srcs = ["//build_tools/bazel:assert_empty_query.sh"],
         args = ["$(location :%s)" % query_name],

@@ -6,6 +6,8 @@
 
 """Generates FlatBuffer source files with flatcc."""
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 def iree_flatbuffer_c_library(
         name,
         srcs,
@@ -42,7 +44,7 @@ def iree_flatbuffer_c_library(
         cmd = "$(location %s) %s %s" % (flatcc, " ".join(flags), " ".join(["$(location {})".format(src) for src in srcs])),
         testonly = testonly,
     )
-    native.cc_library(
+    cc_library(
         name = name,
         hdrs = outs,
         testonly = testonly,

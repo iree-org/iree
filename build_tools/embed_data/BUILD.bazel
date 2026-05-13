@@ -6,6 +6,7 @@
 
 # Generates source files with embedded file contents.
 
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test")
 load(":build_defs.bzl", "iree_c_embed_data")
 
 package(

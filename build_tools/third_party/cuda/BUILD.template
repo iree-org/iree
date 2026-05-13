@@ -6,6 +6,7 @@
 
 
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 # Variables and string substitutions don't work here because of course they don't
 load("%IREE_REPO_ALIAS%//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
@@ -38,7 +39,7 @@ cc_library(
         "include/**/*.h",
         "include/**/*.hpp",
         "include/nv/**/*",
-    ]),
+    ], allow_empty = True),
     includes = ["include"],
 )
 
