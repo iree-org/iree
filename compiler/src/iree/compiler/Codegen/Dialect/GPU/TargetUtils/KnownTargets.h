@@ -38,14 +38,14 @@ struct L1CacheInfo {
   uint32_t cacheSets;
 };
 
-/// Shared memory bank width in bytes. Architecturally fixed at 4 bytes for all
-/// known AMD and NVIDIA targets. Should be promoted to a target attribute
-/// if a target with a different bank width is ever added.
-constexpr int64_t kSharedMemBankWidth = 4;
-
 /// Returns the number of shared memory banks for the given model.
 /// Must not be called with SharedMemoryModel::None.
 int64_t getSharedMemBankCount(SharedMemoryModel model);
+
+/// Returns the shared memory bank width in bytes for the given model.
+/// Currently 4 bytes for all known AMD and NVIDIA architectures.
+/// Must not be called with SharedMemoryModel::None.
+int64_t getSharedMemBankWidth(SharedMemoryModel model);
 
 /// Returns the phase groups for the given shared memory model, read width,
 /// and total number of threads in the wavefront. Each inner vector contains

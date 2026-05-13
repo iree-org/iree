@@ -949,7 +949,7 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
     return failure();
   }
   int64_t bankCount = IREE::GPU::getSharedMemBankCount(sharedMemModel);
-  int64_t bankWidthBits = IREE::GPU::kSharedMemBankWidth * 8;
+  int64_t bankWidthBits = IREE::GPU::getSharedMemBankWidth(sharedMemModel) * 8;
   int64_t ldsBankWidthBits = (bankCount * bankWidthBits) / *bitwidth;
 
   // Row width must be less than or equal to the row size (in elements) of LDS

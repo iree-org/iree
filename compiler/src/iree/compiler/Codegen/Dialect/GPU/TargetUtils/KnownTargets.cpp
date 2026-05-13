@@ -1197,6 +1197,18 @@ int64_t getSharedMemBankCount(SharedMemoryModel model) {
   llvm_unreachable("unhandled SharedMemoryModel");
 }
 
+int64_t getSharedMemBankWidth(SharedMemoryModel model) {
+  switch (model) {
+  case SharedMemoryModel::None:
+    llvm_unreachable("no shared memory model");
+  case SharedMemoryModel::CDNA:
+  case SharedMemoryModel::CDNA4:
+  case SharedMemoryModel::RDNA:
+    return 4;
+  }
+  llvm_unreachable("unhandled SharedMemoryModel");
+}
+
 // TODO: This only models phase groups for read operations (ds_read_*).
 // Write operations (ds_write_*) may have different phase scheduling, but
 // we haven't needed to handle write-side bank conflicts yet.
@@ -1207,8 +1219,8 @@ getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
   }
 
   SmallVector<SmallVector<int64_t>> phases;
-  int64_t banksPerAccess =
-      std::max<int64_t>(1, readBytes / kSharedMemBankWidth);
+  int64_t bankWidth = getSharedMemBankWidth(model);
+  int64_t banksPerAccess = std::max<int64_t>(1, readBytes / bankWidth);
   int64_t threadsPerPhase = numThreads / banksPerAccess;
   if (threadsPerPhase == 0) {
     threadsPerPhase = numThreads;
