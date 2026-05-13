@@ -18,32 +18,33 @@ using PhaseGroups = SmallVector<SmallVector<int64_t>>;
 // getSharedMemBankCount
 //===----------------------------------------------------------------------===//
 
-TEST(SharedMemoryModel, BankCountCDNA) {
-  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::CDNA), 32);
+TEST(SharedMemoryModel, BankCount32Banks) {
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::CDNA1), 32);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::CDNA2), 32);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::CDNA3), 32);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::RDNA1), 32);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::RDNA2), 32);
 }
 
-TEST(SharedMemoryModel, BankCountCDNA4) {
+TEST(SharedMemoryModel, BankCount64Banks) {
   EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::CDNA4), 64);
-}
-
-TEST(SharedMemoryModel, BankCountRDNA) {
-  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::RDNA), 64);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::RDNA3), 64);
+  EXPECT_EQ(getSharedMemBankCount(SharedMemoryModel::RDNA4), 64);
 }
 
 //===----------------------------------------------------------------------===//
 // getSharedMemBankWidth
 //===----------------------------------------------------------------------===//
 
-TEST(SharedMemoryModel, BankWidthCDNA) {
-  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::CDNA), 4);
-}
-
-TEST(SharedMemoryModel, BankWidthCDNA4) {
+TEST(SharedMemoryModel, BankWidthAll4Bytes) {
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::CDNA1), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::CDNA2), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::CDNA3), 4);
   EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::CDNA4), 4);
-}
-
-TEST(SharedMemoryModel, BankWidthRDNA) {
-  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::RDNA), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::RDNA1), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::RDNA2), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::RDNA3), 4);
+  EXPECT_EQ(getSharedMemBankWidth(SharedMemoryModel::RDNA4), 4);
 }
 
 //===----------------------------------------------------------------------===//
@@ -51,8 +52,13 @@ TEST(SharedMemoryModel, BankWidthRDNA) {
 //===----------------------------------------------------------------------===//
 
 TEST(PhaseGroupsTest, NonCDNA4ReturnsNullopt) {
-  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::CDNA, 16, 64), std::nullopt);
-  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::RDNA, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::CDNA1, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::CDNA2, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::CDNA3, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::RDNA1, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::RDNA2, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::RDNA3, 16, 64), std::nullopt);
+  EXPECT_EQ(getPhaseGroups(SharedMemoryModel::RDNA4, 16, 64), std::nullopt);
 }
 
 TEST(PhaseGroupsTest, CDNA4ReadWidthTooWideReturnsNullopt) {

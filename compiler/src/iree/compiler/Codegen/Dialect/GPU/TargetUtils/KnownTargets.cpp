@@ -330,7 +330,7 @@ const WgpDetails *getCDNA3WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/512 * 32,
       /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes),
-      /*sharedMemModel=*/SharedMemoryModel::CDNA};
+      /*sharedMemModel=*/SharedMemoryModel::CDNA3};
   return &cdna3Wgp;
 }
 
@@ -382,7 +382,7 @@ const WgpDetails *getCDNA2WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/256 * 32,
       /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::CDNA};
+      /*sharedMemModel=*/SharedMemoryModel::CDNA2};
   return &cdna2Wgp;
 }
 
@@ -423,7 +423,7 @@ const WgpDetails *getCDNA1WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/256 * 32,
       /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::CDNA};
+      /*sharedMemModel=*/SharedMemoryModel::CDNA1};
   return &cdna1Wgp;
 }
 
@@ -457,7 +457,7 @@ const WgpDetails *getRDNA4WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/256 * 32,
       /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::RDNA};
+      /*sharedMemModel=*/SharedMemoryModel::RDNA4};
   return &rdna4Wgp;
 }
 
@@ -488,41 +488,53 @@ const WgpDetails *getRDNA3WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/256 * 32,
       /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::RDNA};
+      /*sharedMemModel=*/SharedMemoryModel::RDNA3};
   return &rdna3Wgp;
 }
 
 const WgpDetails *getRDNA2WgpDetails() {
-  static const WgpDetails rdna2Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      /*mmaCount=*/0,
-                                      /*mmaOps=*/nullptr,
-                                      /*scaledMmaCount=*/0,
-                                      /*scaledMmaOps=*/nullptr,
-                                      {32, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna2Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {32, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/std::nullopt,
+      /*simdsPerWgp=*/std::nullopt,
+      /*vgprSpaceBits=*/std::nullopt,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::RDNA2};
   return &rdna2Wgp;
 }
 
 const WgpDetails *getRDNA1WgpDetails() {
-  static const WgpDetails rdna1Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      DotProductOps::None,
-                                      /*mmaCount=*/0,
-                                      /*mmaOps=*/nullptr,
-                                      /*scaledMmaCount=*/0,
-                                      /*scaledMmaOps=*/nullptr,
-                                      {32, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
+  static const WgpDetails rdna1Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      DotProductOps::None,
+      /*mmaCount=*/0,
+      /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {32, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/std::nullopt,
+      /*simdsPerWgp=*/std::nullopt,
+      /*vgprSpaceBits=*/std::nullopt,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::RDNA1};
   return &rdna1Wgp;
 }
 
@@ -576,7 +588,7 @@ const WgpDetails *getGfx1250WgpDetails() {
       // 4 banks of 256 32-bit registers.
       /*vgprSpaceBits=*/256 * 4 * 32,
       /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::RDNA};
+      /*sharedMemModel=*/SharedMemoryModel::RDNA4};
   return &gfx1250Wgp;
 }
 
@@ -1188,10 +1200,15 @@ int64_t getSharedMemBankCount(SharedMemoryModel model) {
   switch (model) {
   case SharedMemoryModel::None:
     llvm_unreachable("no shared memory model");
-  case SharedMemoryModel::CDNA:
+  case SharedMemoryModel::CDNA1:
+  case SharedMemoryModel::CDNA2:
+  case SharedMemoryModel::CDNA3:
+  case SharedMemoryModel::RDNA1:
+  case SharedMemoryModel::RDNA2:
     return 32;
   case SharedMemoryModel::CDNA4:
-  case SharedMemoryModel::RDNA:
+  case SharedMemoryModel::RDNA3:
+  case SharedMemoryModel::RDNA4:
     return 64;
   }
   llvm_unreachable("unhandled SharedMemoryModel");
@@ -1201,9 +1218,14 @@ int64_t getSharedMemBankWidth(SharedMemoryModel model) {
   switch (model) {
   case SharedMemoryModel::None:
     llvm_unreachable("no shared memory model");
-  case SharedMemoryModel::CDNA:
+  case SharedMemoryModel::CDNA1:
+  case SharedMemoryModel::CDNA2:
+  case SharedMemoryModel::CDNA3:
   case SharedMemoryModel::CDNA4:
-  case SharedMemoryModel::RDNA:
+  case SharedMemoryModel::RDNA1:
+  case SharedMemoryModel::RDNA2:
+  case SharedMemoryModel::RDNA3:
+  case SharedMemoryModel::RDNA4:
     return 4;
   }
   llvm_unreachable("unhandled SharedMemoryModel");
