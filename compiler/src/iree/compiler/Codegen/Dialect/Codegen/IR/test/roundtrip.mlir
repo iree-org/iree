@@ -144,6 +144,17 @@ func.func private @translation_info_vmvx_pipeline() attributes {
 
 // -----
 
+func.func @workgroup_local_memory_space(
+    %arg0: memref<64x64xf32, #iree_codegen.workgroup_local>)
+    -> memref<64x64xf32, #iree_codegen.workgroup_local> {
+  return %arg0 : memref<64x64xf32, #iree_codegen.workgroup_local>
+}
+// CHECK-LABEL: func.func @workgroup_local_memory_space(
+// CHECK-SAME:    memref<64x64xf32, #iree_codegen.workgroup_local>
+// CHECK-SAME:    -> memref<64x64xf32, #iree_codegen.workgroup_local>
+
+// -----
+
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
@@ -350,7 +361,8 @@ func.func @smt_lookup_sparse(%arg0: index) {
 // -----
 
 iree_codegen.dispatch_config @matmul
-    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+    workgroup_size = [64, 16, 1] subgroup_size = 64
+    workgroup_local_memory = 4096 {
   ^bb0(%w0: index, %w1: index):
     %c1 = arith.constant 1 : index
     iree_codegen.yield %w0, %w1, %c1 : index, index, index
@@ -358,6 +370,7 @@ iree_codegen.dispatch_config @matmul
 // CHECK-LABEL: iree_codegen.dispatch_config @matmul
 // CHECK-SAME:    workgroup_size = [64, 16, 1]
 // CHECK-SAME:    subgroup_size = 64
+// CHECK-SAME:    workgroup_local_memory = 4096
 // CHECK:       ^bb0(%[[W0:.+]]: index, %[[W1:.+]]: index):
 // CHECK:         %[[C1:.+]] = arith.constant 1 : index
 // CHECK:         iree_codegen.yield %[[W0]], %[[W1]], %[[C1]] : index, index, index

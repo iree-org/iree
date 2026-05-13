@@ -122,6 +122,35 @@ def LocalMappingAttr :
 }
 
 //===---------------------------------------------------------------------===//
+// iree_codegen.workgroup_local memory space attribute
+//===---------------------------------------------------------------------===//
+
+def WorkgroupLocalMemoryAttr :
+    AttrDef<IREECodegen_Dialect, "WorkgroupLocalMemory"> {
+  let mnemonic = "workgroup_local";
+  let parameters = (ins);
+  let assemblyFormat = "";
+
+  let description = [{
+    Memory space attribute indicating that an allocation uses per-workgroup
+    local memory supplied by the target runtime instead of the thread stack.
+
+    LLVMCPU dispatch lowering packs `memref.alloc` operations marked with this
+    memory space into one byte allocation and rewrites the original allocations
+    to `memref.view` slices. The packed allocation is lowered to the HAL
+    dispatch ABI local-memory pointer. Matching `memref.dealloc` operations are
+    erased because the storage is owned by the dispatch frame. The aggregate
+    byte size is exported as the dispatch `workgroup_local_memory` requirement.
+
+    Example:
+    ```mlir
+      %scratch = memref.alloc()
+        : memref<64x1536xf32, #iree_codegen.workgroup_local>
+    ```
+  }];
+}
+
+//===---------------------------------------------------------------------===//
 // iree_codegen.simple_target
 //===---------------------------------------------------------------------===//
 

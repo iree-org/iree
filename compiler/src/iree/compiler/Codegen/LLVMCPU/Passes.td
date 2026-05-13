@@ -51,6 +51,24 @@ def LLVMCPUAssignImportOrdinalsPass :
   let summary = "Assigns executable import ordinals across all LLVMCPU variants.";
 }
 
+def LLVMCPUAssignWorkgroupLocalMemoryPass :
+    InterfacePass<"iree-llvmcpu-assign-workgroup-local-memory",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Assigns HAL workgroup local memory layout for marked memref.alloc ops.";
+  let description = [{
+    Scans entry-block memref.alloc operations whose memory space is
+    #iree_codegen.workgroup_local, computes a static byte layout using the
+    target data layout, and rewrites each alloc to a memref.view into one packed
+    byte allocation in the same memory space.
+
+    The pass also sets the corresponding iree_codegen.dispatch_config
+    workgroup_local_memory attribute so propagation to hal.executable.export
+    follows the normal dispatch metadata path. Existing local-memory
+    requirements are rejected instead of being overwritten.
+  }];
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversionPass :
     InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";

@@ -579,6 +579,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
+      .addPass(createLLVMCPUAssignWorkgroupLocalMemoryPass)
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(

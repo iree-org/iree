@@ -94,6 +94,9 @@ void PropagateDispatchConfigPass::runOnOperation() {
     if (auto subgroupSize = configOp.getSubgroupSize()) {
       exportOp.setSubgroupSizeAttr(builder.getIndexAttr(subgroupSize.value()));
     }
+    if (auto localMemoryAttr = configOp.getWorkgroupLocalMemoryAttr()) {
+      exportOp.setWorkgroupLocalMemoryAttr(localMemoryAttr);
+    }
 
     configOp.erase();
   }

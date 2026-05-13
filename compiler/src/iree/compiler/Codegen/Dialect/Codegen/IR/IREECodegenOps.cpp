@@ -504,7 +504,8 @@ void DispatchConfigOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                              FlatSymbolRefAttr functionRef) {
   DispatchConfigOp::build(odsBuilder, odsState, functionRef,
                           /*workgroup_size=*/nullptr,
-                          /*subgroup_size=*/nullptr);
+                          /*subgroup_size=*/nullptr,
+                          /*workgroup_local_memory=*/nullptr);
 }
 
 LogicalResult DispatchConfigOp::verify() {
