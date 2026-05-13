@@ -5,6 +5,10 @@
 // RUN:   --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-use-direct-convolution=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
 // RUN:   | FileCheck %s --check-prefix=CONV
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx1201 \
+// RUN:   --iree-llvmgpu-use-global-transpose-load=true \
+// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN:   | FileCheck %s --check-prefix=GTL
 
 // Verify RDNA4-specific heuristic seed selection produces expected configs for
 // matmul and convolution operations at different arithmetic intensity levels.
@@ -78,6 +82,15 @@ func.func @matmul_large_f16(%arg0: tensor<4096x4096xf16>, %arg1: tensor<4096x409
 //  GEMM-SAME:     reduction = [0, 0, 4]
 //  GEMM-SAME:     subgroup = [4, 4, 0]
 //  GEMM-SAME:     workgroup = [256, 128, 0]
+
+// With --iree-llvmgpu-use-global-transpose-load: RHS promotion uses
+// use_global_transpose_load instead of derived_thread_config because the
+// RHS (B matrix) is N-inner in memory and requires a transpose for the MMA.
+//  GTL-LABEL: func.func @matmul_large_f16
+//   GTL-SAME:   workgroup_size = [256, 1, 1] subgroup_size = 32
+//       GTL:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//   GTL-SAME:     promote_operands = [0, 1]
+//   GTL-SAME:     promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_transpose_load]
 
 // -----
 

@@ -117,6 +117,12 @@ static llvm::cl::opt<bool>
                     llvm::cl::desc("Use global load DMA for direct load ops."),
                     llvm::cl::Hidden, llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clUseGlobalTransposeLoad(
+    "iree-llvmgpu-use-global-transpose-load",
+    llvm::cl::desc("Use global_load_tr instruction for transpose loads on "
+                   "RDNA4+ (gfx1200+)."),
+    llvm::cl::Hidden, llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
     llvm::cl::desc("Use direct convolution in tile and fuse pipeline"),
@@ -2411,9 +2417,9 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     return success();
   }
   if (clGPUUseTileAndFuseMatmul) {
-    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
-                                                     computeOp, clUseDirectLoad,
-                                                     clPrefetchNumStages))) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(
+            target, entryPointFn, computeOp, clUseDirectLoad,
+            clPrefetchNumStages, clUseGlobalTransposeLoad))) {
       LDBG() << "Tile and fuse matmul config";
       return success();
     }
@@ -2428,7 +2434,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
   if (clLLVMGPUUseIgemm) {
     if (succeeded(IREE::GPU::setIGEMMConvolutionLoweringConfig(
             target, entryPointFn, computeOp, clUseDirectLoad,
-            clGPUPadConvolution, clPrefetchNumStages))) {
+            clGPUPadConvolution, clPrefetchNumStages,
+            clUseGlobalTransposeLoad))) {
       LDBG() << "Tile and fuse IGEMM config";
       return success();
     }

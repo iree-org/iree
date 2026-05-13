@@ -97,6 +97,36 @@ def IREEGPU_UseGlobalLoadDma :
   let parameters = (ins);
 }
 
+def IREEGPU_UseGlobalTransposeLoad :
+    AttrDef<IREEGPU_Dialect, "UseGlobalTransposeLoad", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+        "hasTilingLevel",
+      ]>,
+      DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr>
+    ]> {
+  let mnemonic = "use_global_transpose_load";
+  let summary = [{
+    Promote an operand using the global memory transpose load instruction.
+  }];
+  let description = [{
+    Promotion attribute indicating that the operand should be loaded from global
+    memory using the `amdgpu.global_transpose_load` instruction, which loads
+    and transposes a matrix tile in a single subgroup operation.
+
+    This is applicable for gfx1200+ targets when the operand's memory layout
+    requires a transpose relative to what the MMA intrinsic expects:
+    - LHS when `transposedLhs` (K is not the innermost dimension)
+    - RHS when `!transposedRhs` (N is not the innermost dimension)
+
+    Supported element types for gfx1200+: i8, f8E5M2FNUZ, f8E4M3FNUZ,
+    f8E5M2, f8E4M3FN, f16, bf16, i16.
+  }];
+  let assemblyFormat = "";
+  let parameters = (ins);
+}
+
 def IREEGPU_PromoteWithCacheSwizzle :
     AttrDef<IREEGPU_Dialect, "PromoteWithCacheSwizzle", [
       DeclareAttrInterfaceMethods<IREEGPU_PromotionAttr, [

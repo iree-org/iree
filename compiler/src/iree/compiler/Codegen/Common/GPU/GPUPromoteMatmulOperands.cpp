@@ -15,10 +15,12 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -118,6 +120,119 @@ void promoteResult(OpBuilder &builder, Operation *op, Value valToMakeShared) {
   });
 }
 
+/// Traces through tensor.extract_slice ops to find the
+/// iree_codegen.load_from_buffer feeding this value. Returns the slice chain
+/// (outermost first) and the load op, or failure if the pattern isn't matched.
+static FailureOr<std::pair<SmallVector<tensor::ExtractSliceOp>,
+                           IREE::Codegen::LoadFromBufferOp>>
+findLoadFromBuffer(Value v) {
+  SmallVector<tensor::ExtractSliceOp> slices;
+  while (auto sliceOp = v.getDefiningOp<tensor::ExtractSliceOp>()) {
+    slices.push_back(sliceOp);
+    v = sliceOp.getSource();
+  }
+  auto loadOp = v.getDefiningOp<IREE::Codegen::LoadFromBufferOp>();
+  if (!loadOp) {
+    return failure();
+  }
+  return std::make_pair(slices, loadOp);
+}
+
+/// Promotes an operand for global_load_tr by copying to shared memory.
+/// Strips fat_raw_buffer so the copy reads from a flat global pointer
+/// (required by global_load_tr), then creates a linalg.generic that
+/// iterates (K-outer, N-inner) so vectorization produces vector<1x8> reads
+/// — 8 contiguous N-direction elements per lane. This is the access pattern
+/// that global_load_tr_b128 requires.
+/// The matmul's indexing map is updated to read from the transposed [N,K]
+/// shared memory layout.
+Value transposePromoteOperand(OpBuilder &builder, Operation *op,
+                              unsigned index) {
+  OpOperand &operand = op->getOpOperand(index);
+  Location loc = op->getLoc();
+
+  // Strip fat_raw_buffer if present so global_load_tr can use a flat pointer.
+  Value sourceValue = operand.get();
+  auto maybeLoad = findLoadFromBuffer(sourceValue);
+  if (succeeded(maybeLoad)) {
+    auto &[slices, loadOp] = *maybeLoad;
+    if (auto castOp =
+            loadOp.getBuffer().getDefiningOp<amdgpu::FatRawBufferCastOp>()) {
+      OpBuilder::InsertionGuard g(builder);
+      builder.setInsertionPointAfter(loadOp);
+      auto flatMemrefType = cast<MemRefType>(castOp.getSource().getType());
+      auto flatTensorType = RankedTensorType::get(
+          flatMemrefType.getShape(), flatMemrefType.getElementType());
+      Value flatLoad = IREE::Codegen::LoadFromBufferOp::create(
+          builder, loadOp.getLoc(), flatTensorType, castOp.getSource());
+      sourceValue = flatLoad;
+      for (auto sliceOp : llvm::reverse(slices)) {
+        builder.setInsertionPointAfter(sliceOp);
+        sourceValue = tensor::ExtractSliceOp::create(
+            builder, sliceOp.getLoc(), sliceOp.getResultType(), sourceValue,
+            sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
+            sliceOp.getMixedStrides());
+      }
+    }
+  }
+
+  auto tensorType = cast<RankedTensorType>(sourceValue.getType());
+  MLIRContext *ctx = op->getContext();
+
+  // Create the transposed output buffer [N, K].
+  SmallVector<OpFoldResult> mixedSizes =
+      tensor::getMixedSizes(builder, loc, sourceValue);
+  SmallVector<OpFoldResult> transposedSizes(mixedSizes.rbegin(),
+                                            mixedSizes.rend());
+  Value empty = tensor::EmptyOp::create(builder, loc, transposedSizes,
+                                        tensorType.getElementType());
+
+  // linalg.generic with (d0=K outer, d1=N inner):
+  //   input  map: (d0, d1) -> (d0, d1)  reads src[k, n]
+  //   output map: (d0, d1) -> (d1, d0)  writes dst[n, k]
+  // With N as the inner (vectorized) dimension, each thread reads
+  // vector<1x8> (8 contiguous N elements at fixed K) — the correct
+  // access pattern for global_load_tr_b128.
+  // Loop iteration order: (d0=N outer, d1=K inner).
+  // With K as the inner (fast-varying per-lane) dimension,
+  // UseGlobalTransposeLoadAttr's tiling [N=vectorSize, K=1] maps K to
+  // linear_dim_0 (fast thread dim): 8 consecutive lanes get 8 consecutive
+  // K rows, which is the correct wave-level setup for global_load_tr.
+  // Each lane reads vector<1x8> (8 contiguous N from its K row). The tag
+  // UseGlobalTransposeLoadAttr drives the thread tiling level sizes.
+  //   input  map (d0=N, d1=K) -> (d1, d0)  reads B[K, N]
+  //   output map (d0=N, d1=K) -> (d0, d1)  writes alloc[N, K]
+  AffineExpr d0 = builder.getAffineDimExpr(0); // N (outer)
+  AffineExpr d1 = builder.getAffineDimExpr(1); // K (inner)
+  AffineMap inputMap = AffineMap::get(2, 0, {d1, d0}, ctx);
+  AffineMap outputMap = AffineMap::get(2, 0, {d0, d1}, ctx);
+  SmallVector<utils::IteratorType> iterTypes(2, utils::IteratorType::parallel);
+
+  auto copyOp = linalg::GenericOp::create(
+      builder, loc, empty.getType(), sourceValue, empty,
+      ArrayRef<AffineMap>{inputMap, outputMap}, iterTypes,
+      [](OpBuilder &b, Location l, ValueRange args) {
+        linalg::YieldOp::create(b, l, args[0]);
+      });
+  // Use UseGlobalTransposeLoadAttr as the lowering config so the tiling pass
+  // produces K-inner thread assignment via getStaticTilingLevelSizes.
+  setLoweringConfig(copyOp, IREE::GPU::UseGlobalTransposeLoadAttr::get(ctx));
+
+  // Update the matmul's indexing map for this operand by reversing its
+  // results to reflect the [N, K] shared memory layout.
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+    SmallVector<AffineMap> maps(genericOp.getIndexingMapsArray());
+    AffineMap oldMap = maps[index];
+    SmallVector<AffineExpr> results(oldMap.getResults().rbegin(),
+                                    oldMap.getResults().rend());
+    maps[index] = AffineMap::get(oldMap.getNumDims(), oldMap.getNumSymbols(),
+                                 results, ctx);
+    genericOp.setIndexingMapsAttr(builder.getAffineMapArrayAttr(maps));
+  }
+
+  return copyOp.getResult(0);
+}
+
 void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
                     IREE::GPU::PromotionAttr promotionAttr) {
   auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
@@ -133,9 +248,14 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
     // TODO(qedawkins): Move result promotion to attribute interface.
     return promoteResult(builder, op, op->getResult(index));
   }
-  OpOperand &operand = op->getOpOperand(index);
 
-  Value replacement = promotionAttr.promoteOperand(builder, operand);
+  Value replacement;
+  if (isa<IREE::GPU::UseGlobalTransposeLoadAttr>(promotionAttr)) {
+    replacement = transposePromoteOperand(builder, op, index);
+  } else {
+    OpOperand &operand = op->getOpOperand(index);
+    replacement = promotionAttr.promoteOperand(builder, operand);
+  }
   op->setOperand(index, replacement);
 }
 

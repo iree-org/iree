@@ -34,7 +34,8 @@ LogicalResult setDirectConvolutionLoweringConfig(
 LogicalResult setIGEMMConvolutionLoweringConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
     Operation *op, bool useDirectLoad, bool padConv,
-    std::optional<uint64_t> prefetchNumStages);
+    std::optional<uint64_t> prefetchNumStages,
+    bool useGlobalTransposeLoad = false);
 
 /// Helper for setting up a matmul config based on the specified target.
 /// TODO: Currently this only succeeds if the target supports an mma
@@ -43,7 +44,8 @@ LogicalResult
 setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                         mlir::FunctionOpInterface entryPoint, Operation *op,
                         bool useDirectLoad,
-                        std::optional<uint64_t> prefetchNumStages);
+                        std::optional<uint64_t> prefetchNumStages,
+                        bool useGlobalTransposeLoad = false);
 
 /// Helper for setting up a default tile and fuse config for targeting
 /// simple thread distribution. Currently restricted to linalg ops.

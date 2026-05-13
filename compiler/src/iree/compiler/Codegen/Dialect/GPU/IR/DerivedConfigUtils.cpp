@@ -221,4 +221,44 @@ SmallVector<int64_t> globalLoadDMATileSizes(Operation *op) {
   return tileSizes;
 }
 
+SmallVector<int64_t> globalTransposeLoadTileSizes(Operation *op) {
+  auto funcOp = op->getParentOfType<FunctionOpInterface>();
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  if (!workgroupSize) {
+    return {};
+  }
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    return {};
+  }
+
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
+  if (loopRanges.size() != 2) {
+    return {};
+  }
+
+  int64_t targetSubgroupSize = getGPUTargetAttr(op).getPreferredSubgroupSize();
+  // Vector size: 8 bf16 elements = 128 bits per lane per global_load_tr call.
+  int64_t elemBits = getElementTypeOrSelf(linalgOp->getResultTypes()[0])
+                         .getIntOrFloatBitWidth();
+  int64_t vectorSize = 128 / elemBits; // 8 for bf16/f16, 16 for i8
+
+  int64_t numThreads = llvm::product_of(*workgroupSize);
+
+  // Tile: [d0=N (outer, step=vectorSize), d1=K (inner, step=1)].
+  // The K axis (d1, step=1) maps to linear_dim_0 (fast thread dim), giving
+  // K-inner wave assignment needed by global_load_tr.
+  int64_t kRange = loopRanges[1]; // K dimension (inner of linalg.generic)
+  int64_t nRange = loopRanges[0]; // N dimension (outer of linalg.generic)
+
+  // Each thread handles vectorSize N-values (vectorized) and 1 K-value.
+  // Total tasks: (nRange / vectorSize) * kRange = numThreads * numIterations.
+  (void)nRange;
+  (void)kRange;
+  (void)numThreads;
+  (void)targetSubgroupSize;
+
+  return {vectorSize, 1}; // [N_step=vectorSize, K_step=1]
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU
