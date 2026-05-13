@@ -356,7 +356,7 @@ static LogicalResult emitVectorDistributeConstraints(
   unsigned nDim = dims.n.back();
   unsigned kDim = dims.k.back();
 
-  // Create knobs.
+  // Create top-level knobs.
   Value wgM = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, mDim));
   Value wgN = mkKnob(builder, loc, makeVarName(kKnobWgPrefix, nDim));
   Value redK = mkKnob(builder, loc, makeVarName(kKnobRedPrefix, kDim));
@@ -367,10 +367,22 @@ static LogicalResult emitVectorDistributeConstraints(
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
 
+  // Create intermediate knobs.
+  Value sgM = mkKnob(builder, loc, "sg_m");
+  Value sgN = mkKnob(builder, loc, "sg_n");
+  Value sgK = mkKnob(builder, loc, "sg_k");
+  Value sgNum = mkKnob(builder, loc, "sg_num");
+
   // Constraint 0: Set concrete values for knobs.
+  // sg_size == preferred_subgroup_size
   Value sgSizeEq = smt::EqOp::create(builder, loc, sgSize, subgroupSizeVal);
   AssertOp::create(builder, loc, sgSizeEq,
                    "sg_size == preferred_subgroup_size");
+  // TODO(#23535): This is from Tuner Python constraints. Revisit.
+  // sg_num == 4
+  Value sgNumEq =
+      smt::EqOp::create(builder, loc, sgNum, mkIntConst(builder, loc, 4));
+  AssertOp::create(builder, loc, sgNumEq, "num_subgroups == 4");
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
@@ -394,6 +406,7 @@ static LogicalResult emitVectorDistributeConstraints(
             "wg_n <= 512 (max VGPRs)");
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
             "red_k <= 512 (max VGPRs)");
+  // TODO(#23535): This is from Tuner Python constraints. Revisit.
   // wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt
   Value mulResult =
       smt::IntMulOp::create(builder, loc, ValueRange{sgSize, sgNCnt});
@@ -414,17 +427,26 @@ static LogicalResult emitVectorDistributeConstraints(
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   Value mulResultM = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
+      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup, sgM});
   Value mulResultN = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
+      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup, sgN});
   assertDivisible(builder, loc, wgM, mulResultM,
-                  "wg_m % (sg_m_cnt * mma_m) == 0");
+                  "wg_m % (sg_m_cnt * mma_m * sg_m) == 0");
   assertDivisible(builder, loc, wgN, mulResultN,
-                  "wg_n % (sg_n_cnt * mma_n) == 0");
+                  "wg_n % (sg_n_cnt * mma_n * sg_n) == 0");
+  // TODO(#23535): This is from Tuner Python constraints. Revisit.
+  // red_k == sg_k * mma_k
+  Value mulResultK = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgK, mmaLookup.mmaKLookup});
+  Value redKEq = smt::EqOp::create(builder, loc, redK, mulResultK);
+  AssertOp::create(builder, loc, redKEq, "red_k == sg_k * mma_k");
+  // red_k % mma_m == 0
+  assertDivisible(builder, loc, redK, mmaLookup.mmaMLookup,
+                  "red_k % mma_m == 0");
 
   // Constraint 4: Subgroup count bounds.
-  // Max workgroup tile size / Min(Intrinsic size * Subgroup tile size *
-  // Subgroup count) = 512 / (16 * 1 * 1) = 32.
+  // wg_tile = mma * sg_tile * sg_cnt
+  // Upper bound: max(wg_tile) / min(mma * 1) = 512 / 16 = 32.
   // 1 <= sg_m_cnt <= 32.
   // 1 <= sg_n_cnt <= 32.
   Value minSubgroupCntVal = mkIntConst(builder, loc, 1);
@@ -433,6 +455,20 @@ static LogicalResult emitVectorDistributeConstraints(
                maxSubgroupCntVal, "32");
   assertBounds(builder, loc, sgNCnt, kKnobSgNCntName, minSubgroupCntVal, "1",
                maxSubgroupCntVal, "32");
+  // 1 <= sg_m <= 32.
+  // 1 <= sg_n <= 32.
+  // 1 <= sg_k <= 32.
+  assertBounds(builder, loc, sgM, "sg_m", minSubgroupCntVal, "1",
+               maxSubgroupCntVal, "32");
+  assertBounds(builder, loc, sgN, "sg_n", minSubgroupCntVal, "1",
+               maxSubgroupCntVal, "32");
+  assertBounds(builder, loc, sgK, "sg_k", minSubgroupCntVal, "1",
+               maxSubgroupCntVal, "32");
+  // sg_m_cnt * sg_n_cnt == sg_num
+  Value sgCntMulResult =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
+  Value sgCntEq = smt::EqOp::create(builder, loc, sgCntMulResult, sgNum);
+  AssertOp::create(builder, loc, sgCntEq, "sg_m_cnt * sg_n_cnt == sg_num");
 
   // Constraint 5: Thread count limit
   // sg_m_cnt * sg_n_cnt * sg_size <= max_threads
@@ -477,14 +513,17 @@ static LogicalResult emitVectorDistributeConstraints(
             maxSharedMemVal, "shared memory must fit in workgroup memory");
 
   // Constraint 8: TranslationInfo workgroup structure.
-  // For VectorDistribute, workgroup_size = [wg_x, wg_y, wg_z] = [total_threads,
-  // 1, 1] wg_x == total_threads
-  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, totalThreadsMulResult);
-  AssertOp::create(builder, loc, wgXEq, "wg_size_x == total_threads");
-  // wg_y == 1
-  Value wgYEq =
-      smt::EqOp::create(builder, loc, wgSizeY, mkIntConst(builder, loc, 1));
-  AssertOp::create(builder, loc, wgYEq, "wg_size_y == 1");
+  // For VectorDistribute, workgroup_size =
+  // [wg_x, wg_y, wg_z] = [total_threads, 1, 1]
+  // TODO(#23535): This is from Tuner Python constraints. Revisit.
+  // wg_x == sg_size * sg_n_cnt
+  Value expectedWgX =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgSize, sgNCnt});
+  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, expectedWgX);
+  AssertOp::create(builder, loc, wgXEq, "wg_size_x == sg_size * sg_n_cnt");
+  // wg_y == sg_m_cnt
+  Value wgYEq = smt::EqOp::create(builder, loc, wgSizeY, sgMCnt);
+  AssertOp::create(builder, loc, wgYEq, "wg_size_y == sg_m_cnt");
   // wg_z == 1
   Value wgZEq =
       smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
