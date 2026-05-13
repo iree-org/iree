@@ -65,6 +65,56 @@ using ::mlir::iree_compiler::IREE::Codegen::kVDMFMADeinterleaveAcc;
 using ::mlir::iree_compiler::IREE::Codegen::kVDMFMAInterleaveAcc;
 using ::mlir::iree_compiler::IREE::Codegen::TileSwizzle;
 
+constexpr StringLiteral kWorkgroupSizeKey = "workgroup_size";
+constexpr StringLiteral kSubgroupSizeKey = "subgroup_size";
+constexpr StringLiteral kTranslationInfoKey = "translation_info";
+constexpr StringLiteral kPipelineKey = "pipeline";
+constexpr StringLiteral kCodegenSpecKey = "codegen_spec";
+
+static bool isTranslationInfoKey(StringRef key) {
+  return llvm::is_contained({kWorkgroupSizeKey, kSubgroupSizeKey}, key);
+}
+
+static bool isFlatMetadataKey(StringRef key) {
+  return llvm::is_contained(
+      {kConfigAttrName, kTranslationInfoKey, kPipelineKey, kCodegenSpecKey},
+      key);
+}
+
+static void
+appendLoweringConfigEntries(DictionaryAttr source,
+                            SmallVectorImpl<NamedAttribute> &entries,
+                            bool flatSource) {
+  for (NamedAttribute entry : source) {
+    StringRef key = entry.getName().getValue();
+    if (flatSource && (isFlatMetadataKey(key) || isTranslationInfoKey(key))) {
+      continue;
+    }
+    entries.push_back(entry);
+  }
+}
+
+static DictionaryAttr buildTranslationConfiguration(MLIRContext *ctx,
+                                                    DictionaryAttr source) {
+  SmallVector<NamedAttribute> entries;
+  for (NamedAttribute entry : source) {
+    StringRef key = entry.getName().getValue();
+    if (isTranslationInfoKey(key) || key == kCodegenSpecKey) {
+      continue;
+    }
+    entries.push_back(entry);
+  }
+  return DictionaryAttr::get(ctx, entries);
+}
+
+static int64_t extractI64(Attribute attr) {
+  return cast<IntegerAttr>(attr).getInt();
+}
+
+static SmallVector<int64_t> extractI64Array(Attribute attr) {
+  return llvm::map_to_vector(cast<ArrayAttr>(attr).getValue(), extractI64);
+}
+
 //===----------------------------------------------------------------------===//
 // MMA intrinsics semantics: shapes, layouts, operand element types.
 //===----------------------------------------------------------------------===//
@@ -3373,6 +3423,67 @@ PipelineAttr::emitConstraints(ArrayRef<Operation *> rootOps) const {
     return success();
   }
   return emitter(*this, rootOps);
+}
+
+FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
+    DictionaryAttr knobs, function_ref<InFlightDiagnostic()> emitError) const {
+  MLIRContext *ctx = getContext();
+  DictionaryAttr loweringSource = knobs;
+  bool flatLoweringSource = true;
+  if (auto nestedLowering =
+          dyn_cast_if_present<DictionaryAttr>(knobs.get(kConfigAttrName))) {
+    loweringSource = nestedLowering;
+    flatLoweringSource = false;
+  }
+
+  SmallVector<NamedAttribute> loweringEntries;
+  appendLoweringConfigEntries(loweringSource, loweringEntries,
+                              flatLoweringSource);
+  auto loweringConfig =
+      LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, loweringEntries));
+
+  DictionaryAttr translationSource = knobs;
+  bool nestedTranslationSource = false;
+  if (auto nestedTranslation =
+          dyn_cast_if_present<DictionaryAttr>(knobs.get(kTranslationInfoKey))) {
+    translationSource = nestedTranslation;
+    nestedTranslationSource = true;
+  }
+
+  SmallVector<int64_t> workgroupSize;
+  if (Attribute workgroupSizeAttr = translationSource.get(kWorkgroupSizeKey)) {
+    workgroupSize = extractI64Array(workgroupSizeAttr);
+  }
+
+  int64_t subgroupSize = 0;
+  if (Attribute subgroupSizeAttr = translationSource.get(kSubgroupSizeKey)) {
+    subgroupSize = extractI64(subgroupSizeAttr);
+  }
+
+  SymbolRefAttr codegenSpec;
+  if (Attribute codegenSpecAttr = translationSource.get(kCodegenSpecKey)) {
+    codegenSpec = dyn_cast<SymbolRefAttr>(codegenSpecAttr);
+    if (!codegenSpec) {
+      emitError() << "expected '" << kCodegenSpecKey
+                  << "' to be a symbol reference";
+      return failure();
+    }
+  }
+
+  DictionaryAttr configuration;
+  if (nestedTranslationSource) {
+    configuration = buildTranslationConfiguration(ctx, translationSource);
+  }
+
+  Attribute pipeline = *this;
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::getChecked(
+      emitError, ctx, pipeline, codegenSpec, ArrayRef<int64_t>(workgroupSize),
+      subgroupSize, configuration);
+  if (!translationInfo) {
+    return failure();
+  }
+  return IREE::Codegen::CompilationInfoAttr::get(ctx, loweringConfig,
+                                                 translationInfo);
 }
 
 //===----------------------------------------------------------------------===//

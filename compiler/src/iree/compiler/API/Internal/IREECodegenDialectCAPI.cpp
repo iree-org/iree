@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir-c/BuiltinAttributes.h"
@@ -31,6 +32,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Target/SMTLIB/ExportSMTLIB.h"
 
@@ -277,6 +279,45 @@ MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(MlirOperation op,
   mlir::Attribute attr =
       mlir::StringAttr::get(constraintsOp->getContext(), os.str());
   return wrap(attr);
+}
+
+MlirAttribute ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
+    MlirOperation op, size_t numAssignments,
+    const MlirStringRef *assignmentNames, const int64_t *assignmentValues,
+    MlirAttribute *diagnosticMessage) {
+  auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
+  if (diagnosticMessage) {
+    *diagnosticMessage = wrap(mlir::Attribute());
+  }
+
+  llvm::DenseMap<llvm::StringRef, int64_t> assignments;
+  assignments.reserve(numAssignments);
+  for (size_t i = 0; i < numAssignments; ++i) {
+    assignments[unwrap(assignmentNames[i])] = assignmentValues[i];
+  }
+
+  std::string diagnostics;
+  llvm::raw_string_ostream diagnosticStream(diagnostics);
+  mlir::ScopedDiagnosticHandler diagnosticHandler(
+      constraintsOp->getContext(), [&](mlir::Diagnostic &diagnostic) {
+        diagnostic.print(diagnosticStream);
+        diagnosticStream << '\n';
+        return mlir::success();
+      });
+
+  llvm::FailureOr<CompilationInfoAttr> compilationInfo =
+      mlir::iree_compiler::materializeCompilationInfoFromConstraints(
+          constraintsOp, assignments);
+  if (failed(compilationInfo)) {
+    diagnosticStream.flush();
+    if (diagnosticMessage && !diagnostics.empty()) {
+      mlir::Attribute diagnosticAttr =
+          mlir::StringAttr::get(constraintsOp->getContext(), diagnostics);
+      *diagnosticMessage = wrap(diagnosticAttr);
+    }
+    return wrap(mlir::Attribute());
+  }
+  return wrap(*compilationInfo);
 }
 
 ireeCodegenAttentionOpDetail

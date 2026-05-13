@@ -96,6 +96,7 @@ iree_lit_test_suite(
     "materialize_encoding_riscv.mlir"
     "materialize_encoding_vmvx.mlir"
     "materialize_encoding_x86_64.mlir"
+    "materialize_smt_constraint_assignments.mlir"
     "materialize_tuning_specs.mlir"
     "materialize_tuning_specs_default_missing.mlir"
     "materialize_tuning_specs_invalid_spec.mlir"
