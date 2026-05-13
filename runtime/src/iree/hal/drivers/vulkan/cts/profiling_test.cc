@@ -227,8 +227,8 @@ TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
           iree_hal_buffer_byte_length(output_buffer.get())),
   };
   iree_hal_buffer_ref_list_t bindings = {
-      .count = IREE_ARRAYSIZE(binding_refs),
-      .values = binding_refs,
+      /*.count=*/IREE_ARRAYSIZE(binding_refs),
+      /*.values=*/binding_refs,
   };
 
   const uint32_t constant_data[] = {3, 10};

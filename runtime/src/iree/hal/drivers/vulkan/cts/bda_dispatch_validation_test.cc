@@ -173,9 +173,9 @@ static iree_status_t MakeBdaRequirementExecutableData(
   iree_hal_vulkan_PipelineLayoutDef_vec_ref_t pipeline_layouts_ref = 0;
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_PushConstantRange push_constant_range = {
-        .stage_flags = kComputeShaderStageFlag,
-        .offset = 0,
-        .size = kBdaDispatchRootLength,
+        /*.stage_flags=*/kComputeShaderStageFlag,
+        /*.offset=*/0,
+        /*.size=*/kBdaDispatchRootLength,
     };
     iree_hal_vulkan_PushConstantRange_vec_ref_t push_constant_ranges_ref =
         iree_hal_vulkan_PushConstantRange_vec_create(&builder,

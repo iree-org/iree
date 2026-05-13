@@ -67,9 +67,9 @@ TEST_P(VulkanQueueDescriptorCacheTest, DeferredUnalignedFillsExceedOneBlock) {
 
   for (iree_host_size_t i = 0; i < kSubmissionCount; ++i) {
     iree_hal_semaphore_list_t signal_list = {
-        .count = 1,
-        .semaphores = &signals.semaphores[i],
-        .payload_values = &signals.payload_values[i],
+        /*.count=*/1,
+        /*.semaphores=*/&signals.semaphores[i],
+        /*.payload_values=*/&signals.payload_values[i],
     };
     IREE_ASSERT_OK(iree_hal_device_queue_fill(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, gate, signal_list,
@@ -131,9 +131,9 @@ TEST_P(VulkanQueueDescriptorCacheTest, DeferredDispatchesExceedOneBlock) {
         /*.values=*/binding_refs,
     };
     iree_hal_semaphore_list_t signal_list = {
-        .count = 1,
-        .semaphores = &signals.semaphores[i],
-        .payload_values = &signals.payload_values[i],
+        /*.count=*/1,
+        /*.semaphores=*/&signals.semaphores[i],
+        /*.payload_values=*/&signals.payload_values[i],
     };
     IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, gate, signal_list, executable_,
@@ -318,9 +318,9 @@ TEST_P(VulkanQueueDescriptorCacheTest,
         /*.bindings=*/binding_table_entries,
     };
     iree_hal_semaphore_list_t signal_list = {
-        .count = 1,
-        .semaphores = &signals.semaphores[i],
-        .payload_values = &signals.payload_values[i],
+        /*.count=*/1,
+        /*.semaphores=*/&signals.semaphores[i],
+        /*.payload_values=*/&signals.payload_values[i],
     };
     IREE_ASSERT_OK(iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, gate, signal_list, command_buffer,
