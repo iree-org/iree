@@ -189,19 +189,24 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 //   CHECK-DAG:   %[[OUT_D0:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D0]]]
 //   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D1]]]
 //   CHECK-DAG:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}%[[ARG0]]
+// LHS swizzle splits the inner M tile into (intrinsics_m, M_intrinsic),
+// materialized as an `expand_shape` after the pack. ACC swizzle does
+// the same in two groups, giving the rank-5 inner tile below.
+//   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[PACK_LHS]]
 //       CHECK:   %[[PACK_RHS:.+]] = linalg.pack
 //  CHECK-SAME:     %[[ARG1]]
-//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[OUT_D0]], %[[OUT_D1]]) : tensor<?x?x16x16xf32>
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[OUT_D0]], %[[OUT_D1]]) : tensor<?x?x16x1x16xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[EMPTY]] :
-//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[PACK_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[EXPAND_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
 // The RHS pack uses `outer_dims_perm = [1, 0]`, so its outer dims come out as
 // (N_iter, K_iter) — mmt4d-style — not (K_iter, N_iter). The inner_tiled op
 // must label its RHS operand with the matching `(d1, d2)` map, otherwise the
 // verifier rejects the op with "shape does not match iteration bounds".
 //  CHECK-SAME:       indexing_maps = [#[[$MAP_LHS]], #[[$MAP_RHS]], #[[$MAP_ACC]]]
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>, semantics = #iree_cpu.mma_semantics<>
-//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[INNER]]
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[INNER]]
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]]
 //       CHECK:   return %[[UNPACK]]
 
 // -----
@@ -235,17 +240,26 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.0
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<8x255x16x1xf32>
 //       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] padding_value(%[[CST]] : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<8x255x16x1xf32>
-//       CHECK:   return %[[PACK]] : tensor<8x255x16x1xf32>
+// LHS swizzle splits the inner M tile into (intrinsics_m, M_intrinsic),
+// adding a trailing unit dim from M_intrinsic=1.
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[PACK]]
+//  CHECK-SAME:     : tensor<8x255x16x1xf32> into tensor<8x255x16x1x1xf32>
+//       CHECK:   return %[[EXPAND]] : tensor<8x255x16x1x1xf32>
 // CHECK-LABEL: func @set_encoding_matmul_RHS_inner_tiled_avx512(
 //  CHECK-SAME:   %[[INPUT_R:[a-zA-Z0-9]+]]: tensor<127x255xf32>
 //   CHECK-DAG:   %[[CST_R:.+]] = arith.constant 0.0
 //       CHECK:   %[[EMPTY_R:.+]] = tensor.empty() : tensor<16x127x16x1xf32>
 //       CHECK:   %[[PACK_R:.+]] = linalg.pack %[[INPUT_R]] padding_value(%[[CST_R]] : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [16, 1] into %[[EMPTY_R]] : tensor<127x255xf32> -> tensor<16x127x16x1xf32>
+// RHS swizzle is identity here (intrinsics_n=1).
 //       CHECK:   return %[[PACK_R]] : tensor<16x127x16x1xf32>
 // CHECK-LABEL: func @unset_encoding_matmul_RESULT_inner_tiled_avx512(
-//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<8x16x16x16xf32>
+// ACC arrives in the swizzle-expanded rank-5 layout and is collapsed
+// back to rank-2 (M, N) inner before `unpack`.
+//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<8x16x16x1x16xf32>
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[PACKED]]
+//  CHECK-SAME:     : tensor<8x16x16x1x16xf32> into tensor<8x16x16x16xf32>
 //       CHECK:   %[[EMPTY_U:.+]] = tensor.empty() : tensor<127x255xf32>
-//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[PACKED]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_U]] : tensor<8x16x16x16xf32> -> tensor<127x255xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_U]] : tensor<8x16x16x16xf32> -> tensor<127x255xf32>
 //       CHECK:   return %[[UNPACK]]
 
 // -----

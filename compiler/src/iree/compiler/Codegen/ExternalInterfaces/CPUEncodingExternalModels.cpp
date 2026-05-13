@@ -1247,6 +1247,12 @@ private:
     if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
     }
+    // Attach the per-operand swizzle so the pack pipeline's
+    // `getSwizzledShape` applies the `expand_shape` + `transpose` to the
+    // inner tile, matching the permutation-aware tile type that
+    // `DataTiledMMAAttr::getUndistributedTileTypes` returns. Mirrors GPU.
+    info.swizzle =
+        IREE::CPU::getSwizzle(mma, encoding.getOperandIndex().getInt());
     return info;
   }
 };
