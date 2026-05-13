@@ -54,15 +54,8 @@ void DataTiledMMAInterfaceAttr::getUndistributedTileTypes(
   SmallVector<Type> elementTypes;
   getElementTypes(elementTypes);
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
-    TileSwizzle swizzle = getTileSwizzle(i);
-    SmallVector<int64_t> shape;
-    for (TileSwizzle::ExpandShapeDimVectorType group : swizzle.expandShape()) {
-      for (TileSwizzle::Dim d : group) {
-        shape.push_back(d.size());
-      }
-    }
-    applyPermutationToVector(shape, swizzle.permutation());
-    result.push_back(VectorType::get(shape, elementType));
+    result.push_back(
+        Codegen::getTileVectorType(getTileSwizzle(i), elementType));
   }
 }
 
@@ -70,14 +63,11 @@ void DataTiledMMAInterfaceAttr::getDistributedTileTypes(
     SmallVectorImpl<VectorType> &result) {
   SmallVector<Type> elementTypes;
   getElementTypes(elementTypes);
-  auto getShape = [=](unsigned operandIndex) {
-    return Codegen::sliceSwizzledShape(
-        getTileSwizzle(operandIndex), [](TileSwizzle::Dim d) {
-          return d.kind() != TileSwizzle::Dim::Kind::CrossThread;
-        });
-  };
   for (auto [i, elementType] : llvm::enumerate(elementTypes)) {
-    result.push_back(VectorType::get(getShape(i), elementType));
+    result.push_back(Codegen::getTileVectorType(
+        getTileSwizzle(i), elementType, [](TileSwizzle::Dim d) {
+          return d.kind() != TileSwizzle::Dim::Kind::CrossThread;
+        }));
   }
 }
 

@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
@@ -21,6 +22,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-amdgpu-lower-async-dma"
@@ -162,6 +164,16 @@ getGlobalLoadDMALayout(MLIRContext *context, ArrayRef<int64_t> shape,
   return failure();
 }
 
+static IREE::Codegen::XORShuffleAttr getDestXorSwizzleAttr(Value dest) {
+  while (auto viewOp = dest.getDefiningOp<ViewLikeOpInterface>()) {
+    dest = viewOp.getViewSource();
+  }
+  if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
+    return dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle());
+  }
+  return {};
+}
+
 struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
   LowerAsyncDMA(MLIRContext *context, Value threadId, int64_t subgroupSize,
                 int64_t numThreads)
@@ -211,6 +223,7 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
       return rewriter.notifyMatchFailure(
           op, "dest does not have workgroup address space");
     }
+
     // For now, only support contiguous memrefs.
     // TODO(#23782): Relax this constraint.
     if (!destType.areTrailingDimsContiguous(destType.getRank())) {
@@ -240,11 +253,33 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     SmallVector<int64_t> transferShape(transferVectorType.getShape());
 
     int64_t elementBitWidth = destType.getElementTypeBitWidth();
+    int64_t destRank = destType.getRank();
     MLIRContext *context = op.getContext();
+
+    IREE::Codegen::XORShuffleAttr destSwizzle =
+        getDestXorSwizzleAttr(op.getDest());
+    // When dest has a swizzle_hint, filter DMA sizes to those where
+    // elementsPerDMA fits within one swizzle access block. This ensures
+    // gather_to_lds writes contiguous dest elements that all map to contiguous
+    // source elements under the XOR permutation.
+    SmallVector<int64_t> filteredDmaSizes(dmaSizes);
+    if (destSwizzle) {
+      int64_t accessElems = destSwizzle.getAccessElementCount();
+      llvm::erase_if(filteredDmaSizes, [&](int64_t dmaSize) {
+        if (dmaSize % elementBitWidth != 0) {
+          return true;
+        }
+        int64_t elemsPerDMA = dmaSize / elementBitWidth;
+        if (elemsPerDMA == 0) {
+          return true;
+        }
+        return accessElems % elemsPerDMA != 0;
+      });
+    }
 
     FailureOr<NestedLayoutAttr> dmaLayoutOrFailure =
         getGlobalLoadDMALayout(context, transferShape, numThreads, subgroupSize,
-                               elementBitWidth, dmaSizes);
+                               elementBitWidth, filteredDmaSizes);
     if (failed(dmaLayoutOrFailure)) {
       return rewriter.notifyMatchFailure(op, "failed to compute DMA layout");
     }
@@ -268,7 +303,6 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     SmallVector<int64_t> tileShape = getElementVectorTileShape(dmaLayout);
 
     // Get permutation map (or identity).
-    int64_t destRank = destType.getRank();
     AffineMap permutationMap =
         AffineMap::getMultiDimIdentityMap(destRank, context);
     if (auto mapAttr = op.getPermutationMapAttr()) {
@@ -286,18 +320,46 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distributedShape, tileShape)) {
 
-      // Source indices: divergent (include thread contribution).
-      SmallVector<Value> srcBaseIndices(op.getSourceIndices());
-      SmallVector<Value> srcIndices = getTransferIndicesFromNestedLayout(
-          rewriter, srcBaseIndices, offsets, dmaLayout, permutationMap,
-          warpIndices, threadIndices);
-
       // Dest indices: uniform (zero thread contribution).
       SmallVector<Value> destBaseIndices(op.getDestIndices());
       SmallVector<Value> dstIndices = getTransferIndicesFromNestedLayout(
           rewriter, destBaseIndices, offsets, dmaLayout, destIdentityMap,
           warpIndices, zeroThreadIndices);
 
+      if (!destSwizzle) {
+        // Source indices: divergent (include thread contribution).
+        SmallVector<Value> srcBaseIndices(op.getSourceIndices());
+        SmallVector<Value> srcIndices = getTransferIndicesFromNestedLayout(
+            rewriter, srcBaseIndices, offsets, dmaLayout, permutationMap,
+            warpIndices, threadIndices);
+
+        amdgpu::GatherToLDSOp::create(rewriter, loc, op.getSource(), srcIndices,
+                                      op.getDest(), dstIndices,
+                                      TypeAttr::get(transferType));
+        continue;
+      }
+      // Swizzled source indices: compute per-lane tile-relative offset,
+      // apply swizzle (self-inverse), delinearize, map to source coords.
+      // Zero base because the swizzle operates on tile-relative positions;
+      // source base indices are added via the permutation map loop below.
+      llvm::Repeated<Value> zeroBase(destRank, c0);
+      SmallVector<Value> multiDimLane = getTransferIndicesFromNestedLayout(
+          rewriter, zeroBase, offsets, dmaLayout, destIdentityMap, warpIndices,
+          threadIndices);
+      Value flatLane = affine::AffineLinearizeIndexOp::create(
+          rewriter, loc, multiDimLane, transferShape, /*disjoint=*/true);
+      Value swizzledFlat = applyInverseXorSwizzleToDMASourceOffset(
+          rewriter, loc, flatLane, destSwizzle, op.getDest());
+
+      auto coords = affine::AffineDelinearizeIndexOp::create(
+          rewriter, loc, swizzledFlat, transferShape);
+
+      SmallVector<Value> srcIndices(op.getSourceIndices());
+      for (auto [i, dim] : llvm::enumerate(permutationMap.getResults())) {
+        unsigned pos = cast<AffineDimExpr>(dim).getPosition();
+        srcIndices[pos] = arith::AddIOp::create(rewriter, loc, srcIndices[pos],
+                                                coords.getResult(i));
+      }
       amdgpu::GatherToLDSOp::create(rewriter, loc, op.getSource(), srcIndices,
                                     op.getDest(), dstIndices,
                                     TypeAttr::get(transferType));

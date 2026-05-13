@@ -129,8 +129,8 @@ func.func @chain_propagation_dynamic(
 // scf.for propagation through iter_args.
 // The to_layout inside the loop should propagate tile sizes to the
 // loop iter_args and through the scf.yield.
-// The fill-like %init generic is duplicatable, so it should NOT receive
-// tile sizes.
+// The fill-like %init generic is duplicatable, but it only has one semantic
+// use after pre-splitting, so it should receive tile sizes.
 
 #layout = #iree_vector_ext.nested_layout<
   subgroup_tile = [8], batch_tile = [1], outer_tile = [1],
@@ -142,7 +142,7 @@ func.func @scf_for_propagation(%arg0: tensor<512xf32>, %lb: index, %ub: index, %
   %empty = tensor.empty() : tensor<512xf32>
   %cst = arith.constant 0.0 : f32
   // CHECK: linalg.generic
-  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 512>
   %init = linalg.generic {
     indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]
@@ -165,6 +165,28 @@ func.func @scf_for_propagation(%arg0: tensor<512xf32>, %lb: index, %ub: index, %
     scf.yield %updated : tensor<512xf32>
   }
   return %result : tensor<512xf32>
+}
+
+// -----
+
+#layout_loop_init_4 = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1, 1], batch_tile = [1, 1, 1, 1], outer_tile = [1, 1, 1, 1],
+  thread_tile = [1, 1, 1, 1], element_tile = [1, 1, 1, 4],
+  subgroup_strides = [0, 0, 0, 0], thread_strides = [0, 0, 0, 0]>
+
+// CHECK-LABEL: @duplicatable_fill_specializes_scf_for_init
+func.func @duplicatable_fill_specializes_scf_for_init(
+    %lb: index, %ub: index, %step: index) -> tensor<1x1x1x1xf32> {
+  %empty = tensor.empty() : tensor<1x1x1x1xf32>
+  %zero = arith.constant 0.0 : f32
+  // CHECK: linalg.fill
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 1, 4>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x1x1x1xf32>) -> tensor<1x1x1x1xf32>
+  %loop = scf.for %iv = %lb to %ub step %step iter_args(%iter = %fill) -> tensor<1x1x1x1xf32> {
+    %laid_out = iree_vector_ext.to_layout %iter to layout(#layout_loop_init_4) : tensor<1x1x1x1xf32>
+    scf.yield %laid_out : tensor<1x1x1x1xf32>
+  }
+  return %loop : tensor<1x1x1x1xf32>
 }
 
 // -----
@@ -224,7 +246,8 @@ func.func @contraction_indexing_maps(
 func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf32> {
   %empty = tensor.empty() : tensor<512xf32>
   %cst = arith.constant 0.0 : f32
-  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  // CHECK: linalg.fill
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 512>
   %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<512xf32>) -> tensor<512xf32>
   %if_result = scf.if %cond -> tensor<512xf32> {
     %laid_out = iree_vector_ext.to_layout %arg0 to layout(#layout_if) : tensor<512xf32>
@@ -247,7 +270,7 @@ func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf
 
 // -----
 
-// Duplicatable linalg ops are specialized per use at materialization time.
+// Duplicatable linalg ops are split before analysis.
 // One linalg.fill feeding two consumers with different logical vector tile
 // sizes should be duplicated and each clone should keep the tile size of its
 // corresponding use.
@@ -266,14 +289,13 @@ func.func @scf_if_propagation(%arg0: tensor<512xf32>, %cond: i1) -> tensor<512xf
 func.func @result_and_fill_specialization() -> (tensor<16x24xf32>, tensor<16x24xf32>) {
   %empty = tensor.empty() : tensor<16x24xf32>
   %zero = arith.constant 0.0 : f32
-  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x24xf32>
   // CHECK: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
   // CHECK-DAG: %[[FILL24:.+]] = linalg.fill
   // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 16, 24>
-  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<16x24xf32>) -> tensor<16x24xf32>
+  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%{{.+}} : tensor<16x24xf32>) -> tensor<16x24xf32>
   // CHECK-DAG: %[[FILL32:.+]] = linalg.fill
   // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 16, 32>
-  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<16x24xf32>) -> tensor<16x24xf32>
+  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%{{.+}} : tensor<16x24xf32>) -> tensor<16x24xf32>
   %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<16x24xf32>) -> tensor<16x24xf32>
   // CHECK-DAG: %[[LAYOUT32:.+]] = iree_vector_ext.to_layout %[[FILL32]] to layout(#{{.+}}) : tensor<16x24xf32>
   // CHECK-DAG: %[[LAYOUT24:.+]] = iree_vector_ext.to_layout %[[FILL24]] to layout(#{{.+}}) : tensor<16x24xf32>
@@ -281,6 +303,53 @@ func.func @result_and_fill_specialization() -> (tensor<16x24xf32>, tensor<16x24x
   %laid_out_32 = iree_vector_ext.to_layout %fill to layout(#layout_fill_consumer_32) : tensor<16x24xf32>
   %laid_out_24 = iree_vector_ext.to_layout %fill to layout(#layout_fill_consumer_24) : tensor<16x24xf32>
   return %laid_out_32, %laid_out_24 : tensor<16x24xf32>, tensor<16x24xf32>
+}
+
+// -----
+
+// Duplicatable linalg ops whose split clones do not get vector tile sizes
+// should still be deduplicated.
+
+// CHECK-LABEL: @dedup_unclassified_fill_clones
+func.func @dedup_unclassified_fill_clones(
+    %arg0: tensor<16x24xf32>, %arg1: tensor<16x24xf32>
+) -> (tensor<16x24xf32>, tensor<16x24xf32>) {
+  %empty = tensor.empty() : tensor<16x24xf32>
+  %zero = arith.constant 0.0 : f32
+  // CHECK: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+  // CHECK: %[[FILL:.+]] = linalg.fill
+  // CHECK-NOT: linalg.fill
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<16x24xf32>) -> tensor<16x24xf32>
+  %empty0 = tensor.empty() : tensor<16x24xf32>
+  // CHECK: linalg.generic
+  // CHECK-SAME: ins(%[[FILL]], %arg0 : tensor<16x24xf32>, tensor<16x24xf32>)
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%fill, %arg0 : tensor<16x24xf32>, tensor<16x24xf32>)
+    outs(%empty0 : tensor<16x24xf32>) {
+  ^bb0(%in0: f32, %in1: f32, %out: f32):
+    %add = arith.addf %in0, %in1 : f32
+    linalg.yield %add : f32
+  } -> tensor<16x24xf32>
+  %empty1 = tensor.empty() : tensor<16x24xf32>
+  // CHECK: linalg.generic
+  // CHECK-SAME: ins(%[[FILL]], %arg1 : tensor<16x24xf32>, tensor<16x24xf32>)
+  %1 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%fill, %arg1 : tensor<16x24xf32>, tensor<16x24xf32>)
+    outs(%empty1 : tensor<16x24xf32>) {
+  ^bb0(%in0: f32, %in1: f32, %out: f32):
+    %mul = arith.mulf %in0, %in1 : f32
+    linalg.yield %mul : f32
+  } -> tensor<16x24xf32>
+  return %0, %1 : tensor<16x24xf32>, tensor<16x24xf32>
 }
 
 // -----
@@ -299,28 +368,76 @@ func.func @result_and_fill_specialization() -> (tensor<16x24xf32>, tensor<16x24x
 func.func @result_and_fill_specialization_with_unclassified_scf_yield_uses(%cond: i1) -> (tensor<16x24xf32>, tensor<16x24xf32>) {
   %empty = tensor.empty() : tensor<16x24xf32>
   %zero = arith.constant 0.0 : f32
-  // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<16x24xf32>
   // CHECK: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
-  // CHECK: %[[FILL_ORIG:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<16x24xf32>) -> tensor<16x24xf32>
-  // CHECK: %[[FILL32:.+]] = linalg.fill
-  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 16, 32>
-  // CHECK-SAME: ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<16x24xf32>) -> tensor<16x24xf32>
+  // CHECK-DAG: %[[FILL24:.+]] = linalg.fill
+  // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 16, 24>
+  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%{{.+}} : tensor<16x24xf32>) -> tensor<16x24xf32>
+  // CHECK-DAG: %[[FILL32:.+]] = linalg.fill
+  // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 16, 32>
+  // CHECK-DAG: ins(%[[ZERO]] : f32) outs(%{{.+}} : tensor<16x24xf32>) -> tensor<16x24xf32>
   %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<16x24xf32>) -> tensor<16x24xf32>
   // CHECK: %[[LAYOUT32:.+]] = iree_vector_ext.to_layout %[[FILL32]] to layout(#{{.+}}) : tensor<16x24xf32>
   %laid_out_32 = iree_vector_ext.to_layout %fill to layout(#layout_fill_consumer_32) : tensor<16x24xf32>
   // CHECK: %[[IF:.+]] = scf.if
   %if = scf.if %cond -> tensor<16x24xf32> {
-    // CHECK: scf.yield %[[FILL_ORIG]]
+    // CHECK: scf.yield %[[FILL24]]
     scf.yield %fill : tensor<16x24xf32>
   } else {
-    // CHECK: scf.yield %[[FILL_ORIG]]
+    // CHECK: scf.yield %[[FILL24]]
     scf.yield %fill : tensor<16x24xf32>
   }
-  // CHECK-NOT: iree_codegen.vector_tile_sizes = array<i64: 16, 24>
   // CHECK: %[[LAYOUT24:.+]] = iree_vector_ext.to_layout %[[IF]] to layout(#{{.+}}) : tensor<16x24xf32>
   // CHECK: return %[[LAYOUT32]], %[[LAYOUT24]] : tensor<16x24xf32>, tensor<16x24xf32>
   %laid_out_24 = iree_vector_ext.to_layout %if to layout(#layout_fill_consumer_24) : tensor<16x24xf32>
   return %laid_out_32, %laid_out_24 : tensor<16x24xf32>, tensor<16x24xf32>
+}
+
+// -----
+
+#layout_fill_loop = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 1, 1], outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 1], element_tile = [1, 1, 1],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 0, 0]>
+
+#layout_reduce_source = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1, 1], batch_tile = [1, 1, 1, 1], outer_tile = [1, 1, 1, 1],
+  thread_tile = [1, 1, 1, 1], element_tile = [1, 1, 1, 4],
+  subgroup_strides = [0, 0, 0, 0], thread_strides = [0, 0, 0, 0]>
+
+#layout_reduce_result = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1, 1], batch_tile = [1, 1, 1], outer_tile = [1, 1, 1],
+  thread_tile = [1, 1, 1], element_tile = [1, 1, 4],
+  subgroup_strides = [0, 0, 0], thread_strides = [0, 0, 0]>
+
+// CHECK-LABEL: @duplicatable_fill_dps_init_does_not_pollute_loop_init
+func.func @duplicatable_fill_dps_init_does_not_pollute_loop_init(
+    %arg0: tensor<1x1x1x1xf32>, %lb: index, %ub: index, %step: index) -> tensor<1x1x1xf32> {
+  %empty = tensor.empty() : tensor<1x1x1xf32>
+  %zero = arith.constant 0.0 : f32
+  // CHECK-DAG: linalg.fill
+  // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 1>
+  // CHECK-DAG: ins(%{{.+}} : f32) outs(%{{.+}} : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+  // CHECK-DAG: %[[FILL_REDUCE:.+]] = linalg.fill
+  // CHECK-DAG: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4>
+  // CHECK-DAG: ins(%{{.+}} : f32) outs(%{{.+}} : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+  // CHECK: %[[LOOP:.+]] = scf.for {{.+}} iter_args(%{{.+}} = %{{.+}}) -> (tensor<1x1x1xf32>)
+  %loop = scf.for %iv = %lb to %ub step %step iter_args(%iter = %fill) -> tensor<1x1x1xf32> {
+    %laid_out = iree_vector_ext.to_layout %iter to layout(#layout_fill_loop) : tensor<1x1x1xf32>
+    scf.yield %laid_out : tensor<1x1x1xf32>
+  }
+  %src = iree_vector_ext.to_layout %arg0 to layout(#layout_reduce_source) : tensor<1x1x1x1xf32>
+  // CHECK: linalg.reduce
+  // CHECK-SAME: outs(%{{.+}} : tensor<1x1x1xf32>)
+  // CHECK-SAME: dimensions = [0]
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 1, 4>
+  %reduced = linalg.reduce ins(%src : tensor<1x1x1x1xf32>) outs(%fill : tensor<1x1x1xf32>) dimensions = [0]
+    (%in: f32, %init: f32) {
+      %sum = arith.addf %in, %init : f32
+      linalg.yield %sum : f32
+    }
+  %result = iree_vector_ext.to_layout %reduced to layout(#layout_reduce_result) : tensor<1x1x1xf32>
+  return %result : tensor<1x1x1xf32>
 }
 
 // -----

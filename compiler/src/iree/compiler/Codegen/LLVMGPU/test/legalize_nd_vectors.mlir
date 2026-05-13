@@ -14,12 +14,63 @@ func.func @addf_2d(%arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4
 
 // -----
 
+func.func @cmpi_2d(%arg0: vector<2x4xi32>, %arg1: vector<2x4xi32>) -> vector<2x4xi1> {
+  %0 = arith.cmpi slt, %arg0, %arg1 : vector<2x4xi32>
+  return %0 : vector<2x4xi1>
+}
+// CHECK-LABEL: func.func @cmpi_2d
+//  CHECK-SAME:   (%[[A0:.+]]: vector<4xi32>, %[[A1:.+]]: vector<4xi32>, %[[B0:.+]]: vector<4xi32>, %[[B1:.+]]: vector<4xi32>)
+//  CHECK-SAME:   -> (vector<4xi1>, vector<4xi1>)
+//       CHECK:   %[[R0:.+]] = arith.cmpi slt, %[[A0]], %[[B0]] : vector<4xi32>
+//       CHECK:   %[[R1:.+]] = arith.cmpi slt, %[[A1]], %[[B1]] : vector<4xi32>
+//       CHECK:   return %[[R0]], %[[R1]] : vector<4xi1>, vector<4xi1>
+
+// -----
+
 func.func @negf_3d(%arg0: vector<2x3x4xf32>) -> vector<2x3x4xf32> {
   %0 = arith.negf %arg0 : vector<2x3x4xf32>
   return %0 : vector<2x3x4xf32>
 }
 // CHECK-LABEL: func.func @negf_3d
 // CHECK-COUNT-6: arith.negf %{{.*}} : vector<4xf32>
+//       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
+
+// -----
+
+func.func @select_scalar_condition(%cond: i1, %arg0: vector<2x4xi1>, %arg1: vector<2x4xi1>) -> vector<2x4xi1> {
+  %0 = arith.select %cond, %arg0, %arg1 : vector<2x4xi1>
+  return %0 : vector<2x4xi1>
+}
+// CHECK-LABEL: func.func @select_scalar_condition
+//  CHECK-SAME:   (%[[COND:.+]]: i1, %[[A0:.+]]: vector<4xi1>, %[[A1:.+]]: vector<4xi1>, %[[B0:.+]]: vector<4xi1>, %[[B1:.+]]: vector<4xi1>)
+//  CHECK-SAME:   -> (vector<4xi1>, vector<4xi1>)
+//       CHECK:   %[[R0:.+]] = arith.select %[[COND]], %[[A0]], %[[B0]] : vector<4xi1>
+//       CHECK:   %[[R1:.+]] = arith.select %[[COND]], %[[A1]], %[[B1]] : vector<4xi1>
+//       CHECK:   return %[[R0]], %[[R1]] : vector<4xi1>, vector<4xi1>
+
+// -----
+
+func.func @select_vector_condition(%cond: vector<2x4xi1>, %arg0: vector<2x4xf32>, %arg1: vector<2x4xf32>) -> vector<2x4xf32> {
+  %0 = arith.select %cond, %arg0, %arg1 : vector<2x4xi1>, vector<2x4xf32>
+  return %0 : vector<2x4xf32>
+}
+// CHECK-LABEL: func.func @select_vector_condition
+//  CHECK-SAME:   (%[[C0:.+]]: vector<4xi1>, %[[C1:.+]]: vector<4xi1>,
+//  CHECK-SAME:    %[[A0:.+]]: vector<4xf32>, %[[A1:.+]]: vector<4xf32>, %[[B0:.+]]: vector<4xf32>, %[[B1:.+]]: vector<4xf32>)
+//  CHECK-SAME:   -> (vector<4xf32>, vector<4xf32>)
+//       CHECK:   %[[R0:.+]] = arith.select %[[C0]], %[[A0]], %[[B0]] : vector<4xi1>, vector<4xf32>
+//       CHECK:   %[[R1:.+]] = arith.select %[[C1]], %[[A1]], %[[B1]] : vector<4xi1>, vector<4xf32>
+//       CHECK:   return %[[R0]], %[[R1]] : vector<4xf32>, vector<4xf32>
+
+// -----
+
+func.func @select_scalar_condition_3d(%cond: i1, %arg0: vector<2x3x4xf32>, %arg1: vector<2x3x4xf32>) -> vector<2x3x4xf32> {
+  %0 = arith.select %cond, %arg0, %arg1 : vector<2x3x4xf32>
+  return %0 : vector<2x3x4xf32>
+}
+// CHECK-LABEL: func.func @select_scalar_condition_3d
+//  CHECK-SAME:   (%[[COND:.+]]: i1
+// CHECK-COUNT-6: arith.select %[[COND]], %{{.*}}, %{{.*}} : vector<4xf32>
 //       CHECK:   return {{.*}} : vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>
 
 // -----

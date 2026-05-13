@@ -303,17 +303,24 @@ static bool getEnableInnerTiledFromConfig(DictionaryAttr config) {
 }
 
 /// Returns the matmul {M, N, K} tile shape covered by a CPU DataTiledMMAAttr.
-/// Derived directly from `getUndistributedTileTypes`: LHS is M×K (always) and
-/// RHS is N×K (always), regardless of the `transposed_intrinsic` flag. The
-/// ACC layout varies (M×N row-major vs. N×M column-major for transposed
-/// intrinsics), so we derive M and N from the LHS and RHS tiles instead.
+/// The swizzle's `expandShape` is partitioned per its convention (see
+/// `getIntrinsicSwizzle`): LHS is `[M dims, K dims]`, RHS is `[N dims, K
+/// dims]`. So M is the product of LHS group 0, K is the product of LHS
+/// group 1, and N is the product of RHS group 0. Unlike reading from the
+/// vector tile type, this works regardless of the swizzle's permutation.
 static IREE::Codegen::TileMxNxK getTileMxNxK(IREE::CPU::DataTiledMMAAttr mma) {
-  SmallVector<VectorType> tiles;
-  mma.getUndistributedTileTypes(tiles);
-  assert(tiles.size() == 3 && "Expected LHS, RHS, ACC tile types");
-  ArrayRef<int64_t> lhsShape = tiles[0].getShape();
-  ArrayRef<int64_t> rhsShape = tiles[1].getShape();
-  return IREE::Codegen::TileMxNxK{lhsShape[0], rhsShape[0], lhsShape[1]};
+  auto groupProduct = [](ArrayRef<IREE::Codegen::TileSwizzle::Dim> group) {
+    int64_t product = 1;
+    for (const auto &d : group) {
+      product *= d.size();
+    }
+    return product;
+  };
+  IREE::Codegen::TileSwizzle lhsSwizzle = IREE::CPU::getSwizzle(mma, 0);
+  IREE::Codegen::TileSwizzle rhsSwizzle = IREE::CPU::getSwizzle(mma, 1);
+  return IREE::Codegen::TileMxNxK{groupProduct(lhsSwizzle.expandShape()[0]),
+                                  groupProduct(rhsSwizzle.expandShape()[0]),
+                                  groupProduct(lhsSwizzle.expandShape()[1])};
 }
 
 /// Returns the set of `+feature` strings that must all be present in the

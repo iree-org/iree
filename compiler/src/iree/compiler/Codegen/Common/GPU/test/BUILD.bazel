@@ -52,6 +52,7 @@ iree_lit_test_suite(
             "gpu_nested_layout_vector_distribution_inner_tiled.mlir",
             "gpu_nested_layout_vector_distribution_mask.mlir",
             "gpu_nested_layout_vector_distribution_multi_reduce.mlir",
+            "gpu_nested_layout_vector_distribution_scan.mlir",
             "gpu_nested_layout_vector_distribution_step.mlir",
             "gpu_pack_partial_reductions.mlir",
             "gpu_pack_to_intrinsics.mlir",

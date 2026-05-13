@@ -104,14 +104,22 @@ struct UnrollElementwiseOps final
       return failure();
     }
 
-    // Invert operands: from list-of-ValueRanges to N lists of operands.
-    SmallVector<SmallVector<Value>> opOperands;
-    for (auto i : llvm::seq<int64_t>(convertedTypes.size())) {
-      SmallVector<Value> newOperands;
-      for (ValueRange operandList : operands) {
-        newOperands.push_back(operandList[i]);
+    // Invert operands: from list-of-ValueRanges to N lists of operands. A
+    // size-1 operand list already has the only converted value needed for each
+    // unrolled lane, such as an arith.select scalar condition or a vector with
+    // a single outer lane.
+    SmallVector<SmallVector<Value>> opOperands(convertedTypes.size());
+    for (ValueRange operandList : operands) {
+      if (operandList.size() == 1) {
+        for (SmallVector<Value> &newOperands : opOperands) {
+          newOperands.push_back(operandList.front());
+        }
+        continue;
       }
-      opOperands.push_back(newOperands);
+      for (auto [newOperands, operand] :
+           llvm::zip_equal(opOperands, operandList)) {
+        newOperands.push_back(operand);
+      }
     }
 
     int64_t numResults = op->getNumResults();

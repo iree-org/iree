@@ -46,10 +46,9 @@ jobs:
             runs-on: [Linux, X64, gfx1201]
             cache-dir: /home/nod/iree_tests_cache
             extra-flags: "--benchmark-with-rocprofv3"
-          - name: amdgpu_vulkan_O3
-            config-file: torch_ops_gpu_vulkan_O3.json
-            # TODO(#22579): Remove `shark10-ci` label. There are vulkan driver issues on other runners.
-            runs-on: [Linux, X64, rdna3, shark10-ci]
+          - name: amdgpu_vulkan_rdna3_O3
+            config-file: torch_ops_gpu_vulkan_rdna3_O3.json
+            runs-on: [Linux, X64, rdna3]
             cache-dir: /home/nod/iree_tests_cache
             extra-flags: ""
           - name: amdgpu_rocm_mi300_gfx942_O3
