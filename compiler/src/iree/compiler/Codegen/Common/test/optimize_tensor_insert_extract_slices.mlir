@@ -134,6 +134,36 @@ func.func @promote_loop_carried_masked_transfer_write_chain(%size: index) -> vec
 
 // -----
 
+func.func @nested_loop_carried_transfer_from_enclosing_iter_arg() -> tensor<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %init = vector.transfer_write %zero, %empty[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+  %outer = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_acc = %init) -> tensor<4xf32> {
+    %inner = scf.for %j = %c0 to %c4 step %c1 iter_args(%inner_acc = %outer_acc) -> tensor<4xf32> {
+      %old = vector.transfer_read %inner_acc[%c0], %pad {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+      %new = arith.addf %old, %one : vector<4xf32>
+      %next = vector.transfer_write %new, %inner_acc[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+      scf.yield %next : tensor<4xf32>
+    }
+    scf.yield %inner : tensor<4xf32>
+  }
+  return %outer : tensor<4xf32>
+}
+
+// CHECK-LABEL: func.func @nested_loop_carried_transfer_from_enclosing_iter_arg
+// CHECK:         %[[OUTER:.+]] = scf.for {{.*}} iter_args(%[[OUTER_ARG:.+]] = {{.*}}) -> (vector<4xf32>) {
+// CHECK:           %[[INNER:.+]] = scf.for {{.*}} iter_args(%[[INNER_ARG:.+]] = %[[OUTER_ARG]]) -> (vector<4xf32>) {
+// CHECK:             arith.addf %[[INNER_ARG]]
+// CHECK:           scf.yield %[[INNER]]
+// CHECK:         vector.transfer_write %[[OUTER]]
+
+// -----
+
 func.func @fold_dim_of_shape_preserving_transfer_iter_arg(%size: index, %vec: vector<4xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

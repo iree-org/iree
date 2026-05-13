@@ -665,6 +665,7 @@ def OptimizeTensorInsertExtractSlicesPass
   ];
   let dependentDialects = [
     "::mlir::arith::ArithDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
     "::mlir::ub::UBDialect"
   ];
 }
