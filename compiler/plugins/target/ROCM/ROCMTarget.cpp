@@ -806,6 +806,7 @@ public:
                       OpBuilder &executableBuilder) final {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
+    bool useSPIRV = targetAttr.getFormat() == "rocm-spirv-fb";
     StringRef targetArch = targetOptions.target;
     StringRef targetFeatures = targetOptions.targetFeatures;
     if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
@@ -975,7 +976,7 @@ public:
 
       // For SPIR-V mode, the data layout is already set by PrepareForSPIRVPass
       // on the MLIR module and propagated through MLIR->LLVM IR translation.
-      if (!targetOptions.useAmdgcnSpirv) {
+      if (!useSPIRV) {
         llvmModule->setDataLayout(targetMachine->createDataLayout());
 
         // Let the backend know what code object version we're compiling for.
@@ -1018,7 +1019,7 @@ public:
       }
 
       // Link module to HIP device library (skip for SPIR-V — resolved at JIT).
-      if (!targetOptions.useAmdgcnSpirv) {
+      if (!useSPIRV) {
         if (targetOptions.bitcodeDirectory.empty()) {
           return variantOp.emitError()
                  << "cannot find ROCM bitcode files. Check your installation "
@@ -1055,7 +1056,7 @@ public:
       // buffer resource intrinsics (AS 7) and other constructs incompatible
       // with the SPIR-V backend.
       std::string passesString;
-      if (!targetOptions.useAmdgcnSpirv) {
+      if (!useSPIRV) {
         optimizeModule(*llvmModule, *targetMachine,
                        targetOptions.slpVectorization, passesString);
       }
@@ -1076,12 +1077,11 @@ public:
                          ".optimized.ll", *llvmModule, header);
       }
 
-      if (failed(validateFinalizedModule(variantOp, *llvmModule,
-                                         targetOptions.useAmdgcnSpirv))) {
+      if (failed(validateFinalizedModule(variantOp, *llvmModule, useSPIRV))) {
         return failure();
       }
 
-      if (targetOptions.useAmdgcnSpirv) {
+      if (useSPIRV) {
         // SPIR-V codegen path: create a SPIR-V TargetMachine and emit binary.
         llvm::Triple spirvTriple("spirv64-amd-amdhsa");
         std::string spirvError;
@@ -1196,7 +1196,7 @@ public:
     }
 
     if (!serializationOptions.dumpBinariesPath.empty()) {
-      StringRef ext = targetOptions.useAmdgcnSpirv ? ".spv" : ".hsaco";
+      StringRef ext = useSPIRV ? ".spv" : ".hsaco";
       dumpDataToPath(serializationOptions.dumpBinariesPath,
                      serializationOptions.dumpBaseName, variantOp.getName(),
                      ext, targetHSACO);

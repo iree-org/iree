@@ -60,6 +60,7 @@ iree_lit_test_suite(
     "rocdl_pipeline_spirv_test.mlir"
     "rocdl_pipeline_test.mlir"
     "rocdl_prepare_for_spirv.mlir"
+    "rocm_spirv_serialize.mlir"
     "sort_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"
