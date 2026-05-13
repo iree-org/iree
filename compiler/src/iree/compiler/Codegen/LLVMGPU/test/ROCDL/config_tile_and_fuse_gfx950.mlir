@@ -431,6 +431,10 @@ func.func @skinny_gemm_m8_f16(%lhs: tensor<8x4096xf16>, %rhs: tensor<4096x4096xf
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+// CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m8_f16(
+//  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
 
@@ -459,6 +463,10 @@ func.func @skinny_gemm_m6_f16(%lhs: tensor<6x4096xf16>, %rhs: tensor<4096x4096xf
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+// CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m6_f16(
+//  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+//  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
 
@@ -486,6 +494,10 @@ func.func @skinny_gemm_m8_bf16(%lhs: tensor<8x4096xbf16>, %rhs: tensor<4096x4096
 // CHECK-LABEL: func.func @skinny_gemm_m8_bf16(
 //       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_BF16>
+// CHECK-DIRECT-LOAD-LABEL: func.func @skinny_gemm_m8_bf16(
+//  CHECK-DIRECT-LOAD:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-DIRECT-LOAD-SAME:     mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_BF16>
+//  CHECK-DIRECT-LOAD-SAME:     promote_operands = [0, 1], reduction =
 
 // -----
 

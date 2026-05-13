@@ -577,7 +577,7 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
     auto maybeUb = getConstantIntValue(ub);
     auto maybeLb = getConstantIntValue(lb);
     auto maybeStep = getConstantIntValue(step);
-    if (maybeUb && maybeLb && maybeStep) {
+    if (maybeUb && maybeLb && maybeStep && *maybeStep > 0) {
       int64_t cnt = llvm::divideCeil(*maybeUb - *maybeLb, *maybeStep);
       splitReductionTripCnt *= cnt;
     }
@@ -600,6 +600,9 @@ static bool shouldRejectDMAForOccupancy(
     IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
     ArrayRef<int64_t> bounds, ArrayRef<int64_t> workgroupTileSizes) {
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+  if (maxSharedMemoryBytes <= 0) {
+    return false;
+  }
 
   int64_t dmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
       schedule, problem, /*useDirectLoad=*/true, prefetchNumStages,
@@ -609,6 +612,9 @@ static bool shouldRejectDMAForOccupancy(
       doCPromotion);
 
   assert(dmaLdsBytes > 0 && nonDmaLdsBytes > 0 && "LDS usage must be positive");
+  if (dmaLdsBytes <= 0 || nonDmaLdsBytes <= 0) {
+    return false;
+  }
 
   int64_t dmaMaxWgsPerCU = maxSharedMemoryBytes / dmaLdsBytes;
   int64_t nonDmaMaxWgsPerCU = maxSharedMemoryBytes / nonDmaLdsBytes;
@@ -619,15 +625,25 @@ static bool shouldRejectDMAForOccupancy(
   IREE::GPU::TargetChipAttr chip = target.getChip();
   if (chip) {
     int64_t numCUs = chip.getWgpCount();
+    if (numCUs <= 0) {
+      return false;
+    }
     int64_t totalWorkgroups = 1;
+    bool hasStaticWorkgroupCount = true;
     for (auto [dim, tileSize] : llvm::zip_equal(bounds, workgroupTileSizes)) {
       if (tileSize > 0) {
+        if (dim <= 0) {
+          hasStaticWorkgroupCount = false;
+          break;
+        }
         totalWorkgroups *= llvm::divideCeil(dim, tileSize);
       }
     }
-    int64_t maxWgsPerCU = llvm::divideCeil(totalWorkgroups, numCUs);
-    dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
-    nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
+    if (hasStaticWorkgroupCount) {
+      int64_t maxWgsPerCU = llvm::divideCeil(totalWorkgroups, numCUs);
+      dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
+      nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
+    }
   }
 
   return dmaMaxWgsPerCU < kMinWorkgroupsPerCU &&
@@ -996,6 +1012,15 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (auto mmaAttr = dyn_cast<GPU::MMAAttr>(kind)) {
     if (GPU::isNvMmaSync(mmaAttr.getIntrinsic())) {
       GPU::appendConvertAccGemm(context, attrs);
+    }
+  }
+
+  if (useDirectLoad) {
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(kind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        LDBG() << "rejecting direct load DMA for VDMFMA";
+        useDirectLoad = false;
+      }
     }
   }
 
