@@ -18,10 +18,12 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/ValueRange.h"
 
 namespace mlir::iree_compiler {
 
 using AssertOp = IREE::Codegen::AssertOp;
+using LookupOp = IREE::Codegen::LookupOp;
 using IntKnobAttr = IREE::Codegen::IntKnobAttr;
 using OneOfKnobAttr = IREE::Codegen::OneOfKnobAttr;
 using RootOpAttr = IREE::Codegen::RootOpAttr;
@@ -85,6 +87,32 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   Value eq = smt::EqOp::create(builder, loc, rem, zero);
   std::string fmtMsg = (msg + " ({} % {} == 0)").str();
   AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
+}
+
+/// Assert: lhs <pred> rhs
+static void assertCmp(OpBuilder &builder, Location loc, smt::IntPredicate pred,
+                      Value lhs, Value rhs, StringRef msg) {
+  Value cmp = smt::IntCmpOp::create(builder, loc, pred, lhs, rhs);
+  AssertOp::create(builder, loc, cmp, msg);
+}
+
+/// Assert: val >= lo && val <= hi.
+static void assertBounds(OpBuilder &builder, Location loc, Value val,
+                         StringRef name, int64_t lo, int64_t hi) {
+  assertCmp(builder, loc, smt::IntPredicate::ge, val,
+            mkIntConst(builder, loc, lo), (name + " >= " + Twine(lo)).str());
+  assertCmp(builder, loc, smt::IntPredicate::le, val,
+            mkIntConst(builder, loc, hi), (name + " <= " + Twine(hi)).str());
+}
+
+/// Assert: val >= lo && val <= hi.
+static void assertBounds(OpBuilder &builder, Location loc, Value val,
+                         StringRef name, Value lo, StringRef loName, Value hi,
+                         StringRef hiName) {
+  assertCmp(builder, loc, smt::IntPredicate::ge, val, lo,
+            (name + " >= " + loName).str());
+  assertCmp(builder, loc, smt::IntPredicate::le, val, hi,
+            (name + " <= " + hiName).str());
 }
 
 /// Helper to build a knob variable name from a prefix.
@@ -278,39 +306,156 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   return DictionaryAttr::get(ctx, knobsEntries);
 }
 
+/// Emit smt.lookup ops to derive MMA m/n/k shape values from the mma_idx knob.
+/// Returns {mmaMLookup, mmaNLookup, mmaKLookup} SSA values.
+/// Also asserts bounds on mma_idx: 0 <= mma_idx < N.
+struct MMALookup {
+  Value mmaMLookup, mmaNLookup, mmaKLookup;
+};
+static MMALookup emitMMALookup(OpBuilder &builder, Location loc,
+                               ArrayRef<Attribute> mmaAttrs) {
+
+  Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
+  // Assert bounds: 0 <= mma_idx <= N-1.
+  assertBounds(builder, loc, mmaIdx, kKnobMmaIdxName, 0,
+               static_cast<int64_t>(mmaAttrs.size()) - 1);
+
+  // Build lookup tables for m, n, k.
+  SmallVector<int64_t> keys, mVals, nVals, kVals;
+  for (auto [i, attr] : llvm::enumerate(mmaAttrs)) {
+    auto [m, n, k] = cast<IREE::GPU::MmaInterfaceAttr>(attr).getMNKShape();
+    keys.push_back(static_cast<int64_t>(i));
+    mVals.push_back(m);
+    nVals.push_back(n);
+    kVals.push_back(k);
+  }
+  auto intTy = smt::IntType::get(builder.getContext());
+  return MMALookup{LookupOp::create(builder, loc, intTy, mmaIdx, keys, mVals),
+                   LookupOp::create(builder, loc, intTy, mmaIdx, keys, nVals),
+                   LookupOp::create(builder, loc, intTy, mmaIdx, keys, kVals)};
+}
+
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
 /// TODO(#23535): Complete real constraint logics here.
-static LogicalResult
-emitVectorDistributeConstraints(OpBuilder &builder, linalg::LinalgOp linalgOp,
-                                const ContractionLikeDims &dims,
-                                IREE::GPU::TargetAttr gpuTarget,
-                                ArrayRef<Value> smtDimArgs) {
+static LogicalResult emitVectorDistributeConstraints(
+    OpBuilder &builder, linalg::LinalgOp linalgOp,
+    const ContractionLikeDims &dims, IREE::GPU::TargetAttr gpuTarget,
+    ArrayRef<Value> smtDimArgs, ArrayRef<Attribute> compatibleMMAs) {
   Location loc = linalgOp.getLoc();
 
-  // Problem size must be divisible by tiling size.
-  unsigned mDim = dims.m.back();
-  std::string mName = makeVarName(kKnobWgPrefix, mDim);
-  Value wgTileMKnob = mkKnob(builder, loc, mName);
-  assertDivisible(
-      builder, loc, smtDimArgs[mDim], wgTileMKnob,
-      (kLoopRangePrefix + Twine(mDim) + " must be divisible by " + mName)
-          .str());
+  // Hardware constants.
+  constexpr int64_t maxVGPRs = 512;
+  Value subgroupSizeVal =
+      mkIntConst(builder, loc, gpuTarget.getPreferredSubgroupSize());
+  Value maxThreadsVal = mkIntConst(
+      builder, loc, gpuTarget.getWgp().getMaxThreadCountPerWorkgroup());
+  Value maxSharedMemVal =
+      mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
+  Value maxVGPRsVal = mkIntConst(builder, loc, maxVGPRs);
 
-  unsigned nDim = dims.n.back();
-  std::string nName = makeVarName(kKnobWgPrefix, nDim);
-  Value wgTileNKnob = mkKnob(builder, loc, nName);
-  assertDivisible(
-      builder, loc, smtDimArgs[nDim], wgTileNKnob,
-      (kLoopRangePrefix + Twine(nDim) + " must be divisible by " + nName)
-          .str());
+  // Create name strings.
+  std::string wgTileMName = makeVarName(kKnobWgPrefix, dims.m.back());
+  std::string wgTileNName = makeVarName(kKnobWgPrefix, dims.n.back());
+  std::string redTileKName = makeVarName(kKnobRedPrefix, dims.k.back());
+  constexpr StringLiteral mmaMName = "mma_m";
+  constexpr StringLiteral mmaNName = "mma_n";
+  constexpr StringLiteral mmaKName = "mma_k";
+  std::string maxVGPRsName = ("max VGPRs " + Twine(maxVGPRs)).str();
 
-  unsigned kDim = dims.k.back();
-  std::string kName = makeVarName(kKnobRedPrefix, kDim);
-  Value wgTileKKnob = mkKnob(builder, loc, kName);
+  // Create knobs.
+  Value wgTileM = mkKnob(builder, loc, wgTileMName);
+  Value wgTileN = mkKnob(builder, loc, wgTileNName);
+  Value redTileK = mkKnob(builder, loc, redTileKName);
+  Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
+  Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
+  Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
+  Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
+  Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
+  Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
+  Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
+  (void)subgroupSizeVal;
+  (void)maxThreadsVal;
+  (void)maxSharedMemVal;
+  (void)mmaIdx;
+  (void)sgSize;
+  (void)wgSizeX;
+  (void)wgSizeY;
+  (void)wgSizeZ;
+
+  // Helper to create a human readable message for divisible by constraint.
+  auto divisibleByMsg = [&](StringRef lhsName, StringRef rhsName) {
+    return (Twine(lhsName) + " must be divisible by " + rhsName).str();
+  };
+
+  // Constraint 1: Tile size must divide problem size.
+  // dim % wg_tile == 0
   assertDivisible(
-      builder, loc, smtDimArgs[kDim], wgTileKKnob,
-      (kLoopRangePrefix + Twine(kDim) + " must be divisible by " + kName)
-          .str());
+      builder, loc, smtDimArgs[dims.m.back()], wgTileM,
+      divisibleByMsg((kLoopRangePrefix + Twine(dims.m.back())).str(),
+                     wgTileMName));
+  assertDivisible(
+      builder, loc, smtDimArgs[dims.n.back()], wgTileN,
+      divisibleByMsg((kLoopRangePrefix + Twine(dims.n.back())).str(),
+                     wgTileNName));
+  assertDivisible(
+      builder, loc, smtDimArgs[dims.k.back()], redTileK,
+      divisibleByMsg((kLoopRangePrefix + Twine(dims.k.back())).str(),
+                     redTileKName));
+
+  // Constraint 2: Tile size bounds.
+  // Intrinsic size <= Workgroup tile size <= Max available VGPRs.
+  // wg_tile >= mma && wg_tile <= 512
+  MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
+  assertBounds(builder, loc, wgTileM, wgTileMName, mmaLookup.mmaMLookup,
+               mmaMName, maxVGPRsVal, maxVGPRsName);
+  assertBounds(builder, loc, wgTileN, wgTileNName, mmaLookup.mmaNLookup,
+               mmaNName, maxVGPRsVal, maxVGPRsName);
+  assertBounds(builder, loc, redTileK, redTileKName, mmaLookup.mmaKLookup,
+               mmaKName, maxVGPRsVal, maxVGPRsName);
+  // wg_tile <= dim
+  assertCmp(builder, loc, smt::IntPredicate::le, wgTileM,
+            smtDimArgs[dims.m.back()],
+            (Twine(wgTileMName) + " must be <= " + kLoopRangePrefix +
+             Twine(dims.m.back()))
+                .str());
+  assertCmp(builder, loc, smt::IntPredicate::le, wgTileN,
+            smtDimArgs[dims.n.back()],
+            (Twine(wgTileNName) + " must be <= " + kLoopRangePrefix +
+             Twine(dims.n.back()))
+                .str());
+  assertCmp(builder, loc, smt::IntPredicate::le, redTileK,
+            smtDimArgs[dims.k.back()],
+            (Twine(redTileKName) + " must be <= " + kLoopRangePrefix +
+             Twine(dims.k.back()))
+                .str());
+
+  // Constraint 3: Tile size decomposition.
+  // wg_tile % mma == 0
+  assertDivisible(builder, loc, wgTileM, mmaLookup.mmaMLookup,
+                  divisibleByMsg(wgTileMName, mmaMName));
+  assertDivisible(builder, loc, wgTileN, mmaLookup.mmaNLookup,
+                  divisibleByMsg(wgTileNName, mmaNName));
+  assertDivisible(builder, loc, redTileK, mmaLookup.mmaKLookup,
+                  divisibleByMsg(redTileKName, mmaKName));
+  // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
+  // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
+  Value mulResultM = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
+  Value mulResultN = smt::IntMulOp::create(
+      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
+  assertDivisible(builder, loc, wgTileM, mulResultM,
+                  divisibleByMsg(wgTileMName, mmaMName));
+  assertDivisible(builder, loc, wgTileN, mulResultN,
+                  divisibleByMsg(wgTileNName, mmaNName));
+
+  // Constraint 4: Subgroup count bounds.
+  // Max workgroup tile size / Min(Intrinsic size * Subgroup tile size *
+  // Subgroup count) = 512 / (16 * 1 * 1) = 32. 1 <= sg_m_cnt <= 32. 1 <=
+  // sg_n_cnt <= 32.
+  assertBounds(builder, loc, sgMCnt, kKnobSgMCntName, 1, 32);
+  assertBounds(builder, loc, sgNCnt, kKnobSgNCntName, 1, 32);
+
+  // Constraint 5:
 
   return success();
 }
@@ -358,7 +503,7 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr) {
                                loopInfo->numLoops, loopInfo->indexingMaps);
 
   return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
-                                         shell.smtDimArgs);
+                                         shell.smtDimArgs, compatibleMMAs);
 }
 
 /// Multiple root ops may be present in a set, e.g. <set = 0>:
