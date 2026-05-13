@@ -362,10 +362,15 @@ static LogicalResult emitVectorDistributeConstraints(
   Value redK = mkKnob(builder, loc, makeVarName(kKnobRedPrefix, kDim));
   Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
   Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
-  // Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
+  Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
   Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
+
+  // Constraint 0: Set concrete values for knobs.
+  Value sgSizeEq = smt::EqOp::create(builder, loc, sgSize, subgroupSizeVal);
+  AssertOp::create(builder, loc, sgSizeEq,
+                   "sg_size == preferred_subgroup_size");
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
@@ -389,6 +394,16 @@ static LogicalResult emitVectorDistributeConstraints(
             "wg_n <= 512 (max VGPRs)");
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
             "red_k <= 512 (max VGPRs)");
+  // wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt
+  Value mulResult =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgSize, sgNCnt});
+  Value geM = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, wgM,
+                                    mulResult);
+  Value geN = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, wgN,
+                                    mulResult);
+  Value orCond = smt::OrOp::create(builder, loc, ValueRange{geM, geN});
+  AssertOp::create(builder, loc, orCond,
+                   "wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt");
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
@@ -420,22 +435,22 @@ static LogicalResult emitVectorDistributeConstraints(
                maxSubgroupCntVal, "32");
 
   // Constraint 5: Thread count limit
-  // sg_m_cnt * sg_n_cnt * subgroup_size <= max_threads
-  Value mulResult = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgMCnt, sgNCnt, subgroupSizeVal});
-  assertCmp(builder, loc, smt::IntPredicate::le, mulResult, maxThreadsVal,
-            "total threads <= max_threads");
+  // sg_m_cnt * sg_n_cnt * sg_size <= max_threads
+  Value totalThreadsMulResult =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt, sgSize});
+  assertCmp(builder, loc, smt::IntPredicate::le, totalThreadsMulResult,
+            maxThreadsVal, "total_threads <= max_threads");
 
   // Constraint 6: Load distribution
-  // (red_k * wg_m) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
-  // (red_k * wg_n) % (sg_m_cnt * sg_n_cnt * subgroup_size) == 0
-  auto emitLoadDistForWg = [&](Value wg, StringRef Name) -> void {
+  // (red_k * wg_m) % (sg_m_cnt * sg_n_cnt * sg_size) == 0
+  // (red_k * wg_n) % (sg_m_cnt * sg_n_cnt * sg_size) == 0
+  auto emitLoadDistForWg = [&](Value wg, StringRef name) -> void {
     Value lhsMulResult =
         smt::IntMulOp::create(builder, loc, ValueRange{redK, wg});
-    Value rhsMulResult = smt::IntMulOp::create(
-        builder, loc, ValueRange{sgMCnt, sgNCnt, subgroupSizeVal});
+    Value rhsMulResult =
+        smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt, sgSize});
     assertDivisible(builder, loc, lhsMulResult, rhsMulResult,
-                    joinStr(Name, " % thread_count == 0"));
+                    joinStr(name, " % thread_count == 0"));
   };
   emitLoadDistForWg(wgM, "lhs_tile_elements");
   emitLoadDistForWg(wgN, "rhs_tile_elements");
@@ -460,6 +475,20 @@ static LogicalResult emitVectorDistributeConstraints(
       builder, loc, ValueRange{lhsMulResult, rhsMulResult});
   assertCmp(builder, loc, smt::IntPredicate::le, totalSharedMem,
             maxSharedMemVal, "shared memory must fit in workgroup memory");
+
+  // Constraint 8: TranslationInfo workgroup structure.
+  // For VectorDistribute, workgroup_size = [wg_x, wg_y, wg_z] = [total_threads,
+  // 1, 1] wg_x == total_threads
+  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, totalThreadsMulResult);
+  AssertOp::create(builder, loc, wgXEq, "wg_size_x == total_threads");
+  // wg_y == 1
+  Value wgYEq =
+      smt::EqOp::create(builder, loc, wgSizeY, mkIntConst(builder, loc, 1));
+  AssertOp::create(builder, loc, wgYEq, "wg_size_y == 1");
+  // wg_z == 1
+  Value wgZEq =
+      smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
+  AssertOp::create(builder, loc, wgZEq, "wg_size_z == 1");
 
   return success();
 }
