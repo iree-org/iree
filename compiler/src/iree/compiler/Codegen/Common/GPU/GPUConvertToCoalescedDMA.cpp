@@ -34,7 +34,6 @@
 
 namespace mlir::iree_compiler {
 
-
 #define GEN_PASS_DEF_GPUCONVERTTOCOALESCEDDMAPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
@@ -629,28 +628,6 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
       }
     }
 
-    // If no tensor.pad but destination is larger than source in outermost dim
-    // (from padCopyForDMA padding), compute in_bounds from shape comparison.
-    if (source && inBoundsVec.empty()) {
-      auto sourceType = cast<RankedTensorType>(source.getType());
-      auto outputType =
-          cast<RankedTensorType>(innerOp.getOutputs()[0].getType());
-      ArrayRef<int64_t> srcShape = sourceType.getShape();
-      ArrayRef<int64_t> dstShape = outputType.getShape();
-      if (srcShape.size() == dstShape.size()) {
-        for (auto [src, dst] : llvm::zip(srcShape, dstShape)) {
-          if (ShapedType::isDynamic(src) || ShapedType::isDynamic(dst)) {
-            inBoundsVec.push_back(true);
-          } else {
-            inBoundsVec.push_back(src >= dst);
-          }
-        }
-        // Only set in_bounds if there's actual OOB (at least one false).
-        if (llvm::all_of(inBoundsVec, [](bool b) { return b; })) {
-          inBoundsVec.clear();
-        }
-      }
-    }
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
     source = innerOp.getSource();
     indices = innerOp.getIndices();
@@ -767,100 +744,6 @@ protected:
                                                             OpTy op) const = 0;
 };
 
-/// Pad a sub-aligned copy's source and destination to DMA-aligned sizes.
-/// Inserts tensor.pad on the source (with zero pad value) and replaces the
-/// destination with a larger tensor.empty. Returns the new padded copy, or
-/// nullptr if padding is not feasible.
-/// After padding, the original copy is erased and replaced with:
-///   %padded_src = tensor.pad %source low[0,...] high[pad,...] { yield 0 }
-///   %padded_dst = tensor.empty() : tensor<padded_shape>
-///   %new_copy = linalg.copy ins(%padded_src) outs(%padded_dst)
-///   %extracted = tensor.extract_slice %new_copy [0,...] [orig_shape] [1,...]
-/// All uses of the original copy result are replaced with %extracted.
-static linalg::CopyOp padCopyForDMA(linalg::CopyOp copyOp,
-                                    PatternRewriter &rewriter) {
-  auto funcOp = copyOp->getParentOfType<FunctionOpInterface>();
-  if (!funcOp) {
-    return nullptr;
-  }
-
-  auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
-  ArrayRef<int64_t> shape = outputType.getShape();
-  if (llvm::any_of(shape, ShapedType::isDynamic)) {
-    return nullptr;
-  }
-
-  int64_t rank = outputType.getRank();
-  Type elemType = outputType.getElementType();
-  int64_t availableElements = ShapedType::getNumElements(shape);
-
-  auto minAligned = getMinDMAAlignedElements(funcOp, elemType);
-  if (!minAligned) {
-    return nullptr;
-  }
-
-  int64_t paddedTotal =
-      llvm::divideCeil(availableElements, *minAligned) * *minAligned;
-  if (paddedTotal == availableElements) {
-    return nullptr;
-  }
-
-  // Compute padded outermost dimension.
-  int64_t innerElements = 1;
-  for (int64_t i = 1; i < rank; ++i) {
-    innerElements *= shape[i];
-  }
-  int64_t paddedOuterDim = llvm::divideCeil(paddedTotal, innerElements);
-  int64_t highPad = paddedOuterDim - shape[0];
-
-  SmallVector<int64_t> paddedShape(shape);
-  paddedShape[0] = paddedOuterDim;
-
-  Location loc = copyOp.getLoc();
-  rewriter.setInsertionPoint(copyOp);
-
-  // Pad the source with zeros on the outermost dimension.
-  SmallVector<OpFoldResult> lowPad(rank, rewriter.getIndexAttr(0));
-  SmallVector<OpFoldResult> highPadValues(rank, rewriter.getIndexAttr(0));
-  highPadValues[0] = rewriter.getIndexAttr(highPad);
-
-  Value source = copyOp.getInputs()[0];
-  Value padValue =
-      arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
-
-  auto paddedSrcType = RankedTensorType::get(paddedShape, elemType);
-  Value paddedSource = tensor::PadOp::create(
-      rewriter, loc, paddedSrcType, source, lowPad, highPadValues, padValue);
-
-  // Create padded destination tensor.empty.
-  Value paddedDst =
-      tensor::EmptyOp::create(rewriter, loc, paddedShape, elemType);
-
-  // Create new copy with padded operands.
-  auto newCopy = linalg::CopyOp::create(rewriter, loc, paddedSource, paddedDst);
-
-  // Transfer the DMA lowering config to the new copy.
-  auto dmaConfig = getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp);
-  if (dmaConfig) {
-    setLoweringConfig(newCopy, dmaConfig);
-  }
-
-  // Extract original shape from the padded copy result.
-  SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
-  SmallVector<OpFoldResult> sizes;
-  for (int64_t dim : shape) {
-    sizes.push_back(rewriter.getIndexAttr(dim));
-  }
-  SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
-  Value extracted = tensor::ExtractSliceOp::create(
-      rewriter, loc, outputType, newCopy.getResult(0), offsets, sizes, strides);
-
-  // Replace old copy and erase it.
-  rewriter.replaceOp(copyOp, extracted);
-
-  return newCopy;
-}
-
 struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
   using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
 
@@ -873,18 +756,8 @@ struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
 
     SmallVector<OpFoldResult> threadNumThreads =
         computeThreadNumThreads(rewriter, op);
-
-    // If the copy is sub-aligned, try padding to DMA-aligned size.
     if (threadNumThreads.empty()) {
-      linalg::CopyOp paddedCopy = padCopyForDMA(op, rewriter);
-      if (!paddedCopy) {
-        return failure();
-      }
-      op = paddedCopy;
-      threadNumThreads = computeThreadNumThreads(rewriter, op);
-      if (threadNumThreads.empty()) {
-        return failure();
-      }
+      return failure();
     }
 
     scf::ForallOp threadForallOp =
@@ -1135,26 +1008,45 @@ struct GPUConvertToCoalescedDMAPass final
     FunctionOpInterface funcOp = getOperation();
     MLIRContext *context = &getContext();
 
-    // Pre-check: verify that each copy marked with use_global_load_dma is
-    // DMA-convertible (either already aligned or paddable to alignment).
-    // Non-convertible copies are individually downgraded to
-    // derived_thread_config; convertible copies are left unchanged.
-    // Note: GatherOps are excluded -- they come from input IR (not from
+    // Pre-check: decide whether all linalg.copy ops should be DMA-converted.
+    // Only activate when at least one copy already has use_global_load_dma
+    // (indicating DMA intent from upstream config, e.g. --iree-llvmgpu-use-
+    // direct-load). Collect all promoted copies (use_global_load_dma or
+    // derived_thread_config). If ALL are DMA-convertible, upgrade them all to
+    // use_global_load_dma. If ANY fails, downgrade them all to
+    // derived_thread_config.
+    // Note: GatherOps are excluded — they come from input IR (not from
     // GPUPromoteMatmulOperands) and are handled independently by
     // ConvertGatherToCoalescedDMA.
-    SmallVector<linalg::CopyOp> dmaCopies;
+    SmallVector<linalg::CopyOp> promotedCopies;
+    bool hasDMAIntent = false;
     funcOp->walk([&](linalg::CopyOp copyOp) {
       if (getLoweringConfig<IREE::GPU::UseGlobalLoadDMAAttr>(copyOp)) {
-        dmaCopies.push_back(copyOp);
+        hasDMAIntent = true;
+        promotedCopies.push_back(copyOp);
+      } else if (getLoweringConfig<IREE::GPU::DerivedThreadConfigAttr>(
+                     copyOp)) {
+        promotedCopies.push_back(copyOp);
       }
     });
 
-    for (linalg::CopyOp copyOp : dmaCopies) {
-      if (!isCopyDMAConvertible(copyOp)) {
-        LLVM_DEBUG(llvm::dbgs()
-                   << "DMA pre-check: downgrading non-convertible copy\n");
-        setLoweringConfig(copyOp,
-                          IREE::GPU::DerivedThreadConfigAttr::get(context));
+    if (hasDMAIntent) {
+      bool allConvertible = llvm::all_of(promotedCopies, isCopyDMAConvertible);
+      LLVM_DEBUG({
+        if (!allConvertible) {
+          llvm::dbgs() << "DMA pre-check: not all copies convertible, "
+                       << "downgrading " << promotedCopies.size()
+                       << " copies to derived_thread_config\n";
+        }
+      });
+      for (linalg::CopyOp copyOp : promotedCopies) {
+        if (allConvertible) {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::UseGlobalLoadDMAAttr::get(context));
+        } else {
+          setLoweringConfig(copyOp,
+                            IREE::GPU::DerivedThreadConfigAttr::get(context));
+        }
       }
     }
 
@@ -1280,13 +1172,9 @@ private:
       }
     }
 
-    // Allow sub-aligned copies through if they can be padded to alignment.
-    // Padding will be inserted per-warp during the conversion pattern.
+    // If available elements are not aligned to transfer size, skip.
     if (availableElements % *minAligned != 0) {
-      auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation());
-      if (!copyOp || !isCopyDMAConvertible(copyOp)) {
-        return failure();
-      }
+      return failure();
     }
 
     // Check if this is a tensor.pad fusion case.
@@ -1305,12 +1193,12 @@ private:
     }
 
     // When the workgroup tile is DMA-aligned but the naive per-warp tile from
-    // computeSubgroupTileSizes would be sub-aligned, padCopyForDMA runs at
-    // warp level and produces a temp alloc + undistributed memref.copy →
-    // runtime error. Cap the participating warps at the number of full DMA
-    // segments in the tile so each warp sees an aligned slice. The cap is
-    // only meaningful when output traces to tensor.empty (otherwise warp
-    // tiles share the innermost dim, already checked for alignment above).
+    // computeSubgroupTileSizes would be sub-aligned, the per-warp DMA emit
+    // would fail, leaving an orphan linalg.copy inside the warp-mapped forall.
+    // Cap the participating warps at the number of full DMA segments in the
+    // tile so each warp sees an aligned slice. The cap is only meaningful
+    // when output traces to tensor.empty (otherwise warp tiles share the
+    // innermost dim, already checked for alignment above).
     SmallVector<int64_t> effectiveNumWarps = numWarps;
     if (!isPadFusion && availableElements % *minAligned == 0) {
       bool outputTracesEmpty = false;

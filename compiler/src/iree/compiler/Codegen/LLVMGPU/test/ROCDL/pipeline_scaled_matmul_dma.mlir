@@ -80,8 +80,9 @@ func.func @scaled_matmul_dma()
 
 // Verify pipeline completes and produces scaled MFMA compute ops.
 // LHS/RHS and scales are promoted to workgroup shared memory via DMA.
-// Scale copies must not produce any undistributed memref.copy (which would
-// indicate padCopyForDMA created a temp alloc instead of identity tiling).
+// Scale copies must not produce any undistributed memref.copy (regression
+// guard: an undistributed copy would mean a sub-aligned scale slipped past
+// the alignment guard).
 // The compute uses 16x16x128 scaled MFMA instructions.
 
 // CHECK-LABEL: func.func @scaled_matmul_dma

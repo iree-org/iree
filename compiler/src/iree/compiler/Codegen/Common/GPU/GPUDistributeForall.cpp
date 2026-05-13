@@ -21,9 +21,6 @@
 
 namespace mlir::iree_compiler {
 
-static constexpr llvm::StringLiteral kRedundantOnDistribute =
-    "iree_gpu.redundant_on_distribute";
-
 #define GEN_PASS_DEF_GPUDISTRIBUTEFORALLPASS
 #include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
@@ -89,7 +86,6 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
   // Divide the thread ID by the subgroup size if this loop is mapped to
   // subgroups.
   assert(!(hasThreadMapping && hasWarpMapping));
-  bool redundantAcrossSubgroups = forallOp->hasAttr(kRedundantOnDistribute);
   Value flatId = linearThreadId;
   if (hasWarpMapping) {
     if (flatWorkgroupSize % subgroupSize != 0) {
@@ -101,18 +97,6 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
             rewriter, loc, flatId,
             ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize, subgroupSize})
             .getResult(0);
-  } else if (redundantAcrossSubgroups &&
-             flatWorkgroupSize % subgroupSize == 0 &&
-             flatWorkgroupSize > subgroupSize) {
-    // For a thread-mapped forall that carries the redundant_on_distribute
-    // hint, each subgroup independently executes the forall with its lane
-    // id. Collapse the thread id onto the subgroup lane so the standard
-    // distribution logic below covers one subgroup's worth of workers.
-    flatId =
-        affine::AffineDelinearizeIndexOp::create(
-            rewriter, loc, flatId,
-            ArrayRef<int64_t>{flatWorkgroupSize / subgroupSize, subgroupSize})
-            .getResult(1);
   }
 
   SmallVector<Value> delinSizes;
@@ -124,17 +108,8 @@ LogicalResult resolveGPUMappedForallOp(RewriterBase &rewriter,
         rewriter, loc, d0 * d1, {totalLoopTripCount, workerCount});
   }
 
-  // When the thread-mapped forall is marked redundant_on_distribute, each
-  // subgroup redundantly runs the forall using only its lanes, so treat the
-  // worker pool as subgroup-sized rather than workgroup-sized.
-  int64_t flatTotalNumWorkers;
-  if (hasWarpMapping) {
-    flatTotalNumWorkers = flatWorkgroupSize / subgroupSize;
-  } else if (redundantAcrossSubgroups) {
-    flatTotalNumWorkers = subgroupSize;
-  } else {
-    flatTotalNumWorkers = flatWorkgroupSize;
-  }
+  int64_t flatTotalNumWorkers =
+      hasWarpMapping ? flatWorkgroupSize / subgroupSize : flatWorkgroupSize;
   std::optional<int64_t> staticProducerCount =
       getConstantIntValue(totalLoopTripCount);
   bool perfectlyDivides =

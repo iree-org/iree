@@ -46,21 +46,6 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
-// Tag constants for HoistableConversionOp pairs. Each pair of tags marks
-// inverse conversions that can be cancelled or hoisted out of loops.
-static constexpr llvm::StringLiteral kShapeCastToIntrinsic =
-    "shape_cast_to_intrinsic";
-static constexpr llvm::StringLiteral kShapeCastFromIntrinsic =
-    "shape_cast_from_intrinsic";
-static constexpr llvm::StringLiteral kDropUnitDims = "drop_unit_dims";
-static constexpr llvm::StringLiteral kAddUnitDims = "add_unit_dims";
-static constexpr llvm::StringLiteral kUnrollAccDistribute =
-    "unroll_acc_distribute";
-static constexpr llvm::StringLiteral kUnrollAccReassemble =
-    "unroll_acc_reassemble";
-static constexpr llvm::StringLiteral kRedundantOnDistribute =
-    "iree_gpu.redundant_on_distribute";
-
 namespace mlir::iree_compiler::IREE::GPU {
 
 //===---------------------------------------------------------------------===//
@@ -255,34 +240,10 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
         rewriter, loc, d0 * d1, {producerWorkerCount, workerCount});
   }
 
-  // Opt-in: when the producer is marked redundant_on_distribute, each
-  // subgroup independently runs the producer body using only its lanes.
-  // Collapse the consumer id modulo the subgroup size and shrink the
-  // effective consumer worker pool so every subgroup issues the same work
-  // (safe for DMAs that write identical data to shared memory).
-  bool broadcast = producer->hasAttr(kRedundantOnDistribute);
-  OpFoldResult effectiveConsumerWorkerCount = consumerWorkerCount;
-  Value effectiveConsumerIdVal = linearConsumerIdVal;
-  if (broadcast) {
-    auto funcOp = producer->getParentOfType<FunctionOpInterface>();
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    std::optional<int64_t> staticConsumerTotal =
-        getConstantIntValue(consumerWorkerCount);
-    if (subgroupSize.has_value() && staticConsumerTotal.has_value() &&
-        staticConsumerTotal.value() % *subgroupSize == 0 &&
-        staticConsumerTotal.value() > *subgroupSize) {
-      effectiveConsumerWorkerCount = rewriter.getIndexAttr(*subgroupSize);
-      AffineExpr lane;
-      bindDims(context, lane);
-      effectiveConsumerIdVal = affine::makeComposedAffineApply(
-          rewriter, loc, lane % *subgroupSize, {linearConsumerIdVal});
-    }
-  }
-
   std::optional<int64_t> staticProducerCount =
       getConstantIntValue(producerWorkerCount);
   std::optional<int64_t> staticConsumerCount =
-      getConstantIntValue(effectiveConsumerWorkerCount);
+      getConstantIntValue(consumerWorkerCount);
   bool perfectlyDivides =
       staticConsumerCount && staticProducerCount &&
       staticProducerCount.value() % staticConsumerCount.value() == 0;
@@ -291,11 +252,11 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
   // If the consumer worker count perfectly divides the producer worker count,
   // then we can use a lower bound of 0 and keep the loop bounds static.
   Value lb = perfectlyDivides ? arith::ConstantIndexOp::create(rewriter, loc, 0)
-                              : effectiveConsumerIdVal;
+                              : linearConsumerIdVal;
   Value ub =
       getValueOrCreateConstantIndexOp(rewriter, loc, producerWorkerCount);
-  Value step = getValueOrCreateConstantIndexOp(rewriter, loc,
-                                               effectiveConsumerWorkerCount);
+  Value step =
+      getValueOrCreateConstantIndexOp(rewriter, loc, consumerWorkerCount);
   auto newProducer = scf::ForOp::create(rewriter, loc, lb, ub, step,
                                         barrierOp.getBody()->getArgument(0));
   setLoopUnrollMarker(newProducer);
@@ -307,7 +268,7 @@ LogicalResult fuseForallIntoConsumer(RewriterBase &rewriter,
       perfectlyDivides
           ? affine::makeComposedAffineApply(
                 rewriter, loc, d0 + d1,
-                {newProducer.getInductionVar(), effectiveConsumerIdVal})
+                {newProducer.getInductionVar(), linearConsumerIdVal})
           : newProducer.getInductionVar();
 
   // We require a descending relative mapping and scf.forall loop ranges are
@@ -629,12 +590,6 @@ fuseNestedLaneAndWarpForalls(RewriterBase &rewriter, scf::ForallOp warpForallOp,
       rewriter, warpForallOp.getLoc(), lbs, ubs, steps,
       warpForallOp.getOutputs(),
       ArrayAttr::get(rewriter.getContext(), threadMappings));
-  // Propagate opt-in hints (e.g. redundant_on_distribute) from the warp
-  // forall onto the fused thread forall so downstream passes can still see
-  // them.
-  if (auto marker = warpForallOp->getAttr(kRedundantOnDistribute)) {
-    threadForallOp->setAttr(kRedundantOnDistribute, marker);
-  }
 
   bool hasCoalescedGatherDMA = isCoalescedGatherForallOp(laneForallOp);
 
