@@ -1,5 +1,15 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-eliminate-empty-tensors))" %s | FileCheck %s
 
+// Don't choke on empty tensors with no uses.
+func.func @zero_use_empty_eliminated() {
+  %unused = tensor.empty() : tensor<4xf32>
+  return
+}
+
+// CHECK-LABEL: @zero_use_empty_eliminated
+// CHECK-NOT: tensor.empty
+// CHECK: return
+
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
