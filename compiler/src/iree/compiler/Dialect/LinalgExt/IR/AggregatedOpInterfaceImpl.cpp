@@ -474,12 +474,6 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
       linalg::FillOp::create(b, loc, ValueRange{sumInit}, rowRedEmpty)
           .getResult(0);
 
-  Value fullyMaskedRows;
-  if (mask != nullptr) {
-    fullyMaskedRows =
-        createFullyMaskedRowsFromScores(b, loc, sMap, maxMap, rowRedSize, s);
-  }
-
   // max = rowMax(S)
   Value max = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, maxFill);
 
@@ -490,11 +484,14 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
 
-  // P = P / sum
-  p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
-  if (fullyMaskedRows) {
-    p = zeroFullyMaskedRows(b, loc, pMap, sumMap, p, fullyMaskedRows);
+  // P = P / sum. Fully-masked rows have `P == 0` and `sum == 0`, while
+  // non-fully-masked rows have `sum >= 1` because at least one score equals the
+  // row max. Clamp the denominator once per row to avoid a separate rowAll pass
+  // or a full P-shaped post-pass.
+  if (mask != nullptr) {
+    sum = createSafeSoftmaxDenominator(b, loc, sum);
   }
+  p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
 
   // ---- Scale and truncate LHS to match RHS ----
   SmallVector<OpFoldResult> sSizes;
