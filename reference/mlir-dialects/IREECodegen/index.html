@@ -2786,6 +2786,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#workgrouplocalmemoryattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupLocalMemoryAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#workgroupmappingattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7378,6 +7389,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#workgrouplocalmemoryattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WorkgroupLocalMemoryAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#workgroupmappingattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7873,6 +7895,7 @@ within a backend.</p>
 <li><a href="#vmvxpipelineattr">VMVXPipelineAttr</a></li>
 <li><a href="#xorshuffleattr">XORShuffleAttr</a></li>
 <li><a href="#localmappingattr">LocalMappingAttr</a></li>
+<li><a href="#workgrouplocalmemoryattr">WorkgroupLocalMemoryAttr</a></li>
 <li><a href="#workgroupmappingattr">WorkgroupMappingAttr</a></li>
 <li><a href="#workgroupscopeattr">WorkgroupScopeAttr</a></li>
 </ul>
@@ -7943,6 +7966,7 @@ within a backend.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.dispatch_config` $function_ref
               (`workgroup_size` `=` $workgroup_size^)?
               (`subgroup_size` `=` $subgroup_size^)?
+              (`workgroup_local_memory` `=` $workgroup_local_memory^)?
               $body attr-dict
 </code></pre></div>
 <p>A module-level op that captures the workgroup count computation and
@@ -7956,7 +7980,8 @@ alongside the <code>func.func</code> of the same name in a <code>builtin.module<
 symbol table, and two ops cannot define the same symbol.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>iree_codegen.dispatch_config @matmul
-    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+    workgroup_size = [64, 16, 1] subgroup_size = 64
+    workgroup_local_memory = 4096 {
   ^bb0(%w0: index, %w1: index, %w2: index, %w3: index):
     %0 = affine.apply affine_map&lt;()[s0] -&gt; (s0 ceildiv 256)&gt;()[%w2]
     %c1 = arith.constant 1 : index
@@ -7970,6 +7995,7 @@ symbol table, and two ops cannot define the same symbol.</p>
 <tr><td><code>function_ref</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 <tr><td><code>workgroup_size</code></td><td>::mlir::DenseI64ArrayAttr</td><td>i64 dense array attribute</td></tr>
 <tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+<tr><td><code>workgroup_local_memory</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
 <h3 id="iree_codegenextract_strided_metadata-codegenextractstridedmetadataop"><code>iree_codegen.extract_strided_metadata</code> (Codegen::ExtractStridedMetadataOp)<a class="headerlink" href="#iree_codegenextract_strided_metadata-codegenextractstridedmetadataop" title="Permanent link">link</a></h3>
@@ -9350,6 +9376,20 @@ DDDD CCCC FFFF EEEE /// 1 0 3 2
 </tr>
 </tbody>
 </table>
+<h3 id="workgrouplocalmemoryattr">WorkgroupLocalMemoryAttr<a class="headerlink" href="#workgrouplocalmemoryattr" title="Permanent link">link</a></h3>
+<p>Syntax: <code>#iree_codegen.workgroup_local</code></p>
+<p>Memory space attribute indicating that an allocation uses per-workgroup
+local memory supplied by the target runtime instead of the thread stack.</p>
+<p>LLVMCPU dispatch lowering packs <code>memref.alloc</code> operations marked with this
+memory space into one byte allocation and rewrites the original allocations
+to <code>memref.view</code> slices. The packed allocation is lowered to the HAL
+dispatch ABI local-memory pointer. Matching <code>memref.dealloc</code> operations are
+erased because the storage is owned by the dispatch frame. The aggregate
+byte size is exported as the dispatch <code>workgroup_local_memory</code> requirement.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>  %scratch = memref.alloc()
+    : memref&lt;64x1536xf32, #iree_codegen.workgroup_local&gt;
+</code></pre></div></p>
 <h3 id="workgroupmappingattr">WorkgroupMappingAttr<a class="headerlink" href="#workgroupmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.workgroup_mapping&lt;
