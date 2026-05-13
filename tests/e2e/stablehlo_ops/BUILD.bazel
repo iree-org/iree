@@ -284,7 +284,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
-        "--iree-vulkan-experimental-indirect-bindings",
+        "--iree-vulkan-dispatch-abi=bda",
     ],
     driver = "vulkan",
     runner_args = [

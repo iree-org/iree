@@ -327,7 +327,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
-    "--iree-vulkan-experimental-indirect-bindings"
+    "--iree-vulkan-dispatch-abi=bda"
   RUNNER_ARGS
     "--vulkan_dispatch_abi=bda"
   LABELS
