@@ -89,6 +89,7 @@ def LLVMGPULower1DVectorOpsPass :
     "ub::UBDialect",
     "vector::VectorDialect",
     "IREE::VectorExt::IREEVectorExtDialect",
+    "scf::SCFDialect",
   ];
 }
 
