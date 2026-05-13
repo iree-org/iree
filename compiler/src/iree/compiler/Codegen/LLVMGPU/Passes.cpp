@@ -845,6 +845,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   addGPUBufferizePasses(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
 
   // Vector SIMD -> Vector SIMT
