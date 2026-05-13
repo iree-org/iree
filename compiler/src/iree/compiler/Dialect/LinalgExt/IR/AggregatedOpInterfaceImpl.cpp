@@ -622,37 +622,34 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
-/// The decomposition supports leaving either the `batch` or `K` dimension
-/// untiled when the corresponding slice in the input tensor is contiguous.
-/// If the entire `K` dimension maps to a contiguous slice, the loop over `K`
-/// is left untiled to enable more efficient data transfer. Likewise, if the
-/// `batch` dimension is contiguous, it is left untiled instead. All other
-/// dimensions, including any non-contiguous `batch` or `K`, are tiled to 1.
+/// The decomposition supports leaving a contiguous `batch`, unit-window M,
+/// or K dimension untiled when the corresponding slice in the input tensor is
+/// contiguous. All other dimensions are tiled to 1.
 /// TODO(Max191): Fallback to larger tile sizes instead of immediately tiling K
 ///               dimension to 1 when non-contiguous.
 ///
 /// The simple decomposition (with K tiled to 1) will look like:
 /// ```
 ///   %im2col = iree_linalg_ext.im2col
-///       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-///       offsets = [0, %m_off, %k_off]
-///       output_sizes = [[2], [32, 32], [3, 3, 640]]
-///       batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-///       input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+///       strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+///       offsets = [%m_off, %k_off]
+///       output_sizes = [[2, 32, 32], [1, 3, 3, 640]]
+///       batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+///       input_k_perm = [0, 1, 2, 3] output_perm = [0, 1]
 ///       ins(%in : tensor<2x34x34x640xf32>)
-///       outs(%out : tensor<2x4x8xf32>) -> tensor<2x4x8xf32>
+///       outs(%out : tensor<4x8xf32>) -> tensor<4x8xf32>
 /// ```
 /// Decomposes to:
 /// ```
-/// scf.for %B = %c0 to %c2 step %c1
-///   scf.for %M = %c0 to %c4 step %c1
-///     scf.for %K = %c0 to %c8 step %c1
-///       %slice = tensor.extract_slice %in[%B, %h, %w, %k] ... to tensor<1xf32>
-///       %copy = linalg.copy ins(%slice) outs(%out)
-///       %insert = tensor.insert_slice %copy into %loop_arg
+/// scf.for %M = %c0 to %c4 step %c1
+///   scf.for %K = %c0 to %c8 step %c1
+///     %slice = tensor.extract_slice %in[%n, %h, %w, %k] ... to tensor<1xf32>
+///     %copy = linalg.copy ins(%slice) outs(%out)
+///     %insert = tensor.insert_slice %copy into %loop_arg
 /// ```
 /// Where the offsets are computed as:
-///   `%h` = `(%m_off + %M) / 32 + ((%k_off + %K) / 640) / 3`
+///   `%n` = `(%m_off + %M) / (32 * 32)`
+///   `%h` = `((%m_off + %M) / 32) mod 32 + ((%k_off + %K) / (3 * 640)) mod 3`
 ///   `%w` = `(%m_off + %M) mod 32 + ((%k_off + %K) / 640) mod 3`
 ///   `%k` = `(%k_off + %K) mod 640`
 ///

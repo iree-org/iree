@@ -427,9 +427,10 @@ bool isGatherlikeOp(Operation *op) {
 //===---------------------------------------------------------------------===//
 
 /// Classification of IGEMM dims from the image/im2col perspective.
-/// Batch includes both batch and depth (group) dims. M is output spatial
-/// dims. InputChannel and FilterLoop are the two subcategories of reduction
-/// dims. The canonical im2col output order is:
+/// Batch includes depth (group) dims. M includes convolution batch and
+/// output spatial dims.
+/// InputChannel and FilterLoop are the two subcategories of reduction dims.
+/// The canonical im2col output order is:
 ///   [Batch, M, InputChannel, FilterLoop].
 enum class Im2colDimKind {
   Batch,
@@ -463,12 +464,13 @@ static SmallVector<int64_t> computeIm2colOutputPermutation(
   auto classifyIgemmDim = [&](int64_t igemmDim) -> Im2colDimKind {
     ArrayRef<int64_t> convDimGroup = igemmDimToConvDims[igemmDim];
     if (llvm::all_of(convDimGroup, [&](int64_t convDim) {
-          return batchDimSet.contains(convDim) || depthDimSet.contains(convDim);
+          return depthDimSet.contains(convDim);
         })) {
       return Im2colDimKind::Batch;
     }
     if (llvm::all_of(convDimGroup, [&](int64_t convDim) {
-          return outputImageDimSet.contains(convDim);
+          return batchDimSet.contains(convDim) ||
+                 outputImageDimSet.contains(convDim);
         })) {
       return Im2colDimKind::M;
     }

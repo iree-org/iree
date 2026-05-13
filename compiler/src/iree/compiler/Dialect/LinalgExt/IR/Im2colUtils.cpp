@@ -352,6 +352,23 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
          affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
 }
 
+/// Returns true when an M output dim is a contiguous pass-through dim: one
+/// output step corresponds to one input step, with no non-unit window, stride,
+/// or dilation semantics.
+static bool isUnitWindowMOutputDim(Im2colOp im2colOp, int64_t outputDim) {
+  SmallVector<int64_t> mOutputDims = im2colOp.getMOutputDims();
+  auto it = llvm::find(mOutputDims, outputDim);
+  if (it == mOutputDims.end()) {
+    return false;
+  }
+  int64_t idx = it - mOutputDims.begin();
+  SmallVector<OpFoldResult> kernelSizes = im2colOp.getMixedKernelSize();
+  ArrayRef<int64_t> strides = im2colOp.getStrides();
+  ArrayRef<int64_t> dilations = im2colOp.getDilations();
+  return isConstantIntValue(kernelSizes[idx], 1) && strides[idx] == 1 &&
+         dilations[idx] == 1;
+}
+
 std::optional<int64_t>
 chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
                      ArrayRef<Range> iterationDomain,
@@ -397,6 +414,10 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
   // Check each dim in order from innermost to outermost, and return the first
   // one that is vectorizable.
   for (int64_t outputDimToVectorize : llvm::reverse(vectorizableOutputDims)) {
+    OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
+    if (isConstantIntValue(outputDimSize, 1)) {
+      continue;
+    }
     // If a K dim is being vectorized, then it is contiguous along either the
     // input channel dimension, or the filter kernel window. If it is contiguous
     // along the kernel window, then the actual inner slice size is equal to the
@@ -430,8 +451,11 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
       // Use the offset of this specific K dim directly (no linearization).
       offset = offsets[kDimToCanonicalIdx[outputDimToVectorize]];
     } else if (mDimSet.contains(outputDimToVectorize)) {
-      // TODO(Max191): Support vectorization along the M dimension.
-      continue;
+      if (!isUnitWindowMOutputDim(im2colOp, outputDimToVectorize)) {
+        // TODO(Max191): Support vectorizing spatial M dims with non-unit
+        // window, stride, or dilation metadata.
+        continue;
+      }
     }
     // Skip dims with non-zero output low padding. Low padding on the
     // vectorized output dim would require shifting write positions and
@@ -441,7 +465,6 @@ chooseDimToVectorize(OpBuilder &b, Location loc, Im2colOp im2colOp,
       continue;
     }
 
-    OpFoldResult outputDimSize = iterationDomain[outputDimToVectorize].size;
     if (!willBeContiguousSlice(innerSliceSize, outputDimSize, offset,
                                getOffsetDivisibility)) {
       continue;

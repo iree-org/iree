@@ -755,6 +755,47 @@ func.func @im2col_tile_sizes_nhwc(
 
 // -----
 
+// Im2col: unit-window M dims index the input as contiguous pass-through dims
+// and are vectorizable when they are the innermost input dim.
+
+// CHECK-LABEL: @im2col_tile_sizes_unit_m_dim
+func.func @im2col_tile_sizes_unit_m_dim(
+    %input: tensor<1x16xf32>
+) -> tensor<1x16x1xf32> {
+  %0 = tensor.empty() : tensor<1x16x1xf32>
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 16, 1>
+  %1 = iree_linalg_ext.im2col strides = [1] dilations = [1] kernel_size = [1]
+                          offsets = [0, 0, 0] output_sizes = [[1], [16], [1]]
+                          batch_pos = [0] m_pos = [1] k_pos = []
+                          input_k_perm = [0] output_perm = [0, 1, 2]
+                          ins(%input : tensor<1x16xf32>)
+                          outs(%0 : tensor<1x16x1xf32>) -> tensor<1x16x1xf32>
+  return %1 : tensor<1x16x1xf32>
+}
+
+// -----
+
+// Im2col: non-unit stride M dims cannot use the unit-window contiguous path.
+
+// CHECK-LABEL: @im2col_tile_sizes_strided_m_dim
+func.func @im2col_tile_sizes_strided_m_dim(
+    %input: tensor<1x32xf32>
+) -> tensor<1x16x1xf32> {
+  %0 = tensor.empty() : tensor<1x16x1xf32>
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_codegen.vector_tile_sizes
+  %1 = iree_linalg_ext.im2col strides = [2] dilations = [1] kernel_size = [1]
+                          offsets = [0, 0, 0] output_sizes = [[1], [16], [1]]
+                          batch_pos = [0] m_pos = [1] k_pos = []
+                          input_k_perm = [0] output_perm = [0, 1, 2]
+                          ins(%input : tensor<1x32xf32>)
+                          outs(%0 : tensor<1x16x1xf32>) -> tensor<1x16x1xf32>
+  return %1 : tensor<1x16x1xf32>
+}
+
+// -----
+
 // Im2col: non-vectorizable. input_k_perm = [1, 0] makes the innermost K
 // non-contiguous in the input tensor, so no dimension can be vectorized
 // with a contiguous slice. The analysis should not stamp a tile sizes

@@ -2796,8 +2796,9 @@ LogicalResult Im2colOp::verify() {
   // Batch output dims: each produces 1 coordinate (batch index).
   //   -> total inner sizes across all batch dims = batchPos.size()
   //
-  // M output dims: collectively produce mPos.size() coordinates
-  //   (spatial output positions, one per spatial dimension).
+  // M output dims: collectively produce mPos.size() coordinates. For
+  // convolution lowering, these include convolution batch and output spatial
+  // positions.
   //   -> total inner sizes across all M dims = mPos.size()
   //
   // K output dims: collectively produce (mPos.size() + kPos.size())
