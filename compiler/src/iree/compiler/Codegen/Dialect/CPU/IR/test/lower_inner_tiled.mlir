@@ -214,6 +214,51 @@ module attributes { transform.with_named_sequence } {
 
 // -----
 
+// Generic-scalar with `intrinsics_n = 1` (narrow N): the ACC operand
+// arrives as rank-3 `vector<4x1x1xf32>` rather than the rank-2 `(M, N)`
+// form `vector.contract` consumes. The non-unit M dim is at position 0,
+// and the trailing two unit dims come from the swizzle's `Internal(1)`
+// placeholders for the K-side and N-side of the 1×1×1 base intrinsic.
+// The lowering must `shape_cast` the rank-3 operand into the rank-2
+// `(M, N)` shape for the contract, then `shape_cast` the contract result
+// back to the original rank-3 ACC type so the inner_tiled op's result
+// type is preserved downstream.
+
+#contraction_accesses_n = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_generic_narrow_n_f32(
+    %lhs: vector<4x1xf32>, %rhs: vector<1x1xf32>, %acc: vector<4x1x1xf32>)
+    -> vector<4x1x1xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses_n,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 4, lhs_type = f32, rhs_type = f32, acc_type = f32>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<4x1xf32>, vector<1x1xf32> into vector<4x1x1xf32>
+  return %0 : vector<4x1x1xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_generic_narrow_n_f32
+//       CHECK:   %[[ACC_2D:.+]] = vector.shape_cast %{{.+}} : vector<4x1x1xf32> to vector<4x1xf32>
+//       CHECK:   %[[RES_2D:.+]] = vector.contract
+//  CHECK-SAME:     %{{.+}}, %{{.+}}, %[[ACC_2D]] : vector<4x1xf32>, vector<1x1xf32> into vector<4x1xf32>
+//       CHECK:   vector.shape_cast %[[RES_2D]] : vector<4x1xf32> to vector<4x1x1xf32>
+
+// -----
+
 // AVX-512 16×1×1 f32 (M↔N-swapped orientation of 1×16×1) with intrinsics_m=2,
 // intrinsics_n=4. The narrow side is RHS, so broadcast widens RHS 1→16; FMA
 // is LHS/RHS-symmetric so the call args don't swap.
