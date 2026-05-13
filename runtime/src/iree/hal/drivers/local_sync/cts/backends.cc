@@ -105,6 +105,9 @@ static bool local_sync_registered_ =
               {"QueueAllocaTest.AllocaWithWaitSemaphores",
                "sync driver blocks on semaphore waits during queue_alloca "
                "and cannot model wait-before-signal queue submission."},
+              {"QueueTransferTest.UpdateCapturesSourceBeforeWaitResolves",
+               "sync driver blocks on semaphore waits during queue_update and "
+               "cannot model wait-before-signal queue submission."},
               {"QueueDispatchTest.DeferredNoopDispatch",
                "sync driver blocks on semaphore waits during queue_dispatch "
                "and cannot model wait-before-signal queue submission."},
