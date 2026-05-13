@@ -791,6 +791,24 @@ def IREECodegen_PipelineAttrInterface :
       /*defaultImplementation=*/[{
         return ::mlir::success();
       }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Materialize the pipeline-specific compilation_info attribute from a
+        knobs dictionary whose knob leaves have already been substituted with
+        concrete values. Implementations should only mechanically repackage the
+        dictionary into the appropriate CompilationInfoAttr.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::Attribute>",
+      /*methodName=*/"materializeCompilationInfo",
+      /*args=*/(ins "::mlir::DictionaryAttr":$knobs,
+                    "::llvm::function_ref<::mlir::InFlightDiagnostic()>":$emitError),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        (void)knobs;
+        emitError() << "pipeline does not support compilation_info materialization";
+        return ::mlir::failure();
+      }]
     >
   ];
 }

@@ -740,3 +740,67 @@ def test_convert_constraints_op_to_smtlib():
         constraints_op, emit_reset=True
     )
     assert "(reset)" in smtlib, f"Missing reset in SMTLIB:\n{smtlib}"
+
+
+_MATERIALIZE_CONSTRAINTS_MODULE = """
+    module {
+        iree_codegen.smt.constraints
+            target = <set = 0>,
+            pipeline = #iree_gpu.pipeline<VectorDistribute>,
+            knobs = {
+                workgroup = [#iree_codegen.smt.int_knob<"wg_0">, 1, 1],
+                workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, 1, 1],
+                subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
+            }
+            dims() {
+            }
+    }
+"""
+
+
+def _get_materialize_constraints_op():
+    input_module = ir.Module.parse(_MATERIALIZE_CONSTRAINTS_MODULE)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert len(constraints_ops) == 1
+    return input_module, constraints_ops[0]
+
+
+@run
+def test_materialize_compilation_info_happy_path():
+    # Keep the module alive while using the op wrapper below.
+    input_module, constraints_op = _get_materialize_constraints_op()
+    compilation_info = iree_codegen.materialize_compilation_info(
+        constraints_op,
+        {
+            "wg_0": 64,
+            "wg_size_x": 128,
+            "sg_size": 64,
+        },
+    )
+    assert isinstance(compilation_info, iree_codegen.CompilationInfoAttr)
+    assert str(compilation_info.lowering_config) == (
+        "#iree_gpu.lowering_config<{workgroup = [64, 1, 1]}>"
+    )
+    translation_info = iree_codegen.TranslationInfoAttr(
+        compilation_info.translation_info
+    )
+    assert list(translation_info.workgroup_size) == [128, 1, 1]
+    assert translation_info.subgroup_size == 64
+    assert str(translation_info.pass_pipeline) == "#iree_gpu.pipeline<VectorDistribute>"
+
+
+@run
+def test_materialize_compilation_info_error_diagnostic():
+    # Keep the module alive while using the op wrapper below.
+    input_module, constraints_op = _get_materialize_constraints_op()
+    try:
+        iree_codegen.materialize_compilation_info(
+            constraints_op,
+            {
+                "wg_size_x": 128,
+                "sg_size": 64,
+            },
+        )
+        assert False, "expected missing wg_0 assignment to fail"
+    except RuntimeError as e:
+        assert "missing assignment for knob 'wg_0'" in str(e)
