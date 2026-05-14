@@ -954,6 +954,32 @@ func.func @im2col_vectorize_nhwc(
 
 // -----
 
+// Unit-window M dim. This is the shape produced when a convolution batch dim is
+// reclassified as an im2col M dim: the synthetic window metadata is all ones, so
+// the M dim is a contiguous pass-through dim.
+func.func @im2col_vectorize_unit_m_dim(
+    %input: tensor<1x16xf32>
+) -> tensor<1x16x1xf32> {
+  %0 = tensor.empty() : tensor<1x16x1xf32>
+  %1 = iree_linalg_ext.im2col strides = [1] dilations = [1] kernel_size = [1]
+                          offsets = [0, 0, 0] output_sizes = [[1], [16], [1]]
+                          batch_pos = [0] m_pos = [1] k_pos = []
+                          input_k_perm = [0] output_perm = [0, 1, 2]
+                          ins(%input : tensor<1x16xf32>)
+                          outs(%0 : tensor<1x16x1xf32>) -> tensor<1x16x1xf32>
+  return %1 : tensor<1x16x1xf32>
+}
+// CHECK-LABEL: func.func @im2col_vectorize_unit_m_dim
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<1x16xf32>
+//   CHECK-DAG:   %[[POISON:.+]] = ub.poison : f32
+//   CHECK-NOT:   iree_linalg_ext.im2col
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]{{.*}}, %[[POISON]] {in_bounds = [true]} : tensor<1x16xf32>, vector<16xf32>
+//       CHECK:   %[[WRITE_VEC:.+]] = vector.transpose {{.*}} : vector<1x16xf32> to vector<16x1xf32>
+//       CHECK:   %[[FINAL:.+]] = vector.transfer_write %[[WRITE_VEC]], {{.*}} : vector<16x1xf32>, tensor<1x16x1xf32>
+//       CHECK:   return %[[FINAL]] : tensor<1x16x1xf32>
+
+// -----
+
 // Dynamic output shape: vectorization pattern should not match.
 func.func @im2col_no_vectorize_dynamic(
     %input: tensor<2x34x34x640xf32>, %m_size: index, %m_off: index, %k: index
