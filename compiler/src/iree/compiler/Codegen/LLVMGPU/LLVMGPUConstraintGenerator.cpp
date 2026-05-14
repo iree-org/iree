@@ -299,12 +299,9 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
 
 /// Emit smt.lookup ops to derive MMA m/n/k shape values from the mma_idx knob.
 /// Returns {mmaMLookup, mmaNLookup, mmaKLookup} SSA values.
-/// Also asserts bounds on mma_idx: 0 <= mma_idx < N.
-struct MMALookup {
-  Value mmaMLookup, mmaNLookup, mmaKLookup;
-};
-static MMALookup emitMMALookup(OpBuilder &builder, Location loc,
-                               ArrayRef<Attribute> mmaAttrs) {
+/// Also asserts bounds on mma_idx: 0 <= mma_idx <= N-1.
+static std::tuple<Value, Value, Value>
+emitMMALookup(OpBuilder &builder, Location loc, ArrayRef<Attribute> mmaAttrs) {
 
   Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
   Value minMmaIdxVal = mkIntConst(builder, loc, 0);
@@ -325,9 +322,9 @@ static MMALookup emitMMALookup(OpBuilder &builder, Location loc,
     kVals.push_back(k);
   }
   auto intTy = smt::IntType::get(builder.getContext());
-  return MMALookup{LookupOp::create(builder, loc, intTy, mmaIdx, keys, mVals),
-                   LookupOp::create(builder, loc, intTy, mmaIdx, keys, nVals),
-                   LookupOp::create(builder, loc, intTy, mmaIdx, keys, kVals)};
+  return {LookupOp::create(builder, loc, intTy, mmaIdx, keys, mVals),
+          LookupOp::create(builder, loc, intTy, mmaIdx, keys, nVals),
+          LookupOp::create(builder, loc, intTy, mmaIdx, keys, kVals)};
 }
 
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
@@ -369,21 +366,24 @@ static LogicalResult emitVectorDistributeConstraints(
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
 
-  // Create intermediate values.
+  // Create intermediate variables.
+  // Do not create these as knobs because they are not in the knob dict
+  // and would fail constraint verification.
   // mma_m, mma_n, mma_k
-  MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
+  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
+      emitMMALookup(builder, loc, compatibleMMAs);
   // sg_num, number of subgroups per workgroup
   Value sgNum = smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
-  Value sgMDenom = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
+  Value sgMDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, mmaMLookup});
   // sg_m, number of mma_m along M per subgroup
   Value sgM = smt::IntDivOp::create(builder, loc, wgM, sgMDenom);
-  Value sgNDenom = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
+  Value sgNDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgNCnt, mmaNLookup});
   // sg_n, number of mma_n along N per subgroup
   Value sgN = smt::IntDivOp::create(builder, loc, wgN, sgNDenom);
   // sg_k, number of mma_k along K per subgroup
-  Value sgK = smt::IntDivOp::create(builder, loc, redK, mmaLookup.mmaKLookup);
+  Value sgK = smt::IntDivOp::create(builder, loc, redK, mmaKLookup);
 
   // Constraint 0: Set concrete values for knobs.
   // sg_size == preferred_subgroup_size
@@ -405,11 +405,11 @@ static LogicalResult emitVectorDistributeConstraints(
 
   // Constraint 2: Tile size bounds.
   // mma <= wg_tile <= dim
-  assertBounds(builder, loc, wgM, wgMName, mmaLookup.mmaMLookup, "mma_m",
+  assertBounds(builder, loc, wgM, wgMName, mmaMLookup, "mma_m",
                smtDimArgs[mDim], mDimName);
-  assertBounds(builder, loc, wgN, wgNName, mmaLookup.mmaNLookup, "mma_n",
+  assertBounds(builder, loc, wgN, wgNName, mmaNLookup, "mma_n",
                smtDimArgs[nDim], nDimName);
-  assertBounds(builder, loc, redK, redKName, mmaLookup.mmaKLookup, "mma_k",
+  assertBounds(builder, loc, redK, redKName, mmaKLookup, "mma_k",
                smtDimArgs[kDim], kDimName);
   // wg_tile <= 512 (max VGPRs)
   assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
@@ -421,22 +421,22 @@ static LogicalResult emitVectorDistributeConstraints(
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
-  assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup,
+  assertDivisible(builder, loc, wgM, mmaMLookup,
                   llvm::join_items("", wgMName, " must be divisible by mma_m"));
-  assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup,
+  assertDivisible(builder, loc, wgN, mmaNLookup,
                   llvm::join_items("", wgNName, " must be divisible by mma_n"));
   assertDivisible(
-      builder, loc, redK, mmaLookup.mmaKLookup,
+      builder, loc, redK, mmaKLookup,
       llvm::join_items("", redKName, " must be divisible by mma_k"));
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   // red_k % (1 * mma_k * sg_k) == 0
-  Value mulResultM = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup, sgM});
-  Value mulResultN = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup, sgN});
-  Value mulResultK = smt::IntMulOp::create(
-      builder, loc, ValueRange{mmaLookup.mmaKLookup, sgK});
+  Value mulResultM =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, mmaMLookup, sgM});
+  Value mulResultN =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgNCnt, mmaNLookup, sgN});
+  Value mulResultK =
+      smt::IntMulOp::create(builder, loc, ValueRange{mmaKLookup, sgK});
   assertDivisible(builder, loc, wgM, mulResultM,
                   llvm::join_items("", wgMName,
                                    " must be divisible by "
@@ -550,7 +550,7 @@ static LogicalResult emitVectorDistributeConstraints(
                    "wg_size_x <= wg_m OR wg_size_x <= wg_n");
   // red_k % mma_m == 0
   assertDivisible(
-      builder, loc, redK, mmaLookup.mmaMLookup,
+      builder, loc, redK, mmaMLookup,
       llvm::join_items("", redKName, " must be divisible by mma_m"));
 
   return success();
