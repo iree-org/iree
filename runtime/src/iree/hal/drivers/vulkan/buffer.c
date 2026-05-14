@@ -70,6 +70,9 @@ typedef struct iree_hal_vulkan_buffer_t {
   // Vulkan buffer handle.
   VkBuffer handle;
 
+  // Byte offset within |handle| where this HAL allocation begins.
+  VkDeviceSize handle_offset;
+
   // Device pointer returned by vkGetBufferDeviceAddress.
   VkDeviceAddress device_address;
 
@@ -124,7 +127,8 @@ static iree_status_t iree_hal_vulkan_buffer_create_internal(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
-    VkDeviceSize device_memory_offset, VkDeviceSize device_memory_size,
+    VkDeviceSize handle_offset, VkDeviceSize device_memory_offset,
+    VkDeviceSize device_memory_size,
     iree_hal_vulkan_buffer_mapping_state_t* borrowed_mapping_state,
     VkBuffer handle, VkDeviceAddress device_address,
     iree_hal_vulkan_buffer_ownership_t ownership,
@@ -169,6 +173,7 @@ static iree_status_t iree_hal_vulkan_buffer_create_internal(
     buffer->mapping_state = borrowed_mapping_state;
   }
   buffer->handle = handle;
+  buffer->handle_offset = handle_offset;
   buffer->device_address = device_address;
   buffer->memory_property_flags = memory_property_flags;
   buffer->non_coherent_atom_size =
@@ -196,8 +201,8 @@ iree_status_t iree_hal_vulkan_buffer_create(
       syms, logical_device, placement, memory_type, allowed_access,
       allowed_usage, allocation_size, /*byte_offset=*/0, byte_length,
       memory_property_flags, non_coherent_atom_size, device_memory,
-      device_memory_offset, device_memory_size, /*borrowed_mapping_state=*/NULL,
-      handle, device_address,
+      /*handle_offset=*/0, device_memory_offset, device_memory_size,
+      /*borrowed_mapping_state=*/NULL, handle, device_address,
       IREE_HAL_VULKAN_BUFFER_OWNS_HANDLE |
           IREE_HAL_VULKAN_BUFFER_OWNS_DEVICE_MEMORY |
           IREE_HAL_VULKAN_BUFFER_OWNS_MAPPING_STATE,
@@ -209,18 +214,26 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_device_size_t handle_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
     iree_hal_vulkan_buffer_mapping_state_t* mapping_state, VkBuffer handle,
     VkDeviceAddress device_address,
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  if (IREE_UNLIKELY(handle_offset > allocation_size ||
+                    byte_length > allocation_size - handle_offset)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan borrowed buffer handle range offset %" PRIdsz
+        " with length %" PRIdsz " exceeds allocation size %" PRIdsz,
+        handle_offset, byte_length, allocation_size);
+  }
   return iree_hal_vulkan_buffer_create_internal(
       syms, logical_device, placement, memory_type, allowed_access,
-      allowed_usage, allocation_size, byte_offset, byte_length,
+      allowed_usage, byte_length, /*byte_offset=*/0, byte_length,
       memory_property_flags, non_coherent_atom_size, device_memory,
-      /*device_memory_offset=*/0,
+      (VkDeviceSize)handle_offset, (VkDeviceSize)handle_offset,
       mapping_state ? mapping_state->device_memory_size : 0, mapping_state,
       handle, device_address, IREE_HAL_VULKAN_BUFFER_OWNS_NONE,
       release_callback, host_allocator, out_buffer);
@@ -305,6 +318,19 @@ iree_status_t iree_hal_vulkan_buffer_resolve_backing_offset(
   IREE_ASSERT_ARGUMENT(out_backing_byte_offset);
   iree_device_size_t backing_byte_offset =
       iree_hal_buffer_byte_offset(backing_buffer);
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(backing_buffer);
+  if (iree_hal_vulkan_buffer_isa(allocated_buffer)) {
+    iree_hal_vulkan_buffer_t* vulkan_buffer =
+        iree_hal_vulkan_buffer_cast(allocated_buffer);
+    if (!iree_device_size_checked_add(
+            backing_byte_offset,
+            (iree_device_size_t)vulkan_buffer->handle_offset,
+            &backing_byte_offset)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "Vulkan buffer handle offset overflows");
+    }
+  }
   if (backing_buffer != buffer &&
       !iree_device_size_checked_add(backing_byte_offset,
                                     iree_hal_buffer_byte_offset(buffer),

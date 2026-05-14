@@ -39,17 +39,18 @@ iree_status_t iree_hal_vulkan_buffer_create(
 // Wraps a borrowed byte range within an existing bound Vulkan buffer.
 //
 // The returned HAL buffer does not destroy |handle| or free |device_memory|.
-// |allocation_size| is the backing allocation extent used for HAL range
-// validation, and |byte_offset| is the start of the returned HAL buffer's
-// valid range within that allocation. |release_callback| is invoked when the
-// wrapper is destroyed and typically returns a pool reservation to the source
-// pool.
+// |allocation_size| is the backing handle extent used to validate
+// |handle_offset|. |handle_offset| is the start of the returned HAL buffer
+// within |handle| and |byte_length| is the logical byte length exposed through
+// the HAL API.
+// |release_callback| is invoked when the wrapper is destroyed and typically
+// returns a pool reservation to the source pool.
 iree_status_t iree_hal_vulkan_buffer_create_borrowed(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     iree_hal_buffer_placement_t placement, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_device_size_t handle_offset, iree_device_size_t byte_length,
     VkMemoryPropertyFlags memory_property_flags,
     VkDeviceSize non_coherent_atom_size, VkDeviceMemory device_memory,
     iree_hal_vulkan_buffer_mapping_state_t* mapping_state, VkBuffer handle,
