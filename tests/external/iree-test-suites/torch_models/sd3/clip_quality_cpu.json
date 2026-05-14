@@ -1,0 +1,58 @@
+{
+	"type": "quality",
+	"markers": [
+		"cpu",
+		"local-task"
+	],
+	"modules": [
+		"sd3/modules/clip_cpu"
+	],
+	"weights": [
+		{
+			"type": "url",
+    			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/real_weights.irpa",
+			"scope": "model"
+		}
+	],
+	"run_args": [
+    		"--function=encode_tokens",
+		"--device=local-task",
+        	"--expected_f32_threshold=0.15f"
+	],
+	"inputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.0.bin",
+			"value": "1x77x2xi64"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.1.bin",
+			"value": "1x77x2xi64"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.2.bin",
+			"value": "1x77x2xi64"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.3.bin",
+			"value": "1x77x2xi64"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.4.bin",
+			"value": "1x77x2xi64"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_input.5.bin",
+			"value": "1x77x2xi64"
+		}
+	],
+	"expected_outputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.0.bin",
+			"value": "2x154x4096xf32"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-prompt-encoder/inference_output.1.bin",
+			"value": "2x2048xf32"
+		}
+	]
+}
