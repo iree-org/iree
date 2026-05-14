@@ -7413,14 +7413,22 @@ output position <code>(batch, m, k)</code> maps to a specific input element dete
 by the convolution metadata (strides, dilations, kernel_size).</p>
 <h5 id="attributes_5">Attributes<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <p><strong>Convolution metadata</strong> — derived from the original convolution:
-- <code>strides</code>: spatial stride per m_pos dimension.
-- <code>dilations</code>: dilation factor per m_pos dimension.
-- <code>kernel_size</code>: filter kernel extent per m_pos dimension.</p>
-<p><strong>Dimension mapping</strong> — describes which input dimensions are batch, spatial
-(M), or reduction (K):
-- <code>batch_pos</code>: input dimensions that are batch (pass-through to output).
-- <code>m_pos</code>: input dimensions that are spatial (indexed by stride/dilation).
-- <code>k_pos</code>: input dimensions that are channels (direct index).</p>
+- <code>strides</code>: source-coordinate stride per <code>m_pos</code> dimension.
+- <code>dilations</code>: source-coordinate dilation per <code>m_pos</code> dimension.
+- <code>kernel_size</code>: filter/window extent per <code>m_pos</code> dimension.</p>
+<p>Spatial <code>m_pos</code> dimensions use the original convolution window metadata.
+<code>m_pos</code> dimensions without a real filter window, such as convolution batch
+dimensions, use synthetic unit metadata (<code>stride = dilation = kernel = 1</code>).</p>
+<p><strong>Dimension mapping</strong> — describes which input dimensions are GEMM batch,
+M, or K dimensions:
+- <code>batch_pos</code>: input dimensions that are GEMM batch/pass-through dims.
+  For convolution lowering, this is used for depth/group-like dimensions,
+  not convolution batch dimensions that only index the image/output.
+- <code>m_pos</code>: input dimensions that form GEMM M coordinates. For convolution
+  lowering, this includes convolution batch dimensions and output image
+  dimensions.
+- <code>k_pos</code>: input dimensions that form direct GEMM K coordinates, such as
+  input channel dimensions.</p>
 <p><strong>Indexing</strong>:
 - <code>offsets</code>: one offset per output dimension in canonical
   <code>[Batch..., M..., K...]</code> order. Updated by tiling to reflect the tile
@@ -7428,13 +7436,14 @@ by the convolution metadata (strides, dilations, kernel_size).</p>
 - <code>output_sizes</code>: nested list of delinearization sizes per output dimension.
   Each entry describes how to delinearize that output dimension back to
   spatial/channel coordinates. For example:
-  <code>output_sizes = [[2], [32, 32], [3, 3, 640]]</code> means batch=[2],
-  M delinearizes into [OH=32, OW=32], K delinearizes into [KH=3, KW=3, C=640].</p>
+  <code>output_sizes = [[2], [32], [32], [1, 3, 3, 640]]</code> with empty
+  <code>batch_pos</code> means M dims delinearize into [N=2], [OH=32], [OW=32], and K
+  delinearizes into [unit N window=1, KH=3, KW=3, C=640].</p>
 <p><strong>Layout permutations</strong>:
 - <code>input_k_perm</code>: permutation that maps the delinearized K output dimension
-  coordinates (window offsets from spatial dims and channel indices) to their
-  corresponding input dimension positions. Used when
-  the filter layout differs from the input layout (e.g., input=HWC,
+  coordinates (window offsets from M dims, synthetic unit coordinates, and
+  channel indices) to their corresponding input dimension positions. Used
+  when the filter layout differs from the input layout (e.g., input=HWC,
   filter=CHW requires <code>input_k_perm = [2, 0, 1]</code>). The identity permutation
   means the layouts are already aligned.
 - <code>output_perm</code>: permutation of the canonical <code>[Batch, M, K]</code> order to the
@@ -7455,50 +7464,51 @@ by the convolution metadata (strides, dilations, kernel_size).</p>
   without <code>input_pad_low</code>/<code>input_pad_high</code> when only output padding exists
   (e.g., from GEMM alignment). When absent, there is no padding.</p>
 <h5 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">link</a></h5>
-<p>For each output position <code>(b, m, k)</code>, the op computes input coordinates,
-where <code>i</code> indexes over <code>m_pos</code> dimensions (spatial) and <code>j</code> indexes over
-<code>k_pos</code> dimensions (channel):
-<div class="highlight"><pre><span></span><code>  spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
+<p>For each output position, the op computes input coordinates, where <code>i</code>
+indexes over <code>m_pos</code> dimensions and <code>j</code> indexes over <code>k_pos</code> dimensions:
+<div class="highlight"><pre><span></span><code>  m_input_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
   channel_coord[j] = k_coord[j]
 </code></pre></div>
 where <code>m_coord</code> and <code>window_offset</code>/<code>k_coord</code> come from delinearizing the
-M and K output indices using <code>output_sizes</code>.</p>
+M and K output indices using <code>output_sizes</code>. For a convolution batch M dim,
+the synthetic unit metadata makes <code>window_offset = 0</code>, so the input
+coordinate is the M coordinate directly.</p>
 <h5 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">link</a></h5>
 <p>Basic im2col (NHWC conv, 3x3 kernel):
 <div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
-      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      offsets = [0, 0, 0]
-      output_sizes = [[2], [32, 32], [3, 3, 640]]
-      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+      strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+      offsets = [0, 0, 0, 0]
+      output_sizes = [[2], [32], [32], [1, 3, 3, 640]]
+      batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
-      outs(%out : tensor&lt;2x1024x5760xf32&gt;) -&gt; tensor&lt;2x1024x5760xf32&gt;
+      outs(%out : tensor&lt;2x32x32x5760xf32&gt;) -&gt; tensor&lt;2x32x32x5760xf32&gt;
 </code></pre></div></p>
 <p>With input padding (same padding absorbed from tensor.pad):
 <div class="highlight"><pre><span></span><code>  %im2col = iree_linalg_ext.im2col
-      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      offsets = [0, 0, 0]
-      output_sizes = [[2], [34, 34], [3, 3, 640]]
-      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+      strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+      offsets = [0, 0, 0, 0]
+      output_sizes = [[2], [34], [34], [1, 3, 3, 640]]
+      batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
       input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
       pad_value(%cst : f32)
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
-      outs(%out : tensor&lt;2x1156x5760xf32&gt;) -&gt; tensor&lt;2x1156x5760xf32&gt;
+      outs(%out : tensor&lt;2x34x34x5760xf32&gt;) -&gt; tensor&lt;2x34x34x5760xf32&gt;
 </code></pre></div></p>
 <p>With output-only padding (GEMM alignment, no input padding):
-<div class="highlight"><pre><span></span><code>  // M valid = 32*32 = 1024; output has 1040 (16 extra M positions filled
-  // with pad_value for GEMM alignment). K valid = 3*3*640 = 5760.
+<div class="highlight"><pre><span></span><code>  // K valid = 1*3*3*640 = 5760; output has 5768 (8 extra K positions
+  // filled with pad_value for GEMM alignment).
   %im2col = iree_linalg_ext.im2col
-      strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-      offsets = [0, 0, 0]
-      output_sizes = [[2], [32, 32], [3, 3, 640]]
-      batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-      input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
-      output_pad_low = [0, 0, 0] output_pad_high = [0, 16, 0]
+      strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+      offsets = [0, 0, 0, 0]
+      output_sizes = [[2], [32], [32], [1, 3, 3, 640]]
+      batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+      input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
+      output_pad_low = [0, 0, 0, 0] output_pad_high = [0, 0, 0, 8]
       pad_value(%cst : f32)
       ins(%in : tensor&lt;2x34x34x640xf32&gt;)
-      outs(%out : tensor&lt;2x1040x5760xf32&gt;) -&gt; tensor&lt;2x1040x5760xf32&gt;
+      outs(%out : tensor&lt;2x32x32x5768xf32&gt;) -&gt; tensor&lt;2x32x32x5768xf32&gt;
 </code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>AggregatedOpInterface</code>, <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
