@@ -917,31 +917,28 @@ struct TransferReadTransposeToGlobalTransposeLoad final
         rewriter, loc, resultVecType, src, transferOp.getIndices());
 
     // Compute corrected write indices for contiguous K writes:
-    //   N_new = N_base + K_single % N      (lane's N position within N_base
-    //   group) K_new = (K_single // N) * N        (K-group base, aligned to N)
-    // Write vector<1xNxT> at [N_new, K_new] → alloc_8[N_new, K_new..K_new+N-1]
-    // This is contiguous K in alloc_8[N, K] (K is inner) — no subview needed.
+    // Compute corrected write indices for contiguous K writes.
+    // Delinearize K_single into [K_group, K_offset] where K_group = K_single /
+    // N and K_offset = K_single % N. Then:
+    //   N_new = N_base + K_offset   (lane's N position within the N-group)
+    //   K_new = K_group * N         (K-group base, aligned to N)
     ValueRange writeIndices = writeOp.getIndices();
     assert(writeIndices.size() == 2 && "expected 2D write");
-    Value nBase = writeIndices[0];   // N_group * N
-    Value kSingle = writeIndices[1]; // K lane value (0..K_total-1)
+    Value nBase = writeIndices[0];
+    Value kSingle = writeIndices[1];
 
-    AffineExpr dn = rewriter.getAffineDimExpr(0);
-    AffineExpr dk = rewriter.getAffineDimExpr(1);
-    AffineMap nNewMap = AffineMap::get(2, 0, dn + dk % N);
-    AffineMap kNewMap = AffineMap::get(2, 0, (dk.floorDiv(N)) * N);
+    Value nVal = arith::ConstantIndexOp::create(rewriter, loc, N);
+    auto delinOp = affine::AffineDelinearizeIndexOp::create(
+        rewriter, loc, kSingle, SmallVector<Value>{nVal},
+        /*hasOuterBound=*/false);
+    Value kGroup = delinOp.getResult(0);
+    Value kOffset = delinOp.getResult(1);
+    Value nNew = arith::AddIOp::create(rewriter, loc, nBase, kOffset);
+    Value kNew = arith::MulIOp::create(rewriter, loc, kGroup, nVal);
 
-    Value nNew = affine::AffineApplyOp::create(rewriter, loc, nNewMap,
-                                               ValueRange{nBase, kSingle});
-    Value kNew = affine::AffineApplyOp::create(rewriter, loc, kNewMap,
-                                               ValueRange{nBase, kSingle});
-
-    VectorType writeVecType = VectorType::get({1, N}, elemType);
-    Value castResult = vector::ShapeCastOp::create(rewriter, loc, writeVecType,
-                                                   trLoad.getResult());
-    vector::TransferWriteOp::create(rewriter, loc, castResult,
+    vector::TransferWriteOp::create(rewriter, loc, trLoad.getResult(),
                                     writeOp.getBase(), ValueRange{nNew, kNew},
-                                    SmallVector<bool>{true, true});
+                                    SmallVector<bool>{true});
     rewriter.eraseOp(writeOp);
     return success();
   }

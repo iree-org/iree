@@ -9,17 +9,19 @@
 
 // BF16 with explicit gpu global address space.
 
-// CHECK-DAG: #[[N_MAP:.*]] = affine_map<(d0, d1) -> (d0 + d1 mod 8)>
-// CHECK-DAG: #[[K_MAP:.*]] = affine_map<(d0, d1) -> ((d1 floordiv 8) * 8)>
 // CHECK-LABEL: func.func @global_transpose_load_bf16
 // CHECK-SAME:    %[[N_BASE:[A-Za-z0-9]+]]: index, %[[K_SINGLE:[A-Za-z0-9]+]]: index
 // CHECK-NOT: vector.transpose
+// CHECK:     %[[N_VAL:.*]] = arith.constant 8 : index
 // CHECK:     %[[TR:.*]] = amdgpu.global_transpose_load
 // CHECK-SAME:   : memref<128x64xbf16, #gpu.address_space<global>> -> vector<8xbf16>
-// CHECK:     %[[N_NEW:.*]] = affine.apply #[[N_MAP]](%[[N_BASE]], %[[K_SINGLE]])
-// CHECK:     %[[K_NEW:.*]] = affine.apply #[[K_MAP]](%[[N_BASE]], %[[K_SINGLE]])
-// CHECK:     %[[CAST:.*]] = vector.shape_cast %[[TR]] : vector<8xbf16> to vector<1x8xbf16>
-// CHECK:     vector.transfer_write %[[CAST]], {{.*}}[%[[N_NEW]], %[[K_NEW]]]
+// Delinearize K_single into [K_group, K_offset]: K_group = K_single / 8, K_offset = K_single % 8
+// CHECK:     %[[DELIN:.*]]:2 = affine.delinearize_index %[[K_SINGLE]] into (8)
+// CHECK:     %[[N_NEW:.*]] = arith.addi %[[N_BASE]], %[[DELIN]]#1
+// CHECK:     %[[K_NEW:.*]] = arith.muli %[[DELIN]]#0, %[[N_VAL]]
+// N_new = N_base + K_offset, K_new = K_group * N — contiguous K writes.
+// CHECK:     vector.transfer_write %[[TR]], {{.*}}[%[[N_NEW]], %[[K_NEW]]]
+// CHECK-SAME:   {in_bounds = [true]} : vector<8xbf16>, memref<8x64xbf16, #gpu.address_space<workgroup>>
 
 // CHECK-NO-RDNA4-LABEL: func.func @global_transpose_load_bf16
 // CHECK-NO-RDNA4-NOT: amdgpu.global_transpose_load
