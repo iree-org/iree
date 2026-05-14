@@ -793,46 +793,37 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   }
 }
 
-/// Returns `v` with trailing unit dims stripped, down to but not below
-/// rank `minRank`. Emits a `vector.shape_cast` if any dim is stripped;
-/// returns `v` unchanged otherwise.
-static Value dropTrailingUnitDims(OpBuilder &builder, Location loc, Value v,
-                                  int64_t minRank) {
-  auto vt = cast<VectorType>(v.getType());
-  ArrayRef<int64_t> shape = vt.getShape();
-  int64_t newRank = shape.size();
-  while (newRank > minRank && shape[newRank - 1] == 1) {
-    --newRank;
-  }
-  if (newRank == static_cast<int64_t>(shape.size())) {
-    return v;
-  }
-  auto flatTy = VectorType::get(shape.take_front(newRank), vt.getElementType());
-  return vector::ShapeCastOp::create(builder, loc, flatTy, v);
-}
-
 /// Lowers a `DataTiledMMAAttr` whose intrinsic is one of the
 /// `MMA_GENERIC_SCALAR_1x1x1_REG*` cases directly to a single
-/// `vector.contract`. Since the intrinsic's tile shape is 1×1×1, the
-/// operand tiles after applying `intrinsics_m` / `intrinsics_n` /
-/// `intrinsics_k` are simple row-major (M, K)/(N, K)/(M, N) matmul
-/// tiles — no swizzle-based distribution is needed.
+/// `vector.contract`. Since the intrinsic's tile shape is 1×1×1, the only
+/// non-unit dims in each operand tile come from `intrinsics_{m,n,k}`, and
+/// the `Codegen::expand`/`fixupSwizzle` machinery places them in row-major
+/// (M, K) / (N, K) / (M, N) order. Collapse to that rank-2 form with
+/// `vector.shape_cast` regardless of where the non-unit dim(s) sit in the
+/// operand tile, then `shape_cast` the contract result back to the ACC
+/// tile's original shape so callers downstream see the expected type.
 static LogicalResult lowerGenericScalarToVectorContract(
     OpBuilder &builder, Location loc, IREE::CPU::DataTiledMMAAttr attr,
     ValueRange inputs, ValueRange outputs, SmallVectorImpl<Value> &results) {
   assert(isGenericScalar(attr.getIntrinsic()) &&
          "lowerGenericScalarToVectorContract only handles "
          "MMA_GENERIC_SCALAR_1x1x1_REG* intrinsics");
-  // The 1×1×1 base intrinsic means every non-unit dim in the operand tile
-  // came from `intrinsics_{m,n,k}` and is a `Codegen::TileSwizzle`
-  // `CrossIntrinsic` dim, which `Codegen::expand` placed at the start of
-  // its `expandShape` group and at memory slot 0. So all the unit dims end
-  // up at trailing positions of the per-operand tile; drop them to get the
-  // rank-2 (M, K)/(N, K)/(M, N) shape `vector.contract` expects below.
-  Value lhs = dropTrailingUnitDims(builder, loc, inputs[0], /*minRank=*/2);
-  Value rhs = dropTrailingUnitDims(builder, loc, inputs[1], /*minRank=*/2);
-  Value acc = dropTrailingUnitDims(builder, loc, outputs[0], /*minRank=*/2);
-  Type accElem = cast<VectorType>(acc.getType()).getElementType();
+  int64_t M = attr.getIntrinsicsM();
+  int64_t N = attr.getIntrinsicsN();
+  int64_t K = attr.getIntrinsicsK();
+  auto reshape = [&](Value v, ArrayRef<int64_t> targetShape) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    auto targetTy = VectorType::get(targetShape, vt.getElementType());
+    if (vt == targetTy) {
+      return v;
+    }
+    return vector::ShapeCastOp::create(builder, loc, targetTy, v);
+  };
+  Value lhs = reshape(inputs[0], {M, K});
+  Value rhs = reshape(inputs[1], {N, K});
+  auto accTy = cast<VectorType>(outputs[0].getType());
+  Value acc = reshape(outputs[0], {M, N});
+  Type accElem = accTy.getElementType();
   // For the generic intrinsic, ACC is always at least as wide as LHS/RHS,
   // and they're either all float or all integer (the cost model only picks
   // this intrinsic when element types are mutually consistent that way).
@@ -865,9 +856,10 @@ static LogicalResult lowerGenericScalarToVectorContract(
   // `iree_codegen.inner_tiled` op's own indexing maps for CPU.
   vector::IteratorType par = vector::IteratorType::parallel;
   vector::IteratorType red = vector::IteratorType::reduction;
-  results.push_back(vector::ContractionOp::create(
+  Value contractResult = vector::ContractionOp::create(
       builder, loc, lhs, rhs, acc, MapList{{m, k}, {n, k}, {m, n}},
-      ArrayRef<vector::IteratorType>{par, par, red}));
+      ArrayRef<vector::IteratorType>{par, par, red});
+  results.push_back(reshape(contractResult, accTy.getShape()));
   return success();
 }
 
