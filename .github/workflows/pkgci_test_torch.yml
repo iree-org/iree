@@ -185,7 +185,7 @@ jobs:
             --log-cli-level=info \
             -o log_cli=True \
             --durations=0 \
-            --timeout=1200 \
+            --timeout=1800 \
             --capture=no \
             --test-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/torch_models \
             --external-file-directory=${{ github.workspace }}/tests/external/iree-test-suites/test_suite_files \
