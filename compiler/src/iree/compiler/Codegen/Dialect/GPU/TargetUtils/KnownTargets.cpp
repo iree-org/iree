@@ -405,24 +405,23 @@ const WgpDetails *getCDNA1WgpDetails() {
       MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
       MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
-  static const WgpDetails cdna1Wgp = {
-      allComputeBits,
-      allStorageBits,
-      allSubgroupOps,
-      allDotProductOps,
-      std::size(cdna1MMAOps),
-      cdna1MMAOps,
-      0,
-      nullptr,
-      {64, 64},
-      {1024, 1024, 1024},
-      1024,
-      64 * 1024,
-      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-      /*maxLoadInstructionBits=*/128,
-      /*simdsPerWgp=*/4,
-      /*vgprSpaceBits=*/256 * 32,
-      /*dmaSizes=*/std::nullopt};
+  static const WgpDetails cdna1Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      std::size(cdna1MMAOps),
+                                      cdna1MMAOps,
+                                      0,
+                                      nullptr,
+                                      {64, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      /*vgprSpaceBits=*/256 * 32,
+                                      /*dmaSizes=*/std::nullopt};
   return &cdna1Wgp;
 }
 
@@ -1185,8 +1184,8 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 
 int64_t getSharedMemBankCount(SharedMemoryModel model) {
   if (llvm::is_contained({SharedMemoryModel::CDNA4, SharedMemoryModel::RDNA3,
-                           SharedMemoryModel::RDNA4},
-                          model)) {
+                          SharedMemoryModel::RDNA4},
+                         model)) {
     return 64;
   }
   return 32;
