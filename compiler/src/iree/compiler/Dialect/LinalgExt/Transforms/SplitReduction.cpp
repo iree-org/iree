@@ -471,43 +471,57 @@ static Value getSplitReductionInit(OpBuilder &builder, Location loc,
   return linalg::FillOp::create(builder, loc, identityVal, empty).getResult(0);
 }
 
-static std::pair<Value, Value> buildArgmaxCombiner(OpBuilder &b, Location loc,
-                                                   ArgmaxKind kind, Value val,
-                                                   Value idx, Value outVal,
-                                                   Value outIdx) {
+static void setPreservedAttrs(Operation *op, DictionaryAttr attrs) {
+  if (attrs) {
+    op->setAttrs(attrs);
+  }
+}
+
+static std::pair<Value, Value>
+buildArgmaxCombiner(OpBuilder &b, Location loc, const ArgmaxCombinerInfo &info,
+                    Value val, Value idx, Value outVal, Value outIdx) {
   // Split reduction creates new reductions over local and global indices, so
   // rebuild the recognized argmax semantics instead of cloning the original
-  // combiner ops. This intentionally drops operation attributes such as
-  // arith fast-math flags, which is conservative for the newly generated ops.
-  if (kind == ArgmaxKind::Canonical) {
-    Value maxVal = arith::MaximumFOp::create(b, loc, val, outVal);
-    Value cmp =
+  // combiner ops. Preserve the matched combiner attributes explicitly so
+  // frontend flags such as arith fast-math follow the regenerated ops.
+  if (info.kind == ArgmaxKind::Canonical) {
+    auto maxOp = arith::MaximumFOp::create(b, loc, val, outVal);
+    setPreservedAttrs(maxOp, info.maximumAttrs);
+    auto cmpOp =
         arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-    Value selIdx = arith::SelectOp::create(b, loc, cmp, idx, outIdx);
-    return {maxVal, selIdx};
+    setPreservedAttrs(cmpOp, info.greaterThanCmpAttrs);
+    auto selectOp = arith::SelectOp::create(b, loc, cmpOp, idx, outIdx);
+    setPreservedAttrs(selectOp, info.indexSelectAttrs);
+    return {maxOp, selectOp};
   }
 
-  Value greater =
+  auto greater =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-  Value isNan =
+  setPreservedAttrs(greater, info.greaterThanCmpAttrs);
+  auto isNan =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::UNE, val, val);
+  setPreservedAttrs(isNan, info.isNanCmpAttrs);
   Value valueCond = arith::OrIOp::create(b, loc, greater, isNan);
-  Value equal =
+  auto equal =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, val, outVal);
+  setPreservedAttrs(equal, info.equalCmpAttrs);
   Value lowerIndex =
       arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, idx, outIdx);
   Value tieCond = arith::AndIOp::create(b, loc, equal, lowerIndex);
   Value indexCond = arith::OrIOp::create(b, loc, valueCond, tieCond);
-  Value maxVal = arith::SelectOp::create(b, loc, valueCond, val, outVal);
-  Value selIdx = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
-  return {maxVal, selIdx};
+  auto valueSelect = arith::SelectOp::create(b, loc, valueCond, val, outVal);
+  setPreservedAttrs(valueSelect, info.valueSelectAttrs);
+  auto indexSelect = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
+  setPreservedAttrs(indexSelect, info.indexSelectAttrs);
+  return {valueSelect, indexSelect};
 }
 
 FailureOr<linalg::SplitReductionResult>
 splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn) {
-  std::optional<ArgmaxKind> argmaxKind = getArgmaxKind(genericOp);
-  assert(argmaxKind && "expected operation to be an argmax op");
+  std::optional<ArgmaxCombinerInfo> argmaxInfo =
+      getArgmaxCombinerInfo(genericOp);
+  assert(argmaxInfo && "expected operation to be an argmax op");
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(genericOp);
@@ -559,7 +573,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   auto identity =
       FloatAttr::get(valueType, APFloat::getInf(valueType.getFloatSemantics(),
                                                 /*Negative=*/true));
-  ArgmaxKind kind = *argmaxKind;
+  ArgmaxCombinerInfo info = *argmaxInfo;
 
   SmallVector<Value> newInputs;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
@@ -631,7 +645,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       rewriter, loc,
       TypeRange{identityValue.getType(), identityIndex.getType()}, newInputs,
       ValueRange{identityValue, identityIndex}, newMaps, newIteratorTypes,
-      [reductionDim, kind](OpBuilder &b, Location loc, ValueRange args) {
+      [reductionDim, info](OpBuilder &b, Location loc, ValueRange args) {
         Value in = args[0];
         Value outVal = args[1];
         Value outIdx = args[2];
@@ -653,7 +667,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         }
 
         auto [maxVal, selIdx] = buildArgmaxCombiner(
-            b, loc, kind, inCast, reductionIdx, outVal, outIdx);
+            b, loc, info, inCast, reductionIdx, outVal, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 
@@ -683,7 +697,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       rewriter, loc, genericOp.getResultTypes(),
       ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
-      [tileSize, insertSplitDimension, kind](OpBuilder &b, Location loc,
+      [tileSize, insertSplitDimension, info](OpBuilder &b, Location loc,
                                              ValueRange inputs) {
         Value val = inputs[0];
         Value local = inputs[1];
@@ -697,7 +711,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
         auto [maxVal, selIdx] =
-            buildArgmaxCombiner(b, loc, kind, val, gidx, outVal, outIdx);
+            buildArgmaxCombiner(b, loc, info, val, gidx, outVal, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 

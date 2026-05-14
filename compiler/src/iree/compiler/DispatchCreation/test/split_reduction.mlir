@@ -46,8 +46,8 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
   ^bb0(%in: bf16, %out: bf16, %out_0: i64):
     %5 = linalg.index 1 : index
     %6 = arith.index_cast %5 : index to i64
-    %7 = arith.maximumf %in, %out : bf16
-    %8 = arith.cmpf ogt, %in, %out : bf16
+    %7 = arith.maximumf %in, %out fastmath<nnan> : bf16
+    %8 = arith.cmpf ogt, %in, %out fastmath<nnan> : bf16
     %9 = arith.select %8, %6, %out_0 : i64
     linalg.yield %7, %9 : bf16, i64
   } -> (tensor<?xbf16>, tensor<?xi64>)
@@ -81,8 +81,8 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: ^bb0(%[[IN:.+]]: bf16, %[[ACC:.+]]: bf16, %[[IDX:.+]]: i64)
 // CHECK: %[[REDIDX:.+]] = linalg.index 2 : index
 // CHECK: %[[CASTIDX:.+]] = arith.index_cast %[[REDIDX]] : index to i64
-// CHECK: %[[MAXVAL:.+]] = arith.maximumf %[[IN]], %[[ACC]] : bf16
-// CHECK: %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[ACC]] : bf16
+// CHECK: %[[MAXVAL:.+]] = arith.maximumf %[[IN]], %[[ACC]] fastmath<nnan> : bf16
+// CHECK: %[[CMP:.+]] = arith.cmpf ogt, %[[IN]], %[[ACC]] fastmath<nnan> : bf16
 // CHECK: %[[SELIDX:.+]] = arith.select %[[CMP]], %[[CASTIDX]], %[[IDX]] : i64
 // CHECK: linalg.yield %[[MAXVAL]], %[[SELIDX]] : bf16, i64
 
@@ -96,8 +96,8 @@ util.func public @argmax(%arg0: tensor<?x131072xbf16>, %arg1: index) -> tensor<?
 // CHECK: %[[OFFSET:.+]] = arith.muli %[[OUTER]], %[[C128]] : index
 // CHECK: %[[OFFSET_CAST:.+]] = arith.index_cast %[[OFFSET]] : index to i64
 // CHECK: %[[GIDX:.+]] = arith.addi %[[OFFSET_CAST]], %[[I1]] : i64
-// CHECK: %[[MAX2:.+]] = arith.maximumf %[[V1]], %[[V2]] : bf16
-// CHECK: %[[CMP2:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] : bf16
+// CHECK: %[[MAX2:.+]] = arith.maximumf %[[V1]], %[[V2]] fastmath<nnan> : bf16
+// CHECK: %[[CMP2:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] fastmath<nnan> : bf16
 // CHECK: %[[SEL2:.+]] = arith.select %[[CMP2]], %[[GIDX]], %[[I2]] : i64
 // CHECK: linalg.yield %[[MAX2]], %[[SEL2]] : bf16, i64
 
@@ -151,10 +151,10 @@ util.func public @argmax_select_style(%arg0: tensor<1x248320xf32>) -> tensor<1xi
   ^bb0(%in: f32, %out: f32, %out_idx: i32):
     %idx = linalg.index 1 : index
     %idx_i32 = arith.index_cast %idx : index to i32
-    %gt = arith.cmpf ogt, %in, %out : f32
-    %nan = arith.cmpf une, %in, %in : f32
+    %gt = arith.cmpf ogt, %in, %out fastmath<contract> : f32
+    %nan = arith.cmpf une, %in, %in fastmath<contract> : f32
     %value_cond = arith.ori %gt, %nan : i1
-    %eq = arith.cmpf oeq, %in, %out : f32
+    %eq = arith.cmpf oeq, %in, %out fastmath<contract> : f32
     %lower_idx = arith.cmpi slt, %idx_i32, %out_idx : i32
     %tie = arith.andi %eq, %lower_idx : i1
     %index_cond = arith.ori %value_cond, %tie : i1
@@ -168,7 +168,13 @@ util.func public @argmax_select_style(%arg0: tensor<1x248320xf32>) -> tensor<1xi
 // CHECK-LABEL:   util.func public @argmax_select_style
 // CHECK:         tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [1, 1940, 128] : tensor<1x248320xf32> into tensor<1x1940x128xf32>
 // CHECK:         iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK:         arith.cmpf ogt, {{.*}} fastmath<contract> : f32
+// CHECK:         arith.cmpf une, {{.*}} fastmath<contract> : f32
+// CHECK:         arith.cmpf oeq, {{.*}} fastmath<contract> : f32
 // CHECK:         iterator_types = ["parallel", "reduction"]
+// CHECK:         arith.cmpf ogt, {{.*}} fastmath<contract> : f32
+// CHECK:         arith.cmpf une, {{.*}} fastmath<contract> : f32
+// CHECK:         arith.cmpf oeq, {{.*}} fastmath<contract> : f32
 // CHECK:         util.return
 
 // -----

@@ -249,6 +249,21 @@ enum class ArgmaxKind {
   StableHloSelectStyle,
 };
 
+struct ArgmaxCombinerInfo {
+  ArgmaxKind kind;
+  DictionaryAttr maximumAttrs;
+  DictionaryAttr greaterThanCmpAttrs;
+  DictionaryAttr isNanCmpAttrs;
+  DictionaryAttr equalCmpAttrs;
+  DictionaryAttr valueSelectAttrs;
+  DictionaryAttr indexSelectAttrs;
+};
+
+/// Returns the argmax combiner info represented by the given linalg.generic, if
+/// any.
+std::optional<ArgmaxCombinerInfo>
+getArgmaxCombinerInfo(linalg::GenericOp genericOp);
+
 /// Returns the argmax kind represented by the given linalg.generic, if any.
 std::optional<ArgmaxKind> getArgmaxKind(linalg::GenericOp genericOp);
 
