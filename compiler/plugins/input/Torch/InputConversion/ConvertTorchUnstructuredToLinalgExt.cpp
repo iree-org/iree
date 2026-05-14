@@ -318,18 +318,23 @@ static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
         getResultTypes) {
   auto module = contextOp->getParentOfType<ModuleOp>();
   if (!module) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected parent module when inlining callback function");
   }
   auto funcOp = module.lookupSymbol<func::FuncOp>(funcSymbol);
   if (!funcOp || funcOp.isExternal() || !funcOp.getBody().hasOneBlock() ||
       funcOp.getNumArguments() != args.size()) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        contextOp,
+        "expected callback function to be defined with one block and matching "
+        "argument count");
   }
 
   Block &entryBlock = funcOp.getBody().front();
   auto returnOp = dyn_cast<func::ReturnOp>(entryBlock.getTerminator());
   if (!returnOp) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected callback function to terminate with func.return");
   }
 
   IRMapping mapper;
@@ -339,7 +344,10 @@ static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
 
   for (Operation &op : entryBlock.without_terminator()) {
     if (op.getNumRegions() != 0 || op.getNumSuccessors() != 0) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          contextOp,
+          "expected callback function body to contain ops without regions or "
+          "successors");
     }
 
     SmallVector<Value> operands;
@@ -573,7 +581,8 @@ struct FlexAttentionOpConversion
     if (enableGqa) {
       if (failed(preProcessGroupQueryAttentionInputs(op, rewriter, query, key,
                                                      value))) {
-        return failure();
+        return rewriter.notifyMatchFailure(
+            op, "failed to preprocess grouped-query attention inputs");
       }
     }
 
@@ -642,7 +651,8 @@ struct FlexAttentionOpConversion
       FailureOr<Value> mask = createFlexAttentionMask(
           rewriter, loc, maskModSymbol, torchIndices, scoreShape, op);
       if (failed(mask)) {
-        return failure();
+        return rewriter.notifyMatchFailure(
+            op, "failed to materialize flex_attention mask_mod");
       }
       maskOperand = *mask;
     }
