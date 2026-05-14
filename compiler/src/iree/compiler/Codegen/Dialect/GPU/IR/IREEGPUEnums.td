@@ -481,44 +481,31 @@ def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
 // bank count, phase scheduling, and bank width. Use the getter functions
 // in KnownTargets.h to query derived values from the model.
 
-// Unknown or not applicable — shared memory analysis is unavailable.
+// Unknown or not applicable -- shared memory analysis is unavailable.
 def IREEGPU_SharedMemModelNone
     : I32EnumAttrCase<"None", 0, "none">;
-
-// CDNA1-3: 32 banks, 4-byte bank width.
-def IREEGPU_SharedMemModelCDNA1
-    : I32EnumAttrCase<"CDNA1", 1, "cdna1">;
+// CDNA2-3 (gfx90a, gfx942): 32 banks, 4-byte bank width.
 def IREEGPU_SharedMemModelCDNA2
-    : I32EnumAttrCase<"CDNA2", 2, "cdna2">;
+    : I32EnumAttrCase<"CDNA2", 1, "cdna2">;
 def IREEGPU_SharedMemModelCDNA3
-    : I32EnumAttrCase<"CDNA3", 3, "cdna3">;
-
+    : I32EnumAttrCase<"CDNA3", 2, "cdna3">;
 // CDNA4 (gfx950): 64 banks, 4-byte bank width. Non-contiguous 4-phase
 // scheduling for ds_read_b128.
 def IREEGPU_SharedMemModelCDNA4
-    : I32EnumAttrCase<"CDNA4", 4, "cdna4">;
-
-// RDNA1-2: 32 banks, 4-byte bank width.
-def IREEGPU_SharedMemModelRDNA1
-    : I32EnumAttrCase<"RDNA1", 5, "rdna1">;
-def IREEGPU_SharedMemModelRDNA2
-    : I32EnumAttrCase<"RDNA2", 6, "rdna2">;
-
-// RDNA3-4: 64 banks, 4-byte bank width.
+    : I32EnumAttrCase<"CDNA4", 3, "cdna4">;
+// RDNA3 (gfx1100+): 64 banks, 4-byte bank width.
 def IREEGPU_SharedMemModelRDNA3
-    : I32EnumAttrCase<"RDNA3", 7, "rdna3">;
+    : I32EnumAttrCase<"RDNA3", 4, "rdna3">;
+// RDNA4 (gfx1200+): 64 banks, 4-byte bank width.
 def IREEGPU_SharedMemModelRDNA4
-    : I32EnumAttrCase<"RDNA4", 8, "rdna4">;
+    : I32EnumAttrCase<"RDNA4", 5, "rdna4">;
 
 def IREEGPU_SharedMemoryModel : IREEGPU_I32EnumAttr<"SharedMemoryModel",
     "Shared memory hardware model", [
       IREEGPU_SharedMemModelNone,
-      IREEGPU_SharedMemModelCDNA1,
       IREEGPU_SharedMemModelCDNA2,
       IREEGPU_SharedMemModelCDNA3,
       IREEGPU_SharedMemModelCDNA4,
-      IREEGPU_SharedMemModelRDNA1,
-      IREEGPU_SharedMemModelRDNA2,
       IREEGPU_SharedMemModelRDNA3,
       IREEGPU_SharedMemModelRDNA4
     ]>;

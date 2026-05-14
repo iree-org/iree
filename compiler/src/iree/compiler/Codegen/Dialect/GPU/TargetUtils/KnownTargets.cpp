@@ -422,8 +422,7 @@ const WgpDetails *getCDNA1WgpDetails() {
       /*maxLoadInstructionBits=*/128,
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/256 * 32,
-      /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::CDNA1};
+      /*dmaSizes=*/std::nullopt};
   return &cdna1Wgp;
 }
 
@@ -493,48 +492,36 @@ const WgpDetails *getRDNA3WgpDetails() {
 }
 
 const WgpDetails *getRDNA2WgpDetails() {
-  static const WgpDetails rdna2Wgp = {
-      allComputeBits,
-      allStorageBits,
-      allSubgroupOps,
-      allDotProductOps,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr,
-      {32, 64},
-      {1024, 1024, 1024},
-      1024,
-      64 * 1024,
-      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-      /*maxLoadInstructionBits=*/std::nullopt,
-      /*simdsPerWgp=*/std::nullopt,
-      /*vgprSpaceBits=*/std::nullopt,
-      /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::RDNA2};
+  static const WgpDetails rdna2Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna2Wgp;
 }
 
 const WgpDetails *getRDNA1WgpDetails() {
-  static const WgpDetails rdna1Wgp = {
-      allComputeBits,
-      allStorageBits,
-      allSubgroupOps,
-      DotProductOps::None,
-      /*mmaCount=*/0,
-      /*mmaOps=*/nullptr,
-      /*scaledMmaCount=*/0,
-      /*scaledMmaOps=*/nullptr,
-      {32, 64},
-      {1024, 1024, 1024},
-      1024,
-      64 * 1024,
-      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-      /*maxLoadInstructionBits=*/std::nullopt,
-      /*simdsPerWgp=*/std::nullopt,
-      /*vgprSpaceBits=*/std::nullopt,
-      /*dmaSizes=*/std::nullopt,
-      /*sharedMemModel=*/SharedMemoryModel::RDNA1};
+  static const WgpDetails rdna1Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      /*mmaCount=*/0,
+                                      /*mmaOps=*/nullptr,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 64},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      64 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff}};
   return &rdna1Wgp;
 }
 
@@ -1197,43 +1184,22 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 //===----------------------------------------------------------------------===//
 
 int64_t getSharedMemBankCount(SharedMemoryModel model) {
-  switch (model) {
-  case SharedMemoryModel::None:
-    llvm_unreachable("no shared memory model");
-  case SharedMemoryModel::CDNA1:
-  case SharedMemoryModel::CDNA2:
-  case SharedMemoryModel::CDNA3:
-  case SharedMemoryModel::RDNA1:
-  case SharedMemoryModel::RDNA2:
-    return 32;
-  case SharedMemoryModel::CDNA4:
-  case SharedMemoryModel::RDNA3:
-  case SharedMemoryModel::RDNA4:
+  if (llvm::is_contained({SharedMemoryModel::CDNA4, SharedMemoryModel::RDNA3,
+                           SharedMemoryModel::RDNA4},
+                          model)) {
     return 64;
   }
-  llvm_unreachable("unhandled SharedMemoryModel");
+  return 32;
 }
 
 int64_t getSharedMemBankWidth(SharedMemoryModel model) {
-  switch (model) {
-  case SharedMemoryModel::None:
-    llvm_unreachable("no shared memory model");
-  case SharedMemoryModel::CDNA1:
-  case SharedMemoryModel::CDNA2:
-  case SharedMemoryModel::CDNA3:
-  case SharedMemoryModel::CDNA4:
-  case SharedMemoryModel::RDNA1:
-  case SharedMemoryModel::RDNA2:
-  case SharedMemoryModel::RDNA3:
-  case SharedMemoryModel::RDNA4:
-    return 4;
-  }
-  llvm_unreachable("unhandled SharedMemoryModel");
+  assert(model != SharedMemoryModel::None && "no shared memory model");
+  return 4;
 }
 
-// TODO: This only models phase groups for read operations (ds_read_*).
-// Write operations (ds_write_*) may have different phase scheduling, but
-// we haven't needed to handle write-side bank conflicts yet.
+// TODO: Add a read/write access type parameter to distinguish read vs write
+// phase groups. Currently only read phases are modeled; write operations
+// (ds_write_*) may have different phase scheduling.
 std::optional<SmallVector<SmallVector<int64_t>>>
 getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
   if (model != SharedMemoryModel::CDNA4) {
@@ -1256,7 +1222,7 @@ getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
     }
   };
 
-  // Bail out if the thread count is not evenly divisible — the contiguous
+  // Bail out if the thread count is not evenly divisible -- the contiguous
   // phase grouping would be ill-defined.
   if (numThreads % threadsPerPhase != 0) {
     return std::nullopt;
@@ -1265,9 +1231,12 @@ getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
   if (readBytes <= 8) {
     // ds_read_b32/b64: contiguous phase scheduling on CDNA4.
     buildContiguous();
-  } else if (readBytes <= 16) {
+    return phases;
+  }
+
+  if (readBytes <= 16) {
     // ds_read_b128 on CDNA4: 4 phases of 16 threads, non-contiguous.
-    // Phase assignment determined by from internal LDS design spec. See also:
+    // Phase assignment determined from internal LDS design spec. See also:
     // https://rocm.blogs.amd.com/software-tools-optimization/lds-bank-conflict/README.html
     static constexpr int64_t kCDNA4WavefrontSize = 64;
     if (numThreads != kCDNA4WavefrontSize) {
@@ -1282,11 +1251,10 @@ getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
     for (int64_t t = 0; t < kCDNA4WavefrontSize; ++t) {
       phases[cdna4B128Phases[t]].push_back(t);
     }
-  } else {
-    // Reads wider than 16 bytes are not modeled by the b128 phase table.
-    return std::nullopt;
+    return phases;
   }
-  return phases;
+
+  return std::nullopt;
 }
 
 std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {

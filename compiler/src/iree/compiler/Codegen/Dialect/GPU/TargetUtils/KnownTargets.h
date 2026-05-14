@@ -47,11 +47,13 @@ int64_t getSharedMemBankCount(SharedMemoryModel model);
 /// Must not be called with SharedMemoryModel::None.
 int64_t getSharedMemBankWidth(SharedMemoryModel model);
 
-/// Returns the phase groups for the given shared memory model, read width,
-/// and total number of threads in the wavefront. Each inner vector contains
-/// the thread IDs that access shared memory simultaneously in one phase.
-/// Returns nullopt when phase data is unavailable for the model (currently
-/// only CDNA4 has empirically measured phase tables).
+/// Returns the read phase groups for the given shared memory model, read
+/// width, and total number of threads in the wavefront. Each inner vector
+/// contains the thread IDs that access shared memory simultaneously in one
+/// phase. Returns nullopt when phase data is unavailable for the model
+/// (currently only CDNA4 has empirically measured phase tables).
+// TODO: Add a read/write access type parameter to distinguish read vs write
+// phase groups.
 std::optional<SmallVector<SmallVector<int64_t>>>
 getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads);
 
