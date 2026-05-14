@@ -86,7 +86,7 @@ static void unwrapSingleElementArrayTypes(llvm::Module &M) {
             continue;
           }
           // extractvalue [1 x T] %v, 0 → replace with the unwrapped value.
-          // If the aggregate is a PHI, we need to handle it after PHI fixup.
+          // If the aggregate is a PHI, we need to handle it after PHI fixup.ROCMTarget
           // For now, just replace uses with the aggregate operand if types
           // match after unwrapping.
         }
@@ -1107,9 +1107,23 @@ public:
           return variantOp.emitError() << "cannot create SPIR-V target machine";
         }
 
+        // If requested, dump the wrapped .ll just before conversion to SPIRV-binary
+        if(!serializationOptions.dumpIntermediatesPath.empty()) {
+            dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
+                             serializationOptions.dumpBaseName, variantOp.getName(),
+                             ".wrapped.ll", *llvmModule);
+        }
+
         // Unwrap [1 x T] aggregate types that trip up the SPIR-V backend
         // and amd-llvm-spirv reverse translator (PHI type mismatches).
         unwrapSingleElementArrayTypes(*llvmModule);
+
+        // If requested, dump the unwrapped .ll just before conversion to SPIRV-binary
+        if(!serializationOptions.dumpIntermediatesPath.empty()) {
+            dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
+                             serializationOptions.dumpBaseName, variantOp.getName(),
+                             ".unwrapped.ll", *llvmModule);
+        }
 
         // Emit SPIR-V binary (no lld/hsaco needed).
         // The MLIR PrepareForSPIRV pass set triple, data layout, calling

@@ -62,6 +62,7 @@ iree_lit_test_suite(
     "rocdl_prepare_for_spirv.mlir"
     "rocm_spirv_serialize.mlir"
     "rocm_spirv_serialize_target_attr.mlir"
+    "rocm_spirv_unwrap_singleton.mlir"
     "sort_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"
