@@ -413,10 +413,10 @@ def virtual_mma_intrinsic_attr():
     assert lhs_layout.element == [1, 8]
 
     rhs_layout = iree_gpu.get_single_subgroup_layout(gfx950_vdmfma_intrinsic_attr, 1)
-    assert rhs_layout.outer == [2, 1]
+    assert rhs_layout.outer == [4, 1]
     assert rhs_layout.thread == [4, 16]
     assert rhs_layout.tstrides == [16, 1]
-    assert rhs_layout.element == [8, 1]
+    assert rhs_layout.element == [4, 1]
 
     gfx950_vdmfma_attr = iree_gpu.VirtualMMAAttr.get(
         iree_gpu.VirtualMMAIntrinsic.VDMFMA_F32_8x16x64x1_F16

@@ -59,11 +59,11 @@ func.func @expand_virtual_vdmfma_cdna4_f16(%lhs: tensor<1x1x8x64xf16>, %rhs: ten
 // CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<1x1x8x16xf32>
 
 // CHECK-INPUTS-DAG:    %[[EXPANDED_LHS:.+]] = tensor.expand_shape %[[LHS]] {{\[}}[0], [1], [2], [3, 4]] output_shape [1, 1, 8, 2, 32]
-// CHECK-INPUTS-DAG:    %[[EXPANDED_RHS:.+]] = tensor.expand_shape %[[RHS]] {{\[}}[0], [1], [2], [3, 4]] output_shape [1, 1, 16, 2, 32]
+// CHECK-INPUTS-DAG:    %[[EXPANDED_RHS:.+]] = tensor.expand_shape %[[RHS]] {{\[}}[0], [1], [2], [3, 4]] output_shape [1, 1, 16, 4, 16]
 // CHECK-INPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[EXPANDED_LHS]], %[[EXPANDED_RHS]]) outs(%[[ACC]])
 // CHECK-INPUTS-SAME:     kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
 // CHECK-INPUTS-SAME:     permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>]
-// CHECK-INPUTS-SAME:     : tensor<1x1x8x2x32xf16>, tensor<1x1x16x2x32xf16> into tensor<1x1x8x16xf32>
+// CHECK-INPUTS-SAME:     : tensor<1x1x8x2x32xf16>, tensor<1x1x16x4x16xf16> into tensor<1x1x8x16xf32>
 // CHECK-INPUTS:        return %[[MMA]]
 
 // CHECK-OUTPUTS:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])

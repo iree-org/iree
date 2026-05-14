@@ -945,7 +945,7 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] : vector<16xf16>, vector<16xf16>
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15] : vector<16xf16>, vector<16xf16>
 //       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //  CHECK-SAME:   (%[[ACC_COLLAPSE_ARG:[^ ]+]] = %[[SMFMAC]]) : (vector<4xf32>) -> vector<2xf32>
@@ -962,7 +962,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   (%{{[^ ]+}} = %{{[^ )]+}}) : (vector<2xf32>) -> vector<4xf32>
 //       CHECK:   %{{[^ ]+}} = vector.interleave
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
-//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 4, 5, 2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15] : vector<16xbf16>, vector<16xbf16>
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15] : vector<16xbf16>, vector<16xbf16>
 //       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //       CHECK:   return %[[ACC_COLLAPSE]] : vector<2xf32>
