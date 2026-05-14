@@ -322,10 +322,14 @@ static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
         contextOp, "expected parent module when inlining callback function");
   }
   auto funcOp = module.lookupSymbol<func::FuncOp>(funcSymbol);
-  if (!funcOp || funcOp.isExternal() || !funcOp.getBody().hasOneBlock() ||
+  if (!funcOp) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected callback function symbol to resolve");
+  }
+  if (funcOp.isExternal() || !funcOp.getBody().hasOneBlock() ||
       funcOp.getNumArguments() != args.size()) {
     return rewriter.notifyMatchFailure(
-        contextOp,
+        funcOp.getOperation(),
         "expected callback function to be defined with one block and matching "
         "argument count");
   }
@@ -334,7 +338,8 @@ static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
   auto returnOp = dyn_cast<func::ReturnOp>(entryBlock.getTerminator());
   if (!returnOp) {
     return rewriter.notifyMatchFailure(
-        contextOp, "expected callback function to terminate with func.return");
+        funcOp.getOperation(),
+        "expected callback function to terminate with func.return");
   }
 
   IRMapping mapper;
@@ -345,7 +350,7 @@ static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
   for (Operation &op : entryBlock.without_terminator()) {
     if (op.getNumRegions() != 0 || op.getNumSuccessors() != 0) {
       return rewriter.notifyMatchFailure(
-          contextOp,
+          &op,
           "expected callback function body to contain ops without regions or "
           "successors");
     }
