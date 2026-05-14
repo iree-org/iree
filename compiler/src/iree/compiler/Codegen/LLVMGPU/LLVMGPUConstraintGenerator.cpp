@@ -375,18 +375,19 @@ static LogicalResult emitVectorDistributeConstraints(
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
 
   // Create intermediate values.
+  // mma_m, mma_n, mma_k
   MMALookup mmaLookup = emitMMALookup(builder, loc, compatibleMMAs);
-  // sg_m = wg_m / (sg_m_cnt * mma_m)
+  // sg_num, number of subgroups per workgroup
   Value sgNum = smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
   Value sgMDenom = smt::IntMulOp::create(
       builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup});
-  // sgM = wg_m / sg_m_cnt * mma_m
+  // sg_m, number of mma_m along M per subgroup
   Value sgM = smt::IntDivOp::create(builder, loc, wgM, sgMDenom);
   Value sgNDenom = smt::IntMulOp::create(
       builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup});
-  // sgN = wg_n / sg_n_cnt * mma_n
+  // sg_n, number of mma_n along N per subgroup
   Value sgN = smt::IntDivOp::create(builder, loc, wgN, sgNDenom);
-  // sgK = red_k / mma_k
+  // sg_k, number of mma_k along K per subgroup
   Value sgK = smt::IntDivOp::create(builder, loc, redK, mmaLookup.mmaKLookup);
 
   // Constraint 0: Set concrete values for knobs.
@@ -394,11 +395,6 @@ static LogicalResult emitVectorDistributeConstraints(
   Value sgSizeEq = smt::EqOp::create(builder, loc, sgSize, subgroupSizeVal);
   AssertOp::create(builder, loc, sgSizeEq,
                    "sg_size == preferred_subgroup_size");
-  // TODO(#23535): This is from Tuner Python constraints. Revisit.
-  // sg_num == 4
-  Value sgNumEq =
-      smt::EqOp::create(builder, loc, sgNum, mkIntConst(builder, loc, 4));
-  AssertOp::create(builder, loc, sgNumEq, "num_subgroups == 4");
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
@@ -424,18 +420,6 @@ static LogicalResult emitVectorDistributeConstraints(
             joinStr(wgNName, " <= 512 (max VGPRs)"));
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
             joinStr(redKName, " <= 512 (max VGPRs)"));
-  // TODO(#23535): This is from Tuner Python constraints. Revisit.
-  // wg_m >= sg_size * sg_n_cnt OR wg_n >= sg_size * sg_n_cnt
-  Value mulResult =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgSize, sgNCnt});
-  Value geM = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, wgM,
-                                    mulResult);
-  Value geN = smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, wgN,
-                                    mulResult);
-  Value orCond = smt::OrOp::create(builder, loc, ValueRange{geM, geN});
-  AssertOp::create(builder, loc, orCond,
-                   joinStr(wgMName, " >= sg_size * sg_n_cnt OR ", wgNName,
-                           " >= sg_size * sg_n_cnt"));
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
@@ -447,23 +431,20 @@ static LogicalResult emitVectorDistributeConstraints(
                   joinStr(redKName, " % mma_k == 0"));
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
+  // red_k % (1 * mma_k * sg_k) == 0
   Value mulResultM = smt::IntMulOp::create(
       builder, loc, ValueRange{sgMCnt, mmaLookup.mmaMLookup, sgM});
   Value mulResultN = smt::IntMulOp::create(
       builder, loc, ValueRange{sgNCnt, mmaLookup.mmaNLookup, sgN});
+  Value mulResultK = smt::IntMulOp::create(
+      builder, loc, ValueRange{mmaLookup.mmaKLookup, sgK});
   assertDivisible(builder, loc, wgM, mulResultM,
                   joinStr(wgMName, " % (sg_m_cnt * mma_m * sg_m) == 0"));
   assertDivisible(builder, loc, wgN, mulResultN,
                   joinStr(wgNName, " % (sg_n_cnt * mma_n * sg_n) == 0"));
-  // TODO(#23535): This is from Tuner Python constraints. Revisit.
-  // red_k == sg_k * mma_k
-  Value mulResultK = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgK, mmaLookup.mmaKLookup});
-  Value redKEq = smt::EqOp::create(builder, loc, redK, mulResultK);
-  AssertOp::create(builder, loc, redKEq, joinStr(redKName, " == sg_k * mma_k"));
-  // red_k % mma_m == 0
-  assertDivisible(builder, loc, redK, mmaLookup.mmaMLookup,
-                  joinStr(redKName, " % mma_m == 0"));
+
+  assertDivisible(builder, loc, redK, mulResultK,
+                  joinStr(redKName, " % (mma_k * sg_k) == 0"));
 
   // Constraint 4: Subgroup count bounds.
   // wg_tile = mma * sg_tile * sg_cnt
@@ -490,6 +471,10 @@ static LogicalResult emitVectorDistributeConstraints(
       smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
   Value sgCntEq = smt::EqOp::create(builder, loc, sgCntMulResult, sgNum);
   AssertOp::create(builder, loc, sgCntEq, "sg_m_cnt * sg_n_cnt == sg_num");
+  // TODO(#23535): bounds range copied from current Tuner. Need to revisit.
+  // 1 <= sg_num <= 10.
+  assertBounds(builder, loc, sgNum, "sg_num", mkIntConst(builder, loc, 1), "1",
+               mkIntConst(builder, loc, 10), "10");
 
   // Constraint 5: Thread count limit.
   // sg_m_cnt * sg_n_cnt * sg_size <= max_threads
@@ -536,19 +521,30 @@ static LogicalResult emitVectorDistributeConstraints(
   // Constraint 8: TranslationInfo workgroup structure.
   // For VectorDistribute, workgroup_size =
   // [wg_x, wg_y, wg_z] = [total_threads, 1, 1]
-  // TODO(#23535): This is from Tuner Python constraints. Revisit.
-  // wg_x == sg_size * sg_n_cnt
-  Value expectedWgX =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgSize, sgNCnt});
-  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, expectedWgX);
-  AssertOp::create(builder, loc, wgXEq, "wg_size_x == sg_size * sg_n_cnt");
-  // wg_y == sg_m_cnt
-  Value wgYEq = smt::EqOp::create(builder, loc, wgSizeY, sgMCnt);
-  AssertOp::create(builder, loc, wgYEq, "wg_size_y == sg_m_cnt");
+  // wg_x == total_threads
+  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, totalThreadsMulResult);
+  AssertOp::create(builder, loc, wgXEq, "wg_size_x == total_threads");
+  // wg_y == 1
+  Value wgYEq =
+      smt::EqOp::create(builder, loc, wgSizeY, mkIntConst(builder, loc, 1));
+  AssertOp::create(builder, loc, wgYEq, "wg_size_y == 1");
   // wg_z == 1
   Value wgZEq =
       smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
   AssertOp::create(builder, loc, wgZEq, "wg_size_z == 1");
+
+  // Constraint 9: Additional heuristic filters to narrow the search space.
+  // wg_x <= wg_m OR wg_x <= wg_n
+  Value wgXLeM =
+      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::le, wgSizeX, wgM);
+  Value wgXLeN =
+      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::le, wgSizeX, wgN);
+  Value orCond = smt::OrOp::create(builder, loc, ValueRange{wgXLeM, wgXLeN});
+  AssertOp::create(builder, loc, orCond,
+                   "wg_size_x <= wg_m OR wg_size_x <= wg_n");
+  // red_k % mma_m == 0
+  assertDivisible(builder, loc, redK, mmaLookup.mmaMLookup,
+                  joinStr(redKName, " % mma_m == 0"));
 
   return success();
 }
