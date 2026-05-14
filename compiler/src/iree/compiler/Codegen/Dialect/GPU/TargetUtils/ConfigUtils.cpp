@@ -1085,19 +1085,15 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
     // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
     // innermost (contiguous reads) to avoid shared memory bank conflicts.
-    if (!transposedLhs) {
-      if (std::optional<Attribute> swizzle = getXorShuffleAttr(
-              context, lhsAttr, target, kind, kMMAOperandLhs,
-              /*isTransposed=*/false, /*useDirectLoad=*/true)) {
-        lhsAttr = *swizzle;
-      }
+    if (std::optional<Attribute> swizzle = getXorShuffleAttr(
+            context, lhsAttr, target, kind, kMMAOperandLhs,
+            /*isTransposed=*/false, /*useDirectLoad=*/transposedLhs)) {
+      lhsAttr = swizzle.value();
     }
-    if (transposedRhs) {
-      if (std::optional<Attribute> swizzle = getXorShuffleAttr(
-              context, rhsAttr, target, kind, kMMAOperandRhs,
-              /*isTransposed=*/true, /*useDirectLoad=*/true)) {
-        rhsAttr = *swizzle;
-      }
+    if (std::optional<Attribute> swizzle = getXorShuffleAttr(
+            context, rhsAttr, target, kind, kMMAOperandRhs,
+            /*isTransposed=*/true, /*useDirectLoad=*/transposedRhs)) {
+      rhsAttr = swizzle.value();
     }
     promotionArray = {lhsAttr, rhsAttr};
   }

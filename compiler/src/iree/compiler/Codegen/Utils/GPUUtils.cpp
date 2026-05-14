@@ -1155,6 +1155,10 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
   if (!xorShuffleParams) {
     return std::nullopt;
   }
+  // Identity shuffle, return base config directly.
+  if (xorShuffleParams->rowElems == xorShuffleParams->accessElems) {
+    return baseConfigAttr;
+  }
   auto swizzleAttr = IREE::Codegen::XORShuffleAttr::get(
       context, xorShuffleParams->rowElems, xorShuffleParams->accessElems,
       /*row_stride=*/int64_t(0),
