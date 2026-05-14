@@ -35,15 +35,27 @@
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_io_file_handle_t {
+  // Reference count controlling handle lifetime.
   iree_atomic_ref_count_t ref_count;
+
+  // Host allocator used for this handle.
   iree_allocator_t host_allocator;
+
+  // Original platform open mode bits known to this handle.
+  iree_io_file_mode_t mode;
+
+  // Access operations allowed through this handle.
   iree_io_file_access_t access;
+
+  // Wrapped platform primitive.
   iree_io_file_handle_primitive_t primitive;
+
+  // Callback used to release the wrapped primitive.
   iree_io_file_handle_release_callback_t release_callback;
 } iree_io_file_handle_t;
 
 IREE_API_EXPORT iree_status_t iree_io_file_handle_wrap(
-    iree_io_file_access_t allowed_access,
+    iree_io_file_access_t allowed_access, iree_io_file_mode_t mode,
     iree_io_file_handle_primitive_t handle_primitive,
     iree_io_file_handle_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle) {
@@ -57,6 +69,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_wrap(
       iree_allocator_malloc(host_allocator, sizeof(*handle), (void**)&handle));
   iree_atomic_ref_count_init(&handle->ref_count);
   handle->host_allocator = host_allocator;
+  handle->mode = mode;
   handle->access = allowed_access;
   handle->primitive = handle_primitive;
   handle->release_callback = release_callback;
@@ -77,8 +90,9 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_wrap_host_allocation(
               .host_allocation = host_allocation,
           },
   };
-  return iree_io_file_handle_wrap(allowed_access, handle_primitive,
-                                  release_callback, host_allocator, out_handle);
+  return iree_io_file_handle_wrap(allowed_access, IREE_IO_FILE_MODE_NONE,
+                                  handle_primitive, release_callback,
+                                  host_allocator, out_handle);
 }
 
 static void iree_io_file_handle_destroy(iree_io_file_handle_t* handle) {
@@ -120,6 +134,12 @@ IREE_API_EXPORT iree_io_file_handle_primitive_t
 iree_io_file_handle_primitive(const iree_io_file_handle_t* handle) {
   IREE_ASSERT_ARGUMENT(handle);
   return handle->primitive;
+}
+
+IREE_API_EXPORT bool iree_io_file_handle_uses_async_io(
+    const iree_io_file_handle_t* handle) {
+  IREE_ASSERT_ARGUMENT(handle);
+  return iree_all_bits_set(handle->mode, IREE_IO_FILE_MODE_ASYNC);
 }
 
 static iree_status_t iree_io_platform_fd_flush(int fd) {
@@ -423,7 +443,7 @@ static iree_status_t iree_io_file_handle_create_or_open(
   };
   iree_io_file_handle_t* handle = NULL;
   iree_status_t status =
-      iree_io_file_handle_wrap(allowed_access, handle_primitive,
+      iree_io_file_handle_wrap(allowed_access, mode, handle_primitive,
                                release_callback, host_allocator, &handle);
 
   if (iree_status_is_ok(status)) {
@@ -489,7 +509,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
 
   iree_io_file_handle_t* handle = NULL;
   iree_status_t status =
-      iree_io_file_handle_wrap(allowed_access, handle_primitive,
+      iree_io_file_handle_wrap(allowed_access, mode, handle_primitive,
                                release_callback, host_allocator, &handle);
 
   if (iree_status_is_ok(status)) {

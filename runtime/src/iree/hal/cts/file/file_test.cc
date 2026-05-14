@@ -293,6 +293,9 @@ class FileTest : public CtsTestBase<> {
         iree_make_byte_span(file_contents, initial_contents.size()),
         release_callback, iree_allocator_system(), &handle);
     if (iree_status_is_ok(status)) {
+      EXPECT_FALSE(iree_io_file_handle_uses_async_io(handle));
+    }
+    if (iree_status_is_ok(status)) {
       status = iree_hal_file_import(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,
           IREE_HAL_EXTERNAL_FILE_FLAG_NONE, out_file->out_file());
@@ -323,6 +326,9 @@ class FileTest : public CtsTestBase<> {
             IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
             IREE_IO_FILE_MODE_SHARE_WRITE | IREE_IO_FILE_MODE_ASYNC,
         path.path_view(), iree_allocator_system(), &handle);
+    if (iree_status_is_ok(status)) {
+      EXPECT_TRUE(iree_io_file_handle_uses_async_io(handle));
+    }
     if (iree_status_is_ok(status)) {
       status = iree_hal_file_import(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,
