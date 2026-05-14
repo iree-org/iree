@@ -1,0 +1,8 @@
+{
+    "type": "compstat",
+    "markers": [
+        "cpu",
+        "scheduler"
+    ],
+    "module": "sdxl/modules/scheduler_cpu"
+}

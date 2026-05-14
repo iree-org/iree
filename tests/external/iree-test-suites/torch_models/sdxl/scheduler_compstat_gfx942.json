@@ -1,0 +1,9 @@
+{
+    "type": "compstat",
+    "markers": [
+        "hip",
+        "gfx942",
+        "scheduler"
+    ],
+    "module": "sdxl/modules/scheduler_gfx942"
+}
