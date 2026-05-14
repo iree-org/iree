@@ -6,6 +6,8 @@
 
 #include "iree/hal/utils/fd_file.h"
 
+#include <string.h>
+
 #include "iree/async/file.h"
 #include "iree/async/primitive.h"
 
@@ -52,6 +54,38 @@ static iree_status_t iree_hal_platform_fd_stat(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_platform_win32_initialize_overlapped(
+    uint64_t offset, OVERLAPPED* out_overlapped) {
+  memset(out_overlapped, 0, sizeof(*out_overlapped));
+  out_overlapped->Offset = (DWORD)(offset & 0xFFFFFFFFu);
+  out_overlapped->OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  out_overlapped->hEvent = CreateEvent(NULL, /*bManualReset=*/TRUE,
+                                       /*bInitialState=*/FALSE, NULL);
+  if (!out_overlapped->hEvent) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to create file I/O completion event");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_platform_win32_wait_for_overlapped_file_io(
+    HANDLE handle, OVERLAPPED* overlapped, DWORD error_code,
+    iree_string_view_t operation, DWORD* out_byte_count) {
+  if (error_code != ERROR_IO_PENDING) {
+    return iree_make_status(iree_status_code_from_win32_error(error_code),
+                            "failed to %.*s requested buffer length",
+                            (int)operation.size, operation.data);
+  }
+  if (!GetOverlappedResult(handle, overlapped, out_byte_count,
+                           /*bWait=*/TRUE)) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to complete %.*s of requested buffer "
+                            "length",
+                            (int)operation.size, operation.data);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_platform_fd_pread(
     int fd, void* buffer, iree_host_size_t count, uint64_t offset,
     iree_host_size_t* out_bytes_read) {
@@ -70,12 +104,16 @@ static iree_status_t iree_hal_platform_fd_pread(
   if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_read = 0;
-  OVERLAPPED overlapped = {0};
-  overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
-  overlapped.OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  OVERLAPPED overlapped;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_platform_win32_initialize_overlapped(offset, &overlapped));
   if (!ReadFile(handle, buffer, (DWORD)count, &bytes_read, &overlapped)) {
-    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
-                            "failed to read requested buffer length");
+    iree_status_t status = iree_hal_platform_win32_wait_for_overlapped_file_io(
+        handle, &overlapped, GetLastError(), IREE_SV("read"), &bytes_read);
+    CloseHandle(overlapped.hEvent);
+    IREE_RETURN_IF_ERROR(status);
+  } else {
+    CloseHandle(overlapped.hEvent);
   }
 
   *out_bytes_read = (iree_host_size_t)bytes_read;
@@ -100,12 +138,16 @@ static iree_status_t iree_hal_platform_fd_pwrite(
   if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_written = 0;
-  OVERLAPPED overlapped = {0};
-  overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
-  overlapped.OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  OVERLAPPED overlapped;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_platform_win32_initialize_overlapped(offset, &overlapped));
   if (!WriteFile(handle, buffer, (DWORD)count, &bytes_written, &overlapped)) {
-    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
-                            "failed to write requested buffer length");
+    iree_status_t status = iree_hal_platform_win32_wait_for_overlapped_file_io(
+        handle, &overlapped, GetLastError(), IREE_SV("write"), &bytes_written);
+    CloseHandle(overlapped.hEvent);
+    IREE_RETURN_IF_ERROR(status);
+  } else {
+    CloseHandle(overlapped.hEvent);
   }
 
   *out_bytes_written = (iree_host_size_t)bytes_written;
