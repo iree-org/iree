@@ -1,0 +1,8 @@
+{
+    "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/sdxl_unet_pipeline_bench_f16.mlir",
+    "compiler_flags": [
+        "--verify=false",
+        "--iree-opt-const-eval=false",
+        "--iree-hal-target-device=hip"
+    ]
+}
