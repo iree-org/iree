@@ -717,3 +717,39 @@ func.func @reduction_i128() {
 // CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:        partial_reduction
 // CHECK-SAME:        workgroup
+
+// -----
+
+// i256 reduction on gfx942: exercises the divide-by-zero guard in
+// `setReductionVectorDistributionConfig`. With largestLoadSizeInBits == 128
+// on gfx942, `*bitWidth (256) > largestLoadSizeInBits (128)` triggers the
+// early failure, so the reduction config is not set and VectorDistribute is
+// not selected.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @reduction_i256() {
+  %c0 = arith.constant 0 : index
+  %czero = arith.constant 0 : i256
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi256>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi256>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi256>> -> tensor<8x4096xi256>
+  %3 = tensor.empty() : tensor<8xi256>
+  %4 = linalg.fill ins(%czero : i256) outs(%3 : tensor<8xi256>) -> tensor<8xi256>
+  %5 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+      ins(%2 : tensor<8x4096xi256>) outs(%4 : tensor<8xi256>) {
+      ^bb0(%in: i256, %out: i256):
+        %6 = arith.addi %in, %out : i256
+        linalg.yield %6 : i256
+      } -> tensor<8xi256>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xi256> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi256>>
+  return
+}
+
+// CHECK-LABEL: func.func @reduction_i256
+// CHECK-NOT:     pipeline = #iree_gpu.pipeline<VectorDistribute>

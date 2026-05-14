@@ -164,14 +164,34 @@ iree_check_single_backend_test_suite(
         "dynamic_gather_attention.mlir",
         "linalg_ops_dynamic.mlir",
         "split_reduction_using_tiling.mlir",
+    ],
+    compiler_flags = [
+        "--iree-opt-level=O3",
+    ],
+    driver = "hip",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-amd",
+    ],
+    target_backend = "rocm",
+)
+
+# Isolated suite so `--iree-input-demote-f64-to-f32=false` only applies to the
+# 64-bit-element vector distribution test and does not bleed into unrelated
+# tests in `check_regression_hip`.
+iree_check_single_backend_test_suite(
+    name = "check_regression_vector_distribute_64bit_hip",
+    timeout = "moderate",
+    srcs = [
         "vector_distribute_64bit_amdgpu.mlir",
     ],
     compiler_flags = [
         "--iree-opt-level=O3",
-        # vector_distribute_64bit_amdgpu.mlir relies on f64 reaching codegen;
-        # the default f64->f32 demotion would silently turn it into the f32
-        # case. Note: this flag is sticky for the whole suite — any future
-        # f64-touching test added here will also skip demotion.
+        # The test relies on f64 reaching codegen; the default f64->f32
+        # demotion would silently turn it into the f32 case.
         "--iree-input-demote-f64-to-f32=false",
     ],
     driver = "hip",

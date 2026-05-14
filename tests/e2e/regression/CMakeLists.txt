@@ -180,6 +180,26 @@ iree_check_single_backend_test_suite(
     "dynamic_gather_attention.mlir"
     "linalg_ops_dynamic.mlir"
     "split_reduction_using_tiling.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+  COMPILER_FLAGS
+    "--iree-opt-level=O3"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-amd"
+  TIMEOUT
+    300
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_vector_distribute_64bit_hip
+  SRCS
     "vector_distribute_64bit_amdgpu.mlir"
   TARGET_BACKEND
     "rocm"

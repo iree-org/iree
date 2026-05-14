@@ -1576,9 +1576,10 @@ struct DistributeArgCompare final
       return failure();
     }
 
-    // No bitwidth check on the index type: `gpu.shuffle idx` forwards the
-    // winning lane's index and handles wider types (i64). The value-side
-    // check above already honors the AMDGPU shuffle whitelist.
+    // No bitwidth check on the index payload: it is broadcast from the
+    // winning lane via `gpu.shuffle idx`, and the AMDGPU lowering decomposes
+    // wide values (e.g. i64) into i32 chunks. The value-side check above
+    // already gates element types.
 
     // Only explicit index mode; iota indices are materialized earlier.
     if (!inputIndex) {
@@ -2375,6 +2376,11 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     bool needsCrossThread = srcLayout.getThreadTile()[scanDim] > 1;
     bool needsCrossSubgroup = srcLayout.getSubgroupTile()[scanDim] > 1;
     Type elemTy = source.getType().getElementType();
+    // Intentional carve-out: unlike DistributeMultiReduction and
+    // DistributeArgCompare (which use targetSupportsShuffleBitwidth and accept
+    // wider widths on AMDGPU via a decomposing gpu.shuffle lowering), scan is
+    // kept on the 32-bit ceiling until the wider-width scan path has been
+    // separately validated.
     if (needsCrossThread || needsCrossSubgroup) {
       unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
       if (bitwidth > maxBitsPerShuffle) {
@@ -3429,8 +3435,8 @@ void IREE::VectorExt::populateNestedLayoutDistributionPatterns(
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
       patterns.getContext());
-  patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize);
-  patterns.add<DistributeArgCompare>(patterns.getContext(), subgroupSize);
+  patterns.add<DistributeMultiReduction, DistributeArgCompare>(
+      patterns.getContext(), subgroupSize);
   patterns.add<DistributeScan>(patterns.getContext(), subgroupSize,
                                maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());

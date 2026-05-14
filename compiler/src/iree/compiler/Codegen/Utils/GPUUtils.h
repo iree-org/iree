@@ -24,11 +24,12 @@ namespace mlir::iree_compiler {
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
 
-// `gpu.shuffle` natively supports up to 32-bit element types. Wider values
-// must be decomposed by the backend's lowering, which today only ROCDL does
-// (cf. llvm/llvm-project#136320). NVVM tracking is at
-// llvm/llvm-project#197080. See `targetSupportsShuffleBitwidth`.
-static constexpr unsigned kShuffleNativeBits = 32;
+// Universally-safe ceiling for `gpu.shuffle`-based codegen: at this width or
+// below, every backend's `gpu.shuffle` lowering emits working code. Wider
+// values rely on the backend decomposing them, which today only ROCDL does
+// (cf. llvm/llvm-project#136320; NVVM tracking at llvm/llvm-project#197080).
+// See `targetSupportsShuffleBitwidth`.
+constexpr unsigned kShuffleNativeBits = 32;
 
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
