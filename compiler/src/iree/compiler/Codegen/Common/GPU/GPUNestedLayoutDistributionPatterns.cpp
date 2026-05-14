@@ -929,16 +929,17 @@ static VectorValue reshapeFlatToTarget(RewriterBase &rewriter, Location loc,
 }
 
 static LogicalResult checkBitwidthForShuffle(Operation *op, Type type,
-                                             int64_t maxBitsPerShuffle,
                                              StringRef typeName,
                                              PatternRewriter &rewriter) {
   unsigned bitwidth = type.getIntOrFloatBitWidth();
-  if (bitwidth > maxBitsPerShuffle) {
-    return rewriter.notifyMatchFailure(
-        op, llvm::formatv("{0} bitwidth {1} greater than maxBitsPerShuffle {2}",
-                          typeName, bitwidth, maxBitsPerShuffle));
+  if (targetSupportsShuffleBitwidth(getGPUTargetAttr(op), bitwidth)) {
+    return success();
   }
-  return success();
+  return rewriter.notifyMatchFailure(
+      op, llvm::formatv("{0} bitwidth {1} exceeds native shuffle width {2}; "
+                        "wider widths require a target with a decomposing "
+                        "gpu.shuffle lowering",
+                        typeName, bitwidth, kShuffleNativeBits));
 }
 
 /// Creates an equality comparison operation for the given values.
@@ -1194,9 +1195,9 @@ struct DistributeMultiReduction final
   using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
-                           int64_t maxBitsPerShuffle, int64_t benefit = 1)
+                           int64_t benefit = 1)
       : MaskedOpDistributionPattern(context, benefit),
-        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
+        subgroupSize(subgroupSize) {}
 
   LogicalResult
   matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
@@ -1218,8 +1219,8 @@ struct DistributeMultiReduction final
     }
 
     Type elemTy = srcVector.getType().getElementType();
-    if (failed(checkBitwidthForShuffle(multiReduceOp, elemTy, maxBitsPerShuffle,
-                                       "element", rewriter))) {
+    if (failed(checkBitwidthForShuffle(multiReduceOp, elemTy, "element",
+                                       rewriter))) {
       return failure();
     }
 
@@ -1517,7 +1518,6 @@ struct DistributeMultiReduction final
   }
 
   int64_t subgroupSize;
-  int64_t maxBitsPerShuffle;
 };
 
 /// Distributes `iree_vector_ext.arg_compare` ops with nested layouts.
@@ -1527,9 +1527,9 @@ struct DistributeArgCompare final
     : MaskedOpDistributionPattern<IREE::VectorExt::ArgCompareOp> {
 
   DistributeArgCompare(MLIRContext *context, int64_t subgroupSize,
-                       int64_t maxBitsPerShuffle, int64_t benefit = 1)
+                       int64_t benefit = 1)
       : MaskedOpDistributionPattern(context, benefit),
-        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
+        subgroupSize(subgroupSize) {}
 
   LogicalResult
   matchAndRewrite(IREE::VectorExt::ArgCompareOp argCompareOp,
@@ -1571,15 +1571,15 @@ struct DistributeArgCompare final
     }
 
     Type elemTy = inputValue.getType().getElementType();
-    if (failed(checkBitwidthForShuffle(argCompareOp, elemTy, maxBitsPerShuffle,
-                                       "element", rewriter))) {
+    if (failed(checkBitwidthForShuffle(argCompareOp, elemTy, "element",
+                                       rewriter))) {
       return failure();
     }
 
-    // No bitwidth check on the index type: the index is only forwarded from
-    // the winning lane via `gpu.shuffle idx`, which handles wider types (i64).
-    // TODO(Bangtian): On AMD, ROCDL decomposes 64-bit shuffles into 32-bit
-    // pairs. Consider dropping the value bitwidth check above too.
+    // No bitwidth check on the index payload: it is broadcast from the
+    // winning lane via `gpu.shuffle idx`, and the AMDGPU lowering decomposes
+    // wide values (e.g. i64) into i32 chunks. The value-side check above
+    // already gates element types.
 
     // Only explicit index mode; iota indices are materialized earlier.
     if (!inputIndex) {
@@ -2176,7 +2176,6 @@ private:
   }
 
   int64_t subgroupSize;
-  int64_t maxBitsPerShuffle;
 };
 
 /// Broadcast every element of |source| from the last lane in a scan cluster
@@ -2377,10 +2376,20 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
     bool needsCrossThread = srcLayout.getThreadTile()[scanDim] > 1;
     bool needsCrossSubgroup = srcLayout.getSubgroupTile()[scanDim] > 1;
     Type elemTy = source.getType().getElementType();
-    if ((needsCrossThread || needsCrossSubgroup) &&
-        failed(checkBitwidthForShuffle(scanOp, elemTy, maxBitsPerShuffle,
-                                       "element", rewriter))) {
-      return failure();
+    // Intentional carve-out: unlike DistributeMultiReduction and
+    // DistributeArgCompare (which use targetSupportsShuffleBitwidth and accept
+    // wider widths on AMDGPU via a decomposing gpu.shuffle lowering), scan is
+    // kept on the 32-bit ceiling until the wider-width scan path has been
+    // separately validated.
+    if (needsCrossThread || needsCrossSubgroup) {
+      unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
+      if (bitwidth > maxBitsPerShuffle) {
+        return rewriter.notifyMatchFailure(
+            scanOp,
+            llvm::formatv("element bitwidth {0} greater than maxBitsPerShuffle "
+                          "{1}",
+                          bitwidth, maxBitsPerShuffle));
+      }
     }
 
     // Reject multi-subgroup for now.
@@ -3426,10 +3435,8 @@ void IREE::VectorExt::populateNestedLayoutDistributionPatterns(
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
       patterns.getContext());
-  patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
-                                         maxBitsPerShuffle);
-  patterns.add<DistributeArgCompare>(patterns.getContext(), subgroupSize,
-                                     maxBitsPerShuffle);
+  patterns.add<DistributeMultiReduction, DistributeArgCompare>(
+      patterns.getContext(), subgroupSize);
   patterns.add<DistributeScan>(patterns.getContext(), subgroupSize,
                                maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());

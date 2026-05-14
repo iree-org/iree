@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "config_vector_distribute_reduction_gfx942.mlir"
     "config_vector_distribute_reduction_gfx950.mlir"
     "configure_buffer_instructions.mlir"
+    "gpu_nested_layout_vector_distribution_wide_shuffle.mlir"
     "pipeline_argcompare_tile_and_fuse.mlir"
     "pipeline_argcompare_vector_distribute.mlir"
     "pipeline_direct_conv_tile_and_fuse.mlir"

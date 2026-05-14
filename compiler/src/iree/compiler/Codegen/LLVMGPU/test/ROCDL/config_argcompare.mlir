@@ -321,3 +321,80 @@ func.func @argcompare_1d_rank_to_scalar_f32(
 // CHECK-LABEL: func.func @argcompare_1d_rank_to_scalar_f32
 // CHECK:         iree_linalg_ext.arg_compare
 // CHECK-SAME:      lowering_config = #iree_gpu.lowering_config<{thread = [0], workgroup = [0]}>
+
+// -----
+
+// 1d f64 arg_compare on gfx942: AMDGPU, so 64-bit passes the bitwidth gate
+// and reaches VectorDistribute.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @argcompare_1d_f64() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xf64>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f64>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xf64>> -> tensor<4096xf64>
+  %4 = tensor.empty() : tensor<f64>
+  %5 = tensor.empty() : tensor<i32>
+  %6:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%3 : tensor<4096xf64>)
+    outs(%4, %5 : tensor<f64>, tensor<i32>) {
+    ^bb0(%a: f64, %b: f64):
+      %cmp = arith.cmpf ogt, %a, %b : f64
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<f64>, tensor<i32>
+  iree_tensor_ext.dispatch.tensor.store %6#0, %1, offsets = [], sizes = [], strides = [] : tensor<f64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<f64>>
+  iree_tensor_ext.dispatch.tensor.store %6#1, %2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>
+  return
+}
+
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+// CHECK-LABEL: func.func @argcompare_1d_f64
+// CHECK:         iree_linalg_ext.arg_compare
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:        partial_reduction
+// CHECK-SAME:        workgroup
+
+// -----
+
+// 1d i64 arg_compare on gfx942: same gate, integer path.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+func.func @argcompare_1d_i64() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xi64>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4096xi64>> -> tensor<4096xi64>
+  %4 = tensor.empty() : tensor<i64>
+  %5 = tensor.empty() : tensor<i32>
+  %6:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%3 : tensor<4096xi64>)
+    outs(%4, %5 : tensor<i64>, tensor<i32>) {
+    ^bb0(%a: i64, %b: i64):
+      %cmp = arith.cmpi sgt, %a, %b : i64
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<i64>, tensor<i32>
+  iree_tensor_ext.dispatch.tensor.store %6#0, %1, offsets = [], sizes = [], strides = [] : tensor<i64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i64>>
+  iree_tensor_ext.dispatch.tensor.store %6#1, %2, offsets = [], sizes = [], strides = [] : tensor<i32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<i32>>
+  return
+}
+
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+// CHECK-LABEL: func.func @argcompare_1d_i64
+// CHECK:         iree_linalg_ext.arg_compare
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:        partial_reduction
+// CHECK-SAME:        workgroup

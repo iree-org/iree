@@ -179,6 +179,32 @@ iree_check_single_backend_test_suite(
     target_backend = "rocm",
 )
 
+# Isolated suite so `--iree-input-demote-f64-to-f32=false` only applies to the
+# 64-bit-element vector distribution test and does not bleed into unrelated
+# tests in `check_regression_hip`.
+iree_check_single_backend_test_suite(
+    name = "check_regression_vector_distribute_64bit_hip",
+    timeout = "moderate",
+    srcs = [
+        "vector_distribute_64bit_amdgpu.mlir",
+    ],
+    compiler_flags = [
+        "--iree-opt-level=O3",
+        # The test relies on f64 reaching codegen; the default f64->f32
+        # demotion would silently turn it into the f32 case.
+        "--iree-input-demote-f64-to-f32=false",
+    ],
+    driver = "hip",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-amd",
+    ],
+    target_backend = "rocm",
+)
+
 iree_check_single_backend_test_suite(
     name = "aggressive_fusion_test_cuda",
     srcs = [

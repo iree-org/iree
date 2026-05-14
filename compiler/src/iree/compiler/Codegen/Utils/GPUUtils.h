@@ -24,6 +24,13 @@ namespace mlir::iree_compiler {
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
 
+// Universally-safe ceiling for `gpu.shuffle`-based codegen: at this width or
+// below, every backend's `gpu.shuffle` lowering emits working code. Wider
+// values rely on the backend decomposing them, which today only ROCDL does
+// (cf. llvm/llvm-project#136320; NVVM tracking at llvm/llvm-project#197080).
+// See `targetSupportsShuffleBitwidth`.
+constexpr unsigned kShuffleNativeBits = 32;
+
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
 //===----------------------------------------------------------------------===//
@@ -333,6 +340,13 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 /// Check if the target architecture supports global load DMA.
 /// Returns true only for CDNA4+ (gfx950+) architectures.
 bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
+
+/// True if `gpu.shuffle` on `bitwidth`-bit elements is supported by `target`.
+/// Widths up to `kShuffleNativeBits` are universally supported; wider widths
+/// require a backend that decomposes them (today only AMDGPU). A null
+/// `target` is treated conservatively (reject wide shuffles).
+bool targetSupportsShuffleBitwidth(IREE::GPU::TargetAttr target,
+                                   unsigned bitwidth);
 
 // Methods to retrieve information association with `configuration` field
 // of `hal.executable.target` attribute used commonly in GPU codegen pipelines.

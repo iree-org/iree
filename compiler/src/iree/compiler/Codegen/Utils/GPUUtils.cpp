@@ -1323,6 +1323,14 @@ bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
   return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
 }
 
+bool targetSupportsShuffleBitwidth(IREE::GPU::TargetAttr target,
+                                   unsigned bitwidth) {
+  if (bitwidth <= kShuffleNativeBits) {
+    return true;
+  }
+  return target && target.isAMD();
+}
+
 void addConfigGPUTarget(MLIRContext *context,
                         IREE::GPU::TargetAttr gpuTargetAttr,
                         SmallVectorImpl<NamedAttribute> &config) {
