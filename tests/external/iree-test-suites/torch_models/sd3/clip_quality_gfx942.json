@@ -1,7 +1,7 @@
 {
     "type": "quality",
     "markers": [
-       "rocm",
+       "hip",
        "clip",
        "gfx942"
     ],
