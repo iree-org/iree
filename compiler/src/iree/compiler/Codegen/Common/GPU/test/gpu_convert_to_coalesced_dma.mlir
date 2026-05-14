@@ -483,15 +483,15 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: tensor.pad is fused — DMA source is the pre-pad extract_slice
-  // (dynamic outer dim), with in_bounds=[false, true] so the DMA hardware
-  // clamps OOB lanes. M dim has padding; K dim doesn't.
-  // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
-  // CHECK: scf.forall {{.*}} shared_outs(%[[OUTER_INIT:.+]] = %[[INIT]])
-  // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[OUTER_INIT]])
+  // Key check: tensor.pad is fused. The DMA source is a clamped sub-slice of
+  // the pre-pad source. in_bounds = [false, true] because M dim has padding.
+  // CHECK-DAG: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
+  // CHECK: scf.forall
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     arith.minsi
+  // CHECK:     %[[WARP_SRC:.+]] = tensor.extract_slice %[[EXTRACTED]]
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
-  // CHECK-SAME:     : tensor<?x64xf32>, tensor<4x64xf32>, index
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[WARP_SRC]] into {{.*}} lane(%[[LANE]]) in_bounds [false, true]
   // CHECK:     }
   // CHECK-NOT: tensor.pad
 
@@ -500,9 +500,9 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 
 // -----
 
-// Test: tensor.pad fusion with multiple warps. With identity tiling for
-// pad-fusion, the outer warp forall is single-iteration (step = full shape)
-// and the DMA reads the pre-pad source directly with in_bounds clamping.
+// Test: tensor.pad fusion with multiple warps distributes across warps.
+// With 4 warps and shape 4x64, the outer dimension is tiled with step=1 across
+// 4 warps. Each warp gets a clamped sub-slice of the pre-pad source.
 
 #gpu_target_pad_multi_warp = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -536,17 +536,19 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Pad-fusion uses identity tiling (single-iteration outer forall) regardless
-  // of available warp count, so the DMA reads the pre-pad extract_slice as
-  // one whole transfer with in_bounds clamping.
+  // Key check: 4 warps distribute dimension 0 with step=1 (4 iterations).
+  // Each warp's DMA source is a clamped sub-slice of the pre-pad source.
   //
-  // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
-  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (4, 64) step (4, 64)
+  // CHECK-DAG: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
+  // CHECK: scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 64) step (1, 64)
   // CHECK-SAME: shared_outs({{.*}} = %[[INIT]]) -> (tensor<4x64xf32>) {
   //
+  // Thread-level forall with clamped source and DMA:
   // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     %[[CLAMPED_OFF:.+]] = arith.minsi %[[IV0]]
+  // CHECK:     %[[WARP_SRC:.+]] = tensor.extract_slice %[[EXTRACTED]][%[[CLAMPED_OFF]], 0]
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into {{.*}} lane(%[[LANE]]) in_bounds [false, true]
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[WARP_SRC]] into {{.*}} lane(%[[LANE]]) in_bounds [false, true]
   // CHECK:     }
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
   //
@@ -592,10 +594,12 @@ func.func @copy_with_tensor_pad_both_dims(%source: tensor<500x96xf32>, %init: te
     ins(%padded : tensor<32x128xf32>)
     outs(%init : tensor<32x128xf32>) -> tensor<32x128xf32>
 
-  // Pad-fusion uses identity tiling (single iteration covering the full
-  // 32x128 tile). Both dims have padding → in_bounds = [false, false].
-  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 128) step (32, 128)
+  // 4 warps, 32x128 tile. dim 0: tiled to step=8, dim 1: kept whole (128).
+  // Both dims have padding → in_bounds = [false, false].
+  // CHECK: scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (32, 128) step (8, 128)
   // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     arith.minsi
+  // CHECK:     tensor.extract_slice
   // CHECK:     scf.forall.in_parallel {
   // CHECK:       iree_gpu.coalesced_gather_dma {{.*}} in_bounds [false, false]
   // CHECK:     }
@@ -915,6 +919,52 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 
 // -----
 
+// Test: incremental warp-distribution halving in tileAtSubgroupLevel.
+// 32x4xf32 tile = 128 elements. Workgroup has 4 warps.  The greedy 4-warp
+// distribution would give 8x4 = 32 elements per warp, less than the
+// minimum DMA transfer (subgroup_size=64 * 1 elt/lane = 64 elements with
+// dma_sizes=[32,128] / 32-bit f32).  Halving picks numWarps=2, which gives
+// 16x4 = 64 elements per warp (== min) — DMA emit succeeds and the warp
+// forall is well-formed (preserving wave-uniformity by construction).
+// Issue #24139.
+
+#gpu_target_warp_halve = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_warp_halve = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_warp_halve}>
+#translation_warp_halve = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_warp_distribution_halving
+func.func @copy_warp_distribution_halving(%source: tensor<32x4xf32>, %off: index, %sz: index, %high: index) -> tensor<32x4xf32>
+  attributes {hal.executable.target = #exec_target_warp_halve, translation_info = #translation_warp_halve} {
+  %extracted = tensor.extract_slice %source[%off, 0] [%sz, 4] [1, 1]
+      : tensor<32x4xf32> to tensor<?x4xf32>
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
+  ^bb0(%a: index, %b: index):
+    tensor.yield %cst : f32
+  } : tensor<?x4xf32> to tensor<32x4xf32>
+  %init = tensor.empty() : tensor<32x4xf32>
+  %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<32x4xf32>) outs(%init : tensor<32x4xf32>) -> tensor<32x4xf32>
+
+  // 2-warp distribution (step=16 on dim 0, dim 1 kept whole).
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 4) step (16, 4)
+  // CHECK:   scf.forall (%{{.+}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: linalg.copy
+
+  return %r : tensor<32x4xf32>
+}
+
+// -----
+
 // Test: linearized-availability detection must not rely on
 // `availableElements != innermostDim`. With a 1D (or [1,...,N]) shape whose
 // output traces to tensor.empty(), linearization fires but the two values
@@ -949,7 +999,6 @@ func.func @copy_warp_distribution_halving_1d(%source: tensor<128xf32>) -> tensor
 
   return %r : tensor<128xf32>
 }
-
 // -----
 
 // Test: workgroup-aligned but per-warp-sub-aligned scale copy caps the
