@@ -1,0 +1,47 @@
+// THIS TEST IS EXPECTED TO FAIL.
+{
+	"type": "quality",
+	"markers": [
+		"cpu",
+		"local-task",
+		"mmdit"
+	],
+	"modules": [
+		"sd3/modules/mmdit_cpu"
+	],
+	"weights": [
+		{
+			"type": "url",
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/real_weights.irpa",
+			"scope": "model"
+		}
+	],
+	"run_args": [
+		"--function=run_forward",
+		"--device=local-task"
+	],
+    	"inputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.0.bin",
+			"value": "2x16x128x128xf16"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.1.bin",
+			"value": "2x154x4096xf16"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.2.bin",
+			"value": "2x2048xf16"
+		},
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_input.3.bin",
+			"value": "2xf16"
+		}
+	],
+	"expected_outputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-mmdit/inference_output.0.bin",
+			"value": "2x16x128x128xf32"
+		}
+	]
+}
