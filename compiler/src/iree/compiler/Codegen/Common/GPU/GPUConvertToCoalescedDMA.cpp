@@ -960,15 +960,12 @@ static bool isIm2colDMAConvertible(IREE::LinalgExt::Im2colOp im2colOp) {
     return false;
   }
 
-  // Structural preconditions are the single source of truth in LinalgExt.
-  // Calling canDecomposeAsyncCopy guarantees that if this function
-  // returns true, decomposeOperationAsyncCopy will succeed at runtime.
   if (!im2colOp.canDecomposeAsyncCopy()) {
     return false;
   }
 
-  // DMA alignment check — canDecomposeAsyncCopy guarantees the vectorized
-  // dim is the innermost output dim, so contiguousSize is the last dim.
+  // canDecomposeAsyncCopy guarantees the vectorized dim is the innermost
+  // output dim, so contiguousSize is the last dim.
   auto outputType = cast<RankedTensorType>(im2colOp.getOutputType());
   int64_t contiguousSize = outputType.getShape().back();
   return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
@@ -1241,6 +1238,9 @@ private:
     // (issue #24139). Halve `totalWarps` until each warp's tile is aligned.
     SmallVector<int64_t> effectiveNumWarps = numWarps;
     if (linearizedAvailability) {
+      std::optional<int64_t> minAligned =
+          getMinDMAAlignedElements(funcOp, elementType);
+      assert(minAligned && "alignment check above guarantees minAligned");
       auto positiveWarps =
           llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
       int64_t totalWarps = llvm::product_of(positiveWarps);

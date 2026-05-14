@@ -706,105 +706,6 @@ bool Im2colOp::canDecomposeAsyncCopy() {
   return canDecomposeIm2colAsyncCopyImpl(*this);
 }
 
-/// Compute per-input-dim offsets from per-output-dim iteration positions.
-/// Expects one Value per output dim; non-iterated dims should be zero.
-static SmallVector<OpFoldResult>
-computeIm2colInputOffsets(OpBuilder &b, Location nestedLoc, Im2colOp im2colOp,
-                          ValueRange outputDimPositions) {
-  assert(outputDimPositions.size() ==
-             static_cast<size_t>(im2colOp.getOutputRank()) &&
-         "one position Value per im2col output dim");
-
-  SmallVector<OpFoldResult> mixedOffsets = im2colOp.getMixedOffsets();
-  SetVector<int64_t> mPosSet(im2colOp.getMPos().begin(),
-                             im2colOp.getMPos().end());
-  SetVector<int64_t> batchPosSet(im2colOp.getBatchPos().begin(),
-                                 im2colOp.getBatchPos().end());
-  ArrayRef<int64_t> strides = im2colOp.getStrides();
-  ArrayRef<int64_t> dilations = im2colOp.getDilations();
-  ArrayRef<int64_t> inputKPerm = im2colOp.getInputKPerm();
-  SmallVector<int64_t> invInputKPerm = invertPermutationVector(inputKPerm);
-
-  SmallVector<SmallVector<OpFoldResult>> mixedOutputSizes =
-      im2colOp.getMixedOutputSizes();
-  SmallVector<int64_t> kOutputDims = im2colOp.getKOutputDims();
-  int64_t batchSize = im2colOp.getBatchPos().size();
-  int64_t numMOutputDims = im2colOp.getNumMOutputDims();
-
-  // Delinearize each output dim independently using its output_sizes.
-  auto delinearizeOutputDims =
-      [&](ArrayRef<int64_t> outputDims,
-          int64_t canonicalOffset) -> SmallVector<Value> {
-    SmallVector<Value> results;
-    for (auto [i, actualDim] : llvm::enumerate(outputDims)) {
-      int64_t canonicalIdx = canonicalOffset + i;
-      OpFoldResult pos = addOfrs(b, nestedLoc, mixedOffsets[canonicalIdx],
-                                 outputDimPositions[actualDim]);
-      const SmallVector<OpFoldResult> &innerSizes =
-          mixedOutputSizes[canonicalIdx];
-      if (innerSizes.size() == 1) {
-        results.push_back(getValueOrCreateConstantIndexOp(b, nestedLoc, pos));
-      } else {
-        ValueRange components =
-            affine::AffineDelinearizeIndexOp::create(
-                b, nestedLoc,
-                getValueOrCreateConstantIndexOp(b, nestedLoc, pos), innerSizes,
-                /*hasOuterBound=*/true)
-                .getResults();
-        results.append(components.begin(), components.end());
-      }
-    }
-    return results;
-  };
-
-  SmallVector<Value> delinKOffset =
-      delinearizeOutputDims(kOutputDims, batchSize + numMOutputDims);
-
-  SmallVector<Value> windowOffset, inputKOffset;
-  int delinKIdx = 0;
-  for (int i = 0; i < im2colOp.getInputRank(); ++i) {
-    if (batchPosSet.contains(i)) {
-      continue;
-    }
-    if (mPosSet.contains(i)) {
-      windowOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
-      continue;
-    }
-    inputKOffset.push_back(delinKOffset[invInputKPerm[delinKIdx++]]);
-  }
-
-  SmallVector<int64_t> mOutputDims = im2colOp.getMOutputDims();
-  SmallVector<Value> delinMOffset =
-      delinearizeOutputDims(mOutputDims, batchSize);
-
-  OpFoldResult zero = b.getIndexAttr(0);
-  SmallVector<OpFoldResult> sliceOffsets(im2colOp.getInputRank(), zero);
-
-  AffineExpr mOff, wOff;
-  bindDims(b.getContext(), mOff, wOff);
-  for (auto [idx, mPos] : llvm::enumerate(im2colOp.getMPos())) {
-    auto map =
-        AffineMap::get(2, 0, {mOff * strides[idx] + wOff * dilations[idx]});
-    OpFoldResult offset = affine::makeComposedFoldedAffineApply(
-        b, nestedLoc, map, {delinMOffset[idx], windowOffset[idx]});
-    sliceOffsets[mPos] = offset;
-  }
-
-  for (auto [kPos, kOff] : llvm::zip_equal(im2colOp.getKPos(), inputKOffset)) {
-    sliceOffsets[kPos] = kOff;
-  }
-  SmallVector<int64_t> inverseOutputPerm =
-      invertPermutationVector(im2colOp.getOutputPerm());
-  for (auto [ivIdx, bPos] : llvm::enumerate(im2colOp.getBatchPos())) {
-    int64_t canonicalIdx = ivIdx;
-    int64_t actualDim = inverseOutputPerm[canonicalIdx];
-    sliceOffsets[bPos] = addOfrs(b, nestedLoc, mixedOffsets[canonicalIdx],
-                                 outputDimPositions[actualDim]);
-  }
-
-  return sliceOffsets;
-}
-
 /// Decomposition implementation for iree_linalg_ext.im2col op.
 /// The im2col op is decomposed into serial loops of `insert->extract->copy`.
 /// The decomposition supports leaving a contiguous `batch`, unit-window M,
@@ -1009,7 +910,7 @@ decomposeOperationStreamCopy(Im2colOp im2colOp, OpBuilder &b) {
 /// outer_size is the product of all non-channel input dims. A
 /// linalg.generic computes, for each non-innermost output position, the
 /// linearized flat index into that collapsed source via the shared
-/// computeIm2colInputOffsets helper. An iree_linalg_ext.gather reads the
+/// computeIm2colSourceIndices helper. An iree_linalg_ext.gather reads the
 /// contiguous channel slice for every output row; the result is expanded
 /// back to the original output shape.
 static FailureOr<SmallVector<Value>>
@@ -1027,7 +928,7 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
   ArrayRef<int64_t> outputShape = outputType.getShape();
   int64_t inputRank = inputType.getRank();
   int64_t outputRank = outputType.getRank();
-  int64_t batchSize = ShapedType::getNumElements(outputShape.drop_back());
+  int64_t numOutputRows = ShapedType::getNumElements(outputShape.drop_back());
 
   // Step 1: Collapse source to 2D: [[0..inputRank-2], [inputRank-1]].
   SmallVector<ReassociationIndices> srcReassoc = {
@@ -1036,10 +937,10 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
       tensor::CollapseShapeOp::create(b, loc, im2colOp.getInput(), srcReassoc);
 
   // Step 2: Build a 1D index tensor by running a linalg.generic with a
-  // single parallel iterator over batchSize.
+  // single parallel iterator over numOutputRows.
   Type indexType = b.getIndexType();
-  Value indexEmpty =
-      tensor::EmptyOp::create(b, loc, ArrayRef<int64_t>{batchSize}, indexType);
+  Value indexEmpty = tensor::EmptyOp::create(
+      b, loc, ArrayRef<int64_t>{numOutputRows}, indexType);
   AffineMap indexMap = b.getMultiDimIdentityMap(1);
   SmallVector<utils::IteratorType> iterTypes = {utils::IteratorType::parallel};
 
@@ -1062,7 +963,7 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
         SmallVector<Value> nonVectorizedPositions;
         if (outputRank == 1) {
           // Rare: only the vectorized (and innermost) dim, no iteration
-          // positions to delinearize. batchSize is 1 in this case.
+          // positions to delinearize. numOutputRows is 1 in this case.
         } else if (outputRank == 2) {
           nonVectorizedPositions.push_back(flatIdx);
         } else {
@@ -1085,8 +986,11 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
         }
         outputDimPositions.push_back(zero); // vectorized slot
 
-        SmallVector<OpFoldResult> sliceOffsets = computeIm2colInputOffsets(
-            nestedB, nestedLoc, im2colOp, outputDimPositions);
+        SmallVector<OpFoldResult> sliceOffsets =
+            computeIm2colSourceIndices(
+                nestedB, nestedLoc, im2colOp, outputDimPositions,
+                /*innerTileSize=*/nestedB.getIndexAttr(1))
+                .sliceOffsets;
 
         // Linearize sliceOffsets[0..inputRank-2] using
         // inputShape[0..inputRank-2] to get the flat gather index into
@@ -1106,7 +1010,7 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
       });
   Value indices = indexGeneric.getResult(0);
 
-  // Step 3: Collapse the im2col output to 2D [batchSize, C_per_window],
+  // Step 3: Collapse the im2col output to 2D [numOutputRows, C_per_window],
   // build the gather, then expand back.
   SmallVector<ReassociationIndices> outputReassoc = {
       llvm::to_vector(llvm::seq<int64_t>(0, outputRank - 1)), {outputRank - 1}};
@@ -1115,7 +1019,8 @@ decomposeOperationAsyncCopyImpl(Im2colOp im2colOp, OpBuilder &b) {
 
   auto gatherOp = IREE::LinalgExt::GatherOp::create(
       b, loc, cast<RankedTensorType>(collapsedOutput.getType()),
-      collapsedSource, indices, collapsedOutput, b.getDenseI64ArrayAttr({0}));
+      collapsedSource, indices, /*mask=*/Value(), collapsedOutput,
+      b.getDenseI64ArrayAttr({0}));
 
   // Propagate the lowering_config attribute by raw name copy. This keeps
   // LinalgExt free of any dependency on Codegen::IREECodegenAttrs.
