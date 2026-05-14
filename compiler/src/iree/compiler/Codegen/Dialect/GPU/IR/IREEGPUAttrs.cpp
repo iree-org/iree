@@ -1019,6 +1019,10 @@ OpFoldResult MMAAttr::getDistributionWorkerCount(OpBuilder &, Location,
 // Returns virtual intrinsics that are composed from this concrete MMA op.
 SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   switch (getIntrinsic()) {
+  case MMAIntrinsic::MFMA_F32_16x16x32_F16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16};
+  case MMAIntrinsic::MFMA_F32_16x16x32_BF16:
+    return {VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16};
   case MMAIntrinsic::MFMA_F32_16x16x16_F16:
     return {VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F16,
             VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16};
@@ -1234,13 +1238,17 @@ createTransposeLoadIndexHint(OpBuilder &builder, Location loc,
   return results;
 }
 
+enum class PhysicalLaneSplitMode { Element, Outer };
+
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
     ArrayRef<int64_t> permutation, MMASingleSubgroupLayout subgroupLayout,
     SmallVectorImpl<OpFoldResult> &canonicalOffsets,
     SmallVectorImpl<OpFoldResult> &canonicalSizes,
     SmallVectorImpl<OpFoldResult> &canonicalStrides,
-    int64_t physicalLanesPerThread = 1) {
+    int64_t physicalLanesPerThread = 1,
+    PhysicalLaneSplitMode preferredSplitMode =
+        PhysicalLaneSplitMode::Element) {
   assert(physicalLanesPerThread >= 1 &&
          "physicalLanesPerThread must be at least 1");
   SmallVector<int64_t> rankReducedShape;
@@ -1280,19 +1288,35 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   SmallVector<Value> hintedSplitLaneId = createTransposeLoadIndexHint(
       builder, loc, splitLaneId.getResults(), vtidBasis);
 
-  // Find the unique element dimension eligible for lane differentiation:
-  // exactly one dimension with element[dim] > 1 and divisible by
-  // physicalLanesPerThread.
-  std::optional<size_t> splitDim;
-  if (physicalLanesPerThread > 1) {
-    for (auto [dimIdx, element] : llvm::enumerate(subgroupLayout.element)) {
-      if (element > 1 && element % physicalLanesPerThread == 0) {
-        if (splitDim) {
-          splitDim = std::nullopt;
-          break;
+  auto findUniqueSplittableDim =
+      [&](ArrayRef<int64_t> sizes) -> std::optional<size_t> {
+    std::optional<size_t> result;
+    for (auto [dimIdx, size] : llvm::enumerate(sizes)) {
+      if (size > 1 && size % physicalLanesPerThread == 0) {
+        if (result) {
+          return std::nullopt;
         }
-        splitDim = dimIdx;
+        result = dimIdx;
       }
+    }
+    return result;
+  };
+
+  // Find the unique dimension eligible for lane differentiation. Most MMA
+  // layouts split the element vector, but gfx950 16-bit VDMFMA uses the
+  // duplicate physical lanes to select the low/high native-K outer slab.
+  std::optional<size_t> splitDim;
+  PhysicalLaneSplitMode splitMode = PhysicalLaneSplitMode::Element;
+  if (physicalLanesPerThread > 1) {
+    if (preferredSplitMode == PhysicalLaneSplitMode::Outer) {
+      splitDim = findUniqueSplittableDim(subgroupLayout.outer);
+      if (splitDim) {
+        splitMode = PhysicalLaneSplitMode::Outer;
+      }
+    }
+    if (!splitDim) {
+      splitDim = findUniqueSplittableDim(subgroupLayout.element);
+      splitMode = PhysicalLaneSplitMode::Element;
     }
   }
 
@@ -1328,15 +1352,18 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // in order to prevent unwanted "simplifications" on affine maps that
   // worsen the generated code quality.
   //
-  // When physicalLanesPerThread > 1, the splitDim offset also incorporates
-  // laneGroupIndex so each grouped lane gets a disjoint slice instead.
+  // When physicalLanesPerThread > 1 and the split mode is Element, the
+  // splitDim offset also incorporates laneGroupIndex so each grouped lane gets
+  // a disjoint element slice instead. Outer splits are represented below in the
+  // canonical outer dimension offset and keep the full element vector intact.
   for (auto [dimIdx, vtidAndElement] :
        llvm::enumerate(llvm::zip_equal(dimToVtid, subgroupLayout.element))) {
     auto [splitResultIdx, element] = vtidAndElement;
     Value vtid = hintedSplitLaneId[splitResultIdx];
     int64_t vtidLen = vtidBasis[splitResultIdx - 1];
 
-    if (splitDim && dimIdx == *splitDim) {
+    if (splitDim && splitMode == PhysicalLaneSplitMode::Element &&
+        dimIdx == *splitDim) {
       // offset = vtid * element + laneGroupIndex * perLaneElement.
       int64_t perLaneElement = element / physicalLanesPerThread;
       vtid = affine::AffineLinearizeIndexOp::create(
@@ -1357,12 +1384,28 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
            llvm::zip_equal(subgroupLayout.element, subgroupLayout.outer))) {
     auto [element, outer] = elementAndOuter;
     int64_t perLaneElement = element;
-    if (splitDim && dimIdx == *splitDim) {
+    if (splitDim && splitMode == PhysicalLaneSplitMode::Element &&
+        dimIdx == *splitDim) {
       perLaneElement = element / physicalLanesPerThread;
     }
     if (outer != 1) {
-      canonicalSizes.push_back(builder.getIndexAttr(outer));
-      canonicalOffsets.push_back(zero);
+      int64_t perLaneOuter = outer;
+      OpFoldResult outerOffset = zero;
+      if (splitDim && splitMode == PhysicalLaneSplitMode::Outer &&
+          dimIdx == *splitDim) {
+        perLaneOuter = outer / physicalLanesPerThread;
+        if (perLaneOuter == 1) {
+          outerOffset = laneGroupIndex;
+        } else {
+          outerOffset = affine::AffineLinearizeIndexOp::create(
+              builder, loc, ValueRange{laneGroupIndex, cZero},
+              ArrayRef<int64_t>{physicalLanesPerThread, perLaneOuter},
+              /*disjoint=*/true)
+                            .getResult();
+        }
+      }
+      canonicalSizes.push_back(builder.getIndexAttr(perLaneOuter));
+      canonicalOffsets.push_back(outerOffset);
     }
     canonicalSizes.push_back(builder.getIndexAttr(perLaneElement));
     canonicalOffsets.push_back(vtids[vtidIdx++]);
@@ -1645,6 +1688,20 @@ void VirtualMMAAttr::getDistributedTileTypes(
   }
 }
 
+std::optional<SmallVector<int64_t, 2>>
+VirtualMMAAttr::getUndistributedTileDimExpansion(int64_t operandIndex,
+                                                 int64_t dim) const {
+  assert(operandIndex <= 2 && "invalid operand index");
+  assert(dim < 3 && "invalid inner tile dim");
+  MMASingleSubgroupLayout layout =
+      getSingleSubgroupLayout(*this, static_cast<int>(operandIndex));
+  if (layout.outer[dim] > 1) {
+    return SmallVector<int64_t, 2>{layout.outer[dim],
+                                   layout.element[dim] * layout.thread[dim]};
+  }
+  return std::nullopt;
+}
+
 int64_t VirtualMMAAttr::getSubgroupSize() const {
   switch (getIntrinsic()) {
   case VirtualMMAIntrinsic::VMFMA_F32_16x16x32_F8E4M3FNUZ:
@@ -1693,18 +1750,24 @@ LogicalResult VirtualMMAAttr::populateOperandOffsetsSizesStrides(
 
   // When thread product < subgroup size, multiple physical lanes share the
   // same position in the thread[i] decomposition. physicalLanesPerThread
-  // tells populateCanonicalOffsetsSizesAndStrides to split the element
-  // dimension so each physical lane gets a unique slice.
+  // tells populateCanonicalOffsetsSizesAndStrides to split the duplicated
+  // logical lane data so each physical lane gets a unique slice.
   int64_t threadProduct = llvm::product_of(subgroupLayout.thread);
   assert(getSubgroupSize() % threadProduct == 0 &&
          "subgroup size must be a multiple of thread product");
   int64_t physicalLanesPerThread = getSubgroupSize() / threadProduct;
+  bool splitPhysicalLanesAcrossOuter =
+      operandIndex == kMMAOperandLhs &&
+      (getIntrinsic() == VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16 ||
+       getIntrinsic() == VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16);
 
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
           builder, loc, laneId, permutation, subgroupLayout, canonicalOffsets,
-          canonicalSizes, strides, physicalLanesPerThread))) {
+          canonicalSizes, strides, physicalLanesPerThread,
+          splitPhysicalLanesAcrossOuter ? PhysicalLaneSplitMode::Outer
+                                        : PhysicalLaneSplitMode::Element))) {
     return failure();
   }
   offsets.append(canonicalOffsets);
@@ -1802,6 +1865,7 @@ struct VDMFMAConfig {
   uint32_t evenSparseIndex;
   uint32_t oddSparseIndex;
   int64_t aSliceWidth;
+  int64_t kOuterSplits;
 };
 
 // Virtual Dense MFMA (VDMFMA) ops represent invocations of the sparse trick
@@ -1824,9 +1888,11 @@ struct VDMFMAConfig {
 // the full dense dot product for the logical row. This yields a semantic M=8
 // matmul from a physical 16x16 instruction.
 //
-// Each lane loads unique A data via physicalLanesPerThread distribution. Even
-// lanes receive K[0:aSliceWidth*unrollFactor/2], odd lanes receive
-// K[aSliceWidth*unrollFactor/2:aSliceWidth*unrollFactor]. A is sliced
+// Each lane loads unique A data via physicalLanesPerThread distribution. The
+// duplicate physical lane either selects a disjoint element slice or, for
+// CDNA4/gfx950 16-bit VDMFMA, the low/high native-K outer slab. The latter is
+// what gives even lanes K[0:8] and odd lanes K[32:40] for each 16x16x64
+// SMFMAC lane group, matching the HIP sparse-trick packing. A is sliced
 // sequentially into per-SMFMAC chunks of aSliceWidth elements.
 //
 // === Accumulator expand/collapse ===
@@ -1841,25 +1907,43 @@ struct VDMFMAConfig {
 // a collapsed accumulator into the 4-element physical form before the smfmac
 // chain, then collapses the result back afterward.
 
-// Returns the B shuffle indices for one unrolled VDMFMA slice.
-static SmallVector<int64_t, 16>
+// Returns the B shuffle indices for one unrolled VDMFMA slice. kOuterSplits
+// describes how many independent K-outer groups should each be interleaved as
+// low/high halves. The CDNA4 16-bit path exposes four K-outer slabs in the
+// vector layout and uses one interleave group so B follows the proven
+// V_SMFMAC_F32_16X16X64_F16 register order.
+static SmallVector<int64_t, 32>
 getVDMFMABInterleaveIndices(int64_t aSliceWidth, int64_t unrollFactor,
-                            int64_t sliceIndex) {
-  assert(aSliceWidth % 2 == 0 && "expected B slices grouped in pairs");
+                            int64_t sliceIndex, int64_t kOuterSplits) {
   assert(unrollFactor > 0 && "expected positive unroll factor");
   assert(sliceIndex >= 0 && sliceIndex < unrollFactor &&
          "slice index must be within the unrolled K slices");
+  assert(kOuterSplits > 0 && "expected positive K outer split count");
+  assert(aSliceWidth % kOuterSplits == 0 &&
+         "expected A slice width to divide evenly across K outer splits");
 
   int64_t halfWidth = aSliceWidth * unrollFactor;
-  int64_t sliceOffset = aSliceWidth * sliceIndex;
-  SmallVector<int64_t, 16> interleaveIndices;
-  for (int64_t groupOffset = 0; groupOffset < aSliceWidth; groupOffset += 2) {
-    int64_t lowerBase = sliceOffset + groupOffset;
-    int64_t upperBase = lowerBase + halfWidth;
-    interleaveIndices.push_back(lowerBase);
-    interleaveIndices.push_back(lowerBase + 1);
-    interleaveIndices.push_back(upperBase);
-    interleaveIndices.push_back(upperBase + 1);
+  assert(halfWidth % kOuterSplits == 0 &&
+         "expected B half width to divide evenly across K outer splits");
+
+  int64_t kOuterSliceWidth = aSliceWidth / kOuterSplits;
+  assert(kOuterSliceWidth % 2 == 0 &&
+         "expected B K-outer slices grouped in pairs");
+
+  int64_t upperStride = halfWidth / kOuterSplits;
+  int64_t kOuterStride = 2 * upperStride;
+  SmallVector<int64_t, 32> interleaveIndices;
+  for (int64_t outer = 0; outer < kOuterSplits; ++outer) {
+    int64_t sliceOffset = outer * kOuterStride + kOuterSliceWidth * sliceIndex;
+    for (int64_t groupOffset = 0; groupOffset < kOuterSliceWidth;
+         groupOffset += 2) {
+      int64_t lowerBase = sliceOffset + groupOffset;
+      int64_t upperBase = lowerBase + upperStride;
+      interleaveIndices.push_back(lowerBase);
+      interleaveIndices.push_back(lowerBase + 1);
+      interleaveIndices.push_back(upperBase);
+      interleaveIndices.push_back(upperBase + 1);
+    }
   }
   return interleaveIndices;
 }
@@ -1931,8 +2015,8 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
         /*sizes=*/ArrayRef<int64_t>{config.aSliceWidth},
         /*strides=*/ArrayRef<int64_t>{1});
 
-    SmallVector<int64_t, 16> bInterleaveIndices =
-        getVDMFMABInterleaveIndices(config.aSliceWidth, config.unrollFactor, i);
+    SmallVector<int64_t, 32> bInterleaveIndices = getVDMFMABInterleaveIndices(
+        config.aSliceWidth, config.unrollFactor, i, config.kOuterSplits);
     Value bSlice =
         vector::ShuffleOp::create(builder, loc, rhs, rhs, bInterleaveIndices);
 
@@ -2037,7 +2121,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         VectorType::get({4}, builder.getIntegerType(8)),
                         /*evenSparseIndex=*/0x44,
                         /*oddSparseIndex=*/0xEE,
-                        /*aSliceWidth=*/4};
+                        /*aSliceWidth=*/4,
+                        /*kOuterSplits=*/1};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
@@ -2056,7 +2141,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         VectorType::get({2}, builder.getIntegerType(16)),
                         /*evenSparseIndex=*/0x4444,
                         /*oddSparseIndex=*/0xEEEE,
-                        /*aSliceWidth=*/8};
+                        /*aSliceWidth=*/8,
+                        /*kOuterSplits=*/1};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   // CDNA4/gfx950 F16/BF16: wider native smfmac K=64, unroll=1.
@@ -2073,7 +2159,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         VectorType::get({2}, builder.getIntegerType(16)),
                         /*evenSparseIndex=*/0x4444,
                         /*oddSparseIndex=*/0xEEEE,
-                        /*aSliceWidth=*/8};
+                        /*aSliceWidth=*/8,
+                        /*kOuterSplits=*/1};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   // CDNA4/gfx950 I8 + IEEE fp8: wider native smfmac K=128, unroll=1.
@@ -2092,7 +2179,8 @@ LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
                         /*sparseIndexType=*/builder.getI32Type(),
                         /*evenSparseIndex=*/0x44444444,
                         /*oddSparseIndex=*/0xEEEEEEEE,
-                        /*aSliceWidth=*/16};
+                        /*aSliceWidth=*/16,
+                        /*kOuterSplits=*/2};
     return buildVDMFMAOps(builder, loc, config, inputs, outputs[0], results);
   }
   }
@@ -2186,8 +2274,6 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
     }
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_F16:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x2_BF16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
@@ -2199,16 +2285,40 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(VirtualMMAIntrinsic intrinsic,
       return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
               /*element=*/{2, 1}};
     }
-  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_F16:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x64x1_BF16:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return {/*outer=*/{1, 2}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 8}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{4, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{4, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
+    }
   case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x1_I8:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
-  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E5M2_F8E4M3FN:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN_F8E5M2:
   case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x1_F8E4M3FN:
+    switch (operandIndex) {
+    case kMMAOperandLhs:
+      return {/*outer=*/{1, 2}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},
+              /*element=*/{1, 16}};
+    case kMMAOperandRhs:
+      return {/*outer=*/{2, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{16, 1}};
+    case kMMAOperandAcc:
+      return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*tstrides=*/{16, 1},
+              /*element=*/{2, 1}};
+    }
+  case VirtualMMAIntrinsic::VDMFMA_I32_8x16x128x2_I8:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E5M2FNUZ_F8E4M3FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ_F8E5M2FNUZ:
+  case VirtualMMAIntrinsic::VDMFMA_F32_8x16x128x2_F8E4M3FNUZ:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{1, 1}, /*thread=*/{8, 4}, /*tstrides=*/{2, 16},

@@ -40,6 +40,45 @@ func.func @concretize_multi_mma_F32_16x16x16_F16(%lhs: tensor<2x2x16x16xf16>, %r
  affine_map<(i, j, k) -> (k, j)>,
  affine_map<(i, j, k) -> (i, j)>
 ]
+#config = #iree_gpu.lowering_config<{workgroup = [8, 16, 0], reduction = [0, 0, 1], subgroup = [1, 1, 0], promote_operands = [0, 1], mma_kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>}>
+func.func @expand_virtual_vdmfma_cdna4_f16(%lhs: tensor<1x1x8x64xf16>, %rhs: tensor<1x1x16x64xf16>, %acc: tensor<1x1x8x16xf32>) -> tensor<1x1x8x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>,
+    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
+    permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
+    lowering_config = #config
+  } : tensor<1x1x8x64xf16>, tensor<1x1x16x64xf16> into tensor<1x1x8x16xf32>
+  return %0 : tensor<1x1x8x16xf32>
+}
+
+// CHECK-LABEL:       func @expand_virtual_vdmfma_cdna4_f16
+// CHECK-SAME:          %[[LHS:[A-Za-z0-9]+]]: tensor<1x1x8x64xf16>
+// CHECK-SAME:          %[[RHS:[A-Za-z0-9]+]]: tensor<1x1x16x64xf16>
+// CHECK-SAME:          %[[ACC:[A-Za-z0-9]+]]: tensor<1x1x8x16xf32>
+
+// CHECK-INPUTS-DAG:    %[[EXPANDED_LHS:.+]] = tensor.expand_shape %[[LHS]] {{\[}}[0], [1], [2], [3, 4]] output_shape [1, 1, 8, 2, 32]
+// CHECK-INPUTS-DAG:    %[[EXPANDED_RHS:.+]] = tensor.expand_shape %[[RHS]] {{\[}}[0], [1], [2], [3, 4]] output_shape [1, 1, 16, 4, 16]
+// CHECK-INPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[EXPANDED_LHS]], %[[EXPANDED_RHS]]) outs(%[[ACC]])
+// CHECK-INPUTS-SAME:     kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+// CHECK-INPUTS-SAME:     permutations = [array<i64: 0, 1, 2>, array<i64: 2, 0, 1>, array<i64: 0, 1>]
+// CHECK-INPUTS-SAME:     : tensor<1x1x8x2x32xf16>, tensor<1x1x16x4x16xf16> into tensor<1x1x8x16xf32>
+// CHECK-INPUTS:        return %[[MMA]]
+
+// CHECK-OUTPUTS:       %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
+// CHECK-OUTPUTS-SAME:    kind = #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x1_F16>
+// CHECK-OUTPUTS-SAME:    permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
+// CHECK-OUTPUTS-SAME:    : tensor<1x1x8x64xf16>, tensor<1x1x16x64xf16> into tensor<1x1x8x16xf32>
+// CHECK-OUTPUTS:       return %[[MMA]]
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
 #config = #iree_gpu.lowering_config<{workgroup = [64, 64, 0], reduction = [0, 0, 4], thread = [8, 4]}>
 func.func @concretize_multi_mma_I32_16x16x16_I8(%lhs: tensor<2x2x16x16xi8>, %rhs: tensor<2x2x16x16xi8>, %acc: tensor<2x2x16x16xi32>) -> tensor<2x2x16x16xi32> {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {

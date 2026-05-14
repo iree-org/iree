@@ -2692,6 +2692,70 @@ iree_generated_e2e_runner_test(
 
 endif()
 
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna4_tileandfusevdmfma_f16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
+    "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA4"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cdna4_tileandfusevdmfma_bf16
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=bf16"
+    "--acc_type=f32"
+    "--shapes=custom_mnk"
+    "--mnk=8,128,512"
+    "--mnk_dynamicities=static,static,static"
+    "--compilation_info=LLVMGPUTileAndFuseVDMFMA_CDNA4"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna4"
+)
+
+endif()
+
 endif()
 
 if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")

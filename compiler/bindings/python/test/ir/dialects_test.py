@@ -401,6 +401,36 @@ def virtual_mma_intrinsic_attr():
     assert N == 16
     assert K == 32
 
+    gfx950_vdmfma_intrinsic_attr = iree_gpu.VirtualMMAIntrinsicAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VDMFMA_F32_8x16x64x1_F16
+    )
+    assert gfx950_vdmfma_intrinsic_attr is not None
+
+    lhs_layout = iree_gpu.get_single_subgroup_layout(gfx950_vdmfma_intrinsic_attr, 0)
+    assert lhs_layout.outer == [1, 2]
+    assert lhs_layout.thread == [8, 4]
+    assert lhs_layout.tstrides == [2, 16]
+    assert lhs_layout.element == [1, 8]
+
+    rhs_layout = iree_gpu.get_single_subgroup_layout(gfx950_vdmfma_intrinsic_attr, 1)
+    assert rhs_layout.outer == [4, 1]
+    assert rhs_layout.thread == [4, 16]
+    assert rhs_layout.tstrides == [16, 1]
+    assert rhs_layout.element == [4, 1]
+
+    gfx950_vdmfma_attr = iree_gpu.VirtualMMAAttr.get(
+        iree_gpu.VirtualMMAIntrinsic.VDMFMA_F32_8x16x64x1_F16
+    )
+    a_vec_type, b_vec_type, c_vec_type = gfx950_vdmfma_attr.abc_vector_types
+    assert a_vec_type == vec_8xf16
+    assert b_vec_type == ir.VectorType.get((16,), f16)
+    assert c_vec_type == ir.VectorType.get((2,), f32)
+
+    M, N, K = gfx950_vdmfma_attr.mnk_shape
+    assert M == 8
+    assert N == 16
+    assert K == 64
+
     assert virtual_mma_intrinsic_attr.mma == virtual_mma_attr
 
     virtual_mma_attr_col_major = iree_gpu.VirtualMMAAttr.get(

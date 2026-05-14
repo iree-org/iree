@@ -1043,7 +1043,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   (%{{[^ ]+}} = %{{[^ )]+}}) : (vector<2xi32>) -> vector<4xi32>
 //       CHECK:   %{{[^ ]+}} = vector.interleave
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
-//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31] : vector<32xi8>, vector<32xi8>
 //       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //  CHECK-SAME:   (%[[ACC_COLLAPSE_ARG:[^ ]+]] = %[[SMFMAC]]) : (vector<4xi32>) -> vector<2xi32>
@@ -1058,7 +1058,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
 //       CHECK:   %[[ACC_EXPAND:.+]] = util.hoistable_conversion "vdmfma_interleave_acc" inverts("vdmfma_deinterleave_acc")
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
-//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]]
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31] : vector<32xf8E5M2>, vector<32xf8E5M2>
 //       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //       CHECK:   return %[[ACC_COLLAPSE]] : vector<2xf32>
@@ -1069,7 +1069,8 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: vector<2xf32>
 //       CHECK:   %[[ACC_EXPAND:.+]] = util.hoistable_conversion "vdmfma_interleave_acc" inverts("vdmfma_deinterleave_acc")
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select
-//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31] : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //       CHECK:   return %[[ACC_COLLAPSE]] : vector<2xf32>
 
@@ -1077,7 +1078,8 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E5M2>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E4M3FN>
 //       CHECK:   %[[ACC_EXPAND:.+]] = util.hoistable_conversion "vdmfma_interleave_acc" inverts("vdmfma_deinterleave_acc")
-//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31] : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //       CHECK:   return %[[ACC_COLLAPSE]] : vector<2xf32>
 
@@ -1085,6 +1087,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: vector<16xf8E4M3FN>
 //  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: vector<32xf8E5M2>
 //       CHECK:   %[[ACC_EXPAND:.+]] = util.hoistable_conversion "vdmfma_interleave_acc" inverts("vdmfma_deinterleave_acc")
-//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128
+//       CHECK:   %[[B_INTLV:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11, 4, 5, 12, 13, 6, 7, 14, 15, 16, 17, 24, 25, 18, 19, 26, 27, 20, 21, 28, 29, 22, 23, 30, 31] : vector<32xf8E5M2>, vector<32xf8E5M2>
+//       CHECK:   %[[SMFMAC:.+]] = amdgpu.sparse_mfma 16x16x128 %[[A]] * %[[B_INTLV]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
 //       CHECK:   return %[[ACC_COLLAPSE]] : vector<2xf32>

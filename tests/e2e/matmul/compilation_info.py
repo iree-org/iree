@@ -58,6 +58,7 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUVectorDistributeMFMABlockBatch = "LLVMGPUVectorDistributeMFMABlockBatch"
     LLVMGPUTileAndFuseMFMABlockBatch = "LLVMGPUTileAndFuseMFMABlockBatch"
     LLVMGPUTileAndFuseVDMFMA_CDNA3 = "LLVMGPUTileAndFuseVDMFMA_CDNA3"
+    LLVMGPUTileAndFuseVDMFMA_CDNA4 = "LLVMGPUTileAndFuseVDMFMA_CDNA4"
     LLVMGPUVectorDistributeCUDA = "LLVMGPUVectorDistributeCUDA"
     LLVMGPUTileAndFuseCUDA = "LLVMGPUTileAndFuseCUDA"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
@@ -235,6 +236,7 @@ def get_rocm_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeWMMA1250: ("WMMA1250", vecdist),
         CompilationInfoId.LLVMGPUTileAndFuseMFMA: ("MFMA", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA3: ("VDMFMA_CDNA3", tileandfuse),
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA4: ("VDMFMA_CDNA4", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR3: ("WMMAR3", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR4: ("WMMAR4", tileandfuse),
         CompilationInfoId.LLVMGPUTileAndFuseWMMA1250: ("WMMA1250", tileandfuse),
@@ -302,6 +304,15 @@ def get_rocm_test_compilation_infos(
             MMASchedule("VDMFMA_F32_8x16x64x2_F16", 1, 2, 1, 2, 2),
             MMASchedule("VDMFMA_F32_8x16x64x2_BF16", 1, 1, 1, 1, 1),
             MMASchedule("VDMFMA_F32_8x16x64x2_BF16", 1, 2, 1, 2, 2),
+        ]
+    elif intrinsic == "VDMFMA_CDNA4":
+        # CDNA4 (gfx950) VDMFMA: virtual dense MFMAs for skinny matmuls.
+        # F16/BF16: M=8, N=16, K=64 (x1 underlying SMFMAC)
+        schedules = [
+            MMASchedule("VDMFMA_F32_8x16x64x1_F16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x1_F16", 1, 2, 1, 2, 2),
+            MMASchedule("VDMFMA_F32_8x16x64x1_BF16", 1, 1, 1, 1, 1),
+            MMASchedule("VDMFMA_F32_8x16x64x1_BF16", 1, 2, 1, 2, 2),
         ]
     elif intrinsic == "WMMAR3":
         schedules = [
@@ -385,7 +396,7 @@ def get_rocm_test_compilation_infos(
 
     # MFMA and VDMFMA use 64-lane subgroups (CDNA).
     # WMMAR3, WMMAR4, WMMA1250 all use 32.
-    subgroup_size = 64 if intrinsic in ("MFMA", "VDMFMA_CDNA3") else 32
+    subgroup_size = 64 if intrinsic in ("MFMA", "VDMFMA_CDNA3", "VDMFMA_CDNA4") else 32
 
     infos = []
     for schedule in schedules:
@@ -423,6 +434,8 @@ def get_rocm_test_compilation_infos(
         elif schedule.intrinsic in (
             "VDMFMA_F32_8x16x64x2_F16",
             "VDMFMA_F32_8x16x64x2_BF16",
+            "VDMFMA_F32_8x16x64x1_F16",
+            "VDMFMA_F32_8x16x64x1_BF16",
         ):
             # VDMFMA skinny intrinsics: M=8, N=16, K=64
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 8
@@ -637,6 +650,7 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeWMMA1250,
         CompilationInfoId.LLVMGPUTileAndFuseMFMA,
         CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA3,
+        CompilationInfoId.LLVMGPUTileAndFuseVDMFMA_CDNA4,
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR3,
         CompilationInfoId.LLVMGPUTileAndFuseWMMAR4,
         CompilationInfoId.LLVMGPUTileAndFuseWMMA1250,

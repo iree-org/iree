@@ -86,6 +86,10 @@ static int64_t calculateOperandsSharedMemoryUsedInBytes(
   // matmul, scale bitwidth is 0 so the scale terms below have no effect.
   int64_t tileK = schedule.getTotalKSize() * schedule.getTotalKTileSize();
   int64_t tileKb = schedule.kSizes.back() * schedule.kTileSizes.back();
+  if (tileKb <= 0) {
+    assert(false && "expected positive innermost K tile size");
+    return 0;
+  }
   int64_t tileKo = tileK / tileKb;
 
   int64_t lhsSharedMemoryUsed = tileM * tileK * lhsBitwidth;
@@ -178,6 +182,9 @@ static bool isScheduleAligned(const GPUMatmulShapeType &problem,
   // corresponding elements of `b`.
   auto areAligned = [](ArrayRef<int64_t> a, ArrayRef<int64_t> b) {
     for (auto [aVal, bVal] : llvm::zip_equal(a, b)) {
+      if (bVal <= 0) {
+        return false;
+      }
       if (aVal % bVal != 0) {
         return false;
       }
@@ -210,10 +217,16 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   // Constraint to ensure wgTileSize is distributable by wgSize.
   // such that we can distribute to it's corresponding vector.transfer_read.
   const int64_t kMaxVectorLoadBitWidth = 128;
-  int64_t elemsPerThread =
-      kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
+  int64_t bitwidth = problem.bType.getIntOrFloatBitWidth();
+  if (bitwidth <= 0) {
+    return false;
+  }
+  int64_t elemsPerThread = kMaxVectorLoadBitWidth / bitwidth;
   int64_t wgThreads = subgroupSize * schedule.getTotalMSubgroupCount() *
                       schedule.getTotalNSubgroupCount();
+  if (elemsPerThread <= 0 || wgThreads <= 0) {
+    return false;
+  }
   int64_t mWgSize = schedule.getTotalMSize() * schedule.getTotalMTileSize() *
                     schedule.getTotalMSubgroupCount();
   int64_t nWgSize = schedule.getTotalNSize() * schedule.getTotalNTileSize() *
@@ -222,12 +235,16 @@ static bool isValidMMASchedule(const GPUMatmulShapeType &problem,
   int64_t innerLhsDimSize = transposedLhs ? mWgSize : kWgSize;
   int64_t innerRhsDimSize = transposedRhs ? kWgSize : nWgSize;
 
-  bool isDistributableLhs =
-      (innerLhsDimSize / elemsPerThread) % wgThreads == 0 ||
-      wgThreads % (innerLhsDimSize / elemsPerThread) == 0;
-  bool isDistributableRhs =
-      (innerRhsDimSize / elemsPerThread) % wgThreads == 0 ||
-      wgThreads % (innerRhsDimSize / elemsPerThread) == 0;
+  auto isDistributable = [&](int64_t innerDimSize) {
+    if (innerDimSize <= 0) {
+      return false;
+    }
+    int64_t elementsPerThread = innerDimSize / elemsPerThread;
+    return elementsPerThread == 0 || elementsPerThread % wgThreads == 0 ||
+           wgThreads % elementsPerThread == 0;
+  };
+  bool isDistributableLhs = isDistributable(innerLhsDimSize);
+  bool isDistributableRhs = isDistributable(innerRhsDimSize);
 
   return isAligned && isDistributableLhs && isDistributableRhs;
 }
@@ -399,6 +416,9 @@ getBestKTileSizes(const GPUMatmulShapeType &problem,
     APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCounts[kDim]),
                                        APInt(64, bestKTileCountPerSubgroup));
     kTileSizes[kDim] = kGCD.getSExtValue();
+    if (kTileSizes[kDim] <= 0) {
+      return kTileSizes;
+    }
     bestKTileCountPerSubgroup /= kTileSizes[kDim];
     --kDim;
   }
