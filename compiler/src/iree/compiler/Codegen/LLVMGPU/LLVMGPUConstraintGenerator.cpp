@@ -503,8 +503,9 @@ static LogicalResult emitVectorDistributeConstraints(
   emitLoadDistForWg(wgN, "rhs_tile_elements");
 
   // Constraint 7: Shared memory limit.
-  // Approximate formula: (lhs_bytes * wg_m * red_k) + (rhs_bytes * wg_n *
-  // red_k) Get element type bitwidths from operands.
+  // Approximate formula:
+  // (lhs_bytes * wg_m * red_k) + (rhs_bytes * wg_n * red_k)
+  // Get element type bitwidths from operands.
   auto lhsType =
       cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
   auto rhsType =
