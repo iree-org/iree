@@ -14,7 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Builders.h"
@@ -89,11 +89,6 @@ static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
   AssertOp::create(builder, loc, eq, fmtMsg, ValueRange{lhs, rhs});
 }
 
-template <typename... Args>
-static std::string joinStr(const Args &...args) {
-  return (Twine(args) + ...).str();
-}
-
 /// Assert: lhs <pred> rhs
 static void assertCmp(OpBuilder &builder, Location loc, smt::IntPredicate pred,
                       Value lhs, Value rhs, StringRef msg) {
@@ -106,9 +101,9 @@ static void assertBounds(OpBuilder &builder, Location loc, Value val,
                          StringRef name, Value lo, StringRef loName, Value hi,
                          StringRef hiName) {
   assertCmp(builder, loc, smt::IntPredicate::ge, val, lo,
-            joinStr(name, " >= ", loName));
+            llvm::join_items("", name, " >= ", loName));
   assertCmp(builder, loc, smt::IntPredicate::le, val, hi,
-            joinStr(name, " <= ", hiName));
+            llvm::join_items("", name, " <= ", hiName));
 }
 
 /// Helper to build a knob variable name from a prefix.
@@ -398,12 +393,15 @@ static LogicalResult emitVectorDistributeConstraints(
 
   // Constraint 1: Tile size must divide problem size.
   // dim % wg_tile == 0
-  assertDivisible(builder, loc, smtDimArgs[mDim], wgM,
-                  joinStr(mDimName, " % ", wgMName, " == 0"));
-  assertDivisible(builder, loc, smtDimArgs[nDim], wgN,
-                  joinStr(nDimName, " % ", wgNName, " == 0"));
-  assertDivisible(builder, loc, smtDimArgs[kDim], redK,
-                  joinStr(kDimName, " % ", redKName, " == 0"));
+  assertDivisible(
+      builder, loc, smtDimArgs[mDim], wgM,
+      llvm::join_items("", mDimName, " must be divisible by ", wgMName));
+  assertDivisible(
+      builder, loc, smtDimArgs[nDim], wgN,
+      llvm::join_items("", nDimName, " must be divisible by ", wgNName));
+  assertDivisible(
+      builder, loc, smtDimArgs[kDim], redK,
+      llvm::join_items("", kDimName, " must be divisible by ", redKName));
 
   // Constraint 2: Tile size bounds.
   // mma <= wg_tile <= dim
@@ -415,20 +413,21 @@ static LogicalResult emitVectorDistributeConstraints(
                smtDimArgs[kDim], kDimName);
   // wg_tile <= 512 (max VGPRs)
   assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
-            joinStr(wgMName, " <= 512 (max VGPRs)"));
+            llvm::join_items("", wgMName, " <= 512 (max VGPRs)"));
   assertCmp(builder, loc, smt::IntPredicate::le, wgN, maxVGPRsVal,
-            joinStr(wgNName, " <= 512 (max VGPRs)"));
+            llvm::join_items("", wgNName, " <= 512 (max VGPRs)"));
   assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
-            joinStr(redKName, " <= 512 (max VGPRs)"));
+            llvm::join_items("", redKName, " <= 512 (max VGPRs)"));
 
   // Constraint 3: Tile size decomposition.
   // wg_tile % mma == 0
   assertDivisible(builder, loc, wgM, mmaLookup.mmaMLookup,
-                  joinStr(wgMName, " % mma_m == 0"));
+                  llvm::join_items("", wgMName, " must be divisible by mma_m"));
   assertDivisible(builder, loc, wgN, mmaLookup.mmaNLookup,
-                  joinStr(wgNName, " % mma_n == 0"));
-  assertDivisible(builder, loc, redK, mmaLookup.mmaKLookup,
-                  joinStr(redKName, " % mma_k == 0"));
+                  llvm::join_items("", wgNName, " must be divisible by mma_n"));
+  assertDivisible(
+      builder, loc, redK, mmaLookup.mmaKLookup,
+      llvm::join_items("", redKName, " must be divisible by mma_k"));
   // wg_m % (sg_m_cnt * mma_m * sg_m) == 0
   // wg_n % (sg_n_cnt * mma_n * sg_n) == 0
   // red_k % (1 * mma_k * sg_k) == 0
@@ -439,12 +438,17 @@ static LogicalResult emitVectorDistributeConstraints(
   Value mulResultK = smt::IntMulOp::create(
       builder, loc, ValueRange{mmaLookup.mmaKLookup, sgK});
   assertDivisible(builder, loc, wgM, mulResultM,
-                  joinStr(wgMName, " % (sg_m_cnt * mma_m * sg_m) == 0"));
+                  llvm::join_items("", wgMName,
+                                   " must be divisible by "
+                                   "(sg_m_cnt * mma_m * sg_m)"));
   assertDivisible(builder, loc, wgN, mulResultN,
-                  joinStr(wgNName, " % (sg_n_cnt * mma_n * sg_n) == 0"));
+                  llvm::join_items("", wgNName,
+                                   " must be divisible by "
+                                   "(sg_n_cnt * mma_n * sg_n)"));
 
-  assertDivisible(builder, loc, redK, mulResultK,
-                  joinStr(redKName, " % (mma_k * sg_k) == 0"));
+  assertDivisible(
+      builder, loc, redK, mulResultK,
+      llvm::join_items("", redKName, " must be divisible by (mma_k * sg_k)"));
 
   // Constraint 4: Subgroup count bounds.
   // wg_tile = mma * sg_tile * sg_cnt
@@ -491,8 +495,9 @@ static LogicalResult emitVectorDistributeConstraints(
         smt::IntMulOp::create(builder, loc, ValueRange{redK, wg});
     Value rhsMulResult =
         smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt, sgSize});
-    assertDivisible(builder, loc, lhsMulResult, rhsMulResult,
-                    joinStr(name, " % thread_count == 0"));
+    assertDivisible(
+        builder, loc, lhsMulResult, rhsMulResult,
+        llvm::join_items("", name, " must be divisible by thread_count"));
   };
   emitLoadDistForWg(wgM, "lhs_tile_elements");
   emitLoadDistForWg(wgN, "rhs_tile_elements");
@@ -543,8 +548,9 @@ static LogicalResult emitVectorDistributeConstraints(
   AssertOp::create(builder, loc, orCond,
                    "wg_size_x <= wg_m OR wg_size_x <= wg_n");
   // red_k % mma_m == 0
-  assertDivisible(builder, loc, redK, mmaLookup.mmaMLookup,
-                  joinStr(redKName, " % mma_m == 0"));
+  assertDivisible(
+      builder, loc, redK, mmaLookup.mmaMLookup,
+      llvm::join_items("", redKName, " must be divisible by mma_m"));
 
   return success();
 }
