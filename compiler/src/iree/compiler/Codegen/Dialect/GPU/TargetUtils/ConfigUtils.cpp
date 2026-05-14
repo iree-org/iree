@@ -1059,7 +1059,7 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     int64_t scaleElements = scaleMDim * scaleKoDim;
     constexpr int64_t kScaleBits = 8; // f8E8M0FNU is 8-bit
     ArrayRef<int64_t> dmaSizes;
-    if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
       dmaSizes = dmaSizesAttr.asArrayRef();
     }
     if (!isScaledDMAAligned(scaleElements, kScaleBits, targetSubgroupSize,

@@ -232,12 +232,33 @@ getMinDMAAlignedElements(FunctionOpInterface funcOp, Type elementType) {
 static std::optional<int64_t>
 getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
                           int64_t availableElements) {
-  auto minAligned = getMinDMAAlignedElements(funcOp, elementType);
+  std::optional<int64_t> minAligned =
+      getMinDMAAlignedElements(funcOp, elementType);
   if (!minAligned || availableElements % *minAligned != 0) {
     return std::nullopt;
   }
   // getMinDMAAlignedElements already validated subgroupSize is present.
   return getSubgroupSize(funcOp);
+}
+
+/// Largest numWarps in [1, totalWarps] (by repeated halving) such that
+/// `product(shape) / numWarps` satisfies the minimum DMA transfer alignment.
+/// Conservative for shapes that don't divide evenly (the real greedy in
+/// `computeSubgroupTileSizes` can sometimes pack more warps than this), but
+/// always safe. Returns 0 only if even numWarps==1 fails — the pre-check in
+/// `isCopyDMAConvertible` rejects such copies, so callers assert on 0.
+static int64_t computeMaxFeasibleNumWarps(ArrayRef<int64_t> shape,
+                                          int64_t totalWarps,
+                                          int64_t minElementsPerTransfer) {
+  int64_t totalElements = ShapedType::getNumElements(shape);
+  for (int64_t n = std::max<int64_t>(totalWarps, 1); n >= 1; n /= 2) {
+    int64_t perWarp = totalElements / n;
+    if (perWarp >= minElementsPerTransfer &&
+        perWarp % minElementsPerTransfer == 0) {
+      return n;
+    }
+  }
+  return 0;
 }
 
 /// Helper to compute thread number of threads based on translation_info.
@@ -325,7 +346,8 @@ static bool hasDWORDAlignedRows(tensor::PadOp pad, FunctionOpInterface funcOp) {
   if (highPad.empty() || !isConstantIntValue(highPad.back(), 0)) {
     return false;
   }
-  auto minAligned = getMinDMAAlignedElements(funcOp, elemType);
+  std::optional<int64_t> minAligned =
+      getMinDMAAlignedElements(funcOp, elemType);
   if (!minAligned.has_value() || !sourceType.hasStaticShape()) {
     return false;
   }
@@ -349,16 +371,20 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   }
 
   auto outputType = cast<RankedTensorType>(copyOp.getOutputs()[0].getType());
+  int64_t rank = outputType.getRank();
   ArrayRef<int64_t> shape = outputType.getShape();
-  if (llvm::any_of(shape, ShapedType::isDynamic)) {
+  int64_t innermostDim = shape[rank - 1];
+  if (ShapedType::isDynamic(innermostDim)) {
     return false;
   }
 
-  int64_t innermostDim = shape[shape.size() - 1];
+  // The pre-check runs before tiling but after promotion, so the output may
+  // have swizzle promotion ops (swizzle_hint, expand_shape) between it and
+  // tensor.empty. Use tracesToTensorEmpty to handle both cases.
   int64_t availableElements = innermostDim;
   Value output = copyOp.getOutputs()[0];
-  bool outputIsEmpty = tracesToTensorEmpty(output);
-  if (outputIsEmpty) {
+  if (tracesToTensorEmpty(output) &&
+      llvm::none_of(shape, ShapedType::isDynamic)) {
     availableElements = ShapedType::getNumElements(shape);
   }
 
@@ -367,27 +393,9 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
     return false;
   }
 
-  auto minAligned =
-      getMinDMAAlignedElements(funcOp, outputType.getElementType());
-  if (!minAligned) {
-    return false;
-  }
-
-  if (availableElements % *minAligned == 0) {
-    return true;
-  }
-
-  // Padding requires replacing the destination with tensor.empty, so it's
-  // only viable when the original output is already tensor.empty.
-  if (!outputIsEmpty) {
-    return false;
-  }
-
-  // Check if padding can bring it to alignment.
-  int64_t paddedTotal =
-      llvm::divideCeil(availableElements, *minAligned) * *minAligned;
-  // Sanity: padding shouldn't more than double the allocation.
-  return paddedTotal <= 2 * availableElements;
+  return getDMAAlignedSubgroupSize(funcOp, outputType.getElementType(),
+                                   availableElements)
+      .has_value();
 }
 
 /// Check if the given forall op has warp mapping.
@@ -607,7 +615,8 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     auto parentFuncOp =
         innerOp->template getParentOfType<FunctionOpInterface>();
     if (pad && isValidPadForDMA(pad, parentFuncOp)) {
-      source = pad.getSource();
+      source =
+          createClampedSourceSliceFromPad(rewriter, loc, pad, inParallelOp);
 
       // Compute in_bounds based on whether padding was added per dimension.
       for (auto [low, high] :
@@ -747,28 +756,6 @@ protected:
 struct ConvertCopyToCoalescedDMA : ConvertToCoalescedDMABase<linalg::CopyOp> {
   using ConvertToCoalescedDMABase::ConvertToCoalescedDMABase;
 
-  LogicalResult matchAndRewrite(linalg::CopyOp op,
-                                PatternRewriter &rewriter) const override {
-    auto forallOp = op->getParentOfType<scf::ForallOp>();
-    if (!hasWarpMapping(forallOp)) {
-      return failure();
-    }
-
-    SmallVector<OpFoldResult> threadNumThreads =
-        computeThreadNumThreads(rewriter, op);
-    if (threadNumThreads.empty()) {
-      return failure();
-    }
-
-    scf::ForallOp threadForallOp =
-        tileToThreadLevel(op, rewriter, threadNumThreads);
-    if (!threadForallOp) {
-      return failure();
-    }
-
-    return createDMAInForall<linalg::CopyOp>(threadForallOp, rewriter);
-  }
-
 protected:
   SmallVector<OpFoldResult>
   computeThreadNumThreads(OpBuilder &builder,
@@ -888,7 +875,7 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    auto minAligned =
+    std::optional<int64_t> minAligned =
         getMinDMAAlignedElements(funcOp, outputType.getElementType());
     if (!minAligned || innermostDim % *minAligned != 0) {
       return failure();
@@ -1154,7 +1141,8 @@ private:
     ArrayRef<int64_t> shape = outputType.getShape();
 
     Type elementType = outputType.getElementType();
-    auto minAligned = getMinDMAAlignedElements(funcOp, elementType);
+    std::optional<int64_t> minAligned =
+        getMinDMAAlignedElements(funcOp, elementType);
     if (!minAligned) {
       return failure();
     }
@@ -1164,11 +1152,13 @@ private:
     // swizzle promotion ops), we can linearize all dimensions.
     int64_t innermostDim = shape[rank - 1];
     int64_t availableElements = innermostDim;
+    bool linearizedAvailability = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
       Value output = copyOp.getOutputs()[0];
       if (tracesToTensorEmpty(output) &&
           llvm::none_of(shape, ShapedType::isDynamic)) {
         availableElements = ShapedType::getNumElements(shape);
+        linearizedAvailability = true;
       }
     }
 
@@ -1177,64 +1167,33 @@ private:
       return failure();
     }
 
-    // Check if this is a tensor.pad fusion case.
-    bool isPadFusion = false;
-    if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-      if (tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0])) {
-        // Check if padding exists (non-zero low/high pad).
-        for (auto [low, high] :
-             llvm::zip(pad.getMixedLowPad(), pad.getMixedHighPad())) {
-          if (!isConstantIntValue(low, 0) || !isConstantIntValue(high, 0)) {
-            isPadFusion = true;
-            break;
-          }
-        }
-      }
-    }
-
-    // When the workgroup tile is DMA-aligned but the naive per-warp tile from
-    // computeSubgroupTileSizes would be sub-aligned, the per-warp DMA emit
-    // would fail, leaving an orphan linalg.copy inside the warp-mapped forall.
-    // Cap the participating warps at the number of full DMA segments in the
-    // tile so each warp sees an aligned slice. The cap is only meaningful
-    // when output traces to tensor.empty (otherwise warp tiles share the
-    // innermost dim, already checked for alignment above).
+    // In the linearized-availability case the per-warp tile shrinks with more
+    // warps and can fall below the minimum DMA transfer, leaving an orphan
+    // `linalg.copy {use_global_load_dma}` inside a warp-mapped forall
+    // (issue #24139). Halve `totalWarps` until each warp's tile is aligned.
     SmallVector<int64_t> effectiveNumWarps = numWarps;
-    if (!isPadFusion && availableElements % *minAligned == 0) {
-      bool outputTracesEmpty = false;
-      if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
-        outputTracesEmpty = tracesToTensorEmpty(copyOp.getOutputs()[0]) &&
-                            llvm::none_of(shape, ShapedType::isDynamic);
-      }
-      if (outputTracesEmpty) {
-        auto positiveWarps =
-            llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
-        int64_t totalWarps = llvm::product_of(positiveWarps);
-        int64_t maxSegments = availableElements / *minAligned;
-        if (maxSegments < totalWarps) {
-          effectiveNumWarps.assign(numWarps.size(), 1);
-          effectiveNumWarps.front() = maxSegments;
-        }
-      }
+    if (linearizedAvailability) {
+      auto positiveWarps =
+          llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
+      int64_t totalWarps = llvm::product_of(positiveWarps);
+      int64_t feasibleNumWarps =
+          computeMaxFeasibleNumWarps(shape, totalWarps, *minAligned);
+      // The whole-tile alignment check in isCopyDMAConvertible is exactly the
+      // numWarps==1 feasibility check, so reaching here with feasible==0
+      // means the pre-check is out of sync with this distribution policy.
+      assert(feasibleNumWarps >= 1 &&
+             "DMA pre-check should have rejected this copy: even a single "
+             "warp cannot satisfy the minimum DMA transfer alignment");
+      effectiveNumWarps = {feasibleNumWarps};
     }
 
     SmallVector<OpFoldResult> tileSizes;
     int64_t numTiledDims = 0;
 
-    if (isPadFusion) {
-      // For pad fusion: single-iteration wrapper forall so the DMA sees the
-      // full pre-pad source (TODO #23365: proper subgroup tiling).
-      if (llvm::any_of(shape, ShapedType::isDynamic)) {
-        return failure();
-      }
-      for (int64_t i = 0; i < rank; ++i) {
-        tileSizes.push_back(rewriter.getIndexAttr(shape[i]));
-        ++numTiledDims;
-      }
-    } else {
-      std::tie(tileSizes, numTiledDims) =
-          computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
-    }
+    // Distribute across subgroups (warps) for both pad fusion and non-pad
+    // cases.
+    std::tie(tileSizes, numTiledDims) =
+        computeSubgroupTileSizes(rewriter, shape, effectiveNumWarps);
 
     if (numTiledDims == 0) {
       return failure();
