@@ -74,12 +74,11 @@ constexpr int64_t kUnitTileDimVal = 1;
 
 } // namespace
 
-// TODO(#23535): These constraints are VERY incomplete -- they only emit
-// workgroup tile divisibility. Full VectorDistribute constraints (MMA
-// alignment, subgroup counts, shared memory, load distribution, etc.)
-// will be added in follow-up patches.
+// TODO(#23535): These constraints are derived from existing tuner constraints.
+// Need to verify the validity of the additional heuristic constraints,
+// such as `red_k % mma_m == 0`.
 
-/// Assert: lhs % rhs == 0.
+/// Assert: lhs % rhs == 0, with format args for diagnostics.
 static void assertDivisible(OpBuilder &builder, Location loc, Value lhs,
                             Value rhs, StringRef msg) {
   Value zero = mkIntConst(builder, loc, 0);
@@ -328,7 +327,6 @@ emitMMALookup(OpBuilder &builder, Location loc, ArrayRef<Attribute> mmaAttrs) {
 }
 
 /// Emit VectorDistribute constraints for contraction-like dims (matmul/conv).
-/// TODO(#23535): Complete real constraint logics here.
 static LogicalResult emitVectorDistributeConstraints(
     OpBuilder &builder, linalg::LinalgOp linalgOp,
     const ContractionLikeDims &dims, IREE::GPU::TargetAttr gpuTarget,
