@@ -20,6 +20,7 @@
 #include "iree/hal/drivers/amdgpu/host_queue_profile_events.h"
 #include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/hal/drivers/amdgpu/physical_device.h"
+#include "iree/hal/drivers/amdgpu/pm4_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/util/aql_emitter.h"
 #include "iree/testing/gtest.h"
@@ -678,10 +679,13 @@ static iree_status_t CommandBufferProfileSinkWrite(
       EXPECT_NE(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE, records[i].type);
       EXPECT_NE(UINT32_MAX, records[i].command_index);
       EXPECT_NE(0u, records[i].command_buffer_id);
-      EXPECT_TRUE(
-          iree_hal_profile_command_operation_has_block_structure(&records[i]));
-      EXPECT_NE(UINT32_MAX, records[i].block_ordinal);
-      EXPECT_NE(UINT32_MAX, records[i].block_command_ordinal);
+      if (iree_hal_profile_command_operation_has_block_structure(&records[i])) {
+        EXPECT_NE(UINT32_MAX, records[i].block_ordinal);
+        EXPECT_NE(UINT32_MAX, records[i].block_command_ordinal);
+      } else {
+        EXPECT_EQ(UINT32_MAX, records[i].block_ordinal);
+        EXPECT_EQ(UINT32_MAX, records[i].block_command_ordinal);
+      }
       if (records[i].type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
         EXPECT_NE(0u, records[i].executable_id);
         EXPECT_NE(UINT32_MAX, records[i].export_ordinal);
@@ -1001,7 +1005,7 @@ static void ExpectQueueEventProfilingCanBeginAndEnd(
   EXPECT_EQ(1, sink.end_count);
 }
 
-static void ExpectDispatchEventsWithinClockCorrelationRange(
+static void ExpectDispatchEventsHaveClockCorrelations(
     const CommandBufferProfileSink& sink) {
   ASSERT_GE(sink.clock_correlations.size(), 2u);
   ASSERT_EQ(sink.dispatch_events.size(),
@@ -1010,8 +1014,9 @@ static void ExpectDispatchEventsWithinClockCorrelationRange(
        event_index < sink.dispatch_events.size(); ++event_index) {
     const uint32_t physical_device_ordinal =
         sink.dispatch_event_physical_device_ordinals[event_index];
-    uint64_t min_device_tick = UINT64_MAX;
-    uint64_t max_device_tick = 0;
+    uint64_t previous_sample_id = 0;
+    uint64_t previous_device_tick = 0;
+    iree_host_size_t correlation_count = 0;
     for (const iree_hal_profile_clock_correlation_record_t& correlation :
          sink.clock_correlations) {
       if (correlation.physical_device_ordinal != physical_device_ordinal ||
@@ -1020,14 +1025,15 @@ static void ExpectDispatchEventsWithinClockCorrelationRange(
               IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
         continue;
       }
-      min_device_tick = std::min(min_device_tick, correlation.device_tick);
-      max_device_tick = std::max(max_device_tick, correlation.device_tick);
+      if (previous_sample_id != 0) {
+        EXPECT_GT(correlation.sample_id, previous_sample_id);
+        EXPECT_GE(correlation.device_tick, previous_device_tick);
+      }
+      previous_sample_id = correlation.sample_id;
+      previous_device_tick = correlation.device_tick;
+      ++correlation_count;
     }
-    ASSERT_NE(UINT64_MAX, min_device_tick);
-    ASSERT_NE(0u, max_device_tick);
-    ASSERT_LT(min_device_tick, max_device_tick);
-    EXPECT_GE(sink.dispatch_events[event_index].start_tick, min_device_tick);
-    EXPECT_LE(sink.dispatch_events[event_index].end_tick, max_device_tick);
+    EXPECT_GE(correlation_count, 2u);
   }
 }
 
@@ -1683,6 +1689,794 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
   memset(output_values, 0, sizeof(output_values));
   IREE_ASSERT_OK(iree_hal_buffer_map_read(
       output_buffer, /*offset=*/0, output_values, sizeof(output_values)));
+  EXPECT_EQ(0, memcmp(output_values, expected_values, sizeof(expected_values)));
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       Pm4DispatchUsesResidentPrepublishedCommandBuffer) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(
+      &test_device, &fixture, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT));
+  ASSERT_TRUE(iree_hal_amdgpu_pm4_command_buffer_isa(fixture.command_buffer));
+  const iree_hal_amdgpu_pm4_program_t* pm4_program =
+      iree_hal_amdgpu_pm4_command_buffer_program(fixture.command_buffer);
+  ASSERT_NE(pm4_program->dwords, nullptr);
+  EXPECT_GT(pm4_program->dword_count, 0u);
+  const iree_hal_amdgpu_pm4_command_buffer_fixup_plan_t* fixup_plan =
+      iree_hal_amdgpu_pm4_command_buffer_fixup_plan(fixture.command_buffer);
+  EXPECT_EQ(fixup_plan->entries, nullptr);
+  EXPECT_EQ(fixup_plan->entry_count, 0u);
+  ASSERT_NE(fixup_plan->target_base, nullptr);
+  EXPECT_GT(fixup_plan->target_byte_length, 0u);
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  ExpectTwoDispatchOutputs(fixture);
+
+  iree_hal_command_buffer_t* one_shot_command_buffer = nullptr;
+  iree_status_t one_shot_status = iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &one_shot_command_buffer);
+  EXPECT_EQ(iree_status_code(one_shot_status), IREE_STATUS_UNIMPLEMENTED);
+  iree_status_free(one_shot_status);
+  iree_hal_command_buffer_release(one_shot_command_buffer);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       Pm4CommandBufferExecuteEmitsDispatchProfileEvents) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+  if (!iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+          physical_device->pm4_timestamp_strategy)) {
+    GTEST_SKIP() << "PM4 dispatch timestamp packets are not supported on this "
+                    "physical device";
+  }
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(
+      &test_device, &fixture,
+      IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA));
+  ASSERT_TRUE(iree_hal_amdgpu_pm4_command_buffer_isa(fixture.command_buffer));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  ExpectTwoDispatchOutputs(fixture);
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  EXPECT_EQ(1, sink.command_operation_metadata_count);
+  EXPECT_FALSE(sink.write_after_end);
+  ASSERT_EQ(2u, sink.command_operations.size());
+  for (iree_host_size_t i = 0; i < sink.command_operations.size(); ++i) {
+    const iree_hal_profile_command_operation_record_t& operation =
+        sink.command_operations[i];
+    EXPECT_EQ(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH, operation.type);
+    EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
+    EXPECT_EQ((uint32_t)i, operation.command_index);
+    EXPECT_NE(0u, operation.executable_id);
+    EXPECT_EQ(0u, operation.export_ordinal);
+    EXPECT_EQ(2u, operation.binding_count);
+    EXPECT_EQ(1u, operation.workgroup_count[0]);
+    EXPECT_EQ(1u, operation.workgroup_count[1]);
+    EXPECT_EQ(1u, operation.workgroup_count[2]);
+    EXPECT_NE(0u, operation.workgroup_size[0]);
+  }
+  ASSERT_EQ(2u, sink.dispatch_events.size());
+  for (iree_host_size_t i = 0; i < sink.dispatch_events.size(); ++i) {
+    const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[i];
+    EXPECT_EQ(sizeof(iree_hal_profile_dispatch_event_t), event.record_length);
+    EXPECT_EQ(IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER, event.flags);
+    EXPECT_NE(0u, event.event_id);
+    EXPECT_NE(0u, event.submission_id);
+    EXPECT_EQ(sink.command_buffer_ids[0], event.command_buffer_id);
+    EXPECT_NE(0u, event.executable_id);
+    EXPECT_EQ((uint32_t)i, event.command_index);
+    EXPECT_EQ(0u, event.export_ordinal);
+    EXPECT_EQ(1u, event.workgroup_count[0]);
+    EXPECT_EQ(1u, event.workgroup_count[1]);
+    EXPECT_EQ(1u, event.workgroup_count[2]);
+    EXPECT_NE(0u, event.workgroup_size[0]);
+    EXPECT_NE(0u, event.start_tick);
+    EXPECT_NE(0u, event.end_tick);
+    EXPECT_GE(event.end_tick, event.start_tick);
+  }
+  ExpectDispatchEventsHaveClockCorrelations(sink);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       Pm4CommandBufferExecuteEmitsQueueDeviceProfileEnvelope) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS |
+                          IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsQueueDeviceProfilingUnavailable(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "queue-device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(
+      &test_device, &fixture,
+      IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA));
+  ASSERT_TRUE(iree_hal_amdgpu_pm4_command_buffer_isa(fixture.command_buffer));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  ExpectTwoDispatchOutputs(fixture);
+
+  EXPECT_EQ(1, sink.begin_count);
+  EXPECT_EQ(1, sink.end_count);
+  EXPECT_EQ(1, sink.command_buffer_metadata_count);
+  EXPECT_EQ(1, sink.command_operation_metadata_count);
+  EXPECT_EQ(1, sink.queue_event_count);
+  EXPECT_EQ(1, sink.queue_device_event_count);
+  EXPECT_FALSE(sink.write_after_end);
+  ASSERT_EQ(1u, sink.command_buffer_ids.size());
+  ASSERT_EQ(2u, sink.command_operations.size());
+  for (uint32_t i = 0; i < sink.command_operations.size(); ++i) {
+    const iree_hal_profile_command_operation_record_t& operation =
+        sink.command_operations[i];
+    EXPECT_EQ(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH, operation.type);
+    EXPECT_FALSE(
+        iree_hal_profile_command_operation_has_block_structure(&operation));
+    EXPECT_EQ(i, operation.command_index);
+    EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
+    EXPECT_NE(0u, operation.executable_id);
+    EXPECT_EQ(0u, operation.export_ordinal);
+    EXPECT_EQ(2u, operation.binding_count);
+    EXPECT_EQ(1u, operation.workgroup_count[0]);
+    EXPECT_EQ(1u, operation.workgroup_count[1]);
+    EXPECT_EQ(1u, operation.workgroup_count[2]);
+    EXPECT_NE(0u, operation.workgroup_size[0]);
+    EXPECT_NE(0u, operation.flags &
+                      IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_STATIC_BINDINGS);
+    EXPECT_NE(
+        0u, operation.flags &
+                IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_PREPUBLISHED_ARGUMENTS);
+  }
+
+  ASSERT_EQ(1u, sink.queue_events.size());
+  ASSERT_EQ(1u, sink.queue_device_events.size());
+  const iree_hal_profile_queue_event_t& queue_event = sink.queue_events[0];
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE, queue_event.type);
+  EXPECT_NE(0u, queue_event.submission_id);
+  EXPECT_EQ(sink.command_buffer_ids[0], queue_event.command_buffer_id);
+  EXPECT_EQ(0u, queue_event.wait_count);
+  EXPECT_EQ(1u, queue_event.signal_count);
+  EXPECT_EQ(2u, queue_event.operation_count);
+  EXPECT_NE(0u, queue_event.payload_length);
+
+  const iree_hal_profile_queue_device_event_t& device_event =
+      sink.queue_device_events[0];
+  EXPECT_EQ(IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE, device_event.type);
+  EXPECT_EQ(queue_event.submission_id, device_event.submission_id);
+  EXPECT_EQ(queue_event.command_buffer_id, device_event.command_buffer_id);
+  EXPECT_EQ(queue_event.stream_id, device_event.stream_id);
+  EXPECT_EQ(queue_event.physical_device_ordinal,
+            device_event.physical_device_ordinal);
+  EXPECT_EQ(queue_event.queue_ordinal, device_event.queue_ordinal);
+  EXPECT_EQ(queue_event.operation_count, device_event.operation_count);
+  EXPECT_EQ(queue_event.payload_length, device_event.payload_length);
+  EXPECT_NE(0u, device_event.start_tick);
+  EXPECT_NE(0u, device_event.end_tick);
+  EXPECT_GE(device_event.end_tick, device_event.start_tick);
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       AutoCommandBufferModeUsesAqlWithoutUploadRing) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  EXPECT_TRUE(iree_hal_amdgpu_aql_command_buffer_isa(command_buffer));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+
+  Ref<iree_hal_command_buffer_t> transfer_command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, transfer_command_buffer.out()));
+  EXPECT_TRUE(iree_hal_amdgpu_aql_command_buffer_isa(transfer_command_buffer));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_command_buffer_isa(transfer_command_buffer));
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       AutoCommandBufferModeUsesPm4WhenFullySupported) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  const bool pm4_supported =
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities);
+  EXPECT_EQ(pm4_supported,
+            iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+  EXPECT_NE(pm4_supported,
+            iree_hal_amdgpu_aql_command_buffer_isa(command_buffer));
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       AutoCommandBufferModeUsesPm4WhileQueueProfiling) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  const bool pm4_supported =
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities);
+  EXPECT_EQ(pm4_supported,
+            iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+  EXPECT_NE(pm4_supported,
+            iree_hal_amdgpu_aql_command_buffer_isa(command_buffer));
+
+  IREE_ASSERT_OK(profiling.End());
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       AutoCommandBufferModeUsesPm4WhileDispatchProfiling) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  CommandBufferProfileSink sink = {};
+  CommandBufferProfileSinkInitialize(&sink);
+  DeviceProfilingScope profiling(test_device.base_device());
+  iree_status_t profiling_status =
+      profiling.Begin(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS,
+                      CommandBufferProfileSinkAsBase(&sink));
+  if (IsProfilingUnsupported(profiling_status)) {
+    iree_status_free(profiling_status);
+    GTEST_SKIP() << "device profiling data family unsupported by backend";
+  }
+  IREE_ASSERT_OK(profiling_status);
+
+  TwoDispatchCommandBuffer fixture;
+  IREE_ASSERT_OK(CreateTwoDispatchCommandBuffer(
+      &test_device, &fixture,
+      IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  const bool pm4_supported =
+      iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities) &&
+      iree_hal_amdgpu_pm4_timestamp_strategy_supports_ranges(
+          physical_device->pm4_timestamp_strategy);
+  EXPECT_EQ(pm4_supported,
+            iree_hal_amdgpu_pm4_command_buffer_isa(fixture.command_buffer));
+  EXPECT_NE(pm4_supported,
+            iree_hal_amdgpu_aql_command_buffer_isa(fixture.command_buffer));
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      fixture.command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(iree_hal_device_profiling_flush(test_device.base_device()));
+  IREE_ASSERT_OK(profiling.End());
+
+  ExpectTwoDispatchOutputs(fixture);
+  ASSERT_EQ(2u, sink.dispatch_events.size());
+  for (iree_host_size_t i = 0; i < sink.dispatch_events.size(); ++i) {
+    const iree_hal_profile_dispatch_event_t& event = sink.dispatch_events[i];
+    EXPECT_EQ(IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER, event.flags);
+    EXPECT_EQ((uint32_t)i, event.command_index);
+    EXPECT_NE(0u, event.start_tick);
+    EXPECT_NE(0u, event.end_tick);
+    EXPECT_GE(event.end_tick, event.start_tick);
+  }
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       AutoCommandBufferModeFallsBackToAqlForUnsupportedRequest) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  EXPECT_TRUE(iree_hal_amdgpu_aql_command_buffer_isa(command_buffer));
+  EXPECT_FALSE(iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+}
+
+TEST_F(HostQueueCommandBufferTest,
+       ExplicitPm4CommandBufferModeRejectsUnsupportedCategories) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  iree_status_t status = iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &command_buffer);
+  EXPECT_EQ(iree_status_code(status), IREE_STATUS_UNIMPLEMENTED);
+  iree_status_free(status);
+  iree_hal_command_buffer_release(command_buffer);
+}
+
+TEST_F(HostQueueCommandBufferTest, Pm4MixedDynamicDispatchUsesGpuFixup) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      input_buffer.out()));
+  const uint32_t input_values[4] = {1, 2, 3, 4};
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
+                                           input_values, sizeof(input_values)));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
+                               iree_hal_buffer_byte_length(input_buffer)),
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/3, /*offset=*/0,
+          iree_hal_buffer_byte_length(output_buffer)),
+  };
+  const iree_hal_buffer_ref_list_t dispatch_bindings = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs),
+      /*values=*/binding_refs,
+  };
+  const uint32_t constant_values[2] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_values, sizeof(constant_values));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/4, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants,
+      dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  ASSERT_TRUE(iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+  const iree_hal_amdgpu_pm4_program_t* pm4_program =
+      iree_hal_amdgpu_pm4_command_buffer_program(command_buffer);
+  ASSERT_NE(pm4_program->dwords, nullptr);
+  EXPECT_GT(pm4_program->dword_count, 0u);
+  const iree_hal_amdgpu_pm4_command_buffer_fixup_plan_t* fixup_plan =
+      iree_hal_amdgpu_pm4_command_buffer_fixup_plan(command_buffer);
+  ASSERT_NE(fixup_plan->entries, nullptr);
+  ASSERT_NE(fixup_plan->target_base, nullptr);
+  EXPECT_GE(fixup_plan->entry_count, 1u);
+  EXPECT_LE(fixup_plan->entry_count, 2u);
+  EXPECT_GT(fixup_plan->target_byte_length, 0u);
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  iree_hal_buffer_binding_t bindings[4] = {
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/output_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+  };
+  const iree_hal_buffer_binding_table_t binding_table = {
+      /*count=*/IREE_ARRAYSIZE(bindings),
+      /*bindings=*/bindings,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint32_t output_values[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
+      output_buffer, /*offset=*/0, output_values, sizeof(output_values)));
+  const uint32_t expected_values[4] = {13, 16, 19, 22};
+  EXPECT_EQ(0, memcmp(output_values, expected_values, sizeof(expected_values)));
+
+  iree_hal_executable_release(executable);
+  iree_hal_executable_cache_release(executable_cache);
+}
+
+TEST_F(HostQueueCommandBufferTest, Pm4DynamicDispatchUsesBindingTableSlots) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  options.host_queues.upload_capacity = 64 * 1024;
+  options.preallocate_pools = 0;
+
+  TestLogicalDevice test_device;
+  IREE_ASSERT_OK(
+      test_device.Initialize(&options, &libhsa_, &topology_, host_allocator_));
+
+  iree_hal_amdgpu_physical_device_t* physical_device =
+      test_device.logical_device()->physical_devices[0];
+  if (!iree_hal_amdgpu_vendor_packet_capabilities_support_pm4_dispatch_command_buffers(
+          physical_device->vendor_packet_capabilities)) {
+    GTEST_SKIP() << "PM4 dispatch command buffers are not supported on this "
+                    "physical device";
+  }
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  iree_hal_executable_t* executable = NULL;
+  IREE_ASSERT_OK(LoadCtsExecutable(
+      test_device.base_device(),
+      iree_make_cstring_view("command_buffer_dispatch_constants_bindings_test."
+                             "bin"),
+      &executable_cache, &executable));
+
+  Ref<iree_hal_buffer_t> input_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      input_buffer.out()));
+  const uint32_t input_values[4] = {1, 2, 3, 4};
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(input_buffer, /*target_offset=*/0,
+                                           input_values, sizeof(input_values)));
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateHostVisibleDispatchBuffer(
+      test_device.allocator(), /*buffer_size=*/4 * sizeof(uint32_t),
+      output_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(output_buffer, /*offset=*/0,
+                                          IREE_HAL_WHOLE_BUFFER));
+
+  iree_hal_buffer_ref_t binding_refs[2] = {
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/1, /*offset=*/0,
+          iree_hal_buffer_byte_length(input_buffer)),
+      iree_hal_make_indirect_buffer_ref(
+          /*buffer_slot=*/3, /*offset=*/0,
+          iree_hal_buffer_byte_length(output_buffer)),
+  };
+  const iree_hal_buffer_ref_list_t dispatch_bindings = {
+      /*count=*/IREE_ARRAYSIZE(binding_refs),
+      /*values=*/binding_refs,
+  };
+  const uint32_t constant_values[2] = {3, 10};
+  iree_const_byte_span_t constants =
+      iree_make_const_byte_span(constant_values, sizeof(constant_values));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      test_device.base_device(), IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/4, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
+      command_buffer, executable, /*entry_point=*/0,
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants,
+      dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  ASSERT_TRUE(iree_hal_amdgpu_pm4_command_buffer_isa(command_buffer));
+  const iree_hal_amdgpu_pm4_command_buffer_fixup_plan_t* fixup_plan =
+      iree_hal_amdgpu_pm4_command_buffer_fixup_plan(command_buffer);
+  ASSERT_NE(fixup_plan->entries, nullptr);
+  ASSERT_NE(fixup_plan->target_base, nullptr);
+  EXPECT_GE(fixup_plan->entry_count, 2u);
+  EXPECT_LE(fixup_plan->entry_count, 4u);
+  EXPECT_GT(fixup_plan->target_byte_length, 0u);
+
+  Ref<iree_hal_semaphore_t> command_buffer_signal;
+  IREE_ASSERT_OK(
+      CreateSemaphore(test_device.base_device(), command_buffer_signal.out()));
+  uint64_t command_buffer_signal_value = 1;
+  iree_hal_semaphore_t* command_buffer_signal_ptr = command_buffer_signal.get();
+  const iree_hal_semaphore_list_t command_buffer_signal_list = {
+      /*count=*/1,
+      /*semaphores=*/&command_buffer_signal_ptr,
+      /*payload_values=*/&command_buffer_signal_value,
+  };
+  iree_hal_buffer_binding_t bindings[4] = {
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/input_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+      {
+          /*buffer=*/output_buffer.get(),
+          /*offset=*/0,
+          /*length=*/IREE_HAL_WHOLE_BUFFER,
+      },
+  };
+  const iree_hal_buffer_binding_table_t binding_table = {
+      /*count=*/IREE_ARRAYSIZE(bindings),
+      /*bindings=*/bindings,
+  };
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      test_device.base_device(), IREE_HAL_QUEUE_AFFINITY_ANY,
+      iree_hal_semaphore_list_empty(), command_buffer_signal_list,
+      command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      command_buffer_signal, command_buffer_signal_value,
+      iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  uint32_t output_values[4] = {0, 0, 0, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
+      output_buffer, /*offset=*/0, output_values, sizeof(output_values)));
+  const uint32_t expected_values[4] = {13, 16, 19, 22};
   EXPECT_EQ(0, memcmp(output_values, expected_values, sizeof(expected_values)));
 
   iree_hal_executable_release(executable);
@@ -2544,7 +3338,7 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_NE(0u, event.end_tick);
     EXPECT_GE(event.end_tick, event.start_tick);
   }
-  ExpectDispatchEventsWithinClockCorrelationRange(sink);
+  ExpectDispatchEventsHaveClockCorrelations(sink);
 }
 
 TEST_F(HostQueueCommandBufferTest,
@@ -2658,7 +3452,7 @@ TEST_F(HostQueueCommandBufferTest,
           device_event.submission_id,
           IREE_HAL_PROFILE_EVENT_ENDPOINT_TYPE_QUEUE_DEVICE_EVENT,
           device_event.event_id));
-  ExpectDispatchEventsWithinClockCorrelationRange(sink);
+  ExpectDispatchEventsHaveClockCorrelations(sink);
 }
 
 TEST_F(HostQueueCommandBufferTest,

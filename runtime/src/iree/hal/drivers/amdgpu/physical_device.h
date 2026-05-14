@@ -26,6 +26,8 @@
 
 typedef struct iree_hal_amdgpu_host_memory_pools_t
     iree_hal_amdgpu_host_memory_pools_t;
+typedef struct iree_hal_amdgpu_pm4_command_buffer_resident_pool_t
+    iree_hal_amdgpu_pm4_command_buffer_resident_pool_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_amdgpu_physical_device_options_t
@@ -153,6 +155,10 @@ typedef struct iree_hal_amdgpu_physical_device_options_t {
   // Forces cross-queue wait barriers to use software deferral instead of the
   // optimal device-side strategy for the GPU ISA.
   uint32_t force_wait_barrier_defer : 1;
+
+  // Enables PM4 dispatch command-buffer capabilities on unvalidated gfx9-gfx12
+  // targets for hardware bring-up experiments.
+  uint32_t enable_experimental_pm4_command_buffers : 1;
 } iree_hal_amdgpu_physical_device_options_t;
 
 // Initializes |out_options| to its default values.
@@ -201,6 +207,12 @@ typedef struct iree_hal_amdgpu_physical_device_t {
   uint32_t has_physical_device_uuid : 1;
   // NUMA node of the CPU agent nearest to |device_agent|.
   uint32_t host_numa_node;
+  // Number of compute units reported by HSA for this GPU agent.
+  uint32_t compute_unit_count;
+  // Native wavefront size reported by HSA for this GPU agent.
+  uint32_t wavefront_size;
+  // HDP flush register descriptor reported by HSA for this GPU agent.
+  hsa_amd_hdp_flush_t hdp_flush;
   // Host memory pools for the CPU agent nearest to |device_agent|.
   iree_hal_amdgpu_host_memory_pools_t host_memory_pools;
   // Cold memory-system facts used to derive conservative topology flags.
@@ -233,6 +245,10 @@ typedef struct iree_hal_amdgpu_physical_device_t {
 
   // Per-device pool of materialized slab-backed HAL buffer view wrappers.
   iree_hal_amdgpu_buffer_pool_t materialized_buffer_pool;
+
+  // Per-device pool of executable PM4 command-buffer resident allocations.
+  iree_hal_amdgpu_pm4_command_buffer_resident_pool_t*
+      pm4_command_buffer_resident_pool;
 
   // Pool of HSA signals for host-waited semaphores and proactor integration.
   iree_hal_amdgpu_host_signal_pool_t host_signal_pool;

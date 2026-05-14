@@ -15,10 +15,22 @@ iree_status_t iree_hal_amdgpu_pm4_program_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t memory_pool, const uint32_t* source_dwords,
     uint32_t dword_count, iree_hal_amdgpu_pm4_program_t* out_program) {
+  return iree_hal_amdgpu_pm4_program_initialize_with_stats(
+      libhsa, device_agent, memory_pool, source_dwords, dword_count,
+      /*out_stats=*/NULL, out_program);
+}
+
+iree_status_t iree_hal_amdgpu_pm4_program_initialize_with_stats(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
+    hsa_amd_memory_pool_t memory_pool, const uint32_t* source_dwords,
+    uint32_t dword_count,
+    iree_hal_amdgpu_pm4_program_publish_stats_t* out_stats,
+    iree_hal_amdgpu_pm4_program_t* out_program) {
   IREE_ASSERT_ARGUMENT(libhsa);
   IREE_ASSERT_ARGUMENT(source_dwords);
   IREE_ASSERT_ARGUMENT(out_program);
   memset(out_program, 0, sizeof(*out_program));
+  if (out_stats) memset(out_stats, 0, sizeof(*out_stats));
   if (IREE_UNLIKELY(!memory_pool.handle)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "PM4 program memory pool is required");
@@ -42,21 +54,31 @@ iree_status_t iree_hal_amdgpu_pm4_program_initialize(
       z0, IREE_STRUCT_LAYOUT(0, &byte_length,
                              IREE_STRUCT_FIELD(dword_count, uint32_t, NULL)));
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, byte_length);
+  if (out_stats) out_stats->byte_length = byte_length;
+  const bool collect_stats = out_stats != NULL;
 
   IREE_AMDGPU_DEVICE_PTR uint32_t* dwords = NULL;
+  iree_time_t time_start = collect_stats ? iree_time_now() : 0;
   iree_status_t status = iree_hsa_amd_memory_pool_allocate(
       IREE_LIBHSA(libhsa), memory_pool, byte_length,
       HSA_AMD_MEMORY_POOL_EXECUTABLE_FLAG, (void**)&dwords);
+  if (collect_stats) out_stats->allocate_ns += iree_time_now() - time_start;
 
   if (iree_status_is_ok(status)) {
+    time_start = collect_stats ? iree_time_now() : 0;
     status =
         iree_hsa_amd_agents_allow_access(IREE_LIBHSA(libhsa), /*num_agents=*/1,
                                          &device_agent, /*flags=*/NULL, dwords);
+    if (collect_stats) {
+      out_stats->allow_access_ns += iree_time_now() - time_start;
+    }
   }
 
   if (iree_status_is_ok(status)) {
+    time_start = collect_stats ? iree_time_now() : 0;
     status = iree_hsa_memory_copy(IREE_LIBHSA(libhsa), dwords, source_dwords,
                                   byte_length);
+    if (collect_stats) out_stats->copy_ns += iree_time_now() - time_start;
   }
 
   if (iree_status_is_ok(status)) {

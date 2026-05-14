@@ -222,6 +222,13 @@ iree_hal_amdgpu_pm4_timestamp_strategy_t
 iree_hal_amdgpu_select_pm4_timestamp_strategy(
     iree_hal_amdgpu_gfxip_version_t version);
 
+// Selects unvalidated PM4 dispatch command-buffer capabilities for explicit
+// hardware bring-up on known PM4 gfx families. Production automatic selection
+// must use iree_hal_amdgpu_select_vendor_packet_capabilities alone.
+iree_hal_amdgpu_vendor_packet_capability_flags_t
+iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+    iree_hal_amdgpu_gfxip_version_t version);
+
 // AMDGPU memory-system facts used to derive conservative HAL topology flags.
 typedef struct iree_hal_amdgpu_memory_system_capabilities_t {
   // HSA SVM/HMM process and agent facts.

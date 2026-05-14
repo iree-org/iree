@@ -168,6 +168,7 @@ iree_cc_library(
     packet
   HDRS
     "aql_emitter.h"
+    "pm4_barrier.h"
     "pm4_capabilities.h"
     "pm4_emitter.h"
   DEPS
@@ -278,6 +279,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    pm4_dispatch
+  HDRS
+    "pm4_dispatch.h"
+  SRCS
+    "pm4_dispatch.c"
+  DEPS
+    ::packet
+    iree::base
+    iree::hal::drivers::amdgpu::abi
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     queue_primitives
   HDRS
     "aql_ring.h"
@@ -376,6 +391,7 @@ iree_cc_library(
     ::info
     ::kfd
     ::packet
+    ::pm4_dispatch
     ::pm4_program
     ::queue_primitives
     ::target_id
@@ -395,6 +411,20 @@ iree_cc_library(
     iree::async
     iree::base
     iree::base::tooling::flags
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    benchmark_profile
+  HDRS
+    "benchmark_profile.h"
+  SRCS
+    "benchmark_profile.cc"
+  DEPS
+    iree::base
+    iree::hal
   TESTONLY
   PUBLIC
 )
@@ -617,6 +647,83 @@ iree_cc_test(
     "pm4_emitter_test.cc"
   DEPS
     ::packet
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    pm4_barrier_test
+  SRCS
+    "pm4_barrier_test.cc"
+  DEPS
+    ::packet
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_cc_test(
+  NAME
+    pm4_dispatch_test
+  SRCS
+    "pm4_dispatch_test.cc"
+  DEPS
+    ::packet
+    ::pm4_dispatch
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=amdgpu"
+    "nodocker"
+  GROUP
+    "iree-hal-drivers-amdgpu-tests"
+)
+
+iree_amdgpu_binary(
+  NAME
+    pm4_dispatch_test_kernels_gfx1100
+  TARGET
+    amdgcn-amd-amdhsa
+  ARCH
+    gfx1100
+  SRCS
+    "pm4_dispatch_test_kernels.c"
+  COPTS
+
+  LINKOPTS
+
+)
+
+iree_cc_test(
+  NAME
+    pm4_dispatch_live_test
+  SRCS
+    "pm4_dispatch_live_test.cc"
+  DATA
+    ::pm4_dispatch_test_kernels_gfx1100.so
+  DEPS
+    ::libhsa
+    ::packet
+    ::pm4_dispatch
+    ::pm4_program
+    ::queue_primitives
+    ::topology
+    ::vmem
+    iree::base
+    iree::base::threading
+    iree::hal::drivers::amdgpu::abi
+    iree::io::file_handle
     iree::testing::gtest
     iree::testing::gtest_main
   LABELS

@@ -17,6 +17,7 @@ iree_cc_library(
     "command_buffer.h"
     "common.h"
     "kernel_args.h"
+    "kernel_descriptor.h"
     "profile.h"
     "queue.h"
     "signal.h"

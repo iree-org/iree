@@ -234,6 +234,21 @@ IREE_AMDGPU_STATIC_ASSERT(
     sizeof(iree_hal_amdgpu_command_buffer_binding_source_t) == 16,
     "binding source size is part of the command-buffer ABI");
 
+// Device-side fixup entry used by PM4 command buffers.
+typedef struct IREE_AMDGPU_ALIGNAS(8)
+    iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t {
+  // Byte offset from the PM4 command buffer's resident fixup target base to
+  // the uint64_t pointer to write.
+  uint32_t target_offset;
+  // Dynamic queue_execute binding table slot read by the fixup kernel.
+  uint32_t binding_slot;
+  // Byte offset added to the selected binding table pointer before writing.
+  uint64_t binding_offset;
+} iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t;
+IREE_AMDGPU_STATIC_ASSERT(
+    sizeof(iree_hal_amdgpu_command_buffer_pm4_fixup_entry_t) == 16,
+    "PM4 fixup entry size is part of the command-buffer ABI");
+
 // Barrier metadata command. Replay normally folds this into the next
 // packet-bearing command instead of emitting a standalone packet.
 typedef struct IREE_AMDGPU_ALIGNAS(8)

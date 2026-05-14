@@ -571,6 +571,24 @@ IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier);
 
+// Idempotently publishes a locally witnessed, untainted timeline value.
+//
+// If the semaphore has failed this returns that failure. If the semaphore is
+// already at or past |value| this returns OK without dispatching timepoints.
+// Otherwise it advances the timeline, merges |frontier|, conditionally
+// advances the untainted watermark, and dispatches satisfied timepoints exactly
+// like iree_async_semaphore_signal_untainted().
+//
+// This is for late observers that can independently prove completion of a
+// signal already submitted elsewhere. For example, a HAL backend may wait
+// directly on a queue epoch signal while its completion thread is concurrently
+// publishing the same semaphore value. Ordinary producers should still use
+// strict signal paths so duplicate signals remain visible as programming
+// errors.
+IREE_API_EXPORT iree_status_t iree_async_semaphore_publish_untainted(
+    iree_async_semaphore_t* semaphore, uint64_t value,
+    const iree_async_frontier_t* frontier);
+
 // Merges |frontier| into the semaphore's accumulated frontier without
 // advancing the timeline or dispatching timepoints. Used by HAL submission
 // paths to record causal context at submission time so same-queue wait elision

@@ -51,6 +51,18 @@ IREE_FLAG(string, amdgpu_queue_placement, "any",
           "Device queue placement: 'any' (currently host), 'host', or "
           "'device' (reserved and currently unsupported).");
 
+IREE_FLAG(string, amdgpu_command_buffer_mode, "aql",
+          "Command-buffer execution mode: 'aql', 'pm4', or 'auto'. PM4 is an "
+          "experimental gfx1100 dispatch-only reusable-command-buffer path.");
+IREE_FLAG(
+    string, amdgpu_pm4_command_buffer_publication_mode, "host-copy",
+    "PM4 command-buffer resident publication mode: 'host-copy' writes host "
+    "staging builders and publishes populated segments with hsa_memory_copy; "
+    "'host-async-copy' publishes one contiguous staging image with "
+    "hsa_amd_memory_async_copy and waits in end(); "
+    "'host-async-copy-nonblocking' publishes the same staging image and makes "
+    "queue execution wait on publication completion.");
+
 IREE_FLAG(bool, amdgpu_preallocate_pools, true,
           "Preallocates a reasonable number of resources in pools to reduce "
           "initial execution latency.");
@@ -62,6 +74,12 @@ IREE_FLAG(
     bool, amdgpu_force_wait_barrier_defer, false,
     "Forces cross-queue wait barriers through the software deferral path "
     "instead of using the device-side strategy selected from the GPU ISA.");
+
+IREE_FLAG(bool, amdgpu_experimental_pm4_command_buffers, false,
+          "Enables PM4 dispatch command-buffer capabilities on unvalidated "
+          "gfx9-gfx12 "
+          "targets. This is for hardware bring-up only; default automatic PM4 "
+          "selection remains limited to validated GPU ISAs.");
 
 IREE_FLAG(int64_t, amdgpu_wait_active_for_ns, 0,
           "Reserved for future HSA active-wait tuning. Must be 0 today.");
@@ -200,12 +218,49 @@ static iree_status_t iree_hal_amdgpu_driver_factory_try_create(
                             FLAG_amdgpu_queue_placement);
   }
 
+  if (strcmp(FLAG_amdgpu_command_buffer_mode, "aql") == 0) {
+    device_options->command_buffer_mode =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AQL;
+  } else if (strcmp(FLAG_amdgpu_command_buffer_mode, "pm4") == 0) {
+    device_options->command_buffer_mode =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+  } else if (strcmp(FLAG_amdgpu_command_buffer_mode, "auto") == 0) {
+    device_options->command_buffer_mode =
+        IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+  } else {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized command buffer mode: '%s'",
+                            FLAG_amdgpu_command_buffer_mode);
+  }
+
+  if (strcmp(FLAG_amdgpu_pm4_command_buffer_publication_mode, "host-copy") ==
+      0) {
+    device_options->pm4_command_buffer_publication_mode =
+        IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_COPY;
+  } else if (strcmp(FLAG_amdgpu_pm4_command_buffer_publication_mode,
+                    "host-async-copy") == 0) {
+    device_options->pm4_command_buffer_publication_mode =
+        IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_ASYNC_COPY;
+  } else if (strcmp(FLAG_amdgpu_pm4_command_buffer_publication_mode,
+                    "host-async-copy-nonblocking") == 0) {
+    device_options->pm4_command_buffer_publication_mode =
+        IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_ASYNC_COPY_NONBLOCKING;
+  } else {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unrecognized PM4 command-buffer publication mode: '%s'",
+        FLAG_amdgpu_pm4_command_buffer_publication_mode);
+  }
+
   device_options->preallocate_pools = FLAG_amdgpu_preallocate_pools;
 
   device_options->exclusive_execution = FLAG_amdgpu_exclusive_execution;
 
   device_options->force_wait_barrier_defer =
       FLAG_amdgpu_force_wait_barrier_defer;
+
+  device_options->enable_experimental_pm4_command_buffers =
+      FLAG_amdgpu_experimental_pm4_command_buffers;
 
   if (FLAG_amdgpu_wait_active_for_ns < 0) {
     return iree_make_status(

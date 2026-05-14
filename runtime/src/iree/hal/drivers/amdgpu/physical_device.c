@@ -11,6 +11,7 @@
 #include "iree/async/frontier_tracker.h"
 #include "iree/async/notification.h"
 #include "iree/hal/drivers/amdgpu/abi/signal.h"
+#include "iree/hal/drivers/amdgpu/pm4_command_buffer.h"
 #include "iree/hal/drivers/amdgpu/queue_affinity.h"
 #include "iree/hal/drivers/amdgpu/slab_provider.h"
 #include "iree/hal/drivers/amdgpu/system.h"
@@ -398,8 +399,8 @@ static iree_status_t iree_hal_amdgpu_physical_device_initialize_identity(
     iree_host_size_t device_ordinal,
     iree_hal_amdgpu_physical_device_t* out_physical_device) {
   iree_hal_amdgpu_libhsa_t* libhsa = &system->libhsa;
-  hsa_agent_t device_agent = system->topology.gpu_agents[device_ordinal];
   hsa_agent_t host_agent = system->topology.cpu_agents[host_ordinal];
+  hsa_agent_t device_agent = system->topology.gpu_agents[device_ordinal];
 
   // Zeroing allows deinitialization to run after any partial initialization
   // failure below.
@@ -541,6 +542,7 @@ static iree_status_t
 iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t device_coarse_memory_pool,
+    const hsa_amd_hdp_flush_t* hdp_flush,
     iree_hal_amdgpu_gfxip_version_t gfxip_version,
     const iree_hal_amdgpu_topology_t* topology,
     iree_hal_amdgpu_cpu_visible_device_coarse_memory_t* out_memory) {
@@ -562,11 +564,7 @@ iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
   if (!iree_hal_amdgpu_gfxip_allows_hdp_kernarg_publication(gfxip_version)) {
     return iree_ok_status();
   }
-
-  const hsa_amd_hdp_flush_t hdp_flush =
-      iree_hal_amdgpu_physical_device_query_hdp_flush_registers(libhsa,
-                                                                device_agent);
-  if (!hdp_flush.HDP_MEM_FLUSH_CNTL || !hdp_flush.HDP_REG_FLUSH_CNTL) {
+  if (!hdp_flush->HDP_MEM_FLUSH_CNTL || !hdp_flush->HDP_REG_FLUSH_CNTL) {
     return iree_ok_status();
   }
 
@@ -590,7 +588,7 @@ iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
           },
       .hdp =
           {
-              .registers = hdp_flush,
+              .registers = *hdp_flush,
           },
       .flags =
           IREE_HAL_AMDGPU_CPU_VISIBLE_DEVICE_COARSE_MEMORY_SELECTION_FLAG_HOST_WRITE_PUBLICATION_SUPPORTED,
@@ -865,6 +863,8 @@ iree_hal_amdgpu_physical_device_initialize_device_library_and_blit_context(
         "%" PRIhsz " (expected 32 or 64)",
         wavefront_size, device_ordinal);
   }
+  out_physical_device->compute_unit_count = compute_unit_count;
+  out_physical_device->wavefront_size = wavefront_size;
   iree_hal_amdgpu_device_buffer_transfer_context_initialize(
       &out_physical_device->device_kernels, compute_unit_count, wavefront_size,
       &out_physical_device->buffer_transfer_context);
@@ -886,6 +886,11 @@ iree_hal_amdgpu_physical_device_initialize_vendor_packet_strategy(
 
   iree_hal_amdgpu_vendor_packet_capability_flags_t vendor_packet_capabilities =
       iree_hal_amdgpu_select_vendor_packet_capabilities(gfxip_version);
+  if (options->enable_experimental_pm4_command_buffers) {
+    vendor_packet_capabilities |=
+        iree_hal_amdgpu_select_experimental_pm4_command_buffer_capabilities(
+            gfxip_version);
+  }
   iree_hal_amdgpu_pm4_timestamp_strategy_t pm4_timestamp_strategy =
       iree_hal_amdgpu_select_pm4_timestamp_strategy(gfxip_version);
   iree_hal_amdgpu_wait_barrier_strategy_t wait_barrier_strategy =
@@ -917,11 +922,17 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_amdgpu_libhsa_t* libhsa = &system->libhsa;
+  hsa_agent_t host_agent = system->topology.cpu_agents[host_ordinal];
   hsa_agent_t device_agent = system->topology.gpu_agents[device_ordinal];
 
   iree_status_t status = iree_hal_amdgpu_physical_device_initialize_identity(
       system, options, host_ordinal, host_memory_pools, device_ordinal,
       out_physical_device);
+  if (iree_status_is_ok(status)) {
+    out_physical_device->hdp_flush =
+        iree_hal_amdgpu_physical_device_query_hdp_flush_registers(libhsa,
+                                                                  device_agent);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_hal_amdgpu_physical_device_initialize_host_pools(
         options, host_allocator, out_physical_device);
@@ -950,6 +961,12 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
             libhsa, options, device_agent, device_ordinal,
             coarse_block_memory_pool, fine_block_memory_pool, host_allocator,
             out_physical_device);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_amdgpu_pm4_command_buffer_resident_pool_create(
+        libhsa, host_agent, device_agent, coarse_block_memory_pool,
+        host_memory_pools->coarse_pool, host_allocator,
+        &out_physical_device->pm4_command_buffer_resident_pool);
   }
 
   // Create the default queue-allocation slab provider over the device
@@ -994,6 +1011,7 @@ iree_status_t iree_hal_amdgpu_physical_device_initialize(
     status =
         iree_hal_amdgpu_physical_device_initialize_cpu_visible_device_coarse_memory(
             libhsa, device_agent, coarse_block_memory_pool,
+            &out_physical_device->hdp_flush,
             out_physical_device->isa.target_id.version, &system->topology,
             &out_physical_device->cpu_visible_device_coarse_memory);
   }
@@ -1252,6 +1270,9 @@ void iree_hal_amdgpu_physical_device_deinitialize(
       &physical_device->transient_buffer_pool);
   iree_hal_amdgpu_buffer_pool_deinitialize(
       &physical_device->materialized_buffer_pool);
+  iree_hal_amdgpu_pm4_command_buffer_resident_pool_destroy(
+      physical_device->pm4_command_buffer_resident_pool);
+  physical_device->pm4_command_buffer_resident_pool = NULL;
 
   iree_arena_block_pool_deinitialize(&physical_device->fine_host_block_pool);
 
@@ -1291,6 +1312,8 @@ iree_status_t iree_hal_amdgpu_physical_device_trim(
   iree_hal_amdgpu_block_pool_trim(&physical_device->coarse_block_pools.large);
   iree_hal_amdgpu_block_pool_trim(&physical_device->fine_block_pools.small);
   iree_hal_amdgpu_block_pool_trim(&physical_device->fine_block_pools.large);
+  iree_hal_amdgpu_pm4_command_buffer_resident_pool_trim(
+      physical_device->pm4_command_buffer_resident_pool);
 
   iree_arena_block_pool_trim(&physical_device->fine_host_block_pool);
 

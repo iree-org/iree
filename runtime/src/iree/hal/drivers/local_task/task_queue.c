@@ -554,8 +554,8 @@ static void iree_hal_task_queue_profile_finish_host_execution(
           IREE_HAL_DEVICE_PROFILING_DATA_HOST_EXECUTION_EVENTS)) {
     return;
   }
-  const iree_time_t start_host_time_ns = iree_atomic_load(
-      &profile_operation->start_host_time_ns, iree_memory_order_acquire);
+  const iree_time_t start_host_time_ns = iree_atomic_exchange(
+      &profile_operation->start_host_time_ns, 0, iree_memory_order_acq_rel);
   if (start_host_time_ns == 0) return;
 
   iree_hal_local_profile_host_execution_event_info_t event_info =
@@ -697,6 +697,11 @@ static void iree_hal_task_queue_op_complete_with_epoch(
   iree_status_t status = iree_hal_task_queue_op_unmap_binding_mappings(
       operation, iree_ok_status());
   if (iree_status_is_ok(status)) {
+    // Publish profiling before user-visible completion. Waiters may flush and
+    // end profiling immediately after signal semaphores are reached.
+    iree_hal_task_queue_profile_finish_host_execution(operation, status);
+  }
+  if (iree_status_is_ok(status)) {
     status = iree_hal_semaphore_list_signal(operation->signal_semaphores,
                                             /*frontier=*/NULL);
   }
@@ -715,6 +720,11 @@ static void iree_hal_task_queue_op_complete(
     iree_hal_task_queue_op_t* operation) {
   iree_status_t status = iree_hal_task_queue_op_unmap_binding_mappings(
       operation, iree_ok_status());
+  if (iree_status_is_ok(status)) {
+    // Publish profiling before user-visible completion. Waiters may flush and
+    // end profiling immediately after signal semaphores are reached.
+    iree_hal_task_queue_profile_finish_host_execution(operation, status);
+  }
   if (iree_status_is_ok(status)) {
     // Signal all semaphores to their new values.
     status = iree_hal_semaphore_list_signal(operation->signal_semaphores,

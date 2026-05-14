@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "iree/hal/drivers/amdgpu/api.h"
+#include "iree/hal/drivers/amdgpu/logical_device.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -37,6 +38,14 @@ TEST(AmdgpuDriverOptionsTest, LogicalDeviceParamsAreRejectedUntilDefined) {
                                           .count = 1,
                                           .pairs = &pair,
                                       }));
+}
+
+TEST(AmdgpuDriverOptionsTest, LogicalDeviceDefaultsUseHostCopyPm4Publication) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+
+  EXPECT_EQ(options.pm4_command_buffer_publication_mode,
+            IREE_HAL_AMDGPU_PM4_COMMAND_BUFFER_PUBLICATION_MODE_HOST_COPY);
 }
 
 TEST(AmdgpuDriverOptionsTest, RejectsMissingSearchPathStorageBeforeLoadingHsa) {
@@ -97,6 +106,48 @@ TEST(AmdgpuDriverOptionsTest, RejectsInvalidQueuePlacementBeforeLoadingHsa) {
   iree_hal_amdgpu_logical_device_options_t options;
   iree_hal_amdgpu_logical_device_options_initialize(&options);
   options.queue_placement = (iree_hal_amdgpu_queue_placement_t)99;
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        CreateDriverWithDefaultDeviceOptions(&options));
+}
+
+TEST(AmdgpuDriverOptionsTest, AcceptsCommandBufferModesBeforeLoadingHsa) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AQL;
+
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
+
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_PM4;
+
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
+
+  options.command_buffer_mode = IREE_HAL_AMDGPU_COMMAND_BUFFER_MODE_AUTO;
+
+  IREE_EXPECT_OK(
+      iree_hal_amdgpu_logical_device_options_verify_supported_features(
+          &options));
+}
+
+TEST(AmdgpuDriverOptionsTest, RejectsInvalidCommandBufferModeBeforeLoadingHsa) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.command_buffer_mode = (iree_hal_amdgpu_command_buffer_mode_t)99;
+
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        CreateDriverWithDefaultDeviceOptions(&options));
+}
+
+TEST(AmdgpuDriverOptionsTest,
+     RejectsInvalidPm4CommandBufferPublicationBeforeLoadingHsa) {
+  iree_hal_amdgpu_logical_device_options_t options;
+  iree_hal_amdgpu_logical_device_options_initialize(&options);
+  options.pm4_command_buffer_publication_mode =
+      (iree_hal_amdgpu_pm4_command_buffer_publication_mode_t)99;
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         CreateDriverWithDefaultDeviceOptions(&options));

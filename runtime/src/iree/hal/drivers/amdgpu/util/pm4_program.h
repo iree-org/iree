@@ -32,6 +32,18 @@ typedef struct iree_hal_amdgpu_pm4_program_t {
   iree_host_size_t byte_length;
 } iree_hal_amdgpu_pm4_program_t;
 
+// Host timing and byte counters captured while publishing a PM4 program.
+typedef struct iree_hal_amdgpu_pm4_program_publish_stats_t {
+  // Total byte length published into executable PM4 memory.
+  uint64_t byte_length;
+  // Nanoseconds spent in hsa_amd_memory_pool_allocate.
+  uint64_t allocate_ns;
+  // Nanoseconds spent in hsa_amd_agents_allow_access.
+  uint64_t allow_access_ns;
+  // Nanoseconds spent in hsa_memory_copy.
+  uint64_t copy_ns;
+} iree_hal_amdgpu_pm4_program_publish_stats_t;
+
 // Copies |source_dwords| into executable memory and grants |device_agent|
 // access so the command processor can execute the program via PM4-IB AQL
 // envelopes. The copied program is immutable after initialization.
@@ -39,6 +51,14 @@ iree_status_t iree_hal_amdgpu_pm4_program_initialize(
     const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
     hsa_amd_memory_pool_t memory_pool, const uint32_t* source_dwords,
     uint32_t dword_count, iree_hal_amdgpu_pm4_program_t* out_program);
+
+// Initializes a PM4 program and optionally returns publication timing stats.
+iree_status_t iree_hal_amdgpu_pm4_program_initialize_with_stats(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
+    hsa_amd_memory_pool_t memory_pool, const uint32_t* source_dwords,
+    uint32_t dword_count,
+    iree_hal_amdgpu_pm4_program_publish_stats_t* out_stats,
+    iree_hal_amdgpu_pm4_program_t* out_program);
 
 // Releases the executable storage backing |program| and clears it on success.
 iree_status_t iree_hal_amdgpu_pm4_program_release(

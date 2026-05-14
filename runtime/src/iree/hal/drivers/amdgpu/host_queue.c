@@ -147,8 +147,8 @@ static void iree_hal_amdgpu_host_queue_run_post_drain_actions(
 
 // Drains completed notification entries and reclaims kernarg space. If the GPU
 // queue has faulted (error_status is set), fails all pending entries instead of
-// draining normally.
-static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+// draining normally. Caller must hold completion_drain_mutex.
+static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions_locked(
     iree_hal_amdgpu_host_queue_t* queue) {
   // Check for GPU queue error (set by the HSA error callback on another
   // thread). If the queue has faulted, no further epochs will advance;
@@ -182,7 +182,25 @@ static iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
   }
   iree_hal_amdgpu_host_queue_reclaim_queue_owned_positions(queue,
                                                            reclaim_positions);
+  return count;
+}
+
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  iree_slim_mutex_lock(&queue->locks.completion_drain_mutex);
+  iree_host_size_t count =
+      iree_hal_amdgpu_host_queue_drain_completions_locked(queue);
+  iree_slim_mutex_unlock(&queue->locks.completion_drain_mutex);
   iree_hal_amdgpu_host_queue_run_post_drain_actions(queue);
+  return count;
+}
+
+iree_host_size_t iree_hal_amdgpu_host_queue_drain_completions_for_waiter(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  iree_slim_mutex_lock(&queue->locks.completion_drain_mutex);
+  iree_host_size_t count =
+      iree_hal_amdgpu_host_queue_drain_completions_locked(queue);
+  iree_slim_mutex_unlock(&queue->locks.completion_drain_mutex);
   return count;
 }
 
@@ -217,6 +235,67 @@ static hsa_signal_value_t iree_hal_amdgpu_host_queue_last_drained_signal_value(
       &queue->notification_ring.epoch.last_drained, iree_memory_order_acquire);
   return (hsa_signal_value_t)(IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE -
                               last_drained_epoch);
+}
+
+static void iree_hal_amdgpu_host_queue_wait_idle_before_teardown(
+    iree_hal_amdgpu_host_queue_t* queue) {
+  if (!queue->hardware_queue || !queue->notification_ring.epoch.signal.handle) {
+    return;
+  }
+  const uint64_t submitted_epoch =
+      queue->notification_ring.epoch.next_submission;
+  if (submitted_epoch == 0 || iree_hal_amdgpu_host_queue_has_error(queue)) {
+    return;
+  }
+
+  hsa_signal_t epoch_signal =
+      iree_hal_amdgpu_notification_ring_epoch_signal(&queue->notification_ring);
+  hsa_signal_t stop_signal = queue->completion.stop_signal;
+  const hsa_signal_value_t idle_epoch_signal_value =
+      (hsa_signal_value_t)(IREE_HAL_AMDGPU_EPOCH_INITIAL_VALUE -
+                           submitted_epoch);
+  const hsa_signal_value_t idle_compare_value = idle_epoch_signal_value + 1;
+
+  // Submission is already shut out. Wait only for hardware to publish the final
+  // submitted epoch so no late CP write can race with HSA queue/signal
+  // teardown; the completion thread still owns notification-ring draining.
+  if (stop_signal.handle) {
+    enum {
+      IREE_HAL_AMDGPU_IDLE_WAIT_EPOCH_SIGNAL = 0,
+      IREE_HAL_AMDGPU_IDLE_WAIT_STOP_SIGNAL = 1,
+      IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT = 2,
+    };
+    hsa_signal_t signals[IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT] = {
+        epoch_signal,
+        stop_signal,
+    };
+    hsa_signal_condition_t conditions[IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT] =
+        {
+            HSA_SIGNAL_CONDITION_LT,
+            HSA_SIGNAL_CONDITION_NE,
+        };
+    hsa_signal_value_t values[IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT] = {
+        idle_compare_value,
+        0,
+    };
+    const uint32_t signal_index = iree_hsa_amd_signal_wait_any(
+        IREE_LIBHSA(queue->libhsa), IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT,
+        signals, conditions, values, UINT64_MAX, HSA_WAIT_STATE_BLOCKED,
+        /*satisfying_value=*/NULL);
+    if (IREE_UNLIKELY(signal_index >= IREE_HAL_AMDGPU_IDLE_WAIT_SIGNAL_COUNT)) {
+      iree_status_t error = iree_make_status(
+          IREE_STATUS_INTERNAL,
+          "hsa_amd_signal_wait_any returned invalid signal index %u during "
+          "AMDGPU host queue teardown",
+          signal_index);
+      iree_hal_amdgpu_host_queue_store_error(queue, error);
+      iree_hal_amdgpu_host_queue_request_completion_thread_stop(queue);
+    }
+  } else {
+    (void)iree_hsa_signal_wait_scacquire(
+        IREE_LIBHSA(queue->libhsa), epoch_signal, HSA_SIGNAL_CONDITION_LT,
+        idle_compare_value, UINT64_MAX, HSA_WAIT_STATE_BLOCKED);
+  }
 }
 
 // Completion thread entry point. Blocks in HSA until either the queue epoch
@@ -310,7 +389,7 @@ static int iree_hal_amdgpu_host_queue_completion_thread_main(void* entry_arg) {
 // HSA queue error callback. Called by the HSA runtime (on an internal thread)
 // when the queue encounters an unrecoverable error (page fault, invalid AQL
 // packet, ECC error). Stores the error atomically on the queue so the
-// completion thread can fail pending semaphores with the actual GPU error.
+// completion drain path can fail pending semaphores with the actual GPU error.
 static void iree_hal_amdgpu_host_queue_error_callback(hsa_status_t status,
                                                       hsa_queue_t* source,
                                                       void* data) {
@@ -394,6 +473,7 @@ iree_status_t iree_hal_amdgpu_host_queue_initialize(
 
   // Submission pipeline state.
   iree_slim_mutex_initialize(&out_queue->locks.submission_mutex);
+  iree_slim_mutex_initialize(&out_queue->locks.completion_drain_mutex);
   iree_slim_mutex_initialize(&out_queue->locks.post_drain_mutex);
   iree_slim_mutex_initialize(&out_queue->profiling.event_mutex);
   out_queue->profiling.signals.block_pool = profiling_signal_block_pool;
@@ -541,6 +621,8 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   queue->is_shutting_down = true;
   iree_slim_mutex_unlock(&queue->locks.submission_mutex);
 
+  iree_hal_amdgpu_host_queue_wait_idle_before_teardown(queue);
+
   if (queue->completion.thread) {
     iree_hal_amdgpu_host_queue_request_completion_thread_stop(queue);
     // There is only one owner for the thread, so this also joins the thread.
@@ -639,6 +721,7 @@ void iree_hal_amdgpu_host_queue_deinitialize(
   }
 
   iree_slim_mutex_deinitialize(&queue->locks.post_drain_mutex);
+  iree_slim_mutex_deinitialize(&queue->locks.completion_drain_mutex);
   iree_slim_mutex_deinitialize(&queue->profiling.event_mutex);
   iree_slim_mutex_deinitialize(&queue->locks.submission_mutex);
 
@@ -694,7 +777,7 @@ typedef struct iree_hal_amdgpu_host_queue_op_submission_t {
   // Whether the direct submit helper found enough queue capacity.
   bool ready;
 
-  // Whether |deferred_op| should retry on the completion thread after drain.
+  // Whether |deferred_op| should retry after notification-ring drain.
   bool wait_for_capacity;
 } iree_hal_amdgpu_host_queue_op_submission_t;
 
@@ -715,7 +798,7 @@ static inline void iree_hal_amdgpu_host_queue_op_submission_begin(
                                            &out_submission->resolution);
 }
 
-// Marks a captured pending op as retrying after completion-thread drain because
+// Marks a captured pending op as retrying after notification-ring drain because
 // direct submission ran out of queue capacity.
 static inline void iree_hal_amdgpu_host_queue_op_submission_defer_for_capacity(
     iree_hal_amdgpu_host_queue_op_submission_t* submission) {

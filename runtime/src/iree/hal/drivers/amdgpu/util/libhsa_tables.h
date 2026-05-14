@@ -114,6 +114,13 @@ IREE_HAL_AMDGPU_LIBHSA_PFN(TRACE_ALWAYS, hsa_status_t,
 IREE_HAL_AMDGPU_LIBHSA_PFN(TRACE_ALWAYS, hsa_status_t, hsa_memory_copy,
                            DECL(void* dst, const void* src, size_t size),
                            ARGS(dst, src, size))
+IREE_HAL_AMDGPU_LIBHSA_PFN(
+    TRACE_ALWAYS, hsa_status_t, hsa_amd_memory_async_copy,
+    DECL(void* dst, hsa_agent_t dst_agent, const void* src,
+         hsa_agent_t src_agent, size_t size, uint32_t num_dep_signals,
+         const hsa_signal_t* dep_signals, hsa_signal_t completion_signal),
+    ARGS(dst, dst_agent, src, src_agent, size, num_dep_signals, dep_signals,
+         completion_signal))
 
 IREE_HAL_AMDGPU_LIBHSA_PFN(TRACE_ALWAYS, hsa_status_t,
                            hsa_amd_memory_pool_allocate,
