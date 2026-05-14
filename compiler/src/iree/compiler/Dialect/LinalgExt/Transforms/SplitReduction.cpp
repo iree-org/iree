@@ -22,6 +22,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include <utility>
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_DEF_TOPKSPLITREDUCTIONPASS
@@ -469,6 +471,38 @@ static Value getSplitReductionInit(OpBuilder &builder, Location loc,
   return linalg::FillOp::create(builder, loc, identityVal, empty).getResult(0);
 }
 
+static std::pair<Value, Value> buildArgmaxCombiner(OpBuilder &b, Location loc,
+                                                   ArgmaxKind kind, Value val,
+                                                   Value idx, Value outVal,
+                                                   Value outIdx) {
+  // Split reduction creates new reductions over local and global indices, so
+  // rebuild the recognized argmax semantics instead of cloning the original
+  // combiner ops. This intentionally drops operation attributes such as
+  // arith fast-math flags, which is conservative for the newly generated ops.
+  if (kind == ArgmaxKind::Canonical) {
+    Value maxVal = arith::MaximumFOp::create(b, loc, val, outVal);
+    Value cmp =
+        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
+    Value selIdx = arith::SelectOp::create(b, loc, cmp, idx, outIdx);
+    return {maxVal, selIdx};
+  }
+
+  Value greater =
+      arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
+  Value isNan =
+      arith::CmpFOp::create(b, loc, arith::CmpFPredicate::UNE, val, val);
+  Value valueCond = arith::OrIOp::create(b, loc, greater, isNan);
+  Value equal =
+      arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, val, outVal);
+  Value lowerIndex =
+      arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, idx, outIdx);
+  Value tieCond = arith::AndIOp::create(b, loc, equal, lowerIndex);
+  Value indexCond = arith::OrIOp::create(b, loc, valueCond, tieCond);
+  Value maxVal = arith::SelectOp::create(b, loc, valueCond, val, outVal);
+  Value selIdx = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
+  return {maxVal, selIdx};
+}
+
 FailureOr<linalg::SplitReductionResult>
 splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn) {
@@ -521,42 +555,11 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   }
 
   auto valueType =
-      dyn_cast<FloatType>(genericOp.getRegionOutputArgs()[0].getType());
-  if (!valueType) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "Unknown identity value for the reduction");
-  }
-  auto identity = FloatAttr::get(
-      valueType, APFloat::getInf(valueType.getFloatSemantics(), true));
-
-  bool selectStyleArgmax = *argmaxKind == ArgmaxKind::StableHloSelectStyle;
-
-  auto buildArgmaxCombiner = [](OpBuilder &b, Location loc, Value val,
-                                Value idx, Value outVal, Value outIdx,
-                                bool selectStyleArgmax) {
-    if (!selectStyleArgmax) {
-      Value maxVal = arith::MaximumFOp::create(b, loc, val, outVal);
-      Value cmp =
-          arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-      Value selIdx = arith::SelectOp::create(b, loc, cmp, idx, outIdx);
-      return std::pair<Value, Value>{maxVal, selIdx};
-    }
-
-    Value greater =
-        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-    Value isNan =
-        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::UNE, val, val);
-    Value valueCond = arith::OrIOp::create(b, loc, greater, isNan);
-    Value equal =
-        arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, val, outVal);
-    Value lowerIndex =
-        arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, idx, outIdx);
-    Value tieCond = arith::AndIOp::create(b, loc, equal, lowerIndex);
-    Value indexCond = arith::OrIOp::create(b, loc, valueCond, tieCond);
-    Value maxVal = arith::SelectOp::create(b, loc, valueCond, val, outVal);
-    Value selIdx = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
-    return std::pair<Value, Value>{maxVal, selIdx};
-  };
+      cast<FloatType>(genericOp.getRegionOutputArgs()[0].getType());
+  auto identity =
+      FloatAttr::get(valueType, APFloat::getInf(valueType.getFloatSemantics(),
+                                                /*Negative=*/true));
+  ArgmaxKind kind = *argmaxKind;
 
   SmallVector<Value> newInputs;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
@@ -628,8 +631,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       rewriter, loc,
       TypeRange{identityValue.getType(), identityIndex.getType()}, newInputs,
       ValueRange{identityValue, identityIndex}, newMaps, newIteratorTypes,
-      [reductionDim, selectStyleArgmax,
-       buildArgmaxCombiner](OpBuilder &b, Location loc, ValueRange args) {
+      [reductionDim, kind](OpBuilder &b, Location loc, ValueRange args) {
         Value in = args[0];
         Value outVal = args[1];
         Value outIdx = args[2];
@@ -651,7 +653,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         }
 
         auto [maxVal, selIdx] = buildArgmaxCombiner(
-            b, loc, inCast, reductionIdx, outVal, outIdx, selectStyleArgmax);
+            b, loc, kind, inCast, reductionIdx, outVal, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 
@@ -681,8 +683,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
       rewriter, loc, genericOp.getResultTypes(),
       ValueRange{partialArgmax.getResult(0), partialArgmax.getResult(1)},
       genericOp.getDpsInits(), finalReductionMaps, reductionIteratorTypes,
-      [tileSize, insertSplitDimension, selectStyleArgmax,
-       buildArgmaxCombiner](OpBuilder &b, Location loc, ValueRange inputs) {
+      [tileSize, insertSplitDimension, kind](OpBuilder &b, Location loc,
+                                             ValueRange inputs) {
         Value val = inputs[0];
         Value local = inputs[1];
         Value outVal = inputs[2];
@@ -694,8 +696,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         }
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
-        auto [maxVal, selIdx] = buildArgmaxCombiner(b, loc, val, gidx, outVal,
-                                                    outIdx, selectStyleArgmax);
+        auto [maxVal, selIdx] =
+            buildArgmaxCombiner(b, loc, kind, val, gidx, outVal, outIdx);
         linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
       });
 
