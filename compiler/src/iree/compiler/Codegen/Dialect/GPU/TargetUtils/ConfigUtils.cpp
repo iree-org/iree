@@ -1107,7 +1107,6 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
       Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
       promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
     } else {
-      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
       Attribute lhsPromotion =
           getXorShuffleAttr(context, defaultConfigAttr, target, kind,
                             kMMAOperandLhs, /*isTransposed=*/transposedLhs)
