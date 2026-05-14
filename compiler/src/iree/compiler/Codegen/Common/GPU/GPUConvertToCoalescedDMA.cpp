@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -59,6 +58,23 @@ static SmallVector<Attribute> getThreadMapping(MLIRContext *ctx) {
   // Map it to gpu.lane_id<0>.
   mapping.push_back(IREE::GPU::LaneIdAttr::get(ctx, 0));
   return mapping;
+}
+
+/// Check if a pad value matches what hardware OOB clamping returns (zero
+/// bytes). For IEEE floats this is ±0.0. For types like f8E8M0FNU where the
+/// all-zeros bit pattern (0x00) represents 2^(-127) rather than IEEE zero,
+/// we check the bit pattern directly since gather_to_lds OOB clamping returns
+/// zero bytes regardless of the element type's semantics.
+static bool padValueMatchesHardwareOOBZero(Value padVal) {
+  if (matchPattern(padVal, m_AnyZeroFloat()) ||
+      matchPattern(padVal, m_Zero())) {
+    return true;
+  }
+  APFloat floatVal(APFloat::IEEEdouble());
+  if (matchPattern(padVal, m_ConstantFloat(&floatVal))) {
+    return floatVal.bitcastToAPInt().isZero();
+  }
+  return false;
 }
 
 /// Trace through extract_slice operations to find an underlying tensor.pad.
@@ -173,11 +189,10 @@ static bool sourceIsFromFatRawBuffer(Value source) {
   return hasAMDGPUFatRawBufferAddressSpace(memrefType);
 }
 
-/// Returns the subgroup size if the available elements are aligned to DMA
-/// transfer sizes, std::nullopt otherwise.
+/// Returns the minimum number of elements needed (after padding) for DMA
+/// alignment, or std::nullopt if DMA is not supported for this element type.
 static std::optional<int64_t>
-getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
-                          int64_t availableElements) {
+getMinDMAAlignedElements(FunctionOpInterface funcOp, Type elementType) {
   std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
   if (!subgroupSize) {
     return std::nullopt;
@@ -206,12 +221,24 @@ getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
         std::min(minElementsPerTransfer, elementsPerTransfer);
   }
 
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-      availableElements % minElementsPerTransfer != 0) {
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
     return std::nullopt;
   }
+  return minElementsPerTransfer;
+}
 
-  return subgroupSize;
+/// Returns the subgroup size if the available elements are aligned to DMA
+/// transfer sizes, std::nullopt otherwise.
+static std::optional<int64_t>
+getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
+                          int64_t availableElements) {
+  std::optional<int64_t> minAligned =
+      getMinDMAAlignedElements(funcOp, elementType);
+  if (!minAligned || availableElements % *minAligned != 0) {
+    return std::nullopt;
+  }
+  // getMinDMAAlignedElements already validated subgroupSize is present.
+  return getSubgroupSize(funcOp);
 }
 
 /// Largest numWarps in [1, totalWarps] (by repeated halving) such that
@@ -277,27 +304,30 @@ computeThreadNumThreadsImpl(OpBuilder &builder, Operation *op,
   return {builder.getIndexAttr(*subgroupSize)};
 }
 
-/// Check if a tensor.pad is valid for DMA conversion.
-/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows.
+/// Check basic pad constraints for DMA: zero low padding and zero pad value.
 /// TODO(#24156): Relax these checks by supporting individual cases.
-static bool isValidPadForDMA(tensor::PadOp pad) {
-  // Verify pad constraints: low padding must be all zeros, pad value must be 0.
+static bool hasDMACompatiblePadding(tensor::PadOp pad) {
   for (OpFoldResult low : pad.getMixedLowPad()) {
     if (!isConstantIntValue(low, 0)) {
       return false;
     }
   }
   Value padVal = pad.getConstantPaddingValue();
-  if (!padVal || !(matchPattern(padVal, m_AnyZeroFloat()) ||
-                   matchPattern(padVal, m_Zero()))) {
+  if (!padVal || !padValueMatchesHardwareOOBZero(padVal)) {
     return false;
   }
+  return true;
+}
 
-  // Check if source tensor's innermost row size is DWORD (4-byte) aligned. On
-  // AMD CDNA, per-component range checking is performed for each DWORD. If a
-  // DWORD is partially out-of-bounds, the entire DWORD returns zero, causing
-  // incorrect results. Additionally, partial OOB triggers the slow path with
-  // multi-cycling and instruction issue penalties.
+/// Check if a tensor.pad source has DWORD-aligned innermost rows, accepting
+/// sub-DWORD rows when the whole copy fits in a single DMA segment.
+///
+/// DWORD alignment matters because CDNA OOB clamping is per-DWORD: when
+/// multiple DMA segments are issued, a partial-DWORD row causes overlap/
+/// corruption between segments. For single-segment transfers (small copies
+/// like scale operands), partial-DWORD OOB only affects trailing padding, so
+/// the sub-DWORD row is safe.
+static bool hasDWORDAlignedRows(tensor::PadOp pad, FunctionOpInterface funcOp) {
   auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
   int64_t innermostDim = sourceType.getShape().back();
   if (ShapedType::isDynamic(innermostDim)) {
@@ -305,7 +335,31 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
   }
   Type elemType = sourceType.getElementType();
   int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
-  return rowBytes % 4 == 0;
+  if (rowBytes % 4 == 0) {
+    return true;
+  }
+  // Single-segment exemption: safe only when the innermost dimension has no
+  // padding. When the inner dim is padded, output row width != source row
+  // width, so linearized DMA reads wrong source elements for padded positions
+  // instead of returning zeros.
+  SmallVector<OpFoldResult> highPad = pad.getMixedHighPad();
+  if (highPad.empty() || !isConstantIntValue(highPad.back(), 0)) {
+    return false;
+  }
+  std::optional<int64_t> minAligned =
+      getMinDMAAlignedElements(funcOp, elemType);
+  if (!minAligned.has_value() || !sourceType.hasStaticShape()) {
+    return false;
+  }
+  int64_t totalSrcElements = ShapedType::getNumElements(sourceType.getShape());
+  return totalSrcElements <= *minAligned;
+}
+
+/// Check if a tensor.pad is valid for DMA conversion.
+/// Requires: zero low padding, zero pad value, and DWORD-aligned source rows
+/// (with the single-segment exemption documented on hasDWORDAlignedRows).
+static bool isValidPadForDMA(tensor::PadOp pad, FunctionOpInterface funcOp) {
+  return hasDMACompatiblePadding(pad) && hasDWORDAlignedRows(pad, funcOp);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
@@ -335,7 +389,7 @@ static bool isCopyDMAConvertible(linalg::CopyOp copyOp) {
   }
 
   tensor::PadOp pad = traceToTensorPad(copyOp.getInputs()[0]);
-  if (pad && !isValidPadForDMA(pad)) {
+  if (pad && !isValidPadForDMA(pad, funcOp)) {
     return false;
   }
 
@@ -554,8 +608,13 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
     // After tiling, the input is typically:
     //   tensor.extract_slice %padded[...] [...] [1, 1]
     // We need to trace through extract_slice to find if source is tensor.pad.
+    // Eligibility (including the DWORD / single-segment check) was already
+    // vetted by isCopyDMAConvertible in the pre-check, so isValidPadForDMA
+    // here is a consistency guard rather than a fresh decision.
     tensor::PadOp pad = traceToTensorPad(input);
-    if (pad && isValidPadForDMA(pad)) {
+    auto parentFuncOp =
+        innerOp->template getParentOfType<FunctionOpInterface>();
+    if (pad && isValidPadForDMA(pad, parentFuncOp)) {
       source =
           createClampedSourceSliceFromPad(rewriter, loc, pad, inParallelOp);
 
@@ -577,6 +636,7 @@ static LogicalResult createDMAInForall(scf::ForallOp threadForallOp,
         return failure();
       }
     }
+
   } else if constexpr (std::is_same_v<OpTy, IREE::LinalgExt::GatherOp>) {
     source = innerOp.getSource();
     indices = innerOp.getIndices();
@@ -803,19 +863,11 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    // Get the function containing this operation.
     auto funcOp = gatherOp->getParentOfType<FunctionOpInterface>();
     if (!funcOp) {
       return failure();
     }
 
-    // Get subgroup size from translation_info.
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize) {
-      return failure();
-    }
-
-    // Validate that innermost dimension is large enough for coalesced DMA.
     auto outputType = cast<RankedTensorType>(gatherOp.getOutput().getType());
     int64_t rank = outputType.getRank();
     int64_t innermostDim = outputType.getShape()[rank - 1];
@@ -823,32 +875,14 @@ struct ConvertGatherToCoalescedDMA
       return failure();
     }
 
-    Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    std::optional<int64_t> minAligned =
+        getMinDMAAlignedElements(funcOp, outputType.getElementType());
+    if (!minAligned || innermostDim % *minAligned != 0) {
       return failure();
     }
 
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
-    }
-
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        innermostDim % minElementsPerTransfer != 0) {
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!subgroupSize) {
       return failure();
     }
 
@@ -1106,46 +1140,17 @@ private:
     int64_t rank = outputType.getRank();
     ArrayRef<int64_t> shape = outputType.getShape();
 
-    // Skip coalesced DMA if the innermost dimension is smaller than the minimum
-    // transfer size. The minimum transfer size is subgroupSize *
-    // minElementsPerLane, where minElementsPerLane is determined by the
-    // smallest DMA size and element type.
-    int64_t innermostDim = shape[rank - 1];
-    if (ShapedType::isDynamic(innermostDim)) {
-      return failure();
-    }
-
-    // Get the element type bit width.
     Type elementType = outputType.getElementType();
-    int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-    // Get DMA sizes from target to compute minimum transfer size.
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (!target) {
+    std::optional<int64_t> minAligned =
+        getMinDMAAlignedElements(funcOp, elementType);
+    if (!minAligned) {
       return failure();
-    }
-
-    ArrayRef<int64_t> dmaSizes;
-    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
-      dmaSizes = dmaSizesAttr.asArrayRef();
-    }
-
-    // Find minimum elements per transfer across all DMA sizes.
-    // We need innermostDim >= subgroupSize * minElementsPerLane.
-    int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-    for (int64_t dmaSize : dmaSizes) {
-      if (dmaSize % elementBits != 0) {
-        continue;
-      }
-      int64_t elementsPerLane = dmaSize / elementBits;
-      int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-      minElementsPerTransfer =
-          std::min(minElementsPerTransfer, elementsPerTransfer);
     }
 
     // Determine how many elements are available for coalesced access.
     // For CopyOp with output tracing to tensor.empty() (possibly through
     // swizzle promotion ops), we can linearize all dimensions.
+    int64_t innermostDim = shape[rank - 1];
     int64_t availableElements = innermostDim;
     bool linearizedAvailability = false;
     if (auto copyOp = dyn_cast<linalg::CopyOp>(op.getOperation())) {
@@ -1157,10 +1162,8 @@ private:
       }
     }
 
-    // If no valid DMA size found or available elements are not aligned to
-    // transfer size, skip.
-    if (minElementsPerTransfer == std::numeric_limits<int64_t>::max() ||
-        availableElements % minElementsPerTransfer != 0) {
+    // If available elements are not aligned to transfer size, skip.
+    if (availableElements % *minAligned != 0) {
       return failure();
     }
 
@@ -1169,13 +1172,12 @@ private:
     // `linalg.copy {use_global_load_dma}` inside a warp-mapped forall
     // (issue #24139). Halve `totalWarps` until each warp's tile is aligned.
     SmallVector<int64_t> effectiveNumWarps = numWarps;
-    int64_t feasibleNumWarps = 0;
     if (linearizedAvailability) {
       auto positiveWarps =
           llvm::make_filter_range(numWarps, [](int64_t n) { return n > 0; });
       int64_t totalWarps = llvm::product_of(positiveWarps);
-      feasibleNumWarps =
-          computeMaxFeasibleNumWarps(shape, totalWarps, minElementsPerTransfer);
+      int64_t feasibleNumWarps =
+          computeMaxFeasibleNumWarps(shape, totalWarps, *minAligned);
       // The whole-tile alignment check in isCopyDMAConvertible is exactly the
       // numWarps==1 feasibility check, so reaching here with feasible==0
       // means the pre-check is out of sync with this distribution policy.

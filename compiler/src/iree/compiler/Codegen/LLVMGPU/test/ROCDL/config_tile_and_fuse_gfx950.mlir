@@ -18,6 +18,12 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-DIRECT-LOAD
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS-DIRECT-LOAD-2
 
@@ -75,10 +81,20 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
 
+// Sub-byte (f4) scaled matmul DMA is rejected by `shouldRejectDirectLoadDMA`
+// until narrow-type emulation can handle multi-buffered sub-byte LDS slices,
+// so even with --iree-llvmgpu-use-direct-load the heuristic falls back to the
+// swizzled non-DMA promotion path.
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
+
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
+// Same shared-memory usage as the non-direct-load CHECK above — the heuristic
+// rejects DMA for sub-byte scaled matmul.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
@@ -86,6 +102,54 @@ func.func @scaled_matmul(
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+
+// -----
+
+// Small scaled matmul: scale tile is 128M x 4Ko = 512 f8 elements per workgroup
+// step, which is divisible by 256 (minDMAAlignedElements for gfx950 f8), so
+// scales should use use_global_load_dma under --iree-llvmgpu-use-direct-load.
+// Bug: reductionTileSizes[contractionK] counts MFMA invocations (1), not Ko
+// elements (4), so scaleElements was computed as 128x1=128 < 256, causing
+// scales to fall back to derived_thread_config.
+#lhs_map_small = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
+#rhs_map_small = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
+#scale_m_small = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
+#scale_n_small = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
+#out_map_small = affine_map<(M, N, Ko, Kb) -> (M, N)>
+func.func @scaled_matmul_small(
+    %A: tensor<128x64x32xf4E2M1FN>, %B: tensor<128x64x32xf4E2M1FN>,
+    %A_scales: tensor<128x64xf8E8M0FNU>, %B_scales: tensor<128x64xf8E8M0FNU>,
+    %C: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#lhs_map_small, #rhs_map_small, #scale_m_small, #scale_n_small, #out_map_small],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+  } ins(%A, %B, %A_scales, %B_scales : tensor<128x64x32xf4E2M1FN>, tensor<128x64x32xf4E2M1FN>, tensor<128x64xf8E8M0FNU>, tensor<128x64xf8E8M0FNU>) outs(%C : tensor<128x128xf32>) {
+  ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
+    %1 = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
+    %2 = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<128x128xf32>
+  return %0 : tensor<128x128xf32>
+}
+
+// Sub-byte scaled matmul DMA is rejected — see scaled_matmul above.
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_small
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=17408
+
+// CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=17408
+
+// CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=17408
 
 // -----
 
@@ -125,6 +189,7 @@ func.func @scaled_matmul_with_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
@@ -199,6 +264,7 @@ func.func @scaled_matmul_with_dynamic_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=26112
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=26112
@@ -245,6 +311,7 @@ func.func @small_scaled_matmul(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=2176
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=2176
@@ -366,6 +433,7 @@ func.func @scaled_matmul_accumulate(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=157184
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=157184

@@ -637,16 +637,21 @@ static bool shouldRejectDMAForOccupancy(
 /// Returns true if direct load DMA should be rejected, and fall back to stream
 /// copies.
 ///
+/// Problem-size + target-arch rejection (Stage 1). Called before the schedule
+/// is computed.
+///
 /// Rejection cases:
 ///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
 ///   2. Not a GEMM. TODO(#23907): support convolution.
-///   3. Data types are not f16 or bf16. TODO(#22119): support MXFP4.
-///   4. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+///   3. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+///   4. Non-scaled only: data types are not f16 or bf16. TODO(#22119).
+///      For scaled, the data-type filter is replaced by the post-schedule
+///      `isScaledDMAAligned` check (the per-workgroup scale tile must be
+///      DMA-aligned).
 static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
                                       Type lhsElemType, Type rhsElemType,
-                                      bool transposedLhs, bool transposedRhs) {
-  auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
-
+                                      bool transposedLhs, bool transposedRhs,
+                                      bool scaled) {
   // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
   if (!targetSupportsGlobalLoadDMA(target)) {
     return true;
@@ -657,16 +662,56 @@ static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
     return true;
   }
 
-  // Case 3: Only f16/bf16 are supported currently.
-  if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
-    return true;
-  }
-
-  // Case 4: LHS transposed, RHS not transposed show regressions with DMA.
+  // Case 3: LHS transposed, RHS not transposed show regressions with DMA.
   if (transposedLhs && !transposedRhs) {
     return true;
   }
 
+  // Case 4: non-scaled supports f16/bf16 only. Scaled is checked separately
+  // post-schedule via isScaledDMAAligned.
+  if (!scaled) {
+    auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+    if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+      return true;
+    }
+  }
+
+  // Case 5: For scaled matmul, sub-byte LHS/RHS (e.g. f4E2M1FN) is rejected.
+  // Pipelining a sub-byte LDS allocation produces a multi-buffered
+  // `memref.reinterpret_cast` with a dynamic offset and routes the resulting
+  // sub-byte LDS slices through `cf.br` block arguments, neither of which the
+  // current narrow-type emulation pass can legalize. Lift this restriction
+  // once the follow-up narrow-type-emulation PR lands.
+  if (scaled) {
+    auto isSubByte = [](Type t) {
+      return t.isIntOrFloat() && t.getIntOrFloatBitWidth() < 8;
+    };
+    if (isSubByte(lhsElemType) || isSubByte(rhsElemType)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/// Post-schedule check for scaled matmul: returns true if the per-workgroup
+/// scale tile (`scaleElements` of `scaleBits`-wide elements) is DMA-aligned
+/// for at least one of the target's supported DMA widths. Misaligned scales
+/// would force a mixed DMA-LHS/RHS + stream-scale strategy, which we no
+/// longer support — so callers treat misalignment as another reason to drop
+/// the DMA path entirely.
+static bool isScaledDMAAligned(int64_t scaleElements, int64_t scaleBits,
+                               int64_t targetSubgroupSize,
+                               ArrayRef<int64_t> dmaSizes) {
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % scaleBits != 0) {
+      continue;
+    }
+    int64_t elementsPerTransfer = targetSubgroupSize * (dmaSize / scaleBits);
+    if (scaleElements % elementsPerTransfer == 0) {
+      return true;
+    }
+  }
   return false;
 }
 
@@ -864,12 +909,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              rhsScaleType};
 
   Location loc = operands[0].getLoc();
-  // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size)
-  // happens below via shouldRejectDMAForOccupancy after the schedule and
-  // workgroup tiles are computed.
+  // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size
+  // + scaled-tile alignment + occupancy) happens below after the schedule
+  // and workgroup tiles are computed.
   if (useDirectLoad &&
       shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
-                                transposedLhs, transposedRhs)) {
+                                transposedLhs, transposedRhs, scaled)) {
     LDBG() << "overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
@@ -999,9 +1044,31 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
-  // Stage 2 (tile-size) DMA rejection: now that workgroup tiles are known,
-  // check whether DMA would cause an unacceptable occupancy drop. Stage 1
-  // (problem-size + target-arch) ran above via shouldRejectDirectLoadDMA.
+  // Stage 2 (post-schedule). For scaled, reject DMA if the per-workgroup
+  // scale tile is not DMA-aligned (mixed DMA-LHS/RHS + stream-scale is
+  // unsupported). Then the existing occupancy check.
+  if (useDirectLoad && scaled) {
+    // Scale operands have shape [M/N, Ko] where Ko = K-reduction-tile *
+    // koBlocksPerIntrinsic. reductionTileSizes[contractionK] counts MFMA
+    // invocations, not Ko elements; multiply by koBlocksPerIntrinsic.
+    int64_t scaleMDim = workgroupTileSizes[contractionM.back()];
+    auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
+    int64_t koBlocksPerIntrinsic = std::get<2>(smmaKind.getScaledMNKShape());
+    int64_t scaleKoDim =
+        reductionTileSizes[contractionK.back()] * koBlocksPerIntrinsic;
+    int64_t scaleElements = scaleMDim * scaleKoDim;
+    constexpr int64_t kScaleBits = 8; // f8E8M0FNU is 8-bit
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+    if (!isScaledDMAAligned(scaleElements, kScaleBits, targetSubgroupSize,
+                            dmaSizes)) {
+      LDBG() << "rejecting direct load DMA: scale tile not DMA-aligned";
+      useDirectLoad = false;
+    }
+  }
+
   if (useDirectLoad &&
       shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
                                   hasExistingAccumulator, bounds,
@@ -1041,18 +1108,25 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   if (scaled) {
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-    FailureOr<Attribute> lhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandLhs);
-    FailureOr<Attribute> rhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandRhs);
-    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray = {};
+    if (useDirectLoad) {
+      // Scale alignment was already vetted by shouldRejectDirectLoadDMA, so
+      // here we DMA all four operands (LHS, RHS, and both scales).
+      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+      promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
     } else {
-      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                        defaultConfigAttr};
+      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        promotionArray = {};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     }
   }
 

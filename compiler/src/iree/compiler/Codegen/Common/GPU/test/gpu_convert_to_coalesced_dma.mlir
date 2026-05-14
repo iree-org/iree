@@ -999,3 +999,50 @@ func.func @copy_warp_distribution_halving_1d(%source: tensor<128xf32>) -> tensor
 
   return %r : tensor<128xf32>
 }
+// -----
+
+// Test: workgroup-aligned but per-warp-sub-aligned scale copy caps the
+// participating warps instead of collapsing to a single identity-tiled warp.
+// Scale tile is 128x4 f8E8M0FNU = 512 elements. With dma_sizes=[32,128],
+// subgroup_size=64:
+//   min DMA granularity = 64 * (32/8) = 256 elements
+// Workgroup total: 512 % 256 == 0 → aligned.
+// Naive per-warp at 8 warps: 512 / 8 = 64 elements → 64 % 256 != 0 → sub-aligned.
+// Fix: cap usable warps at maxSegments = 512 / 256 = 2, so warp tile = 64x4
+// (= 256 elements). Two warps issue one DMA each in parallel instead of
+// one warp running two sequential DMAs.
+
+#gpu_target_scale_identity = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_scale_identity = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_scale_identity}>
+// 8 warps: workgroup_size[0] / subgroup_size = 512 / 64 = 8
+#translation_scale_identity = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_scale_capped_warps
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x4xf8E8M0FNU>
+func.func @copy_scale_capped_warps(%source: tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
+  attributes {hal.executable.target = #exec_target_scale_identity, translation_info = #translation_scale_identity} {
+  %empty = tensor.empty() : tensor<128x4xf8E8M0FNU>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128x4xf8E8M0FNU>)
+    outs(%empty : tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
+
+  // Outer warp forall: 2 iterations, step=(64,4). Each iteration = 1 warp,
+  // DMA-aligned per-warp tile. The remaining warps idle behind the standard
+  // scf.if guard inserted by downstream distribution.
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (128, 4) step (64, 4)
+
+  // Inner lane forall: 64 lanes per warp, each handles 4 elements (256/64=4).
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK-SAME:  tensor<64x4xf8E8M0FNU>, tensor<64x4xf8E8M0FNU>
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+
+  return %result : tensor<128x4xf8E8M0FNU>
+}
