@@ -414,6 +414,8 @@ public:
     executableTargetAttrs.push_back(getExecutableTarget(context));
   }
 
+  // Builds the CUDA executable target while applying architecture-specific
+  // feature defaults.
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
@@ -422,8 +424,15 @@ public:
       return nullptr;
     }
 
-    if (auto target = GPU::getCUDATargetDetails(
-            options.clTarget, options.clTargetFeatures, context)) {
+    // Use a PTX level that knows about Ada when sm_89 is selected by default.
+    std::string targetFeatures = options.clTargetFeatures;
+    if (GPU::normalizeCUDATarget(options.clTarget) == "sm_89" &&
+        targetFeatures == "+ptx76") {
+      targetFeatures = "+ptx78";
+    }
+
+    if (auto target = GPU::getCUDATargetDetails(options.clTarget,
+                                                targetFeatures, context)) {
       addConfigGPUTarget(context, target, configItems);
     }
 
