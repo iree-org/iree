@@ -16,7 +16,6 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -288,7 +287,10 @@ class ConvertTMTensorToLinalgExtPass final
           ConvertTMTensorToLinalgExtPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect>();
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<linalg::LinalgDialect>();
+    registry.insert<math::MathDialect>();
     registry.insert<tensor::TensorDialect>();
   }
 
