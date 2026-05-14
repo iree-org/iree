@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,10 +16,10 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::GlobalOptimization {
+namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_DEF_PROMOTECONTRACTIONOUTPUTSPASS
-#include "iree/compiler/GlobalOptimization/Passes.h.inc"
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
 namespace {
 
@@ -164,4 +164,4 @@ public:
 
 } // namespace
 
-} // namespace mlir::iree_compiler::GlobalOptimization
+} // namespace mlir::iree_compiler::Preprocessing
