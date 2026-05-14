@@ -676,6 +676,21 @@ static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
     }
   }
 
+  // Case 5: For scaled matmul, sub-byte LHS/RHS (e.g. f4E2M1FN) is rejected.
+  // Pipelining a sub-byte LDS allocation produces a multi-buffered
+  // `memref.reinterpret_cast` with a dynamic offset and routes the resulting
+  // sub-byte LDS slices through `cf.br` block arguments, neither of which the
+  // current narrow-type emulation pass can legalize. Lift this restriction
+  // once the follow-up narrow-type-emulation PR lands.
+  if (scaled) {
+    auto isSubByte = [](Type t) {
+      return t.isIntOrFloat() && t.getIntOrFloatBitWidth() < 8;
+    };
+    if (isSubByte(lhsElemType) || isSubByte(rhsElemType)) {
+      return true;
+    }
+  }
+
   return false;
 }
 

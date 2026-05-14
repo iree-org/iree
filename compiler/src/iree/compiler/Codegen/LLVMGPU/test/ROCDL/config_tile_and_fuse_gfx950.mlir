@@ -81,24 +81,27 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
 
-// With --iree-llvmgpu-use-direct-load, all operands get use_global_load_dma.
+// Sub-byte (f4) scaled matmul DMA is rejected by `shouldRejectDirectLoadDMA`
+// until narrow-type emulation can handle multi-buffered sub-byte LDS slices,
+// so even with --iree-llvmgpu-use-direct-load the heuristic falls back to the
+// swizzled non-DMA promotion path.
 // CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul
 // CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
-// TODO(#22119): With direct-load, no cache swizzle on LHS/RHS so shared
-// memory increases. This needs to be addressed.
+// Same shared-memory usage as the non-direct-load CHECK above — the heuristic
+// rejects DMA for sub-byte scaled matmul.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=104448
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
 
 // -----
 
@@ -131,13 +134,10 @@ func.func @scaled_matmul_small(
   return %0 : tensor<128x128xf32>
 }
 
-// With --iree-llvmgpu-use-direct-load, scale operands must also use
-// use_global_load_dma. The workgroup tile is 128Mx128N with reduction=[0,0,1,1]
-// (1 MFMA step = 4 Ko-blocks), giving a scale tile of 128x4=512 elements,
-// which is divisible by minDMAAlignedElements=256 for gfx950 f8.
+// Sub-byte scaled matmul DMA is rejected — see scaled_matmul above.
 // CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_small
 // CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
-// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
 
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
@@ -145,11 +145,11 @@ func.func @scaled_matmul_small(
 
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=17408
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=52224
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=17408
 
 // -----
 
@@ -189,13 +189,14 @@ func.func @scaled_matmul_with_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=69632
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=104448
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
 
 // -----
 
@@ -263,13 +264,14 @@ func.func @scaled_matmul_with_dynamic_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=26112
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=52224
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=26112
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=78336
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=26112
 
 // -----
 
@@ -309,13 +311,14 @@ func.func @small_scaled_matmul(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=2176
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=4352
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=2176
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=6528
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=2176
 
 // -----
 
@@ -430,13 +433,14 @@ func.func @scaled_matmul_accumulate(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=157184
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=109056
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=157184
 
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
-// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=130816
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=157184
 
 // -----
 
