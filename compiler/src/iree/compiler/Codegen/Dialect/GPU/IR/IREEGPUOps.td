@@ -286,6 +286,13 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
     and user (i.e. trivially no alias). In all other cases this op is best
     effort and has no verification or failure modes.
 
+    Bufferization derives the `amdgpu.fat_raw_buffer_cast`'s `validBytes` from
+    the bufferized memref's shape: when the innermost dimension's byte count
+    is dynamic or statically not a multiple of 4, validBytes is widened to
+    `roundUp(naturalBytes + 3, 4)` so a partial-DWORD straddle read at the
+    buffer end stays in-bounds and is not HW-zeroed by AMD CDNA's per-DWORD
+    OOB clamp. Otherwise no override is emitted.
+
     // TODO: Add other parameters for casting as needed.
   }];
 
@@ -294,7 +301,7 @@ def IREEGPU_BufferResourceCastOp : Op<IREEGPU_Dialect, "buffer_resource_cast", [
   let results   = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
-    $input oilist (`cacheSwizzleStride` `(` $cache_swizzle_stride `)` )
+    $input (`cacheSwizzleStride` `(` $cache_swizzle_stride^ `)`)?
     attr-dict `:` type($result)
   }];
 

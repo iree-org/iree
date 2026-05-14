@@ -2024,3 +2024,52 @@ func.func @lower_dma_strided_source_caps_width(
   } {mapping = [#iree_gpu.lane_id<0>]}
   return
 }
+
+// -----
+
+// Test: source has dynamic innermost extent but a statically unit
+// innermost stride, in fat_raw_buffer address space, with in_bounds set
+// to false on the innermost dim. The earlier behavior bailed because
+// getContiguousTrailingLinearSize stops at the first dynamic trailing
+// dim (returning 1) and the subsequent maxElementsPerLane cap killed
+// every transfer-size choice. Now we trust HW OOB clamping +
+// validBytes (set up by GPUPushDownDMABoundsToConsumers) and derive
+// the cap from the static destination layout, so the fast path engages.
+
+#executable_target_rocm_hsaco_fb_dyn = #hal.executable.target<"rocm",
+  "rocm-hsaco-fb", {iree_codegen.target_info = #iree_gpu.target<
+  arch = "gfx950", features = "", wgp = <
+    compute = fp32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    max_load_instruction_bits = 128, simds_per_wgp = 4,
+    vgpr_space_bits = 8192, dma_sizes = [32, 128]>>}>
+
+#translation_dyn = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
+
+// CHECK-LABEL: func.func @lower_coalesced_dma_dynamic_innermost_fat_raw_buffer
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: memref<?x?xf16, strided<[1234, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>
+// CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]: memref<16x32xf16, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>
+func.func @lower_coalesced_dma_dynamic_innermost_fat_raw_buffer(
+    %source: memref<?x?xf16, strided<[1234, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>,
+    %dest: memref<16x32xf16, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>)
+  attributes {
+    hal.executable.target = #executable_target_rocm_hsaco_fb_dyn,
+    translation_info = #translation_dyn} {
+  scf.forall (%lane) in (32) {
+    // 16x32 = 512 elements, 32 lanes, 128-bit DMA on f16 = 8 elements/lane.
+    // 32 lanes * 8 = 256 elements per transfer, so 2 transfers cover the
+    // tile. The fast path used to bail here because the source's dynamic
+    // innermost extent left srcLinearSize=1 → no DMA size fit.
+    // CHECK-COUNT-2: amdgpu.gather_to_lds %[[SRC]]{{.*}}, %[[DST]]{{.*}} : vector<8xf16>
+    // CHECK-NOT: amdgpu.gather_to_lds
+    // CHECK-NOT: vector.transfer_read
+    // CHECK-NOT: iree_gpu.coalesced_gather_dma
+    iree_gpu.coalesced_gather_dma %source into %dest lane(%lane) in_bounds [false, false] :
+      memref<?x?xf16, strided<[1234, 1], offset: ?>, #amdgpu.address_space<fat_raw_buffer>>,
+      memref<16x32xf16, strided<[32, 1], offset: ?>, #gpu.address_space<workgroup>>, index
+  } {mapping = [#gpu.thread<linear_dim_0>]}
+  return
+}

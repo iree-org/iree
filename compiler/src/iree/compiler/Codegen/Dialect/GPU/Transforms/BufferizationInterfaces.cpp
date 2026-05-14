@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
@@ -606,7 +607,39 @@ struct BufferResourceCastOpBufferizationInterface
     }
 
     // This operation either bufferizes in place or with a cast.
-    if (hasStorageBufferMemSpace(cast<MemRefType>(buffer.value().getType()))) {
+    auto bufferMemrefType = cast<MemRefType>(buffer.value().getType());
+    bool isStorageBuffer = hasStorageBufferMemSpace(bufferMemrefType);
+    bool isFatRawBuffer = false;
+    if (auto fatAddr = dyn_cast_if_present<amdgpu::AddressSpaceAttr>(
+            bufferMemrefType.getMemorySpace())) {
+      isFatRawBuffer = fatAddr.getValue() == amdgpu::AddressSpace::FatRawBuffer;
+    }
+    // Compute a DWORD-padded validBytes only for memrefs we may re-cast.
+    // Keeps the helper from emitting arith ops that would be dropped on the
+    // floor when the cast bufferizes in place (e.g., workgroup space).
+    Value validBytes;
+    if (isStorageBuffer || isFatRawBuffer) {
+      validBytes = computeDwordPadValidBytesIfNeeded(rewriter, castOp.getLoc(),
+                                                     buffer.value());
+    }
+
+    // Re-cast when the input is in storage_buffer space, or when it is
+    // already a fat_raw_buffer but the override widens the bounds (route the
+    // new cast around the existing one). For the fat_raw_buffer case, peel
+    // one cast layer off so the new cast wraps the underlying storage_buffer
+    // (fat-on-fat casting is invalid); if no peel is possible, forward in
+    // place.
+    Value source = buffer.value();
+    if (isFatRawBuffer) {
+      if (auto existing = source.getDefiningOp<amdgpu::FatRawBufferCastOp>()) {
+        source = existing.getSource();
+      } else {
+        source = Value{};
+      }
+    }
+    bool needsNewCast =
+        source && (isStorageBuffer || (isFatRawBuffer && validBytes));
+    if (needsNewCast) {
       Location loc = castOp.getLoc();
       Value cacheSwizzleStride = Value{};
       if (auto maybeIndexCacheSwizzle = castOp.getCacheSwizzleStride()) {
@@ -624,7 +657,7 @@ struct BufferResourceCastOpBufferizationInterface
                                                         maybeIndexCacheSwizzle);
       }
       buffer = amdgpu::FatRawBufferCastOp::create(
-                   rewriter, loc, buffer.value(), /*validBytes=*/Value{},
+                   rewriter, loc, source, /*validBytes=*/validBytes,
                    /*cacheSwizzleStride=*/cacheSwizzleStride,
                    /*boundsCheck=*/true,
                    /*resetOffset=*/true)
@@ -633,6 +666,67 @@ struct BufferResourceCastOpBufferizationInterface
 
     bufferization::replaceOpWithBufferizedValues(rewriter, op, buffer.value());
     return success();
+  }
+
+private:
+  // If the bufferized memref's innermost dim byte count is dynamic or
+  // statically not DWORD-aligned, returns an i64 value equal to
+  // roundUp(naturalBytes + 3, 4) where naturalBytes = prod(shape) * elemBytes.
+  // The +3 covers the worst-case partial-DWORD straddle (a 4-byte load whose
+  // start lands on the last valid byte reads 3 bytes past the end). Otherwise
+  // returns null, meaning no override is needed.
+  static Value computeDwordPadValidBytesIfNeeded(RewriterBase &rewriter,
+                                                 Location loc,
+                                                 Value bufferValue) {
+    auto memrefType = dyn_cast<MemRefType>(bufferValue.getType());
+    if (!memrefType || memrefType.getRank() == 0) {
+      return Value{};
+    }
+    Type elemTy = memrefType.getElementType();
+    if (!elemTy.isIntOrFloat()) {
+      return Value{};
+    }
+    unsigned elemBits = elemTy.getIntOrFloatBitWidth();
+    if (elemBits == 0 || elemBits % 8 != 0) {
+      return Value{};
+    }
+    int64_t elemBytes = elemBits / 8;
+
+    int64_t innermost = memrefType.getDimSize(memrefType.getRank() - 1);
+    if (!ShapedType::isDynamic(innermost) && (innermost * elemBytes) % 4 == 0) {
+      return Value{};
+    }
+
+    // naturalBytes = staticProduct * prod(dynamic dims) — accumulated in i64,
+    // with the static factors folded at constant time.
+    int64_t staticProduct = elemBytes;
+    SmallVector<Value> dynamicExtents;
+    for (int64_t d = 0, e = memrefType.getRank(); d < e; ++d) {
+      int64_t s = memrefType.getDimSize(d);
+      if (ShapedType::isDynamic(s)) {
+        dynamicExtents.push_back(
+            memref::DimOp::create(rewriter, loc, bufferValue, d));
+      } else {
+        staticProduct *= s;
+      }
+    }
+    Type i64Type = rewriter.getI64Type();
+    Value naturalBytes = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getI64IntegerAttr(staticProduct));
+    for (Value dyn : dynamicExtents) {
+      Value dynI64 = arith::IndexCastOp::create(rewriter, loc, i64Type, dyn);
+      naturalBytes = arith::MulIOp::create(rewriter, loc, naturalBytes, dynI64);
+    }
+
+    // roundUp(naturalBytes + 3, 4) = ((naturalBytes + 3 + 3) / 4) * 4 — fold
+    // both +3s into a single +6 to skip one constant.
+    Value six =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(6));
+    Value four =
+        arith::ConstantOp::create(rewriter, loc, rewriter.getI64IntegerAttr(4));
+    Value plusSix = arith::AddIOp::create(rewriter, loc, naturalBytes, six);
+    Value div = arith::DivUIOp::create(rewriter, loc, plusSix, four);
+    return arith::MulIOp::create(rewriter, loc, div, four);
   }
 };
 

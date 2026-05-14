@@ -251,6 +251,20 @@ def GPUPadOperandsPass :
   ];
 }
 
+def GPUPushDownDMABoundsToConsumersPass :
+    InterfacePass<"iree-codegen-gpu-pushdown-dma-bounds-to-consumers",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Insert tensor.pad after coalesced_gather_dma ops whose "
+                "innermost in_bounds entry is false, so downstream "
+                "vectorization produces a masked vector.transfer_read.";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUPipeliningPass :
     InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do software pipelining.";

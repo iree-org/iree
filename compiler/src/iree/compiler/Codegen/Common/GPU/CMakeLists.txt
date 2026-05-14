@@ -85,6 +85,7 @@ iree_cc_library(
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
     "GPUPromotionAnalysis.cpp"
+    "GPUPushDownDMABoundsToConsumers.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"

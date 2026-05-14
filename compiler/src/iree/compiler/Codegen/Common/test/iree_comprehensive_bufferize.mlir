@@ -2966,6 +2966,34 @@ func.func @cache_swizzle_resource_cast(%stride: index) {
 
 // -----
 
+// Cast on a tensor whose innermost row (43 * 2 = 86 bytes) is not DWORD-
+// aligned: bufferization must emit a fat_raw_buffer_cast with
+// validBytes = roundUp(64*43*2 + 3, 4) = 5508, so a partial-DWORD straddle
+// at the buffer end is not HW-zeroed.
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @resource_cast_innermost_not_dword_aligned() {
+  %c0 = arith.constant 0 : index
+  %arg0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x43xf16>>
+  %arg1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x43xf16>>
+  %0 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets=[0,0], sizes=[64,43], strides=[1,1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x43xf16>> -> tensor<64x43xf16>
+  %1 = iree_gpu.buffer_resource_cast %0 : tensor<64x43xf16>
+  iree_tensor_ext.dispatch.tensor.store %1, %arg1, offsets=[0,0], sizes=[64,43], strides=[1,1]
+    : tensor<64x43xf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<64x43xf16>>
+  return
+}
+
+// CHECK-LABEL: func.func @resource_cast_innermost_not_dword_aligned
+//   CHECK-DAG:   %[[VB:.+]] = arith.constant 5508 : i64
+//       CHECK:   amdgpu.fat_raw_buffer_cast %{{.+}} validBytes(%[[VB]])
+
+// -----
+
 func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>) -> vector<8x64xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16

@@ -56,6 +56,7 @@ iree_lit_test_suite(
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
     "gpu_promotion_analysis.mlir"
+    "gpu_pushdown_dma_bounds_to_consumers.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
     "gpu_reuse_shared_memory_allocs.mlir"

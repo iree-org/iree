@@ -661,7 +661,9 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 
 // -----
 
-// Negative test: Dynamic innermost dimension fails DWORD alignment check.
+// Dynamic innermost dimension is now allowed: GPUPushDownDMABoundsToConsumers
+// inserts a consumer-side mask + buffer_resource_cast(validBytes) to cover
+// the partial-DWORD straddle, so the DMA can fire on non-DWORD-aligned rows.
 
 #gpu_target_pad_dynamic_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -695,10 +697,12 @@ func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %
     ins(%padded : tensor<4x256xi8>)
     outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
 
-  // The copy is downgraded from use_global_load_dma to derived_thread_config.
-  // CHECK: tensor.pad
-  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
-  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+  // The pad is consumed and a coalesced DMA fires with in_bounds=[false,false].
+  // Consumer-side mask + validBytes hack are added by the later pushdown pass.
+  // CHECK-NOT: tensor.pad
+  // CHECK-NOT: linalg.copy
+  // CHECK: iree_gpu.coalesced_gather_dma {{.*}} in_bounds [false, false]
+  // CHECK-SAME: tensor<?x?xi8>
 
   return %result : tensor<4x256xi8>
 }
@@ -927,6 +931,10 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 // 16x4 = 64 elements per warp (== min) — DMA emit succeeds and the warp
 // forall is well-formed (preserving wave-uniformity by construction).
 // Issue #24139.
+//
+// Source has its K-tile direction (innermost dim, size 4) dynamic so the
+// pad satisfies isValidPadForDMA's K-boundary gating. M direction (dim 0)
+// stays static — the warp halving check fires on the result-tile shape.
 
 #gpu_target_warp_halve = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -940,15 +948,15 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
 #translation_warp_halve = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
 
 // CHECK-LABEL: func.func @copy_warp_distribution_halving
-func.func @copy_warp_distribution_halving(%source: tensor<32x4xf32>, %off: index, %sz: index, %high: index) -> tensor<32x4xf32>
+func.func @copy_warp_distribution_halving(%source: tensor<32x?xf32>, %sz: index, %high: index) -> tensor<32x4xf32>
   attributes {hal.executable.target = #exec_target_warp_halve, translation_info = #translation_warp_halve} {
-  %extracted = tensor.extract_slice %source[%off, 0] [%sz, 4] [1, 1]
-      : tensor<32x4xf32> to tensor<?x4xf32>
+  %extracted = tensor.extract_slice %source[0, 0] [32, %sz] [1, 1]
+      : tensor<32x?xf32> to tensor<32x?xf32>
   %cst = arith.constant 0.0 : f32
-  %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
+  %padded = tensor.pad %extracted low[0, 0] high[0, %high] {
   ^bb0(%a: index, %b: index):
     tensor.yield %cst : f32
-  } : tensor<?x4xf32> to tensor<32x4xf32>
+  } : tensor<32x?xf32> to tensor<32x4xf32>
   %init = tensor.empty() : tensor<32x4xf32>
   %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
     ins(%padded : tensor<32x4xf32>) outs(%init : tensor<32x4xf32>) -> tensor<32x4xf32>

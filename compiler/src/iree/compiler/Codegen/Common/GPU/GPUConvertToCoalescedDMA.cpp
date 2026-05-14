@@ -293,19 +293,45 @@ static bool isValidPadForDMA(tensor::PadOp pad) {
     return false;
   }
 
-  // Check if source tensor's innermost row size is DWORD (4-byte) aligned. On
-  // AMD CDNA, per-component range checking is performed for each DWORD. If a
-  // DWORD is partially out-of-bounds, the entire DWORD returns zero, causing
-  // incorrect results. Additionally, partial OOB triggers the slow path with
-  // multi-cycling and instruction issue penalties.
-  auto sourceType = cast<RankedTensorType>(pad.getSource().getType());
-  int64_t innermostDim = sourceType.getShape().back();
-  if (ShapedType::isDynamic(innermostDim)) {
+  // AMD CDNA HW does per-DWORD range checking on buffer loads, with two
+  // failure modes when source rows are not DWORD-aligned:
+  //   1. Per-lane straddle DWORDs read from the *next* source row.
+  //   2. The trailing partial DWORD crosses the buffer end and HW zeros it.
+  // GPUPushDownDMABoundsToConsumers handles both via a consumer-side pad
+  // and an iree_gpu.buffer_resource_cast validBytes override, which makes
+  // DMA correct on non-aligned rows.
+  //
+  // Performance gating: DMA's per-lane gather lowering wins on K-block
+  // boundary tiles (partial K-rows) thanks to HW bounds-checked loads;
+  // it loses on K-aligned shapes because the per-lane scalar copies are
+  // pure overhead vs the non-DMA wide vector loads. Opt in only when the
+  // matmul's K is *not* a multiple of K-tile (i.e. a K-block boundary
+  // actually exists at runtime).
+  //
+  // Detection: the pad result is the workgroup LDS tile. The K direction is
+  // identified one of two ways:
+  //   1. Result dims unequal — K-tile direction is the smaller dim (K-tile is
+  //      typically 16-32 elements; M-tile / N-tile is 64-256).
+  //   2. Result dims equal (square workgroup tile, e.g. 64x64 LHS) — K
+  //      direction is whichever source dim is dynamic, since the K-block
+  //      boundary slice is the only source of dynamism.
+  // In both cases the K-direction source dim must be dynamic (the K-block
+  // boundary case where DMA wins).
+  auto resultType = dyn_cast<RankedTensorType>(pad.getResult().getType());
+  auto sourceType = dyn_cast<RankedTensorType>(pad.getSource().getType());
+  if (!resultType || !sourceType || resultType.getRank() != 2 ||
+      sourceType.getRank() != 2) {
     return false;
   }
-  Type elemType = sourceType.getElementType();
-  int64_t rowBytes = innermostDim * (elemType.getIntOrFloatBitWidth() / 8);
-  return rowBytes % 4 == 0;
+  int64_t r0 = resultType.getDimSize(0);
+  int64_t r1 = resultType.getDimSize(1);
+  if (ShapedType::isDynamic(r0) || ShapedType::isDynamic(r1)) {
+    return false;
+  }
+  if (r0 != r1) {
+    return sourceType.isDynamicDim((r0 < r1) ? 0 : 1);
+  }
+  return sourceType.isDynamicDim(0) != sourceType.isDynamicDim(1);
 }
 
 /// Check if a linalg.copy is viable for DMA conversion based on alignment,
