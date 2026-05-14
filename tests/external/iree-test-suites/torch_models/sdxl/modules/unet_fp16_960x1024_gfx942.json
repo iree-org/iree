@@ -2,6 +2,7 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/ian/sdxl_960x1024/stable_diffusion_xl_base_1_0_bs1_64_960x1024_fp16_unet.mlir",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
+        "--iree-rocm-target=gfx942",
         "--iree-opt-const-eval=false",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",

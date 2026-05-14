@@ -3,6 +3,7 @@
     "compiler_flags": [
         "--verify=false",
         "--iree-opt-const-eval=false",
-        "--iree-hal-target-device=hip"
+        "--iree-hal-target-device=hip",
+        "--iree-rocm-target=gfx942"
     ]
 }

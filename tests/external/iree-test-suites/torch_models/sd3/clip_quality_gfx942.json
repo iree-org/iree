@@ -6,7 +6,7 @@
        "gfx942"
     ],
     "modules": [
-	"sd3/modules/clip_cpu"
+	"sd3/modules/clip_gfx942"
     ],
     "weights": [
         {

@@ -2,6 +2,7 @@
     "mlir": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sdxl-scheduled-unet/model.mlir",
     "compiler_flags": [
         "--iree-hal-target-device=hip",
+        "--iree-rocm-target=gfx942",
         "--iree-opt-const-eval=false",
         "--iree-opt-level=O3",
         "--iree-dispatch-creation-enable-fuse-horizontal-contractions=true",
