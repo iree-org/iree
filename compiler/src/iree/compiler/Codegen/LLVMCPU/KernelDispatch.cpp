@@ -3483,6 +3483,12 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   // Adjust root op tiling sizes with non-root op.
   for (auto &[op, vecTileSize] : nonRootOpVecTileSizes) {
     if (isa<linalg::PackOp>(op)) {
+      if (isa<IREE::LinalgExt::OnlineAttentionOp>(rootOperation)) {
+        // Pack tile-size adjustment is mainly for producer/consumer fusion. For
+        // online attention, the downstream pack represents the store-side
+        // layout and should not drive the attention's tiling config.
+        continue;
+      }
       // For pack op, align the distribution tile size and overwrite the
       // vector parallel tile size and scalable flag.
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
