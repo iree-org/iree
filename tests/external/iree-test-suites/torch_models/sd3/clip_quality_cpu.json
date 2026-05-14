@@ -2,7 +2,8 @@
 	"type": "quality",
 	"markers": [
 		"cpu",
-		"local-task"
+		"local-task",
+		"clip"
 	],
 	"modules": [
 		"sd3/modules/clip_cpu"
