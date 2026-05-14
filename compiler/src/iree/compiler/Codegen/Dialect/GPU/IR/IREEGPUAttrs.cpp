@@ -187,6 +187,8 @@ int64_t getIntrinsicSubgroupSize(MMAIntrinsic intrinsic) {
   return is_AMD_MFMA(intrinsic) ? 64 : 32;
 }
 
+// Returns the operand and accumulator element types required by each MMA
+// intrinsic.
 static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
                                                        MMAIntrinsic intrinsic) {
   Type f8E4M3FNUZ = Float8E4M3FNUZType::get(context);
@@ -239,6 +241,8 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::MFMA_F32_32x32x16_BF16:
   case MMAIntrinsic::WMMAR3_F32_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_F32_16x16x16_BF16:
+  // NVIDIA BF16 mma.sync multiplies bf16 fragments and accumulates into f32.
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16:
   case MMAIntrinsic::WMMA_F32_16x16x32_BF16:
     return {bf16, bf16, f32};
   case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
@@ -334,6 +338,7 @@ getUnsupportedMNKShape(MMAIntrinsic intrinsic) {
   return {};
 }
 
+// Returns the per-lane register layout used to map each MMA operand.
 MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
                                                 int operandIndex) {
   auto mfmaLhs16xK = [](int64_t k) -> MMASingleSubgroupLayout {
@@ -757,6 +762,8 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     }
   case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16:
   case MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16:
+  // BF16 mma.sync uses the same 16x8x16 register layout as the f16 variants.
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16:
     switch (operandIndex) {
     case kMMAOperandLhs:
       return {/*outer=*/{2, 2}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
@@ -1035,6 +1042,7 @@ SmallVector<VirtualMMAIntrinsic> MMAAttr::getVirtualIntrinsics() const {
   }
 }
 
+// Creates the target-specific MMA operation for the selected intrinsic layout.
 static Value createMmaOp(OpBuilder &builder, Location loc,
                          MMAIntrinsic intrinsic, Type resultType, Value lhs,
                          Value rhs, Value acc, bool colMajor = false) {
@@ -1135,7 +1143,10 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
     // ordering expected by mma.sync. The input shape differs between pipelines:
     // VectorDistribute produces 2x2x1x2, TileAndFuse produces 2x1x2x2.
     // Remove the unit dimension to simplify the transpose.
-    auto nonUnitVecType = VectorType::get({2, 2, 2}, builder.getF16Type());
+    // Preserve the operand element type so BF16 fragments are not reshaped as
+    // f16.
+    Type elementType = cast<VectorType>(lhs.getType()).getElementType();
+    auto nonUnitVecType = VectorType::get({2, 2, 2}, elementType);
     auto reshaped =
         vector::ShapeCastOp::create(builder, loc, nonUnitVecType, lhs);
     auto permAttr = builder.getDenseI64ArrayAttr({1, 0, 2});
