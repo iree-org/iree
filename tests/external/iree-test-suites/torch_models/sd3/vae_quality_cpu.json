@@ -1,0 +1,35 @@
+{
+	"type": "quality",
+	"markers": [
+		"cpu",
+		"local-task",
+		"vae"
+	],
+	"modules": [
+		"sd3/modules/vae_cpu"
+	],
+	"weights": [
+		{
+			"type": "url",
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/real_weights.irpa",
+			"scope": "model"
+		}
+	],
+	"run_args": [
+		"--function=decode",
+		"--device=local-task",
+		"--expected_f32_threshold=0.01f"
+	],
+	"inputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/inference_input.0.bin",
+			"value": "1x16x128x128xf16"
+		}
+	],
+	"expected_outputs": [
+		{
+			"url": "https://sharkpublic.blob.core.windows.net/sharkpublic/sai/sd3-vae/inference_output.0.bin",
+			"value": "3x1024x1024xf32"
+		}
+	]
+}
