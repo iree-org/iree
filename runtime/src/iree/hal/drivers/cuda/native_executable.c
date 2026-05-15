@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/cuda/cuda_buffer.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
 #include "iree/hal/utils/executable_debug_info.h"
@@ -25,16 +26,25 @@ typedef struct iree_hal_cuda_native_executable_t {
   // Abstract resource used for injecting reference counting and vtable;
   // must be at offset 0.
   iree_hal_resource_t resource;
+  // Host allocator used for executable lifetime.
   iree_allocator_t host_allocator;
 
+  // Borrowed HAL device used for buffer placement metadata.
+  iree_hal_device_t* device;
+  // Borrowed CUDA dynamic symbols used for module and global lookup.
   const iree_hal_cuda_dynamic_symbols_t* symbols;
 
-  // Loaded CUDA modules.
+  // CUDA context owning the executable modules.
+  CUcontext cu_context;
+
+  // Number of loaded CUDA modules.
   iree_host_size_t module_count;
+  // Loaded CUDA modules.
   CUmodule* modules;
 
-  // Exported kernels referencing the loaded modules.
+  // Number of exported kernels referencing the loaded modules.
   iree_host_size_t export_count;
+  // Exported kernels referencing the loaded modules.
   iree_hal_cuda_kernel_params_t exports[];
 } iree_hal_cuda_native_executable_t;
 
@@ -238,7 +248,8 @@ static iree_status_t iree_hal_cuda_native_executable_flatbuffer_verify(
 }
 
 iree_status_t iree_hal_cuda_native_executable_create(
-    const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
+    iree_hal_device_t* device, const iree_hal_cuda_dynamic_symbols_t* symbols,
+    CUdevice cu_device, CUcontext cu_context,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_params);
@@ -250,7 +261,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
   // TODO: move to the executable cache to avoid repeated queries.
   iree_hal_cuda_limits_t limits = {0};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda_query_limits(symbols, device, &limits));
+      z0, iree_hal_cuda_query_limits(symbols, cu_device, &limits));
 
   // Read and strip the flatbuffer header prefix.
   iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
@@ -300,7 +311,9 @@ iree_status_t iree_hal_cuda_native_executable_create(
   iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
                                &executable->resource);
   executable->host_allocator = host_allocator;
+  executable->device = device;
   executable->symbols = symbols;
+  executable->cu_context = cu_context;
   executable->module_count = module_count;
   executable->modules =
       (CUmodule*)((uint8_t*)executable + sizeof(*executable) +
@@ -513,6 +526,87 @@ static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
                           "reflection not implemented");
 }
 
+#define IREE_HAL_CUDA_MAX_STACK_GLOBAL_NAME_LENGTH \
+  ((iree_host_size_t)(4 * 1024))
+
+static void iree_hal_cuda_native_executable_global_buffer_release(
+    void* user_data, iree_hal_buffer_t* buffer) {
+  (void)buffer;
+  iree_hal_executable_release((iree_hal_executable_t*)user_data);
+}
+
+static iree_status_t iree_hal_cuda_native_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  *out_buffer = NULL;
+
+  if (iree_string_view_is_empty(name)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "executable global name is empty");
+  }
+  if (name.size > IREE_HAL_CUDA_MAX_STACK_GLOBAL_NAME_LENGTH) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "executable global name `%.*s` exceeds maximum length %" PRIhsz,
+        (int)name.size, name.data, IREE_HAL_CUDA_MAX_STACK_GLOBAL_NAME_LENGTH);
+  }
+
+  IREE_RETURN_IF_ERROR(
+      IREE_CURESULT_TO_STATUS(executable->symbols,
+                              cuCtxSetCurrent(executable->cu_context)),
+      "setting CUDA context for executable global lookup");
+
+  char* global_name = (char*)iree_alloca(name.size + 1);
+  memcpy(global_name, name.data, name.size);
+  global_name[name.size] = 0;
+
+  CUresult terminal_result = CUDA_ERROR_NOT_FOUND;
+  CUdeviceptr global_device_ptr = 0;
+  size_t global_size = 0;
+  for (iree_host_size_t module_ordinal = 0;
+       module_ordinal < executable->module_count; ++module_ordinal) {
+    terminal_result = executable->symbols->cuModuleGetGlobal(
+        &global_device_ptr, &global_size, executable->modules[module_ordinal],
+        global_name);
+    if (terminal_result == CUDA_SUCCESS) break;
+    if (terminal_result != CUDA_ERROR_NOT_FOUND) {
+      return iree_hal_cuda_result_to_status(
+          executable->symbols, terminal_result, __FILE__, __LINE__);
+    }
+  }
+  if (terminal_result != CUDA_SUCCESS) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND,
+                            "executable global `%.*s` not found",
+                            (int)name.size, name.data);
+  }
+
+  iree_hal_buffer_placement_t placement = {
+      .device = executable->device,
+      .queue_affinity = iree_hal_queue_affinity_is_empty(queue_affinity)
+                            ? IREE_HAL_QUEUE_AFFINITY_ANY
+                            : queue_affinity,
+      .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_NONE,
+  };
+  iree_hal_buffer_release_callback_t release_callback = {
+      .fn = iree_hal_cuda_native_executable_global_buffer_release,
+      .user_data = base_executable,
+  };
+  iree_hal_executable_retain(base_executable);
+  iree_status_t status = iree_hal_cuda_buffer_wrap(
+      placement, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+      IREE_HAL_BUFFER_USAGE_DEFAULT, global_size, /*byte_offset=*/0,
+      global_size, IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL, global_device_ptr,
+      /*host_ptr=*/NULL, release_callback, executable->host_allocator,
+      out_buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_executable_release(base_executable);
+  }
+  return status;
+}
+
 static const iree_hal_executable_vtable_t
     iree_hal_cuda_native_executable_vtable = {
         .destroy = iree_hal_cuda_native_executable_destroy,
@@ -521,4 +615,6 @@ static const iree_hal_executable_vtable_t
         .export_parameters = iree_hal_cuda_native_executable_export_parameters,
         .lookup_export_by_name =
             iree_hal_cuda_native_executable_lookup_export_by_name,
+        .lookup_global_by_name =
+            iree_hal_cuda_native_executable_lookup_global_by_name,
 };

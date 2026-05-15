@@ -1,0 +1,44 @@
+{
+  "config_name": "gpu_vulkan_rdna3",
+  "iree_compile_flags": [
+    "--iree-hal-target-device=vulkan",
+    "--iree-opt-level=O3"
+  ],
+  "iree_run_module_flags": [
+    "--device=vulkan"
+  ],
+  "skip_compile_tests": [
+    "AB/1024x1024xf32_bench",
+    "AB/128x128xf32_bench",
+    "AB/2048x2048xf32_bench",
+    "AB/256x256xf32_bench",
+    "AB/4096x4096xf32_bench",
+    "AB/512x512xf32_bench",
+    "AB/64x64xf16",
+    "AB/8192x8192xf32_bench",
+    "AB/Nx64xf16_64xNxf16",
+    "ABPlusC/64x64xf16",
+    "ABT/64x64xf16",
+    "ATB/64x64xf16",
+    "GeluABPlusC/64x64xf16",
+    "InterestingShapesBiasAdd/997x997xi8_NN_bias",
+    "ReluABPlusC/64x64xf16"
+  ],
+  "skip_run_tests": [
+    "AB/1024x1024xf32_bench",
+    "AB/128x128xf32_bench",
+    "AB/2048x2048xf32_bench",
+    "AB/256x256xf32_bench",
+    "AB/4096x4096xf32_bench",
+    "AB/512x512xf32_bench",
+    "AB/8192x8192xf32_bench",
+    "ConvForward/nchw_fchw",
+    "ConvForward/nhwc_fhwc",
+    "ConvForward/nhwc_hwcf",
+    "InterestingShapesBiasAdd/1152x997xf16_matmul_997x576xf16_NN",
+    "InterestingShapesBiasAdd/6144x419xbf16_matmul_419x384xbf16_NT",
+    "InterestingShapesBiasAdd/997x997xf16_NT_bias"
+  ],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}

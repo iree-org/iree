@@ -603,3 +603,153 @@ func.func @reordered_post_reduction_consumer() {
 // CHECK-SAME:               serial = [128, 0],
 // CHECK-SAME:               subgroup_basis = {{\[}}[1, 1], [0, 1]{{\]}},
 // CHECK-SAME:               thread = [2, 0]
+
+// -----
+
+// f64 reduction on gfx942: AMDGPU, so 64-bit passes the bitwidth gate and
+// reaches VectorDistribute.
+
+// CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @reduction_f64() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.000000e+00 : f64
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xf64>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xf64>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xf64>> -> tensor<8x4096xf64>
+  %3 = tensor.empty() : tensor<8xf64>
+  %4 = linalg.fill ins(%cst : f64) outs(%3 : tensor<8xf64>) -> tensor<8xf64>
+  %5 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+      ins(%2 : tensor<8x4096xf64>) outs(%4 : tensor<8xf64>) {
+      ^bb0(%in: f64, %out: f64):
+        %6 = arith.addf %in, %out : f64
+        linalg.yield %6 : f64
+      } -> tensor<8xf64>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xf64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xf64>>
+  return
+}
+
+// CHECK-LABEL: func.func @reduction_f64
+// CHECK:         linalg.generic
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:        partial_reduction
+// CHECK-SAME:        workgroup
+
+// -----
+
+// Same as above but with i64 element type.
+
+// CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @reduction_i64() {
+  %c0 = arith.constant 0 : index
+  %czero = arith.constant 0 : i64
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi64>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi64>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi64>> -> tensor<8x4096xi64>
+  %3 = tensor.empty() : tensor<8xi64>
+  %4 = linalg.fill ins(%czero : i64) outs(%3 : tensor<8xi64>) -> tensor<8xi64>
+  %5 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+      ins(%2 : tensor<8x4096xi64>) outs(%4 : tensor<8xi64>) {
+      ^bb0(%in: i64, %out: i64):
+        %6 = arith.addi %in, %out : i64
+        linalg.yield %6 : i64
+      } -> tensor<8xi64>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xi64> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi64>>
+  return
+}
+
+// CHECK-LABEL: func.func @reduction_i64
+// CHECK:         linalg.generic
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:        partial_reduction
+// CHECK-SAME:        workgroup
+
+// -----
+
+// i128 reduction on gfx942: AMDGPU, so 128-bit passes the bitwidth gate and
+// reaches VectorDistribute. The ROCDL lowering decomposes 128-bit shuffles
+// into four 32-bit chunks.
+
+// CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @reduction_i128() {
+  %c0 = arith.constant 0 : index
+  %czero = arith.constant 0 : i128
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi128>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi128>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi128>> -> tensor<8x4096xi128>
+  %3 = tensor.empty() : tensor<8xi128>
+  %4 = linalg.fill ins(%czero : i128) outs(%3 : tensor<8xi128>) -> tensor<8xi128>
+  %5 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+      ins(%2 : tensor<8x4096xi128>) outs(%4 : tensor<8xi128>) {
+      ^bb0(%in: i128, %out: i128):
+        %6 = arith.addi %in, %out : i128
+        linalg.yield %6 : i128
+      } -> tensor<8xi128>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xi128> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi128>>
+  return
+}
+
+// CHECK-LABEL: func.func @reduction_i128
+// CHECK:         linalg.generic
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config
+// CHECK-SAME:        partial_reduction
+// CHECK-SAME:        workgroup
+
+// -----
+
+// i256 reduction on gfx942: exercises the divide-by-zero guard in
+// `setReductionVectorDistributionConfig`. With largestLoadSizeInBits == 128
+// on gfx942, `*bitWidth (256) > largestLoadSizeInBits (128)` triggers the
+// early failure, so the reduction config is not set and VectorDistribute is
+// not selected.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @reduction_i256() {
+  %c0 = arith.constant 0 : index
+  %czero = arith.constant 0 : i256
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi256>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi256>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [8, 4096], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x4096xi256>> -> tensor<8x4096xi256>
+  %3 = tensor.empty() : tensor<8xi256>
+  %4 = linalg.fill ins(%czero : i256) outs(%3 : tensor<8xi256>) -> tensor<8xi256>
+  %5 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                         affine_map<(d0, d1) -> (d0)>],
+        iterator_types = ["parallel", "reduction"]}
+      ins(%2 : tensor<8x4096xi256>) outs(%4 : tensor<8xi256>) {
+      ^bb0(%in: i256, %out: i256):
+        %6 = arith.addi %in, %out : i256
+        linalg.yield %6 : i256
+      } -> tensor<8xi256>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<8xi256> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<8xi256>>
+  return
+}
+
+// CHECK-LABEL: func.func @reduction_i256
+// CHECK-NOT:     pipeline = #iree_gpu.pipeline<VectorDistribute>

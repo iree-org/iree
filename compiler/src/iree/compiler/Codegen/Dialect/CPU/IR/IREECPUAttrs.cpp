@@ -6,14 +6,19 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Operation.h"
 #include "mlir/IR/ValueRange.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.cpp.inc"
@@ -331,27 +336,132 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   switch (intrinsic) {
   case MMAIntrinsic::None:
     return Tuple{0, 0, 0};
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+    return Tuple{1, 8, 1};
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32:
+    return Tuple{8, 1, 1};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
     return Tuple{1, 8, 1};
+  case MMAIntrinsic::MMA_X86_AVX512_8x1x1_F64_F64:
+    return Tuple{8, 1, 1};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
     return Tuple{1, 16, 1};
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
+    return Tuple{16, 1, 1};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
     return Tuple{1, 32, 1};
+  case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
+    return Tuple{32, 1, 1};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
     return Tuple{1, 16, 2};
+  case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
+    return Tuple{16, 1, 2};
   default:
+    if (isGenericScalar(intrinsic)) {
+      return Tuple{1, 1, 1};
+    }
     return {};
   }
+}
+
+// Bit-layout constants for the `MMAIntrinsic` enum value (see IREECPUEnums.td
+// for the 0xABCD scheme). The high byte (`kMMAIntrinsicISAMask`) encodes the
+// architecture (nibble A) and the ISA-extension family (nibble B) together
+// — the abbreviation is spelled `ISA` (uppercase) here to avoid reading as
+// the English "is a". The generic-scalar family uses A=F, B=0; the low byte
+// then holds the register-budget heuristic value.
+constexpr uint32_t kMMAIntrinsicISAMask = 0xFF00;
+constexpr uint32_t kMMAIntrinsicISAGeneric = 0xF000;
+constexpr uint32_t kMMAIntrinsicGenericBudgetMask = 0x00FF;
+constexpr uint32_t kMMAIntrinsicISAX86Avx2 = 0x1200;
+constexpr uint32_t kMMAIntrinsicISAX86Avx512 = 0x1300;
+constexpr uint32_t kMMAIntrinsicISAArmSve = 0x2200;
+
+bool isGenericScalar(MMAIntrinsic intr) {
+  return (static_cast<uint32_t>(intr) & kMMAIntrinsicISAMask) ==
+         kMMAIntrinsicISAGeneric;
+}
+
+int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr) {
+  assert(isGenericScalar(intr));
+  return static_cast<uint32_t>(intr) & kMMAIntrinsicGenericBudgetMask;
+}
+
+int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
+  // Total architectural vector register file size, in bytes. The inner-tiled
+  // cost model uses this as the capacity for the union of the ACC, LHS and
+  // RHS tiles. For scalable ISAs we treat the vector length as its minimum
+  // (1 × 128 bits = 16 bytes per register); this is a deliberate
+  // simplification — the resulting `intrinsics_m`/`intrinsics_n` choices are
+  // good enough in practice and avoid propagating scalability into the cost
+  // model.
+  uint32_t isa = static_cast<uint32_t>(intrinsic) & kMMAIntrinsicISAMask;
+  switch (isa) {
+  case kMMAIntrinsicISAX86Avx2: // 16 YMM × 32 B.
+    return 16 * 32;
+  case kMMAIntrinsicISAX86Avx512: // 32 ZMM × 64 B.
+    return 32 * 64;
+  case kMMAIntrinsicISAArmSve: // 32 Z × (VL treated as 128 bits).
+    return 32 * 16;
+  default:
+    // Plausible default, but override it on each arch you care for.
+    return 16 * 32;
+  }
+}
+
+/// Helper for `getIntrinsicSwizzle`:
+/// Ensures every `expandShape` row has at least one piece (unit
+/// dims that received no explicit `expand` get a non-scalable size-1 Internal
+/// piece), and sets `permutation` to the identity over the total number of
+/// expanded dims.
+static Codegen::TileSwizzle fixupSwizzle(Codegen::TileSwizzle swizzle) {
+  for (auto &group : swizzle.expandShape()) {
+    if (group.empty()) {
+      group.push_back(Codegen::TileSwizzle::Dim::internal(1));
+    }
+  }
+  auto &permutation = swizzle.permutation();
+  permutation.resize(swizzle.getExpandedSize());
+  for (size_t i = 0; i < permutation.size(); ++i) {
+    permutation[i] = i;
+  }
+  return swizzle;
 }
 
 Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
                                          int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
+  using Dim = TileSwizzle::Dim;
+
+  // SVE has scalable dims that the row-major path below can't express, so we
+  // hand-roll the swizzle. The natural orientation is 1×4VL×1: 4VL lives on
+  // RHS dim 0 (N) and ACC dim 0 (the convention is `(N, M)` here). The
+  // transposed orientation 4VL×1×1 mirrors that: 4VL on LHS dim 0 (M) and
+  // ACC dim 0 (now `(M, N)`).
+  if (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32 ||
+      mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32) {
+    bool transposed = (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32);
+    TileSwizzle swizzle;
+    swizzle.expandShape().resize(2);
+    int operandWith4VL = transposed ? 0 : 1;
+    if (operandIdx == operandWith4VL || operandIdx == 2) {
+      Codegen::expand(
+          swizzle, /*srcDim=*/0,
+          Dim::internal(4, Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits));
+    }
+    return fixupSwizzle(std::move(swizzle));
+  }
+
   auto maybeMnkTuple = getRowMajorTilesMNKShape(mma);
   if (!maybeMnkTuple) {
     // Whenever one adds support for a new intrinsic that doesn't have a
@@ -368,6 +478,9 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     }
   };
 
+  // expandShape[0] is the outer physical dim and expandShape[1] is the inner
+  // physical dim, with identity permutation. LHS is (M, K), RHS is (N, K),
+  // ACC is (M, N).
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;
     expandIfNonUnit(swizzle, K, kSize);
@@ -377,11 +490,11 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     expandIfNonUnit(swizzle, K, kSize);
     expandIfNonUnit(swizzle, N, nSize);
   } else {
-    constexpr int N = 0, M = 1;
+    constexpr int M = 0, N = 1;
     expandIfNonUnit(swizzle, N, nSize);
     expandIfNonUnit(swizzle, M, mSize);
   }
-  return swizzle;
+  return fixupSwizzle(std::move(swizzle));
 }
 
 Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
@@ -394,7 +507,10 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
       TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsN());
   TileSwizzle::Dim intrinsicsK =
       TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsK());
-  // LHS: (M, K); RHS: (K, N); Acc: (M, N).
+  // Each swizzle is built as (outer physical dim, inner physical dim) in
+  // expandShape[0], expandShape[1]. LHS is (M, K), RHS is (N, K), ACC is
+  // (M, N). The expansion below injects the intrinsics_* cross-intrinsic
+  // factors into whichever group represents each logical dim.
   if (operandIdx == 0) {
     constexpr int M = 0, K = 1;
     if (intrinsicsK.size() > 1) {
@@ -423,37 +539,79 @@ Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
   return swizzle;
 }
 
-static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
+static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
                                                        MMAIntrinsic intrinsic) {
-  Type f64 = Float64Type::get(context);
-  Type f32 = Float32Type::get(context);
-  Type f16 = Float16Type::get(context);
-  Type bf16 = BFloat16Type::get(context);
-  Type i32 = IntegerType::get(context, 32);
-  Type i16 = IntegerType::get(context, 16);
-  Type i8 = IntegerType::get(context, 8);
+  Type f64 = Float64Type::get(ctx);
+  Type f32 = Float32Type::get(ctx);
+  Type f16 = Float16Type::get(ctx);
+  Type bf16 = BFloat16Type::get(ctx);
+  Type i32 = IntegerType::get(ctx, 32);
+  Type i16 = IntegerType::get(ctx, 16);
+  Type i8 = IntegerType::get(ctx, 8);
   switch (intrinsic) {
   case MMAIntrinsic::None:
     return {Type(), Type(), Type()};
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32:
+    return {f32, f32, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+  case MMAIntrinsic::MMA_X86_AVX512_8x1x1_F64_F64:
     return {f64, f64, f64};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
     return {f32, f32, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
     return {f16, f16, f32};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+  case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
     return {f16, f16, f16};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+  case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
     return {bf16, bf16, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
     return {i16, i16, i32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
     return {i8, i8, i32};
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32:
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
+    return {f32, f32, f32};
   default:
     return {Type(), Type(), Type()};
   }
+}
+
+/// Returns the (LHS, RHS, ACC) element types for `attr`, possibly carrying
+/// signedness annotations. For most `MMAIntrinsic` values these are baked
+/// into the enum and the `MMAIntrinsic`-only overload above suffices. The
+/// `MMA_GENERIC_SCALAR_1x1x1_REG*` family is type-polymorphic — its
+/// element types live on the attr's `lhs_type` / `rhs_type` / `acc_type`
+/// parameters and are returned as-is so the lowering can read the
+/// signedness to pick `arith.extsi` vs `arith.extui`.
+/// Vector tile types in IR (via `getUndistributedTileTypes`) are signless;
+/// the signedness here is for matching against the encoding's
+/// `element_types` and for routing in the lowering.
+static std::tuple<Type, Type, Type>
+getABCElementTypes(MLIRContext *context, IREE::CPU::DataTiledMMAAttr attr) {
+  MMAIntrinsic intrinsic = attr.getIntrinsic();
+  if (isGenericScalar(intrinsic)) {
+    auto signless = [&](Type t) -> Type {
+      if (auto intTy = dyn_cast_if_present<IntegerType>(t);
+          intTy && !intTy.isSignless()) {
+        return IntegerType::get(context, intTy.getWidth());
+      }
+      return t;
+    };
+    return {signless(attr.getLhsType()), signless(attr.getRhsType()),
+            signless(attr.getAccType())};
+  }
+  return getABCElementTypes(context, intrinsic);
 }
 
 //===----------------------------------------------------------------------===//
@@ -477,22 +635,10 @@ void DataTiledMMAAttr::getUndistributedTileTypes(
     result.clear();
     return;
   }
-  auto lhsSwizzle = getSwizzle(*this, 0);
-  auto rhsSwizzle = getSwizzle(*this, 1);
-  auto getTileSize = [](const Codegen::TileSwizzle &swizzle, int srcDimIdx) {
-    int64_t size = 1;
-    auto e = swizzle.expandShape()[srcDimIdx];
-    for (auto d : e) {
-      size *= d.size();
-    }
-    return size;
-  };
-  int64_t m = getTileSize(lhsSwizzle, 0);
-  int64_t n = getTileSize(rhsSwizzle, 0);
-  int64_t k = getTileSize(rhsSwizzle, 1);
-  auto [aType, bType, cType] = getABCElementTypes(ctx, intrinsic);
-  result.assign({VectorType::get({m, k}, aType), VectorType::get({k, n}, bType),
-                 VectorType::get({m, n}, cType)});
+  auto [aType, bType, cType] = getABCElementTypes(ctx, *this);
+  result.assign({Codegen::getTileVectorType(getSwizzle(*this, 0), aType),
+                 Codegen::getTileVectorType(getSwizzle(*this, 1), bType),
+                 Codegen::getTileVectorType(getSwizzle(*this, 2), cType)});
 }
 
 void DataTiledMMAAttr::getDistributedTileTypes(
@@ -525,10 +671,227 @@ DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
   return OpFoldResult();
 }
 
+// Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
+// additional ops (potentially broadcasting or widening LHS/RHS or creating an
+// add op if the intrinsic isn't already adding the accumulator).
+static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
+                                       MMAIntrinsic intrinsic, Value lhs,
+                                       Value rhs, Value acc) {
+  // Replicate whichever of LHS/RHS has fewer lanes up to the other's lane
+  // count, so both reach the intrinsic's flat lane width. In the natural
+  // 1×N×K orientation that's the LHS (M=1) broadcast across the N lanes of
+  // the RHS; in the M↔N-swapped N×1×K orientation it's the RHS (N=1) that
+  // gets broadcast. Going through a (lanes, K) 2-D form keeps the K-pair
+  // contiguous; a final shape_cast collapses to the flat 1-D vector the
+  // LLVM intrinsic expects. All x86 LLVM intrinsics we target here (AVX-512
+  // FMA, VNNI vpdpwssd, BF16 dpbf16ps, integer pmaddwd) take same-width
+  // vector operands — there is no single-lane-input variant. The ISA-level
+  // `{1toN}` broadcast-from-memory form is recovered later by the x86
+  // backend's instruction selector pattern-matching this `vector.broadcast`-
+  // of-load into the EVEX broadcast operand, so the explicit broadcast here
+  // is what *enables* that, not a perf liability.
+  // TODO(24311): Arm's by-element FMA (`fmla.4s vd, vn, vm[idx]`) is exposed
+  // via separate intrinsics (e.g. `llvm.aarch64.neon.fma.lane.v4f32`) that
+  // take `(vector, vector, lane_idx)`; when we add Arm support, those cases
+  // should bypass this broadcast and emit the lane-index intrinsic directly.
+  auto lhsType = cast<VectorType>(lhs.getType());
+  auto rhsType = cast<VectorType>(rhs.getType());
+  if (lhsType.getNumElements() != rhsType.getNumElements()) {
+    // `bcastSrc` is the operand fed into `vector.broadcast`; `bcastDst` is
+    // the operand whose lane count we match. They alias the underlying
+    // lhs/rhs through pointers so the broadcast result flows back into the
+    // variable used by the switch below.
+    Value *bcastSrc = &lhs;
+    Value *bcastDst = &rhs;
+    VectorType bcastSrcType = lhsType;
+    VectorType bcastDstType = rhsType;
+    if (bcastSrcType.getNumElements() > bcastDstType.getNumElements()) {
+      std::swap(bcastSrc, bcastDst);
+      std::swap(bcastSrcType, bcastDstType);
+    }
+    int64_t replicate =
+        bcastDstType.getNumElements() / bcastSrcType.getNumElements();
+    auto bcastType = VectorType::get({replicate, bcastSrcType.getNumElements()},
+                                     bcastSrcType.getElementType());
+    Value bcast =
+        vector::BroadcastOp::create(builder, loc, bcastType, *bcastSrc);
+    *bcastSrc = vector::ShapeCastOp::create(builder, loc, bcastDstType, bcast);
+  }
+
+  // Sign-/float-extend a vector to a wider element type. Used by the
+  // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
+  // intrinsic only exists at the wider type.
+  auto widen = [&builder, loc](Value v, Type wider) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    auto wideTy = VectorType::get(vt.getShape(), wider);
+    if (isa<FloatType>(vt.getElementType())) {
+      return arith::ExtFOp::create(builder, loc, wideTy, v);
+    }
+    return arith::ExtSIOp::create(builder, loc, wideTy, v);
+  };
+
+  // Emit llvm.call_intrinsic.
+  auto call = [&builder, loc](StringRef name, Type resultType,
+                              ValueRange args) -> Value {
+    return LLVM::CallIntrinsicOp::create(builder, loc, resultType,
+                                         builder.getStringAttr(name), args)
+        .getResult(0);
+  };
+
+  Type f32 = builder.getF32Type();
+  Type i16 = builder.getI16Type();
+  Type accType = acc.getType();
+  // The x86 MMAs supported here are LHS/RHS-symmetric (FMA, dpbf16ps,
+  // vpdpwssd, pmaddw), so natural and swapped orientations share the same
+  // LLVM intrinsic and arg order — after the broadcast above both operands
+  // have the same lane count. Asymmetric intrinsics (e.g. vpdpbusd) would
+  // need per-orientation arg-routing and aren't supported.
+  switch (intrinsic) {
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_1x8x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX2_FMA_8x1x1_F32_F32:
+    return call("llvm.fma.v8f32", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x8x1_F64_F64:
+  case MMAIntrinsic::MMA_X86_AVX512_8x1x1_F64_F64:
+    return call("llvm.fma.v8f64", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
+    return call("llvm.fma.v16f32", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
+    return call("llvm.fma.v16f32", accType,
+                ValueRange{widen(lhs, f32), widen(rhs, f32), acc});
+  case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
+  case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
+    return call("llvm.fma.v32f16", accType, ValueRange{lhs, rhs, acc});
+  case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
+  case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
+    return call("llvm.x86.avx512bf16.dpbf16ps.512", accType,
+                ValueRange{acc, lhs, rhs});
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
+    return call("llvm.x86.avx512.vpdpwssd.512", accType,
+                ValueRange{acc, lhs, rhs});
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
+    return call("llvm.x86.avx512.vpdpwssd.512", accType,
+                ValueRange{acc, widen(lhs, i16), widen(rhs, i16)});
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16: {
+    return arith::AddIOp::create(
+        builder, loc, acc,
+        call("llvm.x86.avx512.pmaddw.d.512", accType, ValueRange{lhs, rhs}));
+  }
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16: {
+    return arith::AddIOp::create(
+        builder, loc, acc,
+        call("llvm.x86.avx512.pmaddw.d.512", accType,
+             ValueRange{widen(lhs, i16), widen(rhs, i16)}));
+  }
+  default:
+    return {};
+  }
+}
+
+/// Lowers a `DataTiledMMAAttr` whose intrinsic is one of the
+/// `MMA_GENERIC_SCALAR_1x1x1_REG*` cases directly to a single
+/// `vector.contract`. Since the intrinsic's tile shape is 1×1×1, the only
+/// non-unit dims in each operand tile come from `intrinsics_{m,n,k}`, and
+/// the `Codegen::expand`/`fixupSwizzle` machinery places them in row-major
+/// (M, K) / (N, K) / (M, N) order. Collapse to that rank-2 form with
+/// `vector.shape_cast` regardless of where the non-unit dim(s) sit in the
+/// operand tile, then `shape_cast` the contract result back to the ACC
+/// tile's original shape so callers downstream see the expected type.
+static LogicalResult lowerGenericScalarToVectorContract(
+    OpBuilder &builder, Location loc, IREE::CPU::DataTiledMMAAttr attr,
+    ValueRange inputs, ValueRange outputs, SmallVectorImpl<Value> &results) {
+  assert(isGenericScalar(attr.getIntrinsic()) &&
+         "lowerGenericScalarToVectorContract only handles "
+         "MMA_GENERIC_SCALAR_1x1x1_REG* intrinsics");
+  int64_t M = attr.getIntrinsicsM();
+  int64_t N = attr.getIntrinsicsN();
+  int64_t K = attr.getIntrinsicsK();
+  auto reshape = [&](Value v, ArrayRef<int64_t> targetShape) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    auto targetTy = VectorType::get(targetShape, vt.getElementType());
+    if (vt == targetTy) {
+      return v;
+    }
+    return vector::ShapeCastOp::create(builder, loc, targetTy, v);
+  };
+  Value lhs = reshape(inputs[0], {M, K});
+  Value rhs = reshape(inputs[1], {N, K});
+  auto accTy = cast<VectorType>(outputs[0].getType());
+  Value acc = reshape(outputs[0], {M, N});
+  Type accElem = accTy.getElementType();
+  // For the generic intrinsic, ACC is always at least as wide as LHS/RHS,
+  // and they're either all float or all integer (the cost model only picks
+  // this intrinsic when element types are mutually consistent that way).
+  // Signedness lives on the attr's `lhs_type` / `rhs_type` (the operand
+  // vector types are signless storage) and picks ExtSI vs. ExtUI; ACC is
+  // treated as signed.
+  auto isUnsigned = [](Type t) {
+    auto intTy = dyn_cast_if_present<IntegerType>(t);
+    return intTy && intTy.isUnsigned();
+  };
+  auto widenToAcc = [&](Value v, bool unsignedSrc) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    if (vt.getElementType() == accElem) {
+      return v;
+    }
+    auto wideTy = VectorType::get(vt.getShape(), accElem);
+    if (isa<FloatType>(accElem)) {
+      return arith::ExtFOp::create(builder, loc, wideTy, v);
+    }
+    return unsignedSrc ? Value(arith::ExtUIOp::create(builder, loc, wideTy, v))
+                       : Value(arith::ExtSIOp::create(builder, loc, wideTy, v));
+  };
+  lhs = widenToAcc(lhs, isUnsigned(attr.getLhsType()));
+  rhs = widenToAcc(rhs, isUnsigned(attr.getRhsType()));
+  AffineExpr m = builder.getAffineDimExpr(0);
+  AffineExpr n = builder.getAffineDimExpr(1);
+  AffineExpr k = builder.getAffineDimExpr(2);
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  // LHS is (M, K), RHS is (N, K), ACC is (M, N) — same as the
+  // `iree_codegen.inner_tiled` op's own indexing maps for CPU.
+  vector::IteratorType par = vector::IteratorType::parallel;
+  vector::IteratorType red = vector::IteratorType::reduction;
+  Value contractResult = vector::ContractionOp::create(
+      builder, loc, lhs, rhs, acc, MapList{{m, k}, {n, k}, {m, n}},
+      ArrayRef<vector::IteratorType>{par, par, red});
+  results.push_back(reshape(contractResult, accTy.getShape()));
+  return success();
+}
+
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
     SmallVectorImpl<Value> &results) const {
-  return failure();
+  SmallVector<VectorType> regTypes;
+  getDistributedTileTypes(regTypes);
+  if (inputs.size() != 2 || outputs.size() != 1 ||
+      !llvm::equal(regTypes,
+                   llvm::concat<Type>(inputs.getTypes(), outputs.getTypes()))) {
+    return failure();
+  }
+
+  MMAIntrinsic intrinsic = getIntrinsic();
+  // The type-polymorphic generic intrinsic is row-major (1×1×1 base) and
+  // bypasses the swizzle/distribution machinery: it lowers directly to a
+  // single `vector.contract` over the unrolled operand tiles, the way
+  // `linalg.mmt4d` would.
+  if (isGenericScalar(intrinsic)) {
+    return lowerGenericScalarToVectorContract(builder, loc, *this, inputs,
+                                              outputs, results);
+  }
+  auto emitIntrinsic = [&](OpBuilder &b, Location loc, Value lhs, Value rhs,
+                           Value acc) -> Value {
+    return createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs, acc);
+  };
+  return Codegen::buildDataTiledMMAUnderlyingOperations(
+      builder, loc, getSwizzle(*this, /*operandIdx=*/0),
+      getSwizzle(*this, /*operandIdx=*/1), getSwizzle(*this, /*operandIdx=*/2),
+      getIntrinsicsM(), getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
+      emitIntrinsic, results);
 }
 
 //===----------------------------------------------------------------------===//

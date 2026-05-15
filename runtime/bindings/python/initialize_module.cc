@@ -16,6 +16,7 @@
 #include "./loop.h"
 #include "./py_module.h"
 #include "./status_utils.h"
+#include "./tokenizer.h"
 #include "./vm.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/drivers/init.h"
@@ -43,6 +44,7 @@ NB_MODULE(_runtime, m) {
   SetupIoBindings(m);
   SetupLoopBindings(m);
   SetupPyModuleBindings(m);
+  SetupTokenizerBindings(m);
   SetupVmBindings(m);
 
   // Adds the given set of strings to the global flags.  These new flags

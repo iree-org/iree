@@ -12,8 +12,6 @@
 
 namespace mlir::iree_compiler {
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
 /// Verifies pipelines that use iree_gpu.lowering_config attributes.
 LogicalResult verifyLLVMGPUVectorDistributePipeline(
     Operation *op, IREE::GPU::LoweringConfigAttr loweringConfig) {

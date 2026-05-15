@@ -86,28 +86,21 @@ struct StageClassification {
 };
 } // namespace
 
+/// Returns true if the given operation contains gather_to_lds ops nested
+/// inside its regions. This is used to detect region-bearing ops (e.g.,
+/// scf.if) that wrap async DMA loads for warp predication.
+static bool containsNestedGatherToLDS(Operation *op) {
+  bool found = false;
+  op->walk([&](amdgpu::GatherToLDSOp) { found = true; });
+  return found;
+}
+
 /// Checks if a loop contains gather_to_lds operations directly in the loop
 /// body (immediate children of the for loop's body block).
 static bool hasDirectGatherToLDS(scf::ForOp forOp) {
   for (Operation &op : forOp.getBody()->getOperations()) {
     if (isa<amdgpu::GatherToLDSOp>(&op)) {
       return true;
-    }
-  }
-  return false;
-}
-
-/// Checks if a loop contains gather_to_lds operations nested inside regions
-/// (e.g., inside scf.if). Such conditional async copies can't be reliably
-/// pipelined.
-static bool hasNestedGatherToLDS(scf::ForOp forOp) {
-  for (Operation &op : forOp.getBody()->getOperations()) {
-    if (op.getNumRegions() > 0) {
-      bool hasNested = false;
-      op.walk([&](amdgpu::GatherToLDSOp) { hasNested = true; });
-      if (hasNested) {
-        return true;
-      }
     }
   }
   return false;
@@ -341,6 +334,13 @@ static LogicalResult analyzeIfOp(scf::IfOp ifOp,
         readRoots.push_back(nestedOp);
         LDBG() << "  Found global read in scf.if: " << *nestedOp;
       }
+    } else if (auto trLoad =
+                   dyn_cast<amdgpu::GlobalTransposeLoadOp>(nestedOp)) {
+      if (!hasGlobalRead) {
+        hasGlobalRead = true;
+        readRoots.push_back(nestedOp);
+        LDBG() << "  Found global_transpose_load in scf.if: " << *nestedOp;
+      }
     } else if (auto write = dyn_cast<vector::TransferWriteOp>(nestedOp)) {
       if (!hasSharedWrite && isSharedMemoryWrite(write)) {
         hasSharedWrite = true;
@@ -386,10 +386,10 @@ static LogicalResult checkLoopIterations(scf::ForOp forOp) {
 
 // Step 1: Identify root operations for each stage.
 // Root operations are the anchors from which we compute backward slices.
-// This function looks inside scf.if blocks to find roots, so that backward
-// slice computation works naturally without special handling.
+// In async copy mode, any region-bearing op containing gather_to_lds is
+// treated as a load root. In stream copy mode, only scf.if is handled.
 // Returns failure if any scf.if has conflicting operations (both global reads
-// and shared writes).
+// and shared writes) in stream copy mode.
 static LogicalResult identifyRootOperations(
     scf::ForOp forOp, PipelineMode mode, SmallVector<Operation *> &loadRoots,
     SmallVector<Operation *> &readRoots, SmallVector<Operation *> &writeRoots,
@@ -399,22 +399,31 @@ static LogicalResult identifyRootOperations(
 
   for (Operation &op : forOp.getBody()->getOperations()) {
     if (mode == PipelineMode::AsyncCopy) {
-      // Async copy mode: gather_to_lds and scf.yield
       if (isa<amdgpu::GatherToLDSOp>(op)) {
         loadRoots.push_back(&op);
         LDBG() << "  Load root: " << op;
       } else if (isa<scf::YieldOp>(op)) {
         computeRoots.push_back(&op);
         LDBG() << "  Compute root: " << op;
+      } else if (op.getNumRegions() > 0 && containsNestedGatherToLDS(&op)) {
+        // Region-bearing ops (e.g., scf.if, scf.for) may wrap gather_to_lds.
+        // Treat the enclosing op as a load root so it gets scheduled in the
+        // load stage as a single unit.
+        loadRoots.push_back(&op);
+        LDBG() << "  Load root (nested gather_to_lds): " << op;
       }
     } else {
       // Stream copy mode: transfer_read, transfer_write, scf.yield
-      // Read stage roots: vector.transfer_read from global memory
+      // Read stage roots: vector.transfer_read or global_transpose_load from
+      // global memory.
       if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
         if (isGlobalMemoryRead(read)) {
           readRoots.push_back(&op);
           LDBG() << "  Read root: " << op;
         }
+      } else if (isa<amdgpu::GlobalTransposeLoadOp>(op)) {
+        readRoots.push_back(&op);
+        LDBG() << "  Read root (global_transpose_load): " << op;
       }
       // Write stage roots: all vector.transfer_write operations
       else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
@@ -473,37 +482,40 @@ static LogicalResult computeBackwardSlice(ArrayRef<Operation *> roots,
     slice.insert(root);
     slice.insert_range(rootSlice);
 
+    // If the root is a region-bearing op (e.g., scf.if wrapping gather_to_lds),
+    // capture backward slices of all nested operations to get their
+    // dependencies.
+    if (root->getNumRegions() > 0) {
+      root->walk([&](Operation *nestedOp) {
+        if (nestedOp != root) {
+          SetVector<Operation *> nestedSlice;
+          (void)getBackwardSlice(nestedOp, &nestedSlice, options);
+          slice.insert_range(nestedSlice);
+        }
+      });
+    }
+
     // Also add any parent scf.if operations that contain this root
     // This is necessary because roots inside scf.if need the if to be scheduled
     // We also need to compute backward slices of ALL operations inside the
     // scf.if to capture dependencies like memref.alloca that nested ops use
     Operation *parent = root->getParentOp();
     while (parent != forOp.getOperation()) {
-      if (auto ifOp = dyn_cast<scf::IfOp>(parent)) {
-        slice.insert(ifOp.getOperation());
+      if (parent->getNumRegions() > 0) {
+        slice.insert(parent);
 
-        // Compute backward slice OF the scf.if itself to capture its condition
-        SetVector<Operation *> ifSlice;
-        (void)getBackwardSlice(ifOp.getOperation(), &ifSlice, options);
-        slice.insert_range(ifSlice);
+        SetVector<Operation *> parentSlice;
+        (void)getBackwardSlice(parent, &parentSlice, options);
+        slice.insert_range(parentSlice);
 
-        // Compute backward slices of all nested operations to get dependencies
-        // This approach ensures correctness by capturing all transitive
-        // dependencies like memref.alloca that nested operations may use.
-        ifOp.getOperation()->walk([&](Operation *nestedOp) {
-          if (nestedOp != ifOp.getOperation()) {
+        parent->walk([&](Operation *nestedOp) {
+          if (nestedOp != parent) {
             SetVector<Operation *> nestedSlice;
             (void)getBackwardSlice(nestedOp, &nestedSlice, options);
             slice.insert_range(nestedSlice);
           }
         });
-      } else if (parent->getNumRegions() > 0) {
-        // If we encounter a region-bearing op that's not scf.if, fail
-        LDBG() << "  ERROR: Unsupported nested region-bearing operation: "
-               << parent->getName();
-        return failure();
       }
-      // else: Non-region-bearing intermediate operation, continue walking up
       parent = parent->getParentOp();
     }
   }
@@ -1067,15 +1079,55 @@ static Operation *findLastGatherToLDS(Block::iterator begin,
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
       return &*it;
     }
+    if (it->getNumRegions() > 0 && containsNestedGatherToLDS(&*it)) {
+      return &*it;
+    }
   }
   return nullptr;
 }
 
-/// Sets the async flag on all gather_to_lds ops in the parent block so they
+/// Sets the async flag on gather_to_lds ops from `begin` to `end` so they
 /// lower to rocdl.load.async.to.lds instead of rocdl.load.to.lds.
-static void enableAsyncOnGatherOps(Block *parentBlock) {
-  parentBlock->walk(
-      [](amdgpu::GatherToLDSOp gatherOp) { gatherOp.setAsync(true); });
+static void enableAsyncOnGatherOps(Block::iterator begin, Block::iterator end) {
+  for (auto it = begin; it != end; ++it) {
+    it->walk([](amdgpu::GatherToLDSOp gatherOp) { gatherOp.setAsync(true); });
+  }
+}
+
+/// Inserts an asyncmark/wait.asyncmark 0 pair before `insertPt`.
+static void insertAsyncDrainBefore(RewriterBase &rewriter, Location loc,
+                                   Operation *insertPt) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(insertPt);
+  ROCDL::AsyncmarkOp::create(rewriter, loc);
+  ROCDL::WaitAsyncmarkOp::create(rewriter, loc, rewriter.getI16IntegerAttr(0));
+}
+
+/// Converts direct pre-existing gather_to_lds ops before the pipelined loop to
+/// async mode and inserts explicit waits that preserve their original
+/// synchronous behavior.
+static void insertPreLoopAsyncMarkers(RewriterBase &rewriter, Location loc,
+                                      Block::iterator preLoopStart,
+                                      Block::iterator preLoopEnd) {
+  bool hasPendingAsyncGather = false;
+  for (auto it = preLoopStart; it != preLoopEnd;) {
+    Operation *op = &*it++;
+
+    if (hasPendingAsyncGather &&
+        (isa<gpu::BarrierOp>(op) || hasNestedSharedRead(op))) {
+      insertAsyncDrainBefore(rewriter, loc, op);
+      hasPendingAsyncGather = false;
+    }
+
+    if (auto gatherOp = dyn_cast<amdgpu::GatherToLDSOp>(op)) {
+      gatherOp.setAsync(true);
+      hasPendingAsyncGather = true;
+    }
+  }
+
+  if (hasPendingAsyncGather) {
+    insertAsyncDrainBefore(rewriter, loc, &*preLoopEnd);
+  }
 }
 
 /// Inserts asyncmark ops in the prologue to delineate DMA groups.
@@ -1084,12 +1136,14 @@ static void enableAsyncOnGatherOps(Block *parentBlock) {
 /// Each iteration group gets one asyncmark after its last gather_to_lds.
 /// Groups are identified by evenly dividing the total prologue gather ops.
 static void insertPrologueAsyncMarks(RewriterBase &rewriter, Location loc,
-                                     Block *parentBlock,
+                                     Block::iterator prologueStart,
                                      Block::iterator loopStart,
                                      unsigned numStages) {
   SmallVector<Operation *> prologueGathers;
-  for (auto it = parentBlock->begin(); it != loopStart; ++it) {
+  for (auto it = prologueStart; it != loopStart; ++it) {
     if (isa<amdgpu::GatherToLDSOp>(&*it)) {
+      prologueGathers.push_back(&*it);
+    } else if (it->getNumRegions() > 0 && containsNestedGatherToLDS(&*it)) {
       prologueGathers.push_back(&*it);
     }
   }
@@ -1169,15 +1223,16 @@ static void insertEpilogueAsyncWait(RewriterBase &rewriter, Location loc,
 /// new DMA group we wait until only (N-1) groups are in flight, ensuring the
 /// oldest group's data is ready for reading.
 static void insertExplicitAsyncMarkers(RewriterBase &rewriter,
-                                       scf::ForOp newForOp,
-                                       unsigned numStages) {
+                                       scf::ForOp newForOp, unsigned numStages,
+                                       Block::iterator prologueStart) {
   Block *parentBlock = newForOp->getBlock();
   Location loc = newForOp.getLoc();
   int16_t waitCount = static_cast<int16_t>(numStages - 1);
 
-  enableAsyncOnGatherOps(parentBlock);
-  insertPrologueAsyncMarks(rewriter, loc, parentBlock, newForOp->getIterator(),
-                           numStages);
+  insertPreLoopAsyncMarkers(rewriter, loc, parentBlock->begin(), prologueStart);
+  enableAsyncOnGatherOps(prologueStart, parentBlock->end());
+  insertPrologueAsyncMarks(rewriter, loc, prologueStart,
+                           newForOp->getIterator(), numStages);
   insertLoopBodyAsyncMarkers(rewriter, loc, newForOp, waitCount);
   insertEpilogueAsyncWait(rewriter, loc, std::next(newForOp->getIterator()),
                           parentBlock->end());
@@ -1226,14 +1281,6 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   PipelineMode mode = hasGatherToLDS(forOp) ? PipelineMode::AsyncCopy
                                             : PipelineMode::StreamCopy;
 
-  // Check for nested gather_to_lds (e.g., inside scf.if) - this is unsupported
-  // because conditional async copies can't be reliably pipelined.
-  if (hasNestedGatherToLDS(forOp)) {
-    LDBG() << "Loop has gather_to_lds inside nested region (e.g., scf.if) - "
-           << "cannot pipeline";
-    return failure();
-  }
-
   // Check for mixed mode: both gather_to_lds and stream copy ops.
   // This is unsupported - bail out entirely without any pipelining.
   if (hasDirectGatherToLDS(forOp) && hasStreamCopyOps(forOp)) {
@@ -1280,11 +1327,17 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
     return forOp;
   }
 
+  Operation *opBeforeLoop = nullptr;
   if (mode == PipelineMode::AsyncCopy) {
     // Apply multi-buffering: numStages buffers for N-stage pipelining.
     if (failed(multiBufferLDSAllocations(forOp, /*numBuffers=*/numStages))) {
       return failure();
     }
+    // Record the operation before the original loop. After pipelining, the next
+    // operation after this marker is the start of the generated prologue. Ops
+    // before that boundary are pre-existing parent-block ops and are explicitly
+    // drained separately from the pipelined async groups.
+    opBeforeLoop = forOp->getPrevNode();
   }
 
   // Re-run classification on the (potentially multi-buffered) IR to capture
@@ -1336,7 +1389,12 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
   // allowing DMA writes to a new buffer slot to overlap with ds_reads from the
   // previous slot.
   if (mode == PipelineMode::AsyncCopy) {
-    insertExplicitAsyncMarkers(rewriter, newForOp, numStages);
+    // Compute the start of the pipelining prologue, skipping any pre-existing
+    // ops that were before the original loop.
+    Block::iterator prologueStart = opBeforeLoop
+                                        ? std::next(opBeforeLoop->getIterator())
+                                        : newForOp->getBlock()->begin();
+    insertExplicitAsyncMarkers(rewriter, newForOp, numStages, prologueStart);
   }
 
   return newForOp;

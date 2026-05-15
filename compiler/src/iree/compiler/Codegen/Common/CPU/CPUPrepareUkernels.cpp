@@ -60,7 +60,7 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     // Skip the tiling if the size is already 1.
     ShapedType srcType = packOp.getSourceType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
-      if (val && srcType.getDimSize(idx) == 1) {
+      if (!isZeroInteger(val) && srcType.getDimSize(idx) == 1) {
         return;
       }
     }
@@ -97,7 +97,7 @@ static void tileNonPackedDimsFor5DPUnpackOps(RewriterBase &rewriter,
     // Skip the tiling if the size is already 1.
     ShapedType destType = unpackOp.getDestType();
     for (auto [idx, val] : llvm::enumerate(tileSizes)) {
-      if (val && destType.getDimSize(idx) == 1) {
+      if (!isZeroInteger(val) && destType.getDimSize(idx) == 1) {
         return;
       }
     }

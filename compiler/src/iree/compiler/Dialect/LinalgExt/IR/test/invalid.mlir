@@ -2073,7 +2073,7 @@ func.func @index_op_invalid_dim(%arg0 : tensor<?xindex>) -> tensor<?xindex> {
       iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
       outs(%arg0: tensor<?xindex>) {
     ^bb0(%b0 : tensor<?xindex>):
-      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing CustomOp}}
+      // expected-error @+1 {{expected dim (1) to be lower than the number of loops (1) of the enclosing operation}}
       %1 = iree_linalg_ext.index 1 : index
       %2 = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>],

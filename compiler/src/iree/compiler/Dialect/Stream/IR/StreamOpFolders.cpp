@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -964,7 +965,8 @@ struct CanonicalizeResourcePackIntervals : OpRewritePattern<ResourcePackOp> {
       lifetimeIntervals[2 * i + 1] = slice.lifetimeEnd;
       dynamicSliceSizes[i] = slice.dynamicSize;
     }
-    SmallVector<Type> packedOffsetTypes(slices.size(), rewriter.getIndexType());
+    llvm::Repeated<Type> packedOffsetTypes(slices.size(),
+                                           rewriter.getIndexType());
     auto newOp = ResourcePackOp::create(
         rewriter, op.getLoc(), op.getTotalLength().getType(), packedOffsetTypes,
         op.getOffset(), rewriter.getIndexArrayAttr(lifetimeIntervals),
@@ -2134,6 +2136,55 @@ void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<SameAffinityTransferToClone>(context);
   results.insert<IntermediateTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.cast
+//===----------------------------------------------------------------------===//
+
+OpFoldResult AsyncCastOp::fold(FoldAdaptor operands) {
+  // Fold away cast if source and result types match.
+  if (getSource().getType() == getResult().getType()) {
+    return getSource();
+  }
+  // Fold chain: cast(cast(x)) -> x when outer result type matches inner source.
+  if (auto sourceCastOp = getSource().getDefiningOp<AsyncCastOp>()) {
+    if (sourceCastOp.getSource().getType() == getResult().getType()) {
+      return sourceCastOp.getSource();
+    }
+  }
+  return {};
+}
+
+namespace {
+
+// Collapses chains of async casts into a single cast to the final type.
+struct CollapseAsyncCastChain : public OpRewritePattern<AsyncCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncCastOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceCastOp = op.getSource().getDefiningOp<AsyncCastOp>();
+    if (!sourceCastOp) {
+      return failure();
+    }
+    // If folding would handle this (source matches result), let fold do it.
+    if (sourceCastOp.getSource().getType() == op.getResult().getType()) {
+      return failure();
+    }
+    // Collapse the chain: cast(cast(x, A), B) -> cast(x, B).
+    rewriter.replaceOpWithNewOp<AsyncCastOp>(
+        op, op.getResult().getType(), sourceCastOp.getSource(),
+        sourceCastOp.getSourceSize(), op.getAffinityAttr());
+    return success();
+  }
+};
+
+} // namespace
+
+void AsyncCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                              MLIRContext *context) {
+  results.insert<CollapseAsyncCastChain>(context);
+  results.insert<ElideUnusedOp<AsyncCastOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//

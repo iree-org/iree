@@ -43,6 +43,11 @@ getPromotedOperandList(LoweringConfigAttr config);
 /// Helper to retrieve a list of operand promotion types.
 std::optional<ArrayRef<Attribute>>
 getPromotionTypesList(LoweringConfigAttr config);
+/// Verifies that any configured operand promotion types match the promoted
+/// operands list.
+LogicalResult
+verifyPromotedOperandsList(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr attributes);
 /// Append to `attrs` an `ArrayAttr` for `promotedOperands`.
 /// The `promotionTypes` is an optional list of Attributes
 /// describing how to promote each individual operand.

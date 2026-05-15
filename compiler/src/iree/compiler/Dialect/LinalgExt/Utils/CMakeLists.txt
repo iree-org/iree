@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
+    MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRSupport

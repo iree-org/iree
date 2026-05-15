@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "1d_vector_canonicalization.mlir"
     "amdgpu_emulate_narrow_type.mlir"
     "assign_constant_ordinals.mlir"
     "cast_address_space_function.mlir"
@@ -21,6 +22,7 @@ iree_lit_test_suite(
     "config_custom_op.mlir"
     "config_gather_like_ops.mlir"
     "config_horizontally_fused_ops.mlir"
+    "config_llvm_gpu_constraints.mlir"
     "config_matmul.mlir"
     "config_matvec.mlir"
     "config_root_op_attribute.mlir"
@@ -42,9 +44,11 @@ iree_lit_test_suite(
     "gpu_pipeline_relayout_ops.mlir"
     "horizontal_fusion_pipeline.mlir"
     "legalize.mlir"
+    "legalize_nd_vectors.mlir"
     "linalg_transform.mlir"
     "link_executables.mlir"
     "llvmgpu_bufferize.mlir"
+    "llvmgpu_group_global_loads.mlir"
     "nvvm_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "pipeline_coalesced_dma.mlir"
@@ -68,7 +72,9 @@ iree_lit_test_suite(
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
+    "vector_flattening.mlir"
     "vector_lowering.mlir"
+    "vector_multi_reduction_lowering.mlir"
     "vector_to_gpu.mlir"
     "winograd_pipeline_test.mlir"
   TOOLS

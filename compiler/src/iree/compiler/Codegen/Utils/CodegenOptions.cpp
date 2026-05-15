@@ -9,11 +9,68 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::CPUCodegenOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::GPUCodegenOptions);
 
+// Out-of-line definitions for the `llvm::cl::parser` specializations declared
+// in CodegenOptions.h.
+namespace llvm::cl {
+
+template class basic_parser<mlir::iree_compiler::CPUCodegenOptions>;
+bool parser<mlir::iree_compiler::CPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::CPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::CPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::CPUCodegenOptions>::anchor() {}
+
+template class basic_parser<mlir::iree_compiler::GPUCodegenOptions>;
+bool parser<mlir::iree_compiler::GPUCodegenOptions>::parse(
+    Option &, StringRef, StringRef, mlir::iree_compiler::GPUCodegenOptions &) {
+  return false;
+}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::printOptionDiff(
+    const Option &, mlir::iree_compiler::GPUCodegenOptions, const OptVal &,
+    size_t) const {}
+void parser<mlir::iree_compiler::GPUCodegenOptions>::anchor() {}
+
+} // namespace llvm::cl
+
 namespace mlir::iree_compiler {
+
+namespace {
+
+// Applies the opt-level default cascade using a local binder.
+template <typename CodegenOptionsT>
+void applyOptLevelDefaults(CodegenOptionsT &opts,
+                           llvm::OptimizationLevel level) {
+  auto binder = OptionsBinder::local();
+  // Anchor the opt-level hierarchy so applyOptimizationDefaults can walk it.
+  binder.topLevelOpt("opt-level", level);
+  opts.bindOptions(binder);
+  binder.applyOptimizationDefaults();
+}
+
+} // namespace
 
 std::string CodegenOptions::tuningSpecPath = "";
 bool CodegenOptions::setTunerAttributes = false;
 bool CodegenOptions::emitPipelineConstraints = false;
+
+llvm::OptimizationLevel
+mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel) {
+  switch (optLevel) {
+  case CodegenPipelineOptLevel::O0:
+    return llvm::OptimizationLevel::O0;
+  case CodegenPipelineOptLevel::O1:
+    return llvm::OptimizationLevel::O1;
+  case CodegenPipelineOptLevel::O2:
+    return llvm::OptimizationLevel::O2;
+  case CodegenPipelineOptLevel::O3:
+    return llvm::OptimizationLevel::O3;
+  }
+  assert(false && "unhandled codegen pipeline optimization level");
+  return llvm::OptimizationLevel::O0;
+}
 
 void CodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE Codegen Options");
@@ -40,6 +97,17 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
       emitPipelineConstraints, llvm::cl::cat(category),
       llvm::cl::desc("Emit and verify SMT pipeline constraints for root ops. "
                      "Implies --iree-codegen-add-tuner-attributes."));
+}
+
+void CPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
+  applyOptLevelDefaults(*this, level);
+}
+
+CPUCodegenOptions
+CPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel level) {
+  CPUCodegenOptions opts;
+  opts.setWithOptLevel(level);
+  return opts;
 }
 
 void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
@@ -98,6 +166,23 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
           "tracking. Use with --iree-hal-instrument-dispatches=<buffer-size> "
           "and analyze results with iree-dump-instruments."),
       llvm::cl::cat(category));
+
+  binder.opt<bool>("iree-llvmcpu-experimental-vectorize-to-transfer-gather",
+                   enableTransferGather,
+                   llvm::cl::desc("Experimental: enables vectorization to "
+                                  "iree_vector_ext.transfer_gather."),
+                   llvm::cl::cat(category));
+}
+
+void GPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
+  applyOptLevelDefaults(*this, level);
+}
+
+GPUCodegenOptions
+GPUCodegenOptions::getWithOptLevel(llvm::OptimizationLevel level) {
+  GPUCodegenOptions opts;
+  opts.setWithOptLevel(level);
+  return opts;
 }
 
 void GPUCodegenOptions::bindOptions(OptionsBinder &binder) {

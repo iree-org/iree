@@ -13,7 +13,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/threading/notification.h"
-#include "iree/task/task.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,11 +68,6 @@ typedef struct iree_task_scope_t {
   // to completion.
   iree_atomic_intptr_t permanent_status;
 
-  // Dispatch statistics aggregated from all dispatches in this scope. Updated
-  // relatively infrequently and must not be used for task control as values
-  // are undefined in the case of failure and may tear.
-  iree_task_dispatch_statistics_t dispatch_statistics;
-
   // A count of pending submissions within this scope. 0 indicates idle.
   // Each submission has a fence that references this value and decrements it
   // as it is reached indicating that all memory used by all tasks within that
@@ -100,12 +94,6 @@ void iree_task_scope_deinitialize(iree_task_scope_t* scope);
 // Returns the name of the scope. Informational only and may be the empty
 // string.
 iree_string_view_t iree_task_scope_name(iree_task_scope_t* scope);
-
-// Returns and resets the statistics for the scope.
-// Statistics may experience tearing (non-atomic update across fields) if this
-// is performed while tasks are in-flight.
-iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
-    iree_task_scope_t* scope);
 
 // Returns true if the scope has failed.
 // iree_task_scope_consume_status can be used once to get the full status

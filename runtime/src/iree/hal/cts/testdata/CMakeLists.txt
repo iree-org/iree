@@ -15,6 +15,7 @@ add_custom_command(OUTPUT executable_srcs.stamp
   DEPENDS
     "command_buffer_dispatch_constants_bindings_test.mlir"
     "command_buffer_dispatch_constants_test.mlir"
+    "command_buffer_dispatch_indirect_parameters_test.mlir"
     "command_buffer_dispatch_multi_entrypoint_test.mlir"
     "command_buffer_dispatch_multi_workgroup_test.mlir"
     "command_buffer_dispatch_test.mlir"

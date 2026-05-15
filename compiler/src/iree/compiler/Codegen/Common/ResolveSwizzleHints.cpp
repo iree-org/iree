@@ -75,23 +75,19 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   int64_t loadWidth = type.getShape()[0];
   Value memrefOffset = load.getIndices()[0];
 
-  // For loads smaller than accessWidth, swizzle the base offset and add
-  // back the within-group offset. swizzleOffset drops |memrefOffset %
-  // accessWidth| because it targets group-aligned accesses; for scalar
-  // or sub-group loads we need to preserve the element's position within
-  // the group so threads at different elements within the same group
-  // read from distinct addresses.
+  // For loads narrower than accessWidth, restrict to loadWidth == 1: only a
+  // single element is guaranteed not to straddle a swizzle access-width
+  // group, so the permutation maps the access bijectively. For widths in
+  // (1, accessWidth) we'd need to prove `(offset % accessWidth) + width <=
+  // accessWidth` statically, which we can't do here.
   if (loadWidth < accessWidth) {
-    Value swizzledBase = getValueOrCreateConstantIndexOp(
+    if (loadWidth != 1) {
+      return;
+    }
+    Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
                                           memrefOffset, hintOp.getOperand()));
-    Value accessWidthVal =
-        arith::ConstantIndexOp::create(rewriter, hintLoc, accessWidth);
-    Value withinGroup =
-        arith::RemUIOp::create(rewriter, hintLoc, memrefOffset, accessWidthVal);
-    Value newOffset =
-        arith::AddIOp::create(rewriter, hintLoc, swizzledBase, withinGroup);
     auto newLoad = vector::LoadOp::create(rewriter, load.getLoc(), type,
                                           load.getBase(), newOffset);
     rewriter.replaceOp(load, newLoad);
@@ -140,19 +136,16 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   int64_t storeWidth = type.getShape()[0];
   Value memrefOffset = store.getIndices()[0];
 
-  // For stores smaller than accessWidth, swizzle the base offset and add
-  // back the within-group offset (symmetric to the load path above).
+  // Mirror of swizzleLoad: only storeWidth == 1 is safe; wider sub-accessWidth
+  // stores could straddle a group and break the bijection.
   if (storeWidth < accessWidth) {
-    Value swizzledBase = getValueOrCreateConstantIndexOp(
+    if (storeWidth != 1) {
+      return;
+    }
+    Value newOffset = getValueOrCreateConstantIndexOp(
         rewriter, hintLoc,
         hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
                                           memrefOffset, hintOp.getOperand()));
-    Value accessWidthVal =
-        arith::ConstantIndexOp::create(rewriter, hintLoc, accessWidth);
-    Value withinGroup =
-        arith::RemUIOp::create(rewriter, hintLoc, memrefOffset, accessWidthVal);
-    Value newOffset =
-        arith::AddIOp::create(rewriter, hintLoc, swizzledBase, withinGroup);
     vector::StoreOp::create(rewriter, store.getLoc(), store.getValueToStore(),
                             store.getBase(), newOffset);
     rewriter.eraseOp(store);

@@ -226,8 +226,10 @@ typedef struct iree_async_semaphore_vtable_t {
   // (testing, pure-CPU coordination). Implementations that don't participate
   // in remoting may ignore the frontier parameter.
   //
-  // Returns IREE_STATUS_RESOURCE_EXHAUSTED if the frontier merge would exceed
-  // the semaphore's internal frontier capacity.
+  // If the frontier merge overflows capacity, the frontier is left unchanged
+  // (still a valid lower bound) and the signal succeeds. The taint watermark
+  // is not advanced for the overflowing value, so consumers know the causal
+  // data is incomplete and fall back to device-side synchronization.
   iree_status_t (*signal)(iree_async_semaphore_t* semaphore, uint64_t value,
                           const iree_async_frontier_t* frontier);
 
@@ -247,7 +249,7 @@ typedef struct iree_async_semaphore_vtable_t {
 
 // Default inline frontier capacity for semaphores.
 // 16 entries covers typical multi-GPU workloads (4-8 devices x 2-4 queues).
-// Exceeding this capacity during signal() returns RESOURCE_EXHAUSTED.
+// Overflow is handled gracefully (signal succeeds, frontier tracking degrades).
 #define IREE_ASYNC_SEMAPHORE_DEFAULT_FRONTIER_CAPACITY 16
 
 // Timeline semaphore with atomic state, frontier accumulation, and timepoint
@@ -414,8 +416,8 @@ static inline uint64_t iree_async_semaphore_query(
 // (component-wise max). Pass NULL for local-only signals where causal tracking
 // is not needed.
 //
-// Thread-safe. Returns IREE_STATUS_RESOURCE_EXHAUSTED if the frontier merge
-// would exceed the semaphore's internal frontier capacity.
+// Thread-safe. If the frontier merge overflows capacity the signal still
+// succeeds and the frontier is left unchanged (valid lower bound).
 static inline iree_status_t iree_async_semaphore_signal(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier) {
@@ -444,6 +446,15 @@ IREE_API_EXPORT uint8_t iree_async_semaphore_query_frontier(
 // for hardware-specific cleanup (e.g., signaling VkSemaphore to FAILURE_VALUE).
 IREE_API_EXPORT void iree_async_semaphore_fail(
     iree_async_semaphore_t* semaphore, iree_status_t status);
+
+// Returns the status code of the semaphore's failure, or IREE_STATUS_OK if
+// the semaphore has not failed. Thread-safe with acquire semantics.
+static inline iree_status_code_t iree_async_semaphore_query_status(
+    iree_async_semaphore_t* semaphore) {
+  iree_status_t status = (iree_status_t)iree_atomic_load(
+      &semaphore->failure_status, iree_memory_order_acquire);
+  return iree_status_code(status);
+}
 
 // Registers a timepoint that fires when the semaphore reaches |minimum_value|.
 // The |timepoint| is caller-owned storage that must remain valid and at a
@@ -544,13 +555,50 @@ IREE_API_EXPORT bool iree_async_semaphore_is_value_tainted(
 IREE_API_EXPORT void iree_async_semaphore_mark_tainted_above(
     iree_async_semaphore_t* semaphore, uint64_t threshold);
 
-// Signals the semaphore and advances the untainted watermark.
-// Equivalent to signal() followed by marking the value as untainted.
-// Called by HAL signal implementations for internally-witnessed GPU work.
-// This is the "normal" signal path for GPU work completing.
+// Advances the timeline, merges the frontier, conditionally advances the
+// untainted watermark, and dispatches satisfied timepoints.
+//
+// This is the primary signal path for locally-witnessed work (GPU completions,
+// CPU task completions). The untainted watermark is advanced only if the
+// frontier merge succeeds — if it overflows capacity, the frontier is left
+// unchanged (valid lower bound) and the value remains tainted so that
+// consumers fall back to device-side synchronization rather than trusting
+// incomplete causal data.
+//
+// Does NOT go through the signal vtable. Vtable signal implementations should
+// call this after performing their native signaling (e.g., GPU event record).
 IREE_API_EXPORT iree_status_t iree_async_semaphore_signal_untainted(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier);
+
+// Idempotently publishes a locally witnessed, untainted timeline value.
+//
+// If the semaphore has failed this returns that failure. If the semaphore is
+// already at or past |value| this returns OK without dispatching timepoints.
+// Otherwise it advances the timeline, merges |frontier|, conditionally
+// advances the untainted watermark, and dispatches satisfied timepoints exactly
+// like iree_async_semaphore_signal_untainted().
+//
+// This is for late observers that can independently prove completion of a
+// signal already submitted elsewhere. For example, a HAL backend may wait
+// directly on a queue epoch signal while its completion thread is concurrently
+// publishing the same semaphore value. Ordinary producers should still use
+// strict signal paths so duplicate signals remain visible as programming
+// errors.
+IREE_API_EXPORT iree_status_t iree_async_semaphore_publish_untainted(
+    iree_async_semaphore_t* semaphore, uint64_t value,
+    const iree_async_frontier_t* frontier);
+
+// Merges |frontier| into the semaphore's accumulated frontier without
+// advancing the timeline or dispatching timepoints. Used by HAL submission
+// paths to record causal context at submission time so same-queue wait elision
+// can take effect before device completion.
+//
+// Returns true if the merge succeeded. On capacity overflow, returns false and
+// leaves the frontier unchanged, which is a valid lower bound that only
+// degrades wait elision.
+IREE_API_EXPORT bool iree_async_semaphore_merge_frontier(
+    iree_async_semaphore_t* semaphore, const iree_async_frontier_t* frontier);
 
 // Returns the current untainted watermark value.
 // Values <= this are guaranteed to have been signaled by witnessed work.
@@ -588,10 +636,15 @@ iree_async_semaphore_query_untainted_value(iree_async_semaphore_t* semaphore);
 
 // Advances the timeline value (CAS) and merges the frontier.
 // Does NOT dispatch timepoints (caller does that after native signaling).
+//
 // Returns INVALID_ARGUMENT if the timeline is already at or past |value| —
 // each timeline value must be signaled exactly once and concurrent races are
 // not valid (they indicate duplicate signals or non-monotonic scheduling).
-// Returns frontier merge errors if a frontier is provided and the merge fails.
+//
+// If the frontier merge overflows capacity the timeline still advances and
+// the frontier is left unchanged (still a valid lower bound). Does not touch
+// the untainted watermark — callers that need watermark management should use
+// iree_async_semaphore_signal_untainted() instead.
 IREE_API_EXPORT iree_status_t iree_async_semaphore_advance_timeline(
     iree_async_semaphore_t* semaphore, uint64_t value,
     const iree_async_frontier_t* frontier);

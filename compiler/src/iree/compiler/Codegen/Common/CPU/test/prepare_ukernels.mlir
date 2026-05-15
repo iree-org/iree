@@ -197,6 +197,30 @@ func.func @pack_with_outer_dims_perm(%arg0: tensor<484x16x64xbf16>, %arg1: tenso
 
 // -----
 
+func.func @pack_3d_to_2d_regression(%arg0: tensor<32x1x31xf32>, %arg1: tensor<32x2x1x1x16xf32>) -> tensor<32x2x1x1x16xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "pack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %pack = linalg.pack %arg0 padding_value(%cst : f32) outer_dims_perm = [0, 2, 1] inner_dims_pos = [1, 2] inner_tiles = [1, 16] into %arg1 : tensor<32x1x31xf32> -> tensor<32x2x1x1x16xf32>
+  return %pack : tensor<32x2x1x1x16xf32>
+}
+// CHECK:      func.func @pack_3d_to_2d_regression
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK-DAG:    %[[PAD_VAL:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK:        %[[RES:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[DEST]]) -> (tensor<32x2x1x1x16xf32>)
+// CHECK:          %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:       tensor<32x1x31xf32> to tensor<1x31xf32>
+// CHECK:          %[[DEST_SLICE:.+]] = tensor.extract_slice %[[ITER]]
+// CHECK-SAME:       tensor<32x2x1x1x16xf32> to tensor<2x1x1x16xf32>
+// CHECK:          %[[PACK:.+]] = linalg.pack %[[SRC_SLICE]]
+// CHECK-SAME:       padding_value(%[[PAD_VAL]] : f32)
+// CHECK-SAME:       outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 16]
+// CHECK-SAME:       into %[[DEST_SLICE]]
+// CHECK:        return %[[RES]]
+
+// -----
+
 func.func @do_not_decompose_pack(%arg0: tensor<1x16384x512xbf16>, %arg1: tensor<1x1024x256x16x2xbf16>) -> tensor<1x1024x256x16x2xbf16> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "", target_triple="x86_64-xyz-xyz", cpu_features=""}>
 } {
@@ -271,3 +295,24 @@ func.func @unpack_outer_dim_transpose(%arg0: tensor<4x8x29241x16x16xf32>) -> ten
 // CHECK:           }
 // CHECK:           return %[[RES]] : tensor<29241x128x64xf32>
 // CHECK:         }
+
+// -----
+
+func.func @unpack_5d_to_4d_regression(%arg0: tensor<32x2x1x1x16xf32>, %arg1: tensor<32x1x32xf32>) -> tensor<32x1x32xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "unpack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 2, 1] inner_dims_pos = [1, 2] inner_tiles = [1, 16] into %arg1 : tensor<32x2x1x1x16xf32> -> tensor<32x1x32xf32>
+  return %unpack : tensor<32x1x32xf32>
+}
+// CHECK:      func.func @unpack_5d_to_4d_regression
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK:        %[[RES:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[DEST]]) -> (tensor<32x1x32xf32>)
+// CHECK:          %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:       tensor<32x2x1x1x16xf32> to tensor<2x1x1x16xf32>
+// CHECK:          %[[DEST_SLICE:.+]] = tensor.extract_slice %[[ITER]]
+// CHECK-SAME:       tensor<32x1x32xf32> to tensor<1x32xf32>
+// CHECK:          %[[PACK:.+]] = linalg.unpack %[[SRC_SLICE]]
+// CHECK-SAME:       outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [1, 16]
+// CHECK-SAME:       into %[[DEST_SLICE]]
+// CHECK:        return %[[RES]]

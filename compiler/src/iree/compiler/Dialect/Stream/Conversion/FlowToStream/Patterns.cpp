@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -476,7 +477,7 @@ struct ConvertTensorStoreOp
     IndexSet indexSet(op.getLoc(), rewriter);
     SmallVector<Value> convertedIndices = flattenValues(adaptor.getIndices());
     indexSet.populate(convertedIndices);
-    SmallVector<Value> lengths(convertedIndices.size(), indexSet.get(1));
+    llvm::Repeated<Value> lengths(convertedIndices.size(), indexSet.get(1));
     auto targetEncoding = op.getTarget().getType();
     auto fillOp = IREE::Stream::TensorFillOp::create(
         rewriter, op.getLoc(), target.resource, targetEncoding,

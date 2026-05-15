@@ -564,3 +564,60 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// i64 *index* path: the index payload is broadcast via `gpu.shuffle idx`,
+// whose AMDGPU lowering decomposes wide values into i32 chunks, so no
+// bitwidth check applies on the index side.
+
+#layout_1d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1],
+  batch_tile = [1],
+  outer_tile = [1],
+  thread_tile = [64],
+  element_tile = [1],
+
+  subgroup_strides = [1],
+  thread_strides   = [1]
+>
+
+#layout_0d_thread_only = #iree_vector_ext.nested_layout<
+  subgroup_tile = [],
+  batch_tile = [],
+  outer_tile = [],
+  thread_tile = [],
+  element_tile = [],
+
+  subgroup_strides = [],
+  thread_strides   = []
+>
+
+// CHECK-LABEL: func @argcompare_index_i64
+// CHECK: gpu.shuffle idx {{.*}} : i64
+func.func @argcompare_index_i64(
+    %input: vector<64xf32>,
+    %input_idx: vector<64xi64>,
+    %init_val: vector<f32>,
+    %init_idx: vector<i64>) -> (vector<f32>, vector<i64>) {
+  %v = iree_vector_ext.to_layout %input to layout(#layout_1d_thread_only) : vector<64xf32>
+  %i = iree_vector_ext.to_layout %input_idx to layout(#layout_1d_thread_only) : vector<64xi64>
+  %iv = iree_vector_ext.to_layout %init_val to layout(#layout_0d_thread_only) : vector<f32>
+  %ii = iree_vector_ext.to_layout %init_idx to layout(#layout_0d_thread_only) : vector<i64>
+  %res:2 = iree_vector_ext.arg_compare dimension(0)
+      ins(%v, %i : vector<64xf32>, vector<64xi64>)
+      inits(%iv, %ii : vector<f32>, vector<i64>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_vector_ext.yield %cmp : i1
+  } -> vector<f32>, vector<i64>
+  return %res#0, %res#1 : vector<f32>, vector<i64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}

@@ -7,6 +7,7 @@
 #include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -141,7 +142,7 @@ public:
         /*original=*/values, builder.getDenseI64ArrayAttr({0, 1}),
         builder.getBoolAttr(true));
 
-    llvm::SmallVector<Type> args(2, valuesTy.getElementType());
+    llvm::Repeated<Type> args(2, valuesTy.getElementType());
     Block *scatterBody =
         builder.createBlock(&scatter.getRegion(), {}, args,
                             llvm::SmallVector<Location>(2, op.getLoc()));

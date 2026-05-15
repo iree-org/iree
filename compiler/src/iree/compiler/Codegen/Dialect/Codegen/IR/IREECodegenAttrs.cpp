@@ -21,49 +21,6 @@
 #include "mlir/IR/StorageUniquerSupport.h"
 #include "mlir/Pass/PassRegistry.h"
 
-// Custom parse/print directives for TranslationInfoAttr's pipeline field.
-// These must be defined before the generated .cpp.inc is included because
-// the ODS-generated parse/print methods call them.
-namespace mlir::iree_compiler::IREE::Codegen {
-
-/// Parses either a DispatchLoweringPassPipeline enum keyword (e.g.,
-/// `CPUDefault`) or a generic attribute implementing PipelineAttrInterface
-/// (e.g., `#iree_codegen.pass_pipeline<"canonicalize">`).
-ParseResult parsePipelineAttr(AsmParser &parser, Attribute &result) {
-  StringRef keyword;
-  SMLoc loc = parser.getCurrentLocation();
-  if (succeeded(parser.parseOptionalKeyword(&keyword))) {
-    std::optional<DispatchLoweringPassPipeline> pipeline =
-        symbolizeDispatchLoweringPassPipeline(keyword);
-    if (!pipeline) {
-      parser.emitError(loc, "unknown pipeline keyword: ") << keyword;
-      return failure();
-    }
-    result =
-        DispatchLoweringPassPipelineAttr::get(parser.getContext(), *pipeline);
-    return success();
-  }
-  Attribute attr;
-  if (parser.parseAttribute(attr)) {
-    return failure();
-  }
-  result = attr;
-  return success();
-}
-
-/// Prints DispatchLoweringPassPipelineAttr as a bare keyword and other
-/// attributes (e.g., PipelineAttrInterface impls) via the generic printer.
-void printPipelineAttr(AsmPrinter &printer, Attribute pipelineAttr) {
-  if (auto enumAttr =
-          dyn_cast<DispatchLoweringPassPipelineAttr>(pipelineAttr)) {
-    printer << stringifyEnum(enumAttr.getValue());
-    return;
-  }
-  printer.printAttribute(pipelineAttr);
-}
-
-} // namespace mlir::iree_compiler::IREE::Codegen
-
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenEnums.cpp.inc"
@@ -116,6 +73,58 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_codegen.vmvx_pipeline
+//===----------------------------------------------------------------------===//
+
+static VMVXPipelineBuilder &getVMVXPipelineBuilderStorage() {
+  static VMVXPipelineBuilder builder = nullptr;
+  return builder;
+}
+
+void registerVMVXPipelineBuilder(VMVXPipelineBuilder builder) {
+  // Expected to be called exactly once during global init, so thread safety is
+  // not a concern.
+  [[maybe_unused]] static bool registered = false;
+  assert(!registered && "VMVX pipeline builder registered more than once");
+  registered = true;
+  getVMVXPipelineBuilderStorage() = builder;
+}
+
+LogicalResult
+VMVXPipelineAttr::buildPipeline(OpPassManager &pm,
+                                const CodegenPipelineOptions *options) const {
+  VMVXPipelineBuilder builder = getVMVXPipelineBuilderStorage();
+  if (!builder) {
+    return emitError(UnknownLoc::get(getContext()))
+           << "no VMVX pipeline builder registered; ensure "
+              "registerCodegenVMVXPasses() was called";
+  }
+  return builder(*this, pm, options);
+}
+
+//===----------------------------------------------------------------------===//
+// iree_codegen.transform_dialect_codegen
+//===----------------------------------------------------------------------===//
+
+LogicalResult TransformDialectCodegenPipelineAttr::buildPipeline(
+    OpPassManager &, const CodegenPipelineOptions *) const {
+  return emitError(UnknownLoc::get(getContext()))
+         << "transform dialect codegen pipeline should be consumed by "
+            "LowerExecutableUsingTransformDialect and replaced with "
+            "#iree_codegen.no_pipeline before executable target lowering";
+}
+
+//===----------------------------------------------------------------------===//
+// iree_codegen.no_pipeline
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+NoPipelineAttr::buildPipeline(OpPassManager &,
+                              const CodegenPipelineOptions *) const {
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_codegen.pass_pipeline
 //===----------------------------------------------------------------------===//
 
@@ -144,35 +153,6 @@ PassPipelineAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // iree_codegen.translation_info
 //===----------------------------------------------------------------------===//
 
-TranslationInfoAttr TranslationInfoAttr::get(
-    MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    SymbolRefAttr codegenSpec, ArrayRef<int64_t> workgroupSize,
-    std::optional<int64_t> subgroupSize, DictionaryAttr configuration) {
-  Attribute pipelineAttr =
-      DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, codegenSpec, workgroupSize,
-             subgroupSize.value_or(int64_t()), configuration);
-}
-
-TranslationInfoAttr TranslationInfoAttr::get(
-    MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize,
-    DictionaryAttr configuration) {
-  Attribute pipelineAttr =
-      DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, /*codegenSpec=*/SymbolRefAttr(),
-             workgroupSize, subgroupSize.value_or(int64_t()), configuration);
-}
-
-DispatchLoweringPassPipeline
-TranslationInfoAttr::getDispatchLoweringPassPipeline() {
-  if (auto enumAttr =
-          dyn_cast<DispatchLoweringPassPipelineAttr>(getPassPipeline())) {
-    return enumAttr.getValue();
-  }
-  return DispatchLoweringPassPipeline::None;
-}
-
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError, Attribute passPipeline,
     SymbolRefAttr codegenSpec, ArrayRef<int64_t> workgroupSize,
@@ -180,25 +160,12 @@ LogicalResult TranslationInfoAttr::verify(
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
-  if (auto enumAttr =
-          dyn_cast<DispatchLoweringPassPipelineAttr>(passPipeline)) {
-    DispatchLoweringPassPipeline passPipelineValue = enumAttr.getValue();
-    if (passPipelineValue > IREE::Codegen::DispatchLoweringPassPipeline::None) {
-      return emitError() << "invalid pass pipeline value : "
-                         << stringifyEnum(passPipelineValue);
-    }
-    DispatchLoweringPassPipeline tdPassPipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
-    if (codegenSpec && passPipelineValue != tdPassPipeline) {
-      return emitError()
-             << "transform dialect codegen spec requires pass pipeline : "
-             << stringifyEnum(tdPassPipeline);
-    }
-  } else if (!passPipeline
-                  .hasPromiseOrImplementsInterface<PipelineAttrInterface>()) {
-    return emitError()
-           << "pass pipeline must be a DispatchLoweringPassPipelineAttr or "
-              "implement PipelineAttrInterface";
+  if (!passPipeline.hasPromiseOrImplementsInterface<PipelineAttrInterface>()) {
+    return emitError() << "pass pipeline must implement PipelineAttrInterface";
+  }
+  if (codegenSpec && !isa<TransformDialectCodegenPipelineAttr>(passPipeline)) {
+    return emitError() << "transform dialect codegen spec requires transform "
+                          "dialect codegen pipeline";
   }
   if (workgroupSize.size() > 3) {
     return emitError() << "workgroup size cannot have more than 3 entries";
@@ -662,10 +629,8 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // to get the simplest offset possible in case we are accessing values from
   // successive rows. This allows us to CSE the swizzling computation more
   // effectively.
-  int64_t rotationInvariant =
-      getRowWidth() * (getRowWidth() / getAccessWidth());
   OpFoldResult id =
-      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+      getMinimumConstantOffsetValue(b, loc, offset, getSwizzlePeriod());
 
   // Number of elements per row.
   Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
@@ -676,11 +641,16 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   Value accessWidthVal =
       arith::ConstantIndexOp::create(b, loc, getAccessWidth());
 
+  // Strip the sub-access_width remainder to align the offset, since the
+  // swizzle operates at access_width granularity.
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+  Value remainder = arith::RemUIOp::create(b, loc, idVal, accessWidthVal);
+  Value alignedId = arith::SubIOp::create(b, loc, idVal, remainder);
+
   // i = row # = |offset| floordiv |Num elements per row|
-  Value i = arith::DivUIOp::create(b, loc, idVal, rowAlignmentVal);
+  Value i = arith::DivUIOp::create(b, loc, alignedId, rowAlignmentVal);
   // jByte = element column # = |offset| % |Num elements per row|
-  Value jElem = arith::RemUIOp::create(b, loc, idVal, rowAlignmentVal);
+  Value jElem = arith::RemUIOp::create(b, loc, alignedId, rowAlignmentVal);
   // j = group column # = jElem / |Num elements per group|
   Value j = arith::DivUIOp::create(b, loc, jElem, accessWidthVal);
 
@@ -700,7 +670,13 @@ OpFoldResult RotateRowsAttr::swizzleOffset(OpBuilder &b, Location loc,
   // This increases the chance of being able to CSE the offset calculation. When
   // multiple accesses to a memref only differ by a constant value (very common
   // when working with statically shaped memrefs like shared/scratch memory).
-  Value diff = arith::SubIOp::create(b, loc, swizzledId, idVal);
+  //
+  // The diff is computed from |alignedId| but applied to the original |offset|.
+  // This implicitly restores the sub-access_width remainder:
+  //   offset + (swizzle(alignedId) - alignedId)
+  //   = (alignedId + rem) + (swizzle(alignedId) - alignedId)
+  //   = swizzle(alignedId) + rem
+  Value diff = arith::SubIOp::create(b, loc, swizzledId, alignedId);
   return arith::AddIOp::create(
              b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
       .getResult();
@@ -782,21 +758,23 @@ static Value updateCol(OpBuilder &builder, Location loc, OpFoldResult id,
 OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
                                            OpFoldResult offset,
                                            Value src) const {
-  int64_t rotationInvariant =
-      getRowWidth() * (getRowWidth() / getAccessWidth());
   int64_t rowStride =
       getRowStride() != int64_t() ? getRowStride() : getRowWidth();
   int64_t perPhase = getPerPhase() != int64_t() ? getPerPhase() : 1;
 
   OpFoldResult id =
-      getMinimumConstantOffsetValue(b, loc, offset, rotationInvariant);
+      getMinimumConstantOffsetValue(b, loc, offset, getSwizzlePeriod());
+
+  // Strip the sub-access_width remainder to align the offset, since the
+  // swizzle operates at access_width granularity.
   Value idVal = getValueOrCreateConstantIndexOp(b, loc, id);
+  Value accessWidthVal =
+      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
+  Value remainder = arith::RemUIOp::create(b, loc, idVal, accessWidthVal);
+  Value alignedId = arith::SubIOp::create(b, loc, idVal, remainder);
 
   // Number of elements per row.
   Value rowAlignmentVal = arith::ConstantIndexOp::create(b, loc, getRowWidth());
-  // Number of elements per group.
-  Value accessWidthVal =
-      arith::ConstantIndexOp::create(b, loc, getAccessWidth());
   // Number of rows per phase.
   Value perPhaseVal = arith::ConstantIndexOp::create(b, loc, perPhase);
   // Buffer stride.
@@ -805,15 +783,20 @@ OpFoldResult XORShuffleAttr::swizzleOffset(OpBuilder &b, Location loc,
   Value rowAccessAlignmentVal =
       arith::ConstantIndexOp::create(b, loc, getRowWidth() / getAccessWidth());
 
-  Value colVal = extractCol(b, loc, idVal, rowAlignmentVal, accessWidthVal);
-  Value rowVal = extractRow(b, loc, idVal, rowStrideVal, perPhaseVal,
+  Value colVal = extractCol(b, loc, alignedId, rowAlignmentVal, accessWidthVal);
+  Value rowVal = extractRow(b, loc, alignedId, rowStrideVal, perPhaseVal,
                             rowAccessAlignmentVal);
   auto colSwizzled = arith::XOrIOp::create(b, loc, rowVal, colVal);
 
-  // Update colSwizzled to initial id
-  Value swizzledIdVal =
-      updateCol(b, loc, idVal, colSwizzled, rowAlignmentVal, accessWidthVal);
-  Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, idVal);
+  // Update colSwizzled to alignedId
+  Value swizzledIdVal = updateCol(b, loc, alignedId, colSwizzled,
+                                  rowAlignmentVal, accessWidthVal);
+  // The diff is computed from |alignedId| but applied to the original |offset|.
+  // This implicitly restores the sub-access_width remainder:
+  //   offset + (swizzle(alignedId) - alignedId)
+  //   = (alignedId + rem) + (swizzle(alignedId) - alignedId)
+  //   = swizzle(alignedId) + rem
+  Value diff = arith::SubIOp::create(b, loc, swizzledIdVal, alignedId);
   return arith::AddIOp::create(
              b, loc, getValueOrCreateConstantIndexOp(b, loc, offset), diff)
       .getResult();

@@ -10,7 +10,7 @@ module attributes { transform.with_named_sequence } {
     } : !transform.op<"func.func">
 
     // Annotate the exported function as already translated.
-    %none = transform.param.constant #iree_codegen.translation_info<pipeline = None> -> !transform.any_param
+    %none = transform.param.constant #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline> -> !transform.any_param
     transform.annotate %func_op_bufferized "translation_info" = %none : !transform.op<"func.func">, !transform.any_param
     transform.yield
   }

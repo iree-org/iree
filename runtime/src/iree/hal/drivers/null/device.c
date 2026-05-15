@@ -61,9 +61,8 @@ typedef struct iree_hal_null_device_t {
   // Borrowed from the pool — valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's axis and monotonic epoch counter for frontier tracking.
@@ -117,13 +116,7 @@ iree_status_t iree_hal_null_device_create(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
-  device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
-  if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
-                              device->axis, /*semaphore=*/NULL);
-  }
   iree_status_t status =
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
@@ -144,6 +137,19 @@ iree_status_t iree_hal_null_device_create(
   return status;
 }
 
+static void iree_hal_null_device_clear_topology_info(
+    iree_hal_null_device_t* device) {
+  if (device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        device->frontier_tracker, device->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    iree_async_frontier_tracker_release(device->frontier_tracker);
+    device->frontier_tracker = NULL;
+    device->axis = 0;
+  }
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_null_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -155,6 +161,7 @@ static void iree_hal_null_device_destroy(iree_hal_device_t* base_device) {
   // implementation performs internal async operations those should be shutdown
   // and joined first.
 
+  iree_hal_null_device_clear_topology_info(device);
   iree_hal_allocator_release(device->device_allocator);
   iree_hal_channel_provider_release(device->channel_provider);
   iree_async_proactor_pool_release(device->proactor_pool);
@@ -305,7 +312,19 @@ static iree_status_t iree_hal_null_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
+  if (!topology_info) {
+    iree_hal_null_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  iree_async_axis_t axis = topology_info->frontier.base_axis;
+  IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL));
   device->topology_info = *topology_info;
+  device->frontier_tracker = frontier_tracker;
+  device->axis = axis;
+  iree_async_frontier_tracker_retain(device->frontier_tracker);
   return iree_ok_status();
 }
 
@@ -407,11 +426,18 @@ iree_hal_null_device_query_semaphore_compatibility(
   return compatibility;
 }
 
+static iree_status_t iree_hal_null_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "queue pool backend not implemented");
+}
+
 static iree_status_t iree_hal_null_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
@@ -628,9 +654,9 @@ static iree_status_t iree_hal_null_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_null_device_t* device = iree_hal_null_device_cast(base_device);
 
-  // TODO(null): set implementation-defined device or global profiling modes.
-  // This will be paired with a profiling_end call at some point in the future.
-  // Hosting applications may periodically call profiling_flush.
+  // TODO(null): set implementation-defined device or global profiling data
+  // families. This will be paired with a profiling_end call at some point in
+  // the future. Hosting applications may periodically call profiling_flush.
   (void)device;
   iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                                           "device profiling not implemented");
@@ -666,6 +692,22 @@ static iree_status_t iree_hal_null_device_profiling_end(
   return status;
 }
 
+static iree_status_t iree_hal_null_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "null external capture not implemented");
+}
+
+static iree_status_t iree_hal_null_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  (void)base_device;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "null external capture not implemented");
+}
+
 static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .destroy = iree_hal_null_device_destroy,
     .id = iree_hal_null_device_id,
@@ -687,6 +729,7 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .create_semaphore = iree_hal_null_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_null_device_query_semaphore_compatibility,
+    .query_queue_pool_backend = iree_hal_null_device_query_queue_pool_backend,
     .queue_alloca = iree_hal_null_device_queue_alloca,
     .queue_dealloca = iree_hal_null_device_queue_dealloca,
     .queue_fill = iree_hal_null_device_queue_fill,
@@ -701,4 +744,6 @@ static const iree_hal_device_vtable_t iree_hal_null_device_vtable = {
     .profiling_begin = iree_hal_null_device_profiling_begin,
     .profiling_flush = iree_hal_null_device_profiling_flush,
     .profiling_end = iree_hal_null_device_profiling_end,
+    .external_capture_begin = iree_hal_null_device_external_capture_begin,
+    .external_capture_end = iree_hal_null_device_external_capture_end,
 };

@@ -26,6 +26,7 @@ def enforce_glob(files, **kwargs):
     Returns:
         files. The input argument unchanged
     """
+    kwargs.setdefault("allow_empty", True)
     glob_result = native.glob(**kwargs)
     for skip_file in ["CMakeLists.txt"]:
         if skip_file in glob_result:

@@ -50,6 +50,8 @@ option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the R
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
+# Enables POSIX API support. When disabled, tools requiring POSIX (e.g., iree-flatcc-cli) will not be built.
+option(IREE_ENABLE_POSIX "Builds IREE in with POSIX support." ON)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
 set(IREE_TRACING_PROVIDER ${IREE_TRACING_PROVIDER_DEFAULT} CACHE STRING "Chooses which built-in tracing implementation is used when tracing is enabled.")
@@ -84,6 +86,13 @@ option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and 
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 option(IREE_BUILD_CLANG_TOOLS_EXTRA "Enables building the 'clang-tools-extra' LLVM targets." OFF)
 option(IREE_USE_SYSTEM_DEPS "Uses certain system libraries instead of building downloaded dependencies" OFF)
+
+# When IREE_BUILD_TESTS=OFF, IREE_BUILD_BENCHMARKS is ON by default but is
+# configurable. Several test targets transitively depend on the bundled google
+# benchmark target, so when IREE_BUILD_TESTS=ON, IREE_BUILD_BENCHMARKS is forced
+# ON.
+cmake_dependent_option(IREE_BUILD_BENCHMARKS "Builds IREE benchmarks." ON
+    "NOT IREE_BUILD_TESTS" ON)
 
 if(IREE_USE_SYSTEM_DEPS)
   message(WARNING "IREE_USE_SYSTEM_DEPS is on. This option is untested and may find incompatible dependencies.")
@@ -423,7 +432,7 @@ endif()
 # chip because that would rely too much on guessing what the target chip is.
 # But silently continuing with ROCm testing disabled by default has also been
 # surprising.
-if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_ROCM_TEST_TARGET_CHIP} AND NOT DEFINED CACHE{IREE_HIP_TEST_TARGET_CHIP})
+if ((IREE_HAL_DRIVER_HIP OR IREE_HAL_DRIVER_AMDGPU) AND NOT DEFINED CACHE{IREE_ROCM_TEST_TARGET_CHIP})
   find_program(_ROCMINFO_COMMAND rocminfo)
   if (_ROCMINFO_COMMAND)
     execute_process(COMMAND ${_ROCMINFO_COMMAND} OUTPUT_VARIABLE _ROCMINFO_OUTPUT)
@@ -446,13 +455,6 @@ endif()
 set(IREE_ROCM_TEST_TARGET_CHIP "" CACHE STRING
   "Target chip for ROCm tests that need to compile device code. \
    Defaults to empty string to disable tests.")
-# Backward compatibility: accept the old IREE_HIP_TEST_TARGET_CHIP name.
-set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
-  "Deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
-if(IREE_HIP_TEST_TARGET_CHIP AND NOT IREE_ROCM_TEST_TARGET_CHIP)
-  message(WARNING "IREE_HIP_TEST_TARGET_CHIP is deprecated; use IREE_ROCM_TEST_TARGET_CHIP instead.")
-  set(IREE_ROCM_TEST_TARGET_CHIP "${IREE_HIP_TEST_TARGET_CHIP}" CACHE STRING "" FORCE)
-endif()
 
 #-------------------------------------------------------------------------------
 # Compiler Target Options
@@ -982,7 +984,7 @@ if(IREE_BUILD_TESTS)
   add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 endif()
 
-if(IREE_ENABLE_THREADING)
+if(IREE_ENABLE_THREADING AND IREE_BUILD_BENCHMARKS)
   # Benchmark.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)

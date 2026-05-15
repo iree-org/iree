@@ -24,7 +24,7 @@ IREE_HAL_DRIVER_CUDA="${IREE_HAL_DRIVER_CUDA:-${OFF_IF_DARWIN}}"
 IREE_HAL_DRIVER_HIP="${IREE_HAL_DRIVER_HIP:-${OFF_IF_DARWIN}}"
 IREE_TARGET_BACKEND_CUDA="${IREE_TARGET_BACKEND_CUDA:-${OFF_IF_DARWIN}}"
 IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
-IREE_ROCM_TEST_TARGET_CHIP="${IREE_ROCM_TEST_TARGET_CHIP:-${IREE_HIP_TEST_TARGET_CHIP:-}}"
+IREE_ROCM_TEST_TARGET_CHIP="${IREE_ROCM_TEST_TARGET_CHIP:-}"
 
 source build_tools/cmake/setup_build.sh
 
@@ -89,6 +89,10 @@ build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
 # Re-run many times certain tests that are cheap and prone to nondeterministic
 # failure (typically, IREE runtime tests exercising multi-threading features).
+# Benchmark wrapper tests run above as smoke tests, but their timing under TSan
+# is not performance evidence and multiplying them here only adds load noise.
 export IREE_CTEST_TESTS_REGEX="(^iree/base/|^iree/task/)"
 export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT=32
+export IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE="${IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE:-}
+.*_benchmark_test"
 build_tools/cmake/ctest_all.sh "${BUILD_DIR}"

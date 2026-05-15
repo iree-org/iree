@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "iree/async/frontier.h"
@@ -113,15 +114,23 @@ static RENDERDOC_API_LATEST* iree_hal_vulkan_query_renderdoc_api(
 }
 
 // Begins a new RenderDoc capture.
-static void iree_hal_vulkan_begin_renderdoc_capture(
+static iree_status_t iree_hal_vulkan_begin_renderdoc_capture(
     RENDERDOC_API_LATEST* renderdoc_api, VkInstance instance,
-    const iree_hal_device_profiling_options_t* options) {
-  if (!renderdoc_api) return;
-  if (options->file_path) {
-    renderdoc_api->SetCaptureFilePathTemplate(options->file_path);
+    const iree_hal_device_external_capture_options_t* options) {
+  if (!renderdoc_api) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "RenderDoc external capture requires RenderDoc to be loaded");
+  }
+  std::string file_path_storage;
+  iree_string_view_t file_path = options->file_path;
+  if (!iree_string_view_is_empty(file_path)) {
+    file_path_storage.assign(file_path.data, file_path.size);
+    renderdoc_api->SetCaptureFilePathTemplate(file_path_storage.c_str());
   }
   renderdoc_api->StartFrameCapture(
       RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(instance), NULL);
+  return iree_ok_status();
 }
 
 // Ends the active RenderDoc capture, if any active.
@@ -522,9 +531,8 @@ typedef struct iree_hal_vulkan_device_t {
   // Borrowed from the pool - valid as long as the pool is retained.
   iree_async_proactor_t* proactor;
 
-  // Shared frontier tracker for cross-device causal ordering.
-  // Borrowed from the session — valid as long as the session is alive.
-  // NULL if frontier-based fast paths are not enabled.
+  // Shared frontier tracker for cross-device causal ordering. Retained after
+  // topology assignment and released during device destruction.
   iree_async_frontier_tracker_t* frontier_tracker;
 
   // This device's axis and monotonic epoch counter for frontier tracking.
@@ -569,8 +577,12 @@ typedef struct iree_hal_vulkan_device_t {
   iree_hal_device_topology_info_t topology_info;
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  // RenderDoc API loaded when the process is hooked by RenderDoc, or NULL.
   RENDERDOC_API_LATEST* renderdoc_api;
 #endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+
+  // True when this device has started an external capture range.
+  bool external_capture_active;
 } iree_hal_vulkan_device_t;
 
 namespace {
@@ -588,13 +600,11 @@ static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
 // FIFO-ordered: submission order = causal ordering.
 static void iree_hal_vulkan_device_advance_frontier(
     iree_hal_vulkan_device_t* device) {
-  if (device->frontier_tracker) {
-    uint64_t epoch = (uint64_t)iree_atomic_fetch_add(
-                         &device->epoch, 1, iree_memory_order_acq_rel) +
-                     1;
-    iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
-                                        epoch);
-  }
+  uint64_t epoch = (uint64_t)iree_atomic_fetch_add(&device->epoch, 1,
+                                                   iree_memory_order_acq_rel) +
+                   1;
+  iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis,
+                                      epoch);
 }
 
 IREE_API_EXPORT void iree_hal_vulkan_device_options_initialize(
@@ -801,13 +811,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   // Retain the proactor pool and acquire a proactor for this device.
   device->proactor_pool = create_params->proactor_pool;
   iree_async_proactor_pool_retain(device->proactor_pool);
-  device->frontier_tracker = create_params->frontier.tracker;
-  device->axis = create_params->frontier.base_axis;
   iree_atomic_store(&device->epoch, 0, iree_memory_order_relaxed);
-  if (device->frontier_tracker) {
-    iree_async_axis_table_add(&device->frontier_tracker->axis_table,
-                              device->axis, /*semaphore=*/NULL);
-  }
   iree_status_t status =
       iree_async_proactor_pool_get(device->proactor_pool, 0, &device->proactor);
 
@@ -865,6 +869,19 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   return status;
 }
 
+static void iree_hal_vulkan_device_clear_topology_info(
+    iree_hal_vulkan_device_t* device) {
+  if (device->frontier_tracker) {
+    iree_async_frontier_tracker_retire_axis(
+        device->frontier_tracker, device->axis,
+        iree_status_from_code(IREE_STATUS_CANCELLED));
+    iree_async_frontier_tracker_release(device->frontier_tracker);
+    device->frontier_tracker = NULL;
+    device->axis = 0;
+  }
+  memset(&device->topology_info, 0, sizeof(device->topology_info));
+}
+
 static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
@@ -879,6 +896,8 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
   // Shut down the completion watcher. Command queues have been drained by this
   // point, so all tracked semaphores should have reached their final values.
   iree_hal_vulkan_completion_watcher_destroy(device->completion_watcher);
+
+  iree_hal_vulkan_device_clear_topology_info(device);
 
   // Drop command pools now that we know there are no more outstanding command
   // buffers.
@@ -1600,7 +1619,19 @@ static iree_status_t iree_hal_vulkan_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  if (!topology_info) {
+    iree_hal_vulkan_device_clear_topology_info(device);
+    return iree_ok_status();
+  }
+  iree_async_frontier_tracker_t* frontier_tracker =
+      topology_info->frontier.tracker;
+  iree_async_axis_t axis = topology_info->frontier.base_axis;
+  IREE_RETURN_IF_ERROR(iree_async_frontier_tracker_register_axis(
+      frontier_tracker, axis, /*semaphore=*/NULL));
   device->topology_info = *topology_info;
+  device->frontier_tracker = frontier_tracker;
+  device->axis = axis;
+  iree_async_frontier_tracker_retain(device->frontier_tracker);
   return iree_ok_status();
 }
 
@@ -1734,14 +1765,26 @@ iree_hal_vulkan_device_query_semaphore_compatibility(
   return IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY;
 }
 
+static iree_status_t iree_hal_vulkan_device_query_queue_pool_backend(
+    iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_pool_backend_t* out_backend) {
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Vulkan queue pool backend not implemented");
+}
+
 static iree_status_t iree_hal_vulkan_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
+    iree_hal_pool_t* pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size, iree_hal_alloca_flags_t flags,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  if (IREE_UNLIKELY(pool != NULL)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "Vulkan custom queue alloca pools not implemented");
+  }
+
   iree_status_t status = iree_hal_semaphore_list_wait(
       wait_semaphore_list, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE);
   if (iree_status_is_ok(status)) {
@@ -1905,39 +1948,10 @@ static iree_status_t iree_hal_vulkan_device_queue_flush(
 static iree_status_t iree_hal_vulkan_device_profiling_begin(
     iree_hal_device_t* base_device,
     const iree_hal_device_profiling_options_t* options) {
-  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  (void)device;
-
-  if (iree_all_bits_set(options->mode,
-                        IREE_HAL_DEVICE_PROFILING_MODE_QUEUE_OPERATIONS)) {
-    // AMD-specific - we could snoop the device to only do this for the vendor
-    // but this is relatively cheap and could be useful to others. Ideally
-    // there would be a khronos standard for this.
-    // TODO(benvanik): figure out if we need to do this for all queues.
-    auto& syms = device->logical_device->syms();
-    if (syms->vkQueueInsertDebugUtilsLabelEXT) {
-      VkDebugUtilsLabelEXT begin_label = {};
-      begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-      begin_label.pNext = NULL;
-      begin_label.pLabelName = "AmdFrameBegin";
-      device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
-          device->dispatch_queues[0]->handle(), &begin_label);
-    }
-
-    // For now we only support RenderDoc. As much as possible we should try to
-    // use standardized Vulkan layers to do profiling configuration/control like
-    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_performance_query.html
-    // to avoid the combinatorial explosion of vendor tooling hooks.
-    // Since RenderDoc is fairly simple, cross-platform, and cross-vendor we
-    // support it here. If this grows beyond a few lines of code we should
-    // shuffle it off to another file.
-#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
-    iree_hal_vulkan_begin_renderdoc_capture(device->renderdoc_api,
-                                            device->instance, options);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
-  }
-
-  return iree_ok_status();
+  (void)base_device;
+  (void)options;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Vulkan HAL-native profiling is not implemented");
 }
 
 static iree_status_t iree_hal_vulkan_device_profiling_flush(
@@ -1964,13 +1978,59 @@ static iree_status_t iree_hal_vulkan_device_profiling_flush(
 
 static iree_status_t iree_hal_vulkan_device_profiling_end(
     iree_hal_device_t* base_device) {
+  (void)base_device;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_device_external_capture_begin(
+    iree_hal_device_t* base_device,
+    const iree_hal_device_external_capture_options_t* options) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
-  (void)device;
+  if (!iree_string_view_equal(options->provider, IREE_SV("renderdoc"))) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan external capture provider '%.*s' is not implemented",
+        (int)options->provider.size, options->provider.data);
+  }
+  if (device->external_capture_active) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "cannot nest Vulkan external capture");
+  }
+
+#if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_begin_renderdoc_capture(
+      device->renderdoc_api, device->instance, options));
+
+  // AMD-specific.
+  auto& syms = device->logical_device->syms();
+  if (syms->vkQueueInsertDebugUtilsLabelEXT) {
+    VkDebugUtilsLabelEXT begin_label = {};
+    begin_label.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    begin_label.pNext = NULL;
+    begin_label.pLabelName = "AmdFrameBegin";
+    device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
+        device->dispatch_queues[0]->handle(), &begin_label);
+  }
+
+  device->external_capture_active = true;
+  return iree_ok_status();
+#else
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "Vulkan RenderDoc external capture is not compiled");
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
+}
+
+static iree_status_t iree_hal_vulkan_device_external_capture_end(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  if (!device->external_capture_active) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no Vulkan external capture is active");
+  }
 
 #if defined(IREE_HAL_VULKAN_HAVE_RENDERDOC)
   iree_hal_vulkan_end_renderdoc_capture(device->renderdoc_api,
                                         device->instance);
-#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 
   // AMD-specific.
   auto& syms = device->logical_device->syms();
@@ -1982,7 +2042,9 @@ static iree_status_t iree_hal_vulkan_device_profiling_end(
     device->logical_device->syms()->vkQueueInsertDebugUtilsLabelEXT(
         device->dispatch_queues[0]->handle(), &end_label);
   }
+#endif  // IREE_HAL_VULKAN_HAVE_RENDERDOC
 
+  device->external_capture_active = false;
   return iree_ok_status();
 }
 
@@ -2009,6 +2071,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
     /*.query_semaphore_compatibility=*/
     iree_hal_vulkan_device_query_semaphore_compatibility,
+    /*.query_queue_pool_backend=*/
+    iree_hal_vulkan_device_query_queue_pool_backend,
     /*.queue_alloca=*/iree_hal_vulkan_device_queue_alloca,
     /*.queue_dealloca=*/iree_hal_vulkan_device_queue_dealloca,
     /*.queue_fill=*/iree_hal_device_queue_emulated_fill,
@@ -2023,5 +2087,8 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.profiling_begin=*/iree_hal_vulkan_device_profiling_begin,
     /*.profiling_flush=*/iree_hal_vulkan_device_profiling_flush,
     /*.profiling_end=*/iree_hal_vulkan_device_profiling_end,
+    /*.external_capture_begin=*/
+    iree_hal_vulkan_device_external_capture_begin,
+    /*.external_capture_end=*/iree_hal_vulkan_device_external_capture_end,
 };
 }  // namespace

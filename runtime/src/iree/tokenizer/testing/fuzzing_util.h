@@ -55,6 +55,7 @@ extern "C" {
 //   - Special tokens: UNK=0, BOS=1, EOS=2
 //   - Whitespace segmenter
 //   - BPE model with FUSE_UNK (no merges, character-level)
+//   - BOS/EOS postprocessor with single and pair templates
 //   - Byte-level decoder
 //
 // |out_vocab_size| receives the vocab capacity (max_token_id + 1). May be NULL

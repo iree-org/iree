@@ -335,6 +335,15 @@ module {
 //  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{thread = [0, 4], workgroup = [16, 16]}>
 
 module {
+  func.func @test_lowering_config_promotion_types() attributes {
+      lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_load_dma]}>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_lowering_config_promotion_types
+//  CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1], promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.use_global_load_dma]}>
+
+module {
   func.func @test_lowering_config_reordering() attributes {
       lowering_config = #iree_gpu.lowering_config<{workgroup = [256, 256], workgroup_reordering_strategy = #iree_gpu.conditional_transpose<8, 38>}>} {
     return
@@ -441,3 +450,12 @@ module {
 //  CHECK-SAME:   matmul = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize>
 //  CHECK-SAME:   subgroup = #iree_gpu.spirv_pipeline<SubgroupReduce>
 //  CHECK-SAME:   winograd = #iree_gpu.spirv_pipeline<WinogradVectorize>
+
+module {
+  func.func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unswizzled() attributes {
+      mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, unswizzled_operands = [0, 1]>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unswizzled
+//  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, unswizzled_operands = [0, 1]>

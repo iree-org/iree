@@ -10,7 +10,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
-#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
@@ -76,27 +75,17 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   tracing::DebugCounter::registerCLOptions();
   auto &pluginManagerOptions =
       mlir::iree_compiler::PluginManagerOptions::FromFlags::get();
-  // Register the top-level optimization level flag (--iree-opt-level) and
-  // pipeline options so that optimization-level cascading works in iree-opt.
-  mlir::iree_compiler::GlobalPipelineOptions::FromFlags::get();
 
   // Build the list of dialects as a header for the --help message.
   std::string helpHeader = (toolName + "\nAvailable Dialects: ").str();
   {
     llvm::raw_string_ostream os(helpHeader);
-    interleaveComma(registry.getDialectNames(), os,
+    interleaveComma(registry.getRegisteredDialectNames(), os,
                     [&](auto name) { os << name; });
   }
 
   // Parse pass names in main to ensure static initialization completed.
   cl::ParseCommandLineOptions(argc, argv, helpHeader);
-
-  // Apply optimization-level-dependent defaults to global options.
-  {
-    auto globalBinder = mlir::iree_compiler::OptionsBinder::global();
-    globalBinder.applyOptimizationDefaults();
-  }
-
   MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
   // The local binder is meant for overriding session-level options, but for
@@ -126,7 +115,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // printRegisteredDialects and printRegisteredPassesAndReturn
   if (config.shouldShowDialects()) {
     llvm::outs() << "Available Dialects: ";
-    interleave(registry.getDialectNames(), llvm::outs(), ",");
+    interleave(registry.getRegisteredDialectNames(), llvm::outs(), ",");
     llvm::outs() << "\n";
     return success();
   }

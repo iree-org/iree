@@ -1098,6 +1098,19 @@ static iree_status_t iree_hal_vulkan_native_executable_lookup_export_by_name(
                           "reflection not implemented");
 }
 
+static iree_status_t iree_hal_vulkan_native_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  iree_hal_vulkan_native_executable_t* executable =
+      iree_hal_vulkan_native_executable_cast(base_executable);
+  (void)executable;
+  (void)name;
+  (void)queue_affinity;
+  *out_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "global lookup not implemented");
+}
+
 namespace {
 const iree_hal_executable_vtable_t iree_hal_vulkan_native_executable_vtable = {
     /*.destroy=*/iree_hal_vulkan_native_executable_destroy,
@@ -1106,5 +1119,7 @@ const iree_hal_executable_vtable_t iree_hal_vulkan_native_executable_vtable = {
     /*.export_parameters=*/iree_hal_vulkan_native_executable_export_parameters,
     /*.lookup_export_by_name=*/
     iree_hal_vulkan_native_executable_lookup_export_by_name,
+    /*.lookup_global_by_name=*/
+    iree_hal_vulkan_native_executable_lookup_global_by_name,
 };
 }  // namespace

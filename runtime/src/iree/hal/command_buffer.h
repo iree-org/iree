@@ -72,6 +72,21 @@ enum iree_hal_command_buffer_mode_bits_t {
   // about lifetime this flag disables the internal resource tracking to reduce
   // overhead.
   IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
+
+  // Retains producer metadata required for command-buffer profiling.
+  // This makes profiling possible for the command buffer but does not enable
+  // profiling by itself. Implementations may spend additional recording-time
+  // CPU and memory to retain command operation metadata and compact sidecars
+  // used by profiling sessions. This is intended for rich host profiling that
+  // needs source/correlation records, not minimal production timestamp capture.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA = 1u << 7,
+
+  // Retains compact dispatch metadata required for command-buffer timestamping.
+  // This makes dispatch timestamp capture possible for the command buffer but
+  // does not enable timestamp capture by itself. Implementations may spend
+  // additional recording-time CPU and memory to retain compact per-dispatch
+  // packet/correlation sidecars without requiring full profile metadata.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA = 1u << 8,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -564,6 +579,17 @@ enum iree_hal_dispatch_flag_bits_t {
   // knows the workload is small enough that worker wake-up latency would
   // dominate the total cost.
   IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION = 1ull << 5,
+
+  // Allows queue_dispatch implementations to borrow resource lifetimes instead
+  // of retaining them until the submitted work completes. Callers using this
+  // flag must keep the executable and all directly referenced buffers live and
+  // backed by stable storage until the submission's signal semaphores indicate
+  // completion. Implementations may ignore this hint and retain resources.
+  //
+  // Command buffer dispatches ignore this flag. Command buffer lifetime
+  // control is expressed by command buffer modes such as
+  // IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED.
+  IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES = 1ull << 6,
 };
 
 // Returns true if the given dispatch uses indirect workgroup parameters.
@@ -790,6 +816,15 @@ iree_hal_command_buffer_mode(const iree_hal_command_buffer_t* command_buffer);
 // can record.
 IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
+    const iree_hal_command_buffer_t* command_buffer);
+
+// Returns the queue affinity selected for the command buffer.
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer);
+
+// Returns the process-local nonzero profiling identifier for |command_buffer|.
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
     const iree_hal_command_buffer_t* command_buffer);
 
 // Begins recording into the command buffer.
@@ -1123,6 +1158,10 @@ struct iree_hal_command_buffer_t {
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
+
+  // Process-local nonzero command-buffer identifier used by profiling sessions.
+  uint64_t profile_id;
+
   uint32_t binding_capacity;
   uint32_t binding_count;
   void* validation_state;

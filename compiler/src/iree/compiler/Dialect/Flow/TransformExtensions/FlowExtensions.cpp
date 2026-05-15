@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -395,9 +396,9 @@ rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
     IREE::Flow::ReturnOp::create(rewriter, loc);
   }
   // Add trailing index bbArgs and perform a basic sanity check.
-  block->addArguments(
-      SmallVector<Type>(allTensorDynamicDims.size(), rewriter.getIndexType()),
-      SmallVector<Location>(allTensorDynamicDims.size(), loc));
+  block->addArguments(llvm::Repeated<Type>(allTensorDynamicDims.size(),
+                                           rewriter.getIndexType()),
+                      SmallVector<Location>(allTensorDynamicDims.size(), loc));
   SmallVector<Value> allOperands = nonDimOperands;
   llvm::append_range(allOperands, allTensorDynamicDims);
   assert(block->getNumArguments() == allOperands.size() &&

@@ -63,11 +63,31 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    LLVMGPUConstraintGenerator
+  HDRS
+    "LLVMGPUConstraintGenerator.h"
+  SRCS
+    "LLVMGPUConstraintGenerator.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSMT
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::LinalgExt::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
     "KernelConfig.h"
-    "LLVMGPUConstraintGenerator.h"
     "Passes.h"
     "ROCDLPasses.h"
   SRCS
@@ -76,10 +96,12 @@ iree_cc_library(
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
+    "LLVMGPU1DVectorCanonicalizations.cpp"
     "LLVMGPUAssignConstantOrdinals.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUConfigureTensorLayouts.cpp"
-    "LLVMGPUConstraintGenerator.cpp"
+    "LLVMGPUGroupGlobalLoads.cpp"
+    "LLVMGPULegalizeNDVectors.cpp"
     "LLVMGPULinkExecutables.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
@@ -87,7 +109,9 @@ iree_cc_library(
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUVectorDistribute.cpp"
+    "LLVMGPUVectorFlattening.cpp"
     "LLVMGPUVectorLowering.cpp"
+    "LLVMGPUVectorMultiReductionLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
     "ROCDLAnnotateKernelForTranslation.cpp"
@@ -97,6 +121,7 @@ iree_cc_library(
     "ROCDLPrefetching.cpp"
     "Verifiers.cpp"
   DEPS
+    ::LLVMGPUConstraintGenerator
     ::PassHeaders
     ::PassesIncGen
     ::ROCDLPassHeaders
@@ -131,6 +156,7 @@ iree_cc_library(
     MLIRGPUTransformOps
     MLIRGPUTransforms
     MLIRIR
+    MLIRIndexingMapOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
@@ -173,6 +199,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRVectorUtils
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
     iree::compiler::Codegen::Common::GPU::GPUHeuristics

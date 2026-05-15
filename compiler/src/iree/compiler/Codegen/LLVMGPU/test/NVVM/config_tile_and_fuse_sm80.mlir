@@ -91,3 +91,37 @@ func.func @matmul_accumulate_256x256x256_f16_f32() {
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     convert_acc_gemm
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>
+
+// -----
+
+// Mixed precision f32xbf16xf32 matmuls cannot use NVIDIA MMA intrinsics, but
+// should still avoid degenerate SIMT tiling that only computes one M element
+// per workgroup when M has enough work to tile.
+func.func @mixed_precision_matmul_36x151936x896_f32xbf16xf32(
+    %lhs: tensor<36x896xf32>,
+    %rhs: tensor<151936x896xbf16>) -> tensor<36x151936xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<36x151936xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<36x151936xf32>) -> tensor<36x151936xf32>
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<36x896xf32>, tensor<151936x896xbf16>)
+    outs(%fill : tensor<36x151936xf32>) {
+  ^bb0(%in: f32, %in_0: bf16, %out: f32):
+    %0 = arith.extf %in_0 : bf16 to f32
+    %1 = arith.mulf %in, %0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<36x151936xf32>
+  return %result : tensor<36x151936xf32>
+}
+
+// CHECK-LABEL: func.func @mixed_precision_matmul_36x151936x896_f32xbf16xf32(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 8, 1] subgroup_size = 32
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config<{{[{]}}reduction = [0, 0, 32]
+//  CHECK-SAME:     thread = [1, 16, 0]
+//  CHECK-SAME:     workgroup = [32, 128, 1]

@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/base/threading/mutex.h"
 #include "iree/hal/drivers/amdgpu/util/libhsa.h"
+#include "iree/hal/memory/tracing.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +48,9 @@ typedef struct iree_hal_amdgpu_block_pool_options_t {
   // At least this number of blocks will be allocated during pool
   // initialization, possibly split into multiple block pool allocations.
   iree_host_size_t initial_capacity;
+  // Optional named-memory trace identifier for HSA backing allocations made by
+  // this pool. Empty uses a generic process-stable identifier.
+  iree_string_view_t trace_name;
 } iree_hal_amdgpu_block_pool_options_t;
 
 // A block in the block pool.
@@ -117,6 +121,8 @@ typedef struct iree_hal_amdgpu_block_pool_t {
   hsa_agent_t agent;
   // Memory pool blocks are allocated from.
   hsa_amd_memory_pool_t memory_pool;
+  // Stable named-memory stream for HSA backing allocations in this pool.
+  iree_hal_memory_trace_t trace;
   // Size in bytes of a block on device.
   iree_device_size_t block_size;
   // Number of blocks in a single device allocation.

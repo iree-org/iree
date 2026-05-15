@@ -54,12 +54,18 @@ void CreateDispatchConfigPass::runOnOperation() {
     }
 
     Location loc = funcOp.getLoc();
+    auto applyExportMetadata = [&](IREE::Codegen::DispatchConfigOp configOp) {
+      if (auto localMemoryAttr = exportOp.getWorkgroupLocalMemoryAttr()) {
+        configOp.setWorkgroupLocalMemoryAttr(localMemoryAttr);
+      }
+    };
     Block *exportBlock = exportOp.getWorkgroupCountBody();
     if (!exportBlock || exportBlock->getNumArguments() == 0) {
       // No count region — create a dispatch_config with a stub {1,1,1} body.
       builder.setInsertionPointAfter(funcOp);
       auto configOp = IREE::Codegen::DispatchConfigOp::create(
           builder, loc, FlatSymbolRefAttr::get(funcOp.getNameAttr()));
+      applyExportMetadata(configOp);
       Block *block = builder.createBlock(&configOp.getBody());
       builder.setInsertionPointToStart(block);
       auto c1 = arith::ConstantIndexOp::create(builder, loc, 1);
@@ -72,6 +78,7 @@ void CreateDispatchConfigPass::runOnOperation() {
     builder.setInsertionPointAfter(funcOp);
     auto configOp = IREE::Codegen::DispatchConfigOp::create(
         builder, loc, FlatSymbolRefAttr::get(funcOp.getNameAttr()));
+    applyExportMetadata(configOp);
     builder.cloneRegionBefore(exportOp.getWorkgroupCount(), configOp.getBody(),
                               configOp.getBody().end());
     Block *configBlock = &configOp.getBody().front();

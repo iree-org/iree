@@ -101,7 +101,7 @@ getTileSizesForEachDims(linalg::LinalgOp op) {
       FailureOr<int64_t> maybeDimBoundSize =
           ValueBoundsConstraintSet::computeConstantBound(
               presburger::BoundType::UB, {operand, operandDim},
-              /*stopCondition=*/nullptr, /*closedUB=*/true);
+              /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
       if (succeeded(maybeDimBoundSize)) {
         maybeDimSize = maybeDimBoundSize.value();
         break;

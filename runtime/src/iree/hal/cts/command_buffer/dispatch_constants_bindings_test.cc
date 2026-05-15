@@ -62,13 +62,15 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
   iree_hal_buffer_t* input_buffer = nullptr;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(
-        input_data.data(), input_data.size() * sizeof(uint32_t), &input_buffer);
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(uint32_t),
+        &input_buffer));
   }
 
   // Create output buffer (zeroed).
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer);
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer));
 
   // Set up bindings: binding 0 = input, binding 1 = output.
   iree_hal_buffer_ref_t binding_refs[2];

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "bufferize_async_dma.mlir"
     "bufferize_coalesced_gather_dma.mlir"
     "canonicalize.mlir"
     "invalid.mlir"

@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/Transforms/DistributionPatterns.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -15,6 +17,7 @@
 #include "iree/compiler/Utils/Indexing.h"
 #include "iree/compiler/Utils/Permutation.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -39,62 +42,6 @@ namespace mlir::iree_compiler {
 using namespace IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-static bool isBroadcast(AffineExpr expr) {
-  if (auto constExpr = dyn_cast<AffineConstantExpr>(expr)) {
-    return constExpr.getValue() == 0;
-  }
-  return false;
-}
-
-/// Given a set of base transfer |indices|, |offsets| for the batch/outer
-/// dimensions, and distributed warp and thread indices, computes the indices
-/// of the distributed transfer operation based on the |vectorLayout|.
-static SmallVector<Value> getTransferIndicesFromNestedLayout(
-    OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
-    NestedLayoutAttr vectorLayout, AffineMap permutationMap,
-    ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices) {
-
-  int64_t rank = vectorLayout.getRank();
-  // Permute the batch and outer vector offsets to match the order of
-  // the vector dimensions using the inverse of the batch/offset order.
-  ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
-  ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
-
-  SmallVector<Value> slicedIndices(indices);
-  for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
-    // Broadcasted dimension offsets can be used as-is; the read index is
-    // invariant of the thread in such cases (and illegal for writes).
-    if (isBroadcast(dim)) {
-      continue;
-    }
-    unsigned pos = cast<AffineDimExpr>(dim).getPosition();
-    Value offset = indices[pos];
-    int64_t elementCount = vectorLayout.getElementTile()[i];
-    Location loc = offset.getLoc();
-    SmallVector<Value> ids = {
-        warpIndices[i], arith::ConstantIndexOp::create(b, loc, batchOffsets[i]),
-        arith::ConstantIndexOp::create(b, loc, outerVectorOffsets[i]),
-        threadIndices[i], offset};
-    // The order in which a vector dimension is "tiled" is
-    // subgroups -> batches -> outer vectors -> threads -> elements
-    SmallVector<int64_t> sizes = {
-        vectorLayout.getSubgroupTile()[i], vectorLayout.getBatchTile()[i],
-        vectorLayout.getOuterTile()[i], vectorLayout.getThreadTile()[i],
-        elementCount};
-    // The offset is often not an offset within `elementCount`, so, in general,
-    // we can't mark this `disjoint`. However, if `offset` is known to be
-    // a constant less than `elementCount`, we can do this, unlocking
-    // potential optimizations.
-    bool disjoint = false;
-    if (std::optional<int64_t> offsetConst = getConstantIntValue(offset)) {
-      disjoint = *offsetConst < elementCount;
-    }
-    slicedIndices[pos] =
-        affine::AffineLinearizeIndexOp::create(b, loc, ids, sizes, disjoint);
-  }
-  return slicedIndices;
-}
-
 static SmallVector<int64_t>
 getDistributedTransferOffsetsFromNestedLayout(ArrayRef<int64_t> offsets,
                                               NestedLayoutAttr vectorLayout) {
@@ -113,19 +60,6 @@ getDistributedTransferOffsetsFromNestedLayout(ArrayRef<int64_t> offsets,
                             outerOffset * elementSize);
   }
   return slicedOffsets;
-}
-
-static SmallVector<int64_t>
-getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getRank();
-  SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
-  // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
-  // the subvector only containing elements, we need indices in all BATCH and
-  // OUTER (rank * 2) dimensions to have tile size 1.
-  for (int i = 0, e = rank * 2; i < e; ++i) {
-    tileShape[i] = 1;
-  }
-  return tileShape;
 }
 
 /// Given a distributed vector that has B1XB2xO1XO2xE1XE2,
@@ -215,26 +149,6 @@ static VectorValue getInterleavedPackedForm(PatternRewriter &rewriter,
   }
   return vector::TransposeOp::create(rewriter, loc, nonInterleavedPackedShaped,
                                      perm);
-}
-
-/// Computes the warp and thread indices for the given vector layout from a
-/// single linearized thread ID.
-static LogicalResult populateWarpAndThreadIndices(
-    RewriterBase &rewriter, Value threadId, int64_t subgroupSize,
-    NestedLayoutAttr vectorLayout, SmallVector<Value> &warpIndices,
-    SmallVector<Value> &threadIndices) {
-  // The delinearized thread IDs are returned from outer most to inner most,
-  // i.e. before applying the layout described dimensions ordering.
-  int64_t rank = vectorLayout.getRank();
-  SmallVector<Value> threadIds =
-      vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
-  if (threadIds.empty() && rank != 0) {
-    return failure();
-  }
-  warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
-  threadIndices = SmallVector<Value>(threadIds.begin() + rank,
-                                     threadIds.begin() + 2 * rank);
-  return success();
 }
 
 static VectorValue getSlicedPermutedValue(PatternRewriter &rewriter,
@@ -800,7 +714,7 @@ struct DistributeMapStore final
       // offsets.
       AffineMap permutationMap =
           rewriter.getMultiDimIdentityMap(input.getType().getRank());
-      SmallVector<Value> indices(input.getType().getRank(), zero);
+      llvm::Repeated<Value> indices(input.getType().getRank(), zero);
       SmallVector<Value> distributedOffsets =
           getTransferIndicesFromNestedLayout(rewriter, indices, offsets,
                                              vectorLayout, permutationMap,
@@ -873,6 +787,38 @@ static VectorValue broadcastToShape(RewriterBase &rewriter, Value source,
   }
   return vector::TransposeOp::create(rewriter, source.getLoc(), broadcasted,
                                      inversePerm);
+}
+
+/// Re-inserts unit dimensions at the positions indicated by |projectedDims|
+/// via shape_cast, then broadcasts to |targetShape|.
+static Value broadcastFromProjected(RewriterBase &rewriter, Location loc,
+                                    Value source, ArrayRef<int64_t> targetShape,
+                                    ArrayRef<bool> projectedDims) {
+  assert(targetShape.size() == projectedDims.size());
+  SmallVector<int64_t> expandedShape(targetShape);
+  for (int64_t i = 0, expandedNumDims = expandedShape.size();
+       i < expandedNumDims; ++i) {
+    if (projectedDims[i]) {
+      expandedShape[i] = 1;
+    }
+  }
+  Type elemTy = getElementTypeOrSelf(source.getType());
+  VectorType expandedType = VectorType::get(expandedShape, elemTy);
+  Value expanded =
+      vector::ShapeCastOp::create(rewriter, loc, expandedType, source);
+  VectorType targetType = VectorType::get(targetShape, elemTy);
+  return vector::BroadcastOp::create(rewriter, loc, targetType, expanded);
+}
+
+/// Converts a linearized element number into vector indices in row-major order.
+static SmallVector<int64_t> getVectorElementIndices(VectorType vectorType,
+                                                    int64_t linearIndex) {
+  SmallVector<int64_t> indices(vectorType.getRank());
+  for (int64_t d = vectorType.getRank() - 1; d >= 0; --d) {
+    indices[d] = linearIndex % vectorType.getDimSize(d);
+    linearIndex /= vectorType.getDimSize(d);
+  }
+  return indices;
 }
 
 struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
@@ -983,16 +929,17 @@ static VectorValue reshapeFlatToTarget(RewriterBase &rewriter, Location loc,
 }
 
 static LogicalResult checkBitwidthForShuffle(Operation *op, Type type,
-                                             int64_t maxBitsPerShuffle,
                                              StringRef typeName,
                                              PatternRewriter &rewriter) {
   unsigned bitwidth = type.getIntOrFloatBitWidth();
-  if (bitwidth > maxBitsPerShuffle) {
-    return rewriter.notifyMatchFailure(
-        op, llvm::formatv("{0} bitwidth {1} greater than maxBitsPerShuffle {2}",
-                          typeName, bitwidth, maxBitsPerShuffle));
+  if (targetSupportsShuffleBitwidth(getGPUTargetAttr(op), bitwidth)) {
+    return success();
   }
-  return success();
+  return rewriter.notifyMatchFailure(
+      op, llvm::formatv("{0} bitwidth {1} exceeds native shuffle width {2}; "
+                        "wider widths require a target with a decomposing "
+                        "gpu.shuffle lowering",
+                        typeName, bitwidth, kShuffleNativeBits));
 }
 
 /// Creates an equality comparison operation for the given values.
@@ -1248,9 +1195,9 @@ struct DistributeMultiReduction final
   using MaskedOpDistributionPattern::MaskedOpDistributionPattern;
 
   DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
-                           int64_t maxBitsPerShuffle, int64_t benefit = 1)
+                           int64_t benefit = 1)
       : MaskedOpDistributionPattern(context, benefit),
-        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
+        subgroupSize(subgroupSize) {}
 
   LogicalResult
   matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
@@ -1272,8 +1219,8 @@ struct DistributeMultiReduction final
     }
 
     Type elemTy = srcVector.getType().getElementType();
-    if (failed(checkBitwidthForShuffle(multiReduceOp, elemTy, maxBitsPerShuffle,
-                                       "element", rewriter))) {
+    if (failed(checkBitwidthForShuffle(multiReduceOp, elemTy, "element",
+                                       rewriter))) {
       return failure();
     }
 
@@ -1462,7 +1409,7 @@ struct DistributeMultiReduction final
                                   ArrayRef<int64_t> reductionDims) const {
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     VectorType unDistributedType = valueToWrite.getType();
-    SmallVector<Value> indices(unDistributedType.getRank(), c0);
+    llvm::Repeated<Value> indices(unDistributedType.getRank(), c0);
     SmallVector<bool> inBounds(unDistributedType.getRank(), true);
     auto write = vector::TransferWriteOp::create(rewriter, loc, valueToWrite,
                                                  buffer, indices, inBounds);
@@ -1493,7 +1440,7 @@ struct DistributeMultiReduction final
         rewriter, loc,
         /*vectorType=*/readTy,
         /*source=*/buffer,
-        /*indices=*/SmallVector<Value>(readLayout.getRank(), zero),
+        /*indices=*/llvm::Repeated<Value>(readLayout.getRank(), zero),
         /*permMap=*/rewriter.getMultiDimIdentityMap(readLayout.getRank()),
         /*padding=*/padValue,
         /*mask=*/mask,
@@ -1571,7 +1518,6 @@ struct DistributeMultiReduction final
   }
 
   int64_t subgroupSize;
-  int64_t maxBitsPerShuffle;
 };
 
 /// Distributes `iree_vector_ext.arg_compare` ops with nested layouts.
@@ -1581,9 +1527,9 @@ struct DistributeArgCompare final
     : MaskedOpDistributionPattern<IREE::VectorExt::ArgCompareOp> {
 
   DistributeArgCompare(MLIRContext *context, int64_t subgroupSize,
-                       int64_t maxBitsPerShuffle, int64_t benefit = 1)
+                       int64_t benefit = 1)
       : MaskedOpDistributionPattern(context, benefit),
-        subgroupSize(subgroupSize), maxBitsPerShuffle(maxBitsPerShuffle) {}
+        subgroupSize(subgroupSize) {}
 
   LogicalResult
   matchAndRewrite(IREE::VectorExt::ArgCompareOp argCompareOp,
@@ -1625,15 +1571,15 @@ struct DistributeArgCompare final
     }
 
     Type elemTy = inputValue.getType().getElementType();
-    if (failed(checkBitwidthForShuffle(argCompareOp, elemTy, maxBitsPerShuffle,
-                                       "element", rewriter))) {
+    if (failed(checkBitwidthForShuffle(argCompareOp, elemTy, "element",
+                                       rewriter))) {
       return failure();
     }
 
-    // No bitwidth check on the index type: the index is only forwarded from
-    // the winning lane via `gpu.shuffle idx`, which handles wider types (i64).
-    // TODO(Bangtian): On AMD, ROCDL decomposes 64-bit shuffles into 32-bit
-    // pairs. Consider dropping the value bitwidth check above too.
+    // No bitwidth check on the index payload: it is broadcast from the
+    // winning lane via `gpu.shuffle idx`, and the AMDGPU lowering decomposes
+    // wide values (e.g. i64) into i32 chunks. The value-side check above
+    // already gates element types.
 
     // Only explicit index mode; iota indices are materialized earlier.
     if (!inputIndex) {
@@ -1777,18 +1723,11 @@ private:
                           rewriter, loc, rewriter.getZeroAttr(outIdxType))
                           .getResult();
 
-    SmallVector<int64_t> outShape(outValType.getShape());
-    SmallVector<int64_t> outIndices(outValType.getRank(), 0);
     int64_t outNumElements = outValType.getNumElements();
 
     for (int64_t linearIdx = 0; linearIdx < outNumElements; ++linearIdx) {
-      int64_t tmp = linearIdx;
-      for (int64_t i = static_cast<int64_t>(outIndices.size()) - 1; i >= 0;
-           --i) {
-        int64_t extent = outShape[i];
-        outIndices[i] = tmp % extent;
-        tmp /= extent;
-      }
+      SmallVector<int64_t> outIndices =
+          getVectorElementIndices(outValType, linearIdx);
 
       Value accVal =
           vector::ExtractOp::create(rewriter, loc, initVal, outIndices);
@@ -2125,7 +2064,7 @@ private:
       NestedLayoutAttr srcLayout, int64_t reductionDim) const {
     Value c0 = arith::ConstantIndexOp::create(rewriter, loc, 0);
     VectorType valueType = valueToWrite.getType();
-    SmallVector<Value> indices(valueType.getRank(), c0);
+    llvm::Repeated<Value> indices(valueType.getRank(), c0);
     SmallVector<bool> inBounds(valueType.getRank(), true);
 
     auto valueWrite = vector::TransferWriteOp::create(
@@ -2180,13 +2119,13 @@ private:
 
     auto valueRead = vector::TransferReadOp::create(
         rewriter, loc, valueReadTy, valueBuffer,
-        SmallVector<Value>(readLayout.getRank(), zero),
+        llvm::Repeated<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), valuePad,
         /*mask=*/Value(), inBounds);
 
     auto indexRead = vector::TransferReadOp::create(
         rewriter, loc, indexReadTy, indexBuffer,
-        SmallVector<Value>(readLayout.getRank(), zero),
+        llvm::Repeated<Value>(readLayout.getRank(), zero),
         rewriter.getMultiDimIdentityMap(readLayout.getRank()), indexPad,
         /*mask=*/Value(), inBounds);
 
@@ -2234,6 +2173,421 @@ private:
   getLayoutForReductionFromBuffer(NestedLayoutAttr srcLayout,
                                   ArrayRef<int64_t> reductionDims) const {
     return computeLayoutForReductionFromBuffer(srcLayout, reductionDims);
+  }
+
+  int64_t subgroupSize;
+};
+
+/// Broadcast every element of |source| from the last lane in a scan cluster
+/// to all lanes. The cluster is defined by |clusterSize| threads at
+/// |clusterStride| spacing within a subgroup of |subgroupSize| lanes.
+/// Handles pack/unpack for types narrower than 32 bits.
+static Value broadcastFromLastClusterLane(RewriterBase &rewriter, Location loc,
+                                          Value source, int64_t clusterSize,
+                                          int64_t clusterStride,
+                                          int64_t subgroupSize) {
+  auto vecTy = cast<VectorType>(source.getType());
+  Type elemTy = vecTy.getElementType();
+  unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
+  constexpr unsigned shuffleBitwidth = 32;
+  auto shuffleIntType = rewriter.getIntegerType(shuffleBitwidth);
+  auto equivIntType = rewriter.getIntegerType(bitwidth);
+
+  // Compute the lane ID of the last thread in the scan cluster:
+  //   lanePos = (laneId / clusterStride) % clusterSize
+  //   lastLane = laneId - lanePos * clusterStride
+  //              + (clusterSize - 1) * clusterStride
+  auto i32 = rewriter.getI32Type();
+  Value laneId = gpu::LaneIdOp::create(rewriter, loc, /*upper_bound=*/nullptr);
+  Value laneIdI32 = arith::IndexCastOp::create(rewriter, loc, i32, laneId);
+  Value strideCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterStride));
+  Value sizeCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(clusterSize));
+  Value lanePos = arith::RemUIOp::create(
+      rewriter, loc,
+      arith::DivUIOp::create(rewriter, loc, laneIdI32, strideCst), sizeCst);
+  Value posTimesStride =
+      arith::MulIOp::create(rewriter, loc, lanePos, strideCst);
+  Value baseLane =
+      arith::SubIOp::create(rewriter, loc, laneIdI32, posTimesStride);
+  Value lastOffset = arith::ConstantOp::create(
+      rewriter, loc, i32,
+      rewriter.getI32IntegerAttr((clusterSize - 1) * clusterStride));
+  Value lastLane = arith::AddIOp::create(rewriter, loc, baseLane, lastOffset);
+  Value widthCst = arith::ConstantOp::create(
+      rewriter, loc, i32, rewriter.getI32IntegerAttr(subgroupSize));
+
+  // Shuffle each scalar element from the last lane.
+  Value result = source;
+  for (int64_t i = 0, n = vecTy.getNumElements(); i < n; ++i) {
+    SmallVector<int64_t> idx = getVectorElementIndices(vecTy, i);
+    Value scalar = vector::ExtractOp::create(rewriter, loc, source, idx);
+    Value packed = scalar;
+    if (bitwidth < shuffleBitwidth) {
+      packed = arith::BitcastOp::create(rewriter, loc, equivIntType, packed);
+      packed = arith::ExtUIOp::create(rewriter, loc, shuffleIntType, packed);
+    }
+    auto shuffle = gpu::ShuffleOp::create(rewriter, loc, packed, lastLane,
+                                          widthCst, gpu::ShuffleMode::IDX);
+    Value shuffled = shuffle.getShuffleResult();
+    if (bitwidth < shuffleBitwidth) {
+      shuffled = arith::TruncIOp::create(rewriter, loc, equivIntType, shuffled);
+      shuffled = arith::BitcastOp::create(rewriter, loc, elemTy, shuffled);
+    }
+    result = vector::InsertOp::create(rewriter, loc, shuffled, result, idx);
+  }
+  return result;
+}
+
+struct SubgroupScanResult {
+  Value scan;
+  Value total;
+};
+
+/// Helper to create an exclusive `iree_gpu.subgroup_scan` op for a scalar
+/// value, using `vector::CombiningKind` to build the combiner region.
+static SubgroupScanResult
+createExclusiveSubgroupScan(RewriterBase &rewriter, Location loc, Value value,
+                            Value identity, vector::CombiningKind kind,
+                            int64_t clusterSize, int64_t clusterStride) {
+  auto scanOp = IREE::GPU::SubgroupScanOp::create(
+      rewriter, loc, value.getType(), value.getType(), value, identity,
+      /*inclusive=*/nullptr, rewriter.getI32IntegerAttr(clusterSize),
+      rewriter.getI32IntegerAttr(clusterStride));
+
+  // Build combiner region.
+  Block &block = scanOp.getCombiner().emplaceBlock();
+  block.addArguments({value.getType(), value.getType()}, {loc, loc});
+  {
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(&block);
+    Value combined = vector::makeArithReduction(
+        rewriter, loc, kind, block.getArgument(0), block.getArgument(1));
+    IREE::GPU::YieldOp::create(rewriter, loc, combined);
+  }
+
+  return {scanOp.getResult(), scanOp.getTotal()};
+}
+
+/// Distributes `vector.scan` across GPU threads.
+///
+/// The lowering proceeds in two stages:
+///   1. Thread-local scan: Each thread performs `vector.scan` on its local
+///      element tile chunks.
+///   2. Cross-thread scan: Thread chunk totals are scanned across threads
+///      within the subgroup using `iree_gpu.subgroup_scan`.
+///
+/// Cross-subgroup distribution (stages 3-4) is deferred — this pattern
+/// rejects `subgroupTile[scanDim] > 1`.
+///
+/// To distribute and parallelize the scan computation, we use an approach by
+/// Blelloch. The general idea is that we can break the computation into N
+/// blocks and then break the computation into multiple steps:
+/// 1. Local scan over the block and computation of the block total (e.g., sum
+/// of all elements).
+/// 2. Scan over all the block totals, resulting in N scan results.
+/// 3. Update all local elements of block n with the nth scan result.
+///
+/// In our case, we apply this principle repeatedly. We have multiple levels
+/// that break our computation into blocks. The first level is the thread-level,
+/// where each thread holds a number of elements. The next level is the
+/// subgroup. After that, we have to iterate over the batch and outer tile
+/// sizes. Together, this yields the intra-subgroup scan result. The
+/// thread-level is our local scan and for the subgroup and batch/outer level,
+/// we apply steps 2 and 3 from the approach.
+///
+/// This yields the following algorithm:
+/// ```
+/// source = input
+/// result = identity
+/// batchOuterRunning = identity
+/// for b in 0..batch_size[scan_dim]:
+///   for o in 0..outer_size[scan_dim]:
+///     // Extract the current local chunk
+///     srcChunk = source[b, o]
+///     // Perform thread-local scan
+///     localScan, localTotal = vector.scan(srcChunk)
+///     // Adjust local total value for exclusive case
+///     if exclusive:
+///       localTotal = combine(localTotal, srcChunk[-1])
+///
+///     if thread_tile[scan_dim] > 1:
+///       // Compute the scan over each thread's total value within the subgroup
+///       subgroupScan, subgroupTotal = subgroup_scan(localTotal)
+///     else:
+///       subgroupScan = identity
+///       subgroupTotal = localTotal
+///
+///     // Combine the two increments we need to add to this local block.
+///     increment = combine(subgroupScan, batchOuterRunning)
+///     // Broadcast the increment to the local block shape
+///     blockIncrement = broadcast(increment)
+///     localResult = combine(localScan, blockIncrement)
+///
+///     // Update the iteratively computed scan for batch/outer
+///     batchOuterRunning = combine(batchOuterRunning, subgroupTotal)
+///
+///     // Insert result
+///     result[b, o] = localResult
+///
+/// // Scan also returns the total value of all elements as a second result.
+/// // For inclusive mode, this is simply batchOuterRunning
+///
+/// // For exclusive mode, we need to add the increment and shuffle the result
+/// // from the last thread in order for each thread to have the total value
+/// // of all elements.
+/// ```
+///
+/// To compute the scan over the block totals at the subgroup level, we simply
+/// use subgroup_scan. For the loop over the batch/outer dimensions, we can
+/// compute the scan iteratively. The loops over batch/outer do not manifest in
+/// IR, they only exist in codegen and are unrolled in IR.
+///
+/// The pattern does not yet support distribution across multiple subgroups in a
+/// workgroup, that will be added later.
+struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
+  DistributeScan(MLIRContext *context, int64_t subgroupSize,
+                 int64_t maxBitsPerShuffle, int64_t benefit = 1)
+      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
+        maxBitsPerShuffle(maxBitsPerShuffle) {}
+
+  LogicalResult matchAndRewrite(vector::ScanOp scanOp,
+                                DistributionSignature &sig,
+                                PatternRewriter &rewriter) const override {
+    Location loc = scanOp.getLoc();
+    VectorValue source = scanOp.getSource();
+    VectorValue init = scanOp.getInitialValue();
+    vector::CombiningKind kind = scanOp.getKind();
+    int64_t scanDim = scanOp.getReductionDim();
+    bool inclusive = scanOp.getInclusive();
+    int64_t rank = source.getType().getRank();
+
+    auto srcLayout = dyn_cast_if_present<NestedLayoutAttr>(sig[source]);
+    if (!srcLayout) {
+      return rewriter.notifyMatchFailure(scanOp, "expected nested layout attr");
+    }
+    auto initLayout = dyn_cast_if_present<NestedLayoutAttr>(sig[init]);
+    if (!initLayout) {
+      return rewriter.notifyMatchFailure(scanOp,
+                                         "expected nested layout for init");
+    }
+
+    bool needsCrossThread = srcLayout.getThreadTile()[scanDim] > 1;
+    bool needsCrossSubgroup = srcLayout.getSubgroupTile()[scanDim] > 1;
+    Type elemTy = source.getType().getElementType();
+    // Intentional carve-out: unlike DistributeMultiReduction and
+    // DistributeArgCompare (which use targetSupportsShuffleBitwidth and accept
+    // wider widths on AMDGPU via a decomposing gpu.shuffle lowering), scan is
+    // kept on the 32-bit ceiling until the wider-width scan path has been
+    // separately validated.
+    if (needsCrossThread || needsCrossSubgroup) {
+      unsigned bitwidth = elemTy.getIntOrFloatBitWidth();
+      if (bitwidth > maxBitsPerShuffle) {
+        return rewriter.notifyMatchFailure(
+            scanOp,
+            llvm::formatv("element bitwidth {0} greater than maxBitsPerShuffle "
+                          "{1}",
+                          bitwidth, maxBitsPerShuffle));
+      }
+    }
+
+    // Reject multi-subgroup for now.
+    // TODO: Support distribution across workgroups.
+    if (needsCrossSubgroup) {
+      return rewriter.notifyMatchFailure(
+          scanOp, "multi-subgroup scan not yet supported");
+    }
+
+    // Get distributed source.
+    VectorValue disSrc = getDistributed(rewriter, source, sig[source]);
+
+    // Layout tile sizes along scan dimension.
+    int64_t batchSize = srcLayout.getBatchTile()[scanDim];
+    int64_t outerSize = srcLayout.getOuterTile()[scanDim];
+    int64_t threadSize = srcLayout.getThreadTile()[scanDim];
+    int64_t elementSize = srcLayout.getElementTile()[scanDim];
+
+    // Distributed shape is [B0..Bn, O0..On, E0..En].
+    SmallVector<int64_t> distShape = srcLayout.getDistributedShape();
+    int64_t batchIdx = scanDim;           // batch position
+    int64_t outerIdx = rank + scanDim;    // outer position
+    int64_t elemIdx = 2 * rank + scanDim; // element position
+
+    // Build identity value.
+    Value scalarIdentity =
+        getCombiningIdentityValue(loc, rewriter, kind, elemTy);
+
+    // Build the element-chunk shape for local scan:
+    // Same as distShape but with scan-dim batch and outer set to 1.
+    SmallVector<int64_t> chunkShape(distShape);
+    chunkShape[batchIdx] = 1;
+    chunkShape[outerIdx] = 1;
+    // The init for the local vector.scan is the identity broadcast to the
+    // accumulated shape (chunkShape with scan-dim element removed).
+    SmallVector<int64_t> localAccShape(chunkShape);
+    localAccShape.erase(localAccShape.begin() + elemIdx);
+    VectorType localAccType = VectorType::get(localAccShape, elemTy);
+    Value localIdentityInit =
+        getCombiningIdentityValue(loc, rewriter, kind, localAccType);
+
+    // Initialize result vector.
+    VectorType distType = disSrc.getType();
+    Value result = getCombiningIdentityValue(loc, rewriter, kind, distType);
+
+    // Initialize batchOuterRunning to identity with localAccType shape.
+    // This matches the accumulated_value shape from the local scan, which
+    // has the scan-dim element removed from chunkShape.
+    Value batchOuterRunning =
+        getCombiningIdentityValue(loc, rewriter, kind, localAccType);
+
+    SmallVector<int64_t> strides(distShape.size(), 1);
+
+    // Iterate over (batch, outer) chunk positions along the scan dimension.
+    // Non-scan dimensions have chunkShape == distShape so their offsets are
+    // always 0; the scan-dim batch and outer positions vary.
+    for (SmallVector<int64_t> offsets :
+         StaticTileOffsetRange(distShape, chunkShape)) {
+      Value srcChunk = vector::ExtractStridedSliceOp::create(
+          rewriter, loc, disSrc, offsets, chunkShape, strides);
+
+      // Stage 1: local scan over element tile with identity init.
+      // Using identity (not user init) keeps localTotal pure for stage 2.
+      // The user init is applied once at the end for exclusive mode.
+      auto localScanOp = vector::ScanOp::create(
+          rewriter, loc, kind, srcChunk, localIdentityInit, elemIdx, inclusive);
+      Value localScan = localScanOp.getDest();
+      Value localTotal = localScanOp.getAccumulatedValue();
+
+      // For exclusive scan, accumulated_value is the last dest element
+      // which misses the last source element. Combine it in to get the
+      // full chunk reduction needed for stage 2 and carry advancement.
+      if (!inclusive) {
+        SmallVector<int64_t> lastOff(distShape.size(), 0);
+        lastOff[elemIdx] = elementSize - 1;
+        SmallVector<int64_t> lastSz(chunkShape);
+        lastSz[elemIdx] = 1;
+        SmallVector<int64_t> unitStrides(distShape.size(), 1);
+        Value lastElem = vector::ExtractStridedSliceOp::create(
+            rewriter, loc, srcChunk, lastOff, lastSz, unitStrides);
+        Value lastElemFlat = vector::ShapeCastOp::create(
+            rewriter, loc, cast<VectorType>(localTotal.getType()), lastElem);
+        localTotal = vector::makeArithReduction(rewriter, loc, kind, localTotal,
+                                                lastElemFlat);
+      }
+
+      // Stage 2: cross-thread scan (if threadTile[scanDim] > 1).
+      Value subgroupScan, subgroupTotal;
+      if (threadSize > 1) {
+        int64_t clusterStride = srcLayout.getThreadStrides()[scanDim];
+        auto totalType = cast<VectorType>(localTotal.getType());
+
+        subgroupScan = localTotal;
+        subgroupTotal = localTotal;
+
+        for (int64_t i = 0, n = totalType.getNumElements(); i < n; ++i) {
+          SmallVector<int64_t> idx = getVectorElementIndices(totalType, i);
+          Value scalar =
+              vector::ExtractOp::create(rewriter, loc, localTotal, idx);
+          auto [scanResult, scanTotal] =
+              createExclusiveSubgroupScan(rewriter, loc, scalar, scalarIdentity,
+                                          kind, threadSize, clusterStride);
+          subgroupScan = vector::InsertOp::create(rewriter, loc, scanResult,
+                                                  subgroupScan, idx);
+          subgroupTotal = vector::InsertOp::create(rewriter, loc, scanTotal,
+                                                   subgroupTotal, idx);
+        }
+      } else {
+        subgroupScan = getCombiningIdentityValue(
+            loc, rewriter, kind, cast<VectorType>(localTotal.getType()));
+        subgroupTotal = localTotal;
+      }
+
+      // Carry composition:
+      // blockIncrement = combine(batchOuterRunning, subgroupScan).
+      Value blockIncrement = vector::makeArithReduction(
+          rewriter, loc, kind, batchOuterRunning, subgroupScan);
+
+      // Apply carry to local scan result.
+      SmallVector<bool> elemDimMask(chunkShape.size(), false);
+      elemDimMask[elemIdx] = true;
+      Value broadcasted = broadcastFromProjected(rewriter, loc, blockIncrement,
+                                                 chunkShape, elemDimMask);
+      Value localResult = vector::makeArithReduction(rewriter, loc, kind,
+                                                     broadcasted, localScan);
+
+      // Insert partial back into result at (b, o).
+      result = vector::InsertStridedSliceOp::create(rewriter, loc, localResult,
+                                                    result, offsets, strides);
+
+      // Advance running total.
+      batchOuterRunning = vector::makeArithReduction(
+          rewriter, loc, kind, batchOuterRunning, subgroupTotal);
+    }
+
+    VectorType initDistType = VectorType::get(initLayout.getDistributedShape(),
+                                              init.getType().getElementType());
+    // For the inclusive case we're done.
+    if (inclusive) {
+      Value accumulatedValue = vector::ShapeCastOp::create(
+          rewriter, loc, initDistType, batchOuterRunning);
+      replaceOpWithDistributedValues(
+          rewriter, scanOp,
+          {cast<VectorValue>(result), cast<VectorValue>(accumulatedValue)});
+      return success();
+    }
+
+    // For the exclusive case, we need to make two adjustments: In exclusive
+    // mode, the user provides an init operand to the operation. So far, we have
+    // initialized all scans with identity, so we haven't added the provided
+    // init yet. Therefore, we need to add/combine the init to the result we
+    // have computed so far.
+    // This also implies that our running accumulation does not include that
+    // init value yet. Only the last thread in the cluster has access to the
+    // init operand for the last element, so after we have updated the result,
+    // we need to broadcast the result of the last element from the last lane to
+    // all other lanes using a shuffle.
+
+    // Apply user init for exclusive mode.
+    SmallVector<bool> scanDimMask(distShape.size(), false);
+    scanDimMask[batchIdx] = true;
+    scanDimMask[outerIdx] = true;
+    scanDimMask[elemIdx] = true;
+    VectorValue disInit = getDistributed(rewriter, init, sig[init]);
+    Value broadcastedInit =
+        broadcastFromProjected(rewriter, loc, disInit, distShape, scanDimMask);
+    result = vector::makeArithReduction(rewriter, loc, kind, broadcastedInit,
+                                        result);
+
+    Value accumulatedValue;
+    // Extract the last element along the scan dimension.
+    SmallVector<int64_t> lastOffsets(distShape.size(), 0);
+    SmallVector<int64_t> lastSizes(distShape);
+    lastOffsets[batchIdx] = batchSize - 1;
+    lastOffsets[outerIdx] = outerSize - 1;
+    lastOffsets[elemIdx] = elementSize - 1;
+    lastSizes[batchIdx] = 1;
+    lastSizes[outerIdx] = 1;
+    lastSizes[elemIdx] = 1;
+    SmallVector<int64_t> extractStrides(distShape.size(), 1);
+    Value lastSlice = vector::ExtractStridedSliceOp::create(
+        rewriter, loc, result, lastOffsets, lastSizes, extractStrides);
+    Value perThreadAccum =
+        vector::ShapeCastOp::create(rewriter, loc, initDistType, lastSlice);
+
+    if (threadSize > 1) {
+      int64_t clusterStride = srcLayout.getThreadStrides()[scanDim];
+      accumulatedValue =
+          broadcastFromLastClusterLane(rewriter, loc, perThreadAccum,
+                                       threadSize, clusterStride, subgroupSize);
+    } else {
+      accumulatedValue = perThreadAccum;
+    }
+
+    replaceOpWithDistributedValues(
+        rewriter, scanOp,
+        {cast<VectorValue>(result), cast<VectorValue>(accumulatedValue)});
+    return success();
   }
 
   int64_t subgroupSize;
@@ -3081,10 +3435,10 @@ void IREE::VectorExt::populateNestedLayoutDistributionPatterns(
                                         subgroupSize, workgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose, DistributeShapeCast>(
       patterns.getContext());
-  patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
-                                         maxBitsPerShuffle);
-  patterns.add<DistributeArgCompare>(patterns.getContext(), subgroupSize,
-                                     maxBitsPerShuffle);
+  patterns.add<DistributeMultiReduction, DistributeArgCompare>(
+      patterns.getContext(), subgroupSize);
+  patterns.add<DistributeScan>(patterns.getContext(), subgroupSize,
+                               maxBitsPerShuffle);
   patterns.add<DistributeContract>(patterns.getContext());
   patterns.add<DistributeBatchOuterToLayoutConversions>(patterns.getContext());
   patterns.add<DistributeInnerTiled>(patterns.getContext());

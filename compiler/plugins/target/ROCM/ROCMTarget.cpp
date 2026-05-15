@@ -75,6 +75,108 @@ enum class ContainerType {
   HSACO,
 };
 
+enum class AMDGPUTargetFeatureMode {
+  // Feature mode is not specified by the target ID.
+  Any,
+  // Feature is explicitly disabled.
+  Off,
+  // Feature is explicitly enabled.
+  On,
+};
+
+struct AMDGPUTargetFeatureModes {
+  // SRAM ECC target feature mode.
+  AMDGPUTargetFeatureMode sramecc = AMDGPUTargetFeatureMode::Any;
+  // XNACK target feature mode.
+  AMDGPUTargetFeatureMode xnack = AMDGPUTargetFeatureMode::Any;
+};
+
+static LogicalResult
+setAMDGPUTargetFeatureMode(Location loc, StringRef featureName,
+                           AMDGPUTargetFeatureMode featureMode,
+                           AMDGPUTargetFeatureMode &targetFeatureMode) {
+  if (targetFeatureMode != AMDGPUTargetFeatureMode::Any) {
+    return emitError(loc, "duplicate ROCM target feature '")
+           << featureName << "'";
+  }
+  targetFeatureMode = featureMode;
+  return success();
+}
+
+static FailureOr<AMDGPUTargetFeatureModes>
+parseAMDGPUTargetFeatureModes(Location loc, StringRef targetFeatures) {
+  AMDGPUTargetFeatureModes modes;
+  SmallVector<StringRef> features;
+  llvm::SplitString(targetFeatures, features, ",");
+  for (StringRef rawFeature : features) {
+    AMDGPUTargetFeatureMode featureMode = AMDGPUTargetFeatureMode::Any;
+    StringRef feature = rawFeature;
+    if (feature.consume_front("+")) {
+      featureMode = AMDGPUTargetFeatureMode::On;
+    } else if (feature.consume_front("-")) {
+      featureMode = AMDGPUTargetFeatureMode::Off;
+    } else {
+      emitError(loc, "ROCM target feature must be prefixed with '+' or '-'; "
+                     "but seen '")
+          << rawFeature << "'";
+      return failure();
+    }
+    if (feature == "sramecc") {
+      if (failed(setAMDGPUTargetFeatureMode(loc, feature, featureMode,
+                                            modes.sramecc))) {
+        return failure();
+      }
+    } else if (feature == "xnack") {
+      if (failed(setAMDGPUTargetFeatureMode(loc, feature, featureMode,
+                                            modes.xnack))) {
+        return failure();
+      }
+    } else {
+      // We only support these two features to be set explicitly. Features like
+      // wavefrontsize are controlled and tuned by the compiler.
+      emitError(loc,
+                "ROCM target feature can only be 'sramecc' or 'xnack'; but "
+                "seen '")
+          << feature << "'";
+      return failure();
+    }
+  }
+  return modes;
+}
+
+static void appendAMDGPUTargetFeatureSuffix(std::string &targetID,
+                                            StringRef featureName,
+                                            AMDGPUTargetFeatureMode mode) {
+  switch (mode) {
+  case AMDGPUTargetFeatureMode::Any:
+    return;
+  case AMDGPUTargetFeatureMode::Off:
+    targetID += ":";
+    targetID += featureName;
+    targetID += "-";
+    return;
+  case AMDGPUTargetFeatureMode::On:
+    targetID += ":";
+    targetID += featureName;
+    targetID += "+";
+    return;
+  }
+}
+
+static FailureOr<std::string> buildAMDGPUTargetID(Location loc,
+                                                  StringRef targetArch,
+                                                  StringRef targetFeatures) {
+  FailureOr<AMDGPUTargetFeatureModes> modes =
+      parseAMDGPUTargetFeatureModes(loc, targetFeatures);
+  if (failed(modes)) {
+    return failure();
+  }
+  std::string targetID = targetArch.str();
+  appendAMDGPUTargetFeatureSuffix(targetID, "sramecc", modes->sramecc);
+  appendAMDGPUTargetFeatureSuffix(targetID, "xnack", modes->xnack);
+  return targetID;
+}
+
 struct ROCMOptions {
   std::string target = "";
   std::string targetFeatures = "";
@@ -110,19 +212,11 @@ struct ROCMOptions {
             "for more details."
             // clang-format on
             ));
-    binder.opt<std::string>(
-        "iree-hip-target", target, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-target instead."),
-        Deprecated("use --iree-rocm-target instead"));
 
     binder.opt<std::string>(
         "iree-rocm-target-features", targetFeatures, cl::cat(category),
         cl::desc("ROCM target features as expected by LLVM AMDGPU backend; "
                  "e.g., '+sramecc,+xnack'."));
-    binder.opt<std::string>(
-        "iree-hip-target-features", targetFeatures, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-target-features instead."),
-        Deprecated("use --iree-rocm-target-features instead"));
 
     binder.opt<ContainerType>(
         "iree-rocm-container-type", containerType,
@@ -141,28 +235,16 @@ struct ROCMOptions {
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of ROCM Bitcode."));
-    binder.opt<std::string>(
-        "iree-hip-bc-dir", bitcodeDirectory, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-bc-dir instead."),
-        Deprecated("use --iree-rocm-bc-dir instead"));
 
     binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu, cl::cat(category),
                     cl::desc("Optimization hint specifying minimum "
                              "number of waves per execution unit."));
-    binder.opt<int>(
-        "iree-hip-waves-per-eu", wavesPerEu, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-waves-per-eu instead."),
-        Deprecated("use --iree-rocm-waves-per-eu instead"));
 
     binder.opt<std::string>(
         "iree-rocm-enable-ukernels", enableROCMUkernels, cl::cat(category),
         cl::desc("Enables microkernels in the ROCM compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
-    binder.opt<std::string>(
-        "iree-hip-enable-ukernels", enableROCMUkernels, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-ukernels instead."),
-        Deprecated("use --iree-rocm-enable-ukernels instead"));
 
     binder.opt<std::string>(
         "iree-rocm-encoding-layout-resolver", encodingLayoutResolver,
@@ -172,48 +254,24 @@ struct ROCMOptions {
                  "identity layout), `pad` (additional padding "
                  "on allocations to maximize cache bandwidth), "
                  "and `data-tiling` (enable data tiled layouts)"));
-    binder.opt<std::string>(
-        "iree-hip-encoding-layout-resolver", encodingLayoutResolver,
-        cl::cat(category),
-        cl::desc(
-            "Deprecated; use --iree-rocm-encoding-layout-resolver instead."),
-        Deprecated("use --iree-rocm-encoding-layout-resolver instead"));
 
     binder.opt<bool>("iree-rocm-llvm-slp-vec", slpVectorization,
                      cl::cat(category),
                      cl::desc("Enable slp vectorization in llvm opt."));
-    binder.opt<bool>(
-        "iree-hip-llvm-slp-vec", slpVectorization, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-llvm-slp-vec instead."),
-        Deprecated("use --iree-rocm-llvm-slp-vec instead"));
 
     binder.opt<bool>("iree-rocm-llvm-global-isel", globalISel,
                      cl::cat(category),
                      cl::desc("Enable global instruction selection in llvm."));
-    binder.opt<bool>(
-        "iree-hip-llvm-global-isel", globalISel, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-llvm-global-isel instead."),
-        Deprecated("use --iree-rocm-llvm-global-isel instead"));
 
     binder.opt<bool>(
         "iree-rocm-specialize-dispatches", specializeDispatches,
         cl::cat(category),
         cl::desc(
             "Enable runtime specialization of dynamically shaped dispatches."));
-    binder.opt<bool>(
-        "iree-hip-specialize-dispatches", specializeDispatches,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-specialize-dispatches instead."),
-        Deprecated("use --iree-rocm-specialize-dispatches instead"));
 
     binder.opt<bool>("iree-rocm-enable-tensor-ukernels", enableTensorUKernels,
                      cl::cat(category),
                      cl::desc("Enable MLIR-based ukernels."));
-    binder.opt<bool>(
-        "iree-hip-enable-tensor-ukernels", enableTensorUKernels,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-tensor-ukernels instead."),
-        Deprecated("use --iree-rocm-enable-tensor-ukernels instead"));
 
     binder.opt<IREE::Codegen::DenormalFpMath>(
         "iree-rocm-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
@@ -224,34 +282,14 @@ struct ROCMOptions {
                        "Convert denormals to zero while preserving sign"),
             clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
                        "positive-zero", "Convert denormals to positive zero")));
-    binder.opt<IREE::Codegen::DenormalFpMath>(
-        "iree-hip-denormal-fp-math-f32", denormalFpMathF32, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-denormal-fp-math-f32 instead."),
-        Deprecated("use --iree-rocm-denormal-fp-math-f32 instead"),
-        cl::values(
-            clEnumValN(IREE::Codegen::DenormalFpMath::PreserveSign,
-                       "preserve-sign",
-                       "Convert denormals to zero while preserving sign"),
-            clEnumValN(IREE::Codegen::DenormalFpMath::PositiveZero,
-                       "positive-zero", "Convert denormals to positive zero")));
 
     binder.opt<bool>("iree-rocm-enable-register-spill-warning",
                      enableRegSpillWarning, cl::cat(category),
                      cl::desc("Report register spilling for AMD GPUs"));
-    binder.opt<bool>(
-        "iree-hip-enable-register-spill-warning", enableRegSpillWarning,
-        cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-enable-register-spill-warning "
-                 "instead."),
-        Deprecated("use --iree-rocm-enable-register-spill-warning instead"));
 
     binder.opt<bool>("iree-rocm-emit-debug-info", debugSymbols,
                      cl::cat(category),
                      cl::desc("Generate and embed debug information (DWARF)."));
-    binder.opt<bool>(
-        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),
-        Deprecated("use --iree-rocm-emit-debug-info instead"));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -264,24 +302,9 @@ struct ROCMOptions {
       return emitError(builder.getUnknownLoc(), "Unknown ROCM target '")
              << target << "'";
     }
-    SmallVector<StringRef> features;
-    llvm::SplitString(targetFeatures, features, ",");
-    for (StringRef f : features) {
-      if (!(f.starts_with("+") || f.starts_with("-"))) {
-        return emitError(builder.getUnknownLoc(),
-                         "ROCM target feature must be prefixed with '+' or "
-                         "'-'; but seen '")
-               << f << "'";
-      }
-      StringRef feature = f.substr(1);
-      if (feature != "sramecc" && feature != "xnack") {
-        // We only support these two features to be set explicitly. Features
-        // like wavefrontsize is controlled and tuned by the compiler.
-        return emitError(builder.getUnknownLoc(),
-                         "ROCM target feature can only be 'sramecc' or "
-                         "'xnack'; but seen '")
-               << feature << "'";
-      }
+    if (failed(parseAMDGPUTargetFeatureModes(builder.getUnknownLoc(),
+                                             targetFeatures))) {
+      return failure();
     }
     return success();
   }
@@ -392,7 +415,13 @@ public:
     addConfig("abi", b.getStringAttr(deviceID));
     std::string format;
     if (deviceID == "amdgpu") {
-      format = targetOptions.target;
+      FailureOr<std::string> targetID =
+          buildAMDGPUTargetID(b.getUnknownLoc(), targetOptions.target,
+                              targetOptions.targetFeatures);
+      if (failed(targetID)) {
+        return nullptr;
+      }
+      format = *targetID;
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
@@ -552,6 +581,25 @@ public:
                              llvm::TargetMachine &targetMachine,
                              bool slpVectorization,
                              std::string &outPassesString) {
+    // Workaround for upstream LLVM PR llvm/llvm-project#194924 (commit
+    // b09174b41e7e, "[AMDGPU] Enable runtime loop unrolling") which set
+    //   UP.PartialThreshold = UP.Threshold / 4   (75 for AMDGPU)
+    // in AMDGPUTTIImpl::getUnrollingPreferences, regressing partial unrolling
+    // of small constant-trip-count reduction loops. Restore the prior
+    // un-overridden LLVM default (150) by bumping the cl::opt occurrence
+    // count, which makes LoopUnrollPass apply the override (see
+    // LoopUnrollPass.cpp gatherUnrollingPreferences). Skipped when the user
+    // already set --unroll-partial-threshold so an explicit override still
+    // wins. Safe to remove once the upstream regression is fixed.
+    auto &registeredCLOpts = llvm::cl::getRegisteredOptions();
+    auto unrollOptIt = registeredCLOpts.find("unroll-partial-threshold");
+    if (unrollOptIt != registeredCLOpts.end() &&
+        unrollOptIt->second->getNumOccurrences() == 0) {
+      unrollOptIt->second->addOccurrence(/*pos=*/0,
+                                         /*ArgName=*/"unroll-partial-threshold",
+                                         /*Value=*/"150");
+    }
+
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -922,6 +970,7 @@ public:
     }
 
     // Wrap the HSACO ELF binary in the requested container type (if any).
+    StringAttr executableBinaryFormat = variantOp.getTarget().getFormat();
     FailureOr<DenseIntElementsAttr> binaryContainer;
     switch (containerType) {
     case ContainerType::Auto: {
@@ -930,8 +979,14 @@ public:
       break;
     }
     case ContainerType::AMDGPU: {
+      FailureOr<std::string> targetID =
+          buildAMDGPUTargetID(variantOp.getLoc(), targetArch, targetFeatures);
+      if (failed(targetID)) {
+        return failure();
+      }
+      executableBinaryFormat = executableBuilder.getStringAttr(*targetID);
       binaryContainer = serializeAMDGPUBinaryContainer(
-          serializationOptions, variantOp, exportOps, targetHSACO);
+          serializationOptions, variantOp, exportOps, *targetID, targetHSACO);
       break;
     }
     case ContainerType::HIP: {
@@ -957,7 +1012,7 @@ public:
     // Add the binary data to the target executable.
     auto binaryOp = IREE::HAL::ExecutableBinaryOp::create(
         executableBuilder, variantOp.getLoc(), variantOp.getSymName(),
-        variantOp.getTarget().getFormat(), binaryContainer.value());
+        executableBinaryFormat, binaryContainer.value());
     binaryOp.setMimeTypeAttr(
         executableBuilder.getStringAttr("application/x-flatbuffers"));
 
@@ -968,7 +1023,7 @@ protected:
   FailureOr<DenseIntElementsAttr> serializeAMDGPUBinaryContainer(
       const SerializationOptions &serializationOptions,
       IREE::HAL::ExecutableVariantOp variantOp,
-      ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
+      ArrayRef<IREE::HAL::ExecutableExportOp> exportOps, StringRef targetID,
       StringRef hsacoModule) {
     iree_compiler::FlatbufferBuilder builder;
     iree_hal_amdgpu_ExecutableDef_start_as_root(builder);
@@ -1043,7 +1098,7 @@ protected:
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
 
-    auto isaRef = builder.createString(variantOp.getTarget().getFormat());
+    auto isaRef = builder.createString(targetID);
     iree_hal_amdgpu_ExecutableDef_isa_add(builder, isaRef);
     iree_hal_amdgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_amdgpu_ExecutableDef_modules_add(builder, modulesRef);

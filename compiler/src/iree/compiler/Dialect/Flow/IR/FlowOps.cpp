@@ -1053,9 +1053,7 @@ DispatchWorkgroupsOp::getOperandAccess(unsigned operandIndex) {
 
 IREE::Util::ValueAccess
 DispatchWorkgroupsOp::getResultAccess(unsigned resultIndex) {
-  unsigned startIndex = getWorkgroupBody().getNumArguments() - getNumResults();
-  BlockArgument arg =
-      getWorkgroupBody().front().getArgument(startIndex + resultIndex);
+  BlockArgument arg = getOutputBlockArgument(resultIndex);
   if (auto tensorType =
           dyn_cast<IREE::TensorExt::DispatchTensorType>(arg.getType())) {
     auto tensorAccess = refineTensorAccess(arg, tensorType);

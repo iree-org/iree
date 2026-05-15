@@ -86,16 +86,31 @@ getModifiedLoweringConfigForDecomposedGemmOp(
     return origAttr;
   }
 
-  llvm::SmallDenseSet<int64_t> promotedOperandsSet(
-      promotedOperandsList->begin(), promotedOperandsList->end());
-  SmallVector<int64_t> newPromotedOperands;
+  std::optional<ArrayRef<Attribute>> promotionTypes =
+      IREE::GPU::getPromotionTypesList(origAttr);
+
+  llvm::SmallDenseMap<int64_t, int64_t> keptOperandToNewOperand;
   for (auto [index, origOperandNum] : llvm::enumerate(keptOperands)) {
-    if (promotedOperandsSet.contains(origOperandNum)) {
-      newPromotedOperands.push_back(index);
+    keptOperandToNewOperand[origOperandNum] = index;
+  }
+
+  SmallVector<int64_t> newPromotedOperands;
+  SmallVector<Attribute> newPromotionTypes;
+  for (auto [index, promotedOperand] : llvm::enumerate(*promotedOperandsList)) {
+    auto newOperand = keptOperandToNewOperand.find(promotedOperand);
+    if (newOperand != keptOperandToNewOperand.end()) {
+      newPromotedOperands.push_back(newOperand->second);
+      if (promotionTypes) {
+        newPromotionTypes.push_back((*promotionTypes)[index]);
+      }
     }
   }
+  std::optional<ArrayRef<Attribute>> newPromotionTypesRef = std::nullopt;
+  if (!newPromotionTypes.empty()) {
+    newPromotionTypesRef = newPromotionTypes;
+  }
   return setPromotedOperandsList(rewriter.getContext(), origAttr,
-                                 newPromotedOperands);
+                                 newPromotedOperands, newPromotionTypesRef);
 }
 
 static LogicalResult

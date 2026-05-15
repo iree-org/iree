@@ -669,7 +669,7 @@ IREE::transform_dialect::MatchDimBoundsOp::matchValue(
   if (std::optional<int64_t> lb = getLowerBound()) {
     auto constantLb = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::LB, {current, /*dim=*/dim},
-        /*stopCondition=*/nullptr, /*closedLB=*/true);
+        /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantLb)) {
       return emitSilenceableError()
              << "failed to compute constant lower bound for dim " << dim;
@@ -682,7 +682,7 @@ IREE::transform_dialect::MatchDimBoundsOp::matchValue(
   if (std::optional<int64_t> ub = getUpperBound()) {
     auto constantUb = ValueBoundsConstraintSet::computeConstantBound(
         presburger::BoundType::UB, {current, /*dim=*/dim},
-        /*stopCondition=*/nullptr, /*closedUB=*/true);
+        /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantUb)) {
       return emitSilenceableError()
              << "failed to compute constant upper bound for dim " << dim;

@@ -83,6 +83,22 @@ def IREECPU_DataTiledMMAAttr
     thread-distribution, no concept of subgroups and no interleaving of
     intrinsics' layout.
 
+    Each non-square hardware MMA appears as two `MMAIntrinsic` enum values —
+    one per orientation (e.g. `MMA_X86_AVX512_1x16x1_F32_F32` and its
+    M↔N-swapped sibling `MMA_X86_AVX512_16x1x1_F32_F32`). The cost model
+    treats them as distinct candidates and picks whichever fits the matmul
+    shape better.
+
+    For most `intrinsic` values the (LHS, RHS, ACC) element types are baked
+    into the enum and `lhs_type` / `rhs_type` / `acc_type` are unused. The
+    one exception is `MMA_GENERIC_SCALAR_1x1x1`: it is a type-polymorphic
+    fallback used when no element-type-specific intrinsic matches the
+    target, and it carries its element types in those three optional
+    parameters instead. This deliberately breaks the otherwise-strong
+    invariant that an `MMAIntrinsic` enum value pins down a specific element
+    type triple, in exchange for not having to add one enum value per
+    supported (LHS, RHS, ACC) combination.
+
     Some GPU-specific methods in IREECodegen_InnerTileDescAttrInterface are left
     here but are unused.
   }];
@@ -99,7 +115,19 @@ def IREECPU_DataTiledMMAAttr
               "Intrinsic count along the N dimension.">:$intrinsics_n,
           DefaultValuedParameter<
               "int64_t", "1",
-              "Intrinsic count along the K dimension.">:$intrinsics_k);
+              "Intrinsic count along the K dimension.">:$intrinsics_k,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "LHS element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$lhs_type,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "RHS element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$rhs_type,
+          DefaultValuedParameter<
+              "::mlir::Type", "::mlir::Type()",
+              "ACC element type, used only by type-polymorphic intrinsics "
+              "such as MMA_GENERIC_SCALAR_1x1x1.">:$acc_type);
 }
 
 //===----------------------------------------------------------------------===//

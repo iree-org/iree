@@ -128,6 +128,7 @@ iree_cc_library(
     "MaterializeEncoding.cpp"
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingPatterns.cpp"
+    "MaterializeSMTConstraintAssignments.cpp"
     "MaterializeTuningSpecs.cpp"
     "MaterializeVectorMasking.cpp"
     "MaterializeVectorTileSizes.cpp"

@@ -10,11 +10,13 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/Indexing.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -48,6 +50,63 @@ static bool getBoolOption(DictionaryAttr options, StringRef name,
     return attr.getValue();
   }
   return defaultValue;
+}
+
+static std::optional<vector::CombiningKind> matchScanCombiner(Region &region) {
+  if (!region.hasOneBlock()) {
+    return std::nullopt;
+  }
+
+  Block &block = region.front();
+  if (block.getNumArguments() != 2) {
+    return std::nullopt;
+  }
+
+  auto &ops = block.getOperations();
+  if (ops.size() != 2) {
+    return std::nullopt;
+  }
+
+  Operation &firstOp = ops.front();
+  Operation &yieldOp = ops.back();
+  if (firstOp.getNumOperands() != 2 || firstOp.getNumResults() != 1) {
+    return std::nullopt;
+  }
+  if (yieldOp.getNumOperands() != 1 ||
+      yieldOp.getOperand(0) != firstOp.getResult(0)) {
+    return std::nullopt;
+  }
+
+  Value arg0 = block.getArgument(0);
+  Value arg1 = block.getArgument(1);
+  Value opArg0 = firstOp.getOperand(0);
+  Value opArg1 = firstOp.getOperand(1);
+  if (opArg0 != arg0 || opArg1 != arg1) {
+    return std::nullopt;
+  }
+
+  return llvm::TypeSwitch<Operation *, std::optional<vector::CombiningKind>>(
+             &firstOp)
+      .Case<arith::AddIOp, arith::AddFOp>(
+          [](auto) { return vector::CombiningKind::ADD; })
+      .Case<arith::MulIOp, arith::MulFOp>(
+          [](auto) { return vector::CombiningKind::MUL; })
+      .Case<arith::AndIOp>([](auto) { return vector::CombiningKind::AND; })
+      .Case<arith::OrIOp>([](auto) { return vector::CombiningKind::OR; })
+      .Case<arith::XOrIOp>([](auto) { return vector::CombiningKind::XOR; })
+      .Case<arith::MaxSIOp>([](auto) { return vector::CombiningKind::MAXSI; })
+      .Case<arith::MaxUIOp>([](auto) { return vector::CombiningKind::MAXUI; })
+      .Case<arith::MinSIOp>([](auto) { return vector::CombiningKind::MINSI; })
+      .Case<arith::MinUIOp>([](auto) { return vector::CombiningKind::MINUI; })
+      .Case<arith::MaximumFOp>(
+          [](auto) { return vector::CombiningKind::MAXIMUMF; })
+      .Case<arith::MinimumFOp>(
+          [](auto) { return vector::CombiningKind::MINIMUMF; })
+      .Case<arith::MaxNumFOp>(
+          [](auto) { return vector::CombiningKind::MAXNUMF; })
+      .Case<arith::MinNumFOp>(
+          [](auto) { return vector::CombiningKind::MINNUMF; })
+      .Default([](Operation *) { return std::nullopt; });
 }
 
 struct GatherOpVectorizationModel
@@ -109,7 +168,7 @@ struct GatherOpVectorizationModel
         ArrayRef(gatherDims).take_front(gatherOp.getBatchRank()));
     auto indicesVecRead = vector::TransferReadOp::create(
         rewriter, loc, indicesVecTy.clone(indicesTy.getElementType()),
-        gatherOp.getIndices(), SmallVector<Value>(indicesTy.getRank(), zero),
+        gatherOp.getIndices(), llvm::Repeated<Value>(indicesTy.getRank(), zero),
         std::nullopt);
     rewriter.modifyOpInPlace(indicesVecRead, [&] {
       indicesVecRead.getMaskMutable().assign(indicesMask);
@@ -118,7 +177,7 @@ struct GatherOpVectorizationModel
     indicesVec =
         arith::IndexCastOp::create(rewriter, loc, indicesVecTy, indicesVec);
 
-    SmallVector<Value> baseOffsets(sourceTy.getRank(), zero);
+    llvm::Repeated<Value> baseOffsets(sourceTy.getRank(), zero);
     Value padding =
         ub::PoisonOp::create(rewriter, loc, gatherTy.getElementType());
 
@@ -167,7 +226,7 @@ struct GatherOpVectorizationModel
         rewriter, loc, gatherVectorTy, gatherOp.getSource(), baseOffsets,
         ValueRange{indicesVec}, rewriter.getAffineMapArrayAttr(indexingMaps),
         padding, /*mask=*/gatherMask);
-    SmallVector<Value> writeIndices(gatherTy.getRank(), zero);
+    llvm::Repeated<Value> writeIndices(gatherTy.getRank(), zero);
     auto writeOp = vector::TransferWriteOp::create(
         rewriter, loc, transferGatherOp.getResult(), gatherOp.getOutput(),
         writeIndices);
@@ -223,7 +282,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> inputVecs;
     auto vectorizeInput = [&](Value input) {
       auto inputTy = cast<ShapedType>(input.getType());
-      SmallVector<Value> readIndices(inputTy.getRank(), zero);
+      llvm::Repeated<Value> readIndices(inputTy.getRank(), zero);
       auto inputVecTy =
           VectorType::get(inputTy.getShape(), inputTy.getElementType());
       // TODO(Bangtian): Add masking/padding support for partial tiles.
@@ -243,7 +302,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> initVecs;
     for (Value init : argCompareOp.getDpsInits()) {
       auto initTy = cast<ShapedType>(init.getType());
-      SmallVector<Value> readIndices(initShape.size(), zero);
+      llvm::Repeated<Value> readIndices(initShape.size(), zero);
       auto initVecTy = VectorType::get(initShape, initTy.getElementType());
       auto readOp = vector::TransferReadOp::create(
           rewriter, loc, initVecTy, init, readIndices, std::nullopt);
@@ -307,7 +366,7 @@ struct ArgCompareOpVectorizationModel
     SmallVector<Value> results;
     for (auto [result, output] : llvm::zip_equal(
              vectorArgCompareOp.getResults(), argCompareOp.getDpsInits())) {
-      SmallVector<Value> writeIndices(initShape.size(), zero);
+      llvm::Repeated<Value> writeIndices(initShape.size(), zero);
       auto writeOp = vector::TransferWriteOp::create(rewriter, loc, result,
                                                      output, writeIndices);
       results.push_back(writeOp.getResult());
@@ -361,7 +420,7 @@ struct ToLayoutOpVectorizationModel
         rewriter, loc,
         /*type=*/vectorType,
         /*source=*/toLayoutOp.getInput(),
-        /*indices=*/ValueRange{SmallVector<Value>(readShape.size(), zero)},
+        /*indices=*/llvm::Repeated<Value>(readShape.size(), zero),
         /*permutation_map=*/identityMap,
         /*padding=*/padValue,
         /*mask=*/mask,
@@ -369,7 +428,7 @@ struct ToLayoutOpVectorizationModel
     // Create the toLayout operation but with vector types instead.
     auto newLayoutOp = IREE::VectorExt::ToLayoutOp::create(
         rewriter, loc, readOp, toLayoutOp.getLayout(),
-        toLayoutOp.getSharedMemoryConversion());
+        toLayoutOp.getSharedMemoryConversionAttr());
     // Create the write back to a tensor.
     ShapedType tensorTy = toLayoutOp.getType();
     auto resType =
@@ -383,7 +442,7 @@ struct ToLayoutOpVectorizationModel
         /*result=*/resType,
         /*vector=*/newLayoutOp,
         /*source=*/toLayoutOp.getInput(),
-        /*indices=*/ValueRange{SmallVector<Value>(rank, zero)},
+        /*indices=*/llvm::Repeated<Value>(rank, zero),
         /*permutation_map=*/writeIdentityMap,
         /*mask=*/mask,
         /*inBounds=*/writeInBounds);
@@ -444,7 +503,7 @@ struct MapStoreOpVectorizationModel
     rewriter.setInsertionPoint(mapStoreOp);
     ShapedType inputType = mapStoreOp.getInputType();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    SmallVector<Value> zeros(inputType.getRank(), zero);
+    llvm::Repeated<Value> zeros(inputType.getRank(), zero);
     auto inputVectorType =
         VectorType::get(inputType.getShape(), inputType.getElementType());
     Value inputVector = vector::TransferReadOp::create(
@@ -629,9 +688,69 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
 
   rewriter.setInsertionPointAfter(linalgOp);
 
-  // Build the preExtract linalg.generic and vectorize it.
+  // Build the preExtract linalg.generic.
   linalg::GenericOp preOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, preExtract, tensorMap);
+
+  // Vectorize preOp before building the transfer_gather so the gather can
+  // consume preOp's vector results directly instead of reading them back
+  // through its tensor outputs.
+  SmallVector<Value> origPreResults(preOp.getResults());
+  FailureOr<SmallVector<Value>> preResult =
+      vectorizeGatherLikeGenericToTransferGather(
+          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
+  if (failed(preResult)) {
+    return failure();
+  }
+
+  // Redirect tensorMap entries that referenced preOp's (now-erased) results
+  // to the vectorized replacements, so postOp — built below — picks up
+  // valid tensor inputs.
+  rewriter.replaceOp(preOp, *preResult);
+  for (auto &kv : tensorMap) {
+    Value &tensor = kv.second.first;
+    auto *it = llvm::find(origPreResults, tensor);
+    if (it != origPreResults.end()) {
+      tensor = (*preResult)[std::distance(origPreResults.begin(), it)];
+    }
+  }
+
+  // Map each replacement tensor to the vector SSA value written into it.
+  // The linalg vectorizer may wrap the writing op in vector.mask when
+  // masking is enabled; handle both forms. If a replacement is not a
+  // transfer_write (or a vector.mask wrapping one), skip it — the
+  // gather-construction loop below will fall back to a transfer_read of
+  // the replacement tensor, which is semantically equivalent (just less
+  // efficient).
+  //
+  // The captured vector is the *unmasked* operand of transfer_write —
+  // i.e., out-of-bounds lanes hold whatever the vector computation
+  // produced, not the init value of tensor.empty that would be read back
+  // from the tensor. This is safe because the gather op built below is
+  // unmasked and the outer transfer_write of the gather result is masked,
+  // so OOB-lane indices are never observed. Masking the gather itself
+  // (see TODO below) must preserve this invariant.
+  DenseMap<Value, Value> preTensorToVector;
+  for (Value repl : *preResult) {
+    vector::TransferWriteOp writeOp;
+    if (auto maskOp = repl.getDefiningOp<vector::MaskOp>()) {
+      writeOp = dyn_cast<vector::TransferWriteOp>(maskOp.getMaskableOp());
+    } else {
+      writeOp = repl.getDefiningOp<vector::TransferWriteOp>();
+    }
+    if (writeOp) {
+      preTensorToVector[repl] = writeOp.getVector();
+    }
+  }
+
+  // The recursive vectorize call may have moved the rewriter's insertion
+  // point. Pin it past the last vectorized op so the gather and postOp land
+  // in the correct place.
+  if (!preResult->empty()) {
+    if (Operation *lastDef = preResult->back().getDefiningOp()) {
+      rewriter.setInsertionPointAfter(lastDef);
+    }
+  }
 
   // Build the iree_vector_ext.transfer_gather operation.
   SmallVector<Value> baseOffsets;
@@ -656,28 +775,32 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
 
     auto [tensor, map] = tensorMap[index];
 
-    Type elemType = getElementTypeOrSelf(index);
-    AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
-    VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
-
-    SmallVector<Value> operandIndices(map.getNumResults(), zero);
-
-    // TODO: Mask the operation here. It's really hard to do that here though
-    // because we don't have access to the vectorization infra, but maybe there
-    // are easier ways to do it here.
-    auto read = vector::TransferReadOp::create(
-        rewriter, loc, readType, tensor, operandIndices,
-        /*padding=*/std::nullopt, readMap);
+    // Prefer the vector SSA value produced by the vectorized preOp; fall
+    // back to a transfer_read for tensors not produced by preOp (e.g.,
+    // original linalgOp operands directly referenced by the extract).
+    Value indexVec;
+    if (preTensorToVector.contains(tensor)) {
+      indexVec = preTensorToVector[tensor];
+    } else {
+      Type elemType = getElementTypeOrSelf(index);
+      AffineMap readMap = inverseAndBroadcastProjectedPermutation(map);
+      VectorType readType = VectorType::get(canonicalVectorSizes, elemType);
+      llvm::Repeated<Value> operandIndices(map.getNumResults(), zero);
+      auto read = vector::TransferReadOp::create(
+          rewriter, loc, readType, tensor, operandIndices,
+          /*padding=*/std::nullopt, readMap);
+      indexVec = read.getResult();
+    }
 
     baseOffsets.push_back(zero);
     // This source dim is gathered: use a symbol.
     int64_t symIdx = numSymbols++;
     sourceMapExprs.push_back(getAffineSymbolExpr(symIdx, ctx));
-    // The index vec map: the read result has shape canonicalVectorSizes, so
+    // The index vec map: the value has shape canonicalVectorSizes, so
     // it's indexed by all vector dims (identity map).
     indexVecMaps.push_back(
         rewriter.getMultiDimIdentityMap(canonicalVectorSizes.size()));
-    indexVecs.push_back(read.getResult());
+    indexVecs.push_back(indexVec);
   }
 
   auto sourceMap = AffineMap::get(
@@ -696,6 +819,11 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   auto gatherTy = VectorType::get(canonicalVectorSizes, extractOp.getType());
   Value padding = ub::PoisonOp::create(rewriter, loc, extractOp.getType());
 
+  // TODO: Mask the transfer_gather. OOB lanes of the index vectors harvested
+  // from preOp's vectorized body can be arbitrary values (see the comment on
+  // `preTensorToVector` above); today the outer transfer_write of the gather
+  // result is masked, which hides this, but masking the gather directly would
+  // make the invariant local.
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
       rewriter, loc, gatherTy, extractOp.getTensor(), baseOffsets, indexVecs,
       rewriter.getAffineMapArrayAttr(indexingMaps), padding,
@@ -704,7 +832,7 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   // Create a empty tensor to write to.
   auto emptyOp = tensor::EmptyOp::create(rewriter, loc, canonicalVectorSizes,
                                          gatherTy.getElementType());
-  SmallVector<Value> writeIndices(canonicalVectorSizes.size(), zero);
+  llvm::Repeated<Value> writeIndices(canonicalVectorSizes.size(), zero);
 
   auto writeOp = vector::TransferWriteOp::create(
       rewriter, loc, transferGatherOp.getResult(), emptyOp, writeIndices);
@@ -716,16 +844,6 @@ static FailureOr<SmallVector<Value>> vectorizeGatherLikeGenericToTransferGather(
   // Build the postExtract linalg.generic.
   linalg::GenericOp postOp = buildPartialGenericOp(
       rewriter, linalgOp, canonicalVectorSizes, postExtract, tensorMap);
-
-  FailureOr<SmallVector<Value>> preResult =
-      vectorizeGatherLikeGenericToTransferGather(
-          rewriter, preOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
-  if (failed(preResult)) {
-    return failure();
-  }
-  // Replace preOp so its users (e.g., postOp inputs) see the vectorized
-  // results.
-  rewriter.replaceOp(preOp, *preResult);
 
   auto postResult = vectorizeGatherLikeGenericToTransferGather(
       rewriter, postOp, vectorSizes, scalableVecDims, vectorizeNDExtract);
@@ -919,13 +1037,13 @@ vectorizeImplicitGatherToTransferGather(RewriterBase &rewriter,
   Value f0 =
       arith::ConstantOp::create(rewriter, loc, rewriter.getZeroAttr(elemType));
 
-  SmallVector<Value> baseOffsets(inRank, c0);
+  llvm::Repeated<Value> baseOffsets(inRank, c0);
   auto transferGatherOp = IREE::VectorExt::TransferGatherOp::create(
       rewriter, loc, vectorType, inOperand->get(), baseOffsets,
       ValueRange{indices},
       rewriter.getAffineMapArrayAttr({sourceMap, indexMap}), f0, Value());
 
-  SmallVector<Value> writeOffsets(outRank, c0);
+  llvm::Repeated<Value> writeOffsets(outRank, c0);
   auto transferWriteOp = vector::TransferWriteOp::create(
       rewriter, loc, transferGatherOp.getResult(), outOperand->get(),
       writeOffsets);
@@ -1342,6 +1460,138 @@ struct Im2colOpVectorizationModel
     return SmallVector<Value>{result};
   }
 };
+
+struct ScanOpVectorizationModel
+    : VectorizableOpInterface::ExternalModel<ScanOpVectorizationModel,
+                                             IREE::LinalgExt::ScanOp> {
+
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+
+    // Must be able to match region to CombiningKind.
+    if (!matchScanCombiner(scanOp.getRegion())) {
+      return false;
+    }
+
+    // Scalable vectors not yet supported.
+    if (llvm::any_of(scalableDims, [](bool b) { return b; })) {
+      return false;
+    }
+
+    // Without vector sizes, require static shapes.
+    if (vectorSizes.empty()) {
+      auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+      return inputTy.hasStaticShape();
+    }
+
+    return true;
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto scanOp = cast<IREE::LinalgExt::ScanOp>(op);
+    Location loc = scanOp.getLoc();
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(scanOp);
+
+    // Match combiner to CombiningKind.
+    auto kind = matchScanCombiner(scanOp.getRegion());
+    if (!kind) {
+      return failure();
+    }
+
+    // Determine vector shapes.
+    auto inputTy = cast<ShapedType>(scanOp.getInput().getType());
+    auto accumTy = cast<ShapedType>(scanOp.getAccumulator().getType());
+    Type elemType = inputTy.getElementType();
+    int64_t inputRank = inputTy.getRank();
+    int64_t scanDim = scanOp.getDimension();
+
+    SmallVector<int64_t> inputVecShape =
+        vectorSizes.empty() ? llvm::to_vector(inputTy.getShape())
+                            : llvm::to_vector(vectorSizes);
+
+    // Accumulator shape = input shape with scan dimension dropped.
+    SmallVector<int64_t> accumVecShape = inputVecShape;
+    accumVecShape.erase(accumVecShape.begin() + scanDim);
+
+    auto inputVecTy = VectorType::get(inputVecShape, elemType);
+    auto accumVecTy = VectorType::get(accumVecShape, elemType);
+
+    // Determine if masking is needed (dynamic shapes or vector > tensor).
+    bool needsInputMasking = !inputTy.hasStaticShape() ||
+                             !llvm::equal(inputTy.getShape(), inputVecShape);
+    bool needsAccumMasking = !accumTy.hasStaticShape() ||
+                             !llvm::equal(accumTy.getShape(), accumVecShape);
+
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> inputIndices(inputRank, zero);
+    SmallVector<Value> accumIndices(accumTy.getRank(), zero);
+
+    // Read input tensor to vector.
+    Value padding = ub::PoisonOp::create(rewriter, loc, elemType);
+    Value inputVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getInput(), inputVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsInputMasking);
+    if (needsInputMasking) {
+      SmallVector<OpFoldResult> inputDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getInput());
+      auto inputMaskTy = VectorType::get(inputVecShape, rewriter.getI1Type());
+      Value inputMask = vector::CreateMaskOp::create(
+          rewriter, loc, inputMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, inputDims));
+
+      // Replace masked-off lanes with identity value.
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, inputVecTy);
+      inputVec =
+          arith::SelectOp::create(rewriter, loc, inputMask, inputVec, identity);
+    }
+
+    // Read accumulator (initial value) to vector.
+    Value accumVec = vector::createReadOrMaskedRead(
+        rewriter, loc, scanOp.getAccumulator(), accumVecShape, padding,
+        /*useInBoundsInsteadOfMasking=*/!needsAccumMasking);
+    if (needsAccumMasking) {
+      SmallVector<OpFoldResult> accumDims =
+          tensor::getMixedSizes(rewriter, loc, scanOp.getAccumulator());
+      auto accumMaskTy = VectorType::get(accumVecShape, rewriter.getI1Type());
+      Value accumMask = vector::CreateMaskOp::create(
+          rewriter, loc, accumMaskTy,
+          getValueOrCreateConstantIndexOp(rewriter, loc, accumDims));
+
+      Value identity =
+          getCombiningIdentityValue(loc, rewriter, *kind, accumVecTy);
+      accumVec =
+          arith::SelectOp::create(rewriter, loc, accumMask, accumVec, identity);
+    }
+
+    // Create vector.scan.
+    auto vectorScanOp =
+        vector::ScanOp::create(rewriter, loc, *kind, inputVec, accumVec,
+                               scanDim, scanOp.getInclusive());
+
+    // Write results back to tensors.
+    Value output = vector::createWriteOrMaskedWrite(
+                       rewriter, loc, vectorScanOp.getDest(),
+                       scanOp.getOutput(), inputIndices,
+                       /*useInBoundsInsteadOfMasking=*/!needsInputMasking)
+                       ->getResult(0);
+
+    Value accum = vector::createWriteOrMaskedWrite(
+                      rewriter, loc, vectorScanOp.getAccumulatedValue(),
+                      scanOp.getAccumulator(), accumIndices,
+                      /*useInBoundsInsteadOfMasking=*/!needsAccumMasking)
+                      ->getResult(0);
+
+    return SmallVector<Value>{output, accum};
+  }
+};
+
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -1355,6 +1605,7 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
         *ctx);
     IREE::LinalgExt::Im2colOp::attachInterface<Im2colOpVectorizationModel>(
         *ctx);
+    IREE::LinalgExt::ScanOp::attachInterface<ScanOpVectorizationModel>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,
                             IREE::VectorExt::IREEVectorExtDialect *dialect) {

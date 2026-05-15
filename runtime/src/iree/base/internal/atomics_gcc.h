@@ -54,12 +54,10 @@ static inline void iree_atomic_thread_fence(int order) {
   IREE_RESTORE_COMPILER_TSAN_ERRORS()
 }
 
-#define iree_atomic_load(object, order)                            \
-  __extension__({                                                  \
-    __iree_auto_type __atomic_load_ptr = (object);                 \
-    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;              \
-    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (order)); \
-    __atomic_load_tmp;                                             \
+#define iree_atomic_load(object, order)            \
+  __extension__({                                  \
+    __iree_auto_type __atomic_load_ptr = (object); \
+    __atomic_load_n(__atomic_load_ptr, (order));   \
   })
 #define iree_atomic_store(object, desired, order)                     \
   __extension__({                                                     \

@@ -58,10 +58,11 @@ struct StripLinalgOpCompilationInfo final
   }
 };
 
-struct StripAttentionOpCompilationInfo final
-    : OpRewritePattern<IREE::LinalgExt::AttentionOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::LinalgExt::AttentionOp attentionOp,
+template <typename AttentionOpType>
+struct StripAttentionLikeOpCompilationInfo final
+    : OpRewritePattern<AttentionOpType> {
+  using OpRewritePattern<AttentionOpType>::OpRewritePattern;
+  LogicalResult matchAndRewrite(AttentionOpType attentionOp,
                                 PatternRewriter &rewriter) const override {
     if (getCompilationInfo(attentionOp)) {
       eraseCompilationInfo(attentionOp);
@@ -76,10 +77,8 @@ struct StripAttentionOpCompilationInfo final
       DictionaryAttr newConfig = DictionaryAttr::get(
           decompositionConfig.getContext(),
           llvm::filter_to_vector(decompositionConfig, [](NamedAttribute attr) {
-            return attr.getName() !=
-                       IREE::LinalgExt::AttentionOp::getQKAttrStr() &&
-                   attr.getName() !=
-                       IREE::LinalgExt::AttentionOp::getPVAttrStr();
+            return attr.getName() != AttentionOpType::getQKAttrStr() &&
+                   attr.getName() != AttentionOpType::getPVAttrStr();
           }));
       if (newConfig.empty()) {
         attentionOp.removeDecompositionConfigAttr();
@@ -96,8 +95,11 @@ struct StripCompilationInfoPass final
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);
-    patterns.add<StripFuncOpTranslationInfo, StripLinalgOpCompilationInfo,
-                 StripAttentionOpCompilationInfo>(ctx);
+    patterns
+        .add<StripFuncOpTranslationInfo, StripLinalgOpCompilationInfo,
+             StripAttentionLikeOpCompilationInfo<IREE::LinalgExt::AttentionOp>,
+             StripAttentionLikeOpCompilationInfo<
+                 IREE::LinalgExt::OnlineAttentionOp>>(ctx);
     walkAndApplyPatterns(getOperation(), std::move(patterns));
   }
 };

@@ -393,10 +393,20 @@ static bool isUnpackLikeOp(Operation *op) {
 static SmallVector<OpOperand *>
 getFusableUses(MLIRContext *context, Operation *op,
                DominanceInfo const &dominanceInfo, bool aggressiveFusion) {
-  if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
-                             return !isa<tensor::DimOp>(use.getOwner());
-                           }) != 1) {
-    return {};
+  // In non-aggressive mode, restrict fusion to producers whose results flow
+  // to a single consumer. Count distinct consumers rather than operand uses
+  // so that a single consumer reading multiple results from a multi-result
+  // producer (e.g. OnlineAttentionOp) still qualifies.
+  if (!aggressiveFusion) {
+    llvm::SetVector<Operation *> consumers;
+    for (Operation *user : op->getUsers()) {
+      if (!isa<tensor::DimOp>(user)) {
+        consumers.insert(user);
+      }
+    }
+    if (consumers.size() != 1) {
+      return {};
+    }
   }
 
   // Collect all fusable user candidates.
@@ -657,24 +667,32 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      // Analyse the use to see if it is fusable.
-      for (OpOperand *fusableUse : fusableUses) {
-        Operation *consumerOp = fusableUse->getOwner();
+      // Group operands by owning consumer so the per-operand checks inside
+      // `isFusableWithConsumer` are evaluated for every operand of a consumer.
+      llvm::MapVector<Operation *, SmallVector<OpOperand *>> usesByConsumer;
+      for (OpOperand *use : fusableUses) {
+        usesByConsumer[use->getOwner()].push_back(use);
+      }
+
+      for (auto &[consumerOp, operands] : usesByConsumer) {
         if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
           continue;
         }
 
         // Ensure that fusing the consumer would not cause use-def violations.
         if (tracker.getFusionGroup(currRoot)
-                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner(),
+                .hasTransitiveDependencyOnFusionGroup(consumerOp,
                                                       dominanceInfo)) {
           continue;
         }
 
-        if (isFusableWithConsumer(*fusableUse, tracker, options)) {
-          tracker.appendToFusionGroup(consumerOp, fusionGroup);
-          workList.push_back(consumerOp);
+        if (!llvm::all_of(operands, [&](OpOperand *use) {
+              return isFusableWithConsumer(*use, tracker, options);
+            })) {
+          continue;
         }
+        tracker.appendToFusionGroup(consumerOp, fusionGroup);
+        workList.push_back(consumerOp);
       }
     }
   }
@@ -705,7 +723,8 @@ static bool isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          consumer)) {
     // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
@@ -754,6 +773,23 @@ static bool isFusableWithProducer(OpOperand &operand,
   return true;
 }
 
+static bool areAllFusionGroupUsesFusableWithProducer(
+    Operation *producer, const FusionGroup &fusionGroup,
+    const FusionTracker &tracker, FormDispatchRegionsPassOptions const &options,
+    bool fuseWithTruncate) {
+  return llvm::all_of(producer->getUses(), [&](OpOperand &use) {
+    Operation *useOwner = use.getOwner();
+    Operation *useOwnerAtProducerLevel =
+        producer->getBlock()->findAncestorOpInBlock(*useOwner);
+    if (!useOwnerAtProducerLevel ||
+        !fusionGroup.contains(useOwnerAtProducerLevel)) {
+      return true;
+    }
+    return useOwnerAtProducerLevel == useOwner &&
+           isFusableWithProducer(use, tracker, options, fuseWithTruncate);
+  });
+}
+
 /// Starting from the `root` op, traverse the operand use-def chain
 /// in reverse to fuse with producers.
 static void
@@ -783,7 +819,8 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
         continue;
       }
 
-      if (!isFusableWithProducer(operand, tracker, options, fuseWithTruncate)) {
+      if (!areAllFusionGroupUsesFusableWithProducer(
+              producer, fusionGroup, tracker, options, fuseWithTruncate)) {
         continue;
       }
 
@@ -874,8 +911,10 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isCloneableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(),
-                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
+          llvm::all_of(op.getUsers(), [](Operation *user) {
+            return isa<IREE::LinalgExt::AttentionOp,
+                       IREE::LinalgExt::OnlineAttentionOp>(user);
+          })) {
         continue;
       }
 

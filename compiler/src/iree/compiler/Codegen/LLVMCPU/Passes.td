@@ -51,6 +51,24 @@ def LLVMCPUAssignImportOrdinalsPass :
   let summary = "Assigns executable import ordinals across all LLVMCPU variants.";
 }
 
+def LLVMCPUAssignWorkgroupLocalMemoryPass :
+    InterfacePass<"iree-llvmcpu-assign-workgroup-local-memory",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Assigns HAL workgroup local memory layout for marked memref.alloc ops.";
+  let description = [{
+    Scans entry-block memref.alloc operations whose memory space is
+    #iree_codegen.workgroup_local, computes a static byte layout using the
+    target data layout, and rewrites each alloc to a memref.view into one packed
+    byte allocation in the same memory space.
+
+    The pass also sets the corresponding iree_codegen.dispatch_config
+    workgroup_local_memory attribute so propagation to hal.executable.export
+    follows the normal dispatch metadata path. Existing local-memory
+    requirements are rejected instead of being overwritten.
+  }];
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversionPass :
     InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
@@ -81,7 +99,7 @@ def LLVMCPULinkExecutablesPass :
 def LLVMCPULowerExecutableTargetPass :
     InterfacePass<"iree-llvmcpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
-      "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+      "Lower executable target using a pipeline attribute";
   let description = [{
     Pass to lower the module an hal.executable.variant operation to external
     dialect. Currently this pass lowers to LLVM dialect, but could be
@@ -89,9 +107,9 @@ def LLVMCPULowerExecutableTargetPass :
   }];
   let options = [
     Option<"cpuOptions", "cpu-options", "CPUCodegenOptions",
-      /*default=*/"CPUCodegenOptions::FromFlags::get()",
-      "Session-scoped CPU codegen options controlling optimization level, "
-      "distribution, etc.">,
+      /*default=*/"CPUCodegenOptions()",
+      "CPU codegen options consumed by this pass; see CPUCodegenOptions for "
+      "the available and default settings.">,
   ];
 }
 
@@ -113,7 +131,7 @@ def LLVMCPUPeelPass :
 def LLVMCPUSelectLoweringStrategyPass :
     Pass<"iree-llvmcpu-select-lowering-strategy", "ModuleOp"> {
   let summary =
-      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+      "Select a pipeline attribute for lowering the variant";
   let description = [{
     Pass to select a lowering strategy for a hal.executable.variant operation.
     The variant is annotated with the selected strategies, which are
