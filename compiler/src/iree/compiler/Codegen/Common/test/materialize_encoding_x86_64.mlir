@@ -302,6 +302,61 @@ func.func @matmul_bf16_f32_avx2_generic(
 
 // -----
 
+// The ACC swizzle for the same generic-scalar config above
+// (intrinsics_m=2, intrinsics_n=4) has `expandShape = [[Cross(2),
+// Int(1)], [Cross(4), Int(1)]]` with `permutation = [0, 2, 1, 3]` —
+// non-identity, but a no-op modulo unit dims (the permutation only
+// reorders the `Internal(1)` placeholders relative to the non-unit
+// `CrossIntrinsic` dims). The set_encoding lowering recognizes this
+// and emits a single `tensor.expand_shape` from the rank-4 pack output
+// directly into the rank-6 permuted layout, with no `linalg.transpose`.
+// The unset_encoding side is symmetric: a single `tensor.collapse_shape`
+// from the rank-6 permuted source directly into the rank-4 unpack input.
+// Iteration_sizes are pinned to (M=2, N=4, K=?) so the cost model lands
+// on intrinsics_m=2, intrinsics_n=4 regardless of whether the
+// power-of-two cap on `chooseUnrolling` is active.
+
+#map_g_no = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map_g_no1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map_g_no2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_g_no_res = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map_g_no, #map_g_no1, #map_g_no2], iteration_sizes = [2, 4, ?]>
+func.func @set_encoding_RESULT_avx2_generic_no_op_transpose(
+    %arg0: tensor<2x4xf32>, %k: index) -> tensor<2x4xf32, #encoding_g_no_res> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx2,+fma", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%k}
+      : tensor<2x4xf32> -> tensor<2x4xf32, #encoding_g_no_res>
+  return %0 : tensor<2x4xf32, #encoding_g_no_res>
+}
+// CHECK-LABEL: func @set_encoding_RESULT_avx2_generic_no_op_transpose
+//       CHECK:   %[[PACK:.+]] = linalg.pack
+//  CHECK-SAME:     inner_dims_pos = [0, 1] inner_tiles = [2, 4]
+//  CHECK-SAME:     -> tensor<1x1x2x4xf32>
+//       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[PACK]]
+//  CHECK-SAME{LITERAL}: [[0], [1], [2], [3, 4, 5]]
+//  CHECK-SAME:     : tensor<1x1x2x4xf32> into tensor<1x1x2x4x1x1xf32>
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   return %[[EXPAND]] : tensor<1x1x2x4x1x1xf32>
+
+func.func @unset_encoding_RESULT_avx2_generic_no_op_transpose(
+    %arg0: tensor<2x4xf32, #encoding_g_no_res>, %k: index) -> tensor<2x4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx2,+fma", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%k}
+      : tensor<2x4xf32, #encoding_g_no_res> -> tensor<2x4xf32>
+  return %0 : tensor<2x4xf32>
+}
+// CHECK-LABEL: func @unset_encoding_RESULT_avx2_generic_no_op_transpose
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape
+//  CHECK-SAME{LITERAL}: [[0], [1], [2], [3, 4, 5]]
+//  CHECK-SAME:     : tensor<1x1x2x4x1x1xf32> into tensor<1x1x2x4xf32>
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]]
+//  CHECK-SAME:     inner_dims_pos = [0, 1] inner_tiles = [2, 4]
+//       CHECK:   return %[[UNPACK]]
+
+// -----
+
 // Sub-byte LHS/RHS forces `chooseUnrolling` to also pick `intrinsics_k > 1`
 // for the generic intrinsic, so each contiguous K-group covers a whole
 // number of bytes (otherwise sub-byte elements aren't byte-addressable in
