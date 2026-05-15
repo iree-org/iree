@@ -1,0 +1,29 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+
+package(
+    default_visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+    licenses = ["notice"],
+)
+
+iree_cmake_extra_content(
+    content = """
+# Prebuilt code objects are consumed by the parent package's CMake target.
+""",
+    inline = True,
+)
+
+exports_files([
+    "amdgcn-amd-amdhsa--gfx10-1-generic.so",
+    "amdgcn-amd-amdhsa--gfx10-3-generic.so",
+    "amdgcn-amd-amdhsa--gfx11-generic.so",
+    "amdgcn-amd-amdhsa--gfx12-generic.so",
+    "amdgcn-amd-amdhsa--gfx9-generic.so",
+    "amdgcn-amd-amdhsa--gfx9-4-generic.so",
+    "amdgcn-amd-amdhsa--gfx90a.so",
+])

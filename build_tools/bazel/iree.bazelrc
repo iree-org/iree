@@ -236,6 +236,19 @@ build:perf --host_cxxopt=-march=native
 build:tracy --iree_enable_runtime_tracing=tracy
 
 ###############################################################################
+# AMDGPU builtin device binary source builds.
+###############################################################################
+
+# Default AMDGPU runtime builds embed checked-in builtin device code objects.
+# Use these configs when editing runtime/src/iree/hal/drivers/amdgpu/device/*.c
+# and wanting Bazel to rebuild the code objects from source.
+build:amdgpu_device_binaries_source --//runtime/src/iree/hal/drivers/amdgpu/device/binaries:build_mode=source
+build:amdgpu_device_binaries_source_rocm --config=amdgpu_device_binaries_source
+build:amdgpu_device_binaries_source_rocm --repo_env=IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN=rocm
+build:amdgpu_device_binaries_source_llvm_project --config=amdgpu_device_binaries_source
+build:amdgpu_device_binaries_source_llvm_project --repo_env=IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN=llvm-project
+
+###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################

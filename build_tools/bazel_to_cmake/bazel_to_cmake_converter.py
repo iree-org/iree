@@ -1145,6 +1145,12 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_hal_amdgpu_source_device_binaries(self):
+        self._converter.body += (
+            "# Source-built AMDGPU device binary targets are wired manually by\n"
+            "# runtime/src/iree/hal/drivers/amdgpu/device/binaries/CMakeLists.txt.\n\n"
+        )
+
     def iree_cuda_bitcode_library(
         self, name, cuda_arch, srcs, internal_hdrs=None, copts=None
     ):

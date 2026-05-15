@@ -14,6 +14,13 @@ def iree_amdgpu_binary(
         internal_hdrs = [],
         copts = [],
         linkopts = [],
+        clang_tool = "@llvm-project//clang:clang",
+        link_tool = "@llvm-project//llvm:llvm-link",
+        lld_tool = "@llvm-project//lld:lld",
+        objcopy_tool = None,
+        builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen",
+        builtin_headers_marker = None,
+        builtin_headers_include_flag = "-isystem $(BINDIR)/external/+_repo_rules+llvm-project/clang/staging/include/",
         **kwargs):
     """Builds an LLVM shared library for AMDGPU from input files via clang.
 
@@ -27,14 +34,18 @@ def iree_amdgpu_binary(
                        interface headers.
         copts: additional flags to pass to clang.
         linkopts: additional flags to pass to lld.
+        clang_tool: clang/amdclang executable target.
+        link_tool: llvm-link executable target.
+        lld_tool: lld executable target.
+        objcopy_tool: optional llvm-objcopy executable target used to minimize
+                      the linked ELF image.
+        builtin_headers_dep: target containing clang builtin headers.
+        builtin_headers_marker: optional single builtin header file used to
+                                derive the builtin header include directory.
+        builtin_headers_include_flag: shell fragment adding the builtin header
+                                      include directory to clang.
         **kwargs: any additional attributes to pass to the underlying rules.
     """
-
-    clang_tool = "@llvm-project//clang:clang"
-    link_tool = "@llvm-project//llvm:llvm-link"
-    lld_tool = "@llvm-project//lld:lld"
-    builtin_headers_dep = "@llvm-project//clang:builtin_headers_gen"
-    builtin_headers_path = "external/+_repo_rules+llvm-project/clang/staging/include/"
 
     base_copts = [
         # C configuration.
@@ -50,7 +61,7 @@ def iree_amdgpu_binary(
         "-fgpu-rdc",  # NOTE: may not be required for all targets
 
         # Header paths for builtins and our own includes.
-        "-isystem $(BINDIR)/%s" % builtin_headers_path,
+        builtin_headers_include_flag,
         "-I$(BINDIR)/runtime/src",
         "-Iruntime/src",
 
@@ -71,9 +82,12 @@ def iree_amdgpu_binary(
     archive_out = "%s.a" % (name)
     source_locations = " ".join(["$(locations %s)" % (src,) for src in srcs])
     object_dir = "$(@D)/%s.objects" % (name,)
+    compile_srcs = srcs + [builtin_headers_dep] + internal_hdrs
+    if builtin_headers_marker != None:
+        compile_srcs.append(builtin_headers_marker)
     native.genrule(
         name = "archive_%s" % (name),
-        srcs = srcs + [builtin_headers_dep] + internal_hdrs,
+        srcs = compile_srcs,
         outs = [archive_out],
         cmd = " && ".join([
             "set -e",
@@ -141,20 +155,42 @@ def iree_amdgpu_binary(
     ]
 
     out = "%s.so" % (name)
+    version_script = "$(@D)/%s.local.version" % (name,)
+    link_output = "$(location %s)" % (out)
+    lld_linkopts = base_linkopts + linkopts
+    objcopy_command = None
+    if objcopy_tool != None:
+        link_output = "$(@D)/%s.linked.so" % (name,)
+        lld_linkopts = lld_linkopts + [
+            "--version-script=\"%s\"" % (version_script,),
+        ]
+        objcopy_command = " ".join([
+            "$(location %s)" % (objcopy_tool),
+            "-R .comment",
+            "-R .AMDGPU.gpr_maximums",
+            "--discard-all",
+            "-N _DYNAMIC",
+            "\"%s\"" % (link_output,),
+            "$(location %s)" % (out),
+        ])
+    cmd = []
+    if objcopy_tool != None:
+        cmd.append("printf '{\\n  local:\\n    *;\\n};\\n' > \"%s\"" % (version_script,))
+    cmd.append(" ".join([
+        "$(location %s)" % (lld_tool),
+        "-flavor gnu",
+        " ".join(lld_linkopts),
+        "$(location %s)" % (link_out),
+        "-o \"%s\"" % (link_output,),
+    ]))
+    if objcopy_command:
+        cmd.append(objcopy_command)
     native.genrule(
         name = name,
         srcs = [link_out],
         outs = [out],
-        cmd = " && ".join([
-            " ".join([
-                "$(location %s)" % (lld_tool),
-                "-flavor gnu",
-                " ".join(base_linkopts + linkopts),
-                "$(location %s)" % (link_out),
-                "-o $(location %s)" % (out),
-            ]),
-        ]),
-        tools = [lld_tool],
+        cmd = " && ".join(cmd),
+        tools = [tool for tool in [lld_tool, objcopy_tool] if tool != None],
         message = "Generating OpenCL binary %s to %s..." % (name, out),
         output_to_bindir = 1,
         **kwargs

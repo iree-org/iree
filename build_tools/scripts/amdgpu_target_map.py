@@ -4,7 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Generates shared AMDGPU device library target map fragments.
+"""Generates shared AMDGPU device binary target map fragments.
 
 The map in this file is the source of truth for the small generated tables used
 by Bazel, CMake, and the runtime device-library loader. Keep build logic in
@@ -17,7 +17,15 @@ import re
 import sys
 from pathlib import Path
 
-DEFAULT_TARGET_SELECTIONS = ("all",)
+DEFAULT_TARGET_SELECTIONS = (
+    "gfx9-generic",
+    "gfx90a",
+    "gfx9-4-generic",
+    "gfx10-1-generic",
+    "gfx10-3-generic",
+    "gfx11-generic",
+    "gfx12-generic",
+)
 
 # Each exact target must match an HSA ISA architecture suffix. Each code object
 # target must be accepted by LLVM clang/lld as an AMDGPU -march value. Generic
@@ -118,6 +126,8 @@ TARGET_FAMILIES = (
             "gfx1102",
             "gfx1200",
             "gfx1201",
+            "gfx1250",
+            "gfx1251",
         ),
     ),
     ("gfx900-dgpu", ("gfx900",)),
@@ -271,7 +281,7 @@ def bzl_family_dict(name):
         values = family_targets(targets)
         if targets is ALL_EXACT_TARGETS:
             lines.append(
-                '    "{}": IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS,'.format(family)
+                '    "{}": IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS,'.format(family)
             )
         elif len(values) == 1:
             lines.append('    "{}": ["{}"],'.format(family, values[0]))
@@ -290,26 +300,26 @@ def render_bzl():
             [
                 generated_header("#", output_path),
                 bzl_list(
-                    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_DEFAULT_TARGETS",
+                    "IREE_HAL_AMDGPU_DEVICE_BINARY_DEFAULT_TARGETS",
                     DEFAULT_TARGET_SELECTIONS,
                 ),
                 bzl_list(
-                    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS",
+                    "IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS",
                     exact_targets(),
                 ),
                 bzl_list(
-                    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS",
+                    "IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS",
                     code_object_targets(),
                 ),
                 bzl_string_dict(
-                    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS",
+                    "IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS",
                     EXACT_TARGET_CODE_OBJECTS,
                 ),
                 bzl_list(
-                    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES",
+                    "IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILY_NAMES",
                     target_family_names(),
                 ),
-                bzl_family_dict("IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES"),
+                bzl_family_dict("IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILIES"),
             ]
         )
         + "\n"
@@ -447,7 +457,7 @@ def write_outputs(outputs):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate AMDGPU device library target map fragments."
+        description="Generate AMDGPU device binary target map fragments."
     )
     parser.add_argument(
         "--check",

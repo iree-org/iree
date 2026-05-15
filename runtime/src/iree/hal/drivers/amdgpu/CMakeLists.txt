@@ -452,7 +452,7 @@ iree_cc_test(
   GROUP
     "iree-hal-drivers-amdgpu-tests"
 )
-
+if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
 iree_cc_test(
   NAME
     host_queue_command_buffer_test
@@ -476,6 +476,8 @@ iree_cc_test(
   GROUP
     "iree-hal-drivers-amdgpu-tests"
 )
+endif()
+
 if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)
 add_custom_command(OUTPUT pm4_command_buffer_benchmark_testdata_srcs.stamp
     COMMAND ${CMAKE_COMMAND} -E touch pm4_command_buffer_benchmark_testdata_srcs.stamp

@@ -5,18 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load(":device_bitcode_sources.bzl", "IREE_HAL_AMDGPU_DEVICE_BITCODE_SRCS")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-DEVICE_SRCS = [
-    "blit.c",
-    "dispatch.c",
-    "timestamp.c",
-]
 
 DEVICE_HDRS = [
     "blit.h",
@@ -32,14 +27,14 @@ DEVICE_HDRS = [
 
 filegroup(
     name = "bitcode_srcs",
-    srcs = DEVICE_SRCS,
-    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
+    srcs = IREE_HAL_AMDGPU_DEVICE_BITCODE_SRCS,
 )
+
+exports_files(["device_bitcode_sources.bzl"])
 
 filegroup(
     name = "bitcode_hdrs",
     srcs = DEVICE_HDRS,
-    visibility = ["//runtime/src/iree/hal/drivers/amdgpu/device/binaries:__pkg__"],
 )
 
 #===------------------------------------------------------------------------===#

@@ -4,21 +4,40 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""AMDGPU device library target selection."""
+"""AMDGPU device binary target selection."""
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("//build_tools/bazel:iree_amdgpu_binary.bzl", "iree_amdgpu_binary")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 load(
     ":target_map.bzl",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_DEFAULT_TARGETS",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES",
-    "IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_DEFAULT_TARGETS",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILIES",
+    "IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILY_NAMES",
 )
+
+_BUILD_MODE_PREBUILT = "prebuilt"
+_BUILD_MODE_SOURCE = "source"
+_VALID_BUILD_MODES = [
+    _BUILD_MODE_PREBUILT,
+    _BUILD_MODE_SOURCE,
+]
+
+_PREBUILT_CODE_OBJECT_TARGETS = {
+    "gfx10-1-generic": True,
+    "gfx10-3-generic": True,
+    "gfx11-generic": True,
+    "gfx12-generic": True,
+    "gfx9-4-generic": True,
+    "gfx9-generic": True,
+    "gfx90a": True,
+}
+
+# Keep intentionally unbuildable helper targets out of //... CI enumeration.
+_INCOMPATIBLE_TARGET = ["@platforms//:incompatible"]
 
 def _append_unique(values, new_values):
     for value in new_values:
@@ -27,29 +46,29 @@ def _append_unique(values, new_values):
 
 def _valid_selectors():
     selectors = []
-    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS)
-    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS)
-    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES)
+    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS)
+    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS)
+    _append_unique(selectors, IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILY_NAMES)
     return selectors
 
-def iree_hal_amdgpu_expand_device_library_targets(targets):
+def iree_hal_amdgpu_expand_device_binary_targets(targets):
     expanded_targets = []
     for target in targets:
-        if target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS:
+        if target in IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS:
             _append_unique(expanded_targets, [target])
-        elif target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS:
+        elif target in IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS:
             _append_unique(
                 expanded_targets,
-                [IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS[target]],
+                [IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS[target]],
             )
-        elif target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES:
-            for exact_target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES[target]:
+        elif target in IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILIES:
+            for exact_target in IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILIES[target]:
                 _append_unique(
                     expanded_targets,
-                    [IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS[exact_target]],
+                    [IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS[exact_target]],
                 )
         else:
-            fail("Unknown AMDGPU device library target or family '%s'. Available: %s" % (
+            fail("Unknown AMDGPU device binary target or family '%s'. Available: %s" % (
                 target,
                 ", ".join(_valid_selectors()),
             ))
@@ -60,15 +79,15 @@ def _target_label_fragment(target):
 
 def _selectors_for_code_object_target(code_object_target):
     selectors = [code_object_target]
-    for exact_target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS:
-        if IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS[exact_target] == code_object_target:
+    for exact_target in IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS:
+        if IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS[exact_target] == code_object_target:
             _append_unique(selectors, [exact_target])
-    for family in IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES:
-        if code_object_target in iree_hal_amdgpu_expand_device_library_targets([family]):
+    for family in IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILY_NAMES:
+        if code_object_target in iree_hal_amdgpu_expand_device_binary_targets([family]):
             _append_unique(selectors, [family])
     return selectors
 
-def _device_library_targets_flag_impl(ctx):
+def _device_binary_targets_flag_impl(ctx):
     valid_selectors = _valid_selectors()
     invalid_selectors = [
         selector
@@ -76,27 +95,57 @@ def _device_library_targets_flag_impl(ctx):
         if selector not in valid_selectors
     ]
     if invalid_selectors:
-        fail("Unknown AMDGPU device library target selector(s) [{}]. Available: {}".format(
+        fail("Unknown AMDGPU device binary target selector(s) [{}]. Available: {}".format(
             ", ".join(invalid_selectors),
             ", ".join(valid_selectors),
         ))
     return BuildSettingInfo(value = ctx.build_setting_value)
 
-_device_library_targets_flag = rule(
-    implementation = _device_library_targets_flag_impl,
+_device_binary_targets_flag = rule(
+    implementation = _device_binary_targets_flag_impl,
     build_setting = config.string_list(flag = True),
+)
+
+def _device_binary_build_mode_flag_impl(ctx):
+    if ctx.build_setting_value not in _VALID_BUILD_MODES:
+        fail("Unknown AMDGPU device binary build mode '{}'. Available: {}".format(
+            ctx.build_setting_value,
+            ", ".join(_VALID_BUILD_MODES),
+        ))
+    return BuildSettingInfo(value = ctx.build_setting_value)
+
+_device_binary_build_mode_flag = rule(
+    implementation = _device_binary_build_mode_flag_impl,
+    build_setting = config.string(flag = True),
 )
 
 def iree_hal_amdgpu_device_binaries(
         name,
-        srcs,
-        internal_hdrs,
         target_selections = None,
         target = "amdgcn-amd-amdhsa"):
     if target_selections == None:
-        target_selections = IREE_HAL_AMDGPU_DEVICE_LIBRARY_DEFAULT_TARGETS
+        target_selections = IREE_HAL_AMDGPU_DEVICE_BINARY_DEFAULT_TARGETS
 
-    _device_library_targets_flag(
+    _device_binary_build_mode_flag(
+        name = "build_mode",
+        build_setting_default = _BUILD_MODE_PREBUILT,
+    )
+
+    native.config_setting(
+        name = "build_mode_prebuilt",
+        flag_values = {
+            ":build_mode": _BUILD_MODE_PREBUILT,
+        },
+    )
+
+    native.config_setting(
+        name = "build_mode_source",
+        flag_values = {
+            ":build_mode": _BUILD_MODE_SOURCE,
+        },
+    )
+
+    _device_binary_targets_flag(
         name = "targets",
         build_setting_default = target_selections,
     )
@@ -110,15 +159,8 @@ def iree_hal_amdgpu_device_binaries(
         )
 
     binary_srcs = []
-    for code_object_target in IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS:
+    for code_object_target in IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS:
         binary_name = "%s--%s" % (target, code_object_target)
-        iree_amdgpu_binary(
-            name = binary_name,
-            srcs = srcs,
-            arch = code_object_target,
-            internal_hdrs = internal_hdrs,
-            target = target,
-        )
         selects.config_setting_group(
             name = "%s_requested" % (_target_label_fragment(code_object_target),),
             match_any = [
@@ -126,8 +168,33 @@ def iree_hal_amdgpu_device_binaries(
                 for selector in _selectors_for_code_object_target(code_object_target)
             ],
         )
+        selects.config_setting_group(
+            name = "%s_requested_prebuilt" % (_target_label_fragment(code_object_target),),
+            match_all = [
+                ":%s_requested" % (_target_label_fragment(code_object_target),),
+                ":build_mode_prebuilt",
+            ],
+        )
+        selects.config_setting_group(
+            name = "%s_requested_source" % (_target_label_fragment(code_object_target),),
+            match_all = [
+                ":%s_requested" % (_target_label_fragment(code_object_target),),
+                ":build_mode_source",
+            ],
+        )
+        if code_object_target in _PREBUILT_CODE_OBJECT_TARGETS:
+            prebuilt_label = "//runtime/src/iree/hal/drivers/amdgpu/device/binaries/prebuilt:%s.so" % (binary_name,)
+        else:
+            missing_prebuilt_name = "missing_prebuilt_%s" % (_target_label_fragment(code_object_target),)
+            native.filegroup(
+                name = missing_prebuilt_name,
+                target_compatible_with = _INCOMPATIBLE_TARGET,
+            )
+            prebuilt_label = ":%s" % (missing_prebuilt_name,)
+        source_label = "//runtime/src/iree/hal/drivers/amdgpu/device/binaries/source:%s.so" % (binary_name,)
         binary_srcs += select({
-            ":%s_requested" % (_target_label_fragment(code_object_target),): [":%s.so" % (binary_name,)],
+            ":%s_requested_prebuilt" % (_target_label_fragment(code_object_target),): [prebuilt_label],
+            ":%s_requested_source" % (_target_label_fragment(code_object_target),): [source_label],
             "//conditions:default": [],
         })
     iree_c_embed_data(
