@@ -106,6 +106,13 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createDropVectorUnitDimsPass());
+  // Wrap reshape ops around `inner_tiled` in `HoistableConversionOp` pairs
+  // so they can hoist/cancel out of K-reduction loops; otherwise they
+  // remain bridges between the loop's iter args and the inner_tiled's
+  // accumulator, and the per-intrinsic conversion pairs that
+  // `LLVMCPUVirtualVectorLoweringPass` emits below fail to hoist (no
+  // direct iter_arg match) and fall back to inlining-in-place.
+  funcPassManager.addPass(createHoistInnerTiledAccReshapesPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
       LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
                                               options.enableArmI8mm}));
