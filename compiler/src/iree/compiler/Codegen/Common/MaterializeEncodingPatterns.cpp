@@ -507,6 +507,25 @@ getReassociationIndices(int outerDims,
   return result;
 }
 
+/// Returns true if any dim of the swizzle's `expandShape` is a `CrossThread`
+/// dim, which by definition only occurs on SIMT (GPU) targets — CPU swizzles
+/// only carry `Internal` and `CrossIntrinsic` dims. Used to gate the
+/// transpose-fold fast path to CPU: downstream GPU codegen (coalesced DMA, LDS
+/// layout derivation) currently relies on the explicit `linalg.transpose`
+/// produced by the general path, and elides differently when it is folded
+/// into the reshape's reassociation.
+static bool swizzleHasCrossThreadDim(const TileSwizzle &swizzle) {
+  for (const TileSwizzle::ExpandShapeDimVectorType &group :
+       swizzle.expandShape()) {
+    for (const TileSwizzle::Dim &dim : group) {
+      if (dim.kind() == TileSwizzle::Dim::Kind::CrossThread) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Returns true when the swizzle's `permutation` only reorders unit dims
 /// relative to non-unit dims, i.e. it preserves the relative order of all
 /// non-unit dims. In that case the unpermuted and permuted inner-tile shapes
@@ -642,8 +661,10 @@ struct SetEncodingOpLoweringConversion
     // expressible as a single reshape, replace expand_shape + transpose with
     // one expand_shape straight to the permuted shape. This drops the
     // intermediate buffer that, under dynamic shapes, gets hoisted to a stack
-    // alloca with a bogus index-umax-derived static size.
-    if (isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
+    // alloca with a bogus index-umax-derived static size. Gated to non-GPU
+    // swizzles (no CrossThread dims) — see `swizzleHasCrossThreadDim`.
+    if (!swizzleHasCrossThreadDim(*encodingInfo.swizzle) &&
+        isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
       if (auto reassoc = getSwizzleFoldedReassociation(
               origRank, encodingInfo.innerTileSizes, *encodingInfo.swizzle);
           succeeded(reassoc)) {
@@ -722,9 +743,11 @@ struct UnsetEncodingOpLoweringConversion
 
       // Fast path mirroring the SetEncoding side: fold the inverse transpose +
       // collapse_shape into a single collapse_shape when the permutation is a
-      // layout no-op and the fold is a single reshape.
+      // layout no-op and the fold is a single reshape. Gated to non-GPU
+      // swizzles — see `swizzleHasCrossThreadDim`.
       FailureOr<SmallVector<ReassociationIndices>> foldedReassoc = failure();
-      if (isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
+      if (!swizzleHasCrossThreadDim(*encodingInfo.swizzle) &&
+          isSwizzlePermutationLayoutNoOp(*encodingInfo.swizzle)) {
         foldedReassoc = getSwizzleFoldedReassociation(
             targetRank, encodingInfo.innerTileSizes, *encodingInfo.swizzle);
       }
