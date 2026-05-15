@@ -134,16 +134,22 @@ TEST_P(AllocatorTest, ImportHostAllocationNullCallback) {
     GTEST_SKIP() << "Allocator does not support importing host allocations";
   }
 
-  // Use the portable aligned allocator to satisfy backend alignment
-  // requirements (64 bytes on HIP/CUDA/local-task).
+  // Use the compatibility-adjusted size and alignment to satisfy backend
+  // import requirements such as Vulkan minImportedHostPointerAlignment.
+  ASSERT_LE(compat_size, static_cast<iree_device_size_t>(IREE_HOST_SIZE_MAX));
+  ASSERT_LE(compat_params.min_alignment,
+            static_cast<iree_device_size_t>(IREE_HOST_SIZE_MAX));
+  iree_host_size_t host_alignment =
+      static_cast<iree_host_size_t>(compat_params.min_alignment);
+  if (host_alignment == 0) host_alignment = 64;
   void* host_ptr = nullptr;
   IREE_ASSERT_OK(iree_allocator_malloc_aligned(
-      iree_allocator_system(), kAllocationSize, /*min_alignment=*/64,
-      /*offset=*/0, &host_ptr));
+      iree_allocator_system(), static_cast<iree_host_size_t>(compat_size),
+      host_alignment, /*offset=*/0, &host_ptr));
 
   iree_hal_external_buffer_t ext = {};
   ext.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
-  ext.size = kAllocationSize;
+  ext.size = compat_size;
   ext.handle.host_allocation.ptr = host_ptr;
 
   iree_hal_buffer_t* buffer = nullptr;
@@ -188,10 +194,16 @@ TEST_P(AllocatorTest, ImportHostAllocationWithCallback) {
     GTEST_SKIP() << "Allocator does not support importing host allocations";
   }
 
+  ASSERT_LE(compat_size, static_cast<iree_device_size_t>(IREE_HOST_SIZE_MAX));
+  ASSERT_LE(compat_params.min_alignment,
+            static_cast<iree_device_size_t>(IREE_HOST_SIZE_MAX));
+  iree_host_size_t host_alignment =
+      static_cast<iree_host_size_t>(compat_params.min_alignment);
+  if (host_alignment == 0) host_alignment = 64;
   void* host_ptr = nullptr;
   IREE_ASSERT_OK(iree_allocator_malloc_aligned(
-      iree_allocator_system(), kAllocationSize, /*min_alignment=*/64,
-      /*offset=*/0, &host_ptr));
+      iree_allocator_system(), static_cast<iree_host_size_t>(compat_size),
+      host_alignment, /*offset=*/0, &host_ptr));
 
   int release_count = 0;
   iree_hal_buffer_release_callback_t callback = {};
@@ -200,7 +212,7 @@ TEST_P(AllocatorTest, ImportHostAllocationWithCallback) {
 
   iree_hal_external_buffer_t ext = {};
   ext.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION;
-  ext.size = kAllocationSize;
+  ext.size = compat_size;
   ext.handle.host_allocation.ptr = host_ptr;
 
   iree_hal_buffer_t* buffer = nullptr;

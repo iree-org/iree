@@ -646,6 +646,21 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
   }
 }
 
+// Replaces resource barriers with the propagated timepoint for the resource.
+// Barriers are scheduling queries, not memory operations, so when the pass has
+// already threaded a timepoint alongside a resource we can forward that
+// timepoint directly instead of leaving the barrier to lower as immediately
+// available.
+static void expandTimepointBarrierOp(IREE::Stream::TimepointBarrierOp op,
+                                     IRMapping &resourceTimepointMap) {
+  OpBuilder builder(op);
+  auto [timepoint, resource] = consumeTimepoint(op.getLoc(), op.getResource(),
+                                                resourceTimepointMap, builder);
+  op.getResult().replaceAllUsesWith(resource);
+  op.getResultTimepoint().replaceAllUsesWith(timepoint);
+  op.erase();
+}
+
 // Consumes timepoints from resource operands of a generic timeline op and folds
 // them into the op's await_timepoint. This handles timeline ops like
 // stream.async.parameter.write that take resource operands preceded by
@@ -801,6 +816,8 @@ static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
     expandAwaitOp(awaitOp, resourceTimepointMap);
   } else if (auto executeOp = dyn_cast<IREE::Stream::AsyncExecuteOp>(op)) {
     expandAsyncExecuteOp(executeOp, resourceTimepointMap);
+  } else if (auto barrierOp = dyn_cast<IREE::Stream::TimepointBarrierOp>(op)) {
+    expandTimepointBarrierOp(barrierOp, resourceTimepointMap);
   } else if (auto timelineOp =
                  dyn_cast<IREE::Stream::TimelineOpInterface>(op)) {
     expandTimelineOp(timelineOp, resourceTimepointMap);

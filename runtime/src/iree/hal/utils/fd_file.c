@@ -6,6 +6,8 @@
 
 #include "iree/hal/utils/fd_file.h"
 
+#include <string.h>
+
 #include "iree/async/file.h"
 #include "iree/async/primitive.h"
 
@@ -52,6 +54,38 @@ static iree_status_t iree_hal_platform_fd_stat(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_platform_win32_initialize_overlapped(
+    uint64_t offset, OVERLAPPED* out_overlapped) {
+  memset(out_overlapped, 0, sizeof(*out_overlapped));
+  out_overlapped->Offset = (DWORD)(offset & 0xFFFFFFFFu);
+  out_overlapped->OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  out_overlapped->hEvent = CreateEvent(NULL, /*bManualReset=*/TRUE,
+                                       /*bInitialState=*/FALSE, NULL);
+  if (!out_overlapped->hEvent) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to create file I/O completion event");
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_platform_win32_wait_for_overlapped_file_io(
+    HANDLE handle, OVERLAPPED* overlapped, DWORD error_code,
+    iree_string_view_t operation, DWORD* out_byte_count) {
+  if (error_code != ERROR_IO_PENDING) {
+    return iree_make_status(iree_status_code_from_win32_error(error_code),
+                            "failed to %.*s requested buffer length",
+                            (int)operation.size, operation.data);
+  }
+  if (!GetOverlappedResult(handle, overlapped, out_byte_count,
+                           /*bWait=*/TRUE)) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to complete %.*s of requested buffer "
+                            "length",
+                            (int)operation.size, operation.data);
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_platform_fd_pread(
     int fd, void* buffer, iree_host_size_t count, uint64_t offset,
     iree_host_size_t* out_bytes_read) {
@@ -70,12 +104,16 @@ static iree_status_t iree_hal_platform_fd_pread(
   if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_read = 0;
-  OVERLAPPED overlapped = {0};
-  overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
-  overlapped.OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  OVERLAPPED overlapped;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_platform_win32_initialize_overlapped(offset, &overlapped));
   if (!ReadFile(handle, buffer, (DWORD)count, &bytes_read, &overlapped)) {
-    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
-                            "failed to read requested buffer length");
+    iree_status_t status = iree_hal_platform_win32_wait_for_overlapped_file_io(
+        handle, &overlapped, GetLastError(), IREE_SV("read"), &bytes_read);
+    CloseHandle(overlapped.hEvent);
+    IREE_RETURN_IF_ERROR(status);
+  } else {
+    CloseHandle(overlapped.hEvent);
   }
 
   *out_bytes_read = (iree_host_size_t)bytes_read;
@@ -100,12 +138,16 @@ static iree_status_t iree_hal_platform_fd_pwrite(
   if (count > INT32_MAX) count = INT32_MAX;
 
   DWORD bytes_written = 0;
-  OVERLAPPED overlapped = {0};
-  overlapped.Offset = (DWORD)(offset & 0xFFFFFFFFu);
-  overlapped.OffsetHigh = (DWORD)((offset >> 32) & 0xFFFFFFFFu);
+  OVERLAPPED overlapped;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_platform_win32_initialize_overlapped(offset, &overlapped));
   if (!WriteFile(handle, buffer, (DWORD)count, &bytes_written, &overlapped)) {
-    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
-                            "failed to write requested buffer length");
+    iree_status_t status = iree_hal_platform_win32_wait_for_overlapped_file_io(
+        handle, &overlapped, GetLastError(), IREE_SV("write"), &bytes_written);
+    CloseHandle(overlapped.hEvent);
+    IREE_RETURN_IF_ERROR(status);
+  } else {
+    CloseHandle(overlapped.hEvent);
   }
 
   *out_bytes_written = (iree_host_size_t)bytes_written;
@@ -181,21 +223,39 @@ static iree_status_t iree_hal_platform_fd_pwrite(
 
 #endif  // IREE_PLATFORM_WINDOWS
 
-#if defined(IREE_ASYNC_HAVE_FD)
-// Attempts to duplicate |fd| for optional async I/O ownership transfer.
-static bool iree_hal_platform_fd_try_dup_for_async(
+#if defined(IREE_ASYNC_HAVE_FD) || defined(IREE_ASYNC_HAVE_WIN32_HANDLE)
+// Duplicates |fd| for async I/O ownership transfer.
+static iree_status_t iree_hal_platform_fd_dup_for_async(
     int fd, iree_async_primitive_t* out_primitive) {
   *out_primitive = iree_async_primitive_none();
 #if defined(IREE_PLATFORM_WINDOWS)
-  int dup_fd = _dup(fd);
+  HANDLE handle = (HANDLE)_get_osfhandle(fd);
+  if (handle == INVALID_HANDLE_VALUE) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "file descriptor is not backed by a valid Win32 HANDLE");
+  }
+  HANDLE dup_handle = NULL;
+  if (!DuplicateHandle(GetCurrentProcess(), handle, GetCurrentProcess(),
+                       &dup_handle, /*dwDesiredAccess=*/0,
+                       /*bInheritHandle=*/FALSE, DUPLICATE_SAME_ACCESS)) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to duplicate Win32 file handle");
+  }
+  *out_primitive =
+      iree_async_primitive_from_win32_handle((uintptr_t)dup_handle);
+  return iree_ok_status();
 #else
   int dup_fd = dup(fd);
-#endif  // IREE_PLATFORM_WINDOWS
-  if (dup_fd == -1) return false;
+  if (dup_fd == -1) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to duplicate file descriptor");
+  }
   *out_primitive = iree_async_primitive_from_fd(dup_fd);
-  return true;
+  return iree_ok_status();
+#endif  // IREE_PLATFORM_WINDOWS
 }
-#endif  // IREE_ASYNC_HAVE_FD
+#endif  // IREE_ASYNC_HAVE_FD || IREE_ASYNC_HAVE_WIN32_HANDLE
 
 #endif  // IREE_FILE_IO_ENABLE
 
@@ -238,8 +298,8 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
   IREE_ASSERT_ARGUMENT(out_file);
   *out_file = NULL;
 
-  // For now we only support posix file descriptors but could support other
-  // handle types so long as they are compatible with pread/pwrite.
+  // For now we only support descriptor-backed file handles that can satisfy
+  // positional read/write operations.
   iree_io_file_handle_primitive_t primitive =
       iree_io_file_handle_primitive(handle);
   if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_FD) {
@@ -288,25 +348,22 @@ IREE_API_EXPORT iree_status_t iree_hal_fd_file_from_handle(
 
   iree_status_t status = iree_ok_status();
 
-#if defined(IREE_ASYNC_HAVE_FD)
-  if (proactor) {
-    // If a proactor is provided, attempt to duplicate the fd and import it for
-    // async I/O. The duplicate is owned by the proactor-managed async file and
-    // closed when the async file is released.
-    //
-    // Duplication is an optional fast-path probe: if the OS cannot produce a
-    // duplicate fd then the file remains synchronous-only. Once duplication
-    // succeeds, import failures are real construction failures and propagate.
+#if defined(IREE_ASYNC_HAVE_FD) || defined(IREE_ASYNC_HAVE_WIN32_HANDLE)
+  if (proactor && iree_io_file_handle_uses_async_io(handle)) {
+    // Only handles explicitly opened for platform async I/O can be imported
+    // into a proactor. On Windows this means FILE_FLAG_OVERLAPPED; duplicating
+    // a synchronous handle does not make it IOCP-compatible.
     iree_async_primitive_t dup_primitive;
-    if (iree_hal_platform_fd_try_dup_for_async(fd, &dup_primitive)) {
+    status = iree_hal_platform_fd_dup_for_async(fd, &dup_primitive);
+    if (iree_status_is_ok(status)) {
       status =
           iree_async_file_import(proactor, dup_primitive, &file->async_file);
-      if (!iree_status_is_ok(status)) {
-        iree_async_primitive_close(&dup_primitive);
-      }
+    }
+    if (!iree_status_is_ok(status)) {
+      iree_async_primitive_close(&dup_primitive);
     }
   }
-#endif  // IREE_ASYNC_HAVE_FD
+#endif  // IREE_ASYNC_HAVE_FD || IREE_ASYNC_HAVE_WIN32_HANDLE
 
   if (iree_status_is_ok(status)) {
     *out_file = (iree_hal_file_t*)file;

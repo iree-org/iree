@@ -200,6 +200,7 @@ iree_cc_library(
     "dispatch_reuse_test.cc"
   DEPS
     iree::hal
+    iree::hal::cts::util::profile_test_util
     iree::hal::cts::util::test_base
   TESTONLY
   ALWAYSLINK

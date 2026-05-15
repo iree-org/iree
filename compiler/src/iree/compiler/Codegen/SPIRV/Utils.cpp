@@ -44,7 +44,16 @@ DictionaryAttr getTargetConfigAttr(Operation *op) {
 
 bool usesIndirectBindingsAttr(Operation *op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  return targetAttr ? targetAttr.getFormat().getValue().ends_with("-ptr")
+  if (!targetAttr) {
+    return false;
+  }
+  StringRef format = targetAttr.getFormat().getValue();
+  return format.ends_with("-ptr") || format == "vulkan-spirv-bda-v1";
+}
+
+bool usesBdaRootDispatchAbiAttr(Operation *op) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  return targetAttr ? targetAttr.getFormat().getValue() == "vulkan-spirv-bda-v1"
                     : false;
 }
 

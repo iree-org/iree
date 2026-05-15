@@ -18,6 +18,7 @@ class DriverTest : public CtsTestBase<> {
                                 iree_string_view_t path) {
     std::cout << "  Creating device '" << std::string(name.data, name.size)
               << "' with path '" << std::string(path.data, path.size) << "'\n";
+    const bool is_default_path = iree_string_view_is_empty(path);
 
     iree_async_proactor_pool_t* proactor_pool = NULL;
     IREE_ASSERT_OK(iree_async_proactor_pool_create(
@@ -35,8 +36,9 @@ class DriverTest : public CtsTestBase<> {
 
     iree_async_proactor_pool_release(proactor_pool);
 
-    // Creation via path is HAL driver specific. Allow unimplemented cases.
-    if (iree_status_is_not_found(status)) {
+    // Bare driver URIs split into an empty device path, so every driver must
+    // support empty-path creation even when explicit paths are driver-specific.
+    if (!is_default_path && iree_status_is_not_found(status)) {
       iree_status_ignore(status);
       iree_hal_device_release(device);
       return;

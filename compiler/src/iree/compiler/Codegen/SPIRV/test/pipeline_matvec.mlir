@@ -166,7 +166,7 @@ func.func @i4_dequant_matvec_f16_subgroup_64() attributes {
 //     CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
 //     CHECK-DAG: %[[CSTVEC4XF16_1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf16>
 
-//         CHECK: %[[PCPTR0:.+]] = spirv.AccessChain %{{.*}}[%[[C0]], %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0])>, PushConstant>, i32, i32
+//         CHECK: %[[PCPTR0:.+]] = spirv.AccessChain %{{.*}}[%[[C0]], %[[C0]]] : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>, i32, i32
 //         CHECK: %[[STREAMBINDING:.+]] = spirv.Load "PushConstant" %[[PCPTR0]] : i32
 
 //         CHECK: %[[RADDR:.+]] = spirv.mlir.addressof @{{.*}} : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>

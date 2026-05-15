@@ -58,6 +58,11 @@ static iree_status_t iree_profile_summary_get_device(
 static void iree_profile_summary_record_clock_sample(
     iree_profile_device_summary_t* device,
     const iree_hal_profile_clock_correlation_record_t* record) {
+  if (iree_any_bit_set(
+          record->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
+    ++device->invalid_clock_alignment_sample_count;
+  }
   if (device->clock_sample_count == 0) {
     device->first_clock_sample = *record;
   }
@@ -861,6 +866,8 @@ static bool iree_profile_device_summary_try_fit_clock_exact(
   memset(&model_device, 0, sizeof(model_device));
   model_device.physical_device_ordinal = device->physical_device_ordinal;
   model_device.clock_sample_count = device->clock_sample_count;
+  model_device.invalid_clock_alignment_sample_count =
+      device->invalid_clock_alignment_sample_count;
   model_device.first_clock_sample = device->first_clock_sample;
   model_device.last_clock_sample = device->last_clock_sample;
   return iree_profile_model_device_try_fit_clock_exact(
@@ -875,10 +882,14 @@ static bool iree_profile_device_summary_clock_covers_dispatches(
   if (device->clock_sample_count < 2 || valid_dispatch_count == 0) {
     return false;
   }
+  if (device->invalid_clock_alignment_sample_count != 0) return false;
   if (!iree_all_bits_set(device->first_clock_sample.flags,
                          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
       !iree_all_bits_set(device->last_clock_sample.flags,
-                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
+                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
+      iree_any_bit_set(
+          device->first_clock_sample.flags | device->last_clock_sample.flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
     return false;
   }
   return device->first_clock_sample.device_tick <=
@@ -1093,10 +1104,18 @@ static void iree_profile_print_summary_text_device_clock(
     const iree_profile_summary_device_timing_t* timing, FILE* file) {
   fprintf(file,
           "    clock_samples=%" PRIu64 " min_uncertainty_ns=%" PRId64
-          " max_uncertainty_ns=%" PRId64 "\n",
+          " max_uncertainty_ns=%" PRId64 " invalid_alignment_samples=%" PRIu64
+          "\n",
           device->clock_sample_count,
           iree_profile_summary_minimum_clock_uncertainty_ns(device),
-          device->maximum_clock_uncertainty_ns);
+          device->maximum_clock_uncertainty_ns,
+          device->invalid_clock_alignment_sample_count);
+  if (device->invalid_clock_alignment_sample_count != 0) {
+    fprintf(file,
+            "    warning: device clock samples are not aligned with profiled "
+            "event ticks; raw device events are retained, but host timeline "
+            "correlation is disabled\n");
+  }
   if (timing->has_clock_fit) {
     fprintf(file,
             "    clock_fit: ns_per_tick=%.9f tick_frequency_hz=%.3f"
@@ -1339,6 +1358,7 @@ static void iree_profile_print_summary_jsonl_device(
       "{\"type\":\"device_summary\",\"physical_device_ordinal\":%u"
       ",\"device_records\":%u,\"queue_records\":%u,\"queues\":%u"
       ",\"clock_samples\":%" PRIu64
+      ",\"invalid_clock_alignment_samples\":%" PRIu64
       ",\"clock_fit_available\":%s"
       ",\"ns_per_tick\":%.9f,\"tick_frequency_hz\":%.3f"
       ",\"min_clock_uncertainty_ns\":%" PRId64
@@ -1358,8 +1378,9 @@ static void iree_profile_print_summary_jsonl_device(
       ",\"invalid_device_metric_samples\":%" PRIu64 "}\n",
       device->physical_device_ordinal, device->device_record_count,
       device->queue_record_count, device->queue_count,
-      device->clock_sample_count, timing.has_clock_fit ? "true" : "false",
-      timing.ns_per_tick, timing.tick_frequency_hz,
+      device->clock_sample_count, device->invalid_clock_alignment_sample_count,
+      timing.has_clock_fit ? "true" : "false", timing.ns_per_tick,
+      timing.tick_frequency_hz,
       iree_profile_summary_minimum_clock_uncertainty_ns(device),
       device->maximum_clock_uncertainty_ns, device->dispatch_event_count,
       timing.valid_dispatch_count, device->invalid_dispatch_event_count,

@@ -231,6 +231,22 @@ TEST(ProfileClockFitTest, FitsIreeHostTimeFromBracketMidpoints) {
   EXPECT_EQ(136, time_ns);
 }
 
+TEST(ProfileClockFitTest, RejectsInvalidDeviceTickAlignment) {
+  iree_profile_model_device_t device;
+  memset(&device, 0, sizeof(device));
+  device.clock_sample_count = 2;
+  device.invalid_clock_alignment_sample_count = 1;
+  device.first_clock_sample = MakeClockSample(1, 1000, 5000);
+  device.last_clock_sample = MakeClockSample(2, 1010, 6000);
+  device.last_clock_sample.flags |=
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED;
+
+  iree_profile_model_clock_fit_t fit;
+  EXPECT_FALSE(iree_profile_model_device_try_fit_clock_exact(
+      &device, IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
+      &fit));
+}
+
 TEST(ProfileModelTest, AcceptsLinearCommandOperationsWithoutBlockStructure) {
   std::vector<uint8_t> command_buffer_payload;
   AppendCommandBuffer(&command_buffer_payload, 1);

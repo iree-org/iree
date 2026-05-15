@@ -44,7 +44,12 @@ typedef uint32_t iree_hal_external_file_flags_t;
 // iree_hal_file_t
 //===----------------------------------------------------------------------===//
 
-// A file handle usable with asynchronous device transfer operations.
+// A file handle usable with device transfer operations.
+// Production queue read/write paths expect files to expose a backend-supported
+// asynchronous or device-visible representation. Examples include native async
+// file handles imported into a proactor, storage-buffer-backed memory files,
+// and platform-specific direct-storage objects.
+//
 // Files are used for bulk data upload and download and on some implementations
 // may have hardware-optimized transfer paths.
 //
@@ -116,8 +121,11 @@ IREE_API_EXPORT iree_hal_buffer_t* iree_hal_file_storage_buffer(
 // TODO(benvanik): truncate/extend? (both can be tricky with async)
 
 // Returns the proactor-managed async file handle, or NULL if the file does not
-// support async proactor I/O (e.g., memory-backed files). The returned handle
-// is owned by the file and valid for the file's lifetime.
+// expose async proactor I/O. NULL does not imply the file is unusable by queue
+// operations: memory-backed files may expose a storage buffer instead. Native
+// platform files intended for async queue transfers must be opened in a
+// platform async mode, such as IREE_IO_FILE_MODE_ASYNC.
+// The returned handle is owned by the file and valid for the file's lifetime.
 IREE_API_EXPORT iree_async_file_t* iree_hal_file_async_handle(
     iree_hal_file_t* file);
 
@@ -126,9 +134,10 @@ IREE_API_EXPORT iree_async_file_t* iree_hal_file_async_handle(
 IREE_API_EXPORT iree_status_t iree_hal_file_validate_access(
     iree_hal_file_t* file, iree_hal_memory_access_t required_access);
 
-// Returns true if the iree_hal_file_read and iree_hal_file_write APIs are
-// available for use on the file. Not all implementations support synchronous
-// I/O.
+// Returns true if the host-side iree_hal_file_read and iree_hal_file_write APIs
+// are available for use on the file. Synchronous I/O support is optional,
+// backend-varying, and independent of whether queue read/write operations can
+// use the file.
 IREE_API_EXPORT bool iree_hal_file_supports_synchronous_io(
     iree_hal_file_t* file);
 

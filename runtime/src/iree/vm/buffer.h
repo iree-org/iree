@@ -37,6 +37,8 @@ enum iree_vm_buffer_access_bits_t {
 };
 typedef uint32_t iree_vm_buffer_access_t;
 
+typedef struct iree_vm_module_t iree_vm_module_t;
+
 // A simple byte range with options for ownership and wrapping semantics.
 // The access flags indicate what access is allowed from the VM.
 // Buffers are fixed-length and may only contain primitive values.
@@ -59,10 +61,16 @@ typedef uint32_t iree_vm_buffer_access_t;
 // allocator is used to free the entire iree_vm_buffer_t and the co-allocated
 // buffer data that lives after it in memory.
 typedef struct iree_vm_buffer_t {
+  // Intrusive VM ref-count header.
   iree_vm_ref_object_t ref_object;
+  // Access and origin flags controlling allowed uses and storage lifetime.
   iree_vm_buffer_access_t access;
+  // Byte storage visible through the buffer.
   iree_byte_span_t data;
+  // Allocator used to release in-place buffer data on deinitialize.
   iree_allocator_t allocator;
+  // Module that owns |data| storage, or NULL for ordinary buffers.
+  iree_vm_module_t* storage_module;
 } iree_vm_buffer_t;
 
 // Initializes a buffer in-place with the given byte contents.
@@ -84,6 +92,16 @@ IREE_API_EXPORT void iree_vm_buffer_initialize(iree_vm_buffer_access_t access,
                                                iree_byte_span_t data,
                                                iree_allocator_t allocator,
                                                iree_vm_buffer_t* out_buffer);
+
+// Initializes a read-only buffer that aliases module-owned storage. The buffer
+// starts with no external references: the first retain keeps |storage_module|
+// alive until the last external reference is released.
+//
+// |data| must remain valid while |storage_module| is live and will not be freed
+// by the buffer when deinitialized.
+IREE_API_EXPORT void iree_vm_buffer_initialize_module_storage(
+    iree_byte_span_t data, iree_vm_module_t* storage_module,
+    iree_vm_buffer_t* out_buffer);
 
 // Deinitializes a buffer previously initialized in-place with
 // iree_vm_buffer_initialize. Invalid to call on a buffer that was allocated
@@ -107,6 +125,11 @@ IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer);
 
 // Releases the given |buffer| from the caller.
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer);
+
+// Wraps |buffer| in |out_ref| retaining it for the caller. Existing contents
+// of |out_ref| are released unless already referencing |buffer|.
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_wrap_retain(iree_vm_buffer_t* buffer, iree_vm_ref_t* out_ref);
 
 // Clones a range of bytes in |source| to a new buffer.
 // The allocated data will be aligned to |alignment| or iree_max_align_t if 0.

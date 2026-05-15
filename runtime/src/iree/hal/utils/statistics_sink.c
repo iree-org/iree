@@ -42,6 +42,8 @@ typedef struct iree_hal_profile_statistics_device_t {
   uint32_t physical_device_ordinal;
   // Number of clock-correlation samples seen for this device.
   uint64_t clock_sample_count;
+  // Number of clock samples that report invalid device event tick alignment.
+  uint64_t invalid_clock_alignment_sample_count;
   // First clock-correlation sample seen for this device.
   iree_hal_profile_clock_correlation_record_t first_clock_sample;
   // Last clock-correlation sample seen for this device.
@@ -416,6 +418,11 @@ static iree_status_t iree_hal_profile_statistics_sink_ensure_device(
 static void iree_hal_profile_statistics_device_record_clock_sample(
     iree_hal_profile_statistics_device_t* device,
     const iree_hal_profile_clock_correlation_record_t* record) {
+  if (iree_any_bit_set(
+          record->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
+    ++device->invalid_clock_alignment_sample_count;
+  }
   if (device->clock_sample_count == 0) {
     device->first_clock_sample = *record;
   }
@@ -488,6 +495,7 @@ static bool iree_hal_profile_statistics_scale_device_ticks_to_ns(
     uint64_t* out_duration_ns) {
   *out_duration_ns = 0;
   if (!device || device->clock_sample_count < 2) return false;
+  if (device->invalid_clock_alignment_sample_count != 0) return false;
 
   const iree_hal_profile_clock_correlation_record_t* first =
       &device->first_clock_sample;
@@ -497,6 +505,9 @@ static bool iree_hal_profile_statistics_scale_device_ticks_to_ns(
                          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
       !iree_all_bits_set(last->flags,
                          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
+      iree_any_bit_set(
+          first->flags | last->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED) ||
       last->device_tick <= first->device_tick) {
     return false;
   }

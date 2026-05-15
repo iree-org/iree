@@ -34,6 +34,8 @@ typedef struct iree_profile_device_summary_t {
   uint32_t queue_record_count;
   // Number of clock-correlation samples seen for this physical device.
   uint64_t clock_sample_count;
+  // Number of clock samples that report invalid device event tick alignment.
+  uint64_t invalid_clock_alignment_sample_count;
   // First clock-correlation sample seen for this physical device.
   iree_hal_profile_clock_correlation_record_t first_clock_sample;
   // Last clock-correlation sample seen for this physical device.

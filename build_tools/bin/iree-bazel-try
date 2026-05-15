@@ -1136,6 +1136,7 @@ generate_build_file() {
         echo 'cc_binary('
         echo '    name = "snippet",'
         echo '    testonly = True,'
+        echo '    tags = ["manual"],'
         printf '    srcs = ['
         local first=1
         for src in "${BUILD_SRCS[@]}"; do

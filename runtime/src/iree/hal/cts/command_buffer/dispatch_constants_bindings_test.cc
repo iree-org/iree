@@ -83,14 +83,14 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/0,
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       break;
@@ -99,7 +99,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       binding_table.bindings = binding_table_values;
       binding_table_values[0] = {
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       binding_refs[0] = {
@@ -111,7 +111,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       };
       binding_table_values[1] = {
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       binding_refs[1] = {
