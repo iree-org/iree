@@ -303,8 +303,8 @@ struct ROCDLPrepareForSPIRVPass final
     auto i8Type = IntegerType::get(moduleOp.getContext(), 8);
     auto cmdlineGlobal = moduleOp.lookupSymbol<LLVM::GlobalOp>("llvm.cmdline");
     if (cmdlineGlobal) {
-      auto valueAttr = dyn_cast_if_present<StringAttr>(
-          cmdlineGlobal.getValueAttr());
+      auto valueAttr =
+          dyn_cast_if_present<StringAttr>(cmdlineGlobal.getValueAttr());
       if (!valueAttr) {
         cmdlineGlobal.emitOpError()
             << "expected @llvm.cmdline to have a string initializer";
@@ -320,11 +320,11 @@ struct ROCDLPrepareForSPIRVPass final
     } else {
       StringRef flags("-O3\0", 4);
       OpBuilder builder(moduleOp.getBody(), moduleOp.getBody()->end());
-      auto globalOp = LLVM::GlobalOp::create(
-          builder, moduleOp.getLoc(),
-          LLVM::LLVMArrayType::get(i8Type, flags.size()),
-          /*isConstant=*/true,
-          LLVM::Linkage::Private, "llvm.cmdline", builder.getStringAttr(flags));
+      auto globalOp =
+          LLVM::GlobalOp::create(builder, moduleOp.getLoc(),
+                                 LLVM::LLVMArrayType::get(i8Type, flags.size()),
+                                 /*isConstant=*/true, LLVM::Linkage::Private,
+                                 "llvm.cmdline", builder.getStringAttr(flags));
       globalOp.setSection(".llvmcmd");
       globalOp.setAlignment(1);
       globalOp.setAddrSpace(1);

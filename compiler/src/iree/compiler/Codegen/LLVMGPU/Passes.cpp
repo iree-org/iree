@@ -1184,7 +1184,8 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
   //   - The module contains the final llvm.module ready to be serialized.
   //===--------------------------------------------------------------------===//
   if (includeLLVMLowering) {
-    addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo, useSPIRV);
+    addLowerToLLVMGPUPasses(modulePassManager, useROCM, preserveDebugInfo,
+                            useSPIRV);
   }
 
   LLVM_DEBUG({
@@ -1311,10 +1312,9 @@ void registerCodegenLLVMGPUPasses() {
           "Runs the LLVMGPU ROCDL lowering pipeline",
           [](OpPassManager &modulePassManager,
              const LLVMGPULoweringPipelineOptions &options) {
-            buildLLVMGPUCodegenPassPipeline(modulePassManager, true,
-                                            options.preserveDebugInfo,
-                                            options.includeLLVMLowering,
-                                            options.useSPIRV);
+            buildLLVMGPUCodegenPassPipeline(
+                modulePassManager, true, options.preserveDebugInfo,
+                options.includeLLVMLowering, options.useSPIRV);
           });
 
   static PassPipelineRegistration<> LLVMGPULinkingPipeline(

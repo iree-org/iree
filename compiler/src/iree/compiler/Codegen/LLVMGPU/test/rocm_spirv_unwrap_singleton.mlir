@@ -4,7 +4,7 @@
 // RUN: FileCheck %s < %t/module_rocm_spirv_unwrap_test_rocm_spirv_fb.unwrapped.ll
 
 // Two single-element array values flowing through the same control-flow merge
-// should become two PHI nodes after LLVM export. 
+// should become two PHI nodes after LLVM export.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = []>
 #target = #iree_gpu.target<arch = "gfx1201", features = "", wgp = <

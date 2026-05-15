@@ -683,8 +683,9 @@ public:
     // Derive SPIR-V mode from the target format rather than the CLI flag,
     // so that programmatically-constructed target attrs work correctly.
     bool useSPIRV = targetAttr.getFormat() == "rocm-spirv-fb";
-    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), /*useROCM=*/true,
-                                    targetOptions.debugSymbols, /*includeLLVMLowering=*/true, useSPIRV);
+    buildLLVMGPUCodegenPassPipeline(
+        passManager.nest<ModuleOp>(), /*useROCM=*/true,
+        targetOptions.debugSymbols, /*includeLLVMLowering=*/true, useSPIRV);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
@@ -1081,22 +1082,24 @@ public:
           return variantOp.emitError() << "cannot create SPIR-V target machine";
         }
 
-        // If requested, dump the wrapped .ll just before conversion to SPIRV-binary
-        if(!serializationOptions.dumpIntermediatesPath.empty()) {
-            dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
-                             serializationOptions.dumpBaseName, variantOp.getName(),
-                             ".wrapped.ll", *llvmModule);
+        // If requested, dump the wrapped .ll just before conversion to
+        // SPIRV-binary
+        if (!serializationOptions.dumpIntermediatesPath.empty()) {
+          dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
+                           serializationOptions.dumpBaseName,
+                           variantOp.getName(), ".wrapped.ll", *llvmModule);
         }
 
         // Unwrap [1 x T] aggregate types that trip up the SPIR-V backend
         // and amd-llvm-spirv reverse translator (PHI type mismatches).
         unwrapSingleElementArrayTypes(*llvmModule);
 
-        // If requested, dump the unwrapped .ll just before conversion to SPIRV-binary
-        if(!serializationOptions.dumpIntermediatesPath.empty()) {
-            dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
-                             serializationOptions.dumpBaseName, variantOp.getName(),
-                             ".unwrapped.ll", *llvmModule);
+        // If requested, dump the unwrapped .ll just before conversion to
+        // SPIRV-binary
+        if (!serializationOptions.dumpIntermediatesPath.empty()) {
+          dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
+                           serializationOptions.dumpBaseName,
+                           variantOp.getName(), ".unwrapped.ll", *llvmModule);
         }
 
         // Emit SPIR-V binary (no lld/hsaco needed).

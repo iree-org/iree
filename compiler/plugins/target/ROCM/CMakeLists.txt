@@ -27,7 +27,6 @@ iree_cc_library(
     "ROCMTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
-    LLVMSPIRVCodeGen
     LLVMAnalysis
     LLVMBitWriter
     LLVMCore
@@ -36,6 +35,7 @@ iree_cc_library(
     LLVMLinker
     LLVMMC
     LLVMPasses
+    LLVMSPIRVCodeGen
     LLVMSupport
     LLVMTarget
     LLVMTransformUtils
