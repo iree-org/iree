@@ -7,13 +7,13 @@
 // Cross-platform futex primitives for low-level synchronization.
 //
 // This provides a 32-bit futex API that works across Linux, Windows, and
-// Emscripten. These are the building blocks for higher-level synchronization
+// Wasm. These are the building blocks for higher-level synchronization
 // primitives like iree_slim_mutex_t and iree_notification_t.
 //
 // The API is 32-bit only because that's the lowest common denominator:
 //   - Linux futex syscall: 32-bit
 //   - Windows WaitOnAddress: variable size, but we use 32-bit
-//   - Emscripten: 32-bit (JavaScript Atomics.wait)
+//   - Wasm: 32-bit (memory.atomic.wait32 / memory.atomic.notify)
 //
 // For 64-bit futex support (Linux kernel 6.7+ futex2), see
 // iree/async/operations/futex.h which provides async io_uring operations
@@ -44,8 +44,8 @@
 // to never need it. This removes our dependency on pthreads.
 #if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
-    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX) || \
+    defined(IREE_PLATFORM_WASM) || defined(IREE_PLATFORM_WINDOWS)
 #define IREE_PLATFORM_HAS_FUTEX 1
 #endif  // IREE_PLATFORM_*
 
@@ -63,9 +63,8 @@
 
 #if defined(IREE_RUNTIME_USE_FUTEX)
 
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
-#include <emscripten/threading.h>
-#include <errno.h>
+#if defined(IREE_PLATFORM_WASM)
+// Wasm atomic wait/notify are compiler builtins — no headers needed.
 #elif defined(IREE_PLATFORM_WINDOWS)
 // Windows headers included via iree/base/target_platform.h
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
@@ -147,7 +146,7 @@ static inline void iree_futex_wake(void* address, int32_t count);
 // On Windows, WaitOnAddress/WakeByAddress already hash by physical page, so
 // these are identical to the private variants.
 //
-// On Emscripten, cross-process shared memory is not meaningful, so these are
+// On Wasm, cross-process shared memory is not meaningful, so these are
 // identical to the private variants.
 //
 // Performance: ~20ns slower per operation on Linux due to the kernel page table
@@ -161,28 +160,45 @@ static inline void iree_futex_wake_shared(void* address, int32_t count);
 // Platform implementations
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_WASM)
+
+// Wasm provides memory.atomic.wait32 and memory.atomic.notify instructions
+// via compiler builtins. These map directly to Atomics.wait/Atomics.notify
+// in the JS host. memory.atomic.wait32 is only allowed on non-main threads
+// (Web Workers); on the main thread it traps. This is fine because IREE's
+// futex-based synchronization primitives are only used from worker threads
+// in cooperative mode (the main thread uses the proactor poll loop instead).
+//
+// The timeout is specified in nanoseconds (-1 for infinite).
 
 static inline iree_status_code_t iree_futex_wait(void* address,
                                                  uint32_t expected_value,
                                                  iree_time_t deadline_ns) {
-  uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
-  int rc = emscripten_futex_wait(address, expected_value, (double)timeout_ms);
+  int64_t timeout_ns = -1;
+  if (deadline_ns != IREE_TIME_INFINITE_FUTURE) {
+    iree_time_t now_ns = iree_time_now();
+    timeout_ns = deadline_ns > now_ns ? (int64_t)(deadline_ns - now_ns) : 0;
+  }
+  // Returns: 0 = "ok" (woken), 1 = "not-equal", 2 = "timed-out".
+  int rc = __builtin_wasm_memory_atomic_wait32(
+      (int32_t*)address, (int32_t)expected_value, timeout_ns);
   switch (rc) {
+    case 0:
+      return IREE_STATUS_OK;
+    case 1:
+      return IREE_STATUS_UNAVAILABLE;
+    case 2:
+      return IREE_STATUS_DEADLINE_EXCEEDED;
     default:
       return IREE_STATUS_OK;
-    case -ETIMEDOUT:
-      return IREE_STATUS_DEADLINE_EXCEEDED;
-    case -EWOULDBLOCK:
-      return IREE_STATUS_UNAVAILABLE;
   }
 }
 
 static inline void iree_futex_wake(void* address, int32_t count) {
-  emscripten_futex_wake(address, count);
+  __builtin_wasm_memory_atomic_notify((int32_t*)address, (uint32_t)count);
 }
 
-// Emscripten has no cross-process shared memory — alias to private variants.
+// Wasm has no cross-process shared memory — alias to private variants.
 static inline iree_status_code_t iree_futex_wait_shared(
     void* address, uint32_t expected_value, iree_time_t deadline_ns) {
   return iree_futex_wait(address, expected_value, deadline_ns);

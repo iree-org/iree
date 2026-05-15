@@ -12,7 +12,7 @@
 // This file dispatches to platform-specific implementations at compile time.
 // The build system selects exactly one implementation file based on the target
 // platform:
-// - Linux (not Android cpuinfo, not Emscripten): platform_topology_sysfs.c
+// - Linux (not Android cpuinfo, not Wasm): platform_topology_sysfs.c
 // - macOS/iOS: platform_topology_darwin.c
 // - Windows: platform_topology_win32.c
 // - Fallback: platform_topology_fallback.c

@@ -8,7 +8,7 @@
 #include "iree/async/socket.h"
 #include "iree/base/api.h"
 
-#if defined(IREE_PLATFORM_GENERIC) || defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_GENERIC) || defined(IREE_PLATFORM_WASM)
 
 #include <stddef.h>
 #include <string.h>
@@ -165,4 +165,4 @@ IREE_API_EXPORT iree_status_t iree_async_address_format(
   return iree_ok_status();
 }
 
-#endif  // IREE_PLATFORM_GENERIC || IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_GENERIC || IREE_PLATFORM_WASM

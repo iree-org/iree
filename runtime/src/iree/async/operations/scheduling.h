@@ -105,6 +105,11 @@ typedef struct iree_async_timer_operation_t {
       struct iree_async_timer_operation_t* next;
       struct iree_async_timer_operation_t* prev;
     } iocp;
+    // JS proactor: token assigned by the token table for JS timer dispatch.
+    // The JS host uses this token to identify the timer when it fires.
+    struct {
+      uint32_t token;
+    } js;
   } platform;
 } iree_async_timer_operation_t;
 

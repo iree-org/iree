@@ -50,6 +50,32 @@ config_setting(
     constraint_values = ["@platforms//os:windows"],
 )
 
+config_setting(
+    name = "iree_is_wasm",
+    constraint_values = ["@platforms//cpu:wasm32"],
+)
+
+# Selects a user-provided system allocator. Users must provide
+# IREE_ALLOCATOR_SYSTEM_CTL, and optionally IREE_ALLOCATOR_SYSTEM_SELF, via
+# their own copts/defines and link the implementation into final binaries.
+config_setting(
+    name = "iree_allocator_system_custom",
+    define_values = {
+        "iree_allocator_system": "custom",
+    },
+)
+
+# Selects a user-provided freestanding WebAssembly libc. The wasm toolchains
+# keep the freestanding target model but stop injecting IREE's libc headers; users
+# must provide their own declared headers, include paths, and allocator/libc
+# objects.
+config_setting(
+    name = "iree_wasm_libc_custom",
+    define_values = {
+        "iree_wasm_libc": "custom",
+    },
+)
+
 # ROCM GPU chip target for test and sample compilation. Override with:
 #   --//build_tools/bazel:rocm_test_target=gfx942
 string_flag(

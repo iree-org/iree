@@ -6,7 +6,7 @@
 
 #include "iree/async/platform/posix/signal.h"
 
-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
 
 #include <errno.h>
 #include <fcntl.h>
@@ -281,4 +281,4 @@ iree_status_t iree_async_selfpipe_signal_read_pipe(
   return iree_ok_status();
 }
 
-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM

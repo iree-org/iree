@@ -27,7 +27,7 @@ extern "C" {
 void iree_benchmark_use_ptr(char const volatile* x);
 
 #if !defined(IREE_BENCHMARK_HAS_INLINE_ASSEMBLY)
-#if defined(IREE_COMPILER_MSVC) || defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_COMPILER_MSVC) || defined(IREE_PLATFORM_WASM)
 #define IREE_BENCHMARK_HAS_INLINE_ASSEMBLY 0
 #elif defined(IREE_COMPILER_CLANG) || defined(IREE_COMPILER_GCC)
 #define IREE_BENCHMARK_HAS_INLINE_ASSEMBLY 1

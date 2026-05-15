@@ -27,12 +27,13 @@ _BUILD_SETTING_CMAKE_VARIABLES = {
 }
 
 # Maps Bazel platform labels (from both select() conditions and
-# target_compatible_with) to CMake CMAKE_SYSTEM_NAME values.
+# target_compatible_with) to CMake platform condition values.
 _PLATFORM_CMAKE_SYSTEM_NAME = {
     # select() condition labels (config_setting in build_tools/bazel/).
     "//build_tools/bazel:iree_is_android": "Android",
     "//build_tools/bazel:iree_is_linux": "Linux",
     "//build_tools/bazel:iree_is_macos": "Darwin",
+    "//build_tools/bazel:iree_is_wasm": "wasm_32",
     "//build_tools/bazel:iree_is_windows": "Windows",
     # target_compatible_with constraint labels.
     "@platforms//os:android": "Android",
@@ -166,6 +167,8 @@ class BuildFileFunctions(object):
 
     def _convert_platform_condition(self, constraint_label):
         """Returns a CMake condition string for a platform constraint label."""
+        if constraint_label == "//build_tools/bazel:iree_is_wasm":
+            return 'IREE_ARCH STREQUAL "wasm_32"'
         cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
         if not cmake_name:
             return None
@@ -183,7 +186,7 @@ class BuildFileFunctions(object):
         return _COMPILER_PLUGIN_CMAKE_OPTIONS.get(label)
 
     def _emit_platform_guard_begin(self, target_compatible_with):
-        """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
+        """Emits platform guards for target_compatible_with."""
         if not target_compatible_with:
             return
 
@@ -621,6 +624,151 @@ class BuildFileFunctions(object):
         if self._should_skip_target(**kwargs):
             return
         self._convert_unimplemented_function("sh_binary", name)
+
+    def wasm_cc_library(
+        self,
+        name,
+        srcs=None,
+        module=None,
+        deps=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_string_list_block("SRCS", srcs, sort=True)
+        module_block = self._convert_string_arg_block("MODULE", module)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_library(\n"
+            f"{name_block}"
+            f"{srcs_block}"
+            f"{module_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_library(self, **kwargs):
+        """Direct handler for iree_wasm_cc_library (loaded from .bzl)."""
+        self.wasm_cc_library(**kwargs)
+
+    def wasm_entry(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        main_block = self._convert_string_arg_block("MAIN", main)
+        srcs_block = self._convert_string_list_block("SRCS", srcs, sort=True)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_entry(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_entry(self, **kwargs):
+        """Direct handler for iree_wasm_entry (loaded from .bzl)."""
+        self.wasm_entry(**kwargs)
+
+    def wasm_cc_binary(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        deps=None,
+        copts=None,
+        defines=None,
+        linkopts=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        # Emit as a standard iree_cc_binary for the C side, plus a
+        # wasm bundle step. For now, emit the cc_binary and add a comment
+        # noting the JS bundling is handled at build time.
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        defines_block = self._convert_string_list_block("DEFINES", defines)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+        main_block = self._convert_string_arg_block("MAIN", main)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_binary(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{defines_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f")\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_binary(self, **kwargs):
+        """Direct handler for iree_wasm_cc_binary (loaded from .bzl)."""
+        self.wasm_cc_binary(**kwargs)
+
+    def wasm_cc_test(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        deps=None,
+        copts=None,
+        defines=None,
+        linkopts=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        defines_block = self._convert_string_list_block("DEFINES", defines)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        main_block = self._convert_string_arg_block("MAIN", main)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_test(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{defines_block}"
+            f"{deps_block}"
+            f")\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_test(self, **kwargs):
+        """Direct handler for iree_wasm_cc_test (loaded from .bzl)."""
+        self.wasm_cc_test(**kwargs)
 
     def enforce_glob(self, files, **kwargs):
         return files

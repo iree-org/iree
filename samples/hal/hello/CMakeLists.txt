@@ -33,3 +33,9 @@ iree_native_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_ARCH STREQUAL "wasm_32")
+  target_link_libraries(iree_samples_hal_hello_hello PRIVATE
+    iree_wasm_libc
+  )
+endif()

@@ -292,7 +292,14 @@ def check_description_and_show_diff(
 
 def parse_trailer_map_from_description(description: str):
     trailer_lines = subprocess.run(
-        ["git", "interpret-trailers", "--parse", "--no-divider"],
+        [
+            "git",
+            "interpret-trailers",
+            "--only-trailers",
+            "--only-input",
+            "--no-unfold",
+            "--no-divider",
+        ],
         input=description,
         stdout=subprocess.PIPE,
         check=True,

@@ -45,8 +45,10 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
   __asm__ volatile(".inst 0xd4200000");
 #elif defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
   __asm__ volatile("int $0x03");
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
-  EM_ASM({ debugger; });
+#elif defined(IREE_PLATFORM_WASM)
+  // Wasm has no debug break instruction. __builtin_trap() is unrecoverable
+  // but is the best we can do without a JS bridge.
+  __builtin_trap();
 #else
   // NOTE: this is unrecoverable and debugging cannot continue.
   __builtin_trap();

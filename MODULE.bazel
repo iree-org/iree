@@ -88,6 +88,7 @@ use_repo(
     "torch-mlir-raw",
     "tracy_client",
     "vulkan_headers",
+    "wasi_sdk",
     "webgpu_headers",
 )
 
