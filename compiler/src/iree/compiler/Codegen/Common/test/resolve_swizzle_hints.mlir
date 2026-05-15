@@ -388,3 +388,17 @@ func.func @gather_to_lds_inconsistent_error(%global: memref<2048xf32>) {
   %v = vector.load %1[%c0] : memref<2048xf32, #gpu.address_space<workgroup>>, vector<5xf32>
   return
 }
+
+// -----
+
+// View-like ops between a swizzle_hint and its load/store user are no longer
+// transparent: ResolveSwizzleHints expects them to have been folded away.
+func.func @swizzle_hint_viewlike_user_error() -> vector<4xf32> {
+  %alloc = memref.alloc() : memref<2048xf32>
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{unsupported SwizzleHintOp user}}
+  %0 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32>
+  %1 = memref.expand_shape %0 [[0, 1]] output_shape [32, 64] : memref<2048xf32> into memref<32x64xf32>
+  %2 = vector.load %1[%c0, %c0] : memref<32x64xf32>, vector<4xf32>
+  return %2 : vector<4xf32>
+}

@@ -166,9 +166,7 @@ static memref::AllocOp traceToAllocation(Value val) {
     if (!visited.insert(current).second) {
       continue;
     }
-    Operation *defOp = current.getDefiningOp();
-    if (!defOp) {
-      auto blockArg = cast<BlockArgument>(current);
+    if (auto blockArg = dyn_cast<BlockArgument>(current)) {
       auto loopOp =
           dyn_cast<LoopLikeOpInterface>(blockArg.getOwner()->getParentOp());
       if (!loopOp) {
@@ -177,14 +175,14 @@ static memref::AllocOp traceToAllocation(Value val) {
       if (OpOperand *init = loopOp.getTiedLoopInit(blockArg)) {
         worklist.push_back(init->get());
       }
-    } else if (auto allocOp = dyn_cast<memref::AllocOp>(defOp)) {
+    } else if (auto allocOp = current.getDefiningOp<memref::AllocOp>()) {
       return allocOp;
-    } else if (auto loopOp = dyn_cast<LoopLikeOpInterface>(defOp)) {
+    } else if (auto loopOp = current.getDefiningOp<LoopLikeOpInterface>()) {
       if (OpOperand *init = loopOp.getTiedLoopInit(cast<OpResult>(current))) {
         worklist.push_back(init->get());
       }
     } else {
-      for (Value operand : defOp->getOperands()) {
+      for (Value operand : current.getDefiningOp()->getOperands()) {
         if (isa<MemRefType>(operand.getType())) {
           worklist.push_back(operand);
         }
