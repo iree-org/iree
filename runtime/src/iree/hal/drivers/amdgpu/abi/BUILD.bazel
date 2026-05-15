@@ -12,18 +12,25 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ABI_HDRS = [
+    "command_buffer.h",
+    "common.h",
+    "kernel_args.h",
+    "kernel_descriptor.h",
+    "profile.h",
+    "queue.h",
+    "signal.h",
+    "timestamp.h",
+]
+
+filegroup(
+    name = "amdgpu_abi_bitcode_hdrs",
+    srcs = ABI_HDRS,
+)
+
 iree_runtime_cc_library(
     name = "abi",
-    hdrs = [
-        "command_buffer.h",
-        "common.h",
-        "kernel_args.h",
-        "kernel_descriptor.h",
-        "profile.h",
-        "queue.h",
-        "signal.h",
-        "timestamp.h",
-    ],
+    hdrs = ABI_HDRS,
     deps = [
         "@hsa_runtime_headers",
     ],

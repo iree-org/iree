@@ -79,6 +79,7 @@ use_repo(
     "dlmalloc",
     "hip_api_headers",
     "hsa_runtime_headers",
+    "iree_amdgpu_device_toolchain",
     "iree_cuda",
     "llvm-raw",
     "nccl",

@@ -431,11 +431,8 @@ static bool iree_hal_amdgpu_generic_version_compatible(
     iree_hal_amdgpu_gfxip_version_t code_object_version,
     iree_hal_amdgpu_gfxip_version_t agent_version) {
   if (code_object_version.major != agent_version.major) return false;
-  if (code_object_version.minor > agent_version.minor) return false;
-  if (code_object_version.minor == agent_version.minor &&
-      code_object_version.stepping > agent_version.stepping) {
-    return false;
-  }
+  if (code_object_version.minor != agent_version.minor) return false;
+  if (code_object_version.stepping > agent_version.stepping) return false;
   return true;
 }
 
