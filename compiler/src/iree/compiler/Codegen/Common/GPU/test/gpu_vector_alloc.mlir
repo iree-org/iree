@@ -65,6 +65,54 @@ func.func @test_wide(%vector: vector<16x128xf16>) -> vector<16x128xf16> {
 
 // -----
 
+// With sub-bank f16, mismatched writer/reader access widths would hit a
+// scalar/sub-access path in ResolveSwizzleHints. Do not emit the hint for these
+// allocations so the bank-conflict padding pass can handle them instead.
+
+#f16_scalar_writer = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [16, 128],
+  element_tile = [1, 1],
+  subgroup_strides = [1, 1],
+  thread_strides = [128, 1]
+>
+
+#f16_wide_reader = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [16, 16],
+  element_tile = [1, 8],
+  subgroup_strides = [1, 1],
+  thread_strides = [16, 1]
+>
+
+func.func @test_f16_scalar_writer(%vector: vector<16x128xf16>) -> vector<16x128xf16> {
+  %in = iree_vector_ext.to_layout %vector to layout(#f16_scalar_writer) : vector<16x128xf16>
+  %out = iree_vector_ext.to_layout %in to layout(#f16_wide_reader) {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x128xf16>
+  return %out : vector<16x128xf16>
+}
+
+//    SWZ-LABEL: func.func @test_f16_scalar_writer
+//         SWZ:    %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x128xf16, #gpu.address_space<workgroup>>
+//     SWZ-NOT:    iree_codegen.swizzle_hint
+//         SWZ:    vector.transfer_write %{{.*}}, %[[ALLOC]]
+
+func.func @test_f16_scalar_reader(%vector: vector<16x128xf16>) -> vector<16x128xf16> {
+  %in = iree_vector_ext.to_layout %vector to layout(#f16_wide_reader) : vector<16x128xf16>
+  %out = iree_vector_ext.to_layout %in to layout(#f16_scalar_writer) {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x128xf16>
+  return %out : vector<16x128xf16>
+}
+
+//    SWZ-LABEL: func.func @test_f16_scalar_reader
+//         SWZ:    %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x128xf16, #gpu.address_space<workgroup>>
+//     SWZ-NOT:    iree_codegen.swizzle_hint
+//         SWZ:    vector.transfer_write %{{.*}}, %[[ALLOC]]
+
+// -----
+
 // f32 with writer vector<4> and reader scalar (MFMA_F32_16x16x4_F32 pattern):
 // accessWidth = max(4, 1) = 4 triggers the cap → shrinks to 2 for bijection.
 

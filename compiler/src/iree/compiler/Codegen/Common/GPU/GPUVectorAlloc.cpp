@@ -136,6 +136,16 @@ computeSwizzleFromLayouts(MLIRContext *ctx, VectorType vectorType,
     return std::nullopt;
   }
 
+  // For sub-bank element types, a swizzle whose writer and reader use different
+  // access widths lowers one side through a scalar/sub-access path in
+  // ResolveSwizzleHints. That creates per-element swizzle address computation
+  // on the narrow side. Leave those cases to padding; f16/bf16 swizzles where
+  // both sides use the same access width still use the hint.
+  if (elemBytes < kSharedMemoryBankWidthBytes && writerAccess != readerAccess &&
+      accessWidth > 1) {
+    return std::nullopt;
+  }
+
   // When an element is at least a full bank wide (elemBytes >= bankBytes,
   // i.e. f32/f64) and the reader is narrower than the writer (typical MFMA:
   // vector<k> stores, scalar reads), picking accessWidth = max(w, r) yields
