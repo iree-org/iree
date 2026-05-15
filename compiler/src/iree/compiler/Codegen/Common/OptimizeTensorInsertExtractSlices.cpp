@@ -435,12 +435,11 @@ private:
     auto readConversion = IREE::Util::HoistableConversionOp::create(
         rewriter, readOp.getLoc(), kTransferReadTag, kTransferWriteTag,
         TypeRange{readOp.getVectorType()}, ValueRange{candidate.iterArg},
-        [&](OpBuilder &builder, Location loc, ValueRange args) {
-          Value read = vector::TransferReadOp::create(
-              builder, loc, readOp.getVectorType(), args[0],
-              readOp.getIndices(), readOp.getPermutationMap(),
-              readOp.getPadding(), readOp.getMask(), readOp.getInBoundsAttr());
-          return SmallVector<Value>{read};
+        [&](OpBuilder &builder, Location, ValueRange args) {
+          auto clonedRead = cast<vector::TransferReadOp>(
+              builder.clone(*readOp.getOperation()));
+          clonedRead.getBaseMutable().assign(args[0]);
+          return SmallVector<Value>{clonedRead.getResult()};
         });
 
     TypedValue<VectorType> mask = readOp.getMask();
@@ -456,14 +455,12 @@ private:
     auto writeConversion = IREE::Util::HoistableConversionOp::create(
         rewriter, writeOp.getLoc(), kTransferWriteTag, kTransferReadTag,
         TypeRange{writeOp.getResult().getType()}, ValueRange{carriedValue},
-        [&](OpBuilder &builder, Location loc, ValueRange args) {
-          Value write =
-              vector::TransferWriteOp::create(
-                  builder, loc, args[0], candidate.initArg,
-                  writeOp.getIndices(), writeOp.getPermutationMapAttr(),
-                  writeOp.getMask(), writeOp.getInBoundsAttr())
-                  .getResult();
-          return SmallVector<Value>{write};
+        [&](OpBuilder &builder, Location, ValueRange args) {
+          auto clonedWrite = cast<vector::TransferWriteOp>(
+              builder.clone(*writeOp.getOperation()));
+          clonedWrite.getValueToStoreMutable().assign(args[0]);
+          clonedWrite.getBaseMutable().assign(candidate.initArg);
+          return SmallVector<Value>{clonedWrite.getResult()};
         });
 
     rewriter.replaceOp(writeOp, writeConversion.getResult(0));
