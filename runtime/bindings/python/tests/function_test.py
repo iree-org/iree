@@ -456,6 +456,37 @@ class FunctionTest(unittest.TestCase):
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
         )
 
+    def testCudaImplicitNdArrayArgMemoryType(self):
+        try:
+            device = rt.get_device("cuda")
+        except Exception as e:
+            self.skipTest(f"CUDA device unavailable: {e}")
+
+        arg_array = np.zeros([3, 4], dtype=np.float32)
+        invoked_buffer_view = None
+
+        def invoke(arg_list, ret_list):
+            nonlocal invoked_buffer_view
+            invoked_buffer_view = arg_list.get_as_object(0, rt.HalBufferView)
+
+        vm_context = MockVmContext(invoke)
+        vm_function = MockVmFunction(
+            reflection={
+                "iree.abi": json.dumps(
+                    {
+                        "a": [["ndarray", "f32", 3, 4]],
+                        "r": [],
+                    }
+                )
+            }
+        )
+        invoker = FunctionInvoker(vm_context, device, vm_function)
+        _ = invoker(arg_array)
+
+        memory_type = invoked_buffer_view.get_buffer().memory_type()
+        self.assertTrue(memory_type & int(rt.MemoryType.DEVICE_LOCAL))
+        self.assertFalse(memory_type & int(rt.MemoryType.HOST_LOCAL))
+
     def testDeviceArrayArg(self):
         # Note that since the device array is set up to disallow implicit host
         # transfers, this also verifies that no accidental/automatic transfers
