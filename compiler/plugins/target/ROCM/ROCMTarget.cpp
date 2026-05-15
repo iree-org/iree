@@ -72,37 +72,14 @@ namespace {
 // producing type mismatches that cause amd-llvm-spirv reverse translation
 // to fail. Eliminating the wrapper before codegen avoids this.
 static void unwrapSingleElementArrayTypes(llvm::Module &M) {
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      llvm::SmallVector<llvm::Instruction *, 8> toErase;
-      for (auto &I : BB) {
-        if (auto *EV = llvm::dyn_cast<llvm::ExtractValueInst>(&I)) {
-          if (EV->getNumIndices() != 1 || EV->getIndices()[0] != 0) {
-            continue;
-          }
-          auto *ArrTy = llvm::dyn_cast<llvm::ArrayType>(
-              EV->getAggregateOperand()->getType());
-          if (!ArrTy || ArrTy->getNumElements() != 1) {
-            continue;
-          }
-          // extractvalue [1 x T] %v, 0 → replace with the unwrapped value.
-          // If the aggregate is a PHI, we need to handle it after PHI fixup.ROCMTarget
-          // For now, just replace uses with the aggregate operand if types
-          // match after unwrapping.
-        }
-      }
-    }
-  }
-
   // Do a targeted rewrite: find phi [1 x T] and rewrite to phi T.
   for (auto &F : M) {
     for (auto &BB : F) {
-      for (auto &I : BB) {
-        auto *PN = llvm::dyn_cast<llvm::PHINode>(&I);
-        if (!PN) {
-          continue;
-        }
-        auto *ArrTy = llvm::dyn_cast<llvm::ArrayType>(PN->getType());
+      // Users of rewritten phi nodes
+      llvm::SmallVector<llvm::Instruction *, 4> deadInsts;
+      for (auto &PN : BB.phis()) {
+
+        auto *ArrTy = llvm::dyn_cast<llvm::ArrayType>(PN.getType());
         if (!ArrTy || ArrTy->getNumElements() != 1) {
           continue;
         }
@@ -110,11 +87,11 @@ static void unwrapSingleElementArrayTypes(llvm::Module &M) {
         llvm::Type *InnerTy = ArrTy->getElementType();
         // Create a new PHI with the inner type.
         auto *NewPN =
-            llvm::PHINode::Create(InnerTy, PN->getNumIncomingValues(),
-                                  PN->getName() + ".unwrap", PN->getIterator());
-        for (unsigned i = 0, e = PN->getNumIncomingValues(); i != e; ++i) {
-          llvm::Value *InVal = PN->getIncomingValue(i);
-          llvm::BasicBlock *InBB = PN->getIncomingBlock(i);
+            llvm::PHINode::Create(InnerTy, PN.getNumIncomingValues(),
+                                  PN.getName() + ".unwrap", PN.getIterator());
+        for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
+          llvm::Value *InVal = PN.getIncomingValue(i);
+          llvm::BasicBlock *InBB = PN.getIncomingBlock(i);
           if (auto *IV = llvm::dyn_cast<llvm::InsertValueInst>(InVal)) {
             // insertvalue [1 x T] poison, T %x, 0 → just use %x
             if (IV->getNumIndices() == 1 && IV->getIndices()[0] == 0) {
@@ -152,8 +129,7 @@ static void unwrapSingleElementArrayTypes(llvm::Module &M) {
 
         // Replace uses of the old PHI. Users are extractvalue [1 x T] %phi, 0
         // which should become direct uses of the new PHI.
-        llvm::SmallVector<llvm::Instruction *, 4> deadInsts;
-        for (auto *U : llvm::make_early_inc_range(PN->users())) {
+        for (auto *U : llvm::make_early_inc_range(PN.users())) {
           if (auto *EV = llvm::dyn_cast<llvm::ExtractValueInst>(U)) {
             if (EV->getNumIndices() == 1 && EV->getIndices()[0] == 0) {
               EV->replaceAllUsesWith(NewPN);
@@ -169,7 +145,7 @@ static void unwrapSingleElementArrayTypes(llvm::Module &M) {
             // the PHI incoming values are rewritten.
             bool allUsesArePhi = true;
             for (auto *IVU : IV->users()) {
-              if (IVU != PN) {
+              if (IVU != &PN) {
                 allUsesArePhi = false;
               }
             }
@@ -179,14 +155,12 @@ static void unwrapSingleElementArrayTypes(llvm::Module &M) {
             }
           }
         }
-        PN->replaceAllUsesWith(llvm::PoisonValue::get(ArrTy));
-        deadInsts.push_back(PN);
-        for (auto *DI : llvm::reverse(deadInsts)) {
-          DI->eraseFromParent();
-        }
-        // We modified the BB, restart. This is safe since there's typically
-        // only one such PHI per BB.
-        break;
+        PN.replaceAllUsesWith(llvm::PoisonValue::get(ArrTy));
+        deadInsts.push_back(&PN);
+      }
+      // Erase dead instructions at the end.
+      for (auto *DI : llvm::reverse(deadInsts)) {
+        DI->eraseFromParent();
       }
     }
   }

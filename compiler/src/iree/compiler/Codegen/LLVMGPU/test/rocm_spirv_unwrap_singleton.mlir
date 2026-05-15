@@ -6,8 +6,6 @@
 // Two single-element array values flowing through the same control-flow merge
 // should become two PHI nodes after LLVM export. 
 
-// UnwrapSingleElementArrayTypes should remove all instances of insertvalue and extractvalue
-
 #pipeline_layout = #hal.pipeline.layout<bindings = []>
 #target = #iree_gpu.target<arch = "gfx1201", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = none,
@@ -40,11 +38,11 @@ hal.executable public @rocm_spirv_unwrap_test {
           %inner_a: vector<16xf32>,
           %inner_b: vector<16xf32>,
           %inner_c: vector<16xf32>,
-          %inner_d: vector<16xf32>,
-          %init_a: !llvm.array<1 x vector<16xf32>>,
-          %init_b: !llvm.array<1 x vector<16xf32>>) -> vector<16xf32> {
-        // CHECK-NOT: insertvalue
-        // CHECK-NOT: extractvalue
+          %inner_d: vector<16xf32>) -> vector<16xf32> {
+        // CHECK-LABEL: @two_singletons
+        // CHECK-NOT: phi [1 x {{.*}}]
+        %init_a = llvm.mlir.poison : !llvm.array<1 x vector<16xf32>>
+        %init_b = llvm.mlir.poison : !llvm.array<1 x vector<16xf32>>
         %initial_a = llvm.insertvalue %inner_a, %init_a[0] : !llvm.array<1 x vector<16xf32>>
         %initial_b = llvm.insertvalue %inner_b, %init_b[0] : !llvm.array<1 x vector<16xf32>>
 
