@@ -36,3 +36,104 @@ func.func @bufferize_with_thread_private_memory(%arg0: index) {
 //  CHECK-SAME:       memref<1x1x4x4xf16, strided<[1310720, 4096, 64, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
 //  CHECK-SAME:       to memref<1x1x4x4xf16, #gpu.address_space<private>>
 //       CHECK:   } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
+
+// -----
+
+#pipeline_layout_scatter = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @linalg_ext_scatter_preserves_original() {
+  %c0 = arith.constant 0 : index
+  %updates_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>>
+  %indices_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>>
+  %original_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>>
+  %result_dst = hal.interface.binding.subspan layout(#pipeline_layout_scatter) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  %updates = iree_tensor_ext.dispatch.tensor.load %updates_src, offsets = [0, 0, 0], sizes = [11, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>> -> tensor<11x1x512xf32>
+  %indices = iree_tensor_ext.dispatch.tensor.load %indices_src, offsets = [0], sizes = [11], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>> -> tensor<11xi32>
+  %original = iree_tensor_ext.dispatch.tensor.load %original_src, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>> -> tensor<32x1x512xf32>
+  %scatter = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%updates, %indices : tensor<11x1x512xf32>, tensor<11xi32>) outs(%original : tensor<32x1x512xf32>) {
+  ^bb0(%update: f32, %original_value: f32):
+    iree_linalg_ext.yield %update : f32
+  } -> tensor<32x1x512xf32>
+  iree_tensor_ext.dispatch.tensor.store %scatter, %result_dst, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : tensor<32x1x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  return
+}
+// CHECK-LABEL: func.func @linalg_ext_scatter_preserves_original
+// CHECK:       %[[ORIGINAL_SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} binding(2)
+// CHECK:       %[[ORIGINAL:.+]] = memref.assume_alignment %[[ORIGINAL_SUBSPAN]]
+// CHECK:       %[[RESULT:.+]] = hal.interface.binding.subspan {{.*}} binding(3)
+// CHECK:       %[[ALLOC:.+]] = memref.alloc()
+// CHECK:       memref.copy %[[ORIGINAL]], %[[ALLOC]]
+// CHECK:       iree_linalg_ext.scatter
+// CHECK-SAME:    outs(%[[ALLOC]]
+
+// -----
+
+#pipeline_layout_scatter_combine = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @linalg_ext_scatter_combiner_reads_original() {
+  %c0 = arith.constant 0 : index
+  %updates_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_combine) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>>
+  %indices_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_combine) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>>
+  %original_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_combine) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>>
+  %result_dst = hal.interface.binding.subspan layout(#pipeline_layout_scatter_combine) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  %updates = iree_tensor_ext.dispatch.tensor.load %updates_src, offsets = [0, 0, 0], sizes = [11, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>> -> tensor<11x1x512xf32>
+  %indices = iree_tensor_ext.dispatch.tensor.load %indices_src, offsets = [0], sizes = [11], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>> -> tensor<11xi32>
+  %original = iree_tensor_ext.dispatch.tensor.load %original_src, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>> -> tensor<32x1x512xf32>
+  %scatter = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false) ins(%updates, %indices : tensor<11x1x512xf32>, tensor<11xi32>) outs(%original : tensor<32x1x512xf32>) {
+  ^bb0(%update: f32, %original_value: f32):
+    %combined = arith.addf %update, %original_value : f32
+    iree_linalg_ext.yield %combined : f32
+  } -> tensor<32x1x512xf32>
+  iree_tensor_ext.dispatch.tensor.store %scatter, %result_dst, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : tensor<32x1x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  return
+}
+// CHECK-LABEL: func.func @linalg_ext_scatter_combiner_reads_original
+// CHECK:       %[[ORIGINAL_SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} binding(2)
+// CHECK:       %[[ORIGINAL:.+]] = memref.assume_alignment %[[ORIGINAL_SUBSPAN]]
+// CHECK:       %[[ALLOC:.+]] = memref.alloc()
+// CHECK:       memref.copy %[[ORIGINAL]], %[[ALLOC]]
+// CHECK:       iree_linalg_ext.scatter
+// CHECK-SAME:    outs(%[[ALLOC]]
+
+// -----
+
+#pipeline_layout_scatter_mask = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @linalg_ext_scatter_masked_update_preserves_original() {
+  %c0 = arith.constant 0 : index
+  %updates_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_mask) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>>
+  %indices_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_mask) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>>
+  %mask_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_mask) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi1>>
+  %original_src = hal.interface.binding.subspan layout(#pipeline_layout_scatter_mask) binding(3) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>>
+  %result_dst = hal.interface.binding.subspan layout(#pipeline_layout_scatter_mask) binding(4) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  %updates = iree_tensor_ext.dispatch.tensor.load %updates_src, offsets = [0, 0, 0], sizes = [11, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x512xf32>> -> tensor<11x1x512xf32>
+  %indices = iree_tensor_ext.dispatch.tensor.load %indices_src, offsets = [0], sizes = [11], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>> -> tensor<11xi32>
+  %mask = iree_tensor_ext.dispatch.tensor.load %mask_src, offsets = [0], sizes = [11], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi1>> -> tensor<11xi1>
+  %original = iree_tensor_ext.dispatch.tensor.load %original_src, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x512xf32>> -> tensor<32x1x512xf32>
+  %scatter = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%updates, %indices, %mask : tensor<11x1x512xf32>, tensor<11xi32>, tensor<11xi1>) outs(%original : tensor<32x1x512xf32>) {
+  ^bb0(%update: f32, %original_value: f32):
+    iree_linalg_ext.yield %update : f32
+  } -> tensor<32x1x512xf32>
+  iree_tensor_ext.dispatch.tensor.store %scatter, %result_dst, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : tensor<32x1x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x512xf32>>
+  return
+}
+// CHECK-LABEL: func.func @linalg_ext_scatter_masked_update_preserves_original
+// CHECK:       %[[ORIGINAL_SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} binding(3)
+// CHECK:       %[[ORIGINAL:.+]] = memref.assume_alignment %[[ORIGINAL_SUBSPAN]]
+// CHECK:       %[[ALLOC:.+]] = memref.alloc()
+// CHECK:       memref.copy %[[ORIGINAL]], %[[ALLOC]]
+// CHECK:       iree_linalg_ext.scatter
+// CHECK-SAME:    outs(%[[ALLOC]]
