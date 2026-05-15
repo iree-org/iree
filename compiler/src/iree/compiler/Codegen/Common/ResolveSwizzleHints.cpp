@@ -184,6 +184,17 @@ verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
   return success();
 }
 
+static bool isSupportedSwizzledAccess(VectorType type, int64_t accessWidth) {
+  if (type.getRank() != 1) {
+    return false;
+  }
+  int64_t width = type.getShape()[0];
+  if (width < accessWidth) {
+    return width == 1;
+  }
+  return width % accessWidth == 0;
+}
+
 /// Resolves all hints. Walks all direct users and splits them into loads and
 /// stores. If any user is not a swizzle-able load or store, bail out and
 /// silently drop the optimization hint.
@@ -191,20 +202,17 @@ static void resolveHintOp(RewriterBase &rewriter,
                           IREE::Codegen::SwizzleHintOp hintOp) {
   SmallVector<vector::LoadOp> loads;
   SmallVector<vector::StoreOp> stores;
+  int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
-      VectorType loadType = load.getVectorType();
-      // Guard on zero rank loads.
-      if (loadType.getRank() != 1) {
+      if (!isSupportedSwizzledAccess(load.getVectorType(), accessWidth)) {
         return;
       }
       loads.push_back(load);
       continue;
     }
     if (auto store = dyn_cast<vector::StoreOp>(user)) {
-      VectorType storeType = store.getVectorType();
-      // Guard on zero rank stores.
-      if (storeType.getRank() != 1) {
+      if (!isSupportedSwizzledAccess(store.getVectorType(), accessWidth)) {
         return;
       }
       stores.push_back(store);

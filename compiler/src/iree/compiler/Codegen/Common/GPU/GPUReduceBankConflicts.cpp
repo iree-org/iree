@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -33,6 +34,15 @@ static bool hasCollapseShapeUser(memref::AllocOp allocOp) {
     }
   }
   return false;
+}
+
+/// Check if AllocOp is already protected by a swizzle hint. These allocs keep
+/// their original row stride because padding would invalidate the hint's
+/// address calculation.
+static bool hasSwizzleHintUser(memref::AllocOp allocOp) {
+  return llvm::any_of(allocOp->getUsers(), [](Operation *user) {
+    return isa<IREE::Codegen::SwizzleHintOp>(user);
+  });
 }
 
 /// Pad out the inner dimension of the `memref.alloc` op in order reduce the
@@ -127,7 +137,7 @@ static unsigned computeEffectiveExtraBytes(mlir::FunctionOpInterface funcOp,
 
   funcOp.walk([&](memref::AllocOp allocOp) {
     if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
-        allocOp.getType().hasStaticShape()) {
+        allocOp.getType().hasStaticShape() && !hasSwizzleHintUser(allocOp)) {
       MemRefType allocType = cast<MemRefType>(allocOp.getType());
 
       ArrayRef<int64_t> shape = allocType.getShape();
@@ -202,7 +212,7 @@ LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
   // Collect all the alloc operations.
   funcOp.walk([&](memref::AllocOp allocOp) {
     if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
-        allocOp.getType().hasStaticShape()) {
+        allocOp.getType().hasStaticShape() && !hasSwizzleHintUser(allocOp)) {
       sharedMemAllocs.push_back(allocOp);
     }
   });

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
@@ -39,8 +41,9 @@ namespace mlir::iree_compiler {
 llvm::cl::opt<bool> clEnableVectorAllocSwizzle(
     "iree-codegen-gpu-enable-vector-alloc-swizzle",
     llvm::cl::desc("Enable XOR swizzle hint creation in GPUVectorAlloc to "
-                   "eliminate LDS bank conflicts. Mutually exclusive with the "
-                   "GPUReduceBankConflicts padding pass."),
+                   "eliminate LDS bank conflicts. The "
+                   "GPUReduceBankConflicts padding pass skips allocs with "
+                   "swizzle hints."),
     llvm::cl::init(false));
 
 namespace {

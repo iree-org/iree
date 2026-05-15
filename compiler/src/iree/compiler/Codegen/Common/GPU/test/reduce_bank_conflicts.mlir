@@ -182,3 +182,17 @@ func.func @pad_if_below_limit() {
   %0 = memref.alloc() : memref<4x32x126xf32, #gpu.address_space<workgroup>>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @skip_swizzled_alloc_pad_plain_alloc
+// CHECK:         %[[SWIZZLED_ALLOC:.*]] = memref.alloc() : memref<16x128xi8, #gpu.address_space<workgroup>>
+// CHECK:         iree_codegen.swizzle_hint %[[SWIZZLED_ALLOC]][#iree_codegen.xor_shuffle<128, 16>] : memref<16x128xi8, #gpu.address_space<workgroup>>
+// CHECK:         %[[PADDED_ALLOC:.*]] = memref.alloc() : memref<4x32x66xf32, #gpu.address_space<workgroup>>
+// CHECK:         memref.subview %[[PADDED_ALLOC]][0, 0, 0] [4, 32, 64] [1, 1, 1]
+func.func @skip_swizzled_alloc_pad_plain_alloc() {
+  %0 = memref.alloc() : memref<16x128xi8, #gpu.address_space<workgroup>>
+  %1 = iree_codegen.swizzle_hint %0[#iree_codegen.xor_shuffle<128, 16>] : memref<16x128xi8, #gpu.address_space<workgroup>>
+  %2 = memref.alloc() : memref<4x32x64xf32, #gpu.address_space<workgroup>>
+  return
+}

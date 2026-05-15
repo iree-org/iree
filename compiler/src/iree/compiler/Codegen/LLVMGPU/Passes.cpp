@@ -71,9 +71,8 @@ static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
-// Declared in GPUVectorAlloc.cpp; used here to make padding and swizzle
-// mutually exclusive — when swizzle is enabled, the padding pass is skipped
-// (padding changes row strides and breaks the XOR swizzle's address math).
+// Declared in GPUVectorAlloc.cpp; used here to add the flattening pass only
+// when GPUVectorAlloc may have emitted swizzle hints.
 extern llvm::cl::opt<bool> clEnableVectorAllocSwizzle;
 
 static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
@@ -868,13 +867,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  // Padding and swizzle are mutually exclusive: padding changes the row
-  // stride to a non-power-of-2, which breaks the XOR swizzle's address
-  // math (the swizzle formula assumes rowStride == rowWidth). Only run
-  // padding when swizzle is NOT enabled. Default: swizzle off, padding
-  // runs — preserving the upstream compilation flow.
-  if (options.enableReduceSharedMemoryBankConflicts &&
-      !clEnableVectorAllocSwizzle) {
+  // The padding pass skips swizzled allocs locally, but can still pad any
+  // shared-memory allocs that did not receive a swizzle hint.
+  if (options.enableReduceSharedMemoryBankConflicts) {
     GPUReduceBankConflictsPassOptions options = {};
     options.paddingBits = 64;
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
