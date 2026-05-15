@@ -118,3 +118,21 @@ func.func @trace_through_scf_for() -> vector<8xbf16> {
 //       CHECK:   %[[H2:.+]] = iree_codegen.swizzle_hint %[[C2]][#iree_codegen.xor_shuffle<128, 8>]
 //       CHECK:   %[[E2:.+]] = memref.expand_shape %[[H2]] {{\[\[}}0, 1{{\]\]}}
 //       CHECK:   vector.load %[[E2]]
+
+// -----
+
+func.func @gather_to_lds_2d(%src: memref<8x128xbf16>) {
+  %alloc = memref.alloc() {iree_codegen.swizzle = #iree_codegen.xor_shuffle<128, 8>}
+    : memref<8x128xbf16, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  amdgpu.gather_to_lds %src[%c0, %c0], %alloc[%c0, %c0]
+    : vector<8xbf16>, memref<8x128xbf16>, memref<8x128xbf16, #gpu.address_space<workgroup>>
+  return
+}
+
+// CHECK-LABEL: func @gather_to_lds_2d
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<8x128xbf16, #gpu.address_space<workgroup>>
+//       CHECK:   %[[COLLAPSED:.+]] = memref.collapse_shape %[[ALLOC]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   %[[HINT:.+]] = iree_codegen.swizzle_hint %[[COLLAPSED]][#iree_codegen.xor_shuffle<128, 8>]
+//       CHECK:   %[[EXPANDED:.+]] = memref.expand_shape %[[HINT]] {{\[\[}}0, 1{{\]\]}}
+//       CHECK:   amdgpu.gather_to_lds %{{.+}}[%{{.+}}, %{{.+}}], %[[EXPANDED]][%{{.+}}, %{{.+}}]

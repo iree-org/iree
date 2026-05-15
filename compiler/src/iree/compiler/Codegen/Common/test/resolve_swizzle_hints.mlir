@@ -353,3 +353,52 @@ func.func @swizzle_hint_non_contiguous_memref_error() -> vector<4xf32> {
   %1 = vector.load %0[%offset, %offset] : memref<32x64xf32, strided<[2, 1], offset: 0>>, vector<4xf32>
   return %1: vector<4xf32>
 }
+
+// -----
+
+// When one hint is not resolvable and no gather_to_lds is present, the whole
+// alloc's hints are softly dropped (no swizzle applied to any access).
+func.func @soft_drop_inconsistent_no_gather(%vec: vector<4xf32>) -> (vector<4xf32>, vector<5xf32>) {
+  %alloc = memref.alloc() : memref<2048xf32>
+  %c0 = arith.constant 0 : index
+  %0 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32>
+  %v1 = vector.load %0[%c0] : memref<2048xf32>, vector<4xf32>
+  %1 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32>
+  %v2 = vector.load %1[%c0] : memref<2048xf32>, vector<5xf32>
+  return %v1, %v2 : vector<4xf32>, vector<5xf32>
+}
+
+// CHECK-LABEL: func @soft_drop_inconsistent_no_gather
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc()
+//       CHECK:   %[[V1:.+]] = vector.load %[[ALLOC]]
+//       CHECK:   %[[V2:.+]] = vector.load %[[ALLOC]]
+//       CHECK:   return %[[V1]], %[[V2]]
+
+// -----
+
+// When gather_to_lds is present on a swizzled alloc, all hints must resolve.
+// Here the load hint is not resolvable (width 5), so this is a hard error.
+func.func @gather_to_lds_inconsistent_error(%global: memref<2048xf32>) {
+  // expected-error @+1 {{alloc has gather_to_lds users; all swizzle hints must resolve}}
+  %alloc = memref.alloc() : memref<2048xf32, #gpu.address_space<workgroup>>
+  %c0 = arith.constant 0 : index
+  %0 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32, #gpu.address_space<workgroup>>
+  amdgpu.gather_to_lds %global[%c0], %0[%c0] : vector<4xf32>, memref<2048xf32>, memref<2048xf32, #gpu.address_space<workgroup>>
+  %1 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32, #gpu.address_space<workgroup>>
+  %v = vector.load %1[%c0] : memref<2048xf32, #gpu.address_space<workgroup>>, vector<5xf32>
+  return
+}
+
+// -----
+
+// View-like ops between a swizzle_hint and its load/store user are no longer
+// transparent: ResolveSwizzleHints expects them to have been folded away.
+func.func @swizzle_hint_viewlike_user_error() -> vector<4xf32> {
+  %alloc = memref.alloc() : memref<2048xf32>
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{unsupported SwizzleHintOp user}}
+  %0 = iree_codegen.swizzle_hint %alloc[#iree_codegen.rotate_rows<64, 4>] : memref<2048xf32>
+  %1 = memref.expand_shape %0 [[0, 1]] output_shape [32, 64] : memref<2048xf32> into memref<32x64xf32>
+  %2 = vector.load %1[%c0, %c0] : memref<32x64xf32>, vector<4xf32>
+  return %2 : vector<4xf32>
+}
