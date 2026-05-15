@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-tensor-insert-extract-slices{fold-identity-slices=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-tensor-insert-extract-slices{fold-identity-slices=false}))" --split-input-file %s | FileCheck %s --check-prefix=NOIDENTITY
 
 func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf16>, %arg1: index) -> tensor<1x?x128xf16> {
   %c0 = arith.constant 0 : index
@@ -16,6 +17,295 @@ func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf1
 // CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true, false, true]}
 // CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x128xf16>
 // CHECK:         return %[[WRITE]]
+
+// -----
+
+func.func @promote_loop_carried_masked_transfer(%mask: vector<4xi1>) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %init = vector.transfer_write %zero, %empty[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> tensor<4xf32> {
+    %old = vector.transfer_read %acc[%c0], %pad, %mask {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+    %new = arith.addf %old, %one : vector<4xf32>
+    %next = vector.transfer_write %new, %acc[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+    scf.yield %next : tensor<4xf32>
+  }
+  %result = vector.transfer_read %loop[%c0], %pad, %mask {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+  return %result : vector<4xf32>
+}
+
+// CHECK-LABEL: func.func @promote_loop_carried_masked_transfer
+// CHECK:         %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK:         %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[ACC:.+]] = %[[ZERO]]) -> (vector<4xf32>) {
+// CHECK:           %[[NEW:.+]] = arith.addf %[[ACC]]
+// CHECK:           %[[YIELD:.+]] = arith.select {{.*}}, %[[NEW]], %[[ZERO]]
+// CHECK:           scf.yield %[[YIELD]] : vector<4xf32>
+// CHECK:         }
+// CHECK:         %[[RESULT:.+]] = arith.select {{.*}}, %[[LOOP]], %[[ZERO]]
+// CHECK:         return %[[RESULT]]
+
+// -----
+
+func.func @promote_loop_carried_masked_transfer_multiple_reads(%mask: vector<4xi1>) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %init = vector.transfer_write %zero, %empty[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> tensor<4xf32> {
+    %old0 = vector.transfer_read %acc[%c0], %pad, %mask {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+    %old1 = vector.transfer_read %acc[%c0], %pad, %mask {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+    %sum = arith.addf %old0, %old1 : vector<4xf32>
+    %new = arith.addf %sum, %one : vector<4xf32>
+    %next = vector.transfer_write %new, %acc[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+    scf.yield %next : tensor<4xf32>
+  }
+  %result = vector.transfer_read %loop[%c0], %pad, %mask {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+  return %result : vector<4xf32>
+}
+
+// CHECK-LABEL: func.func @promote_loop_carried_masked_transfer_multiple_reads
+// CHECK:         %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK:         %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[ACC:.+]] = %[[ZERO]]) -> (vector<4xf32>) {
+// CHECK-NOT:       vector.transfer_read
+// CHECK:           %[[SUM:.+]] = arith.addf %[[ACC]], %[[ACC]]
+// CHECK:           %[[NEW:.+]] = arith.addf %[[SUM]]
+// CHECK:           %[[YIELD:.+]] = arith.select {{.*}}, %[[NEW]], %[[ZERO]]
+// CHECK:           scf.yield %[[YIELD]] : vector<4xf32>
+// CHECK:         }
+// CHECK:         %[[RESULT:.+]] = arith.select {{.*}}, %[[LOOP]], %[[ZERO]]
+// CHECK:         return %[[RESULT]]
+
+// -----
+
+func.func @promote_loop_carried_masked_transfer_write_chain(%size: index) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty(%size) : tensor<?xf32>
+  %init_mask = vector.create_mask %size : vector<4xi1>
+  %init = vector.transfer_write %zero, %empty[%c0], %init_mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> tensor<?xf32> {
+    %dim = tensor.dim %acc, %c0 : tensor<?xf32>
+    %mask = vector.create_mask %dim : vector<4xi1>
+    %old = vector.transfer_read %acc[%c0], %pad, %mask {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+    %scaled = arith.addf %old, %one : vector<4xf32>
+    %write0 = vector.transfer_write %scaled, %acc[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+    %read0 = vector.transfer_read %write0[%c0], %pad, %init_mask {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+    %updated = arith.addf %read0, %one : vector<4xf32>
+    %write1 = vector.transfer_write %updated, %write0[%c0], %init_mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+    %read1 = vector.transfer_read %write1[%c0], %pad, %mask {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+    %updated2 = arith.addf %read1, %one : vector<4xf32>
+    %write2 = vector.transfer_write %updated2, %write1[%c0], %mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+    scf.yield %write2 : tensor<?xf32>
+  }
+  %result = vector.transfer_read %loop[%c0], %pad, %init_mask {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+  return %result : vector<4xf32>
+}
+
+// CHECK-LABEL: func.func @promote_loop_carried_masked_transfer_write_chain
+// CHECK:         %[[ZERO:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+// CHECK:         %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[ACC:.+]] = %[[ZERO]]) -> (vector<4xf32>) {
+// CHECK-NOT:       tensor.dim
+// CHECK-NOT:       vector.transfer_read
+// CHECK-NOT:       vector.transfer_write
+// CHECK:           arith.addf
+// CHECK-NOT:       tensor.dim
+// CHECK-NOT:       vector.transfer_read
+// CHECK-NOT:       vector.transfer_write
+// CHECK:           arith.select
+// CHECK-NOT:       tensor.dim
+// CHECK-NOT:       vector.transfer_read
+// CHECK-NOT:       vector.transfer_write
+// CHECK:           scf.yield {{.*}} : vector<4xf32>
+// CHECK:         }
+// CHECK:         return
+
+// -----
+
+func.func @nested_loop_carried_transfer_from_enclosing_iter_arg() -> tensor<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty() : tensor<4xf32>
+  %init = vector.transfer_write %zero, %empty[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+  %outer = scf.for %i = %c0 to %c4 step %c1 iter_args(%outer_acc = %init) -> tensor<4xf32> {
+    %inner = scf.for %j = %c0 to %c4 step %c1 iter_args(%inner_acc = %outer_acc) -> tensor<4xf32> {
+      %old = vector.transfer_read %inner_acc[%c0], %pad {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+      %new = arith.addf %old, %one : vector<4xf32>
+      %next = vector.transfer_write %new, %inner_acc[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+      scf.yield %next : tensor<4xf32>
+    }
+    scf.yield %inner : tensor<4xf32>
+  }
+  return %outer : tensor<4xf32>
+}
+
+// CHECK-LABEL: func.func @nested_loop_carried_transfer_from_enclosing_iter_arg
+// CHECK:         %[[OUTER:.+]] = scf.for {{.*}} iter_args(%[[OUTER_ARG:.+]] = {{.*}}) -> (vector<4xf32>) {
+// CHECK:           %[[INNER:.+]] = scf.for {{.*}} iter_args(%[[INNER_ARG:.+]] = %[[OUTER_ARG]]) -> (vector<4xf32>) {
+// CHECK:             arith.addf %[[INNER_ARG]]
+// CHECK:           scf.yield %[[INNER]]
+// CHECK:         vector.transfer_write %[[OUTER]]
+
+// -----
+
+func.func @fold_dim_of_shape_preserving_transfer_iter_arg(%size: index, %vec: vector<4xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %empty = tensor.empty(%size) : tensor<?xf32>
+  %init_mask = vector.create_mask %size : vector<4xi1>
+  %init = vector.transfer_write %vec, %empty[%c0], %init_mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> tensor<?xf32> {
+    %dim = tensor.dim %acc, %c0 : tensor<?xf32>
+    %loop_mask = vector.create_mask %dim : vector<4xi1>
+    %next = vector.transfer_write %vec, %acc[%c0], %loop_mask {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+    scf.yield %next : tensor<?xf32>
+  }
+  return %loop : tensor<?xf32>
+}
+
+// CHECK-LABEL: func.func @fold_dim_of_shape_preserving_transfer_iter_arg
+// CHECK-SAME:    %[[SIZE:[a-zA-Z0-9]+]]
+// CHECK-NOT:     tensor.dim
+// CHECK:         vector.create_mask %[[SIZE]]
+// CHECK:         scf.for
+// CHECK-NOT:     tensor.dim
+// CHECK:         vector.transfer_write
+// CHECK:         scf.yield
+// CHECK:         return
+
+// -----
+
+func.func @fold_transfer_write_chain_equivalent_masks(%t: tensor<?xf32>, %size: index) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %two = arith.constant dense<2.0> : vector<4xf32>
+  %mask0 = vector.create_mask %size : vector<4xi1>
+  %write0 = vector.transfer_write %one, %t[%c0], %mask0 {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  %mask1 = vector.create_mask %size : vector<4xi1>
+  %write1 = vector.transfer_write %two, %write0[%c0], %mask1 {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  return %write1 : tensor<?xf32>
+}
+
+// CHECK-LABEL: func.func @fold_transfer_write_chain_equivalent_masks
+// CHECK-SAME:    %[[T:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[TWO:.+]] = arith.constant dense<2.000000e+00> : vector<4xf32>
+// CHECK-NOT:     dense<1.000000e+00>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[TWO]], %[[T]]
+// CHECK:         return %[[WRITE]]
+
+// -----
+
+func.func @negative_fold_transfer_write_chain_non_equivalent_masks(%t: tensor<?xf32>, %size0: index, %size1: index) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %two = arith.constant dense<2.0> : vector<4xf32>
+  %mask0 = vector.create_mask %size0 : vector<4xi1>
+  %write0 = vector.transfer_write %one, %t[%c0], %mask0 {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  %mask1 = vector.create_mask %size1 : vector<4xi1>
+  %write1 = vector.transfer_write %two, %write0[%c0], %mask1 {in_bounds = [true]} : vector<4xf32>, tensor<?xf32>
+  return %write1 : tensor<?xf32>
+}
+
+// CHECK-LABEL: func.func @negative_fold_transfer_write_chain_non_equivalent_masks
+// CHECK-DAG:     %[[ONE:.+]] = arith.constant dense<1.000000e+00> : vector<4xf32>
+// CHECK-DAG:     %[[TWO:.+]] = arith.constant dense<2.000000e+00> : vector<4xf32>
+// CHECK:         %[[WRITE0:.+]] = vector.transfer_write %[[ONE]]
+// CHECK:         %[[WRITE1:.+]] = vector.transfer_write %[[TWO]], %[[WRITE0]]
+// CHECK:         return %[[WRITE1]]
+
+// -----
+
+func.func @fold_transfer_read_of_identity_extract_slice(%t: tensor<?xf32>) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f32
+  %dim = tensor.dim %t, %c0 : tensor<?xf32>
+  %slice = tensor.extract_slice %t[0] [%dim] [1] : tensor<?xf32> to tensor<?xf32>
+  %read = vector.transfer_read %slice[%c0], %pad {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+  return %read : vector<4xf32>
+}
+
+// NOIDENTITY-LABEL: func.func @fold_transfer_read_of_identity_extract_slice
+// NOIDENTITY-SAME:    %[[T:[a-zA-Z0-9]+]]
+// NOIDENTITY-NOT:     tensor.extract_slice
+// NOIDENTITY:         %[[READ:.+]] = vector.transfer_read %[[T]]
+// NOIDENTITY:         return %[[READ]]
+
+// -----
+
+func.func @negative_fold_transfer_read_of_offset_extract_slice(%t: tensor<?xf32>, %size: index) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f32
+  %slice = tensor.extract_slice %t[1] [%size] [1] : tensor<?xf32> to tensor<?xf32>
+  %read = vector.transfer_read %slice[%c0], %pad {in_bounds = [true]} : tensor<?xf32>, vector<4xf32>
+  return %read : vector<4xf32>
+}
+
+// NOIDENTITY-LABEL: func.func @negative_fold_transfer_read_of_offset_extract_slice
+// NOIDENTITY-SAME:    %[[T:[a-zA-Z0-9]+]]
+// NOIDENTITY:         %[[C1:.+]] = arith.constant 1 : index
+// NOIDENTITY:         %[[READ:.+]] = vector.transfer_read %[[T]][%[[C1]]]
+// NOIDENTITY:         return %[[READ]]
+
+// -----
+
+func.func @fold_transfer_read_of_identity_insert_slice(%src: tensor<4xf32>, %dst: tensor<4xf32>) -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %pad = arith.constant 0.0 : f32
+  %inserted = tensor.insert_slice %src into %dst[0] [4] [1] : tensor<4xf32> into tensor<4xf32>
+  %read = vector.transfer_read %inserted[%c0], %pad {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
+  return %read : vector<4xf32>
+}
+
+// NOIDENTITY-LABEL: func.func @fold_transfer_read_of_identity_insert_slice
+// NOIDENTITY-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// NOIDENTITY-NOT:     tensor.insert_slice
+// NOIDENTITY:         %[[READ:.+]] = vector.transfer_read %[[SRC]]
+// NOIDENTITY:         return %[[READ]]
+
+// -----
+
+func.func @negative_promote_loop_carried_out_of_bounds_transfer() -> vector<4xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %pad = arith.constant 0.0 : f32
+  %zero = arith.constant dense<0.0> : vector<4xf32>
+  %one = arith.constant dense<1.0> : vector<4xf32>
+  %empty = tensor.empty() : tensor<1xf32>
+  %init = vector.transfer_write %zero, %empty[%c0] : vector<4xf32>, tensor<1xf32>
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> tensor<1xf32> {
+    %old0 = vector.transfer_read %acc[%c0], %pad : tensor<1xf32>, vector<4xf32>
+    %old1 = vector.transfer_read %acc[%c0], %pad : tensor<1xf32>, vector<4xf32>
+    %sum = arith.addf %old0, %old1 : vector<4xf32>
+    %new = arith.addf %sum, %one : vector<4xf32>
+    %next = vector.transfer_write %new, %acc[%c0] : vector<4xf32>, tensor<1xf32>
+    scf.yield %next : tensor<1xf32>
+  }
+  %result = vector.transfer_read %loop[%c0], %pad : tensor<1xf32>, vector<4xf32>
+  return %result : vector<4xf32>
+}
+
+// CHECK-LABEL: func.func @negative_promote_loop_carried_out_of_bounds_transfer
+// CHECK:         scf.for {{.*}} iter_args(%{{.*}} = %{{.*}}) -> (tensor<1xf32>) {
+// CHECK:           vector.transfer_read %{{.*}} : tensor<1xf32>, vector<4xf32>
+// CHECK:           vector.transfer_write %{{.*}} : vector<4xf32>, tensor<1xf32>
 
 // -----
 
