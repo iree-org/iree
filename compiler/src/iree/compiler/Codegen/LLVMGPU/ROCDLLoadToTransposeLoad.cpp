@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
@@ -18,6 +19,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -34,6 +36,7 @@ namespace {
 
 constexpr int64_t kTransposeLoadLaneGroupSize = 16;
 constexpr amdgpu::Chipset kGfx950 = amdgpu::Chipset(9, 5, 0);
+constexpr amdgpu::Chipset kGfx1200 = amdgpu::Chipset(12, 0, 0);
 constexpr llvm::StringLiteral kPassLocalHintAttr = "__pass_local_hint";
 
 //===----------------------------------------------------------------------===//
@@ -752,6 +755,203 @@ struct TransferReadToTransposeLoad final
 };
 
 //===----------------------------------------------------------------------===//
+// Global Transfer Read + Transpose to Global Transpose Load Pattern
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the memref memory space is a flat global (not workgroup,
+/// not fat_raw_buffer). Accepts no memory space, gpu::Global, integer 0/1,
+/// or #hal.descriptor_type<storage_buffer>.
+static bool isGlobalMemorySpace(Attribute memSpace) {
+  if (!memSpace) {
+    return true;
+  }
+  if (auto gpuAttr = dyn_cast<gpu::AddressSpaceAttr>(memSpace)) {
+    return gpuAttr.getValue() == gpu::AddressSpace::Global;
+  }
+  if (auto intAttr = dyn_cast<IntegerAttr>(memSpace)) {
+    return intAttr.getInt() == 0 || intAttr.getInt() == 1;
+  }
+  // Accept HAL descriptor_type (flat global binding in IREE).
+  if (isa<IREE::HAL::DescriptorTypeAttr>(memSpace)) {
+    return true;
+  }
+  return false;
+}
+
+/// Returns the required vector size (number of elements in the transposed
+/// dimension) for global_transpose_load given an element type, or nullopt if
+/// unsupported.
+static std::optional<int64_t>
+getGlobalTransposeLoadVectorSize(Type elementType) {
+  unsigned bits = elementType.getIntOrFloatBitWidth();
+  switch (bits) {
+  case 8:
+  case 16:
+    return 8;
+  default:
+    return std::nullopt;
+  }
+}
+
+/// Matches:
+///   %read = vector.transfer_read %src[%row, %col] : memref<..., global>,
+///                                                   vector<Nx1xT>
+///   %result = vector.transpose %read, [1, 0] : vector<Nx1xT> to vector<1xNxT>
+///
+/// and replaces with:
+///   %cast = memref.memory_space_cast %src : ... to memref<..., global>
+///   %tr   = amdgpu.global_transpose_load %cast[%row, %col]
+///                   : memref<..., global> -> vector<NxT>
+///   %result = vector.shape_cast %tr : vector<NxT> to vector<1xNxT>
+///
+/// Only fires on gfx1250+ targets.
+struct TransferReadTransposeToGlobalTransposeLoad final
+    : OpRewritePattern<vector::TransposeOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    // Must be a simple [1, 0] transpose (2D).
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
+    if (perm.size() != 2 || perm[0] != 1 || perm[1] != 0) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "not a 2D [1,0] transpose");
+    }
+
+    // Input to transpose must be a transfer_read.
+    auto transferOp =
+        transposeOp.getVector().getDefiningOp<vector::TransferReadOp>();
+    if (!transferOp) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "not fed by transfer_read");
+    }
+
+    // Source memref must be flat global (not workgroup, not fat_raw_buffer).
+    auto memrefType = cast<MemRefType>(transferOp.getBase().getType());
+    if (!isGlobalMemorySpace(memrefType.getMemorySpace())) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "source is not flat global memory");
+    }
+
+    // With (K-outer, N-inner) iteration in the linalg.generic copy, N is the
+    // vectorized inner dimension.  The transfer_read reads 8 contiguous
+    // N-elements per lane, giving vector<1xNxT> (1 K row, N contiguous cols).
+    //   vector<1x8xT>  [K_dim=1, N_dim=8]
+    // After the software transpose [1,0] this becomes vector<8x1xT> [N,K],
+    // which is written to alloc_8[N_base, K_single] along N (stride-8 write).
+    // global_load_tr replaces the N read: each of 8 consecutive lanes provides
+    // its own K-row address, the hardware transposes (8×8 block transpose),
+    // and the result is written with the corrected stride-8 subview.
+    VectorType readType = transferOp.getVectorType();
+    if (readType.getRank() != 2 || readType.getDimSize(0) != 1) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "expected vector<1xNxT> from read");
+    }
+
+    // Check element type and expected N (number of contiguous N elements read).
+    Type elemType = readType.getElementType();
+    std::optional<int64_t> expectedN =
+        getGlobalTransposeLoadVectorSize(elemType);
+    if (!expectedN) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "unsupported element type");
+    }
+    if (readType.getDimSize(1) != *expectedN) {
+      return rewriter.notifyMatchFailure(
+          transposeOp,
+          "vector inner dim does not match global_transpose_load size");
+    }
+
+    // Must be in_bounds.
+    ArrayAttr inBounds = transferOp.getInBounds();
+    if (!inBounds || !llvm::all_of(inBounds.getAsRange<BoolAttr>(),
+                                   [](BoolAttr b) { return b.getValue(); })) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "transfer_read not in_bounds");
+    }
+
+    // Permutation map must be identity (no broadcast).
+    if (!transferOp.getPermutationMap().isIdentity()) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "non-identity permutation map");
+    }
+
+    Location loc = transposeOp.getLoc();
+
+    // Cast memref to gpu::AddressSpace::Global if needed so that
+    // amdgpu.global_transpose_load verifier is satisfied.
+    Value src = transferOp.getBase();
+    if (memrefType.getMemorySpace()) {
+      auto globalSpace = gpu::AddressSpaceAttr::get(rewriter.getContext(),
+                                                    gpu::AddressSpace::Global);
+      auto globalMemrefType =
+          MemRefType::get(memrefType.getShape(), memrefType.getElementType(),
+                          memrefType.getLayout(), globalSpace);
+      src = memref::MemorySpaceCastOp::create(rewriter, loc, globalMemrefType,
+                                              src);
+    }
+
+    // The transpose result must have exactly one use: a transfer_write to
+    // workgroup memory at [N_base, K_single] with vector<8x1>.
+    // With the K-inner tiling (UseGlobalTransposeLoadAttr, (N-outer, K-inner)
+    // linalg.generic), global_load_tr's 8-lane wave-level 8×8 transpose means
+    // lane K_single's result[i] = B[K_group_base+i, N_base + K_single%N].
+    // This should be written to alloc_8[N_base + K_single%N, K_group_base..N-1]
+    // as vector<1x8> (contiguous K) — no subview needed.
+    if (!transposeOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "transpose result has multiple uses");
+    }
+    auto writeOp =
+        dyn_cast<vector::TransferWriteOp>(*transposeOp->user_begin());
+    if (!writeOp) {
+      return rewriter.notifyMatchFailure(
+          transposeOp, "transpose not consumed by transfer_write");
+    }
+    auto writeDst = cast<MemRefType>(writeOp.getBase().getType());
+    if (!hasSharedMemoryAddressSpace(writeDst)) {
+      return rewriter.notifyMatchFailure(
+          transposeOp, "write destination is not workgroup memory");
+    }
+
+    // Emit amdgpu.global_transpose_load.
+    int64_t N = *expectedN;
+    auto resultVecType = VectorType::get({N}, elemType);
+    auto trLoad = amdgpu::GlobalTransposeLoadOp::create(
+        rewriter, loc, resultVecType, src, transferOp.getIndices());
+
+    // Compute corrected write indices for contiguous K writes:
+    //   N_new = N_base + K_single % N      (lane's N position within N_base
+    //   group) K_new = (K_single // N) * N        (K-group base, aligned to N)
+    // Write vector<1xNxT> at [N_new, K_new] → alloc_8[N_new, K_new..K_new+N-1]
+    // This is contiguous K in alloc_8[N, K] (K is inner) — no subview needed.
+    ValueRange writeIndices = writeOp.getIndices();
+    assert(writeIndices.size() == 2 && "expected 2D write");
+    Value nBase = writeIndices[0];   // N_group * N
+    Value kSingle = writeIndices[1]; // K lane value (0..K_total-1)
+
+    AffineExpr dn = rewriter.getAffineDimExpr(0);
+    AffineExpr dk = rewriter.getAffineDimExpr(1);
+    AffineMap nNewMap = AffineMap::get(2, 0, dn + dk % N);
+    AffineMap kNewMap = AffineMap::get(2, 0, (dk.floorDiv(N)) * N);
+
+    Value nNew = affine::AffineApplyOp::create(rewriter, loc, nNewMap,
+                                               ValueRange{nBase, kSingle});
+    Value kNew = affine::AffineApplyOp::create(rewriter, loc, kNewMap,
+                                               ValueRange{nBase, kSingle});
+
+    VectorType writeVecType = VectorType::get({1, N}, elemType);
+    Value castResult = vector::ShapeCastOp::create(rewriter, loc, writeVecType,
+                                                   trLoad.getResult());
+    vector::TransferWriteOp::create(rewriter, loc, castResult,
+                                    writeOp.getBase(), ValueRange{nNew, kNew},
+                                    SmallVector<bool>{true, true});
+    rewriter.eraseOp(writeOp);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
 
@@ -768,36 +968,52 @@ struct ROCDLLoadToTransposeLoadPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    // Check if target supports transpose_load (currently gfx950 only)
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
     if (!target) {
       return;
     }
     FailureOr<amdgpu::Chipset> chipset =
         amdgpu::Chipset::parse(target.getArch());
-    if (failed(chipset) || *chipset != kGfx950) {
+    if (failed(chipset)) {
+      return;
+    }
+
+    bool isGfx950 = (*chipset == kGfx950);
+    bool isRDNA4 = chipset->majorVersion == 12 && chipset->minorVersion <= 1;
+
+    if (!isGfx950 && !isRDNA4) {
       return;
     }
 
     IRRewriter rewriter(funcOp.getContext());
 
-    // Phase 1: Seed hints on gpu.thread_id ops
-    std::optional<SmallVector<int64_t>> workgroupSize =
-        getWorkgroupSize(funcOp);
-    if (workgroupSize) {
-      seedThreadIdHints(funcOp, rewriter, *workgroupSize);
+    RewritePatternSet patterns(funcOp.getContext());
+
+    if (isGfx950) {
+      // Phase 1: Seed hints on gpu.thread_id ops for LDS transpose load.
+      std::optional<SmallVector<int64_t>> workgroupSize =
+          getWorkgroupSize(funcOp);
+      if (workgroupSize) {
+        seedThreadIdHints(funcOp, rewriter, *workgroupSize);
+      }
+      patterns
+          .add<PropagateHintThroughDelinearize, TransferReadToTransposeLoad>(
+              funcOp.getContext());
     }
 
-    // Phase 2: Propagate hints and lower transfer_reads via greedy patterns
-    RewritePatternSet patterns(funcOp.getContext());
-    patterns.add<PropagateHintThroughDelinearize, TransferReadToTransposeLoad>(
-        funcOp.getContext());
+    if (isRDNA4) {
+      // Global memory transpose load: match vector<1x8> transfer_read +
+      // transpose [1,0] → vector<8x1> from flat global memory and replace
+      // with amdgpu.global_transpose_load.
+      patterns.add<TransferReadTransposeToGlobalTransposeLoad>(
+          funcOp.getContext());
+    }
 
     if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
 
-    // Phase 3: Remove pass-local index_hint ops for IR cleanliness
+    // Remove pass-local index_hint ops for IR cleanliness (gfx950 path).
     funcOp.walk([&](IREE::Codegen::IndexHintOp hintOp) {
       if (hintOp->hasAttr(kPassLocalHintAttr)) {
         rewriter.replaceAllUsesWith(hintOp.getResult(), hintOp.getOperand());
