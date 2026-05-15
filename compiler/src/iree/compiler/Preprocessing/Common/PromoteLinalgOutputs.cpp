@@ -18,7 +18,7 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_PROMOTECONTRACTIONOUTPUTSPASS
+#define GEN_PASS_DEF_PROMOTELINALGOUTPUTSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc"
 
 namespace {
@@ -64,16 +64,16 @@ void replaceOpOutputs(T op, PatternRewriter &rewriter, Type srcType,
       });
 }
 
-// Template pattern for promoting contraction outputs from a narrower
-// floating-point type.
+// Template pattern for promoting linalg operation outputs from a narrower
+// floating-point type to a wider type.
 // SrcType: The source floating-point type (e.g., BFloat16Type, Float16Type)
 // DestType: The destination floating-point type (e.g., Float32Type)
 template <typename SrcType, typename DestType>
-struct PromoteContractionOutputsPattern
+struct PromoteLinalgOutputsPattern
     : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-  explicit PromoteContractionOutputsPattern(MLIRContext *ctx,
-                                            const PromoteOperation &operation)
+  explicit PromoteLinalgOutputsPattern(MLIRContext *ctx,
+                                       const PromoteOperation &operation)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx),
         promoteOperation(operation) {}
 
@@ -130,9 +130,8 @@ private:
   PromoteOperation promoteOperation;
 };
 
-class PromoteContractionOutputsPass
-    : public impl::PromoteContractionOutputsPassBase<
-          PromoteContractionOutputsPass> {
+class PromoteLinalgOutputsPass
+    : public impl::PromoteLinalgOutputsPassBase<PromoteLinalgOutputsPass> {
 public:
   using Base::Base;
   void runOnOperation() override {
@@ -143,14 +142,12 @@ public:
 
     switch (promoteType.getValue()) {
     case PromoteType::F16:
-      patterns
-          .insert<PromoteContractionOutputsPattern<Float16Type, Float32Type>>(
-              context, ops);
+      patterns.insert<PromoteLinalgOutputsPattern<Float16Type, Float32Type>>(
+          context, ops);
       break;
     case PromoteType::BF16:
-      patterns
-          .insert<PromoteContractionOutputsPattern<BFloat16Type, Float32Type>>(
-              context, ops);
+      patterns.insert<PromoteLinalgOutputsPattern<BFloat16Type, Float32Type>>(
+          context, ops);
       break;
     default:
       llvm_unreachable("Unsupported promotion type");

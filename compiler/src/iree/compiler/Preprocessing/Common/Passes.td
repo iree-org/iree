@@ -172,11 +172,9 @@ def GeneralizeLinalgMatMulPass :
   ];
 }
 
-def PromoteContractionOutputsPass
-    : Pass<"iree-preprocessing-promote-contraction-outputs", ""> {
-  let summary =
-      "Promotes outputs of linalg matmul-like ops from a narrower type to "
-      "f32.";
+def PromoteLinalgOutputsPass
+    : Pass<"iree-preprocessing-promote-linalg-outputs", ""> {
+  let summary = "Promotes outputs of linalg ops from a narrower type to f32.";
   let options =
       [Option<"promoteType", "type",
               "mlir::iree_compiler::Preprocessing::PromoteType",
@@ -193,11 +191,11 @@ def PromoteContractionOutputsPass
               "mlir::iree_compiler::Preprocessing::PromoteOperation",
               /*default=*/
               "mlir::iree_compiler::Preprocessing::PromoteOperation::None",
-              "Select the type of contraction ops to promote.",
+              "Select the type of operations to promote.",
               [{::llvm::cl::values(
              clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::All,
                         "all",
-                        "Promote all contraction ops."),
+                        "Promote all ops."),
              clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::Conv,
                         "conv",
                         "Only promote convolution ops."),
@@ -206,7 +204,7 @@ def PromoteContractionOutputsPass
                         "Only promote matmul ops."),
              clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::None,
                         "none",
-                        "Promote no contraction ops.")
+                        "Promote no ops.")
            )}]>,
   ];
 }

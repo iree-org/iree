@@ -38,7 +38,7 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
-    "PromoteContractionOutputs.cpp"
+    "PromoteLinalgOutputs.cpp"
     "TransposeMatmul.cpp"
   DEPS
     ::PassesIncGen

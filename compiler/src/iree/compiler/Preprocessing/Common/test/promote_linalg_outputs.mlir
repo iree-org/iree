@@ -1,7 +1,7 @@
-// RUN: iree-opt --split-input-file -iree-preprocessing-promote-contraction-outputs="type=bf16 operation=matmul" %s | FileCheck %s --check-prefix=BF16-MATMUL
-// RUN: iree-opt --split-input-file -iree-preprocessing-promote-contraction-outputs="type=bf16 operation=conv" %s | FileCheck %s --check-prefix=BF16-CONV
-// RUN: iree-opt --split-input-file -iree-preprocessing-promote-contraction-outputs="type=f16 operation=matmul" %s | FileCheck %s --check-prefix=F16-MATMUL
-// RUN: iree-opt --split-input-file -iree-preprocessing-promote-contraction-outputs="type=f16 operation=conv" %s | FileCheck %s --check-prefix=F16-CONV
+// RUN: iree-opt --split-input-file -iree-preprocessing-promote-linalg-outputs="type=bf16 operation=matmul" %s | FileCheck %s --check-prefix=BF16-MATMUL
+// RUN: iree-opt --split-input-file -iree-preprocessing-promote-linalg-outputs="type=bf16 operation=conv" %s | FileCheck %s --check-prefix=BF16-CONV
+// RUN: iree-opt --split-input-file -iree-preprocessing-promote-linalg-outputs="type=f16 operation=matmul" %s | FileCheck %s --check-prefix=F16-MATMUL
+// RUN: iree-opt --split-input-file -iree-preprocessing-promote-linalg-outputs="type=f16 operation=conv" %s | FileCheck %s --check-prefix=F16-CONV
 
 util.func public @matmul_bf16bf16bf16(%arg0 : tensor<100x250xbf16>, %arg1 : tensor<250x500xbf16>,
     %arg2 : tensor<100x500xbf16>) -> tensor<100x500xbf16> {
