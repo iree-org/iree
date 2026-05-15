@@ -68,6 +68,7 @@ iree_cc_library(
     iree::compiler::Modules::IO::Parameters::Transforms
     iree::compiler::Pipelines
     iree::compiler::Preprocessing::Passes
+    iree::compiler::Transforms
     iree::compiler::Preprocessing::TransformExtensions::PreprocessingExtensions
   PUBLIC
 )

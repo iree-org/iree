@@ -282,8 +282,10 @@ static void iree_dynamic_library_delete(iree_dynamic_library_t* library) {
   iree_allocator_t allocator = library->allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION) || \
+    defined(IREE_SANITIZER_ADDRESS)
   // Leak the library when tracing, since the profiler may still be reading it.
+  // Under ASAN, keep libraries mapped so LSAN can resolve module names.
   // TODO(benvanik): move to an atexit handler instead, verify with ASAN/MSAN
   // TODO(scotttodd): Make this compatible with testing:
   //     two test cases, one for each function in the same executable

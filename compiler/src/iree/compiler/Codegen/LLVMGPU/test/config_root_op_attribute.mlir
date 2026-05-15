@@ -1,4 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-add-tuner-attributes --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
+// Verify that --iree-codegen-experimental-verify-pipeline-constraints implies tuner attributes.
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-experimental-verify-pipeline-constraints --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 
 func.func @matmul(%lhs: tensor<4x4xf32>, %rhs: tensor<4x4xf32>) -> tensor<4x4xf32> {
   %c0 = arith.constant 0.0 : f32
@@ -20,7 +22,7 @@ func.func @matvec(%matrix: tensor<32000x4096xf16>, %vector: tensor<4096xf16>, %i
   return
 }
 
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-LABEL: func.func @matvec
 // CHECK: linalg.matvec
 // CHECK-SAME: lowering_config = #iree_gpu.lowering_config
@@ -43,7 +45,7 @@ func.func @reduction_sum(%input: tensor<2x32x128x4096xf32>, %init: tensor<2x32xf
   return
 }
 
-// CHECK: #translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-LABEL: func.func @reduction_sum
 // CHECK: %{{.*}} = linalg.generic
 // CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction", "reduction"]

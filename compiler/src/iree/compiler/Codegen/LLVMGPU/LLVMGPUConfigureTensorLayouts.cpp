@@ -178,6 +178,17 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
   int64_t innerNDim = opInfo.getNDims().back();
   int64_t innerKDim = opInfo.getKDims().back();
 
+  bool isBlock = intrinsic.isBlockIntrinsic();
+  // For block intrinsics the innermost batch dim is consumed by the intrinsic.
+  int64_t innerBDim = -1;
+  if (isBlock) {
+    if (opInfo.getBatchDims().empty()) {
+      return candidate->emitError(
+          "block intrinsic requires at least one batch dimension");
+    }
+    innerBDim = opInfo.getBatchDims().back();
+  }
+
   SmallVector<int64_t> batchCounts(bounds);
 
   // Subgroup distribution layouts.
@@ -191,10 +202,18 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
   // Since these MMA intrinsics have a given tile size for each subgroup, we can
   // calculate the batch dimensions without looking at the subgroup layout.
   SmallVector<int64_t> subgroupSize(rank, 1);
-  auto [mSize, nSize, kSize] = intrinsic.getMNKShape();
-  subgroupSize[innerMDim] = mSize;
-  subgroupSize[innerNDim] = nSize;
-  subgroupSize[innerKDim] = kSize;
+  if (isBlock) {
+    auto [bSize, mSize, nSize, kSize] = intrinsic.getBMNKShape();
+    subgroupSize[innerBDim] = bSize;
+    subgroupSize[innerMDim] = mSize;
+    subgroupSize[innerNDim] = nSize;
+    subgroupSize[innerKDim] = kSize;
+  } else {
+    auto [mSize, nSize, kSize] = intrinsic.getMNKShape();
+    subgroupSize[innerMDim] = mSize;
+    subgroupSize[innerNDim] = nSize;
+    subgroupSize[innerKDim] = kSize;
+  }
 
   for (auto i : llvm::seq<int64_t>(rank)) {
     batchCounts[i] = llvm::divideCeil(batchCounts[i], subgroupSize[i]);
@@ -203,8 +222,8 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
   // MMA intrinsics can be weird and usually don't have a single subgroup
   // iteration space, so we need to find their value subgroup iteration space
   // individually.
-  auto getFragmentLayout = [&](int operandIndex, int64_t outerDim,
-                               int64_t innerDim,
+  auto getFragmentLayout = [&](int operandIndex, int64_t blockDim,
+                               int64_t outerDim, int64_t innerDim,
                                AffineMap map) -> VectorLayoutInterface {
     // Note that the struct MMASingleSubgroupLayout contains the partial layout
     // for the canonical (M, K) x (K, N) -> (M, N) matmul form. We treat the
@@ -217,14 +236,32 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
 
     MMASingleSubgroupLayout subgroupLayout =
         IREE::GPU::getSingleSubgroupLayout(intrinsic, operandIndex);
-    outerCounts[outerDim] = subgroupLayout.outer[0];
-    outerCounts[innerDim] = subgroupLayout.outer[1];
-    threadCounts[outerDim] = subgroupLayout.thread[0];
-    threadCounts[innerDim] = subgroupLayout.thread[1];
-    threadStrides[outerDim] = subgroupLayout.tstrides[0];
-    threadStrides[innerDim] = subgroupLayout.tstrides[1];
-    elementCounts[outerDim] = subgroupLayout.element[0];
-    elementCounts[innerDim] = subgroupLayout.element[1];
+
+    if (isBlock) {
+      // 3D layout: indices 0=Block, 1=outer(M/K), 2=inner(K/N).
+      outerCounts[blockDim] = subgroupLayout.outer[0];
+      outerCounts[outerDim] = subgroupLayout.outer[1];
+      outerCounts[innerDim] = subgroupLayout.outer[2];
+      threadCounts[blockDim] = subgroupLayout.thread[0];
+      threadCounts[outerDim] = subgroupLayout.thread[1];
+      threadCounts[innerDim] = subgroupLayout.thread[2];
+      threadStrides[blockDim] = subgroupLayout.tstrides[0];
+      threadStrides[outerDim] = subgroupLayout.tstrides[1];
+      threadStrides[innerDim] = subgroupLayout.tstrides[2];
+      elementCounts[blockDim] = subgroupLayout.element[0];
+      elementCounts[outerDim] = subgroupLayout.element[1];
+      elementCounts[innerDim] = subgroupLayout.element[2];
+    } else {
+      outerCounts[outerDim] = subgroupLayout.outer[0];
+      outerCounts[innerDim] = subgroupLayout.outer[1];
+      threadCounts[outerDim] = subgroupLayout.thread[0];
+      threadCounts[innerDim] = subgroupLayout.thread[1];
+      threadStrides[outerDim] = subgroupLayout.tstrides[0];
+      threadStrides[innerDim] = subgroupLayout.tstrides[1];
+      elementCounts[outerDim] = subgroupLayout.element[0];
+      elementCounts[innerDim] = subgroupLayout.element[1];
+    }
+
     // Get the fragment layout for the entire iteration space and then project
     // it. This is significantly easier than trying to create a layout for each
     // fragment itself.
@@ -234,12 +271,15 @@ getContractionLayout(Operation *candidate, ArrayRef<int64_t> bounds,
     return fragmentSpaceLayout.apply(map);
   };
 
-  VectorLayoutInterface lhs = getFragmentLayout(
-      IREE::GPU::kMMAOperandLhs, innerMDim, innerKDim, contractIndexingMaps[0]);
-  VectorLayoutInterface rhs = getFragmentLayout(
-      IREE::GPU::kMMAOperandRhs, innerKDim, innerNDim, contractIndexingMaps[1]);
-  VectorLayoutInterface acc = getFragmentLayout(
-      IREE::GPU::kMMAOperandAcc, innerMDim, innerNDim, contractIndexingMaps[2]);
+  VectorLayoutInterface lhs =
+      getFragmentLayout(IREE::GPU::kMMAOperandLhs, innerBDim, innerMDim,
+                        innerKDim, contractIndexingMaps[0]);
+  VectorLayoutInterface rhs =
+      getFragmentLayout(IREE::GPU::kMMAOperandRhs, innerBDim, innerKDim,
+                        innerNDim, contractIndexingMaps[1]);
+  VectorLayoutInterface acc =
+      getFragmentLayout(IREE::GPU::kMMAOperandAcc, innerBDim, innerMDim,
+                        innerNDim, contractIndexingMaps[2]);
 
   return ContractionLayout{lhs, rhs, acc};
 }

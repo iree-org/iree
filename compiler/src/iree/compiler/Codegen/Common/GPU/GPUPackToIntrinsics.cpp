@@ -69,9 +69,16 @@ getPackedSizes(linalg::LinalgOp linalgOp, RewriterBase &rewriter,
     FailureOr<linalg::ContractionDimensions> contractionDims =
         linalg::inferContractionDims(linalgOp);
     if (succeeded(contractionDims)) {
-      auto [m, n, k] = mmaKind.getMNKShape();
-      indices = {contractionDims->m, contractionDims->n, contractionDims->k};
-      dims = {m, n, k};
+      if (mmaKind.isBlockIntrinsic()) {
+        auto [b, m, n, k] = mmaKind.getBMNKShape();
+        indices = {contractionDims->batch, contractionDims->m,
+                   contractionDims->n, contractionDims->k};
+        dims = {b, m, n, k};
+      } else {
+        auto [m, n, k] = mmaKind.getMNKShape();
+        indices = {contractionDims->m, contractionDims->n, contractionDims->k};
+        dims = {m, n, k};
+      }
     }
   }
 

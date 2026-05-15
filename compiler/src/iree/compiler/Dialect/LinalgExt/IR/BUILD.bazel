@@ -48,6 +48,7 @@ iree_compiler_cc_library(
     name = "IR",
     srcs = [
         "AggregatedOpInterfaceImpl.cpp",
+        "Im2colUtils.cpp",
         "LinalgExtAttrs.cpp.inc",
         "LinalgExtDialect.cpp",
         "LinalgExtDialect.cpp.inc",
@@ -59,6 +60,7 @@ iree_compiler_cc_library(
         "TilingInterfaceImpl.cpp",
     ],
     hdrs = [
+        "Im2colUtils.h",
         "LinalgExtAttrs.h.inc",
         "LinalgExtDialect.h",
         "LinalgExtDialect.h.inc",

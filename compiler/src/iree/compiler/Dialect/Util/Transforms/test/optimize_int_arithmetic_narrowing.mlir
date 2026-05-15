@@ -1,6 +1,9 @@
 // RUN: iree-opt --split-input-file \
 // RUN:  --iree-util-optimize-int-arithmetic=narrow-to-i32=true --cse %s \
-// RUN:  | FileCheck %s
+// RUN:  | FileCheck %s --check-prefixes=CHECK,DEFAULT
+// RUN: iree-opt --split-input-file \
+// RUN:  --iree-util-optimize-int-arithmetic="narrow-to-i32=true index-is-i64=true" --cse %s \
+// RUN:  | FileCheck %s --check-prefixes=CHECK,I64
 // We inherit a number of patterns from upstream for narrowing specific arith
 // operations. Those are not the focus of testing, but we may test some of them
 // here incidentally as part of verifying that the overall pass and local
@@ -63,6 +66,121 @@ util.func @narrow_scf_for(%arg0: memref<?xf32>) {
   scf.for %arg1 = %tid to %c96 step %c64 {
     %0 = arith.addi %arg1, %c512 : index
     memref.store %c0_f32, %arg0[%0] : memref<?xf32>
+  }
+  util.return
+}
+
+// -----
+
+// Verify that broadcast(index_castui(x)) is rewritten to index_castui(broadcast(x)).
+// CHECK-LABEL: @narrow_broadcast_index_castui
+// CHECK-SAME: (%[[ARG0:.+]]: i32)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : i32 to vector<4xi32>
+// CHECK: %[[CAST:.+]] = arith.index_castui %[[BCAST]] : vector<4xi32> to vector<4xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_index_castui(%arg0: i32) -> vector<4xindex> {
+  %cast = arith.index_castui %arg0 : i32 to index
+  %bcast = vector.broadcast %cast : index to vector<4xindex>
+  return %bcast : vector<4xindex>
+}
+
+// -----
+
+// Verify that we take divsi to divui on index if the input is non-negative as
+// an i64 but out of range as an i32 only if we know that index is i64.
+// CHECK-LABEL: @index_divsi_beyond_i32_range
+// DEFAULT: arith.divsi
+// I64: arith.divui
+util.func @index_divsi_beyond_i32_range(%arg0 : index) -> index {
+  %cst = arith.constant 5 : index
+  %0 = util.assume.int %arg0<umin=10, umax=5000000000> : index
+  %1 = arith.divsi %0, %cst : index
+  util.return %1 : index
+}
+
+// -----
+
+// Verify that broadcast(index_cast(x)) is rewritten to index_cast(broadcast(x)).
+// CHECK-LABEL: @narrow_broadcast_index_cast
+// CHECK-SAME: (%[[ARG0:.+]]: i32)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : i32 to vector<2xi32>
+// CHECK: %[[CAST:.+]] = arith.index_cast %[[BCAST]] : vector<2xi32> to vector<2xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_index_cast(%arg0: i32) -> vector<2xindex> {
+  %cast = arith.index_cast %arg0 : i32 to index
+  %bcast = vector.broadcast %cast : index to vector<2xindex>
+  return %bcast : vector<2xindex>
+}
+
+// -----
+
+// Verify that we move index casts across arithmetic if the inputs are outside
+// of i32 range only if we know that index is i64.
+// CHECK-LABEL: @i64_index_cast_beyond_i32_range
+// DEFAULT: arith.addi %{{.*}}, %{{.*}} : i64
+// I64: arith.addi %{{.*}}, %{{.*}} : index
+util.func @i64_index_cast_beyond_i32_range(%arg0 : i64) -> index {
+  %c1 = arith.constant 1 : i64
+  %0 = util.assume.int %arg0<umin=10, umax=4294967295> : i64
+  %1 = arith.addi %0, %c1 : i64
+  %2 = arith.index_castui %1 : i64 to index
+  util.return %2 : index
+}
+
+// -----
+
+// Verify that broadcast(index_castui(vector)) is also rewritten.
+// CHECK-LABEL: @narrow_broadcast_vector_index_castui
+// CHECK-SAME: (%[[ARG0:.+]]: vector<4xi32>)
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[ARG0]] : vector<4xi32> to vector<2x4xi32>
+// CHECK: %[[CAST:.+]] = arith.index_castui %[[BCAST]] : vector<2x4xi32> to vector<2x4xindex>
+// CHECK: return %[[CAST]]
+func.func @narrow_broadcast_vector_index_castui(%arg0: vector<4xi32>) -> vector<2x4xindex> {
+  %cast = arith.index_castui %arg0 : vector<4xi32> to vector<4xindex>
+  %bcast = vector.broadcast %cast : vector<4xindex> to vector<2x4xindex>
+  return %bcast : vector<2x4xindex>
+}
+
+// -----
+
+// Negative test: broadcast is on i32 (not index) — should NOT be rewritten.
+// CHECK-LABEL: @no_narrow_broadcast_non_index
+// CHECK: %[[CAST:.+]] = arith.index_cast %{{.*}} : index to i32
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[CAST]] : i32 to vector<4xi32>
+// CHECK: return %[[BCAST]]
+func.func @no_narrow_broadcast_non_index(%arg0: index) -> vector<4xi32> {
+  %cast = arith.index_cast %arg0 : index to i32
+  %bcast = vector.broadcast %cast : i32 to vector<4xi32>
+  return %bcast : vector<4xi32>
+}
+
+// -----
+
+// Verify that we only move index_casts across i64 orithmetic if we know the
+// inputs are i64.
+// CHECK-LABEL: @i64_index_cast_no_range_info
+// DEFAULT: arith.addi %{{.*}}, %{{.*}} : i64
+// I64: arith.addi %{{.*}}, %{{.*}} : index
+util.func @i64_index_cast_no_range_info(%arg0 : i64, %arg1 : i64) -> index {
+  %0 = arith.addi %arg0, %arg1 : i64
+  %1 = arith.index_castui %0 : i64 to index
+  util.return %1 : index
+}
+
+// -----
+
+// Negative test: ensure we don't narrow scf.for IVs to i32 when they might
+// be out of i32 range.
+// CHECK-LABEL: @no_narrow_scf_for_large_iv
+// CHECK-NOT: : i32
+// CHECK: util.return
+util.func @no_narrow_scf_for_large_iv(%arg0: memref<?xf32>) {
+  %c0_f32 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3000000000 = arith.constant 3000000000 : index
+  scf.for %iv = %c0 to %c3000000000 step %c1 {
+    memref.store %c0_f32, %arg0[%iv] : memref<?xf32>
   }
   util.return
 }

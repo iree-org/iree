@@ -256,4 +256,22 @@ def LookupNearestSymbolFromSelfOp : Op<Transform_Dialect, "util.lookup_nearest_s
   }];
 }
 
+def EliminateHoistableConversionsOp : Op<Transform_Dialect,
+    "util.eliminate_hoistable_conversions",
+    [DeclareOpInterfaceMethods<TransformOpInterface>,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     FunctionalStyleTransformOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::Util::transform_dialect";
+  let description = [{
+    Hoists and cancels matching `util.hoistable_conversion` pairs on the
+    target op. See the op documentation for the optimizations performed and the
+    requirements on the op contents.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+}
+
 #endif // IREE_COMPILER_DIALECT_UTIL_TRANSFORMOPS_UTILTRANSFORM_OPS

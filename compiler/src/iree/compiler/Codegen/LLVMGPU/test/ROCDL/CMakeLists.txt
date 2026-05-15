@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "config_tile_and_fuse.mlir"
     "config_tile_and_fuse_gfx1201.mlir"
     "config_tile_and_fuse_gfx950.mlir"
+    "config_tile_and_fuse_outer_reduction.mlir"
     "config_user_vector_distribute.mlir"
     "config_vector_distribute_gfx1100.mlir"
     "config_vector_distribute_gfx942.mlir"

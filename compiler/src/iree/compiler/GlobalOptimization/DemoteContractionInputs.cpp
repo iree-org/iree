@@ -145,12 +145,6 @@ class DemoteContractionInputsPass
           DemoteContractionInputsPass> {
 public:
   using Base::Base;
-  explicit DemoteContractionInputsPass(
-      const DemoteContractionInputsPassOptions &operation) {
-    this->demoteType = operation.demoteType;
-    this->demoteOperation = operation.demoteOperation;
-  }
-
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

@@ -6,7 +6,7 @@
 // Test matmul lowering with NV_MMA_SYNC intrinsics produces nvgpu.mma.sync operations.
 
 #config = #iree_gpu.lowering_config<{workgroup = [32, 16, 0], reduction = [0, 0, 32], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -16,7 +16,7 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -44,16 +44,16 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // K=256 with reduction tile K=32 means 8 loop iterations, 2 mma.sync per iteration.
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
-//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<1x1x2x1x1x2xf32>)
+//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf32>)
 // CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
-//       CHECK:     scf.yield {{.*}} : vector<1x1x2x1x1x2xf32>
+//       CHECK:     scf.yield
 
 // -----
 
 // Test with F16 accumulator
 
 #config_f16 = #iree_gpu.lowering_config<{workgroup = [32, 16, 0], reduction = [0, 0, 32], promote_operands = [0, 1], mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>, subgroup_basis = [[2, 2, 1], [0, 1, 2]]}>
-#translation_f16 = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
+#translation_f16 = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 2, 1] subgroup_size = 32, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 1, no_reduce_shared_memory_bank_conflicts = false>}>
 
 #pipeline_layout_f16 = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -63,7 +63,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @matmul_256x256x256_f16_f16 layout(#pipeline_layout_f16) count(%arg0: !hal.device, %arg1: index, %arg2 : index) -> (index, index, index) {
-      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_dag_root(%arg1, %arg2)
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg1, %arg2)
       hal.return %x, %y, %z : index, index, index
     }
   builtin.module {
@@ -88,6 +88,6 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 // Test F16 accumulator path - should use NV_MMA_SYNC_F16_16x8x16_F16 and produce f16 results.
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
-//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<1x1x2x1x1x2xf16>)
+//       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf16>)
 // CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
-//       CHECK:     scf.yield {{.*}} : vector<1x1x2x1x1x2xf16>
+//       CHECK:     scf.yield

@@ -13,6 +13,7 @@
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/IR.h"
+#include "mlir-c/Target/ExportSMTLIB.h"
 #include "mlir-c/Target/LLVMIR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
@@ -216,6 +217,17 @@ NB_MODULE(_ireeCompilerDialects, m) {
       .def_property_readonly("set", ireeCodegenRootOpAttrGetSet);
 
   //===-------------------------------------------------------------------===//
+  // CodegenIntKnobAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_codegen_module, "IntKnobAttr",
+                          ireeAttributeIsACodegenIntKnobAttr,
+                          ireeCodegenIntKnobAttrGetTypeID)
+      .def_property_readonly("name", [](MlirAttribute self) -> MlirStringRef {
+        return mlirStringAttrGetValue(ireeCodegenIntKnobAttrGetName(self));
+      });
+
+  //===-------------------------------------------------------------------===//
   // CodegenOneOfKnobAttr
   //===-------------------------------------------------------------------===//
 
@@ -260,6 +272,27 @@ NB_MODULE(_ireeCompilerDialects, m) {
         uint32_t rawValue = ireeGPUReorderWorkgroupsStrategyAttrGetValue(self);
         return py::module_::import_(kGpuModuleImportPath)
             .attr("ReorderWorkgroupsStrategy")(rawValue);
+      });
+
+  //===-------------------------------------------------------------------===//
+  // GPUPipelineAttr
+  //===-------------------------------------------------------------------===//
+
+  mlir_attribute_subclass(iree_gpu_module, "PipelineAttr",
+                          ireeAttributeIsAGPUPipelineAttr,
+                          ireeGPUPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, uint32_t value, MlirContext ctx) {
+            return ireeGPUPipelineAttrGet(ctx, value);
+          },
+          "cls"_a, "value"_a, "ctx"_a = py::none(),
+          "Gets an #iree_gpu.pipeline from parameters.")
+      .def_property_readonly("raw_value", ireeGPUPipelineAttrGetValue)
+      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
+        uint32_t rawValue = ireeGPUPipelineAttrGetValue(self);
+        return py::module_::import_(kGpuModuleImportPath)
+            .attr("LoweringPipeline")(rawValue);
       });
 
   //===-------------------------------------------------------------------===//
@@ -716,6 +749,23 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "get_executable_variant_ops", &ireeCodegenGetExecutableVariantOpsBinding,
       "Gets the executable variant operations from a module.",
       py::arg("module"));
+
+  //===-------------------------------------------------------------------===//
+  // Binding to utility function ireeCodegenConvertConstraintsOpToSMTLIB
+  //===-------------------------------------------------------------------===//
+
+  iree_codegen_module.def(
+      "convert_constraints_op_to_smtlib",
+      [](MlirOperation op, bool emitReset) -> MlirStringRef {
+        MlirAttribute strAttr =
+            ireeCodegenConvertConstraintsOpToSMTLIB(op, emitReset);
+        if (mlirAttributeIsNull(strAttr)) {
+          throw std::runtime_error("SMT-LIB export failed");
+        }
+        return mlirStringAttrGetValue(strAttr);
+      },
+      "Convert an iree_codegen.smt.constraints op to an SMT-LIB string.",
+      py::arg("constraints_op"), py::arg("emit_reset") = false);
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps

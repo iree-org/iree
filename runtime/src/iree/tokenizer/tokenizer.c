@@ -1639,10 +1639,22 @@ static iree_host_size_t iree_tokenizer_strip_lstrip_whitespace(
     flags = special_tokens->flags[check_state->partial_token_index];
   }
 
-  // If LSTRIP is set, strip trailing whitespace from the safe prefix.
+  // If LSTRIP is set, strip trailing Unicode whitespace from the safe prefix.
   if (iree_any_bit_set(flags, IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_LSTRIP)) {
-    while (safe > 0 && (uint8_t)input.data[safe - 1] <= 0x20) {
-      --safe;
+    while (safe > 0) {
+      // Walk back over UTF-8 continuation bytes (10xxxxxx) to find the
+      // leading byte. ASCII bytes (0xxxxxxx) don't match the continuation
+      // pattern, so the loop is a no-op for single-byte characters.
+      iree_host_size_t start = safe - 1;
+      while (start > 0 && ((uint8_t)input.data[start] & 0xC0) == 0x80) {
+        --start;
+      }
+      iree_host_size_t pos = 0;
+      iree_string_view_t tail =
+          iree_make_string_view(input.data + start, safe - start);
+      uint32_t codepoint = iree_unicode_utf8_decode(tail, &pos);
+      if (!iree_unicode_is_whitespace(codepoint)) break;
+      safe = start;
     }
   }
 
@@ -1691,9 +1703,11 @@ iree_tokenizer_encode_state_match_post_norm_special_tokens(
     iree_host_size_t* out_segment_limit) {
   *out_segment_limit = IREE_HOST_SIZE_MAX;
 
-  // Skip if no post-norm tokens configured.
+  // Skip if no post-norm tokens configured or matching disabled.
   if (iree_tokenizer_special_tokens_is_empty(
-          &tokenizer->special_tokens_post_norm)) {
+          &tokenizer->special_tokens_post_norm) ||
+      iree_any_bit_set(state->flags,
+                       IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING)) {
     return IREE_TOKENIZER_POST_NORM_NO_MATCH;
   }
   // Skip if no unprocessed normalized output available.
@@ -2246,7 +2260,9 @@ static iree_status_t iree_tokenizer_encode_state_pump(
   // content itself serves as the "buffer" for reconstruction via get_partial().
   iree_host_size_t normalize_limit = IREE_HOST_SIZE_MAX;
   if (!iree_tokenizer_special_tokens_is_empty(&tokenizer->special_tokens) &&
-      chunk->size > 0) {
+      !iree_any_bit_set(state->flags,
+                        IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING) &&
+      chunk->size > 0 && state->pending_special_token < 0) {
     // Continuing a partial match? Pass chunk directly to match().
     // Starting fresh? Check if first byte could start a special token.
     bool should_match = state->special_token_match.match_position > 0;
@@ -2324,6 +2340,20 @@ static iree_status_t iree_tokenizer_encode_state_pump(
         chunk->data += match_length;
         chunk->size -= match_length;
         *out_made_progress = true;
+
+        // rstrip: consume trailing Unicode whitespace after the matched token.
+        if (iree_any_bit_set(state->special_token_match.matched_flags,
+                             IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_RSTRIP)) {
+          while (chunk->size > 0) {
+            iree_host_size_t pos = 0;
+            iree_string_view_t remaining =
+                iree_make_string_view(chunk->data, chunk->size);
+            uint32_t codepoint = iree_unicode_utf8_decode(remaining, &pos);
+            if (!iree_unicode_is_whitespace(codepoint)) break;
+            chunk->data += pos;
+            chunk->size -= pos;
+          }
+        }
 
         // Check if pipeline has content that must be emitted first.
         bool pipeline_has_content =
@@ -2898,6 +2928,18 @@ iree_status_t iree_tokenizer_encode_state_finalize(
       &state->postprocessor, output, total_tokens);
 
   *out_token_count = total_tokens;
+
+  // Detect output buffer overflow: if any pipeline stage still has pending
+  // data after finalize completed all its work, the output buffer was too
+  // small. has_pending checks all stages: postprocessor, model, segments,
+  // ring buffer, normalizer, and special token state.
+  if (iree_tokenizer_encode_state_has_pending(state)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "encode finalize: output buffer full "
+                            "(wrote %" PRIhsz " of %" PRIhsz " capacity)",
+                            total_tokens, output.capacity);
+  }
+
   return iree_ok_status();
 }
 
@@ -3518,6 +3560,17 @@ iree_status_t iree_tokenizer_decode_state_finalize(
           iree_tokenizer_decode_flush_pending_as_replacement(
               state, (uint8_t*)text_output.data, 0, text_output.size);
       *out_text_length = flushed;
+      // Defensive: if pending bytes remain after flush, the output buffer was
+      // too small for the replacement characters. Each pending byte emits one
+      // U+FFFD (3 bytes UTF-8). Only reachable with byte_fallback decoders
+      // (SentencePiece-based tokenizers) when the last fed tokens form an
+      // incomplete UTF-8 sequence and the output buffer is very small
+      // (edge case).
+      if (state->byte_fallback_pending_count > 0) {
+        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                "decode finalize: output buffer too small "
+                                "for pending byte fallback replacements");
+      }
     }
     return iree_ok_status();
   }

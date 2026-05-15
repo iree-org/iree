@@ -6,18 +6,19 @@
 
 //=== ResolveWorkgroupCountHints.cpp -------------------------------------===//
 //
-// Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
-// agreeable workgroup count per export. This pass performs a depth first walk
-// of the target variant's call graph constructing the necessary information to
+// Resolves `iree_codegen.workgroup_count_hint` ops by materializing the
+// workgroup count computation into the body of each
+// `iree_codegen.dispatch_config` op. This pass performs a depth-first walk
+// of the module's call graph constructing the necessary information to
 // materialize workgroup count hints for that function.
 //
-// Workgroup counts are materialized by again walking the callgraph starting
-// from each exported function and mapping the required operands to construct
-// the hints for a function using the operands of the callsite we're traversing
-// from.
+// Workgroup counts are materialized by walking the callgraph starting from
+// each dispatch_config op and mapping the required operands to construct
+// the hints for a function using the ordinals and operands of the callsite
+// being traversed from.
 //
 // Additionally any conditional statements (scf.if ops) transitively wrapping
-// a workgroup count hint are tracked and materialized in the workgroup count
+// a workgroup count hint are tracked and materialized in the dispatch_config
 // region as well. This avoids pessimizing the workgroup count for situations
 // where we are switching implementations on uniform host provided parameters
 // (workloads/device queries).
@@ -913,8 +914,7 @@ static LogicalResult replaceFromSliceOpWithFunctionSlice(
 //===---------------------------------------------------------------------===//
 
 void ResolveWorkgroupCountHintsPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp innerModuleOp = variantOp.getInnerModule();
+  ModuleOp innerModuleOp = getOperation();
 
   // Run the analysis. If a function that contains a `workgroup_count_hint`
   // fails processing, this results in a pass failure. Diagnostic information
@@ -938,51 +938,52 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // Rewrite all `workgroup_count_from_slice` ops based on the result of the
-  // analysis.
-  IRRewriter rewriter(variantOp);
-  for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-    auto rootFuncOp = llvm::dyn_cast_if_present<FunctionOpInterface>(
-        symbolTables.lookupNearestSymbolFrom(innerModuleOp,
-                                             exportOp.getSymNameAttr()));
+  // Resolve from_slice placeholders in each dispatch_config body using the
+  // workgroup count computation derived from workgroup_count_hint ops.
+  IRRewriter rewriter(innerModuleOp);
+  SymbolTable moduleSymTable(innerModuleOp);
+  SmallVector<IREE::Codegen::DispatchConfigOp> configOps =
+      llvm::to_vector(innerModuleOp.getOps<IREE::Codegen::DispatchConfigOp>());
+
+  for (IREE::Codegen::DispatchConfigOp configOp : configOps) {
+    auto rootFuncOp = dyn_cast_if_present<FunctionOpInterface>(
+        moduleSymTable.lookup(configOp.getFunctionRef()));
     if (!rootFuncOp || rootFuncOp.isExternal()) {
-      // Skip external functions.
+      continue;
+    }
+
+    // Find the from_slice placeholder in the dispatch_config body.
+    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
+    configOp.getBody().walk(
+        [&](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fs) {
+          fromSliceOp = fs;
+          return WalkResult::interrupt();
+        });
+    if (!fromSliceOp) {
       continue;
     }
 
     auto sliceIt = slices.find(rootFuncOp);
     bool hasSlice = sliceIt != slices.end();
-    IREE::TensorExt::DispatchWorkgroupCountFromSliceOp fromSliceOp;
-    if (!exportOp.getWorkgroupCountBody() ||
-        !exportOp.getWorkgroupCountBody()
-             ->walk([&](Operation *op) -> WalkResult {
-               fromSliceOp =
-                   dyn_cast<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(
-                       op);
-               return fromSliceOp ? WalkResult::interrupt()
-                                  : WalkResult::advance();
-             })
-             .wasInterrupted()) {
-      // If the workgroup count was already materialized pass through.
-      continue;
-    }
-
-    if (!hasSlice || !sliceIt->second.required || !sliceIt->second.valid) {
-      // If there is an unresolved `workgroup_count_from_slice` op. The default
-      // behavior is to convert this to {1, 1, 1}.
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(fromSliceOp);
-      auto one =
-          arith::ConstantIndexOp::create(rewriter, fromSliceOp.getLoc(), 1);
-      rewriter.replaceOp(fromSliceOp, {one, one, one});
-      continue;
-    }
 
     if (hasSlice && !sliceIt->second.valid) {
       // Something went wrong. Should have been caught on processing.
       return signalPassFailure();
     }
 
+    if (!hasSlice || !sliceIt->second.required) {
+      // If there is an unresolved `workgroup_count_from_slice` op. The default
+      // behavior is to convert this to {1, 1, 1}.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(fromSliceOp);
+      Location loc = fromSliceOp.getLoc();
+      auto one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+      rewriter.replaceOp(fromSliceOp, ValueRange{one, one, one});
+      continue;
+    }
+
+    // Replace the from_slice placeholder with the materialized hint
+    // computation.
     FunctionSlice &root = sliceIt->second;
     rewriter.setInsertionPoint(fromSliceOp);
     if (failed(replaceFromSliceOpWithFunctionSlice(rewriter, fromSliceOp, root,
@@ -990,15 +991,13 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
       return signalPassFailure();
     }
 
-    if (exportOp.getWorkgroupCountBody()
-            ->walk([](Operation *op) {
-              return isa<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>(op)
-                         ? WalkResult::interrupt()
-                         : WalkResult::advance();
+    if (configOp.getBody()
+            .walk([](IREE::TensorExt::DispatchWorkgroupCountFromSliceOp) {
+              return WalkResult::interrupt();
             })
             .wasInterrupted()) {
-      exportOp->emitOpError(
-          "failed to convert all `workgroup_count_from_slice` ops.");
+      configOp.emitError(
+          "failed to resolve all `workgroup_count_from_slice` ops");
       return signalPassFailure();
     }
   }
@@ -1006,7 +1005,7 @@ void ResolveWorkgroupCountHintsPass::runOnOperation() {
   // Erase all ordinals and hints.
   SmallVector<IREE::TensorExt::DispatchWorkloadOrdinalOp> ordinals;
   SmallVector<IREE::Codegen::WorkgroupCountHintOp> hints;
-  variantOp.walk([&](Operation *op) {
+  innerModuleOp.walk([&](Operation *op) {
     if (auto ordinal =
             dyn_cast<IREE::TensorExt::DispatchWorkloadOrdinalOp>(op)) {
       ordinals.push_back(ordinal);

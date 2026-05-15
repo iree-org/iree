@@ -325,23 +325,6 @@ class IREETensorExt_DispatchWorkgroupCountOp<string mnemonic, list<Trait> traits
   }];
 }
 
-def IREETensorExt_DispatchWorkgroupCountFromDagRootOp :
-    IREETensorExt_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_dag_root"> {
-  let summary = [{
-    Workgroup count computed based on iteration range of the root of the DAG
-    for ops within the dispatch.
-  }];
-  let description = [{
-    When using tile + distribution of the root of the DAG (Directed Acyclic
-    Graph) of ops within the dispatch to split the work amongst workgroups. The
-    workload captured is the size of the iteration space of the root of the DAG.
-    This op represents the computation that given the workload returns the
-    number of workgroups to use. The backends are responsible for lowering this
-    op into actual computation (typically based on the tile sizes used to tile
-    and distribute the root of the DAG).
-  }];
-}
-
 def IREETensorExt_DispatchWorkgroupCountFromSliceOp :
     IREETensorExt_DispatchWorkgroupCountOp<"dispatch.workgroup_count_from_slice"> {
   let summary = [{
@@ -560,10 +543,6 @@ def IREETensorExt_CastToRaggedShapeOp :
 
     In other words, `column_lengths` is same as the `ROW_INDEX` in CSR
     representation (https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)).
-    An optional argument `max_ragged_column_length` allows specifying the dynamic
-    upper bound for the number of columns (for static upper bounds the shape of the
-    dimension in the result shaped type encodes this value)
-
     For example, if the `n` and `n+1` dimensions of the result represent this ragged structure
 
     ```
@@ -593,7 +572,6 @@ def IREETensorExt_CastToRaggedShapeOp :
     IndexAttr:$raggedDim,
     AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$columnLengths,
     Optional<Index>:$numRaggedRows,
-    Optional<Index>:$avgRaggedColumnLength,
     Variadic<Index>:$sourceDynamicDims
   );
   let results = (outs AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$result);
@@ -602,7 +580,6 @@ def IREETensorExt_CastToRaggedShapeOp :
     $source `ragged_dim` `(` $raggedDim `)`
     `column_lengths` `(` $columnLengths `)`
     (`num_ragged_rows` `(` $numRaggedRows^ `)`)?
-    (`avg_ragged_column_length` `(` $avgRaggedColumnLength^ `)`)?
     attr-dict `:`
     `(` type($source) (`{` $sourceDynamicDims^ `}`)? `,` type($columnLengths) `)`
     `->` type($result)

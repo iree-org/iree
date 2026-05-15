@@ -3,7 +3,7 @@
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // Test that sm_80 selects NV_MMA_SYNC intrinsics for matmul operations.
-// With --iree-codegen-llvmgpu-use-vector-distribution, it should select LLVMGPUVectorDistribute.
+// With --iree-codegen-llvmgpu-use-vector-distribution, it should select #iree_gpu.pipeline<VectorDistribute>.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -25,7 +25,7 @@ func.func @matmul_256x256x256_f16_f32() {
   return
 }
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // Verify that the matmul gets NV_MMA_SYNC_F32 intrinsic.
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
 // CHECK:       linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
@@ -55,7 +55,7 @@ func.func @matmul_256x256x256_f16_f16() {
   return
 }
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // Verify that the f16 output matmul gets NV_MMA_SYNC_F16 intrinsic.
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
 // CHECK:       linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config

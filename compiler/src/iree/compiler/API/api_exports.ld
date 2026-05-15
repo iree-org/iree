@@ -3,12 +3,14 @@ VER_0 {
   global:
     ireeAttributeIsACodegenCompilationInfoAttr;
     ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr;
+    ireeAttributeIsACodegenIntKnobAttr;
     ireeAttributeIsACodegenOneOfKnobAttr;
     ireeAttributeIsACodegenRootOpAttr;
     ireeAttributeIsACodegenTranslationInfoAttr;
     ireeAttributeIsAGPULoweringConfigAttr;
     ireeAttributeIsAGPUMMAAttr;
     ireeAttributeIsAGPUMMAIntrinsicAttr;
+    ireeAttributeIsAGPUPipelineAttr;
     ireeAttributeIsAGPUPipelineOptionsAttr;
     ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr;
     ireeAttributeIsAGPUVirtualMMAAttr;
@@ -16,6 +18,7 @@ VER_0 {
     ireeCodegenCompilationInfoAttrGet;
     ireeCodegenCompilationInfoAttrGetParameters;
     ireeCodegenCompilationInfoAttrGetTypeID;
+    ireeCodegenConvertConstraintsOpToSMTLIB;
     ireeCodegenDispatchLoweringPassPipelineAttrGet;
     ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID;
     ireeCodegenDispatchLoweringPassPipelineAttrGetValue;
@@ -25,6 +28,8 @@ VER_0 {
     ireeCodegenGetTunerRootOps;
     ireeCodegenHasIGEMMGenericConvDetails;
     ireeCodegenInferScaledContractionDimensions;
+    ireeCodegenIntKnobAttrGetName;
+    ireeCodegenIntKnobAttrGetTypeID;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenOneOfKnobAttrGetName;
@@ -105,6 +110,9 @@ VER_0 {
     ireeGPUMMAIntrinsicAttrGet;
     ireeGPUMMAIntrinsicAttrGetTypeID;
     ireeGPUMMAIntrinsicAttrGetValue;
+    ireeGPUPipelineAttrGet;
+    ireeGPUPipelineAttrGetTypeID;
+    ireeGPUPipelineAttrGetValue;
     ireeGPUPipelineOptionsAttrGet;
     ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts;
     ireeGPUPipelineOptionsAttrGetPrefetchNumStages;
@@ -818,6 +826,7 @@ VER_0 {
     mlirOperationIsBeforeInBlock;
     mlirOperationMoveAfter;
     mlirOperationMoveBefore;
+    mlirOperationNameHasTrait;
     mlirOperationPrint;
     mlirOperationPrintWithFlags;
     mlirOperationPrintWithState;

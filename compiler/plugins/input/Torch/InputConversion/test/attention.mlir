@@ -94,3 +94,35 @@ func.func @attention_dyn(%arg0: tensor<?x?x4xf32>, %arg1: tensor<?x?x4xf32>, %ar
 // CHECK:         linalg_ext.yield %[[SCORE]]
 // CHECK: } -> tensor<?x?x4xf32>
 // CHECK:         return %[[ATTN]] : tensor<?x?x4xf32>
+
+// -----
+func.func @attention_dyn_head_dim(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>, %arg2: tensor<?x?x?xf32>, %arg3: tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
+  %0 = tm_tensor.attention ins(%arg0, %arg1, %arg2 : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>) outs(%arg3: tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  return %0 : tensor<?x?x?xf32>
+}
+
+// CHECK-DAG: #[[$MAP_Q:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+// CHECK-DAG: #[[$MAP_K:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
+// CHECK-DAG: #[[$MAP_V:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
+// CHECK-DAG: #[[$MAP_S:.+]] = affine_map<(d0, d1, d2, d3, d4) -> ()>
+// CHECK-DAG: #[[$MAP_O:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+
+// CHECK-LABEL:         func.func @attention_dyn_head_dim(
+// CHECK-SAME:         %[[ARG0:.*]]: tensor<?x?x?xf32>, %[[ARG1:.*]]: tensor<?x?x?xf32>, %[[ARG2:.*]]: tensor<?x?x?xf32>,
+// CHECK:         %arg3: tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
+// CHECK-DAG:         %[[C2:.*]] = arith.constant 2 : index
+// CHECK-DAG:         %[[C1:.*]] = arith.constant 1 : index
+// CHECK-DAG:         %[[C0:.*]] = arith.constant 0 : index
+// CHECK:         %[[DIM0:.*]] = tensor.dim %[[ARG0]], %[[C0]]
+// CHECK:         %[[DIM1:.*]] = tensor.dim %[[ARG0]], %[[C1]]
+// CHECK:         %[[DIM_V:.*]] = tensor.dim %[[ARG2]], %[[C2]]
+// CHECK:         %[[EMPTY:.*]] = tensor.empty(%[[DIM0]], %[[DIM1]], %[[DIM_V]]) : tensor<?x?x?xf32>
+// CHECK:         %[[HEAD_DIM:.*]] = tensor.dim %[[ARG0]], %[[C2]]
+// CHECK:         %[[HEAD_DIM_I64:.*]] = arith.index_cast %[[HEAD_DIM]] : index to i64
+// CHECK:         %[[HEAD_DIM_F32:.*]] = arith.sitofp %[[HEAD_DIM_I64]] : i64 to f32
+// CHECK:         %[[SCALE:.*]] = math.rsqrt %[[HEAD_DIM_F32]] : f32
+// CHECK:         %[[ATTN:.*]] = iree_linalg_ext.attention {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]} ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%[[EMPTY]] : tensor<?x?x?xf32>) {
+// CHECK:    ^[[BLOCK:.+]](%[[SCORE:.+]]: f32):
+// CHECK:         linalg_ext.yield %[[SCORE]]
+// CHECK: } -> tensor<?x?x?xf32>
+// CHECK:         return %[[ATTN]] : tensor<?x?x?xf32>

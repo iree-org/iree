@@ -7,7 +7,7 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -46,7 +46,7 @@ func.func @expanded_matmul_transpose_b() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -106,11 +106,11 @@ func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_
 
 // Check that we do not use the distribute pipeline if there are no supported
 // intrinsics.
-//       CHECK-NOT: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//       CHECK-NOT: iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -141,7 +141,7 @@ func.func @mfma_matmul_1024x1024x1024() {
 
 // -----
 
-// CHECK:      #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:      #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -191,7 +191,7 @@ func.func @conv_nchwc() {
 
 // -----
 
-//       CHECK: iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+//       CHECK: iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 
 #pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -232,7 +232,7 @@ func.func @matmul_dynamic_dim() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
@@ -277,7 +277,7 @@ func.func @attention_20x4096x64x4096x64() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64_f8()
@@ -323,7 +323,7 @@ func.func @attention_20x4096x64x4096x64_f8() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-NOT:   prefetch_num_stages = 2
 
 // CHECK-LABEL: func.func @attention_large_head_dim_shared_mem()
@@ -371,7 +371,7 @@ func.func @attention_large_head_dim_shared_mem() {
 
 // -----
 
-// CHECK:       #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+// CHECK:       #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
 // CHECK-LABEL: func.func @attention_20x64x4096x64_f8()
 
 // Test that the config logic can handle a missing M dimension.

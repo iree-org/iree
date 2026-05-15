@@ -53,6 +53,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    semaphore_thread_test
+  SRCS
+    "semaphore_thread_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     executable_test
   SRCS
     "executable_test.cc"
@@ -77,6 +90,11 @@ iree_cc_library(
   PUBLIC
 )
 
+set(_all_tests_platform_deps "")
+if(IREE_ARCH STREQUAL "wasm_32")
+else()
+  list(APPEND _all_tests_platform_deps ::semaphore_thread_test)
+endif()
 iree_cc_library(
   NAME
     all_tests
@@ -84,6 +102,7 @@ iree_cc_library(
     ::driver_test
     ::event_test
     ::semaphore_test
+    ${_all_tests_platform_deps}
   TESTONLY
   PUBLIC
 )

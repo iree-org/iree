@@ -49,8 +49,7 @@ struct FoldTensorLoadWithExtractSlice
 /// `iree_tensor_ext.dispatch.tensor.store` operations.
 struct FoldInsertSliceWithTensorStoreOp
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult
   matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp dispatchTensorStoreOp,

@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -87,6 +88,19 @@ struct LLVMCPUPipelineOptions {
   bool lowerToAVX2 = false;
 };
 
+/// Wraps LLVMCPUPipelineOptions and loweringConfig for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct CPUCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<CPUCodegenPipelineOptions> {
+  CPUCodegenPipelineOptions(
+      const LLVMCPUPipelineOptions &options,
+      IREE::Codegen::LoweringConfigAttrInterface loweringConfig)
+      : options(options), loweringConfig(loweringConfig) {}
+
+  LLVMCPUPipelineOptions options;
+  IREE::Codegen::LoweringConfigAttrInterface loweringConfig;
+};
+
 /// Populates the passes to lower linalg ops on buffers. Currently this
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
@@ -126,14 +140,15 @@ void addMultiTilingExpertPassPipeline(
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
 void buildLLVMCPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManager, const CPUCodegenOptions &cpuOpts);
+    OpPassManager &modulePassManager, const CPUCodegenOptions &cpuOpts);
 
 /// Populates passes needed to lower high level ops, e.g., linalg, vector, etc,
-/// to LLVM dialect via the structured ops path. The  `variantPassManager`
+/// to LLVM dialect via the structured ops path. The `modulePassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &codegenOptions,
-                                     bool enableAArch64SME = false);
+                                     bool enableAArch64SME = false,
+                                     bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines

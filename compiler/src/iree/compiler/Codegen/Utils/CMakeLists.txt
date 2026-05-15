@@ -15,19 +15,23 @@ iree_cc_library(
     Utils
   HDRS
     "CPUUtils.h"
+    "CodegenPipelineOptions.h"
     "EncodingUtils.h"
     "GPUUtils.h"
     "LinalgOpInfo.h"
     "LinkingUtils.h"
     "MarkerUtils.h"
+    "SliceUtils.h"
     "Utils.h"
   SRCS
     "CPUUtils.cpp"
+    "CodegenPipelineOptions.cpp"
     "EncodingUtils.cpp"
     "GPUUtils.cpp"
     "LinalgOpInfo.cpp"
     "LinkingUtils.cpp"
     "MarkerUtils.cpp"
+    "SliceUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport
@@ -38,10 +42,12 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRIndexingMapOpInterface
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms

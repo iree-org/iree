@@ -183,6 +183,20 @@ def MFMA_F32_32x32x16_F8E4M3FNUZ : I32EnumAttrCase<"MFMA_F32_32x32x16_F8E4M3FNUZ
 def MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ : I32EnumAttrCase<"MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ", 0x1237>;
 def MFMA_I32_16x16x32_I8 : I32EnumAttrCase<"MFMA_I32_16x16x32_I8", 0x12C0>;
 def MFMA_I32_32x32x16_I8 : I32EnumAttrCase<"MFMA_I32_32x32x16_I8", 0x12C1>;
+// Block intrinsics
+def MFMA_F32_4x4x4x16B_F16 : I32EnumAttrCase<"MFMA_F32_4x4x4x16B_F16", 0x1222>;
+def MFMA_F32_16x16x4x4B_F16 : I32EnumAttrCase<"MFMA_F32_16x16x4x4B_F16", 0x1223>;
+def MFMA_F32_32x32x4x2B_F16 : I32EnumAttrCase<"MFMA_F32_32x32x4x2B_F16", 0x1224>;
+def MFMA_F32_4x4x4x16B_BF16 : I32EnumAttrCase<"MFMA_F32_4x4x4x16B_BF16", 0x1225>;
+def MFMA_F32_16x16x4x4B_BF16 : I32EnumAttrCase<"MFMA_F32_16x16x4x4B_BF16", 0x1226>;
+def MFMA_F32_32x32x4x2B_BF16 : I32EnumAttrCase<"MFMA_F32_32x32x4x2B_BF16", 0x1227>;
+def MFMA_F32_4x4x1x16B_F32 : I32EnumAttrCase<"MFMA_F32_4x4x1x16B_F32", 0x1210>;
+def MFMA_F32_16x16x1x4B_F32 : I32EnumAttrCase<"MFMA_F32_16x16x1x4B_F32", 0x1211>;
+def MFMA_F32_32x32x1x2B_F32 : I32EnumAttrCase<"MFMA_F32_32x32x1x2B_F32", 0x1212>;
+def MFMA_F64_4x4x4x4B_F64 : I32EnumAttrCase<"MFMA_F64_4x4x4x4B_F64", 0x1200>;
+def MFMA_I32_4x4x4x16B_I8 : I32EnumAttrCase<"MFMA_I32_4x4x4x16B_I8", 0x12C2>;
+def MFMA_I32_16x16x4x4B_I8 : I32EnumAttrCase<"MFMA_I32_16x16x4x4B_I8", 0x12C3>;
+def MFMA_I32_32x32x4x2B_I8 : I32EnumAttrCase<"MFMA_I32_32x32x4x2B_I8", 0x12C4>;
 
 // Introduced in CDNA4.
 def MFMA_F32_16x16x32_F16 : I32EnumAttrCase<"MFMA_F32_16x16x32_F16", 0x1320>;
@@ -290,6 +304,20 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
       MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
       MFMA_I32_16x16x32_I8,
       MFMA_I32_32x32x16_I8,
+      // Block intrinsics.
+      MFMA_F32_4x4x4x16B_F16,
+      MFMA_F32_16x16x4x4B_F16,
+      MFMA_F32_32x32x4x2B_F16,
+      MFMA_F32_4x4x4x16B_BF16,
+      MFMA_F32_16x16x4x4B_BF16,
+      MFMA_F32_32x32x4x2B_BF16,
+      MFMA_F32_4x4x1x16B_F32,
+      MFMA_F32_16x16x1x4B_F32,
+      MFMA_F32_32x32x1x2B_F32,
+      MFMA_F64_4x4x4x4B_F64,
+      MFMA_I32_4x4x4x16B_I8,
+      MFMA_I32_16x16x4x4B_I8,
+      MFMA_I32_32x32x4x2B_I8,
 
       // Introduced in CDNA4.
       MFMA_F32_16x16x32_F16,
@@ -373,6 +401,13 @@ def VMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F16", 0>;
 def VMFMA_F32_32x32x16_F16  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F16", 1>;
 def VMFMA_F32_16x16x32_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F8E4M3FNUZ", 2>;
 def VMFMA_F32_32x32x16_F8E4M3FNUZ  : I32EnumAttrCase<"VMFMA_F32_32x32x16_F8E4M3FNUZ", 3>;
+def VDMFMA_F32_8x16x64_F16  : I32EnumAttrCase<"VDMFMA_F32_8x16x64_F16", 4>;
+def VDMFMA_I32_8x16x128_I8  : I32EnumAttrCase<"VDMFMA_I32_8x16x128_I8", 5>;
+def VDMFMA_F32_8x16x64_BF16  : I32EnumAttrCase<"VDMFMA_F32_8x16x64_BF16", 6>;
+def VDMFMA_F32_8x16x128_F8E5M2FNUZ  : I32EnumAttrCase<"VDMFMA_F32_8x16x128_F8E5M2FNUZ", 7>;
+def VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ  : I32EnumAttrCase<"VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ", 8>;
+def VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ  : I32EnumAttrCase<"VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ", 9>;
+def VDMFMA_F32_8x16x128_F8E4M3FNUZ  : I32EnumAttrCase<"VDMFMA_F32_8x16x128_F8E4M3FNUZ", 10>;
 
 def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
     "Descriptor for different Virtual MMA intrinsics", [
@@ -380,6 +415,15 @@ def IREEGPU_VirtualMMAIntrinsic : IREEGPU_I32EnumAttr<"VirtualMMAIntrinsic",
       VMFMA_F32_32x32x16_F16,
       VMFMA_F32_16x16x32_F8E4M3FNUZ,
       VMFMA_F32_32x32x16_F8E4M3FNUZ,
+      // 16-bit VDMFMA variants.
+      VDMFMA_F32_8x16x64_F16,
+      VDMFMA_F32_8x16x64_BF16,
+      // 8-bit VDMFMA variants.
+      VDMFMA_I32_8x16x128_I8,
+      VDMFMA_F32_8x16x128_F8E5M2FNUZ,
+      VDMFMA_F32_8x16x128_F8E5M2FNUZ_F8E4M3FNUZ,
+      VDMFMA_F32_8x16x128_F8E4M3FNUZ_F8E5M2FNUZ,
+      VDMFMA_F32_8x16x128_F8E4M3FNUZ,
     ]>;
 
 // Enum for scaled mma intrinsic, loosely matching the MMAIntrinsic enum above
@@ -461,5 +505,48 @@ def IREEGPU_ReorderWorkgroupsStrategy : IREEGPU_I32PipelineEnumAttr<"ReorderWork
       ReorderWorkgroupsTranspose
     ]> {
 }
+
+//===----------------------------------------------------------------------===//
+// GPU Lowering Pipelines
+//===----------------------------------------------------------------------===//
+
+// LLVMGPU pipelines.
+def IREEGPU_LP_Default : I32EnumAttrCase<"Default", 0>;
+def IREEGPU_LP_BaseLowering : I32EnumAttrCase<"BaseLowering", 1>;
+def IREEGPU_LP_Distribute : I32EnumAttrCase<"Distribute", 2>;
+def IREEGPU_LP_Vectorize : I32EnumAttrCase<"Vectorize", 3>;
+def IREEGPU_LP_VectorDistribute : I32EnumAttrCase<"VectorDistribute", 4>;
+def IREEGPU_LP_WinogradVectorize : I32EnumAttrCase<"WinogradVectorize", 5>;
+def IREEGPU_LP_TileAndFuse : I32EnumAttrCase<"TileAndFuse", 6>;
+
+def IREEGPU_LoweringPipeline : IREEGPU_I32EnumAttr<"LoweringPipeline",
+    "LLVMGPU lowering pipeline identifier", [
+      IREEGPU_LP_Default, IREEGPU_LP_BaseLowering, IREEGPU_LP_Distribute,
+      IREEGPU_LP_Vectorize, IREEGPU_LP_VectorDistribute,
+      IREEGPU_LP_WinogradVectorize, IREEGPU_LP_TileAndFuse
+    ]>;
+
+//===----------------------------------------------------------------------===//
+// SPIRV Lowering Pipelines
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_SP_BaseLowering : I32EnumAttrCase<"BaseLowering", 0>;
+def IREEGPU_SP_BaseDistribute : I32EnumAttrCase<"BaseDistribute", 1>;
+def IREEGPU_SP_BaseVectorize : I32EnumAttrCase<"BaseVectorize", 2>;
+def IREEGPU_SP_SubgroupReduce : I32EnumAttrCase<"SubgroupReduce", 3>;
+def IREEGPU_SP_MatmulPromoteVectorize
+    : I32EnumAttrCase<"MatmulPromoteVectorize", 4>;
+def IREEGPU_SP_CooperativeMatrixVectorize
+    : I32EnumAttrCase<"CooperativeMatrixVectorize", 5>;
+def IREEGPU_SP_WinogradVectorize : I32EnumAttrCase<"WinogradVectorize", 6>;
+
+def IREEGPU_SPIRVLoweringPipeline : IREEGPU_I32EnumAttr<
+    "SPIRVLoweringPipeline",
+    "SPIRV lowering pipeline identifier", [
+      IREEGPU_SP_BaseLowering, IREEGPU_SP_BaseDistribute,
+      IREEGPU_SP_BaseVectorize, IREEGPU_SP_SubgroupReduce,
+      IREEGPU_SP_MatmulPromoteVectorize,
+      IREEGPU_SP_CooperativeMatrixVectorize, IREEGPU_SP_WinogradVectorize
+    ]>;
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS

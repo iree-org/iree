@@ -260,6 +260,27 @@ static void iree_hal_memory_file_try_import_buffer(
       imported_release_callback, &file->imported_buffer);
   if (!iree_status_is_ok(status)) {
     iree_hal_memory_file_storage_release(file->storage);
+
+    // Device import failed (common on WebGPU and other backends that cannot
+    // import host allocations as GPU buffers). Fall back to wrapping the host
+    // pointer as a HOST_LOCAL heap buffer. This ensures storage_buffer() always
+    // returns a usable buffer for HOST_ALLOCATION files, enabling queue_read/
+    // write to map it and access the host pointer without staging copies.
+    iree_status_ignore(status);
+    iree_hal_memory_file_storage_retain(file->storage);
+    status = iree_hal_heap_buffer_wrap(
+        iree_hal_buffer_placement_undefined(),
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+        access | IREE_HAL_MEMORY_ACCESS_UNALIGNED,
+        IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE |
+            IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET |
+            IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+            IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_RANDOM,
+        contents.data_length, contents, imported_release_callback,
+        file->host_allocator, &file->imported_buffer);
+    if (!iree_status_is_ok(status)) {
+      iree_hal_memory_file_storage_release(file->storage);
+    }
   }
 
   IREE_TRACE({

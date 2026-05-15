@@ -161,9 +161,6 @@ public:
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     auto target = IREE::HAL::ExecutableTargetAttr::lookup(getOperation());
-    if (!target) {
-      return signalPassFailure();
-    }
     populateMathFunctionsRewritePatterns(patterns, [target](StringRef name) {
       return predicateRewrite(name, target);
     });

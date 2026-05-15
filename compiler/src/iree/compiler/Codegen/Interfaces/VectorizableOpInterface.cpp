@@ -10,16 +10,23 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Utils/Indexing.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/IRMapping.h"
 
@@ -1055,9 +1062,17 @@ struct InnerTiledOpVectorizationModel
     if (!tiledOp.hasTensorSemantics()) {
       return false;
     }
-    SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
-    return llvm::all_of(argTypes,
-                        [](ShapedType st) { return st.hasStaticShape(); });
+    SmallVector<int64_t> loopRanges;
+    tiledOp.getIterationBounds(loopRanges);
+    // If vector sizes are provided (from tile size analysis or config),
+    // dynamic outer shapes are fine - they'll be masked during vectorization.
+    // However, vector sizes must be >= the static outer dimension sizes.
+    if (!vectorSizes.empty()) {
+      return succeeded(
+          vector::isValidMaskedInputVector(loopRanges, vectorSizes));
+    }
+    // Without vector sizes, require static outer shapes.
+    return ShapedType::isStaticShape(loopRanges);
   }
 
   FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
@@ -1070,6 +1085,19 @@ struct InnerTiledOpVectorizationModel
     Location loc = tiledOp.getLoc();
 
     SmallVector<ShapedType> argTypes = tiledOp.getOperandShapedTypes();
+    SmallVector<AffineMap> indexingMaps = tiledOp.getIndexingMapsArray();
+
+    // If no vector sizes are provided, use static loop ranges and the inBounds
+    // attribute instead of masking.
+    bool needsMasking = true;
+    if (vectorSizes.empty()) {
+      SmallVector<int64_t> loopRanges;
+      tiledOp.getIterationBounds(loopRanges);
+      assert(ShapedType::isStaticShape(loopRanges) &&
+             "unable to infer vector sizes");
+      vectorSizes = loopRanges;
+      needsMasking = false;
+    }
 
     // Construct the zero padding value for each operand. Ideally, we'd need the
     // InnerTile interface to return the padding value to use. If it is not
@@ -1081,13 +1109,35 @@ struct InnerTiledOpVectorizationModel
               rewriter, loc, rewriter.getZeroAttr(argType.getElementType()));
         });
 
-    SmallVector<Value> newOperands = tiledOp.getOperands();
-    for (auto [operand, type, padValue] :
-         llvm::zip_equal(newOperands, argTypes, padValues)) {
-      operand = vector::createReadOrMaskedRead(
-          rewriter, loc, operand, type.getShape(), padValue,
-          /*useInBoundsInsteadOfMasking=*/true);
+    // Compute the read shape for each operand.
+    SmallVector<SmallVector<int64_t>> readShapes;
+    for (auto [i, argType] : llvm::enumerate(argTypes)) {
+      if (!needsMasking) {
+        readShapes.push_back(llvm::to_vector(argType.getShape()));
+        continue;
+      }
+      // Outer dimensions come from vector sizes via the indexing map, inner
+      // dimensions are static.
+      SmallVector<int64_t> readShape;
+      AffineMap map = indexingMaps[i];
+      for (AffineExpr expr : map.getResults()) {
+        auto dimExpr = cast<AffineDimExpr>(expr);
+        readShape.push_back(vectorSizes[dimExpr.getPosition()]);
+      }
+      ArrayRef<int64_t> innerShape = tiledOp.getOperandInnerShape(i);
+      readShape.append(innerShape.begin(), innerShape.end());
+      readShapes.push_back(std::move(readShape));
     }
+
+    // Read each operand into a vector, with masking if needed.
+    SmallVector<Value> newOperands(tiledOp->getOperands());
+    for (auto [operand, readShape, padValue] :
+         llvm::zip_equal(newOperands, readShapes, padValues)) {
+      operand = vector::createReadOrMaskedRead(
+          rewriter, loc, operand, readShape, padValue,
+          /*useInBoundsInsteadOfMasking=*/!needsMasking);
+    }
+
     auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
         rewriter, loc,
         ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
@@ -1095,16 +1145,40 @@ struct InnerTiledOpVectorizationModel
         tiledOp.getIndexingMaps(), tiledOp.getIteratorTypes(),
         tiledOp.getKind(), tiledOp.getSemantics());
 
+    // Write results back to tensor, with masking if needed.
+    // TODO: Use createWriteOrMaskedWrite once it is promoted to a public
+    // utility in mlir/Dialect/Vector/Utils/VectorUtils.h.
     auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     SmallVector<Value> results;
-    for (auto [result, tensorAcc] :
-         llvm::zip_equal(newTiledOp.getResults(), tiledOp.getOutputs())) {
-      int64_t rank = cast<RankedTensorType>(tensorAcc.getType()).getRank();
-      auto write = vector::TransferWriteOp::create(
-          rewriter, loc, result, tensorAcc,
-          /*indices=*/SmallVector<Value>(rank, zero),
-          /*inBounds=*/SmallVector<bool>(rank, true));
-      results.push_back(write.getResults().front());
+    unsigned numInputs = tiledOp.getNumInputs();
+    for (auto [i, result, dest] :
+         llvm::enumerate(newTiledOp.getResults(), tiledOp.getOutputs())) {
+      auto destType = cast<ShapedType>(dest.getType());
+      int64_t rank = destType.getRank();
+      SmallVector<Value> indices(rank, zero);
+
+      ArrayRef<int64_t> writeShape = readShapes[numInputs + i];
+      SmallVector<bool> inBounds(rank);
+      for (int64_t d = 0; d < rank; ++d) {
+        inBounds[d] =
+            destType.isStaticDim(d) && destType.getDimSize(d) >= writeShape[d];
+      }
+
+      auto write = vector::TransferWriteOp::create(rewriter, loc, result, dest,
+                                                   indices, inBounds);
+      if (!needsMasking) {
+        results.push_back(write.getResults().front());
+        continue;
+      }
+      auto vecType = cast<VectorType>(result.getType());
+      auto maskType =
+          vecType.cloneWith(/*shape=*/std::nullopt, rewriter.getI1Type());
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, dest);
+      Value mask =
+          vector::CreateMaskOp::create(rewriter, loc, maskType, mixedSizes);
+      results.push_back(
+          mlir::vector::maskOperation(rewriter, write, mask)->getResult(0));
     }
     return results;
   }
@@ -1124,6 +1198,168 @@ static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
   registerInterfaceForLinalgOps<OpTy2, More...>(ctx);
 }
 
+//===----------------------------------------------------------------------===//
+// Im2col Vectorization
+//===----------------------------------------------------------------------===//
+
+/// Compute the padding mask for im2col vectorization.
+/// Gets the valid size from computeIm2colValidSize and converts it to a
+/// vector mask. The mask guards against out-of-bounds accesses, so read
+/// indices do not need clamping.
+static Value computeIm2colPaddingMask(
+    OpBuilder &b, Location loc, IREE::LinalgExt::Im2colOp im2colOp,
+    const IREE::LinalgExt::Im2colSourceIndices &srcIndices, int64_t vecWidth,
+    ArrayRef<Value> outputIVs, std::optional<int64_t> vecOutputDim) {
+  auto vecI1Type = VectorType::get({vecWidth}, b.getI1Type());
+  OpFoldResult innerTileSize = b.getIndexAttr(vecWidth);
+  Value validSize = IREE::LinalgExt::computeIm2colValidSize(
+      b, loc, im2colOp, srcIndices, innerTileSize, outputIVs, vecOutputDim);
+  return vector::CreateMaskOp::create(b, loc, vecI1Type, validSize);
+}
+
+// Im2col vectorization uses the driver-provided vectorSizes to determine
+// which output dimension to vectorize and the vector width. The vector
+// sizes are computed by the MaterializeVectorTileSizes pass.
+struct Im2colOpVectorizationModel
+    : public VectorizableOpInterface::ExternalModel<Im2colOpVectorizationModel,
+                                                    IREE::LinalgExt::Im2colOp> {
+  bool isVectorizable(Operation *op, ArrayRef<int64_t> vectorSizes,
+                      ArrayRef<bool> scalableDims,
+                      DictionaryAttr options) const {
+    auto im2colOp = cast<IREE::LinalgExt::Im2colOp>(op);
+    return im2colOp.getOutputType().hasStaticShape();
+  }
+
+  FailureOr<SmallVector<Value>> vectorize(Operation *op, RewriterBase &rewriter,
+                                          ArrayRef<int64_t> vectorSizes,
+                                          ArrayRef<bool> scalableDims,
+                                          DictionaryAttr options) const {
+    auto im2colOp = cast<IREE::LinalgExt::Im2colOp>(op);
+    RewriterBase::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(im2colOp);
+    ShapedType outputType = im2colOp.getOutputType();
+    Location loc = im2colOp.getLoc();
+    bool hasPadding = im2colOp.hasPadding();
+
+    int64_t inputRank = im2colOp.getInputRank();
+
+    int64_t outputRank = im2colOp.getOutputRank();
+    ArrayRef<int64_t> outputShape = outputType.getShape();
+    Type elemType = outputType.getElementType();
+
+    // Determine the vectorized dimension from the driver-provided vectorSizes.
+    // The vectorized dim has size > 1; all others are 1.
+    std::optional<int64_t> vecDim;
+    for (int64_t d = 0; d < outputRank; ++d) {
+      if (d < static_cast<int64_t>(vectorSizes.size()) && vectorSizes[d] > 1) {
+        vecDim = d;
+        break;
+      }
+    }
+
+    int64_t vecWidth = vecDim ? outputShape[*vecDim] : 1;
+
+    auto vecType = VectorType::get({vecWidth}, elemType);
+
+    // Pad value for transfer_read: use im2col's pad_value when padding is
+    // present, otherwise use poison (transfer_read requires a padding operand).
+    Value padValue = hasPadding ? im2colOp.getPadValue()
+                                : ub::PoisonOp::create(rewriter, loc, elemType);
+
+    int64_t writeDim = vecDim ? *vecDim : (outputRank - 1);
+    AffineMap writePermMap =
+        AffineMap::get(outputRank, 0, rewriter.getAffineDimExpr(writeDim),
+                       rewriter.getContext());
+
+    SmallVector<int64_t> loopDims;
+    SmallVector<int64_t> loopBounds;
+    int64_t totalIters = 1;
+    for (int64_t d = 0; d < outputRank; ++d) {
+      if (vecDim && d == *vecDim) {
+        continue;
+      }
+      loopDims.push_back(d);
+      loopBounds.push_back(outputShape[d]);
+      totalIters *= outputShape[d];
+    }
+
+    Value result = im2colOp.getOutput();
+    Value zeroIdx = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+    // Hoist loop-invariant padding and clamping state.
+    SmallVector<OpFoldResult> padLow(inputRank, rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> inputPadLow = im2colOp.getMixedInputPadLow();
+    if (!inputPadLow.empty()) {
+      padLow = inputPadLow;
+    }
+    SmallVector<OpFoldResult> inputSizes =
+        tensor::getMixedSizes(rewriter, loc, im2colOp.getInput());
+    // AffineMap for clamping: max(d0, 0) and min(d0, d1 - 1).
+    MLIRContext *ctx = rewriter.getContext();
+    AffineExpr d0 = getAffineDimExpr(0, ctx);
+    AffineExpr d1 = getAffineDimExpr(1, ctx);
+    AffineMap maxZeroMap =
+        AffineMap::get(1, 0, {d0, getAffineConstantExpr(0, ctx)}, ctx);
+    AffineMap clampHighMap = AffineMap::get(2, 0, {d0, d1 - 1}, ctx);
+
+    for (int64_t iter = 0; iter < totalIters; ++iter) {
+      SmallVector<Value> ivs(outputRank, zeroIdx);
+      int64_t remaining = iter;
+      for (int64_t i = loopDims.size() - 1; i >= 0; --i) {
+        int64_t idx = remaining % loopBounds[i];
+        remaining /= loopBounds[i];
+        ivs[loopDims[i]] = arith::ConstantIndexOp::create(rewriter, loc, idx);
+      }
+
+      IREE::LinalgExt::Im2colSourceIndices srcIndices =
+          IREE::LinalgExt::computeIm2colSourceIndices(
+              rewriter, loc, im2colOp, ivs, rewriter.getIndexAttr(vecWidth));
+
+      // Convert padded-space source offsets to actual input tensor coordinates
+      // by subtracting padLow. When there is no padding, padLow is all zeros
+      // and subOfrs folds to identity.
+      SmallVector<Value> readIndices;
+      for (int64_t d = 0; d < inputRank; ++d) {
+        OpFoldResult adjusted = IREE::LinalgExt::subOfrs(
+            rewriter, loc, srcIndices.sliceOffsets[d], padLow[d]);
+        // Clamp to [0, dimSize - 1] so downstream optimizations can prove
+        // buffer accesses are in-bounds. The mask already zeros out OOB reads,
+        // so clamping doesn't affect correctness.
+        if (hasPadding) {
+          adjusted = affine::makeComposedFoldedAffineMax(
+              rewriter, loc, maxZeroMap, {adjusted});
+          adjusted = affine::makeComposedFoldedAffineMin(
+              rewriter, loc, clampHighMap, {adjusted, inputSizes[d]});
+        }
+        readIndices.push_back(
+            getValueOrCreateConstantIndexOp(rewriter, loc, adjusted));
+      }
+      Value mask;
+      if (hasPadding) {
+        mask = computeIm2colPaddingMask(rewriter, loc, im2colOp, srcIndices,
+                                        vecWidth, ivs, vecDim);
+      }
+
+      AffineMap readPermMap =
+          AffineMap::getMinorIdentityMap(inputRank, 1, rewriter.getContext());
+      auto readOp = vector::TransferReadOp::create(
+          rewriter, loc, vecType, im2colOp.getInput(), readIndices,
+          AffineMapAttr::get(readPermMap), padValue, mask,
+          rewriter.getBoolArrayAttr({true}));
+      Value readVec = readOp.getResult();
+
+      SmallVector<Value> writeIndices(ivs);
+      if (vecDim) {
+        writeIndices[*vecDim] = zeroIdx;
+      }
+      result = vector::TransferWriteOp::create(rewriter, loc, readVec, result,
+                                               writeIndices, writePermMap)
+                   .getResult();
+    }
+
+    return SmallVector<Value>{result};
+  }
+};
 } // namespace
 
 void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
@@ -1134,6 +1370,8 @@ void registerVectorizableOpInterfaceExternalModels(DialectRegistry &registry) {
     IREE::LinalgExt::ArgCompareOp::attachInterface<
         ArgCompareOpVectorizationModel>(*ctx);
     IREE::LinalgExt::MapStoreOp::attachInterface<MapStoreOpVectorizationModel>(
+        *ctx);
+    IREE::LinalgExt::Im2colOp::attachInterface<Im2colOpVectorizationModel>(
         *ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx,

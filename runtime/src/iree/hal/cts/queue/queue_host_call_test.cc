@@ -124,7 +124,8 @@ TEST_P(QueueHostCallTest, EnqueueBeforeSignal) {
   // call blocks inline waiting for the wait semaphore.
   std::thread waker([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+    IREE_EXPECT_OK(
+        iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
   });
 
   uint64_t args[4] = {10, 20, 30, UINT64_MAX};
@@ -201,7 +202,8 @@ TEST_P(QueueHostCallTest, NonBlockingFlag) {
         state->received_semaphores =
             !iree_hal_semaphore_list_is_empty(context->signal_semaphore_list);
         IREE_EXPECT_OK(
-            iree_hal_semaphore_list_signal(state->sideband_semaphore_list));
+            iree_hal_semaphore_list_signal(state->sideband_semaphore_list,
+                                           /*frontier=*/NULL));
         return iree_ok_status();
       },
       &state);
@@ -209,7 +211,8 @@ TEST_P(QueueHostCallTest, NonBlockingFlag) {
   SemaphoreList wait_semaphore_list(device_, {0}, {1});
   SemaphoreList signal_semaphore_list(device_, {0}, {1});
 
-  IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+  IREE_EXPECT_OK(
+      iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
 
   uint64_t args[4] = {1, 2, 3, 4};
   IREE_EXPECT_OK(iree_hal_device_queue_host_call(
@@ -254,7 +257,8 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
             state->thread_started = true;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             state->thread_completed = true;
-            iree_hal_semaphore_list_signal(*state->cloned_list);
+            iree_hal_semaphore_list_signal(*state->cloned_list,
+                                           /*frontier=*/NULL);
             delete state->cloned_list;
             state->cloned_list = nullptr;
           });
@@ -268,7 +272,8 @@ TEST_P(QueueHostCallTest, AsyncCallback) {
   SemaphoreList wait_semaphore_list(device_, {0}, {1});
   SemaphoreList signal_semaphore_list(device_, {0, 0}, {1, 2});
 
-  IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+  IREE_EXPECT_OK(
+      iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
 
   uint64_t args[4] = {5, 6, 7, 8};
   IREE_EXPECT_OK(iree_hal_device_queue_host_call(
@@ -309,7 +314,8 @@ TEST_P(QueueHostCallTest, CallbackReturnsError) {
   SemaphoreList wait_semaphore_list(device_, {0}, {1});
   SemaphoreList signal_semaphore_list(device_, {0, 0}, {1, 2});
 
-  IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+  IREE_EXPECT_OK(
+      iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
 
   uint64_t args[4] = {9, 10, 11, 12};
   IREE_EXPECT_OK(iree_hal_device_queue_host_call(
@@ -379,7 +385,8 @@ TEST_P(QueueHostCallTest, CallbackReturnsErrorAfterWait) {
   // the blocking queue_host_call before signaling the wait semaphore.
   std::thread waker([&]() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    IREE_EXPECT_OK(iree_hal_semaphore_list_signal(wait_semaphore_list));
+    IREE_EXPECT_OK(
+        iree_hal_semaphore_list_signal(wait_semaphore_list, /*frontier=*/NULL));
   });
 
   uint64_t args[4] = {13, 14, 15, 16};

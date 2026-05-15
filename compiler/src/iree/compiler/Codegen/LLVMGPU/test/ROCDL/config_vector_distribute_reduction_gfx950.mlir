@@ -2,7 +2,7 @@
 // RUN:   --iree-codegen-llvmgpu-use-igemm=false \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
-// Check that skinny scaled matmuls are sent down the LLVMGPUVectorDistribute pipeline.
+// Check that skinny scaled matmuls are sent down the #iree_gpu.pipeline<VectorDistribute> pipeline.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -46,5 +46,5 @@ func.func @skinny_scaled_matmul() {
   iree_tensor_ext.dispatch.tensor.store %13, %4, offsets = [4, 1024], sizes = [4, 1024], strides = [1, 1] : tensor<4x1024xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4x1024xf32>>
   return
 }
-//       CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+//       CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64
 // CHECK-LABEL: @skinny_scaled_matmul

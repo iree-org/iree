@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-fuse-and-hoist-parallel-loops))' --split-input-file --verify-diagnostics | FileCheck %s
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
@@ -65,7 +65,7 @@ func.func @forall_fuse_then_hoist(%3: tensor<128x128xf16>, %4: tensor<128x128xf1
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
@@ -118,7 +118,7 @@ func.func @forall_fuse_then_hoist_mixed_mappings(%3: tensor<128x128xf16>, %5: te
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 4)>
@@ -380,7 +380,7 @@ func.func @no_fuse_forall_without_workgroup_size(%arg0: tensor<128x128xf32>) -> 
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64>
 #map = affine_map<(d0) -> (d0 * 2)>
 #map1 = affine_map<(d0) -> (d0 * 16)>
 func.func @no_fuse_forall_workgroup_size_mismatch(%arg0: tensor<128x128xf32>) -> tensor<128x128xf32>
@@ -414,7 +414,7 @@ func.func @no_fuse_forall_workgroup_size_mismatch(%arg0: tensor<128x128xf32>) ->
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 #map1 = affine_map<(d0) -> (d0 * 16)>
 func.func @fuse_direct_forall_use(%arg0: tensor<128x128xf32>, %arg1: tensor<16x16xf32>) -> tensor<128x128xf32>
   attributes {translation_info = #translation_info} {
@@ -449,7 +449,7 @@ func.func @fuse_direct_forall_use(%arg0: tensor<128x128xf32>, %arg1: tensor<16x1
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 func.func @forall_hoist_unit_loop_with_fill(%3: tensor<1x128xf16>, %4: tensor<128x1xf16>) -> tensor<1x1xf32>
     attributes {translation_info = #translation_info} {
@@ -947,7 +947,7 @@ func.func @fuse_pad_dest(%arg0: tensor<128xf16>, %arg1: index) -> tensor<128xf16
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 func.func @no_swap_same_block_expand_slice(%arg0: tensor<64xf16>) -> tensor<4x4xf16>
     attributes {translation_info = #translation_info} {
   %expanded = tensor.expand_shape %arg0 [[0, 1]] output_shape [8, 8]
@@ -966,7 +966,7 @@ func.func @no_swap_same_block_expand_slice(%arg0: tensor<64xf16>) -> tensor<4x4x
 
 // Check that when fusing two separate producer foralls (each with different swizzle hints)
 // into a consumer, each producer creates a bufferization.alloc_tensor with its correct swizzle.
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [1024, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [1024, 1, 1] subgroup_size = 64>
 func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128xf16>) -> tensor<128x128xf16>
     attributes {translation_info = #translation_info} {
   %empty1 = tensor.empty() : tensor<128x128xf16>

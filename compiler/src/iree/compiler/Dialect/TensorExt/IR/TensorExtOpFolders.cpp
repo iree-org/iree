@@ -130,7 +130,7 @@ struct BitCastOfTensorCastStaticInfo final : OpRewritePattern<BitCastOp> {
 /// Replaces chains of two bitcast operations by a single bitcast operation.
 /// bitcast(bitcast(x : A -> B) : B -> C) -> bitcast(x : A -> C).
 struct ChainedBitCast final : OpRewritePattern<BitCastOp> {
-  using OpRewritePattern<BitCastOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {

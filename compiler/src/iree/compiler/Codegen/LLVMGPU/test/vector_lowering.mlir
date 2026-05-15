@@ -300,3 +300,95 @@ func.func @transfer_gather_unroll_transposed_index(
 // CHECK-NOT: transfer_gather
 // CHECK-COUNT-32: vector.load
 // CHECK-NOT: transfer_gather
+
+// -----
+
+// Test unrolling of a 2D transfer_scatter: outer dim is scattered (indices),
+// inner dim is contiguous.
+
+func.func @transfer_scatter_unroll_embedding_write(
+  %source: memref<4096x64xf16>,
+  %vector: vector<4x64xf16>,
+  %indices: vector<4xindex>) {
+  %c0 = arith.constant 0 : index
+  iree_vector_ext.transfer_scatter %vector into %source[%c0, %c0]
+  [%indices : vector<4xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<4x64xf16>, memref<4096x64xf16>
+  return
+}
+
+// After unrolling, the 2D scatter becomes 4 rank-1 stores.
+// CHECK-LABEL: func.func @transfer_scatter_unroll_embedding_write
+// CHECK-COUNT-4: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+
+// -----
+
+// Test unrolling of a masked 2D transfer_scatter.
+
+func.func @transfer_scatter_unroll_masked(
+  %source: memref<4096x64xf16>,
+  %vector: vector<4x64xf16>,
+  %indices: vector<4xindex>,
+  %mask: vector<4x64xi1>) {
+  %c0 = arith.constant 0 : index
+  iree_vector_ext.transfer_scatter %vector into %source[%c0, %c0]
+  [%indices : vector<4xindex>], %mask {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>,
+                     affine_map<(d0, d1)[s0] -> (d0, d1)>]
+  } : vector<4x64xf16>, memref<4096x64xf16>, vector<4x64xi1>
+  return
+}
+
+// After unrolling, mask slices are passed to each masked store.
+// CHECK-LABEL: func.func @transfer_scatter_unroll_masked
+// CHECK-COUNT-4: vector.maskedstore {{.+}} : memref<4096x64xf16>, vector<64xi1>, vector<64xf16>
+
+// -----
+
+// Test unrolling of a 2D transfer_scatter with tensor semantics.
+
+func.func @transfer_scatter_unroll_tensor(
+  %dest: tensor<4096x64xf16>,
+  %vector: vector<4x64xf16>,
+  %indices: vector<4xindex>) -> tensor<4096x64xf16> {
+  %c0 = arith.constant 0 : index
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<4xindex>] {
+    indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
+                     affine_map<(d0, d1)[s0] -> (d0)>]
+  } : vector<4x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  return %out : tensor<4096x64xf16>
+}
+
+// After unrolling, the 2D scatter becomes 4 rank-1 transfer_write chained
+// via tensor SSA results.
+// CHECK-LABEL: func.func @transfer_scatter_unroll_tensor
+// CHECK-COUNT-4: vector.transfer_write {{.+}} : vector<64xf16>, tensor<4096x64xf16>
+
+// -----
+
+// Test unrolling of a 3D transfer_scatter with a transposed 2D index vector.
+// The first two output dims (d0=4, d1=8) are both scattered via a single
+// index vec of shape 8x4 (note: d1 before d0, i.e. "transposed").
+// The inner dim (d2=64) is contiguous.
+
+func.func @transfer_scatter_unroll_transposed_index(
+  %dest: memref<4096x64xf16>,
+  %vector: vector<4x8x64xf16>,
+  %indices: vector<8x4xindex>) {
+  %c0 = arith.constant 0 : index
+  iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
+  [%indices : vector<8x4xindex>] {
+    indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
+                     affine_map<(d0, d1, d2)[s0] -> (d1, d0)>]
+  } : vector<4x8x64xf16>, memref<4096x64xf16>
+  return
+}
+
+// After two rounds of unrolling (d0=4 then d1=8), the 3D scatter
+// becomes 4*8=32 rank-1 stores.
+// CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
+// CHECK-COUNT-32: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>

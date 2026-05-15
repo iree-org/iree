@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
@@ -91,6 +92,8 @@ struct ConvertToNVVMPass final
             return static_cast<unsigned>(NVVM::NVVMMemorySpace::Shared);
           case gpu::AddressSpace::Private:
             return 0;
+          case gpu::AddressSpace::Constant:
+            return static_cast<unsigned>(NVVM::NVVMMemorySpace::Constant);
           }
           llvm_unreachable("unknown address space enum value");
           return 0;
@@ -199,6 +202,9 @@ struct ConvertToNVVMPass final
 
       // TODO: Remove once we support replacing non-root ops.
       target.addLegalOp<gpu::YieldOp, gpu::GPUModuleOp>();
+      target.addLegalOp<IREE::Codegen::DispatchConfigOp,
+                        IREE::Codegen::YieldOp>();
+      target.markOpRecursivelyLegal<IREE::Codegen::DispatchConfigOp>();
 
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();

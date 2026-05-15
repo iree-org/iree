@@ -20,7 +20,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -98,7 +98,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -137,7 +137,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
+//       CHECK:     %[[LOOP:.+]]:4 = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 //       CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
@@ -150,7 +150,9 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
 // CHECK-COUNT-4:     amdgpu.mfma 16x16x16
 //       CHECK:       scf.yield
-//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
+//       CHECK:     %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<4xf32> to vector<4x1xf32>
+//       CHECK:     %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0]{{.*}}} : vector<4x1xf32> into vector<2x2x4x1xf32>
+//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[INS]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -176,7 +178,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmmar3()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -215,7 +217,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x8x1x1xf32>)
+//       CHECK:     %[[LOOP:.+]]:4 = scf.for {{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<8xf32>, vector<8xf32>, vector<8xf32>, vector<8xf32>)
 //       CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-DAG:       vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //   CHECK-DAG:       vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
@@ -228,7 +230,9 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x16xf16>
 // CHECK-COUNT-8:     amdgpu.wmma 16x16x16 {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
 //       CHECK:       scf.yield
-//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
+//       CHECK:     %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<8xf32> to vector<8x1x1xf32>
+//       CHECK:     %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0, 0]{{.*}}} : vector<8x1x1xf32> into vector<2x2x8x1x1xf32>
+//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[INS]], [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]], %[[BUF2]]
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
@@ -258,7 +262,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x4()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : !aeltype
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -288,7 +292,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x10xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
+//       CHECK:     scf.for %{{.*}} = %c0 to %c320 step %c2 {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-8:     amdgpu.mfma 16x16x4
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -319,7 +323,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_16x16x32_f8()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : !aeltype
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -349,7 +353,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x72xf8E4M3FNUZ, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     scf.for %{{.*}} = %c0 to %c40 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
+//       CHECK:     scf.for %{{.*}} = %c0 to %c40 step %c2 {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // CHECK-COUNT-8:     amdgpu.mfma 16x16x32
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -380,7 +384,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_mfma_32x32x16_i8()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0 : !aeltype
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -410,7 +414,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x40xi8, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<1x1x4x4x1xi32>)
+//       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<16xi32>)
 // CHECK-COUNT-2:     amdgpu.mfma 32x32x16
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -441,7 +445,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_wmmar3_f16_16x16x16_f16()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>} {
         %cst = arith.constant 0.000000e+00 : !aeltype
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280x!eltype>>
@@ -471,7 +475,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x16x1x1xf16>)
+//       CHECK:     scf.for %{{.*}} = %c0 to %c80 step %c2 {{.*}} -> (vector<16xf16>, vector<16xf16>, vector<16xf16>, vector<16xf16>)
 // CHECK-COUNT-8:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<16xf16>
 //       CHECK:       scf.yield
 //       CHECK:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
@@ -484,7 +488,7 @@ hal.executable public @main {
   workgroup = [1, 1, 4, 8, 0, 0, 0]
 }>
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -547,7 +551,7 @@ hal.executable public @main {
   promote_operands = [0, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [8, 4, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [8, 4, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -619,7 +623,7 @@ hal.executable public @main {
   #hal.pipeline.binding<storage_buffer, Indirect>
 ]>
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 #lowering_config = #iree_gpu.lowering_config<{
   mma_kind = #iree_gpu.mma_layout<WMMAR3_I32_16x16x16_I8>,
@@ -685,7 +689,7 @@ hal.executable public @main {
   thread = [1, 1], workgroup = [1, 1]
 }>
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -737,7 +741,7 @@ hal.executable public @main {
   flags = Indirect
 >
 #translation_info = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -867,7 +871,7 @@ hal.executable public @main {
   thread = [1, 4, 0],
   workgroup = [1, 128, 0]
 }>
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
 
 hal.executable public @main {
   hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
@@ -938,7 +942,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @small_matvec()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x10xf32>>
         %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x1xf32>>
@@ -989,7 +993,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @elemwise_reduction_elemwise() attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [32, 1, 1] subgroup_size = 32>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
       } {
         %cst_3 = arith.constant 3.0 : f32
         %cst_4 = arith.constant 4.0 : f32
@@ -1103,7 +1107,7 @@ hal.executable public @main {
     }
     builtin.module {
       func.func @matmul_transpose_b_promote_result()
-        attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 2, 1] subgroup_size = 64>} {
+        attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 2, 1] subgroup_size = 64>} {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2048x1280xf16>>
@@ -1143,7 +1147,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<64x36xf16, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<64x66xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (32, 160) {
-//       CHECK:     %[[LOOP:.+]] = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<2x2x4x1xf32>)
+//       CHECK:     %[[LOOP:.+]]:4 = scf.for %[[IV:.+]] = %c0 to %c80 step %c2 {{.*}} -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 //       CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-DAG:       %[[LHS_RD:.+]] = vector.transfer_read %[[BUF0]]{{.*}} vector<8xf16>
 //   CHECK-DAG:       vector.transfer_write %[[LHS_RD]]
@@ -1156,7 +1160,9 @@ hal.executable public @main {
 //   CHECK-DAG:       vector.transpose %{{.*}}, [0, 2, 1, 3] : vector<2x1x2x4xf16>
 // CHECK-COUNT-4:     amdgpu.mfma 16x16x16
 //       CHECK:       scf.yield
-//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[LOOP]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
+//       CHECK:     %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<4xf32> to vector<4x1xf32>
+//       CHECK:     %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0]{{.*}}} : vector<4x1xf32> into vector<2x2x4x1xf32>
+//       CHECK:     %[[LOOP_T:.+]] = vector.transpose %[[INS]], [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:     vector.transfer_write %[[LOOP_T]]
 //       CHECK:     scf.for {{.*}} {
 //       CHECK:       %[[SHARED_READ:.+]] = vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<4xf32>
@@ -1180,7 +1186,7 @@ hal.executable public @main {
   workgroup = [1, 16, 64, 0]
 }>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -1223,7 +1229,7 @@ hal.executable public @main {
 //   CHECK-DAG:   memref.alloc() : memref<1x16x6xf32, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<1x16x66xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
-//       CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
+//       CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<4xf32>)
 //       CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //   CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
@@ -1251,7 +1257,7 @@ hal.executable public @main {
   workgroup = [1, 16, 64, 0]
 }>
 #translation = #iree_codegen.translation_info<pipeline =
-  LLVMGPUTileAndFuse
+  #iree_gpu.pipeline<TileAndFuse>
   workgroup_size = [256, 1, 1]
   subgroup_size = 64,
   {
@@ -1294,7 +1300,7 @@ hal.executable public @main {
 //     CHECK-DAG:   %[[B1:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //     CHECK-DAG:   %[[B2:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //         CHECK:   scf.forall ({{.*}}) in (12, 37, 10) {
-//         CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<1x1x1x4x1xf32>)
+//         CHECK:     scf.for %[[IV:.+]] = %c0 to %c144 step %c1 {{.*}} -> (vector<4xf32>)
 //         CHECK:       gpu.barrier memfence [#gpu.address_space<workgroup>]
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
 //     CHECK-DAG:       vector.transfer_read {{.*}} #gpu.address_space<workgroup>>, vector<1xf32>
@@ -1308,7 +1314,7 @@ hal.executable public @main {
   thread = [1, 1, 1, 4], workgroup = [1, 1, 16, 32]
 }>
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
@@ -1350,7 +1356,7 @@ hal.executable public @main {
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 #lowering_config = #iree_gpu.lowering_config<{
   thread = [1, 4], workgroup = [1, 256]
 }>
@@ -1397,7 +1403,7 @@ hal.executable public @main {
 
 
 // -----
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 #lowering_config = #iree_gpu.lowering_config<{thread = [1, 1, 1, 4], workgroup = [1, 1, 32, 8]}>
 
 #pipeline_layout = #hal.pipeline.layout<bindings =

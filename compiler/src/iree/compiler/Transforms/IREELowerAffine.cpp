@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
@@ -16,17 +16,17 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-codegen-lower-affine"
+#define DEBUG_TYPE "iree-lower-affine"
 
 namespace mlir::iree_compiler {
 
-#define GEN_PASS_DEF_IREECODEGENLOWERAFFINEPASS
-#include "iree/compiler/Codegen/Common/Passes.h.inc"
+#define GEN_PASS_DEF_IREELOWERAFFINEPASS
+#include "iree/compiler/Transforms/Passes.h.inc"
 
 namespace {
 
-struct IREECodegenLowerAffinePass final
-    : impl::IREECodegenLowerAffinePassBase<IREECodegenLowerAffinePass> {
+struct IREELowerAffinePass final
+    : impl::IREELowerAffinePassBase<IREELowerAffinePass> {
 public:
   using Base::Base;
 

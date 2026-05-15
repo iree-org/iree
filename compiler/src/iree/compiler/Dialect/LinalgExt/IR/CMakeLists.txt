@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "Im2colUtils.h"
     "LinalgExtAttrs.h.inc"
     "LinalgExtDialect.h"
     "LinalgExtDialect.h.inc"
@@ -27,6 +28,7 @@ iree_cc_library(
     "LinalgExtOps.h.inc"
   SRCS
     "AggregatedOpInterfaceImpl.cpp"
+    "Im2colUtils.cpp"
     "LinalgExtAttrs.cpp.inc"
     "LinalgExtDialect.cpp"
     "LinalgExtDialect.cpp.inc"

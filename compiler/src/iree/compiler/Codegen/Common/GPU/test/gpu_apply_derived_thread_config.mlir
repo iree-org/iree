@@ -5,7 +5,7 @@
 module {
   func.func @inferred_add_tensor(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [16, 32, 1] subgroup_size = 64>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -32,7 +32,7 @@ module {
 module {
   func.func @inferred_dynamic(%3: tensor<?x?xf32>, %4: tensor<?x?xf32>, %5: tensor<?x?xf32>) -> tensor<?x?xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [16, 32, 1] subgroup_size = 64>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -62,7 +62,7 @@ module {
 module {
   func.func @inferred_small_inner_dim(%3: tensor<8x2xf32>, %4: tensor<8x2xf32>, %5: tensor<8x2xf32>) -> tensor<8x2xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [16, 32, 1] subgroup_size = 64>
       } {
     %6 = linalg.generic {
       indexing_maps = [#map, #map, #map],
@@ -87,7 +87,7 @@ module {
 module {
   func.func @inferred_small_inner_dim_fill_vector_sizes(%0: tensor<4x16x8x4x16x2x4xf16>, %1: tensor<4x16x8x4x16x2x4xf16>) -> tensor<4x16x8x4x16x2x4xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<4x16x8x4x16x2x4xf16>)
@@ -108,7 +108,7 @@ module {
   func.func @inferred_small_inner_dim_dont_fill_non_contiguous(
     %0: tensor<4x16x4x4xf16>, %1: tensor<4x16x4x4xf16>) -> tensor<4x16x4x4xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<4x16x4x4xf16>)
@@ -128,7 +128,7 @@ module {
 module {
   func.func @inferred_unaligned(%0: tensor<70xf16>, %1: tensor<70xf16>) -> tensor<70xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<70xf16>)
@@ -148,7 +148,7 @@ module {
 module {
   func.func @inferred_smaller_load(%0: tensor<128xf16>, %1: tensor<128xf16>) -> tensor<128xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
       } {
     %2 = linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
         ins(%0 : tensor<128xf16>)
@@ -169,7 +169,7 @@ module {
 module {
   func.func @inferred_im2col(%2: tensor<2x34x34x128xf16>, %3: tensor<2x128x8xf16>) -> tensor<2x128x8xf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [16, 32, 1] subgroup_size = 64>
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
@@ -194,7 +194,7 @@ module {
 module {
   func.func @inferred_im2col_batch_last(%2: tensor<16x26x18x32xbf16>, %3: tensor<32x1x1x32xbf16>) -> tensor<32x1x1x32xbf16>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>
       } {
     %4 = iree_linalg_ext.im2col {lowering_config = #config}
       strides = [1, 1] dilations = [1, 1] kernel_size = [24, 16]
@@ -218,7 +218,7 @@ module {
 #config = #iree_gpu.derived_thread_config
 func.func @scatter(%arg0: tensor<3x32x16xf32>, %arg1: tensor<3x1xi32>, %arg2: tensor<3x32x16xf32>) -> tensor<3x32x16xf32>
       attributes {
-        translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+        translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
       } {
   %1 = iree_linalg_ext.scatter {lowering_config = #config} dimension_map = [0] unique_indices(true)
     ins(%arg0, %arg1 : tensor<3x32x16xf32>, tensor<3x1xi32>) outs(%arg2 : tensor<3x32x16xf32>) {
@@ -238,7 +238,7 @@ func.func @scatter(%arg0: tensor<3x32x16xf32>, %arg1: tensor<3x1xi32>, %arg2: te
 #config = #iree_gpu.derived_thread_config
 func.func @map_store(%arg0: tensor<2x32xf32>, %arg1: tensor<64x256xf32>) -> tensor<64x256xf32>
     attributes {
-      translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [16, 32] subgroup_size = 64>
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [16, 32] subgroup_size = 64>
     } {
   %true = arith.constant true
   %1 = iree_linalg_ext.map_store {lowering_config = #config} %arg0 into %arg1 {

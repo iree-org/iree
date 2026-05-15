@@ -391,4 +391,40 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 //   CHECK-NOT:   iree_codegen.swizzle_hint
 //   CHECK-NOT:   tensor.expand_shape
 //       CHECK:   linalg.matmul
+
+// -----
+
+// Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
+// promotionImpl must never stamp use_global_load_dma on it — it always falls
+// back to derived_thread_config regardless of the requested promotion type.
+#lowering_config_im2col_dma = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]}>
+
+func.func @im2col_producer_dma_downgraded_to_derived(
+    %a: tensor<32x98x128xf32>, %b: tensor<2x128x256xf32>) -> tensor<2x32x256xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<2x32x256xf32>
+  %im2col_empty = tensor.empty() : tensor<2x32x128xf32>
+  %im2col = iree_linalg_ext.im2col
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0] output_sizes = [[2], [32], [3, 3, 128]]
+    batch_pos = [] m_pos = [0, 1] k_pos = [2]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%a : tensor<32x98x128xf32>)
+    outs(%im2col_empty : tensor<2x32x128xf32>) -> tensor<2x32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x32x256xf32>) -> tensor<2x32x256xf32>
+  %mm = linalg.batch_matmul {lowering_config = #lowering_config_im2col_dma}
+    ins(%im2col, %b : tensor<2x32x128xf32>, tensor<2x128x256xf32>) outs(%fill : tensor<2x32x256xf32>) -> tensor<2x32x256xf32>
+  return %mm : tensor<2x32x256xf32>
+}
+
+// Im2col gets derived_thread_config (not use_global_load_dma) because Im2col
+// has no DMA lowering path. The non-Im2col operand still gets use_global_load_dma.
+// CHECK-LABEL: func.func @im2col_producer_dma_downgraded_to_derived
+//       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//       CHECK:   %[[PB:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
+//       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]
 //       CHECK: return

@@ -1,13 +1,13 @@
 // RUN: iree-opt --split-input-file --iree-codegen-strip-compilation-info %s | FileCheck %s
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1] subgroup_size = 64>
 func.func @main() attributes {translation_info = #translation_info} {
   return
 }
 
 // CHECK-LABEL: func.func @main
 // CHECK-NOT:   iree_codegen.translation_info
-// CHECK-NOT:   LLVMGPUVectorDistribute
+// CHECK-NOT:   #iree_gpu.pipeline<VectorDistribute>
 
 // -----
 

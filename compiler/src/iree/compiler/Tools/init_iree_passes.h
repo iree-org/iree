@@ -34,6 +34,7 @@
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Preprocessing/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 // TODO: Remove these once rolled up into explicit registration.
@@ -68,6 +69,7 @@ inline void registerAllIreePasses() {
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();
   IREE::VMVX::registerVMVXPasses();
+  registerTransformsPasses();
   registerIREEVMTransformPassPipeline();
 
   // We have some dangling passes that don't use explicit

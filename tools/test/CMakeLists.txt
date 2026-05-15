@@ -29,6 +29,7 @@ iree_lit_test_suite(
     "iree-dump-module.mlir"
     "iree-dump-parameters.txt"
     "iree-link-bundle.mlir"
+    "iree-link-executable-source.mlir"
     "iree-link.mlir"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
@@ -68,6 +69,7 @@ iree_lit_test_suite(
     MLIROpBaseTdFiles
     echo_npy.py
     iree-link-anonymous.mlir
+    iree-link-executable-source-module-d.mlir
     iree-link-globals-a.mlir
     iree-link-globals-b.mlir
     iree-link-globals-c.mlir

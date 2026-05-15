@@ -8,10 +8,10 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -115,8 +115,8 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
         // TODO: Maybe this should be a part of Affine lowering pass.
         // Remove if it is added there.
         // https://github.com/llvm/llvm-project/issues/78458
-        .addPass(createIREECodegenAffineExpandIndexOpsPass)
-        .addPass(createIREECodegenLowerAffinePass);
+        .addPass(createIREEAffineExpandIndexOpsPass)
+        .addPass(createIREELowerAffinePass);
   }
 
   passManager.addPass(mlir::arith::createArithUnsignedWhenEquivalentPass());

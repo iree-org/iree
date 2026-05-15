@@ -27,10 +27,6 @@ class DispatchRegionOp;
 bool isNonNullAndOutsideDispatch(Operation *op);
 bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations);
 
-/// For a given operation returns the loop ranges needed to compute the op.
-SmallVector<Range> getLoopRanges(Operation *op, Location loc,
-                                 OpBuilder &builder);
-
 /// Reify the dynamic dimensions of the given value, inserting at the back of
 /// 'dynamicDims'.
 LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,

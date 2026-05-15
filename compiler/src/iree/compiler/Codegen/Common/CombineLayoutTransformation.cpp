@@ -1194,7 +1194,7 @@ FailureOr<MapLoadOp> foldIntoMapLoad(RewriterBase &rewriter, Operation *op,
 /// Pattern to fold consumer relayout ops into a producer map_load.
 struct FoldConsumerRelayoutIntoMapLoadPattern
     : OpRewritePattern<IREE::LinalgExt::MapLoadOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::MapLoadOp mapLoadOp,
                                 PatternRewriter &rewriter) const override {

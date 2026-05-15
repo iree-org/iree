@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 
-// CHECK:   LLVMGPUTileAndFuse
+// CHECK:   #iree_gpu.pipeline<TileAndFuse>
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 func.func @elementwise_broadcast(%3: tensor<128256x4096xf16>, %4: tensor<1024xi64>) -> tensor<1024x4096xf16> {

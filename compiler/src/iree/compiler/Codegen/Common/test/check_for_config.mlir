@@ -36,7 +36,7 @@ module attributes { transform.with_named_sequence } {
 func.func @compilation_info() -> index {
   %0 = arith.constant {compilation_info = #iree_codegen.compilation_info<
     lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUDefault>>} 0 : index
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>>} 0 : index
   return %0 : index
 }
 

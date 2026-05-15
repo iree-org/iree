@@ -33,11 +33,35 @@ def IREEGPU_MmaInterfaceAttr
       /*methodName=*/"getSubgroupSize",
       /*args=*/(ins)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return true if this is a block (batched) intrinsic whose operands have
+        a leading batch/block dimension, i.e. A: <B, M, K>, B: <B, K, N>,
+        C: <B, M, N>. Defaults to false for non-block intrinsics.
+      }],
+      /*retType=*/"bool",
+      /*methodName=*/"isBlockIntrinsic",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/"return false;"
+    >,
   ];
 
   // Methods included to preserve interfaces from beforet he InnerTileDescAttrInterface
   // refactoring.
   let extraSharedClassDeclaration = [{
+    /// Returns the (B, M, N, K) shape of a block MMA operation where A has
+    /// shape <B, M, K>, B has shape <B, K, N>, and C has shape <B, M, N>.
+    /// Only valid to call when isBlockIntrinsic() returns true.
+    ::std::tuple<int64_t, int64_t, int64_t, int64_t>
+    getBMNKShape() const {
+      ::llvm::SmallVector<::mlir::VectorType> preThreadTypes;
+      $_attr.getUndistributedTileTypes(preThreadTypes);
+      ::llvm::ArrayRef<int64_t> accShape = preThreadTypes[2].getShape();
+      ::llvm::ArrayRef<int64_t> lhsShape = preThreadTypes[0].getShape();
+      return {accShape[0], accShape[1], accShape[2], lhsShape[2]};
+    }
+
     /// Returns the shape of the MMA operation:
     /// ```
     ///   C += A * B

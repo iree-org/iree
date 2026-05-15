@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -34,6 +35,16 @@ void registerTransformDialectTranslationDependentDialects(
 /// kicks in.
 void addCommonTargetExecutablePreprocessingPasses(
     FunctionLikeNest &funcPassManager, bool useDecomposeSoftmaxFusion = true);
+
+/// Variant-scoped pre-processing passes run before the configuration pipeline.
+/// Includes specialize-exports and create-dispatch-config.
+void buildCodegenConfigurationPreProcessingPassPipeline(
+    OpPassManager &variantPassManager);
+
+/// Variant-scoped post-processing passes run after the translation pipeline.
+/// Includes hoist-executable-objects and propagate-dispatch-config.
+void buildCodegenTranslationPostProcessingPassPipeline(
+    OpPassManager &variantPassManager);
 
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
@@ -171,6 +182,14 @@ void populateForOpInductionVarShapePatterns(RewritePatternSet &,
 
 /// Method to register all passes.
 void registerCodegenCommonPasses();
+
+//----------------------------------------------------------------------------//
+// SMT Conversion Utilities
+//----------------------------------------------------------------------------//
+
+/// Converts a ConstraintsOp into a new ModuleOp containing an smt.solver op.
+mlir::OwningOpRef<mlir::ModuleOp>
+convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op);
 
 } // namespace mlir::iree_compiler
 

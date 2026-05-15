@@ -375,6 +375,43 @@ struct AffineDelinearizeIndexInferIntDivisibilityOpInterface
   }
 };
 
+/// Helper for binary arith ops whose result divisibility is the GCD (union) of
+/// their operands' divisibilities. This covers add, sub, min, and max.
+template <typename OpTy>
+struct ArithBinaryGCDInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithBinaryGCDInferIntDivisibilityOpInterface<OpTy>, OpTy> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto binOp = cast<OpTy>(op);
+    auto lhsDiv = getDivisibilityOfOperand(binOp.getLhs(), argDivs[0]);
+    auto rhsDiv = getDivisibilityOfOperand(binOp.getRhs(), argDivs[1]);
+    setResultDivs(binOp.getResult(), lhsDiv.getUnion(rhsDiv));
+  }
+};
+
+/// For arith.select, the result divisibility is the GCD of the true and false
+/// operands' divisibilities. The condition (operand 0) is i1 and irrelevant.
+struct ArithSelectInferIntDivisibilityOpInterface
+    : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
+          ArithSelectInferIntDivisibilityOpInterface, arith::SelectOp> {
+
+  void inferResultDivisibility(
+      Operation *op, ArrayRef<IREE::Util::IntegerDivisibility> argDivs,
+      IREE::Util::SetIntDivisibilityFn setResultDivs) const {
+    auto selectOp = cast<arith::SelectOp>(op);
+    // argDivs[0] is the condition (i1), argDivs[1] is true, argDivs[2] is
+    // false.
+    auto trueDiv =
+        getDivisibilityOfOperand(selectOp.getTrueValue(), argDivs[1]);
+    auto falseDiv =
+        getDivisibilityOfOperand(selectOp.getFalseValue(), argDivs[2]);
+    setResultDivs(selectOp.getResult(), trueDiv.getUnion(falseDiv));
+  }
+};
+
 struct ArithConstantInferIntDivisibilityOpInterface
     : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
@@ -1312,6 +1349,24 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         *context);
     arith::DivUIOp::attachInterface<ArithDivUIInferIntDivisibilityOpInterface>(
         *context);
+    arith::AddIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::AddIOp>>(*context);
+    arith::SubIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::SubIOp>>(*context);
+    arith::MinUIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MinUIOp>>(
+        *context);
+    arith::MaxUIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MaxUIOp>>(
+        *context);
+    arith::MinSIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MinSIOp>>(
+        *context);
+    arith::MaxSIOp::attachInterface<
+        ArithBinaryGCDInferIntDivisibilityOpInterface<arith::MaxSIOp>>(
+        *context);
+    arith::SelectOp::attachInterface<
+        ArithSelectInferIntDivisibilityOpInterface>(*context);
   });
 
   registry.addExtension(

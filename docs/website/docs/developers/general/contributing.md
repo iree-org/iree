@@ -486,12 +486,6 @@ runs.
     ci-extra: linux_arm64_clang
     ```
 
-* Opt in to the Windows compiler build and test workflow:
-
-    ``` text
-    ci-extra: windows_x64_msvc
-    ```
-
 * Opt in to the MacOS build and test workflows:
 
     ``` text

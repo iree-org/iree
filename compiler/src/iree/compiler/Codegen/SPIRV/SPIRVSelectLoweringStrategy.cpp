@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -19,7 +20,7 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_SPIRVSELECTLOWERINGSTRATEGYPASS
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
-using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+using SPIRVPipeline = IREE::GPU::SPIRVLoweringPipeline;
 
 namespace {
 /// Lowers a hal.executable.variant inner module to SPIR-V scalar/native-vector
@@ -62,23 +63,36 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
 static LogicalResult
 verifyTranslationInfo(FunctionOpInterface funcOp,
                       IREE::Codegen::TranslationInfoAttr translationInfo) {
-  if (translationInfo.getDispatchLoweringPassPipeline() ==
-      CodeGenPipeline::TransformDialectCodegen) {
-    // Transform dialect encodes configuration into the schedule directly.
+  Attribute pipelineAttr = translationInfo.getPassPipeline();
+
+  // Transform dialect encodes configuration into the schedule directly.
+  if (auto enumPipeline =
+          dyn_cast<IREE::Codegen::DispatchLoweringPassPipelineAttr>(
+              pipelineAttr)) {
+    if (enumPipeline.getValue() ==
+        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen) {
+      return success();
+    }
+  }
+
+  // Only SPIRV pipelines have additional verification. Other pipeline types
+  // (e.g., custom pipelines via PipelineAttrInterface) skip verification.
+  auto spirvPipeline = dyn_cast<IREE::GPU::SPIRVPipelineAttr>(pipelineAttr);
+  if (!spirvPipeline) {
     return success();
   }
 
   SmallVector<int64_t> workgroupSizes =
       llvm::to_vector(translationInfo.getWorkgroupSize());
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-  case CodeGenPipeline::SPIRVBaseVectorize:
+  switch (spirvPipeline.getValue()) {
+  case SPIRVPipeline::BaseVectorize:
     return verifyLoweringConfiguration(funcOp, translationInfo, workgroupSizes,
                                        verifySPIRVBaseVectorizePassPipeline);
-  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+  case SPIRVPipeline::MatmulPromoteVectorize:
     return verifyLoweringConfiguration(
         funcOp, translationInfo, workgroupSizes,
         verifySPIRVMatmulPromoteVectorizePassPipeline);
-  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+  case SPIRVPipeline::CooperativeMatrixVectorize:
     return verifyLoweringConfiguration(
         funcOp, translationInfo, workgroupSizes,
         verifySPIRVCooperativeMatrixVectorizePassPipeline);
@@ -99,12 +113,6 @@ void SPIRVSelectLoweringStrategyPass::runOnOperation() {
     IREE::Codegen::TranslationInfoAttr translationInfo =
         getTranslationInfo(funcOp);
     if (!translationInfo) {
-      continue;
-    }
-
-    // Custom pipelines via PipelineAttrInterface skip enum-based verification.
-    if (isa<IREE::Codegen::PipelineAttrInterface>(
-            translationInfo.getPassPipeline())) {
       continue;
     }
 

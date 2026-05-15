@@ -1,12 +1,12 @@
 #compilation0 = #iree_codegen.compilation_info<
     lowering_config = #iree_cpu.lowering_config<distribution = [32, 32], vector_common_parallel = [1, 8, 0], vector_reduction = [0, 0, 8], vector_inner_parallel = [0, 0, 0]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>>
 #compilation1 = #iree_codegen.compilation_info<
     lowering_config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [1, 8, 0], vector_reduction = [0, 0, 4], vector_inner_parallel = [0, 0, 0]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>>
 #compilation2 = #iree_codegen.compilation_info<
     lowering_config = #iree_cpu.lowering_config<distribution = {sizes=[64, 64], interchange=[1, 0]}, vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 8], vector_inner_parallel = [0, 0, 0]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>>
 
 func.func @lowering_config_test() {
   %a = util.unfoldable_constant dense<1.0> : tensor<128x256xf32>
@@ -25,11 +25,11 @@ func.func @lowering_config_test() {
 // Remove H
 #conv_compilation0 = #iree_codegen.compilation_info<
     lowering_config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [1, 1, 7, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3, 4]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>>
 // Remove W
 #conv_compilation1 = #iree_codegen.compilation_info<
     lowering_config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [1, 7, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 3, 1, 4]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUConvTileAndDecomposeExpert>>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>>
 func.func @conv() {
   %input = util.unfoldable_constant dense<1.0> : tensor<36x7x7x512xf32>
   %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x512x512xf32>

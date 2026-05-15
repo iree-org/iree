@@ -512,6 +512,94 @@ def Util_AssumeIntOp : Util_PureOp<"assume.int", [
   let hasVerifier = 1;
 }
 
+def Util_HoistableConversionOp : Util_Op<"hoistable_conversion", [
+  SingleBlockImplicitTerminator<"IREE::Util::ReturnOp">,
+  RecursiveMemoryEffects,
+]> {
+  let summary = [{Defines a hoistable conversion between inputs and outputs.}];
+  let description = [{
+    Defines a conversion between some number of inputs and outputs that should
+    be hoisted out of loops or canceled where possible.
+
+    This is an operation that allows local pattern rewrites to be defined that
+    shouldn't modify loop structure to allow that structure to be modified as
+    a post-processing step. It is **not** expected to appear in IR long-term,
+    and should, if possible, be rewritten away by the same pass that introduced
+    it.
+
+    The initial motivation for this operation is to enable code such as the
+    lowering of an `inner_tiled` operation to platform intrinsics to mark
+    marshaling/unmarshaling needed to convert between the types and shapes IREE
+    expects and what the platform expects. However, it could be used for other
+    cases where, within a loop, we have `arg <- f^{-1}(g(f(arg)))` where the
+    $f$ and $f^{-1}$ can be moved out of the loop without sacrificing
+    correctness.
+
+    In general, this operation executes the contained single-block region once,
+    with the arguments of the region bound to its inputs and the returned
+    results bound to its outputs. It must always be correct to perform this
+    inlining, though it is likely to be less performant.
+
+    The `tag` and `inverse_tag` are used to identify pairs of hoistable
+    conversions that can cancel with each other. The operations placed in a
+    `hoistable_conversion` operation must be such that the following operations
+    are correct for a pair of operations F and G such that `tag(F) ==
+    inverse_tag(G)` and `inverse_tag(G) == tag(F)`:
+
+    1. If the outputs of F are the inputs of G, the results of G can be
+       replaced by the arguments to F
+    2. If the arguments to F are loop iteration arguments and the results of G
+       are the subsequent yielded values of those arguments, then
+       - Those loop arguments can be replaced by a set of arguments whose types
+         match the result types of F / input types of G
+       - The initial values of those new loop arguments can be constructed by
+         applying F to the previous initial values
+       - The results of the loop can be transformed back into their old types
+         by applying G to the new results
+       - If F is not the only user of those loop-carried arguments, applying G
+         to the new arguments inside the loop will preserve correctness
+
+    These optimizations are performed by `eliminateHoistableConversions`
+    transformation in util optimizations.
+
+    These properties allow pure pre-/post-processing of operands, such as
+    chains of `shape_cast` operations surrounding the accumulators of intrinsic
+    calls, to be pulled out of loops, and to prevent redundant conversions from
+    being added after unrolling intrinsics.
+
+    Note that these hoistable conversions are **not** expected to commute with
+    other hoistable conversions.
+  }];
+
+  let arguments = (ins
+    StringProp:$tag,
+    StringProp:$inverseTag,
+    Variadic<AnyType>:$inputs
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+  let regions = (region AnyRegion:$body);
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$tag,
+      "StringRef":$inverseTag,
+      "TypeRange":$resultTypes,
+      "ValueRange":$inputs,
+      "function_ref<SmallVector<Value>(OpBuilder &, Location, ValueRange)>":$bodyBuilder
+    )>,
+    OpBuilder<(ins
+      "StringRef":$tag,
+      "StringRef":$inverseTag,
+      "ValueRange":$inputs,
+      "function_ref<SmallVector<Value>(OpBuilder &, Location, ValueRange)>":$bodyBuilder
+    )>,
+  ];
+
+  let hasVerifier = 1;
+}
+
 def Util_OptimizationBarrierOp : Util_Op<"optimization_barrier", [
   AllTypesMatch<["operands", "results"]>,
 ]> {
@@ -832,6 +920,7 @@ def Util_ReturnOp : Util_Op<"return", [
   ParentOneOf<[
     "IREE::Util::InitializerOp",
     "IREE::Util::FuncOp",
+    "IREE::Util::HoistableConversionOp",
   ]>,
   Pure,
   ReturnLike,

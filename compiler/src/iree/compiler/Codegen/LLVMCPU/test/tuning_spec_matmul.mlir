@@ -14,7 +14,7 @@ transform.named_sequence @match_matmul(%matmul: !transform.any_op {transform.rea
       distribution = [64, 64, 0],
       vector_common_parallel = [8, 16, 0],
       vector_reduction = [0, 0, 8]>,
-    translation_info = #iree_codegen.translation_info<pipeline = CPUDoubleTilingExpert>
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
   > -> !transform.any_param
   transform.yield %matmul, %config : !transform.any_op, !transform.any_param
 }

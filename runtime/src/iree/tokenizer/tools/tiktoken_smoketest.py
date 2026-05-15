@@ -201,6 +201,7 @@ def run_iree_tokenize(
         f"--tokenizer={tokenizer_path}",
         "--json",
         "--special=false",
+        "--match_special=false",
         input_text,
     ]
 
@@ -241,6 +242,7 @@ def run_iree_tokenize_batch(
         "--json",
         "--batch",
         "--special=false",
+        "--match_special=false",
     ]
 
     # Batch mode is line-delimited on stdin, so inputs with newlines can't

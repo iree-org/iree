@@ -450,8 +450,6 @@ namespace {
 
 struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using Base::Base;
-  ConvertLinalgConvNchwFchw(MLIRContext *context, PatternBenefit benefit = 2)
-      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
@@ -519,9 +517,6 @@ class GeneralizeOuterUnitDimsPackOp final
     : public OpRewritePattern<linalg::PackOp> {
 public:
   using Base::Base;
-  GeneralizeOuterUnitDimsPackOp(MLIRContext *context,
-                                PatternBenefit benefit = 2)
-      : OpRewritePattern<linalg::PackOp>(context, benefit) {}
 
   LogicalResult matchAndRewrite(linalg::PackOp packOp,
                                 PatternRewriter &rewriter) const override {
@@ -603,9 +598,6 @@ class GeneralizeOuterUnitDimsUnPackOp final
     : public OpRewritePattern<linalg::UnPackOp> {
 public:
   using Base::Base;
-  GeneralizeOuterUnitDimsUnPackOp(MLIRContext *context,
-                                  PatternBenefit benefit = 2)
-      : OpRewritePattern<linalg::UnPackOp>(context, benefit) {}
 
   LogicalResult matchAndRewrite(linalg::UnPackOp unpackOp,
                                 PatternRewriter &rewriter) const override {
@@ -670,7 +662,7 @@ public:
     {
       RewritePatternSet patterns(context);
       if (tilingFactor <= 0) {
-        patterns.insert<ConvertLinalgConvNchwFchw>(context);
+        patterns.insert<ConvertLinalgConvNchwFchw>(context, /*benefit=*/2);
       }
       patterns.insert<ConvertLinalgConvOp>(context, tilingFactor);
       if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
@@ -714,8 +706,8 @@ public:
     // effectively.
     {
       RewritePatternSet patterns(context);
-      patterns.insert<GeneralizeOuterUnitDimsPackOp>(context);
-      patterns.insert<GeneralizeOuterUnitDimsUnPackOp>(context);
+      patterns.insert<GeneralizeOuterUnitDimsPackOp>(context, /*benefit=*/2);
+      patterns.insert<GeneralizeOuterUnitDimsUnPackOp>(context, /*benefit=*/2);
       if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }

@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -30,8 +31,10 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
-// Returns the vector sizes from the local lowering config or try to infer them
-// from the tensor shapes and tiled loops in the IR.
+
+// Returns the vector sizes from the local lowering config, materialized
+// tile size attributes, or tries to infer them from the tensor shapes and
+// tiled loops in the IR.
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
@@ -80,6 +83,15 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
     LDBG() << "Failed to get configured vector sizes, fall back to inference";
   }
 
+  // Try to get vector sizes from materialized tile size attribute.
+  if (auto tileSizesAttr =
+          op->getAttrOfType<DenseI64ArrayAttr>(kVectorTileSizesAttrName)) {
+    LDBG() << "Use vector sizes from materialized tile size attribute";
+    SmallVector<int64_t> vectorSizes(tileSizesAttr.asArrayRef());
+    SmallVector<bool> scalableFlags(vectorSizes.size(), false);
+    return std::make_pair(vectorSizes, scalableFlags);
+  }
+
   // Try to infer the vector sizes from the IR.
   std::optional<SmallVector<int64_t>> vectorSizes;
   SmallVector<bool> scalableFlags;
@@ -122,6 +134,11 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         if (result) {
           vectorSizes = result->vectorSizes;
         }
+      })
+      .Case([&](IREE::LinalgExt::Im2colOp im2colOp) {
+        OpBuilder builder(op);
+        vectorSizes =
+            IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
       })
       .Default([&](Operation *) {});
 

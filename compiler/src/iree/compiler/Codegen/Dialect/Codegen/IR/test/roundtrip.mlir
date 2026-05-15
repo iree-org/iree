@@ -116,7 +116,7 @@ func.func private @workgroup_scope_attr_linearize() attributes {
 
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
@@ -128,7 +128,7 @@ func.func @constraints_op(%arg0: index, %arg1: index) {
 // CHECK-LABEL: func.func @constraints_op(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
@@ -139,7 +139,7 @@ func.func @constraints_op(%arg0: index, %arg1: index) {
 
 // Test constraints op with nested knobs (multiple dict groups) and SMT body.
 func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0, %arg1) {
   ^bb0(%m: !smt.int, %n: !smt.int):
@@ -155,7 +155,7 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 // CHECK-LABEL: func.func @constraints_op_with_smt_body(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:    %[[N:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK:     knobs = {reduction = [#iree_codegen.smt.int_knob<"red_k">], workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
 // CHECK:     dims(%[[M]], %[[N]])
 // CHECK:    ^bb0(%{{.*}}: !smt.int, %{{.*}}: !smt.int):
@@ -188,7 +188,7 @@ func.func @assert_static_message(%arg0: index) {
 
 // Test assert op with format string args.
 func.func @assert_with_format_args(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUVectorDistribute,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">, #iree_codegen.smt.int_knob<"wg_n">]}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -224,7 +224,7 @@ func.func @constraints_op_empty_dims() {
 
 // Test constraints op with extra attributes (placed before the body).
 func.func @constraints_op_with_attrs(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
    knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
    dims(%arg0) attributes {some_tag = "hello"} {
   ^bb0(%m: !smt.int):
@@ -233,7 +233,7 @@ func.func @constraints_op_with_attrs(%arg0: index) {
 }
 // CHECK-LABEL: func.func @constraints_op_with_attrs(
 // CHECK-SAME:    %[[M:[a-zA-Z0-9_]+]]: index
-// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = LLVMGPUTileAndFuse,
+// CHECK:    iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
 // CHECK:     knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_m">]}
 // CHECK:     dims(%[[M]]) attributes {some_tag = "hello"}
 // CHECK:    ^bb0(%{{.*}}: !smt.int):
@@ -316,3 +316,65 @@ func.func @smt_lookup_sparse(%arg0: index) {
 // CHECK-LABEL: func.func @smt_lookup_sparse(
 // CHECK:    %[[IDX:.*]] = iree_codegen.smt.knob "mma_idx" : !smt.int
 // CHECK:    iree_codegen.smt.lookup %[[IDX]] [3, 7, 12] -> [16, 32, 64] : !smt.int
+
+// -----
+
+iree_codegen.dispatch_config @matmul
+    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+  ^bb0(%w0: index, %w1: index):
+    %c1 = arith.constant 1 : index
+    iree_codegen.yield %w0, %w1, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @matmul
+// CHECK-SAME:    workgroup_size = [64, 16, 1]
+// CHECK-SAME:    subgroup_size = 64
+// CHECK:       ^bb0(%[[W0:.+]]: index, %[[W1:.+]]: index):
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[W0]], %[[W1]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @no_subgroup
+    workgroup_size = [256, 1, 1] {
+  ^bb0(%w0: index):
+    %c1 = arith.constant 1 : index
+    iree_codegen.yield %w0, %c1, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @no_subgroup
+// CHECK-SAME:    workgroup_size = [256, 1, 1]
+// CHECK-NOT:     subgroup_size
+// CHECK:       ^bb0(%[[W0:.+]]: index):
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[W0]], %[[C1]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @static_count
+    workgroup_size = [64] {
+  %c4 = arith.constant 4 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c4, %c2, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @static_count
+// CHECK-SAME:    workgroup_size = [64]
+// CHECK:         %[[C4:.+]] = arith.constant 4 : index
+// CHECK:         %[[C2:.+]] = arith.constant 2 : index
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index
+
+// -----
+
+iree_codegen.dispatch_config @no_config {
+  %c4 = arith.constant 4 : index
+  %c2 = arith.constant 2 : index
+  %c1 = arith.constant 1 : index
+  iree_codegen.yield %c4, %c2, %c1 : index, index, index
+}
+// CHECK-LABEL: iree_codegen.dispatch_config @no_config
+// CHECK-NOT:     workgroup_size
+// CHECK-NOT:     subgroup_size
+// CHECK:         %[[C4:.+]] = arith.constant 4 : index
+// CHECK:         %[[C2:.+]] = arith.constant 2 : index
+// CHECK:         %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         iree_codegen.yield %[[C4]], %[[C2]], %[[C1]] : index, index, index

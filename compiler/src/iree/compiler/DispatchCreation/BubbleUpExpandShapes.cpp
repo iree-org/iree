@@ -383,7 +383,7 @@ struct BubbleExpandThroughConcat final
 /// bitcast(expand_shape(x)).
 struct BubbleExpandThroughBitCast final
     : OpRewritePattern<tensor::ExpandShapeOp> {
-  using OpRewritePattern<tensor::ExpandShapeOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExpandShapeOp expandOp,
                                 PatternRewriter &rewriter) const override {
@@ -485,7 +485,7 @@ struct BubbleExpandThroughBitCast final
 /// collapse_shape(bitcast(x)).
 struct SinkCollapseThroughBitCast final
     : OpRewritePattern<IREE::TensorExt::BitCastOp> {
-  using OpRewritePattern<IREE::TensorExt::BitCastOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::BitCastOp bitcastOp,
                                 PatternRewriter &rewriter) const override {

@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 
@@ -67,17 +68,28 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
 /// Populates the common passes needed to preprocess and select the translation
 /// strategy.
 void buildLLVMGPUCodegenCommonConfigurationPassPipeline(
-    OpPassManager &variantPassManagery);
+    OpPassManager &modulePassManager);
 
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(
-    OpPassManager &variantPassManagery);
+    OpPassManager &modulePassManager);
 
 /// Populates passes needed to lower a XLA HLO op to NVVM/ROCDL dialect via
-/// the structured ops path. The pass manager `pm` in here should operate on
-/// the module within the IREE::HAL::ExecutableOp.
-void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManagery,
+/// the structured ops path. The `modulePassManager` should operate on the
+/// module within the IREE::HAL::ExecutableOp.
+void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      bool useROCM, bool preserveDebugInfo);
+
+/// Wraps GPUPipelineOptions and forROCDL for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct GPUCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<GPUCodegenPipelineOptions> {
+  GPUCodegenPipelineOptions(const GPUPipelineOptions &options, bool forROCDL)
+      : options(options), forROCDL(forROCDL) {}
+
+  GPUPipelineOptions options;
+  bool forROCDL = false;
+};
 
 /// Verify configuration set for the LLVMGPUVectorDistribute pass pipeline.
 LogicalResult verifyLLVMGPUVectorDistributePipeline(

@@ -103,6 +103,26 @@ def IREECPU_DataTiledMMAAttr
 }
 
 //===----------------------------------------------------------------------===//
+// CPU Pipeline Attribute
+//===----------------------------------------------------------------------===//
+
+def IREECPU_PipelineAttr : AttrDef<IREECPU_Dialect, "Pipeline", [
+    DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface>]> {
+  let mnemonic = "pipeline";
+  let summary = "CPU lowering pipeline identifier.";
+  let description = [{
+    Identifies a CPU lowering pipeline. Implements PipelineAttrInterface
+    by delegating to a builder callback registered via
+    registerCPUPipelineBuilder(). The builder must handle all
+    LoweringPipeline enum values.
+  }];
+  let parameters = (ins
+    EnumParameter<IREECPU_LoweringPipeline>:$value
+  );
+  let assemblyFormat = "`<` $value `>`";
+}
+
+//===----------------------------------------------------------------------===//
 // CPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 

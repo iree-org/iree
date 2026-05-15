@@ -6,10 +6,10 @@
 // RUN:   | FileCheck %s
 
 // Verify that complex element types do not crash the MMA heuristics and get
-// routed to a working pipeline (LLVMGPUTileAndFuse via the SIMT contraction
+// routed to a working pipeline (#iree_gpu.pipeline<TileAndFuse> via the SIMT contraction
 // config, not the MMA-based matmul config).
 
-//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//      CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 // CHECK-LABEL: func.func @complex_batch_matmul
 //      CHECK:   linalg.{{fill|generic}}
 //      CHECK:   lowering_config = #iree_gpu.lowering_config
@@ -31,7 +31,7 @@ func.func @complex_batch_matmul(%arg0: !TA, %arg1: !TB, %arg2: !DTC) {
 
 // -----
 
-//      CHECK: #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+//      CHECK: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
 // CHECK-LABEL: func.func @complex_matmul
 //      CHECK:   linalg.{{fill|generic}}
 //      CHECK:   lowering_config = #iree_gpu.lowering_config

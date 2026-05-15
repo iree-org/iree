@@ -10,7 +10,7 @@ func.func @incomplete_funcop() {
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @unmapped_forall() attributes {translation_info = #translation} {
   // expected-error @+1 {{requires a mapping attribute}}
   scf.forall (%arg0) in (32) {
@@ -20,7 +20,7 @@ func.func @unmapped_forall() attributes {translation_info = #translation} {
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @lane_forall_no_warp_parent() attributes {translation_info = #translation} {
   // expected-error @+1 {{lane distributed scf.forall must have a parent subgroup distributed loop}}
   scf.forall (%arg0) in (32) {
@@ -32,7 +32,7 @@ func.func @lane_forall_no_warp_parent() attributes {translation_info = #translat
 
 // Writes inside thread-mapped foralls should pass verification.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @thread_forall_write_ok(%buf: memref<64xf32, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   scf.forall (%tid) in (64) {
@@ -46,7 +46,7 @@ func.func @thread_forall_write_ok(%buf: memref<64xf32, #gpu.address_space<workgr
 
 // Writes outside any distributed context should fail.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 32>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 32>
 func.func @undistributed_write(%buf: memref<64xf32, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   %c0 = arith.constant 0 : index
@@ -60,7 +60,7 @@ func.func @undistributed_write(%buf: memref<64xf32, #gpu.address_space<workgroup
 
 // Writes inside pcf.generic should pass verification.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64>
 func.func @pcf_generic_write_ok(%buf: memref<256xf16, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   pcf.generic scope(#iree_gpu.subgroup_scope)
@@ -80,7 +80,7 @@ func.func @pcf_generic_write_ok(%buf: memref<256xf16, #gpu.address_space<workgro
 
 // Writes inside lane-scoped pcf.loop should pass verification.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64>
 func.func @pcf_loop_lane_scope_write_ok(%buf: memref<256xf16, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   %c4 = arith.constant 4 : index
@@ -97,7 +97,7 @@ func.func @pcf_loop_lane_scope_write_ok(%buf: memref<256xf16, #gpu.address_space
 
 // Writes inside subgroup-scoped pcf.generic (without lane nesting) should fail.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64>
 func.func @pcf_subgroup_scope_write_fail(%buf: memref<256xf16, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   pcf.generic scope(#iree_gpu.subgroup_scope)
@@ -114,7 +114,7 @@ func.func @pcf_subgroup_scope_write_fail(%buf: memref<256xf16, #gpu.address_spac
 
 // Write outside pcf.generic (but pcf.generic exists elsewhere) should fail.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64>
 func.func @write_outside_pcf_generic(%buf: memref<256xf16, #gpu.address_space<workgroup>>)
     attributes {translation_info = #translation} {
   pcf.generic scope(#iree_gpu.subgroup_scope)

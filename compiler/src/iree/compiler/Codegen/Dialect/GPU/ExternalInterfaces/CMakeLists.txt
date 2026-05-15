@@ -24,6 +24,8 @@ iree_cc_library(
     MLIRArithDialect
     MLIRGPUDialect
     MLIRIR
+    MLIRPass
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Dialect::PCF::IR
     iree::compiler::Codegen::Dialect::PCF::Transforms

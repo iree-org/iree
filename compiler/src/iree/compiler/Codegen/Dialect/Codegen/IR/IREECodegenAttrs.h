@@ -29,6 +29,8 @@ using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 /// Returns whether tuner attributes should be set on root ops.
 bool shouldSetTunerAttributes();
+/// Returns whether pipeline constraints should be emitted for root ops.
+bool shouldEmitPipelineConstraints();
 } // namespace mlir::iree_compiler
 
 // clang-format off
@@ -69,6 +71,8 @@ constexpr StringLiteral kSerializedTuningSpecAttrName =
 constexpr StringLiteral kKernelConfigSpecName = "__kernel_config";
 constexpr StringLiteral kUkernelAttrName = "iree_codegen.ukernel";
 constexpr StringLiteral kUKernelProviderName = "iree_codegen.ukernel_provider";
+constexpr StringLiteral kVectorTileSizesAttrName =
+    "iree_codegen.vector_tile_sizes";
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on a
@@ -154,6 +158,7 @@ void setLoweringConfig(Operation *op, Attribute config);
 void setRootOpInfo(Operation *op, int64_t set = 0);
 
 bool hasRootOpInfo(Operation *op);
+IREE::Codegen::RootOpAttr getRootOpInfo(Operation *op);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info.

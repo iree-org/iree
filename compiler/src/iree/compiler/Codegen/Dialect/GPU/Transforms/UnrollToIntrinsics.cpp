@@ -10,9 +10,13 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -41,6 +45,10 @@ void UnrollToIntrinsicsPass::runOnOperation() {
     }
   }
 
+  if (failed(IREE::Util::eliminateHoistableConversions(getOperation()))) {
+    return signalPassFailure();
+  }
+
   // Post unrolling unit dim folding patterns in preparation for later
   // lowerings.
   {
@@ -49,6 +57,10 @@ void UnrollToIntrinsicsPass::runOnOperation() {
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
+  }
+
+  if (failed(IREE::Util::eliminateHoistableConversions(getOperation()))) {
+    return signalPassFailure();
   }
 }
 

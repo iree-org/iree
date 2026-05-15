@@ -47,6 +47,17 @@ namespace mlir::iree_compiler::IREE::GPU {
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
 constexpr int64_t kPreferredCopyNumBits = 128;
 
+/// Helper to build a TranslationInfoAttr with a GPU pipeline.
+static IREE::Codegen::TranslationInfoAttr
+getGPUTranslationInfo(MLIRContext *ctx, LoweringPipeline pipeline,
+                      ArrayRef<int64_t> workgroupSize = {},
+                      std::optional<int64_t> subgroupSize = std::nullopt,
+                      DictionaryAttr pipelineConfig = {}) {
+  return IREE::Codegen::TranslationInfoAttr::get(
+      ctx, PipelineAttr::get(ctx, pipeline), SymbolRefAttr(), workgroupSize,
+      subgroupSize.value_or(0), pipelineConfig);
+}
+
 //===----------------------------------------------------------------------===//
 // Lowering Config Selection
 //===----------------------------------------------------------------------===//
@@ -124,11 +135,10 @@ LogicalResult setDataTiledMmaInnerTiledLoweringConfig(
       IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName(), pipelineOptions);
   auto pipelineConfig = b.getDictionaryAttr(pipelineAttrs);
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 static std::optional<ComputeBitwidths> getComputeBitwidthForType(Type type) {
@@ -832,9 +842,19 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   SmallVector<int64_t> workgroupTileSizes(bounds.size(), 0);
   SmallVector<int64_t> reductionTileSizes(bounds.size(), 0);
   SmallVector<int64_t> subgroupTileSizes(bounds.size(), 0);
-  // Tile all batch dimensions with unit size.
-  for (int64_t batch : contractionB) {
-    workgroupTileSizes[batch] = 1;
+
+  // Use the batch tile sizes computed by the heuristic. When both M and
+  // N sizes are smaller than the intrinsic sizes and must be padded up to
+  // them, tiling batch elements per workgroup may help amortize the
+  // padding overhead.
+  int64_t staticBatchIdx = 0;
+  for (unsigned batch : contractionB) {
+    if (ShapedType::isDynamic(bounds[batch])) {
+      workgroupTileSizes[batch] = 1;
+    } else {
+      workgroupTileSizes[batch] =
+          schedule->workgroupBatchSizes[staticBatchIdx++];
+    }
   }
 
   // Tile all m, n, k and k_b dimensions to 1 except the innermost. Unit dims
@@ -1078,11 +1098,10 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       DictionaryAttr::get(linalgOp->getContext(), pipelineAttrs);
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 LogicalResult
@@ -1164,11 +1183,10 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       DictionaryAttr::get(linalgOp->getContext(), pipelineAttrs);
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, targetSubgroupSize, pipelineConfig);
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 /// Helper to identify contraction like operations for operand promotiong.
@@ -1648,11 +1666,10 @@ LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Selected tile and fuse lowering config: " << loweringConfig
          << "\n";
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      {flatWorkgroupSize, 1, 1}, subgroupSize, DictionaryAttr());
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            {flatWorkgroupSize, 1, 1}, subgroupSize));
 }
 
 LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
@@ -1754,11 +1771,10 @@ LogicalResult setScatterLoweringConfig(IREE::GPU::TargetAttr target,
   LDBG() << "Selected tile and fuse lowering config: " << loweringConfig
          << "\n";
 
-  // TODO(qedawkins): Use a shared pipeline identifier here.
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, scatter, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      {flatWorkgroupSize, 1, 1}, flatWorkgroupSize, DictionaryAttr());
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            {flatWorkgroupSize, 1, 1}, flatWorkgroupSize));
 }
 
 LogicalResult setDirectConvolutionLoweringConfig(
@@ -2025,8 +2041,8 @@ LogicalResult setDirectConvolutionLoweringConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse, workgroupSize,
-      targetSubgroupSize, pipelineConfig);
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
 //====---------------------------------------------------------------------===//
@@ -2058,8 +2074,8 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
         createLoweringConfig(int64_t{0}, int64_t{0});
     return setOpConfigAndEntryPointFnTranslation(
         entryPoint, op, loweringConfig,
-        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-        {1, 1, 1}, subgroupSize, DictionaryAttr());
+        getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                              {1, 1, 1}, subgroupSize));
   }
 
   unsigned numLoops = cast<ShapedType>(op->getResult(0).getType()).getRank();
@@ -2104,8 +2120,8 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       createLoweringConfig(workgroupTileSizes, threadTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, loweringConfig,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTileAndFuse,
-      workgroupSize, subgroupSize, DictionaryAttr());
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, subgroupSize));
 }
 
 //===----------------------------------------------------------------------===//

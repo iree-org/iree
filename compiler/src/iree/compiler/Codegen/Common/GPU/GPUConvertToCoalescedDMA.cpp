@@ -622,7 +622,7 @@ protected:
 /// Pattern to convert tensor.pad fusion cases directly without requiring
 /// warp-mapped forall parent.
 struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
@@ -677,7 +677,7 @@ struct ConvertPadFusionCopyToCoalescedDMA : OpRewritePattern<linalg::CopyOp> {
 
 struct ConvertGatherToCoalescedDMA
     : OpRewritePattern<IREE::LinalgExt::GatherOp> {
-  using OpRewritePattern<IREE::LinalgExt::GatherOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::LinalgExt::GatherOp gatherOp,
                                 PatternRewriter &rewriter) const override {

@@ -245,11 +245,15 @@ struct InsertBatchDimForBatchlessConvPass final
       populateReshapeToInterfaceTensorPatterns(reshapePatterns);
 
       linalg::ControlFusionFn controlFn = [&](OpOperand *fusedOperand) {
-        Operation *op = fusedOperand->getOwner();
-        if (op->getBlock() != newConvOp->getBlock()) {
+        auto collapseOp =
+            fusedOperand->get().getDefiningOp<tensor::CollapseShapeOp>();
+        if (!collapseOp) {
           return false;
         }
-        return newConvOp->isBeforeInBlock(op);
+        if (collapseOp->getBlock() != newConvOp->getBlock()) {
+          return false;
+        }
+        return newConvOp->isBeforeInBlock(collapseOp);
       };
 
       linalg::populateFoldReshapeOpsByExpansionPatterns(reshapePatterns,

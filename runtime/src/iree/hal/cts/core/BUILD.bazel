@@ -50,6 +50,21 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "semaphore_thread_test",
+    testonly = True,
+    srcs = ["semaphore_thread_test.cc"],
+    target_compatible_with = select({
+        "@platforms//cpu:wasm32": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:test_base",
+    ],
+    alwayslink = True,
+)
+
+iree_runtime_cc_library(
     name = "executable_test",
     testonly = True,
     srcs = ["executable_test.cc"],
@@ -79,7 +94,12 @@ iree_runtime_cc_library(
         ":driver_test",
         ":event_test",
         ":semaphore_test",
-    ],
+    ] + select({
+        "@platforms//cpu:wasm32": [],
+        "//conditions:default": [
+            ":semaphore_thread_test",
+        ],
+    }),
 )
 
 # All executable-dependent core tests.

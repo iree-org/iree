@@ -91,6 +91,11 @@ def ConvertBf16ArithToF32Pass : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
 }
 
+def ConvertConstraintsToSMTPass : Pass<"iree-codegen-convert-constraints-to-smt", "IREE::Codegen::ConstraintsOp"> {
+  let summary = "Convert iree_codegen.smt.constraints op to smt.solver op";
+  let dependentDialects = ["mlir::smt::SMTDialect"];
+}
+
 def ConvertUnsupportedFloatToIntBuffersPass :
     Pass<"iree-codegen-convert-unsupported-float-to-int-buffers", ""> {
   let summary = "Convert unsupported float buffer types to integer types of same bit width.";
@@ -352,11 +357,10 @@ def DropVectorUnitDimsPass :
 }
 
 def ReconcileTranslationInfoPass
-    : Pass<"iree-codegen-reconcile-translation-info", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-reconcile-translation-info", "ModuleOp"> {
   let summary =
       "Reconcile information (like workgroup_size, subgroup_size) across "
-      "`TranslationInfo` set on each function in the dispatch and merge them"
-      "and set them at the appropriate places in the surrounding HAL ops";
+      "`TranslationInfo` set on each function in the dispatch and merge them";
   let options = [
     Option<"distributeAlong", "distribute-along",
            "::mlir::iree_compiler::IREE::Codegen::WorkgroupId",
@@ -369,16 +373,12 @@ def ReconcileTranslationInfoPass
             clEnumValN(IREE::Codegen::WorkgroupId::IdY, "y",
               "Constrain the workgroup distribution to use only workgroups along x and y."),
             clEnumValN(IREE::Codegen::WorkgroupId::IdZ, "z",
-              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>,
-    Option<"foldSplitReductionLoopIntoWorkgroupMappingLoop",
-           "fold-split-reduction-loop-into-workgroup-mapping-loop",
-           "bool", /*default=*/"true",
-           "Resolve scf.forall loops created by split reduction by folding into workgroup mapping loop">
+              "Constrain the workgroup distribution to use only workgroups along x, y and z."))}]>
   ];
 }
 
 def ResolveWorkgroupCountHintsPass
-    : Pass<"iree-codegen-resolve-workgroup-count-hints", "IREE::HAL::ExecutableVariantOp"> {
+    : Pass<"iree-codegen-resolve-workgroup-count-hints", "ModuleOp"> {
   let summary = "Materialize workgroup count hints in the workgroup count region per export.";
   let description = [{
     Resolves `iree_codegen.workgroup_count_hint` ops by materializing a globally
@@ -461,8 +461,39 @@ def ResolveWorkgroupCountHintsPass
     (e.g., `hal.interface.*` ops, workgroup/thread IDs) result in a compiler
     error for hint operands and omit conditionals for `scf.if` operands.
   }];
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+  ];
 }
 
+def CreateDispatchConfigPass
+    : Pass<"iree-codegen-create-dispatch-config", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Create dispatch_config ops by cloning export count regions.";
+  let description = [{
+    For each `hal.executable.export`, creates an `iree_codegen.dispatch_config`
+    op in the inner module by cloning the export's count region as-is. The
+    `hal.return` terminator is replaced with `iree_codegen.yield`.
+
+    The dispatch_config op is placed immediately after its corresponding
+    function in the inner module so that functions and configs are interleaved.
+  }];
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+  ];
+}
+
+def PropagateDispatchConfigPass
+    : Pass<"iree-codegen-propagate-dispatch-config", "IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Propagate dispatch_config into hal.executable.export count regions.";
+  let description = [{
+    For each `iree_codegen.dispatch_config` in the inner module:
+    1. Find the matching `hal.executable.export` by symbol name.
+    2. Move the dispatch_config region body into the export count region,
+       replacing `iree_codegen.yield` with `hal.return`.
+    3. Set workgroup_size / subgroup_size on the export.
+    4. Erase the dispatch_config op.
+  }];
+}
 def ReplaceSlowMinMaxOpsPass
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =
@@ -625,6 +656,23 @@ def OptimizeTensorInsertExtractSlicesPass
   ];
 }
 
+def HoistInnerTiledAccReshapesPass :
+    InterfacePass<"iree-codegen-hoist-inner-tiled-acc-reshapes", "mlir::FunctionOpInterface"> {
+  let summary = "Hoist vector reshapes surrounding inner_tiled ops out of loops";
+  let description = [{
+    This pass, mainly intended for use in vector distribution-based pipelines,
+    searches for chains of vector reshapes (currently transpose, shape_cast, and
+    broadcast, but it could be extended to other operations) that bracket an
+    `iree_codegen.inner_tiled`'s accumulator(s) on the way from and to the
+    argument of the reduction loop it's in, and adds in `util.hoistable_conversion`
+    markers to move these operations out of the loop to enable further optimizations.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Util::UtilDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
 def HoistUnrolledVectorExtractInsertSlicePass :
     InterfacePass<"iree-codegen-hoist-vector-extract-insert-slice", "mlir::FunctionOpInterface"> {
   let summary = "Hoist unrolled vector (extract, insert) pairs out of scf.for op";
@@ -653,11 +701,6 @@ def IREEBufferizeConstantsPass :
   let summary = "Convert from arith.constant on tensors to buffers";
 }
 
-def IREECodegenAffineExpandIndexOpsPass :
-    Pass<"iree-codegen-affine-expand-index-ops", ""> {
-  let summary = "Expand affine index ops with region simplification config";
-}
-
 def IREECodegenCanonicalizerPass :
     Pass<"iree-codegen-canonicalize", ""> {
   let summary = "Codegen canonicalization pass with IREE specific patterns";
@@ -670,11 +713,6 @@ def IREECodegenCanonicalizerPass :
 def IREECodegenFoldMemRefAliasOpsPass :
     Pass<"iree-codegen-fold-memref-alias-ops", ""> {
   let summary = "Fold memref alias ops with region simplification config";
-}
-
-def IREECodegenLowerAffinePass :
-    Pass<"iree-codegen-lower-affine", ""> {
-  let summary = "Lower affine operations to standard with region simplification config";
 }
 
 def IREEComprehensiveBufferizePass :
@@ -821,6 +859,16 @@ def MaterializeEncodingIntoNopPass :
   let summary = "Drop the encodings from tensor types with encodings.";
 }
 
+def MaterializeVectorTileSizesPass :
+    InterfacePass<"iree-codegen-materialize-vector-tile-sizes",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Propagate vector tile sizes and materialize as attribute";
+  let description = [{
+    Propagate vector tile sizes from to_layout anchors and materialize them as
+    discardable attributes on compute ops.
+  }];
+}
+
 def MaterializeTuningSpecsPass : Pass<"iree-codegen-materialize-tuning-specs", "ModuleOp"> {
   let summary =
       "Load tuning spec transform dialect libraries and encode them in the module";
@@ -955,6 +1003,12 @@ def PropagateDispatchSizeBoundsPass :
     InterfacePass<"iree-codegen-propagate-dispatch-size-bounds", "mlir::FunctionOpInterface"> {
   let summary = "Pass to annotate workitem and workgroup IDs with known bounds";
   let dependentDialects = ["::mlir::arith::ArithDialect"];
+  let options = [
+    Option<"useDispatchConfig", "use-dispatch-config", "bool",
+           /*default=*/"false",
+           "Read workgroup size/count from dispatch_config op instead of "
+           "hal.executable.export.">,
+  ];
 }
 
 def PropagateReshapesByExpansionPass :
@@ -1151,6 +1205,39 @@ def VerifyWorkgroupDistributionPass :
     manage distribution to workgroups, we require that all ops with write
     side effects are contained within a workgroup distributed loop.
   }];
+}
+
+def InsertSMTConstraintsPass :
+    InterfacePass<"iree-codegen-insert-smt-constraints", "mlir::FunctionOpInterface"> {
+  let summary = "Insert SMT constraints for root ops via pipeline attribute interface";
+  let description = [{
+    Collects root ops (those with `root_op` attr) and calls the
+    PipelineAttrInterface::emitConstraints on each available pipeline attribute.
+    The interface implementation handles supported pipelines and creates
+    complete ConstraintsOps with knobs, common constraints (static dim
+    values, util.assume.int bounds), and pipeline-specific constraints.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "mlir::smt::SMTDialect",
+    "mlir::arith::ArithDialect"
+  ];
+}
+
+def VerifySMTConstraintsPass :
+    InterfacePass<"iree-codegen-verify-smt-constraints", "mlir::FunctionOpInterface"> {
+  let summary = "Verify SMT constraints against chosen lowering configs";
+  let description = [{
+    After strategy selection, evaluates iree_codegen.smt.constraints ops
+    by substituting concrete knob values from the lowering config into the
+    constraint region and reporting violations as errors. Assertions
+    involving unresolved knob values are silently skipped.
+    Always erases all constraints ops afterward.
+  }];
+  let dependentDialects = [
+    "IREE::Codegen::IREECodegenDialect",
+    "mlir::smt::SMTDialect"
+  ];
 }
 
 #endif // IREE_CODEGEN_COMMON_PASSES

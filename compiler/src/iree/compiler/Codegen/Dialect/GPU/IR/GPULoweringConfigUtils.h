@@ -62,9 +62,6 @@ IREE::GPU::LoweringConfigAttr setPromotedOperandsList(
 std::optional<SmallVector<int64_t>> getPaddingList(LoweringConfigAttr config,
                                                    bool paddingConv = false);
 
-/// Helper to retrieve dimension expansion config from lowering config.
-DimensionExpansionAttr getDimensionExpansion(LoweringConfigAttr config);
-
 /// Helper to check if the lowering config indicates acc gemm should be
 /// converted.
 bool shouldConvertAccGemm(LoweringConfigAttr config);

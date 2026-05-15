@@ -125,6 +125,23 @@ static bool iree_hal_compare_strided_elements_approximate_absolute_f64(
   return true;
 }
 
+static bool iree_hal_compare_strided_elements_approximate_absolute_bf16(
+    iree_hal_buffer_equality_t equality, iree_host_size_t element_count,
+    const uint16_t* expected_ptr, iree_host_size_t expected_stride,
+    const uint16_t* actual_ptr, iree_host_size_t actual_stride,
+    iree_host_size_t* out_index) {
+  for (iree_host_size_t i = 0; i < element_count; ++i) {
+    if (fabsf(iree_math_bf16_to_f32(*expected_ptr) -
+              iree_math_bf16_to_f32(*actual_ptr)) > equality.bf16_threshold) {
+      *out_index = i;
+      return false;
+    }
+    expected_ptr += expected_stride;
+    actual_ptr += actual_stride;
+  }
+  return true;
+}
+
 static bool iree_hal_compare_strided_elements_approximate_relative_f16(
     iree_hal_buffer_equality_t equality, iree_host_size_t element_count,
     const uint16_t* expected_ptr, iree_host_size_t expected_stride,
@@ -177,6 +194,24 @@ static bool iree_hal_compare_strided_elements_approximate_relative_f64(
   return true;
 }
 
+static bool iree_hal_compare_strided_elements_approximate_relative_bf16(
+    iree_hal_buffer_equality_t equality, iree_host_size_t element_count,
+    const uint16_t* expected_ptr, iree_host_size_t expected_stride,
+    const uint16_t* actual_ptr, iree_host_size_t actual_stride,
+    iree_host_size_t* out_index) {
+  for (iree_host_size_t i = 0; i < element_count; ++i) {
+    if (fabsf((iree_math_bf16_to_f32(*expected_ptr) -
+               iree_math_bf16_to_f32(*actual_ptr)) /
+              iree_math_bf16_to_f32(*expected_ptr)) > equality.bf16_threshold) {
+      *out_index = i;
+      return false;
+    }
+    expected_ptr += expected_stride;
+    actual_ptr += actual_stride;
+  }
+  return true;
+}
+
 static bool iree_hal_compare_strided_elements_approximate_absolute(
     iree_hal_buffer_equality_t equality, iree_hal_element_type_t element_type,
     iree_host_size_t element_count, iree_const_byte_span_t expected_elements,
@@ -197,6 +232,11 @@ static bool iree_hal_compare_strided_elements_approximate_absolute(
       return iree_hal_compare_strided_elements_approximate_absolute_f64(
           equality, element_count, (const double*)expected_elements.data,
           expected_stride, (const double*)actual_elements.data, actual_stride,
+          out_index);
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      return iree_hal_compare_strided_elements_approximate_absolute_bf16(
+          equality, element_count, (const uint16_t*)expected_elements.data,
+          expected_stride, (const uint16_t*)actual_elements.data, actual_stride,
           out_index);
     default:
       return iree_hal_compare_strided_elements_exact(
@@ -225,6 +265,11 @@ static bool iree_hal_compare_strided_elements_approximate_relative(
       return iree_hal_compare_strided_elements_approximate_relative_f64(
           equality, element_count, (const double*)expected_elements.data,
           expected_stride, (const double*)actual_elements.data, actual_stride,
+          out_index);
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      return iree_hal_compare_strided_elements_approximate_relative_bf16(
+          equality, element_count, (const uint16_t*)expected_elements.data,
+          expected_stride, (const uint16_t*)actual_elements.data, actual_stride,
           out_index);
     default:
       return iree_hal_compare_strided_elements_exact(

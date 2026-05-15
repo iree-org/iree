@@ -9,3 +9,5 @@
 # Re-export some legacy APIs from the tools package to this top-level.
 # TODO: Deprecate and remove these names once clients are migrated.
 from .tools import *
+
+from iree.compiler import ir

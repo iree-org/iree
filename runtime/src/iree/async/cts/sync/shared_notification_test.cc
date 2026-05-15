@@ -172,6 +172,10 @@ TEST_P(SharedNotificationTest, SharedEpochSignalAndQuery) {
 }
 
 // Synchronous wait on shared notification, signal from another thread.
+//
+// Signal continuously until the waiter completes — there is no way to observe
+// when wait()'s internal epoch snapshot has executed, so a single signal is
+// not guaranteed to land after the snapshot.
 TEST_P(SharedNotificationTest, SharedEpochSyncWait) {
   SharedState state;
   IREE_ASSERT_OK(CreateSharedState(&state));
@@ -181,22 +185,19 @@ TEST_P(SharedNotificationTest, SharedEpochSyncWait) {
   IREE_ASSERT_OK(iree_async_notification_create_shared(proactor_, &options,
                                                        &notification));
 
-  std::atomic<bool> wait_started{false};
   std::atomic<bool> wait_result{false};
 
   std::thread waiter([&]() {
-    wait_started.store(true, std::memory_order_release);
     bool result =
         iree_async_notification_wait(notification, iree_make_timeout_ms(5000));
     wait_result.store(result, std::memory_order_release);
   });
 
-  while (!wait_started.load(std::memory_order_acquire)) {
+  // Signal continuously until the waiter completes.
+  while (!wait_result.load(std::memory_order_acquire)) {
+    iree_async_notification_signal(notification, 1);
     iree_thread_yield();
   }
-  iree_wait_until(iree_time_now() + iree_make_duration_ms(10));
-
-  iree_async_notification_signal(notification, 1);
 
   waiter.join();
   EXPECT_TRUE(wait_result.load(std::memory_order_acquire));
@@ -292,7 +293,14 @@ TEST_P(SharedNotificationTest, DestroyDoesNotClosePrimitives) {
   DestroySharedState(&state);
 }
 
-// Repeated signal/wait cycles through shared epoch.
+// Repeated wait/signal cycles work correctly through shared epoch.
+//
+// Epoch-based notifications coalesce signals that arrive before the waiter
+// captures the epoch (via the internal prepare_wait). There is no way to
+// observe from outside when prepare_wait has executed, so a single signal
+// is not guaranteed to wake the worker. Instead, the main thread signals
+// continuously until the worker acknowledges each cycle. This makes progress
+// unconditional: if a signal coalesces, the next one lands after prepare_wait.
 TEST_P(SharedNotificationTest, MultipleCycles) {
   SharedState state;
   IREE_ASSERT_OK(CreateSharedState(&state));
@@ -303,12 +311,17 @@ TEST_P(SharedNotificationTest, MultipleCycles) {
                                                        &notification));
 
   std::atomic<int> cycles_completed{0};
+  std::atomic<int> worker_cycle{0};
   constexpr int kCycles = 5;
 
   std::thread worker([&]() {
     for (int i = 0; i < kCycles; ++i) {
+      // Publish which cycle we are about to wait on. The main thread uses
+      // this to avoid racing ahead to cycle N+1 before we start cycle N.
+      worker_cycle.store(i + 1, std::memory_order_release);
+
       bool result = iree_async_notification_wait(notification,
-                                                 iree_make_timeout_ms(1000));
+                                                 iree_make_timeout_ms(5000));
       if (result) {
         cycles_completed.fetch_add(1, std::memory_order_acq_rel);
       }
@@ -316,8 +329,15 @@ TEST_P(SharedNotificationTest, MultipleCycles) {
   });
 
   for (int i = 0; i < kCycles; ++i) {
-    iree_wait_until(iree_time_now() + iree_make_duration_ms(20));
-    iree_async_notification_signal(notification, 1);
+    // Wait for the worker to begin this cycle.
+    while (worker_cycle.load(std::memory_order_acquire) < i + 1) {
+      iree_thread_yield();
+    }
+    // Signal continuously until the worker completes this cycle.
+    while (cycles_completed.load(std::memory_order_acquire) < i + 1) {
+      iree_async_notification_signal(notification, 1);
+      iree_thread_yield();
+    }
   }
 
   worker.join();
@@ -367,6 +387,7 @@ TEST_P(SharedNotificationTest, TwoNotificationsOneEpoch) {
 }
 
 // Sync wait on one shared notification, signal from the other (same epoch).
+// Signal continuously until the waiter completes.
 TEST_P(SharedNotificationTest, CrossNotificationSyncWait) {
   SharedState state;
   IREE_ASSERT_OK(CreateSharedState(&state));
@@ -379,24 +400,21 @@ TEST_P(SharedNotificationTest, CrossNotificationSyncWait) {
   IREE_ASSERT_OK(iree_async_notification_create_shared(proactor_, &options,
                                                        &notification_signaler));
 
-  std::atomic<bool> wait_started{false};
   std::atomic<bool> wait_result{false};
 
   // Wait on notification_waiter.
   std::thread waiter([&]() {
-    wait_started.store(true, std::memory_order_release);
     bool result = iree_async_notification_wait(notification_waiter,
                                                iree_make_timeout_ms(5000));
     wait_result.store(result, std::memory_order_release);
   });
 
-  while (!wait_started.load(std::memory_order_acquire)) {
+  // Signal through notification_signaler (same shared epoch) continuously
+  // until the waiter observes the epoch advance.
+  while (!wait_result.load(std::memory_order_acquire)) {
+    iree_async_notification_signal(notification_signaler, 1);
     iree_thread_yield();
   }
-  iree_wait_until(iree_time_now() + iree_make_duration_ms(10));
-
-  // Signal through notification_signaler (same shared epoch).
-  iree_async_notification_signal(notification_signaler, 1);
 
   waiter.join();
   EXPECT_TRUE(wait_result.load(std::memory_order_acquire));

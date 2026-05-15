@@ -1473,6 +1473,10 @@ def main():
     model_results: list[ModelResult] = []
 
     for model_name, model_config in models:
+        # Skip tiktoken models — tested by tiktoken_smoketest.py instead.
+        if model_name.startswith("tiktoken/"):
+            continue
+
         description = model_config.get("description", "")
         xfail = model_config.get("xfail", False)
         test_count = len(model_config.get("tests", []))

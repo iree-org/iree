@@ -175,6 +175,14 @@ struct ReshapeOps {
   tensor::CollapseShapeOp collapseShapeOp;
 };
 
+/// Populate pattern to expand the destination of scf.forall ops by hoisting
+/// collapse_shape ops out of the parallel_insert_slice.
+void populateExpandDestinationForallPatterns(RewritePatternSet &patterns);
+
+/// Populate pattern to collapse the destination of scf.forall ops by hoisting
+/// expand_shape ops out of the parallel_insert_slice.
+void populateCollapseDestinationForallPatterns(RewritePatternSet &patterns);
+
 /// Populate patterns to remove optimization barriers.
 void populateRemoveOptimizationBarrierPatterns(RewritePatternSet &patterns);
 

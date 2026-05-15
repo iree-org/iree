@@ -2081,7 +2081,7 @@ namespace {
 
 struct FoldConsecutiveResourceTransientsOps
     : OpRewritePattern<ResourceTransientsOp> {
-  using OpRewritePattern::OpRewritePattern;
+  using Base::Base;
   LogicalResult matchAndRewrite(ResourceTransientsOp op,
                                 PatternRewriter &rewriter) const override {
     auto resourceOp = op.getResource().getDefiningOp<ResourceTransientsOp>();

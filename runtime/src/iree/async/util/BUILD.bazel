@@ -90,18 +90,31 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "proactor_pool_types",
+    hdrs = ["proactor_pool_types.h"],
+    deps = [
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "proactor_pool",
     srcs = ["proactor_pool.c"],
     hdrs = ["proactor_pool.h"],
     deps = [
-        ":proactor_thread",
+        ":proactor_pool_types",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async:platform",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/threading",
-        "//runtime/src/iree/base/threading:thread",
-    ],
+    ] + select({
+        "@platforms//cpu:wasm32": [],
+        "//conditions:default": [
+            ":proactor_thread_runner",
+        ],
+    }),
 )
 
 iree_runtime_cc_test(
@@ -113,6 +126,16 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "proactor_thread_runner",
+    srcs = ["proactor_thread_runner.c"],
+    hdrs = ["proactor_thread_runner.h"],
+    deps = [
+        ":proactor_pool_types",
+        ":proactor_thread",
     ],
 )
 

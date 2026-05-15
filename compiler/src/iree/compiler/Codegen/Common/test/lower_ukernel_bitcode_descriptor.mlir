@@ -5,7 +5,7 @@
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<16x32xf32>
 // CHECK-NOT:     linalg.generic
 // CHECK:         %[[OUT:.+]] = linalg.fill
-// CHECK:         %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "test"
+// CHECK:         %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"test", bitcode>} "test"
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] : tensor<16x32xf32>, tensor<16x32xf32>)
 // CHECK-SAME:       outs(%[[OUT]] : tensor<16x16xf32>)
 // CHECK:         return %[[MICRO_KERNEL]]

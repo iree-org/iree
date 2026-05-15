@@ -47,9 +47,9 @@ func.func public @simpleTest(%source : memref<?x?xf32>, %column_lengths: memref<
 
 // -----
 
-// Check interface methods for `cast_to_ragged_shape` with `avg_ragged_column_length` specified.
-func.func public @testAvgRaggedColumnLengths(%source : memref<?x?xf32>, %column_lengths: memref<?xi32>,
-    %num_rows: index, %avg_ragged_column_length: index, %lb0 : index, %lb1 : index,
+// Check interface methods for `cast_to_ragged_shape` with estimated column length.
+func.func public @testEstimatedColumnLength(%source : memref<?x?xf32>, %column_lengths: memref<?xi32>,
+    %num_rows: index, %lb0 : index, %lb1 : index,
     %step0 : index, %step1 : index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -57,7 +57,6 @@ func.func public @testAvgRaggedColumnLengths(%source : memref<?x?xf32>, %column_
   %source_d1 = memref.dim %source, %c1 : memref<?x?xf32>
   %0 = iree_tensor_ext.cast_to_ragged_shape %source
       ragged_dim(0) column_lengths(%column_lengths) num_ragged_rows(%num_rows)
-      avg_ragged_column_length(%avg_ragged_column_length)
       : (memref<?x?xf32>{%source_d0, %source_d1}, memref<?xi32>)
       -> memref<?x?x?xf32, #iree_tensor_ext.ragged_shape<0>>
   %d0 = memref.dim %0, %c0 : memref<?x?x?xf32, #iree_tensor_ext.ragged_shape<0>>
@@ -67,11 +66,10 @@ func.func public @testAvgRaggedColumnLengths(%source : memref<?x?xf32>, %column_
   } {iree_tensor_ext.sparse_iteration_dims = #iree_tensor_ext.sparse_iteration_dims<[0, 1]>}
   return
 }
-// CHECK-ALL-LABEL: func public @testAvgRaggedColumnLengths(
+// CHECK-ALL-LABEL: func public @testEstimatedColumnLength(
 //  CHECK-ALL-SAME:     %[[SOURCE:.+]]: memref<?x?xf32>,
 //  CHECK-ALL-SAME:     %[[COLUMN_LENGTHS:.+]]: memref<?xi32>,
 //  CHECK-ALL-SAME:     %[[NUM_ROWS:[a-zA-Z0-9]+]]: index,
-//  CHECK-ALL-SAME:     %[[AVG_RAGGED_COLUMN_LENGTH:[a-zA-Z0-9]+]]: index,
 //  CHECK-ALL-SAME:     %[[LB0:[a-zA-Z0-9]+]]: index
 //  CHECK-ALL-SAME:     %[[LB1:[a-zA-Z0-9]+]]: index
 //  CHECK-ALL-SAME:     %[[STEP0:[a-zA-Z0-9]+]]: index,
@@ -88,8 +86,10 @@ func.func public @testAvgRaggedColumnLengths(%source : memref<?x?xf32>, %column_
 // LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB]] to %[[ROW_UB]] step %[[STEP1]] {
 // LOWER-LOOP-RANGE:       "some_op"(%[[IV0]], %[[IV1]])
 
+//      GET-ESTIMATED-LOOP-RANGE: %[[EST_COLS:.+]] = affine.apply
+// GET-ESTIMATED-LOOP-RANGE-SAME:     affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%[[SOURCE_D0:.+]], %[[NUM_ROWS]]]
 //      GET-ESTIMATED-LOOP-RANGE: scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]]) = (%[[LB0]], %[[LB1]])
-// GET-ESTIMATED-LOOP-RANGE-SAME:     to (%[[NUM_ROWS]], %[[AVG_RAGGED_COLUMN_LENGTH]]) step (%[[STEP0]], %[[STEP1]]) {
+// GET-ESTIMATED-LOOP-RANGE-SAME:     to (%[[NUM_ROWS]], %[[EST_COLS]]) step (%[[STEP0]], %[[STEP1]]) {
 //      GET-ESTIMATED-LOOP-RANGE:   "some_op"(%[[IV0]], %[[IV1]])
 
 // -----

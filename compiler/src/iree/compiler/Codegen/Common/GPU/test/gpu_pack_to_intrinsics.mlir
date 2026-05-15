@@ -410,3 +410,27 @@ func.func @no_propagate_extract_differentblock_2(%input : tensor<128xf32>, %arg0
 // CHECK-LABEL: func.func @no_propagate_extract_differentblock_2
 //       CHECK:  tensor.extract_slice
 //       CHECK:  linalg.generic
+
+// -----
+
+#config_batch_block = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>}>
+module {
+  // linalg.batch_matmul: C[b,m,n] += A[b,m,k] * B[b,k,n]
+  // MFMA_F32_32x32x4x2B_F16: B=2, M=32, N=32, K=4
+  func.func @batch_matmul_32x32x4_block(%a: tensor<2x32x4xf16>, %b: tensor<2x4x32xf16>, %c: tensor<2x32x32xf32>) -> tensor<2x32x32xf32> {
+    %mm = linalg.batch_matmul {lowering_config = #config_batch_block} ins(%a, %b : tensor<2x32x4xf16>, tensor<2x4x32xf16>) outs(%c : tensor<2x32x32xf32>) -> tensor<2x32x32xf32>
+    return %mm : tensor<2x32x32xf32>
+  }
+}
+
+// CHECK-LABEL: func.func @batch_matmul_32x32x4_block
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x32x4xf16>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<2x4x32xf16>
+//  CHECK-SAME:   %[[C:[A-Za-z0-9]+]]: tensor<2x32x32xf32>
+//   CHECK-DAG:   %[[A_PACK:.+]] = linalg.pack %[[A]] inner_dims_pos = [0, 1, 2] inner_tiles = [2, 32, 4]
+//   CHECK-DAG:   %[[B_PACK:.+]] = linalg.pack %[[B]] inner_dims_pos = [0, 2, 1] inner_tiles = [2, 32, 4]
+//   CHECK-DAG:   %[[C_PACK:.+]] = linalg.pack %[[C]] inner_dims_pos = [0, 1, 2] inner_tiles = [2, 32, 32]
+//       CHECK:   iree_codegen.inner_tiled ins(%[[A_PACK]], %[[B_PACK]]) outs(%[[C_PACK]])
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>
+//  CHECK-SAME:     lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>}>
+//  CHECK-SAME:     permutations = [array<i64: 0, 1, 2>, array<i64: 0, 2, 1>, array<i64: 0, 1, 2>]

@@ -4,7 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -140,12 +142,12 @@ struct PropagateDispatchSizeBoundsPass final
     SmallVector<std::optional<int64_t>, 3> workgroupSizes(3, std::nullopt);
     SmallVector<std::optional<int64_t>, 3> workgroupCounts(3, std::nullopt);
 
-    IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    if (target) {
+    IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(funcOp);
+    if (gpuTarget) {
       ArrayRef<int32_t> targetWorkgroupSizes =
-          target.getWgp().getMaxWorkgroupSizes().asArrayRef();
+          gpuTarget.getWgp().getMaxWorkgroupSizes().asArrayRef();
       ArrayRef<int32_t> targetWorkgroupCounts =
-          target.getWgp().getMaxWorkgroupCounts().asArrayRef();
+          gpuTarget.getWgp().getMaxWorkgroupCounts().asArrayRef();
       llvm::transform(targetWorkgroupSizes, workgroupSizes.begin(),
                       [](int32_t x) { return std::optional<int64_t>{x}; });
       llvm::transform(targetWorkgroupCounts, workgroupCounts.begin(),
@@ -159,19 +161,34 @@ struct PropagateDispatchSizeBoundsPass final
     // codegen pipeline configuration.
     std::optional<int64_t> staticSubgroupSize = getSubgroupSize(funcOp);
 
-    // Late in codegen, we've reconciled the workgroup size onto the export op.
-    if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-            getEntryPoint(funcOp)) {
-      if (std::optional<ArrayAttr> exportWorkgroupSize =
-              exportOp->getWorkgroupSize()) {
-        staticWorkgroupSize =
-            llvm::map_to_vector(exportWorkgroupSize->getAsRange<IntegerAttr>(),
-                                [](IntegerAttr a) { return a.getInt(); });
+    IREE::Codegen::DispatchConfigOp configOp;
+    if (useDispatchConfig) {
+      configOp = getDispatchConfigOp(funcOp);
+      if (configOp) {
+        if (std::optional<ArrayRef<int64_t>> wgSize =
+                configOp.getWorkgroupSize()) {
+          staticWorkgroupSize = llvm::to_vector(wgSize.value());
+        }
+        if (std::optional<uint64_t> sgSize = configOp.getSubgroupSize()) {
+          staticSubgroupSize = static_cast<int64_t>(*sgSize);
+        }
       }
+    } else {
+      // Late in codegen, we've reconciled the workgroup size onto the export
+      // op.
+      if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
+              getEntryPoint(funcOp)) {
+        if (std::optional<ArrayAttr> exportWorkgroupSize =
+                exportOp->getWorkgroupSize()) {
+          staticWorkgroupSize = llvm::map_to_vector(
+              exportWorkgroupSize->getAsRange<IntegerAttr>(),
+              [](IntegerAttr a) { return a.getInt(); });
+        }
 
-      if (std::optional<uint64_t> exportSubgroupSize =
-              exportOp->getSubgroupSizeAsUInt()) {
-        staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
+        if (std::optional<uint64_t> exportSubgroupSize =
+                exportOp->getSubgroupSizeAsUInt()) {
+          staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
+        }
       }
     }
 
@@ -182,11 +199,11 @@ struct PropagateDispatchSizeBoundsPass final
     std::optional<int64_t> maxSubgroupSize;
     if (staticSubgroupSize) {
       minSubgroupSize = maxSubgroupSize = staticSubgroupSize;
-    } else if (target) {
-      assert(!target.getWgp().getSubgroupSizeChoices().empty() &&
+    } else if (gpuTarget) {
+      assert(!gpuTarget.getWgp().getSubgroupSizeChoices().empty() &&
              "GPU target must have at least one subgroup size choice");
-      minSubgroupSize = target.getMinSubgroupSize();
-      maxSubgroupSize = target.getMaxSubgroupSize();
+      minSubgroupSize = gpuTarget.getMinSubgroupSize();
+      maxSubgroupSize = gpuTarget.getMaxSubgroupSize();
       if (*minSubgroupSize == *maxSubgroupSize) {
         // There's only one option, so we know what it is.
         staticSubgroupSize = maxSubgroupSize;
@@ -201,7 +218,12 @@ struct PropagateDispatchSizeBoundsPass final
         size = staticSize;
       }
     }
-    SmallVector<int64_t> staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
+    SmallVector<int64_t> staticWorkgroupCounts;
+    if (useDispatchConfig && configOp) {
+      staticWorkgroupCounts = configOp.getStaticNumWorkgroups();
+    } else {
+      staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
+    }
     assert(staticWorkgroupCounts.size() <= 3 &&
            "workgroup counts are 3D at most");
     for (auto [count, staticCount] :
@@ -217,11 +239,11 @@ struct PropagateDispatchSizeBoundsPass final
     if (staticWorkgroupSize) {
       maxFlatWorkgroupSize = llvm::product_of(*staticWorkgroupSize);
     }
-    if (target) {
+    if (gpuTarget) {
       maxFlatWorkgroupSize = std::min(
           maxFlatWorkgroupSize.value_or(std::numeric_limits<int64_t>::max()),
           static_cast<int64_t>(
-              target.getWgp().getMaxThreadCountPerWorkgroup()));
+              gpuTarget.getWgp().getMaxThreadCountPerWorkgroup()));
     }
     if (maxFlatWorkgroupSize && minSubgroupSize) {
       subgroupIdBound =
@@ -232,6 +254,16 @@ struct PropagateDispatchSizeBoundsPass final
                        staticSubgroupSize);
     applyBounds(funcOp, workgroupSizes, workgroupCounts, maxSubgroupSize,
                 subgroupIdBound);
+
+    if (auto *gpuDialect = getContext().getLoadedDialect<gpu::GPUDialect>()) {
+      if (staticWorkgroupSize && gpuTarget) {
+        std::array<int32_t, 3> blockSize = {1, 1, 1};
+        llvm::transform(ArrayRef<int64_t>{*staticWorkgroupSize}.take_front(3),
+                        blockSize.begin(), llvm::StaticCastTo<int32_t>);
+        gpuDialect->getKnownBlockSizeAttrHelper().setAttr(
+            funcOp, DenseI32ArrayAttr::get(funcOp->getContext(), blockSize));
+      }
+    }
   }
 };
 } // namespace

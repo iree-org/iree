@@ -7,7 +7,7 @@ func.func @winograd_filter_transform(%2: tensor<3x3x64x128xf32>) -> tensor<8x8x6
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 16], [1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [16, 32, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<WinogradVectorize> workgroup_size = [16, 32, 1]>
 //       CHECK: func.func @winograd_filter_transform(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.filter_transform
@@ -22,7 +22,7 @@ func.func @winograd_input_transform(%2: tensor<2x34x34x128xf16>) -> tensor<8x8x2
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 4, 4, 32], [1, 1, 1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<WinogradVectorize> workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_input_transform(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.input_transform
@@ -37,7 +37,7 @@ func.func @winograd_output_transform(%2: tensor<8x8x2x6x6x128xf16>) -> tensor<2x
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 4, 4, 32], [1, 1, 1, 1]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUWinogradVectorize workgroup_size = [32, 4, 4]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<WinogradVectorize> workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_output_transform(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   iree_linalg_ext.winograd.output_transform

@@ -54,11 +54,11 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   tosaToLinalgNamedOptions.preferConv2DKernelLayoutHWCF = true;
   tosa::TosaValidationOptions tosaValidationOptions;
   tosa::TosaAttachTargetOptions tosaTargetOptions;
-  tosaTargetOptions.extensions = {"dynamic"};
+  tosaTargetOptions.extensions = {"dynamic", "doubleround"};
   tosaTargetOptions.profiles = {"pro_int", "pro_fp"};
-  passManager.addPass(tosa::createTosaAttachTarget(tosaTargetOptions));
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
-                              tosaToLinalgNamedOptions, tosaValidationOptions);
+                              tosaToLinalgNamedOptions, tosaValidationOptions,
+                              tosaTargetOptions);
   passManager.addNestedPass<func::FuncOp>(
       iree_compiler::createConverti48Toi64Pass());
 

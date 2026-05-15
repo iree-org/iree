@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
@@ -19,6 +20,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -60,8 +62,8 @@ static constexpr uint64_t SAFE_INDEX_UNSIGNED_MAX_VALUE =
 /// Succeeds when a value is statically non-negative in that it has a lower
 /// bound on its value (if it is treated as signed) and that bound is
 /// non-negative.
-static bool staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
-                                               Value v) {
+static bool staticallyLegalToConvertToUnsigned(DataFlowSolver &solver, Value v,
+                                               bool indexIsI64) {
   auto *result = solver.lookupState<IntegerValueRangeLattice>(v);
   if (!result || result->getValue().isUninitialized()) {
     return false;
@@ -69,24 +71,23 @@ static bool staticallyLegalToConvertToUnsigned(DataFlowSolver &solver,
   const ConstantIntRanges &range = result->getValue().getValue();
   bool isNonNegative = range.smin().isNonNegative();
   Type type = v.getType();
-  if (isa<IndexType>(type)) {
+  if (isa<IndexType>(type) && !indexIsI64) {
     bool canSafelyTruncate =
         range.umin().getZExtValue() <= SAFE_INDEX_UNSIGNED_MAX_VALUE &&
         range.umax().getZExtValue() <= SAFE_INDEX_UNSIGNED_MAX_VALUE;
     return isNonNegative && canSafelyTruncate;
-  } else {
-    return isNonNegative;
   }
+  return isNonNegative;
 }
 
 /// Succeeds if an op can be converted to its unsigned equivalent without
-/// changing its semantics. This is the case when none of its openands or
+/// changing its semantics. This is the case when none of its operands or
 /// results can be below 0 when analyzed from a signed perspective.
 static LogicalResult
-staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op) {
-  auto nonNegativePred = [&solver](Value v) -> bool {
-    bool isNonNegative = staticallyLegalToConvertToUnsigned(solver, v);
-    return isNonNegative;
+staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op,
+                                     bool indexIsI64) {
+  auto nonNegativePred = [&](Value v) -> bool {
+    return staticallyLegalToConvertToUnsigned(solver, v, indexIsI64);
   };
   return success(llvm::all_of(op->getOperands(), nonNegativePred) &&
                  llvm::all_of(op->getResults(), nonNegativePred));
@@ -94,12 +95,14 @@ staticallyLegalToConvertToUnsignedOp(DataFlowSolver &solver, Operation *op) {
 
 template <typename Signed, typename Unsigned>
 struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
-  ConvertOpToUnsigned(MLIRContext *context, DataFlowSolver &solver)
-      : OpRewritePattern<Signed>(context), solver(solver) {}
+  ConvertOpToUnsigned(MLIRContext *context, DataFlowSolver &solver,
+                      bool indexIsI64)
+      : OpRewritePattern<Signed>(context), solver(solver),
+        indexIsI64(indexIsI64) {}
 
   LogicalResult matchAndRewrite(Signed op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(staticallyLegalToConvertToUnsignedOp(solver, op))) {
+    if (failed(staticallyLegalToConvertToUnsignedOp(solver, op, indexIsI64))) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<Unsigned>(op, op->getResultTypes(),
@@ -108,6 +111,7 @@ struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
   }
 
   DataFlowSolver &solver;
+  bool indexIsI64;
 };
 
 //===----------------------------------------------------------------------===//
@@ -129,8 +133,9 @@ struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
 struct ConvertUnsignedI64IndexCastProducerToIndex
     : OpRewritePattern<arith::IndexCastUIOp> {
   ConvertUnsignedI64IndexCastProducerToIndex(MLIRContext *context,
-                                             DataFlowSolver &solver)
-      : OpRewritePattern(context), solver(solver) {}
+                                             DataFlowSolver &solver,
+                                             bool indexIsI64)
+      : OpRewritePattern(context), solver(solver), indexIsI64(indexIsI64) {}
 
   LogicalResult matchAndRewrite(arith::IndexCastUIOp origIndexOp,
                                 PatternRewriter &rewriter) const override {
@@ -150,6 +155,9 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
     }
 
     auto pred = [&](Value v) -> bool {
+      if (indexIsI64) {
+        return true;
+      }
       auto *result = solver.lookupState<IntegerValueRangeLattice>(v);
       if (!result || result->getValue().isUninitialized()) {
         return false;
@@ -194,6 +202,7 @@ struct ConvertUnsignedI64IndexCastProducerToIndex
   }
 
   DataFlowSolver &solver;
+  bool indexIsI64;
 };
 
 //===----------------------------------------------------------------------===//
@@ -264,6 +273,60 @@ struct RemoveIndexCastForAssumeOfI32 : OpRewritePattern<Util::AssumeIntOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// vector.broadcast cast commutation
+// Rewrites broadcast(cast(x)) → cast(broadcast(x)) so that the broadcast
+// operates on the narrower type.  This is a purely structural rewrite —
+// no range analysis needed.  It enables downstream patterns (e.g. NarrowCmpI)
+// to fold away intermediate casts.
+//===----------------------------------------------------------------------===//
+
+struct NarrowVectorBroadcast : OpRewritePattern<vector::BroadcastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp op,
+                                PatternRewriter &rewriter) const override {
+    // The broadcast source must be defined by a widening cast op.
+    Value source = op.getSource();
+    Operation *castOp = source.getDefiningOp();
+    if (!castOp || !isa<arith::IndexCastOp, arith::IndexCastUIOp>(castOp)) {
+      return failure();
+    }
+
+    // The broadcast must operate on index type and the cast source must be
+    // a non-index type (i.e. we are narrowing from index to integer).
+    Value castInput = castOp->getOperand(0);
+    Type srcElemTy = getElementTypeOrSelf(castInput.getType());
+    if (!isa<IndexType>(getElementTypeOrSelf(source.getType())) ||
+        isa<IndexType>(srcElemTy)) {
+      return failure();
+    }
+
+    VectorType resultType = cast<VectorType>(op.getResult().getType());
+    Location loc = op.getLoc();
+
+    // Broadcast in the narrower (input) type.
+    VectorType narrowBcastType =
+        VectorType::get(resultType.getShape(), srcElemTy);
+    Value narrowBcast =
+        vector::BroadcastOp::create(rewriter, loc, narrowBcastType, castInput);
+
+    // Re-apply the same cast on the broadcast result.
+    Value result = TypeSwitch<Operation *, Value>(castOp)
+                       .Case([&](arith::IndexCastOp) {
+                         return arith::IndexCastOp::create(
+                             rewriter, loc, resultType, narrowBcast);
+                       })
+                       .Case([&](arith::IndexCastUIOp) {
+                         return arith::IndexCastUIOp::create(
+                             rewriter, loc, resultType, narrowBcast);
+                       });
+
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // scf.for induction variable range narrowing
 // If the induction variable of an scf.for can be represented as an I32,
 // make that change to save on registers etc.
@@ -280,10 +343,14 @@ struct NarrowSCFForIvToI32 : OpRewritePattern<scf::ForOp> {
     if (!srcType.isIndex() && !srcType.isInteger(64)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't an index or i64");
     }
-    if (!staticallyLegalToConvertToUnsigned(solver, iv)) {
+    // Note: we pass index-is-i64=false here to use this truncation correctness
+    // helper as a way to check if the index typ falls inside 32 bits.
+    if (!staticallyLegalToConvertToUnsigned(solver, iv,
+                                            /*indexIsI64=*/false)) {
       return rewriter.notifyMatchFailure(forOp, "IV isn't non-negative");
     }
-    if (!staticallyLegalToConvertToUnsigned(solver, forOp.getStep())) {
+    if (!staticallyLegalToConvertToUnsigned(solver, forOp.getStep(),
+                                            /*indexIsI64=*/false)) {
       return rewriter.notifyMatchFailure(forOp, "Step isn't non-negative");
     }
     auto *ivState = solver.lookupState<IntegerValueRangeLattice>(iv);
@@ -480,6 +547,7 @@ class OptimizeIntArithmeticPass
       arith::populateIntRangeNarrowingPatterns(patterns, solver, {32});
       patterns.add<NarrowSCFForIvToI32, RemoveIndexCastForAssumeOfI32>(ctx,
                                                                        solver);
+      patterns.add<NarrowVectorBroadcast>(ctx);
     }
 
     // Populate canonicalization patterns.
@@ -502,8 +570,8 @@ class OptimizeIntArithmeticPass
                  ConvertOpToUnsigned<arith::RemSIOp, arith::RemUIOp>,
                  ConvertOpToUnsigned<arith::MinSIOp, arith::MinUIOp>,
                  ConvertOpToUnsigned<arith::MaxSIOp, arith::MaxUIOp>,
-                 ConvertOpToUnsigned<arith::ExtSIOp, arith::ExtUIOp>>(ctx,
-                                                                      solver);
+                 ConvertOpToUnsigned<arith::ExtSIOp, arith::ExtUIOp>>(
+        ctx, solver, indexIsI64);
 
     // Populate divisibility patterns.
     patterns.add<RemUIDivisibilityByConstant>(ctx, solver);

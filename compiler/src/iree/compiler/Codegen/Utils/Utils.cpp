@@ -75,6 +75,20 @@ getEntryPoint(mlir::FunctionOpInterface funcOp) {
   return std::nullopt;
 }
 
+IREE::Codegen::DispatchConfigOp
+getDispatchConfigOp(mlir::FunctionOpInterface funcOp) {
+  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
+  if (!moduleOp) {
+    return {};
+  }
+  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    if (configOp.getFunctionRef() == funcOp.getName()) {
+      return configOp;
+    }
+  }
+  return {};
+}
+
 bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
 }
@@ -174,6 +188,16 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
 
 bool isWebGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("webgpu");
+}
+
+bool isGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (!targetAttr) {
+    return false;
+  }
+  StringRef backend = targetAttr.getBackend().getValue();
+  return backend.starts_with("rocm") || backend.starts_with("cuda") ||
+         backend.starts_with("vulkan") || backend.starts_with("metal") ||
+         backend.starts_with("webgpu");
 }
 
 static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {

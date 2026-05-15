@@ -16,7 +16,7 @@ transform.named_sequence @match_mmt(%matmul: !transform.any_op {transform.readon
                                                   reduction = [0, 0, 4],
                                                   thread = [8, 4],
                                                   promote_operands = [0, 1]}>,
-    translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
       workgroup_size = [128, 1, 1] subgroup_size = 64>
   > -> !transform.any_param
  transform.yield %matmul, %config : !transform.any_op, !transform.any_param

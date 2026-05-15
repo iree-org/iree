@@ -63,13 +63,24 @@ struct ConvertTensorImportOp
     // Import (buffer view to stream resource).
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    Value resultSize = IREE::Stream::TensorSizeOfOp::create(
+    Value tensorSize = IREE::Stream::TensorSizeOfOp::create(
         rewriter, op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getTarget().getType()),
         flattenValues(adaptor.getTargetDims()), executionAffinityAttr);
+
+    // When a byte_offset is specified, the tensor data starts at that offset
+    // within the source buffer. Import the full extent (offset + tensor size)
+    // and then subview to expose the offset to alignment analysis.
+    Value byteOffset = op.getByteOffset();
+    Value importSize = tensorSize;
+    if (byteOffset) {
+      importSize =
+          arith::AddIOp::create(rewriter, op.getLoc(), byteOffset, tensorSize);
+    }
+
     Value resource = IREE::Stream::TensorImportOp::create(
         rewriter, op.getLoc(), resultType, adaptor.getSource().front(),
-        targetType, flattenValues(adaptor.getTargetDims()), resultSize,
+        targetType, flattenValues(adaptor.getTargetDims()), importSize,
         op.getConsume(), executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
@@ -81,16 +92,30 @@ struct ConvertTensorImportOp
           ValueRange{waitFence}, executionAffinityAttr);
       resource = IREE::Stream::TimepointAwaitOp::create(
                      rewriter, op.getLoc(), ValueRange{resource},
-                     ValueRange{resultSize}, waitTimepoint)
+                     ValueRange{importSize}, waitTimepoint)
                      .getResult(0);
+    }
+
+    // If byte_offset was specified, create a subview at that offset before
+    // the transfer. This makes the non-zero offset visible to
+    // AnnotateDispatchArguments, which computes alignment as
+    // gcd(base_alignment, offset).
+    Value transferSource = resource;
+    Value transferSize = importSize;
+    if (byteOffset) {
+      transferSource = IREE::Stream::ResourceSubviewOp::create(
+          rewriter, op.getLoc(), resource, importSize, byteOffset, tensorSize);
+      transferSize = tensorSize;
     }
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     Value newImport = IREE::Stream::AsyncTransferOp::create(
-        rewriter, op.getLoc(), unknownType, resource, resultSize, resultSize,
+        rewriter, op.getLoc(), unknownType, transferSource, transferSize,
+        transferSize,
         /*source_affinity=*/executionAffinityAttr,
         /*target_affinity=*/executionAffinityAttr);
-    rewriter.replaceOpWithMultiple(op, {{newImport, resultSize}});
+
+    rewriter.replaceOpWithMultiple(op, {{newImport, transferSize}});
     return success();
   }
 

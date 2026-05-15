@@ -1,10 +1,10 @@
 // CPU backend disable fp reassociation for O0 and O1, so the checks should be the same.
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-reassociate-fp-reductions=false --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-mlir-opt-level=O0 --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-reassociate-fp-reductions=false --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O0 --split-input-file %s | FileCheck %s
 
 // CPU backend enables fp reassociation starting from O2, so the checks should be the same.
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-reassociate-fp-reductions=true --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy, func.func(iree-llvmcpu-lower-executable-target))' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-reassociate-fp-reductions=true --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='include-llvm-lowering=false' --iree-llvmcpu-mlir-opt-level=O2 --split-input-file %s | FileCheck %s --check-prefix=REORDERCHECK
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -109,17 +109,18 @@ func.func @split_reduction_innermost_reduction_next_dynamic_supported() attribut
   %c0 = arith.constant 0 : index
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
   %1 = arith.index_castui %0 : i32 to index
-  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%1}
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%1}
-  %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [1024, %1, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%1} -> tensor<1024x?x256xi32>
-  %5 = tensor.empty(%1) : tensor<1024x?xi32>
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %1, 0 : index
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%dim0}
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%dim0}
+  %4 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [1024, %dim0, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x?x256xi32>>{%dim0} -> tensor<1024x?x256xi32>
+  %5 = tensor.empty(%dim0) : tensor<1024x?xi32>
   %6 = linalg.fill ins(%c0_i32 : i32) outs(%5 : tensor<1024x?xi32>) -> tensor<1024x?xi32>
   %7 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%4 : tensor<1024x?x256xi32>) outs(%6 : tensor<1024x?xi32>) {
   ^bb0(%in: i32, %out: i32):
     %8 = arith.addi %in, %out : i32
     linalg.yield %8 : i32
   } -> tensor<1024x?xi32>
-  iree_tensor_ext.dispatch.tensor.store %7, %3, offsets = [0, 0], sizes = [1024, %1], strides = [1, 1] : tensor<1024x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%1}
+  iree_tensor_ext.dispatch.tensor.store %7, %3, offsets = [0, 0], sizes = [1024, %dim0], strides = [1, 1] : tensor<1024x?xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x?xi32>>{%dim0}
   return
 }
 
@@ -146,11 +147,13 @@ func.func @split_reduction_innermost_reduction_next_dynamic_supported() attribut
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant dense<0> : tensor<1024x513xi32>
+  %c0_i32 = arith.constant 0 : i32
+  %empty = tensor.empty() : tensor<1024x513xi32>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<1024x513xi32>) -> tensor<1024x513xi32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x513x256xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x513xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 513, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x513x256xi32>> -> tensor<1024x513x256xi32>
-  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x513x256xi32>) outs(%cst : tensor<1024x513xi32>) {
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x513x256xi32>) outs(%fill : tensor<1024x513xi32>) {
   ^bb0(%in: i32, %out: i32):
     %4 = arith.addi %in, %out : i32
     linalg.yield %4 : i32
@@ -181,14 +184,17 @@ func.func @split_reduction_innermost_reduction_next_imperfect_tiling_supported()
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @split_reduction_innermost_dynamic_reduction_unsupported() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
-  %cst = arith.constant dense<0> : tensor<1024x512xi32>
   %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %empty = tensor.empty() : tensor<1024x512xi32>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<1024x512xi32>) -> tensor<1024x512xi32>
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
   %1 = arith.index_castui %0 : i32 to index
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %1, 0 : index
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x512xi32>>
-  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%1}
-  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0], sizes = [1024, 512, %1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%1} -> tensor<1024x512x?xi32>
-  %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%4 : tensor<1024x512x?xi32>) outs(%cst : tensor<1024x512xi32>) {
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%dim0}
+  %4 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0], sizes = [1024, 512, %dim0], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x?xi32>>{%dim0} -> tensor<1024x512x?xi32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%4 : tensor<1024x512x?xi32>) outs(%fill : tensor<1024x512xi32>) {
   ^bb0(%in: i32, %out: i32):
     %6 = arith.addi %in, %out : i32
     linalg.yield %6 : i32
@@ -211,11 +217,13 @@ func.func @split_reduction_innermost_dynamic_reduction_unsupported() attributes 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @split_reduction_innermost_imperfect_reduction_unsupported() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant dense<0> : tensor<1024x512xi32>
+  %c0_i32 = arith.constant 0 : i32
+  %empty = tensor.empty() : tensor<1024x512xi32>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<1024x512xi32>) -> tensor<1024x512xi32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x257xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x512xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 257], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x257xi32>> -> tensor<1024x512x257xi32>
-  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x257xi32>) outs(%cst : tensor<1024x512xi32>) {
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x257xi32>) outs(%fill : tensor<1024x512xi32>) {
   ^bb0(%in: i32, %out: i32):
     %4 = arith.addi %in, %out : i32
     linalg.yield %4 : i32
@@ -238,11 +246,13 @@ func.func @split_reduction_innermost_imperfect_reduction_unsupported() attribute
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @split_reduction_not_innermost_reduction_unsupported() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant dense<0> : tensor<1024x256xi32>
+  %c0_i32 = arith.constant 0 : i32
+  %empty = tensor.empty() : tensor<1024x256xi32>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<1024x256xi32>) -> tensor<1024x256xi32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024x256xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x256xi32>> -> tensor<1024x512x256xi32>
-  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%cst : tensor<1024x256xi32>) {
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%fill : tensor<1024x256xi32>) {
   ^bb0(%in: i32, %out: i32):
     %4 = arith.addi %in, %out : i32
     linalg.yield %4 : i32
@@ -265,11 +275,13 @@ func.func @split_reduction_not_innermost_reduction_unsupported() attributes {hal
 #map1 = affine_map<(d0, d1, d2) -> (d0)>
 func.func @split_reduction_double_reduction_unsupported() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %c0 = arith.constant 0 : index
-  %cst = arith.constant dense<0> : tensor<1024xi32>
+  %c0_i32 = arith.constant 0 : i32
+  %empty = tensor.empty() : tensor<1024xi32>
+  %fill = linalg.fill ins(%c0_i32 : i32) outs(%empty : tensor<1024xi32>) -> tensor<1024xi32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x256xi32>>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xi32>>
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1024, 512, 256], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024x512x256xi32>> -> tensor<1024x512x256xi32>
-  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%cst : tensor<1024xi32>) {
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction", "reduction"]} ins(%2 : tensor<1024x512x256xi32>) outs(%fill : tensor<1024xi32>) {
   ^bb0(%in: i32, %out: i32):
     %4 = arith.addi %in, %out : i32
     linalg.yield %4 : i32

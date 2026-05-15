@@ -1746,9 +1746,9 @@ void SetupHalBindings(nanobind::module_ m) {
            })
       .def("signal",
            [](HalSemaphore& self, uint64_t new_value) {
-             CheckApiStatus(
-                 iree_hal_semaphore_signal(self.raw_ptr(), new_value),
-                 "signaling semaphore");
+             CheckApiStatus(iree_hal_semaphore_signal(self.raw_ptr(), new_value,
+                                                      /*frontier=*/NULL),
+                            "signaling semaphore");
            })
       .def(
           "wait",

@@ -69,7 +69,7 @@ func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
 }
 // CHECK-LABEL: func @fused_contraction_1
 //  CHECK-SAME:     translation_info = #iree_codegen.translation_info
-//  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:         pipeline = #iree_gpu.pipeline<VectorDistribute>
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   linalg.generic
@@ -120,7 +120,7 @@ func.func @fused_contraction_2(%arg0: tensor<4096x640xf32>,
 }
 // CHECK-LABEL: func @fused_contraction_2
 //  CHECK-SAME:     translation_info = #iree_codegen.translation_info
-//  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:         pipeline = #iree_gpu.pipeline<VectorDistribute>
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   linalg.generic
@@ -185,7 +185,7 @@ func.func @fused_contraction_3(%arg0 : tensor<2x4096x640xi8>,
 }
 // CHECK-LABEL: func @fused_contraction_3
 //  CHECK-SAME:     translation_info = #iree_codegen.translation_info
-//  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:         pipeline = #iree_gpu.pipeline<VectorDistribute>
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   linalg.generic
@@ -271,7 +271,7 @@ func.func @fused_contraction_4(%arg0: tensor<2x4096x640xf16>,
 }
 // CHECK-LABEL: func @fused_contraction_4
 //  CHECK-SAME:     translation_info = #iree_codegen.translation_info
-//  CHECK-SAME:         pipeline = LLVMGPUVectorDistribute
+//  CHECK-SAME:         pipeline = #iree_gpu.pipeline<VectorDistribute>
 //  CHECK-SAME:         workgroup_size = [256, 1, 1]
 //  CHECK-SAME:         subgroup_size = 64
 //       CHECK:   linalg.generic

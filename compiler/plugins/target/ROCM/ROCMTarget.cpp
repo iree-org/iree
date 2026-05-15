@@ -512,9 +512,9 @@ public:
         });
       }
     }
-    passManager.addPass(createSpecializeExportsPass());
-    buildLLVMGPUCodegenCommonConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    buildLLVMGPUCodegenCommonConfigurationPassPipeline(modulePassManager);
     if (targetOptions.enableTensorUKernels) {
       modulePassManager.addPass(
           IREE::ROCM::createApplyBuiltinPDLPatternsDriverPass());
@@ -527,12 +527,18 @@ public:
     modulePassManager.addPass(createMaterializeUserConfigsPass());
     modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
         LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
+    if (shouldEmitPipelineConstraints()) {
+      FunctionLikeNest(modulePassManager)
+          .addPass(createInsertSMTConstraintsPass)
+          .addPass(createVerifySMTConstraintsPass);
+    }
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildLLVMGPUCodegenPassPipeline(passManager, true,
+    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), true,
                                     targetOptions.debugSymbols);
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

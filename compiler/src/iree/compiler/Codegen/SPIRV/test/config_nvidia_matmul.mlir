@@ -6,7 +6,7 @@ func.func @matmul_4x4096x9216(%4: tensor<4x9216xf32>, %5: tensor<9216x4096xf32>,
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 128, 32]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 4, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize> workgroup_size = [32, 4, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 //      CHECK: func.func @matmul_4x4096x9216(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -22,7 +22,7 @@ func.func @matmul_1x4096x9216(%4: tensor<1x9216xf32>, %5: tensor<9216x4096xf32>,
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 1024]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [256, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [256, 1, 1]>
 //      CHECK: func.func @matmul_1x4096x9216(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -49,7 +49,7 @@ func.func @multi_reduction_transposed_b_matmul(%3: tensor<4096x86x128xf32>, %4: 
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 1, 32]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<MatmulPromoteVectorize> workgroup_size = [32, 8, 1], {pipeline_depth = 1 : i64, store_stage = 1 : i64}>
 //      CHECK: func.func @multi_reduction_transposed_b_matmul(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic

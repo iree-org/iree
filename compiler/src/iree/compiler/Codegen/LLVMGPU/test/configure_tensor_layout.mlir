@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-configure-tensor-layouts, canonicalize, cse))' %s | FileCheck %s
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -50,7 +50,7 @@ func.func @matmul_96x64x16_mfma(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -100,7 +100,7 @@ func.func @matmul_96x64x16_wmmar3(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -150,7 +150,7 @@ func.func @matmul_96x64x16_wmmar4(%lhs: tensor<96x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [32, 1, 1]
                                               subgroup_size = 32>
 
@@ -199,7 +199,7 @@ func.func @matmul_96x64x32_wmma_gfx1250(%lhs: tensor<96x32xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -249,7 +249,7 @@ func.func @matmul_128x64x16_multi_subgroup(%lhs: tensor<128x16xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -271,7 +271,7 @@ func.func @linalg_copy(%in : tensor<16x16x16xf16>) -> tensor<16x16x16xf16>
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -314,7 +314,7 @@ func.func @gather_like(%base : tensor<16384x16x32x128xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -338,7 +338,7 @@ func.func @dynamic_infer_sizes(%in : tensor<4x32x?x128xf16>) -> tensor<1x1x?x128
 
 // -----
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [64, 1, 1]
                                               subgroup_size = 64>
 
@@ -373,7 +373,7 @@ func.func @dynamic_infer_sizes_lowering_config(%in : tensor<4x32x?x128xf16>) -> 
 // Verify that the batch tile for a dimension that requires ceil division
 // (63 / 8 = 8, not 7) is computed correctly.
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUVectorDistribute
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
                                               workgroup_size = [512, 1, 1]
                                               subgroup_size = 64>
 
@@ -420,3 +420,53 @@ func.func @contraction_ceildiv_batch(%lhs: tensor<1x1x63xf16>,
 // CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute>
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64>
+
+#maps_block = [
+  affine_map<(b, m, n, k) -> (b, m, k)>,
+  affine_map<(b, m, n, k) -> (b, k, n)>,
+  affine_map<(b, m, n, k) -> (b, m, n)>
+]
+
+#traits_block = {
+  indexing_maps = #maps_block,
+  iterator_types = ["parallel", "parallel", "parallel", "reduction"],
+  lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x4x2B_F16>,
+                                              subgroup_basis = [[1, 1, 1, 1], [0, 1, 2, 3]]}>
+}
+
+func.func @batch_matmul_block_intrinsic(%lhs: tensor<4x32x4xf16>,
+                                        %rhs: tensor<4x4x32xf16>,
+                                        %init: tensor<4x32x32xf32>)
+                                        -> tensor<4x32x32xf32>
+                                        attributes { translation_info = #translation } {
+  %out = linalg.generic #traits_block
+                        ins(%lhs, %rhs: tensor<4x32x4xf16>, tensor<4x4x32xf16>)
+                        outs(%init: tensor<4x32x32xf32>) {
+    ^bb0(%in: f16, %in_1: f16, %out: f32):
+      %ex   = arith.extf %in   : f16 to f32
+      %ex_1 = arith.extf %in_1 : f16 to f32
+      %mul  = arith.mulf %ex, %ex_1 : f32
+      %sum  = arith.addf %out, %mul : f32
+      linalg.yield %sum : f32
+  } -> tensor<4x32x32xf32>
+  return %out : tensor<4x32x32xf32>
+}
+
+// CHECK-DAG: #[[$NESTED:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 1], batch_tile = [2, 1, 1], outer_tile = [1, 1, 1], thread_tile = [2, 32, 1], element_tile = [1, 1, 4], subgroup_strides = [0, 0, 0], thread_strides = [32, 1, 0]>
+// CHECK-DAG: #[[$NESTED1:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 1], batch_tile = [2, 1, 1], outer_tile = [1, 1, 1], thread_tile = [2, 1, 32], element_tile = [1, 4, 1], subgroup_strides = [0, 0, 0], thread_strides = [32, 0, 1]>
+// CHECK-DAG: #[[$NESTED2:.+]] = #iree_vector_ext.nested_layout<subgroup_tile = [1, 1, 1], batch_tile = [2, 1, 1], outer_tile = [1, 4, 1], thread_tile = [1, 2, 32], element_tile = [2, 4, 1], subgroup_strides = [0, 0, 0], thread_strides = [0, 32, 1]>
+
+// CHECK-LABEL: func.func @batch_matmul_block_intrinsic
+
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]])
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]])
+// CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME: outs(%[[ACC]]

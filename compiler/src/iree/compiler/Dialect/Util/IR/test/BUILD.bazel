@@ -32,6 +32,7 @@ iree_lit_test_suite(
             "global_ops.mlir",
             "hint_folding.mlir",
             "hint_ops.mlir",
+            "hoistable_conversion_ops.mlir",
             "list_ops.mlir",
             "numeric_ops.mlir",
             "op_verification.mlir",

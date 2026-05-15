@@ -278,8 +278,7 @@ struct FoldExpandShapeIntoInterfaceTensorLoad
 ///       tensor<864xf32>
 struct FoldExpandShapeIntoInterfaceTensorStore
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -397,8 +396,7 @@ static void transformOverReassociation(
 /// is possible)
 struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -616,8 +614,7 @@ struct FoldCollapseShapeIntoInterfaceTensorStoreFullSlice
 /// - For constants: divisible if value % innerDimProduct == 0
 struct FoldCollapseShapeIntoInterfaceTensorStore
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
@@ -1004,8 +1001,7 @@ struct FoldInnerBitcastIntoInterfaceTensorLoad
 
 struct FoldInnerBitcastIntoInterfaceTensorStore
     : OpRewritePattern<IREE::TensorExt::DispatchTensorStoreOp> {
-  using OpRewritePattern<
-      IREE::TensorExt::DispatchTensorStoreOp>::OpRewritePattern;
+  using Base::Base;
 
   LogicalResult matchAndRewrite(IREE::TensorExt::DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {

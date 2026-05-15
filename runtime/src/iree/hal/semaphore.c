@@ -118,12 +118,13 @@ iree_hal_semaphore_query(iree_hal_semaphore_t* semaphore, uint64_t* out_value) {
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value) {
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value,
+                          const iree_async_frontier_t* frontier) {
   IREE_ASSERT_ARGUMENT(semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, new_value);
   iree_status_t status = iree_hal_semaphore_vtable(semaphore)->async.signal(
-      (iree_async_semaphore_t*)semaphore, new_value, /*frontier=*/NULL);
+      (iree_async_semaphore_t*)semaphore, new_value, frontier);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -320,13 +321,15 @@ IREE_API_EXPORT bool iree_hal_semaphore_list_poll(
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list) {
+iree_hal_semaphore_list_signal(iree_hal_semaphore_list_t semaphore_list,
+                               const iree_async_frontier_t* frontier) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    status = iree_hal_semaphore_signal(semaphore_list.semaphores[i],
-                                       semaphore_list.payload_values[i]);
+    status =
+        iree_hal_semaphore_signal(semaphore_list.semaphores[i],
+                                  semaphore_list.payload_values[i], frontier);
     if (!iree_status_is_ok(status)) break;
   }
 

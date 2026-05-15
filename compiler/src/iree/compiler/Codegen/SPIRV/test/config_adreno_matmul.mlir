@@ -11,7 +11,7 @@ func.func @matmul_1024x2048x512(%3: tensor<1024x512xf32>, %4: tensor<512x2048xf3
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128], [16, 4], [0, 0, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 2, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 2, 1]>
 //      CHECK: func.func @matmul_1024x2048x512(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -30,7 +30,7 @@ func.func @matmul_3136x24x96(%3: tensor<3136x96xf32>, %4: tensor<96x24xf32>) -> 
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[448, 8], [14, 4], [0, 0, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 32, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [2, 32, 1]>
 //      CHECK: func.func @matmul_3136x24x96(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -49,7 +49,7 @@ func.func @matmul_196x64x192(%3: tensor<196x192xf32>, %4: tensor<192x64xf32>) ->
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[28, 64], [7, 4], [0, 0, 8]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 4, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [16, 4, 1]>
 //      CHECK: func.func @matmul_196x64x192(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -67,7 +67,7 @@ func.func @matmul_12544x96x16(%0: memref<12544x16xf32>, %1: memref<16x96xf32>, %
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 32], [16, 4], [0, 0, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 8, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [8, 8, 1]>
 //      CHECK: func.func @matmul_12544x96x16(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -86,7 +86,7 @@ func.func @matmul_49x160x576(%3: tensor<49x576xf32>, %4: tensor<576x160xf32>) ->
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[7, 32], [7, 4], [0, 0, 8]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [8, 1, 1]>
 //      CHECK: func.func @matmul_49x160x576(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -105,7 +105,7 @@ func.func @batch_matmul_4x384x384(%3: tensor<4x384x32xf32>, %4: tensor<4x32x384x
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 32, 128], [1, 16, 4], [0, 0, 0, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [32, 2, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [32, 2, 1]>
 //      CHECK: func.func @batch_matmul_4x384x384(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.batch_matmul
@@ -124,7 +124,7 @@ func.func @batch_matmul_4x8x8(%3: tensor<4x8x32xf32>, %4: tensor<4x32x8xf32>) ->
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8, 8], [1, 1, 4], [0, 0, 0, 16]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 8, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [2, 8, 1]>
 //      CHECK: func.func @batch_matmul_4x8x8(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.batch_matmul

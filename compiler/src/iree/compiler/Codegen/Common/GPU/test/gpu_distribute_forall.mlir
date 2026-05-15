@@ -1,7 +1,7 @@
 // RUN: iree-opt %s --split-input-file --mlir-print-local-scope \
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-distribute-forall, canonicalize, cse))" | FileCheck %s
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -27,7 +27,7 @@ func.func @distribute_thread_forall(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_warp_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -54,7 +54,7 @@ func.func @distribute_warp_forall(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_lane_forall(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -71,7 +71,7 @@ func.func @distribute_lane_forall(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -92,7 +92,7 @@ func.func @distribute_thread_forall_drop_for_loop(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -116,7 +116,7 @@ func.func @distribute_thread_forall_single_thread(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {
@@ -140,7 +140,7 @@ func.func @distribute_thread_forall_overhang(%out : memref<?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 2, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 2, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
     attributes {translation_info = #translation_info} {
@@ -167,7 +167,7 @@ func.func @distribute_thread_forall_multi_dim(%out : memref<?x?x?xi32>)
 
 // -----
 
-#translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [7, 1, 1] subgroup_size = 32>
+#translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [7, 1, 1] subgroup_size = 32>
 
 func.func @distribute_thread_forall_small_workgroup(%out : memref<?xi32>)
     attributes {translation_info = #translation_info} {

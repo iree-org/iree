@@ -433,7 +433,7 @@ func.func @transform_unroll_f16_8x1() -> vector<8x1xf16> {
 // Test: 3-element delinearize_index from thread_id gets hints with correct group sizes
 // With workgroup_size = [128, 1, 1], thread_id x gets lane_increment<128>
 // For basis (2, 4, 16): result #0 gets lane_constant<64>, result #1 gets lane_constant<16>, result #2 gets lane_increment<16>
-#translation_128 = #iree_codegen.translation_info<pipeline = LLVMGPUDefault workgroup_size = [128, 1, 1]>
+#translation_128 = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Default> workgroup_size = [128, 1, 1]>
 // CHECK-LABEL: func.func @preprocess_delinearize_3d
 // CHECK: amdgpu.transpose_load
 // CHECK: vector.shape_cast

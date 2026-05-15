@@ -34,6 +34,10 @@ OpFoldResult addOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
 OpFoldResult mulOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                      OpFoldResult b);
 
+/// Helper method to subtract 2 OpFoldResult inputs with affine.apply.
+OpFoldResult subOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
+                     OpFoldResult b);
+
 /// Helper method to compute (a * b + c) with OpFoldResult inputs using
 /// affine.apply.
 OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,

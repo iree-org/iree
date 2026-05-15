@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "compiler/plugins/target/WebGPUSPIRV/SPIRVToWGSL.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -104,12 +105,14 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    buildSPIRVCodegenConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildSPIRVCodegenConfigurationPassPipeline(passManager.nest<ModuleOp>());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildSPIRVCodegenPassPipeline(passManager);
+    buildSPIRVCodegenPassPipeline(passManager.nest<ModuleOp>());
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
 
     // Prepare SPIR-V for WebGPU by expanding or removing unsupported ops.
     // For example,

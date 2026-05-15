@@ -521,8 +521,8 @@ util.func public @conv_2d_no_input_channel(%arg0: tensor<61x93x16x64xbf16>, %arg
 // CHECK-SAME:   ins({{.*}} : tensor<61x93x16x64xbf16>)
 // CHECK-SAME:   outs({{.*}} : tensor<3x3x5369x16x64xbf16>) -> tensor<3x3x5369x16x64xbf16>
 // CHECK:        tensor.collapse_shape %{{.*}} {{\[}}[0, 1], [2], [3]] : tensor<59x91x16x56xbf16> into tensor<5369x16x56xbf16>
-// CHECK:        linalg.generic
-// CHECK:        util.return
+// CHECK:        %[[MATMUL:.+]] = linalg.generic
+// CHECK:        util.return %[[MATMUL]]
 
 // -----
 

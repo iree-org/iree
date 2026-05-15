@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "conv1x1_to_matmul.mlir"
     "conv_filter_to_channels_last.mlir"
     "conv_to_channels_last.mlir"
+    "convert_strided_insert_slice_to_generic.mlir"
     "fold_attention_with_transpose.mlir"
     "generalize_linalg_matmul.mlir"
     "make_single_dispatch_for_function.mlir"
@@ -27,6 +28,7 @@ iree_lit_test_suite(
     "pdl_example.mlir"
     "preprocessing_match_ops.mlir"
     "promote_linalg_outputs.mlir"
+    "swap_strided_insert_slice_with_contraction.mlir"
     "transform_symbol_importing.mlir"
     "transpose_matmul.mlir"
   TOOLS

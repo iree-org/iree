@@ -18,6 +18,7 @@ exports_files([
     "VectorExtBase.td",
     "VectorExtOps.td",
     "VectorExtInterfaces.td",
+    "VectorExtOpInterfaces.td",
 ])
 
 iree_td_library(
@@ -28,6 +29,7 @@ iree_td_library(
             "VectorExtAttrs.td",
             "VectorExtBase.td",
             "VectorExtInterfaces.td",
+            "VectorExtOpInterfaces.td",
             "VectorExtOps.td",
         ],
         include = ["*.td"],
@@ -64,6 +66,8 @@ iree_compiler_cc_library(
         "VectorExtEnums.cpp.inc",
         "VectorExtAttrInterfaces.h.inc",
         "VectorExtAttrInterfaces.cpp.inc",
+        "VectorExtOpInterfaces.h.inc",
+        "VectorExtOpInterfaces.cpp.inc",
         "VectorExtOps.h.inc",
         "VectorExtOps.cpp.inc",
     ],
@@ -72,6 +76,7 @@ iree_compiler_cc_library(
         ":IREEVectorExtDialectGen",
         ":IREEVectorExtEnumsGen",
         ":IREEVectorExtInterfacesGen",
+        ":IREEVectorExtOpInterfacesGen",
         ":IREEVectorExtOpsGen",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//compiler/src/iree/compiler/Utils",
@@ -164,6 +169,23 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VectorExtInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEVectorExtOpInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "VectorExtOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "VectorExtOpInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VectorExtOpInterfaces.td",
     deps = [":td_files"],
 )
 

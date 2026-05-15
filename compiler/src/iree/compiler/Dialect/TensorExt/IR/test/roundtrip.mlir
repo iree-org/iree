@@ -27,7 +27,6 @@ util.func public @workgroup_count_splitk(%arg0: index, %arg1: index, %arg2: inde
 util.func public @workgroup_count_no_args() {
   %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
   %result_x, %result_y, %result_z = iree_tensor_ext.dispatch.workgroup_count_split_reduction_modifier workgroups(%x, %y, %z) workload()
-  %a, %b, %c = iree_tensor_ext.dispatch.workgroup_count_from_dag_root()
   util.return
 }
 
@@ -176,21 +175,6 @@ util.func public @staticAvgRaggedColumnLengths(%source : tensor<?x?x?xf32>,
   util.return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
 }
 // CHECK-LABEL: @staticAvgRaggedColumnLengths
-//       CHECK:     iree_tensor_ext.cast_to_ragged_shape
-
-// -----
-
-// Check for dynamically specified `avg_ragged_column_length`.
-
-util.func public @dynamicAvgRaggedColumnLengths(%source : tensor<?x?x?xf32>,
-    %columnLengths : tensor<4xindex>, %avgColumnLength : index,
-    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> {
-  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%columnLengths)
-      avg_ragged_column_length(%avgColumnLength)
-      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
-  util.return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
-}
-// CHECK-LABEL: @dynamicAvgRaggedColumnLengths
 //       CHECK:     iree_tensor_ext.cast_to_ragged_shape
 
 // -----

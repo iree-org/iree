@@ -69,7 +69,7 @@ module attributes { transform.with_named_sequence } {
     %lowering_config = transform.param.constant #iree_codegen.lowering_config<tile_sizes = [[8, 0], [1, 0], [0, 0, 4]]> -> !transform.any_param
     transform.annotate %reduce "lowering_config" = %lowering_config : !transform.any_op, !transform.any_param
     %funcs = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [16, 1, 1]> -> !transform.any_param
+    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [16, 1, 1]> -> !transform.any_param
     transform.annotate %funcs "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
     transform.print {name = "Setting reduce strategy to base vectorize"}
     transform.yield

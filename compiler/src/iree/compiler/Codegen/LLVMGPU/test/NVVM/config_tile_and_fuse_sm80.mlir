@@ -1,7 +1,7 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=sm_80 \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
-// Test that sm_80 selects LLVMGPUTileAndFuse with NV_MMA_SYNC intrinsics by default.
+// Test that sm_80 selects #iree_gpu.pipeline<TileAndFuse> with NV_MMA_SYNC intrinsics by default.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -24,7 +24,7 @@ func.func @matmul_256x256x256_f16_f32() {
 }
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f32(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 32
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>
@@ -58,7 +58,7 @@ func.func @matmul_256x256x256_f16_f16() {
 }
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f16(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 32
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>
@@ -86,7 +86,7 @@ func.func @matmul_accumulate_256x256x256_f16_f32() {
 }
 
 // CHECK-LABEL: func.func @matmul_accumulate_256x256x256_f16_f32(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 32
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 32
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     convert_acc_gemm

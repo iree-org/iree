@@ -125,6 +125,12 @@ struct GPUMMASchedule {
   SmallVector<int64_t, 2> nTileSizes; // N tile sizes per subgroup.
   SmallVector<int64_t, 2> kTileSizes; // K tile sizes.
 
+  // Workgroup-level batch tile sizes. Defaults to all 1s. When both M and
+  // N sizes are smaller than the intrinsic sizes and must be padded up to
+  // them, tiling batch elements per workgroup may help amortize the
+  // padding overhead.
+  SmallVector<int64_t, 2> workgroupBatchSizes;
+
   // Constructor for multi M, N, K dim schedules.
   GPUMMASchedule(IREE::Codegen::InnerTileDescAttrInterface kind,
                  ArrayRef<int64_t> mIntrinsicSizes,
@@ -167,6 +173,12 @@ struct GPUMMASchedule {
     return llvm::product_of(nSubgroupCounts);
   }
 
+  // Total workgroup batch tile factor (product of all batch tile sizes).
+  int64_t getTotalWorkgroupBatchSize() const {
+    return workgroupBatchSizes.empty() ? 1
+                                       : llvm::product_of(workgroupBatchSizes);
+  }
+
   // Check if all schedule dimensions are single-element.
   bool hasSingleDimensions() const {
     return llvm::all_equal({size_t(1), mSubgroupCounts.size(),
@@ -183,6 +195,10 @@ struct GPUMMASchedule {
 /// When |doCPromotion| is true, the accumulator uses shared memory. This can be
 /// due to padding requirements or because the operation has an existing
 /// accumulator that needs to be loaded from global memory (matmul_accumulate).
+/// When |useDirectLoad| is true, operands are loaded directly from global
+/// memory into shared memory. In this mode, ROCDLPrefetchSharedMemoryPass
+/// multi-buffers shared memory allocations where the number of buffers equals
+/// |prefetchNumStages|, so the shared memory estimate is scaled accordingly.
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUIntrinsicType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,

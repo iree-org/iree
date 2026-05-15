@@ -25,7 +25,7 @@ func.func @complex_view_as_real(%arg0: tensor<1x1x32x50x2xf32>, %arg1: tensor<50
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 2, 2], [1, 1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute workgroup_size = [2, 2, 16]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [2, 2, 16]>
 //      CHECK: func.func @complex_view_as_real(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic

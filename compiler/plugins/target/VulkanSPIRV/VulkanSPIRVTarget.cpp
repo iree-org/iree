@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -214,12 +215,14 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    buildSPIRVCodegenConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildSPIRVCodegenConfigurationPassPipeline(passManager.nest<ModuleOp>());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildSPIRVCodegenPassPipeline(passManager);
+    buildSPIRVCodegenPassPipeline(passManager.nest<ModuleOp>());
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

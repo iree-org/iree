@@ -433,8 +433,8 @@ TEST_F(TokenizerJsonTest, AddedTokenLstripFlag) {
 }
 
 TEST_F(TokenizerJsonTest, AddedTokenRstripFlag) {
-  // The rstrip flag means the token only matches when followed by whitespace
-  // or at the end of input.
+  // The rstrip flag indicates trailing whitespace should be stripped after
+  // matching (post-processing). It does not affect match eligibility.
   iree_string_view_t json = IREE_SV(R"({
     "model": {
       "type": "BPE",
@@ -457,6 +457,185 @@ TEST_F(TokenizerJsonTest, AddedTokenRstripFlag) {
   IREE_ASSERT_OK(
       iree_tokenizer_from_huggingface_json(json, allocator_, &tokenizer));
   ASSERT_NE(tokenizer, nullptr);
+  iree_tokenizer_free(tokenizer);
+}
+
+// Verifies that back-to-back special tokens are both emitted. Previously,
+// when the pipeline had buffered content, the second match would overwrite
+// pending_special_token before the first was emitted, dropping it.
+TEST_F(TokenizerJsonTest, BackToBackSpecialTokens) {
+  iree_string_view_t json = IREE_SV(R"({
+    "model": {
+      "type": "BPE",
+      "vocab": {"hello": 1, "world": 2},
+      "merges": []
+    },
+    "added_tokens": [{
+      "id": 100,
+      "content": "<|user|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }, {
+      "id": 101,
+      "content": "<|end|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }, {
+      "id": 102,
+      "content": "<|assistant|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }],
+    "pre_tokenizer": null
+  })");
+
+  iree_tokenizer_t* tokenizer = nullptr;
+  IREE_ASSERT_OK(
+      iree_tokenizer_from_huggingface_json(json, allocator_, &tokenizer));
+  ASSERT_NE(tokenizer, nullptr);
+
+  auto encode = [&](const char* text) -> std::vector<int32_t> {
+    std::vector<int32_t> tokens(64);
+    iree_host_size_t token_count = 0;
+    IREE_CHECK_OK(
+        iree_tokenizer_encode(tokenizer, iree_make_cstring_view(text),
+                              IREE_TOKENIZER_ENCODE_FLAG_NONE,
+                              iree_tokenizer_make_token_output(
+                                  tokens.data(), NULL, NULL, tokens.size()),
+                              allocator_, &token_count));
+    tokens.resize(token_count);
+    return tokens;
+  };
+
+  // Two special tokens with no text between them.
+  {
+    auto tokens = encode("<|end|><|assistant|>");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 101);  // <|end|>
+    EXPECT_EQ(tokens[1], 102);  // <|assistant|>
+  }
+
+  // Text, then two back-to-back special tokens, then more text.
+  {
+    auto tokens = encode("<|user|>hello<|end|><|assistant|>world<|end|>");
+    ASSERT_EQ(tokens.size(), 6u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello
+    EXPECT_EQ(tokens[2], 101);  // <|end|>
+    EXPECT_EQ(tokens[3], 102);  // <|assistant|>
+    EXPECT_EQ(tokens[4], 2);    // world
+    EXPECT_EQ(tokens[5], 101);  // <|end|>
+  }
+
+  // Three back-to-back special tokens.
+  {
+    auto tokens = encode("<|end|><|user|><|assistant|>");
+    ASSERT_EQ(tokens.size(), 3u);
+    EXPECT_EQ(tokens[0], 101);  // <|end|>
+    EXPECT_EQ(tokens[1], 100);  // <|user|>
+    EXPECT_EQ(tokens[2], 102);  // <|assistant|>
+  }
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Verifies end-to-end rstrip behavior: the token matches regardless of what
+// follows, and trailing whitespace after the token is consumed (not passed to
+// BPE). See:
+// https://github.com/huggingface/tokenizers/blob/main/tokenizers/src/tokenizer/added_vocabulary.rs
+TEST_F(TokenizerJsonTest, RstripTokenMatchAndWhitespaceConsumption) {
+  iree_string_view_t json = IREE_SV(R"({
+    "model": {
+      "type": "BPE",
+      "vocab": {"hello": 1, "world": 2},
+      "merges": []
+    },
+    "added_tokens": [{
+      "id": 100,
+      "content": "<|user|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": true,
+      "normalized": false,
+      "special": true
+    }],
+    "pre_tokenizer": null
+  })");
+
+  iree_tokenizer_t* tokenizer = nullptr;
+  IREE_ASSERT_OK(
+      iree_tokenizer_from_huggingface_json(json, allocator_, &tokenizer));
+  ASSERT_NE(tokenizer, nullptr);
+
+  auto encode = [&](const char* text) -> std::vector<int32_t> {
+    std::vector<int32_t> tokens(64);
+    iree_host_size_t token_count = 0;
+    IREE_CHECK_OK(
+        iree_tokenizer_encode(tokenizer, iree_make_cstring_view(text),
+                              IREE_TOKENIZER_ENCODE_FLAG_NONE,
+                              iree_tokenizer_make_token_output(
+                                  tokens.data(), NULL, NULL, tokens.size()),
+                              allocator_, &token_count));
+    tokens.resize(token_count);
+    return tokens;
+  };
+
+  // rstrip token followed by text (no whitespace): token must match.
+  {
+    auto tokens = encode("<|user|>hello");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello
+  }
+
+  // rstrip token followed by space + text: whitespace must be consumed.
+  {
+    auto tokens = encode("<|user|> hello");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello (space consumed by rstrip)
+  }
+
+  // rstrip token followed by multiple spaces + text.
+  {
+    auto tokens = encode("<|user|>   hello");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello (spaces consumed by rstrip)
+  }
+
+  // rstrip token followed by tab + text.
+  {
+    auto tokens = encode("<|user|>\thello");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello (tab consumed by rstrip)
+  }
+
+  // rstrip token followed by newline + text.
+  {
+    auto tokens = encode("<|user|>\nhello");
+    ASSERT_EQ(tokens.size(), 2u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|>
+    EXPECT_EQ(tokens[1], 1);    // hello (newline consumed by rstrip)
+  }
+
+  // rstrip token followed by only whitespace (no text after).
+  {
+    auto tokens = encode("<|user|>   ");
+    ASSERT_EQ(tokens.size(), 1u);
+    EXPECT_EQ(tokens[0], 100);  // <|user|> (whitespace consumed, nothing left)
+  }
+
   iree_tokenizer_free(tokenizer);
 }
 

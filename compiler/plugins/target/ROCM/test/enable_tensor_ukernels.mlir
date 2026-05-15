@@ -44,7 +44,7 @@ hal.executable public @main {
     }
   }
 }
-// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [512, 1, 1] subgroup_size = 64
+// CHECK:      #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64
 // CHECK:      func.func @matmul_f8
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK:        linalg.generic

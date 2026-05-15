@@ -448,13 +448,15 @@ public:
   void
   buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                  OpPassManager &passManager) final {
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
+    buildCodegenConfigurationPreProcessingPassPipeline(passManager);
+    buildLLVMGPUCodegenConfigurationPassPipeline(passManager.nest<ModuleOp>());
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildLLVMGPUCodegenPassPipeline(passManager, false,
+    buildLLVMGPUCodegenPassPipeline(passManager.nest<ModuleOp>(), false,
                                     /*preserveDebugInfo=*/false);
+    buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) final {

@@ -70,11 +70,15 @@ namespace mlir::iree_compiler::IREE::GPU {
 // 2. The product of all the outer[i] times all the element[i] equals the
 //    length of the vector operand to the intrinsic. It is the number of
 //    elements that one intrinsic consumes on one thread.
-// 3. The product of all the thread[i] is a divisor of subgroup size. It is
-//    almost always equal to subgroup size. If not, then it is a strict divisor
-//    of subgroup size and that means that multiple threads get the exact same
-//    data, i.e., there is an implied broadcasting, as will be seen in the
-//    modulo (t % thread [0]) below.
+// 3. The product of all the thread[i] is a divisor of subgroup size. Let
+//    physicalLanesPerThread = subgroupSize / product(thread[i]). It is
+//    almost always 1. If not, then it is greater than 1 and that means
+//    that multiple threads get the exact same data, i.e., there is an
+//    implied broadcasting, as will be seen in the modulo (t % thread[0])
+//    below. When greater than 1, that many physical lanes share the same
+//    position in the thread[i] decomposition. Which specific lanes are
+//    grouped is determined by tstrides. The element dimension may be split
+//    by this factor so each grouped lane loads a disjoint slice.
 //
 // Detailed semantics: case of semantic rank 1
 // -------------------------------------------
@@ -296,6 +300,23 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
 StringRef getTilingLevelName(GPU::TilingLevel level);
 
 //===----------------------------------------------------------------------===//
+// VDMFMA accumulator utilities
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the given VirtualMMAIntrinsic is a VDMFMA (virtual dense
+/// MFMA via sparse trick) intrinsic.
+bool isVDMFMAIntrinsic(VirtualMMAIntrinsic intrinsic);
+
+/// Expands a collapsed 2-element ACC into the 4-element native SMFMAC form
+/// by interleaving with zeros: [c0, c1] -> [c0, 0, c1, 0].
+Value expandAccumulator(OpBuilder &builder, Location loc, Value acc);
+
+/// Collapses a 4-element native SMFMAC ACC back to the 2-element semantic
+/// form. Deinterleaves into evens [d0, d2] and odds [d1, d3], then sums
+/// pairwise: [d0, d1, d2, d3] -> [d0+d1, d2+d3].
+Value collapseAccumulator(OpBuilder &builder, Location loc, Value acc);
+
+//===----------------------------------------------------------------------===//
 // Implementations for operand promotion
 //===----------------------------------------------------------------------===//
 
@@ -305,6 +326,27 @@ Value cacheSwizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
 Value swizzlePromotionImpl(OpBuilder &builder, OpOperand &operand,
                            Attribute attr,
                            Codegen::SwizzleAttrInterface swizzle);
+
+/// Callback type for GPU pipeline builders.
+using GPUPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Callback type for GPU constraint emitters.
+using GPUConstraintEmitter = LogicalResult (*)(Attribute pipelineAttr,
+                                               ArrayRef<Operation *> rootOps);
+
+/// Registers GPU pipeline callbacks.
+void registerGPUPipelineCallbacks(GPUPipelineBuilder builder,
+                                  GPUConstraintEmitter constraintEmitter);
+
+/// Callback type for SPIRV pipeline builders.
+using SPIRVPipelineBuilder =
+    LogicalResult (*)(Attribute pipelineAttr, OpPassManager &pm,
+                      const CodegenPipelineOptions *options);
+
+/// Registers a SPIRV pipeline builder callback.
+void registerSPIRVPipelineBuilder(SPIRVPipelineBuilder builder);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

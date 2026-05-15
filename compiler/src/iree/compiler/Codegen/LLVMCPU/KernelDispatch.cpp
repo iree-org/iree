@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
+#include "iree/compiler/Codegen/Utils/SliceUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -57,6 +58,17 @@
 #define DEBUG_TYPE "kernel-dispatch"
 
 namespace mlir::iree_compiler {
+
+using CPUPipeline = IREE::CPU::LoweringPipeline;
+
+/// Helper to build a TranslationInfoAttr with a CPU pipeline.
+static IREE::Codegen::TranslationInfoAttr
+getCPUTranslationInfo(MLIRContext *ctx, CPUPipeline pipeline,
+                      DictionaryAttr pipelineConfig = {}) {
+  return IREE::Codegen::TranslationInfoAttr::get(
+      ctx, IREE::CPU::PipelineAttr::get(ctx, pipeline), SymbolRefAttr(),
+      /*workgroupSize=*/{}, /*subgroupSize=*/0, pipelineConfig);
+}
 
 /// NOTE: None of these flags are supported in any form long term. This are
 /// temporary hooks added for development purposes. They could be
@@ -1090,235 +1102,6 @@ private:
   SmallVector<bool> vectorScalableFlags;
 };
 
-/// A helper class that tracks dimension mappings both within individual
-/// operations and across multiple operations by analyzing the producer-consumer
-/// relationships of SSA values. This tracking is established by assigning a
-/// global dimension index to all loop dimensions encountered. Dimensions
-/// sharing the same global index are considered equivalent.
-class IterationDimTracker {
-public:
-  explicit IterationDimTracker(ArrayRef<Operation *> operations)
-      : operations(operations.begin(), operations.end()) {
-    // Ensure operations are processed in topological order.
-    mlir::computeTopologicalSorting(this->operations);
-    buildDimMapping();
-  }
-
-  /// Returns true if the given global dimension index is present across all
-  /// operations.
-  bool presentInAllOps(int64_t globalDimIdx) const {
-    for ([[maybe_unused]] auto &[_, dims] : operationToGlobalDimMaps) {
-      if (!llvm::is_contained(dims, globalDimIdx)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /// Returns all global dimension indices associated with the given operation.
-  ArrayRef<int64_t> getAllGlobalDimIdx(Operation *op) const {
-    auto it = operationToGlobalDimMaps.find(op);
-    assert(it != operationToGlobalDimMaps.end() &&
-           "Operation not found in DimTracker");
-    return it->second;
-  }
-
-  /// Returns the global dimension index corresponding to the given local loop
-  /// dimension `pos` for the specified operation.
-  int64_t getGlobalDimIdx(Operation *op, int64_t pos) const {
-    ArrayRef<int64_t> globalDims = getAllGlobalDimIdx(op);
-    return globalDims[pos];
-  }
-
-  /// Returns the total number of unique global dimension indices.
-  int64_t getTotalLoopNum() const { return totalLoopNum; }
-
-private:
-  /// Builds and unifies dimension index mappings for all operations,
-  /// using producer–consumer SSA value relationships.
-  void buildDimMapping() {
-    // Tracks equivalent global dimension indices.
-    llvm::EquivalenceClasses<int64_t> indicesEquivalence;
-    // For each SSA value, maps its local dimension index to a global index.
-    // Value -> (local dim index -> global dim index)
-    llvm::SmallDenseMap<Value, SmallVector<int64_t>> valueToGlobalDimMaps;
-
-    for (Operation *op : operations) {
-      auto tilingOp = cast<TilingInterface>(op);
-      int64_t numLoops = tilingOp.getLoopIteratorTypes().size();
-      // Unconditionally assign new global indices, to be unified later.
-      for (int64_t i = 0; i < numLoops; ++i) {
-        int64_t globalIndex = totalLoopNum++;
-        indicesEquivalence.insert(globalIndex);
-        operationToGlobalDimMaps[op].push_back(globalIndex);
-      }
-      // The assigned global dimension indices are now unified based on
-      // producer–consumer SSA value relationships:
-      // - For operations implementing `IndexingMapOpInterface`, unify
-      // dimensions by iterating over their indexing maps.
-      // - For pack/unpack operations, use an identity mapping, since tiling
-      // applies to the outer (unpacked) dimensions.
-      // - For all other (unknown) operations, assume an identity mapping for
-      // any value whose rank matches the operation’s loop count.
-      TypeSwitch<Operation *>(op)
-          .Case([&](IndexingMapOpInterface op) {
-            propagateOnIndexingMapOp(op, indicesEquivalence,
-                                     valueToGlobalDimMaps);
-          })
-          .Case<linalg::PackOp, linalg::UnPackOp>([&](auto op) {
-            propagateOnPackUnpackOp(op, indicesEquivalence,
-                                    valueToGlobalDimMaps, numLoops);
-          })
-          .Default([&](auto op) {
-            propagateOnUnknownOp(op, indicesEquivalence, valueToGlobalDimMaps,
-                                 numLoops);
-          });
-    }
-
-    // Remap the global dimension indices in two steps:
-    // 1. Assign the same temporary index to all equivalent dimensions.
-    // 2. Convert these temporary indices to a compact, zero-based range.
-    auto applyReplaceMap = [&](llvm::SmallDenseMap<int64_t, int64_t> &map) {
-      for (auto &opEntry : operationToGlobalDimMaps) {
-        for (auto &dim : opEntry.second) {
-          dim = map.lookup(dim);
-        }
-      }
-    };
-    llvm::SmallDenseMap<int64_t, int64_t> replaceMap0, replaceMap1;
-    int64_t tempDimIndex = totalLoopNum;
-    totalLoopNum = 0;
-    for (auto it = indicesEquivalence.begin(); it != indicesEquivalence.end();
-         ++it) {
-      if (!(*it)->isLeader()) {
-        continue;
-      }
-      for (auto mit = indicesEquivalence.member_begin(**it);
-           mit != indicesEquivalence.member_end(); ++mit) {
-        replaceMap0[*mit] = tempDimIndex;
-      }
-      replaceMap1[tempDimIndex] = totalLoopNum;
-      tempDimIndex++;
-      totalLoopNum++;
-    }
-    applyReplaceMap(replaceMap0);
-    applyReplaceMap(replaceMap1);
-  }
-
-  /// Ties loop dimensions together based on the operation’s indexing maps,
-  /// considering only simple result dimension expressions (`AffineDimExpr`).
-  ///
-  /// Complex expressions (e.g., `affine_map<(d0, d1, d2, d3) -> (d0 * 2 + d2,
-  /// d1 * 3 + d3)>`) are ignored because they fall outside the "loop dimension"
-  /// concept. Such expressions describe how indices are computed within the
-  /// innermost loop body, but they do not directly identify which loop
-  /// dimensions correspond or should be tied.
-  void propagateOnIndexingMapOp(
-      IndexingMapOpInterface indexingMapOp,
-      llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
-      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps) {
-    Operation *op = indexingMapOp.getOperation();
-    for (OpOperand &operand : op->getOpOperands()) {
-      Value value = operand.get();
-      // Skip operands that have no known mapping from their producers.
-      if (!valueToGlobalDimMaps.contains(value)) {
-        continue;
-      }
-      AffineMap map = indexingMapOp.getMatchingIndexingMap(&operand);
-      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
-        // Stop if the current dimension exceeds the number of mapped ones.
-        if (dim >= valueToGlobalDimMaps[value].size()) {
-          break;
-        }
-        // Skip on complex expressions.
-        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-        if (!dimExpr) {
-          continue;
-        }
-        int64_t pos = dimExpr.getPosition();
-        // Unify the dimension index between the producer and the current op.
-        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][dim],
-                                     operationToGlobalDimMaps[op][pos]);
-      }
-    }
-    // Propagate to results.
-    auto dsOp = cast<DestinationStyleOpInterface>(op);
-    for (OpResult result : op->getResults()) {
-      OpOperand *operand = dsOp.getTiedOpOperand(result);
-      AffineMap map = indexingMapOp.getMatchingIndexingMap(operand);
-      for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
-        // Skip on complex expressions.
-        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-        if (!dimExpr) {
-          continue;
-        }
-        int64_t pos = dimExpr.getPosition();
-        valueToGlobalDimMaps[result].push_back(
-            operationToGlobalDimMaps[op][pos]);
-      }
-    }
-  }
-
-  /// Ties the dimensions of pack and unpack operations with their operands in
-  /// the outer (unpacked) dimensions.
-  void propagateOnPackUnpackOp(
-      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
-      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
-      int64_t numLoops) {
-    for (OpOperand &operand : op->getOpOperands()) {
-      Value value = operand.get();
-      if (!valueToGlobalDimMaps.contains(value)) {
-        continue;
-      }
-      int64_t rank = cast<ShapedType>(value.getType()).getRank();
-      int64_t outDimSize = std::min(rank, numLoops);
-      for (int64_t i = 0; i < outDimSize; ++i) {
-        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
-                                     operationToGlobalDimMaps[op][i]);
-      }
-    }
-    // Propagate to results.
-    for (Value result : op->getResults()) {
-      valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
-    }
-  }
-
-  /// Ties the dimensions of operations with their operands, if the operand rank
-  /// matches the operation’s loop count.
-  void propagateOnUnknownOp(
-      Operation *op, llvm::EquivalenceClasses<int64_t> &indicesEquivalence,
-      llvm::SmallDenseMap<Value, SmallVector<int64_t>> &valueToGlobalDimMaps,
-      int64_t numLoops) {
-    for (OpOperand &operand : op->getOpOperands()) {
-      Value value = operand.get();
-      if (!valueToGlobalDimMaps.contains(value) ||
-          numLoops != cast<ShapedType>(value.getType()).getRank()) {
-        continue;
-      }
-      for (int64_t i = 0; i < numLoops; ++i) {
-        indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
-                                     operationToGlobalDimMaps[op][i]);
-      }
-    }
-    // Propagate to results.
-    for (Value result : op->getResults()) {
-      if (numLoops == cast<ShapedType>(result.getType()).getRank()) {
-        valueToGlobalDimMaps[result] = operationToGlobalDimMaps[op];
-      }
-    }
-  }
-
-  SmallVector<Operation *> operations;
-  // Tracks the total number of unique loop dimensions among the given set of
-  // operations.
-  int64_t totalLoopNum = 0;
-  // For each compute operation, maps its local loop dimension index to the
-  // global index. Operation -> (local dim index -> global dim
-  // index)
-  llvm::SmallDenseMap<Operation *, SmallVector<int64_t>>
-      operationToGlobalDimMaps;
-};
-
 /// Returns the same lowering_config attribute with the updated tile sizes and
 /// scalable tile flags. The distribution tiling sizes is not set if it is
 /// false.
@@ -1412,8 +1195,8 @@ setMatmulPeelingRootConfig(mlir::FunctionOpInterface entryPointFn,
       getPipelineConfWithPeelingAttr(op.getContext());
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
-      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::DoubleTilingExpert,
+                            pipelineConfig));
 }
 
 static LogicalResult
@@ -1458,9 +1241,10 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Final tile sizes and scalable flags for contraction: "
          << loweringConfig;
 
-  auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, linalgOp,
-                                               loweringConfig, pipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, linalgOp, loweringConfig,
+      getCPUTranslationInfo(linalgOp.getContext(),
+                            CPUPipeline::DoubleTilingExpert));
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -2176,7 +1960,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       targetAttr ? targetAttr.getConfiguration() : nullptr;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, getMmt4dLoweringConfig(mmt4dOp, targetConfig),
-      DispatchLoweringPassPipeline::Mmt4dTilingExpert);
+      getCPUTranslationInfo(mmt4dOp.getContext(),
+                            CPUPipeline::Mmt4dTilingExpert));
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.batch_mmt4d
@@ -2192,7 +1977,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, batchMmt4dOp,
       getMmt4dLoweringConfig(batchMmt4dOp, targetConfig),
-      DispatchLoweringPassPipeline::Mmt4dTilingExpert);
+      getCPUTranslationInfo(batchMmt4dOp.getContext(),
+                            CPUPipeline::Mmt4dTilingExpert));
 }
 
 static bool isPackMatmulLHS(linalg::PackOp op) {
@@ -2288,8 +2074,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
-      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
-      /*subgroupSize=*/{}, pipelineConfig);
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::DataTiling,
+                            pipelineConfig));
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2359,8 +2145,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
-      DispatchLoweringPassPipeline::CPUDataTiling, /*workgroupSize=*/{},
-      /*subgroupSize=*/{}, pipelineConfig);
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::DataTiling,
+                            pipelineConfig));
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2488,7 +2274,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Set lowering_config for attnOp: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+      getCPUTranslationInfo(attnOp.getContext(),
+                            CPUPipeline::LinalgExtTileAndVectorize));
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -2499,27 +2286,42 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(fftOp, DistributionHeuristicConfig{});
   auto rank = fftOp.getOperandRank();
-  if (distTileSizes.size() >= rank && distTileSizes[rank - 1] != 0) {
-    APInt value;
-    if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
-      distTileSizes[rank - 1] = 1ll << value.getSExtValue();
-      distTileSizes[rank - 1] = std::max(
-          distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
-    } else {
-      return fftOp.emitOpError("non-constant stage might not work for fft op");
-    }
+  std::optional<int64_t> stageValue = getConstantIntValue(fftOp.getStage());
+  if (!stageValue) {
+    return fftOp.emitOpError("non-constant stage might not work for fft op");
   }
-  // Append vector level tiling sizes using zero values, which means no tiling
-  // in the pipeline.
+  if (distTileSizes.size() >= rank && distTileSizes[rank - 1] != 0) {
+    distTileSizes[rank - 1] = 1ll << *stageValue;
+    distTileSizes[rank - 1] = std::max(
+        distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
+  }
+  // Set vector tile sizes. The FFT dimension is set to the full butterfly
+  // stride (= 2^stage = 2*halfSize). Each butterfly group reads lhs at
+  // [0..halfSize-1] and rhs at [halfSize..2*halfSize-1], so the tile must
+  // span the complete group. The innermost batch dimension is scaled inversely
+  // so the total vector width stays close to the native vector size, keeping
+  // SIMD utilization high across all stages.
+  int64_t halfSize = 1ll << (*stageValue - 1);
+  int64_t fftTileSize = 2 * halfSize;
+  int64_t nativeVectorSize =
+      getNativeVectorSizeInBytes(entryPointFn) /
+      (fftOp.getOperandType().getElementTypeBitWidth() / 8);
+  // Scale the innermost batch dim to fill the native vector width.
+  int64_t batchTile = std::max<int64_t>(1, nativeVectorSize / halfSize);
   LoweringConfigGenerator generator(fftOp);
   generator.setDistributionTileSizes(distTileSizes);
-  SmallVector<int64_t> zeros(rank, 0);
-  generator.setVectorTileSizes(zeros);
+  SmallVector<int64_t> vecTiles(rank, 1);
+  if (rank >= 2) {
+    vecTiles[rank - 2] = batchTile;
+  }
+  vecTiles.back() = fftTileSize;
+  generator.setVectorTileSizes(vecTiles);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+      getCPUTranslationInfo(fftOp.getContext(),
+                            CPUPipeline::LinalgExtTileAndVectorize));
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2544,7 +2346,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, gatherOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+      getCPUTranslationInfo(gatherOp.getContext(),
+                            CPUPipeline::LinalgExtTileAndVectorize));
 }
 
 /// Sets the lowering configuration for dispatch region for winograd ops:
@@ -2580,7 +2383,8 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+      getCPUTranslationInfo(winogradOp.getContext(),
+                            CPUPipeline::LinalgExtTileAndVectorize));
 }
 
 static void setVectorTileSizes(linalg::LinalgOp op,
@@ -2624,7 +2428,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
     LoweringConfigGenerator generator(genericOp);
     return setOpConfigAndEntryPointFnTranslation(
         entryPointFn, genericOp, generator.generateCPULoweringConfig(),
-        DispatchLoweringPassPipeline::CPUDefault);
+        getCPUTranslationInfo(genericOp.getContext(), CPUPipeline::Default));
   }
 
   DistributionHeuristicConfig distConfig;
@@ -2656,21 +2460,21 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Set lowering_config: " << loweringConfig;
 
   // For non-tensor based ops use the Buffer ops pipeline.
-  DispatchLoweringPassPipeline passPipeline;
+  CPUPipeline passPipeline;
   DictionaryAttr pipelineConfig;
   if (genericOp.hasPureTensorSemantics()) {
-    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+    passPipeline = CPUPipeline::DoubleTilingExpert;
     if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
       pipelineConfig = getPipelineConfWithPeelingAttr(genericOp.getContext());
     }
   } else {
-    passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+    passPipeline = CPUPipeline::BufferOpsTileAndVectorize;
   }
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, loweringConfig, passPipeline,
-      /*workgroupSize=*/{},
-      /*subgroupSize=*/{}, pipelineConfig);
+      entryPointFn, genericOp, loweringConfig,
+      getCPUTranslationInfo(genericOp.getContext(), passPipeline,
+                            pipelineConfig));
 }
 
 /// Utility to return the transpose vector `sizes` for X86. Empty `sizes` on
@@ -2816,9 +2620,10 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   LDBG() << "Set lowering_config: " << loweringConfig;
 
-  auto passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               loweringConfig, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, loweringConfig,
+      getCPUTranslationInfo(genericOp.getContext(),
+                            CPUPipeline::DoubleTilingExpert));
 }
 
 /// Sets elementwise dispatches to use peeling approach. It scales the number of
@@ -2897,12 +2702,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
       generator.generateCPULoweringConfig();
   LDBG() << "Set lowering_config for element-wise op: " << loweringConfig;
 
-  DispatchLoweringPassPipeline passPipeline;
+  CPUPipeline passPipeline;
   DictionaryAttr pipelineConfig;
   if (genericOp.hasPureBufferSemantics()) {
-    passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+    passPipeline = CPUPipeline::BufferOpsTileAndVectorize;
   } else {
-    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+    passPipeline = CPUPipeline::DoubleTilingExpert;
   }
 
   if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
@@ -2910,9 +2715,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   }
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, loweringConfig, passPipeline,
-      /*workgroupSize=*/{},
-      /*subgroupSize=*/{}, pipelineConfig);
+      entryPointFn, genericOp, loweringConfig,
+      getCPUTranslationInfo(genericOp.getContext(), passPipeline,
+                            pipelineConfig));
 }
 
 /// Sets the lowering configuration for a generic op to use
@@ -3048,8 +2853,9 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
       generator.generateCPULoweringConfig();
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert,
-      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
+      getCPUTranslationInfo(convOp.getContext(),
+                            CPUPipeline::ConvTileAndDecomposeExpert,
+                            pipelineConfig));
 }
 
 /// Main utility to compute the vectorization/unrolling tile sizes.
@@ -3183,7 +2989,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, loweringConfig,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+      getCPUTranslationInfo(padOp.getContext(),
+                            CPUPipeline::DoubleTilingExpert));
 }
 
 /// Set the default configuration for operations that implement the
@@ -3209,7 +3016,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "Set lowering_config for tensor.pad op: " << loweringConfig;
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, loweringConfig,
-      DispatchLoweringPassPipeline::CPUDefault);
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::Default));
 }
 
 /// Redirects to methods that set the configuration based on operation type.
@@ -3976,17 +3783,15 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  IREE::Codegen::TranslationInfoAttr tInfo = getTranslationInfo(entryPointFn);
-  DispatchLoweringPassPipeline pipeline =
-      tInfo.getDispatchLoweringPassPipeline();
-  DictionaryAttr pipelineConfig = tInfo.getConfiguration();
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(entryPointFn);
   if (isOptEnabled(entryPointFn, getEnableLoopPeelingStr())) {
     // See #16406
     LDBG() << "unpack fusion does not work with peeling, falling back to "
               "non-peeling path";
-    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 
     // Remove the "enable_loop_peeling" attr from pipelineConfig
+    DictionaryAttr pipelineConfig = translationInfo.getConfiguration();
     auto enableLoopPeelingAttrName =
         getEnableLoopPeelingAttrName(rootOp->getContext());
     auto newPipelineConfigEntries = llvm::filter_to_vector(
@@ -3994,16 +3799,18 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
           return entry.getName() != enableLoopPeelingAttrName;
         });
 
-    pipelineConfig =
+    auto newPipelineConfig =
         DictionaryAttr::get(rootOp->getContext(), newPipelineConfigEntries);
+    translationInfo = getCPUTranslationInfo(rootOp->getContext(),
+                                            CPUPipeline::DoubleTilingExpert,
+                                            newPipelineConfig);
   }
 
   IREE::Codegen::LoweringConfigAttrInterface newLoweringConfig =
       getNewLoweringConfig(rootOp->getContext(), tilingInfo,
                            /*setDistributionConfig=*/true);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, rootOp, newLoweringConfig, pipeline, /*workgroupSize=*/{},
-      /*subgroupSize=*/{}, pipelineConfig);
+      entryPointFn, rootOp, newLoweringConfig, translationInfo);
 }
 
 /// Set the lowering configs for all the compute ops. The lowering config is
@@ -4090,8 +3897,8 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
     return success();
   }
   // Otherwise lower using default pipeline.
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getCPUTranslationInfo(entryPointFn->getContext(), CPUPipeline::Default);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 

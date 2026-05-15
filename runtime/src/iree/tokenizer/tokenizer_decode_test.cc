@@ -1250,6 +1250,81 @@ TEST_F(TokenizerDecodeTest, ByteFallbackInvalidContinuation) {
   iree_tokenizer_free(tokenizer);
 }
 
+//===----------------------------------------------------------------------===//
+// Output Buffer Overflow Detection
+//
+// Verifies that decode functions return IREE_STATUS_RESOURCE_EXHAUSTED when the
+// output buffer is too small, rather than silently truncating.
+//===----------------------------------------------------------------------===//
+
+class TokenizerDecodeOverflowTest : public ::testing::Test {};
+
+// Batch decode with output buffer too small for the decoded text.
+// "Hello" = 5 bytes, but buffer only holds 1.
+TEST_F(TokenizerDecodeOverflowTest, BatchDecodeOutputBufferTooSmall) {
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "Hello");
+  vocab_builder.AddToken(1, "world");
+  ScopedVocab vocab = vocab_builder.Build();
+
+  iree_tokenizer_t* tokenizer = BuildByteLevelTokenizer(vocab.release());
+  ASSERT_NE(tokenizer, nullptr);
+
+  // Buffer size = 1, but "Helloworld" needs 10 bytes.
+  int32_t token_ids[] = {0, 1};
+  iree_tokenizer_token_id_list_t tokens = {2, token_ids};
+  char output[1];
+  iree_host_size_t text_length = 0;
+  iree_status_t status = iree_tokenizer_decode(
+      tokenizer, tokens, IREE_TOKENIZER_DECODE_FLAG_NONE,
+      iree_make_mutable_string_view(output, sizeof(output)),
+      iree_allocator_system(), &text_length);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+
+  iree_tokenizer_free(tokenizer);
+}
+
+// Defensive: byte_fallback finalize with partial flush.
+// Feed <0xF0> + <0x9F> (2 bytes of a 4-byte UTF-8 sequence). Finalize emits
+// one U+FFFD per pending byte (2 * 3 = 6 bytes needed). Buffer of 5 bytes
+// fits one U+FFFD (3 bytes) but not the second, triggering RESOURCE_EXHAUSTED.
+TEST_F(TokenizerDecodeOverflowTest,
+       FinalizePreDecodedByteFallbackPartialFlush) {
+  ScopedVocabBuilder vocab_builder;
+  vocab_builder.AddToken(0, "<0xF0>", IREE_TOKENIZER_TOKEN_ATTR_BYTE);
+  vocab_builder.AddToken(1, "<0x9F>", IREE_TOKENIZER_TOKEN_ATTR_BYTE);
+  ScopedVocab vocab = vocab_builder.Build();
+
+  iree_tokenizer_t* tokenizer = BuildByteFallbackTokenizer(vocab.release());
+  ASSERT_NE(tokenizer, nullptr);
+
+  IREE_ASSERT_OK_AND_ASSIGN(auto state_storage,
+                            DecodeStateStorage::Allocate(tokenizer));
+  auto* state = state_storage.state();
+
+  // Feed both byte tokens — accumulates 2 bytes in fallback buffer.
+  int32_t token_ids[] = {0, 1};
+  iree_tokenizer_token_id_list_t tokens = {2, token_ids};
+  char feed_output[256];
+  iree_host_size_t tokens_consumed = 0;
+  iree_host_size_t text_written = 0;
+  IREE_ASSERT_OK(iree_tokenizer_decode_state_feed(
+      state, tokens,
+      iree_make_mutable_string_view(feed_output, sizeof(feed_output)),
+      &tokens_consumed, &text_written));
+
+  // Finalize with 5 bytes — fits one U+FFFD (3 bytes) but not two (6 bytes).
+  char finalize_output[5];
+  iree_host_size_t finalize_written = 0;
+  iree_status_t status = iree_tokenizer_decode_state_finalize(
+      state, iree_make_mutable_string_view(finalize_output, 5),
+      &finalize_written);
+  EXPECT_EQ(finalize_written, 3u) << "Should have flushed one U+FFFD (3 bytes)";
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_RESOURCE_EXHAUSTED, status);
+
+  iree_tokenizer_free(tokenizer);
+}
+
 }  // namespace
 }  // namespace tokenizer
 }  // namespace iree

@@ -22,7 +22,7 @@ func.func @subgroup_reduce_f32(%2: tensor<2x512xf32>) -> tensor<2xf32> attribute
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 512]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [128, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [128, 1, 1]>
 //      CHECK: func.func @subgroup_reduce_f32(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -58,7 +58,7 @@ func.func @subgroup_reduce_f16(%2: tensor<16x4096x4096xf16>) -> tensor<16x4096x4
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 512]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //      CHECK: func.func @subgroup_reduce_f16(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -91,7 +91,7 @@ func.func @subgroup_reduce_dynamic(%10: tensor<8x?xf32>) -> tensor<8xf32> attrib
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 64]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //      CHECK: func.func @subgroup_reduce_dynamic(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
@@ -204,8 +204,8 @@ func.func @reduction_with_distributable_elementwise_consumer(
 //  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256]{{\]}}>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 256]{{\]}}>
 //  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
-//  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = SPIRVSubgroupReduce workgroup_size = [512, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [512, 1, 1]>
 //      CHECK: func.func @reduction_with_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION1]]
 //      CHECK:   linalg.generic
@@ -273,8 +273,8 @@ func.func @fail_reduction_with_nondistributable_consumer(
   return %epilogue : tensor<16x74x64xf32>
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseDistribute {{.*}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> {{.*}}>
 //      CHECK: func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-// CHECK-NOT: pipeline = SPIRVSubgroupReduce
+// CHECK-NOT: pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce>
 //      CHECK: return

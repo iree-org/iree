@@ -133,13 +133,13 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
   // handled. For example, fusing B with A will create a slice of B that will
   // need to be handled correctly.
   SmallVector<ConsumerFusionQueueEntry> candidates;
-  llvm::SmallDenseSet<tensor::ParallelInsertSliceOp> allCandidates;
-  auto addCandidateSlices = [&candidates, &allCandidates,
+  llvm::SmallDenseSet<OpResult> visitedLoopResults;
+  auto addCandidateSlices = [&candidates, &visitedLoopResults,
                              &filterFn](Operation *fusedOp,
                                         DominanceInfo &dominanceInfo) {
     for (auto *userOp : fusedOp->getResults().getUsers()) {
       auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(userOp);
-      if (!sliceOp || allCandidates.contains(sliceOp)) {
+      if (!sliceOp) {
         continue;
       }
 
@@ -147,6 +147,10 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
           cast<scf::ForallOp>(sliceOp->getParentOp()->getParentOp());
       OpResult loopResult = currLoop.getTiedOpResult(
           currLoop.getTiedOpOperand(cast<BlockArgument>(sliceOp.getDest())));
+      if (visitedLoopResults.contains(loopResult)) {
+        continue;
+      }
+      visitedLoopResults.insert(loopResult);
       SmallVector<Operation *> users = llvm::to_vector(
           llvm::make_filter_range(loopResult.getUsers(), filterFn));
       if (users.empty()) {
@@ -172,7 +176,6 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
                     return cast<tensor::ParallelInsertSliceOp>(op);
                   });
           llvm::append_range(fusedSlices, slices);
-          allCandidates.insert_range(slices);
         }
         if (!fusedSlices.empty()) {
           ConsumerFusionQueueEntry entry(std::move(fusedSlices), fusableUser);
@@ -210,7 +213,7 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     ConsumerFusionQueueEntry entry = candidates.pop_back_val();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumerOfSlices(rewriter, entry.slices, loops);
+        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops);
     if (failed(fusedResult)) {
       return failure();
     }

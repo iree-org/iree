@@ -2,12 +2,14 @@
 EXPORTS
   ireeAttributeIsACodegenCompilationInfoAttr
   ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr
+  ireeAttributeIsACodegenIntKnobAttr
   ireeAttributeIsACodegenOneOfKnobAttr
   ireeAttributeIsACodegenRootOpAttr
   ireeAttributeIsACodegenTranslationInfoAttr
   ireeAttributeIsAGPULoweringConfigAttr
   ireeAttributeIsAGPUMMAAttr
   ireeAttributeIsAGPUMMAIntrinsicAttr
+  ireeAttributeIsAGPUPipelineAttr
   ireeAttributeIsAGPUPipelineOptionsAttr
   ireeAttributeIsAGPUReorderWorkgroupsStrategyAttr
   ireeAttributeIsAGPUVirtualMMAAttr
@@ -15,6 +17,7 @@ EXPORTS
   ireeCodegenCompilationInfoAttrGet
   ireeCodegenCompilationInfoAttrGetParameters
   ireeCodegenCompilationInfoAttrGetTypeID
+  ireeCodegenConvertConstraintsOpToSMTLIB
   ireeCodegenDispatchLoweringPassPipelineAttrGet
   ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID
   ireeCodegenDispatchLoweringPassPipelineAttrGetValue
@@ -24,6 +27,8 @@ EXPORTS
   ireeCodegenGetTunerRootOps
   ireeCodegenHasIGEMMGenericConvDetails
   ireeCodegenInferScaledContractionDimensions
+  ireeCodegenIntKnobAttrGetName
+  ireeCodegenIntKnobAttrGetTypeID
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenOneOfKnobAttrGetName
@@ -104,6 +109,9 @@ EXPORTS
   ireeGPUMMAIntrinsicAttrGet
   ireeGPUMMAIntrinsicAttrGetTypeID
   ireeGPUMMAIntrinsicAttrGetValue
+  ireeGPUPipelineAttrGet
+  ireeGPUPipelineAttrGetTypeID
+  ireeGPUPipelineAttrGetValue
   ireeGPUPipelineOptionsAttrGet
   ireeGPUPipelineOptionsAttrGetNoReduceSharedMemoryBankConflicts
   ireeGPUPipelineOptionsAttrGetPrefetchNumStages
@@ -817,6 +825,7 @@ EXPORTS
   mlirOperationIsBeforeInBlock
   mlirOperationMoveAfter
   mlirOperationMoveBefore
+  mlirOperationNameHasTrait
   mlirOperationPrint
   mlirOperationPrintWithFlags
   mlirOperationPrintWithState

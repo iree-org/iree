@@ -349,30 +349,32 @@ func.func @distribute_I32_32x32x16_I8(%lhs: tensor<32x16xi8>, %rhs: tensor<16x32
  affine_map<() -> ()>,
  affine_map<() -> ()>
 ]
-func.func @distribute_WMMAR3_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tensor<16x16xf16>, %acc: tensor<16x8x2xf16>) -> tensor<16x8x2xf16> {
+func.func @distribute_WMMAR3_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: tensor<16x16xf16>, %acc: tensor<8x2x16xf16>) -> tensor<8x2x16xf16> {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [],
     kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x8x2xf16>
-  return %0 : tensor<16x8x2xf16>
+  } : tensor<16x16xf16>, tensor<16x16xf16> into tensor<8x2x16xf16>
+  return %0 : tensor<8x2x16xf16>
 }
 
 // CHECK-LABEL: func @distribute_WMMAR3_F16_16x16x16_F16
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<16x16xf16>
-//       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<16x8x2xf16>)
-//   CHECK-DAG:     %[[ID:.+]]:2 = affine.delinearize_index %[[LANEID]] into (16)
-//   CHECK-DAG:     %[[ROW:.+]] = iree_codegen.index_hint %[[ID]]#1(#iree_gpu.lane_increment<16, aligned>) : index
-//   CHECK-DAG:     %[[COL:.+]] = iree_codegen.index_hint %c0(#iree_gpu.lane_constant<16>) : index
-//   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[ROW]], 0] [1, 16]
-//   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][0, %[[ROW]]] [16, 1]
-//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, %[[COL]], %[[ROW]]] [16, 1, 1]
+//       CHECK:   scf.forall (%[[LANEID:.+]]) in (32) shared_outs(%[[ACC:.+]] = {{.*}}) -> (tensor<8x2x16xf16>)
+//   CHECK-DAG:     %[[LHS_ID:.+]]:2 = affine.delinearize_index %[[LANEID]] into (16)
+//   CHECK-DAG:     %[[LHS_ROW:.+]] = iree_codegen.index_hint %[[LHS_ID]]#1(#iree_gpu.lane_increment<16, aligned>) : index
+//   CHECK-DAG:     %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]][%[[LHS_ROW]], 0] [1, 16]
+//   CHECK-DAG:     %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]][{{.*}}, %[[LHS_ROW]]] [16, 1]
+//   CHECK-DAG:     %[[ACC_ID:.+]]:3 = affine.delinearize_index %[[LANEID]] into (2, 16)
+//   CHECK-DAG:     %[[ACC_TROW:.+]] = iree_codegen.index_hint %[[ACC_ID]]#1(#iree_gpu.lane_constant<16>) : index
+//   CHECK-DAG:     %[[ACC_TCOL:.+]] = iree_codegen.index_hint %[[ACC_ID]]#2(#iree_gpu.lane_increment<16, aligned>) : index
+//   CHECK-DAG:     %[[ACC_SLICE:.+]] = tensor.extract_slice %[[ACC]][0, %[[ACC_TROW]], %[[ACC_TCOL]]] [8, 1, 1]
 //       CHECK:     %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS_SLICE]], %[[RHS_SLICE]]) outs(%[[ACC_SLICE]])
 //  CHECK-SAME:       kind = #iree_gpu.mma_layout<WMMAR3_F16_16x16x16_F16>
-//  CHECK-SAME:       : tensor<1x16xf16>, tensor<16x1xf16> into tensor<16x1x1xf16>
-//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][0, %[[COL]], %[[ROW]]] [16, 1, 1]
+//  CHECK-SAME:       : tensor<1x16xf16>, tensor<16x1xf16> into tensor<8x1x1xf16>
+//       CHECK:     tensor.parallel_insert_slice %[[MMA]] into %[[ACC]][0, %[[ACC_TROW]], %[[ACC_TCOL]]] [8, 1, 1]
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
 
 // -----
@@ -572,7 +574,7 @@ func.func @distribute_WMMA_F32_16x16x128_F8E4M3FN(%lhs: tensor<16x128xf8E4M3FN>,
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: tensor<1x1x4x16xf32>, %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -607,7 +609,7 @@ func.func @data_tiled_1x1x1_tensor_multi_mma(%lhs: tensor<1x1x4x16xf32>, %rhs: t
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_1x1x1_tensor_multi_mma_permuted(%lhs: tensor<1x1x16x4xf32>, %rhs: tensor<1x1x16x4xf32>, %acc: tensor<1x1x4x4x16xf32>) -> tensor<1x1x4x4x16xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -643,7 +645,7 @@ func.func @data_tiled_1x1x1_tensor_multi_mma_permuted(%lhs: tensor<1x1x16x4xf32>
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -680,7 +682,7 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled(%lhs: tensor<1x1x2x4x16x4x
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k(%lhs: tensor<1x1x4x16x2x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -717,7 +719,7 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_and_k(%lhs: tensor<1x1
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_only(%lhs: tensor<1x1x4x4x16x2xf32>, %rhs: tensor<1x1x2x4x4x16xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -754,7 +756,7 @@ func.func @data_tiled_2x2x4_tensor_multi_mma_interleave_m_only(%lhs: tensor<1x1x
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(%lhs: tensor<1x1x2x4x16x4xf32>, %rhs: tensor<1x1x2x4x16x4xf32>, %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -800,7 +802,7 @@ func.func @data_tiled_scaled_2x2x4_tensor_multi_mma_unrolled_to_subgroups(
     %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>,
     %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
@@ -852,7 +854,7 @@ func.func @data_tiled_scaled_2x2x4_tensor_multi_mma_unrolled(
     %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>,
     %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
@@ -900,7 +902,7 @@ func.func @data_tiled_scaled_2x2x4_tensor_interleave_m_n_and_k(
     %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x4x16x2x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16x2x4xf8E8M0FNU>,
     %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32>
-    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
@@ -943,7 +945,7 @@ func.func @data_tiled_scaled_2x2x4_tensor_interleave_m_n_and_k(
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @data_tiled_tensor_multi_mma_subgroups_k_2(%lhs: tensor<1x1x2x4x16xf32>, %rhs: tensor<1x1x2x4x16xf32>, %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32>
-      attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [128, 1, 1] subgroup_size = 64>} {
+      attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
@@ -984,7 +986,7 @@ func.func @data_tiled_scaled_1x1x1_tensor_multi_mma(
     %lhs: tensor<1x1x1x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x4x16x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x4x16xf8E8M0FNU>, %rhs_scales: tensor<1x1x4x16xf8E8M0FNU>,
     %acc: tensor<1x1x4x16x4xf32>) -> tensor<1x1x4x16x4xf32>
-    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>} {
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
@@ -1032,7 +1034,7 @@ func.func @data_tiled_scaled_multi_mma_subgroups_m_and_k(
     %lhs: tensor<1x1x1x2x2x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x16x32xf4E2M1FN>,
     %lhs_scales: tensor<1x1x2x2x4x16xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16xf8E8M0FNU>,
     %acc: tensor<1x1x2x4x16x4xf32>) -> tensor<1x1x2x4x16x4xf32>
-    attributes {translation_info = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [256, 1, 1] subgroup_size = 64>} {
+    attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64>} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
     indexing_maps = #scaled_contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],

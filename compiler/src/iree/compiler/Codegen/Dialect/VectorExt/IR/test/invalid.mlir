@@ -73,7 +73,7 @@ func.func @index_vec_shape_mismatch(%indices: vector<128x64xindex>,
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
 
-  // expected-error @+1 {{'iree_vector_ext.transfer_gather' op Mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
+  // expected-error @+1 {{'iree_vector_ext.transfer_gather' op mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
   [%indices : vector<128x64xindex>], %cst0 {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
@@ -110,7 +110,7 @@ func.func @scatter_index_vec_shape_mismatch(%indices: vector<128x64xindex>,
 
   %c0 = arith.constant 0 : index
 
-  // expected-error @+1 {{'iree_vector_ext.transfer_scatter' op Mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
+  // expected-error @+1 {{'iree_vector_ext.transfer_scatter' op mismatched vector shape for index vec at position 0. Expected: [64, 128], got: [128, 64]}}
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
   [%indices : vector<128x64xindex>] {
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,

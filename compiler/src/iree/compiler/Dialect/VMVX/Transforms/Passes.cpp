@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -57,28 +58,34 @@ void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager) {
 
 static void
 buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
+  variantPassManager.addPass(createCreateDispatchConfigPass());
+
   // ---------------------------------------------------------------------------
   // Tensor-level optimization, kernel dispatch and lower to buffers.
   // ---------------------------------------------------------------------------
-  FunctionLikeNest(variantPassManager.nest<ModuleOp>())
-      .addPass(createVMVXLowerExecutableTargetPass);
+  {
+    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    FunctionLikeNest(modulePassManager)
+        .addPass(createVMVXLowerExecutableTargetPass);
 
-  // Resolve workgroup distribution before lowering ukernels to calls.
-  // CPULowerToUKernelsPass (inside VMVXLowerExecutableTargetPass) lowers
-  // iree_codegen.query_tile_sizes to iree_codegen.ukernel.generic which is
-  // memory-effect-free at the tensor level (no memref operands). The WAR hack
-  // in materializeSliceFromOrdinals replaces it with a constant in the count
-  // region. After LowerUKernelOpsToCallsPass it becomes a func.call which is
-  // memory-effecting and would be rejected by the backward slice.
-  variantPassManager.addPass(createReconcileTranslationInfoPass());
-  variantPassManager.addPass(createResolveWorkgroupCountHintsPass());
-
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
+    // Resolve workgroup distribution before lowering ukernels to calls.
+    // CPULowerToUKernelsPass (inside VMVXLowerExecutableTargetPass) lowers
+    // iree_codegen.query_tile_sizes to iree_codegen.ukernel.generic which is
+    // memory-effect-free at the tensor level (no memref operands). The WAR
+    // hack in materializeSliceFromOrdinals replaces it with a constant in
+    // the count region. After LowerUKernelOpsToCallsPass it becomes a
+    // func.call which is memory-effecting and would be rejected by the
+    // backward slice.
+    modulePassManager.addPass(createReconcileTranslationInfoPass());
+    modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
+  }
+  variantPassManager.addPass(createPropagateDispatchConfigPass());
 
   // ---------------------------------------------------------------------------
   // Linalg -> Vectors
   // ---------------------------------------------------------------------------
+  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+  modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   FunctionLikeNest(modulePassManager)
       .addPass(createCanonicalizerPass)
@@ -131,7 +138,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
 
 static void buildLoopOptimizationVMVXTransformPassPipeline(
     FunctionLikeNest &funcPassManager) {
-  funcPassManager.addPass(createIREECodegenLowerAffinePass)
+  funcPassManager.addPass(createIREELowerAffinePass)
       .addPass(createForOpCanonicalizationPass)
       .addPass(createIREELoopInvariantCodeMotionPass);
 }

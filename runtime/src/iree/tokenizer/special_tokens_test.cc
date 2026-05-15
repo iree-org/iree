@@ -682,23 +682,29 @@ TEST_F(SpecialTokensFlagsTest, RstripMatchesBeforeWhitespace) {
             IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 }
 
-TEST_F(SpecialTokensFlagsTest, RstripRejectsBeforeNonWhitespace) {
+TEST_F(SpecialTokensFlagsTest, RstripMatchesBeforeNonWhitespace) {
   BuildWithFlags("<|special|>", 100, IREE_TOKENIZER_SPECIAL_TOKEN_FLAG_RSTRIP);
 
-  // Before letter, rstrip should NOT allow match.
+  // rstrip is a post-processing directive (strip trailing whitespace after the
+  // token), NOT a match condition. Tokens with rstrip always match regardless
+  // of what follows.
   ResetState();
-  EXPECT_EQ(TryMatch(IREE_SV("<|special|>abc")),
-            IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+  iree_host_size_t length = 0;
+  EXPECT_EQ(TryMatch(IREE_SV("<|special|>abc"), &length),
+            IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
+  EXPECT_EQ(length, 11u);
 
   // Before digit.
   ResetState();
-  EXPECT_EQ(TryMatch(IREE_SV("<|special|>123")),
-            IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+  EXPECT_EQ(TryMatch(IREE_SV("<|special|>123"), &length),
+            IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
+  EXPECT_EQ(length, 11u);
 
   // Before punctuation.
   ResetState();
-  EXPECT_EQ(TryMatch(IREE_SV("<|special|>!")),
-            IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+  EXPECT_EQ(TryMatch(IREE_SV("<|special|>!"), &length),
+            IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
+  EXPECT_EQ(length, 11u);
 }
 
 //===----------------------------------------------------------------------===//
@@ -768,11 +774,11 @@ TEST_F(SpecialTokensFlagsTest, LstripAndRstripCombined) {
   EXPECT_EQ(TryMatch(IREE_SV("<|special|> ")),
             IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
 
-  // After space, before letter - rstrip fails.
+  // After space, before letter - rstrip is post-processing only, still matches.
   ResetState();
   ConsumeBytes(IREE_SV(" "));
   EXPECT_EQ(TryMatch(IREE_SV("<|special|>abc")),
-            IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+            IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 }
 
 TEST_F(SpecialTokensFlagsTest, NoFlagsMatchesAnywhere) {
@@ -844,14 +850,15 @@ TEST_F(SpecialTokensFlagsTest, RstripStreamingChecksNextByte) {
   result = TryMatch(IREE_SV("cial|> "));
   EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 
-  // Scenario 3: Stream token with letter after (should NOT match).
+  // Scenario 3: Stream token with letter after - rstrip is post-processing
+  // only, so token still matches regardless of what follows.
   ResetState();
   result = TryMatch(IREE_SV("<|spe"));
   EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_NEED_MORE);
 
-  // Complete with letter after - should NOT match.
+  // Complete with letter after - rstrip does not reject, still matches.
   result = TryMatch(IREE_SV("cial|>abc"));
-  EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+  EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 }
 
 TEST_F(SpecialTokensFlagsTest, SingleWordStreamingChecksBothBoundaries) {
@@ -902,7 +909,8 @@ TEST_F(SpecialTokensFlagsTest, StreamingByteByByteWithFlags) {
   result = TryMatch(IREE_SV("C "));  // Complete with trailing space.
   EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 
-  // Same but no trailing whitespace at end - should NOT match.
+  // Same but with non-whitespace after - rstrip is post-processing only,
+  // so the token still matches. Only lstrip is a match condition.
   ResetState();
   ConsumeBytes(IREE_SV(" "));
 
@@ -913,7 +921,7 @@ TEST_F(SpecialTokensFlagsTest, StreamingByteByByteWithFlags) {
   EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_NEED_MORE);
 
   result = TryMatch(IREE_SV("Cx"));  // Complete with 'x' after.
-  EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_NO_MATCH);
+  EXPECT_EQ(result, IREE_TOKENIZER_SPECIAL_TOKENS_MATCHED);
 }
 
 //===----------------------------------------------------------------------===//

@@ -160,22 +160,16 @@ struct AttentionOpConversion
     // TODO: We are currently assuming that head dimension is dim = -1. Once we
     // have support for batch dims using more general indexing maps, we should
     // change this and rely on more general mechanisms.
-    // TODO: We are currently not handling dynamic shape of head dimensions at
-    // all. This is because it messes with dispatch formation. This should be
-    // fixed.
-    ArrayRef<int64_t> queryShape = op.getQueryType().getShape();
-    int64_t headDim = queryShape.back();
-    if (headDim == ShapedType::kDynamic) {
-      return op->emitOpError("NYI: Dynamic head dimension");
-    }
 
-    // Attention only works for FloatType.
-    FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
-
-    double dk = static_cast<double>(headDim);
-    dk = 1.0 / std::sqrt(dk);
-    Value scale = arith::ConstantOp::create(
-        rewriter, loc, targetType, rewriter.getFloatAttr(targetType, dk));
+    // Compute scale = rsqrt(head_dim) in f32.
+    int64_t queryRank = op.getQueryType().getRank();
+    Value dimIdx =
+        rewriter.createOrFold<tensor::DimOp>(loc, query, queryRank - 1);
+    Value dimInt = rewriter.createOrFold<arith::IndexCastOp>(
+        loc, rewriter.getI64Type(), dimIdx);
+    Value dimFloat = rewriter.createOrFold<arith::SIToFPOp>(
+        loc, rewriter.getF32Type(), dimInt);
+    Value scale = rewriter.createOrFold<math::RsqrtOp>(loc, dimFloat);
 
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps =

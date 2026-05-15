@@ -149,6 +149,11 @@ enum iree_tokenizer_encode_flag_bits_e {
   // to emit special tokens and assign type_ids to model-produced tokens.
   // When not set, no special tokens are inserted and type_ids are all 0.
   IREE_TOKENIZER_ENCODE_FLAG_ADD_SPECIAL_TOKENS = 1u << 2,
+  // Disable special token matching in input text. When set, sequences like
+  // <|endoftext|> are tokenized as ordinary text instead of being matched
+  // to special token IDs. Equivalent to tiktoken's encode_ordinary()
+  // (also known as encode(text, disallowed_special=())).
+  IREE_TOKENIZER_ENCODE_FLAG_NO_SPECIAL_TOKEN_MATCHING = 1u << 3,
 };
 typedef uint32_t iree_tokenizer_encode_flags_t;
 

@@ -136,7 +136,7 @@ public:
   using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, bufferization::BufferizationDialect,
-                    memref::MemRefDialect>();
+                    gpu::GPUDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;
@@ -278,6 +278,16 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // data races on GPU.
   options.checkParallelRegions = false;
 
+  // Place constants in the GPU constant address space to enable
+  // backend-specific optimizations (e.g., scalar reads on AMDGPU).
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(funcOp))) {
+    options.defaultMemorySpaceFn =
+        [](TensorType t) -> std::optional<Attribute> {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Constant);
+    };
+  }
+
   bufferization::BufferizationState bufferizationState;
   if (failed(runIREEOneShotBufferize(funcOp, options, bufferizationState))) {
     return signalPassFailure();
@@ -297,6 +307,16 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   mlir::bufferization::OneShotBufferizationOptions opt;
   opt.copyBeforeWrite = true;
   opt.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+
+  // Place constants in the GPU constant address space to enable
+  // backend-specific optimizations (e.g., scalar reads on AMDGPU).
+  if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(getOperation()))) {
+    opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
+      return gpu::AddressSpaceAttr::get(t.getContext(),
+                                        gpu::AddressSpace::Constant);
+    };
+  }
+
   bufferization::BufferizationState bufferizationState;
   if (failed(mlir::bufferization::runOneShotBufferize(
           getOperation(), opt, bufferizationState,

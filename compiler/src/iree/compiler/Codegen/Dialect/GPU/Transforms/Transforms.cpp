@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -44,6 +45,19 @@
 #include "mlir/Support/LLVM.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
+
+// Tag constants for HoistableConversionOp pairs. Each pair of tags marks
+// inverse conversions that can be cancelled or hoisted out of loops.
+static constexpr llvm::StringLiteral kShapeCastToIntrinsic =
+    "shape_cast_to_intrinsic";
+static constexpr llvm::StringLiteral kShapeCastFromIntrinsic =
+    "shape_cast_from_intrinsic";
+static constexpr llvm::StringLiteral kDropUnitDims = "drop_unit_dims";
+static constexpr llvm::StringLiteral kAddUnitDims = "add_unit_dims";
+static constexpr llvm::StringLiteral kUnrollAccDistribute =
+    "unroll_acc_distribute";
+static constexpr llvm::StringLiteral kUnrollAccReassemble =
+    "unroll_acc_reassemble";
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -1107,7 +1121,8 @@ fuseExtractSliceIntoProducerForall(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
+struct LowerInnerTiledPattern final
+    : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
@@ -1126,29 +1141,69 @@ struct LowerInnerTiledPattern : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
     SmallVector<VectorType> regTypes;
     tiledOp.getKind().getDistributedTileTypes(regTypes);
 
-    for (auto [operand, regType] : llvm::zip_equal(operands, regTypes)) {
-      if (operand.getType() != regType) {
-        operand = vector::ShapeCastOp::create(rewriter, tiledOp.getLoc(),
-                                              regType, operand);
+    int64_t numInputs = tiledOp.getNumInputs();
+
+    for (int64_t i = 0; i < numInputs; ++i) {
+      if (operands[i].getType() != regTypes[i]) {
+        operands[i] = vector::ShapeCastOp::create(rewriter, tiledOp.getLoc(),
+                                                  regTypes[i], operands[i]);
       }
     }
 
-    SmallVector<Value> concreteResults;
-    int64_t numInputs = tiledOp.getNumInputs();
+    bool needsCast = !llvm::all_of_zip(
+        ArrayRef(operands).drop_front(numInputs),
+        ArrayRef(regTypes).drop_front(numInputs),
+        [](Value v, VectorType t) { return v.getType() == t; });
+    if (needsCast) {
+      auto outputs = ArrayRef(operands).drop_front(numInputs);
+      auto outputRegTypes = ArrayRef(regTypes).drop_front(numInputs);
+      // Shape-cast accumulator to intrinsic register types; the inverse
+      // conversion after the op will be hoisted out of the reduction loop.
+      auto hoistOp = IREE::Util::HoistableConversionOp::create(
+          rewriter, tiledOp.getLoc(), /*tag=*/kShapeCastToIntrinsic,
+          /*inverseTag=*/kShapeCastFromIntrinsic, outputs,
+          [&outputRegTypes](OpBuilder &b, Location loc, ValueRange args) {
+            return llvm::map_to_vector(
+                llvm::zip_equal(args, outputRegTypes), [&](auto pair) -> Value {
+                  auto [arg, regType] = pair;
+                  if (arg.getType() == regType) {
+                    return arg;
+                  }
+                  return vector::ShapeCastOp::create(b, loc, regType, arg);
+                });
+          });
+
+      llvm::copy(hoistOp.getResults(), operands.begin() + numInputs);
+    }
+
+    SmallVector<Value> results;
     LogicalResult couldLower = tiledOp.getKind().buildUnderlyingOperations(
         rewriter, tiledOp.getLoc(), ValueRange{operands}.take_front(numInputs),
-        ValueRange{operands}.drop_front(numInputs), concreteResults);
+        ValueRange{operands}.drop_front(numInputs), results);
     if (failed(couldLower)) {
       tiledOp.emitOpError(
           "failed to lower to concrete inner tiled operations.");
       return failure();
     }
-    for (auto [result, externalShape] :
-         llvm::zip_equal(concreteResults, tiledOp.getResultTypes())) {
-      result = vector::ShapeCastOp::create(rewriter, tiledOp.getLoc(),
-                                           externalShape, result);
+
+    if (needsCast) {
+      auto resultTypes = tiledOp.getResultTypes();
+      auto hoistOp = IREE::Util::HoistableConversionOp::create(
+          rewriter, tiledOp.getLoc(), /*tag=*/kShapeCastFromIntrinsic,
+          /*inverseTag=*/kShapeCastToIntrinsic, results,
+          [&resultTypes](OpBuilder &b, Location loc, ValueRange args) {
+            return llvm::map_to_vector(
+                llvm::zip_equal(args, resultTypes), [&](auto pair) -> Value {
+                  auto [arg, extType] = pair;
+                  if (arg.getType() == extType) {
+                    return arg;
+                  }
+                  return vector::ShapeCastOp::create(b, loc, extType, arg);
+                });
+          });
+      results = SmallVector<Value>(hoistOp.getResults());
     }
-    rewriter.replaceOp(tiledOp, concreteResults);
+    rewriter.replaceOp(tiledOp, results);
     return success();
   }
 };
@@ -1346,15 +1401,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return failure();
   }
 
+  bool isBlock = mmaKind.isBlockIntrinsic();
+  if (isBlock && contractionDims.batch.empty()) {
+    return failure();
+  }
+
   MLIRContext *context = rewriter.getContext();
 
   int64_t innerM = contractionDims.m.back();
   int64_t innerN = contractionDims.n.back();
   int64_t innerK = contractionDims.k.back();
 
-  AffineExpr d0, d1, d2;
-  bindDims(context, d0, d1, d2);
-  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
   AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
   AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
   AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
@@ -1381,24 +1438,49 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
     return permutation;
   };
 
-  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
-  SmallVector<int64_t> lhsInnerPerm =
-      getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
-  SmallVector<int64_t> rhsInnerPerm =
-      getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
-  SmallVector<int64_t> accInnerPerm =
-      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
-
-  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
-    return failure();
-  }
-
+  SmallVector<int64_t> lhsInnerPerm, rhsInnerPerm, accInnerPerm;
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+  int64_t numDims = lhsMap.getNumDims();
+  llvm::SmallDenseSet<int64_t> droppedDims;
+  int64_t numInnerDims;
 
-  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
-  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
-      intrinsicK != bounds[innerK]) {
-    return failure();
+  if (isBlock) {
+    int64_t innerB = contractionDims.batch.back();
+    AffineExpr bExpr = rewriter.getAffineDimExpr(innerB);
+    lhsInnerPerm = getNormalizedPermutation(lhsMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, kExpr});
+    rhsInnerPerm = getNormalizedPermutation(rhsMap.getMinorSubMap(3),
+                                            {bExpr, kExpr, nExpr});
+    accInnerPerm = getNormalizedPermutation(accMap.getMinorSubMap(3),
+                                            {bExpr, mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicB, intrinsicM, intrinsicN, intrinsicK] =
+        mmaKind.getBMNKShape();
+    if (intrinsicB != bounds[innerB] || intrinsicM != bounds[innerM] ||
+        intrinsicN != bounds[innerN] || intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerB, innerM, innerN, innerK};
+    numInnerDims = 4;
+  } else {
+    lhsInnerPerm =
+        getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
+    rhsInnerPerm =
+        getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+    accInnerPerm =
+        getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+    if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+      return failure();
+    }
+    auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+    if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+        intrinsicK != bounds[innerK]) {
+      return failure();
+    }
+    droppedDims = {innerM, innerN, innerK};
+    numInnerDims = 3;
   }
 
   SmallVector<Value> inputs = linalgOp->getOperands();
@@ -1415,10 +1497,8 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
 
   SmallVector<utils::IteratorType> linalgIteratorTypes =
       linalgOp.getIteratorTypesArray();
-  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
   llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
   int64_t currentDim = 0;
-  int64_t numDims = lhsMap.getNumDims();
   SmallVector<utils::IteratorType> iteratorTypes;
   for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
     if (droppedDims.contains(dim)) {
@@ -1429,16 +1509,17 @@ FailureOr<IREE::Codegen::InnerTiledOp> convertContractionToInnerTiledMma(
   }
 
   AffineMap outerLhsMap =
-      dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, lhsMap, oldDimsToNewDimsMap);
   AffineMap outerRhsMap =
-      dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, rhsMap, oldDimsToNewDimsMap);
   AffineMap outerAccMap =
-      dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
+      dropDims(context, numDims - numInnerDims, accMap, oldDimsToNewDimsMap);
 
   std::optional<SmallVector<SmallVector<int64_t>>> perms =
       SmallVector<SmallVector<int64_t>>{lhsInnerPerm, rhsInnerPerm,
                                         accInnerPerm};
-  SmallVector<int64_t> identityPerm = {0, 1};
+  SmallVector<int64_t> identityPerm =
+      isBlock ? SmallVector<int64_t>{0, 1, 2} : SmallVector<int64_t>{0, 1};
 
   if (lhsInnerPerm == identityPerm && rhsInnerPerm == identityPerm &&
       accInnerPerm == identityPerm) {
@@ -1590,7 +1671,7 @@ distributeInnerTiledOp(RewriterBase &rewriter,
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct DropInnerTiledUnitDimsPattern
+struct DropInnerTiledUnitDimsPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
@@ -1614,35 +1695,64 @@ struct DropInnerTiledUnitDimsPattern
     }
 
     Location loc = tiledOp.getLoc();
+    int64_t numInputs = tiledOp.getNumInputs();
     SmallVector<Value> newOperands;
-    for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getOperands())) {
+    for (auto [opIndex, operand] : llvm::enumerate(tiledOp.getInputs())) {
       int64_t outerRank = tiledOp.getOperandOuterRank(opIndex);
       if (outerRank == 0) {
         newOperands.push_back(operand);
-        continue;
+      } else {
+        SmallVector<int64_t> zeros(outerRank, 0);
+        newOperands.push_back(
+            vector::ExtractOp::create(rewriter, loc, operand, zeros));
       }
-      SmallVector<int64_t> droppedDimIndices(outerRank, 0);
-      Value slice =
-          vector::ExtractOp::create(rewriter, loc, operand, droppedDimIndices);
-      newOperands.push_back(slice);
     }
+
+    auto outputs = tiledOp.getOutputs();
+    // Drop outer unit dims from accumulator for the intrinsic; the inverse
+    // broadcast will be hoisted out of the reduction loop.
+    auto hoistExtractOp = IREE::Util::HoistableConversionOp::create(
+        rewriter, loc, /*tag=*/kDropUnitDims, /*inverseTag=*/kAddUnitDims,
+        outputs, [&](OpBuilder &b, Location bLoc, ValueRange args) {
+          return llvm::map_to_vector(
+              llvm::enumerate(args), [&](auto pair) -> Value {
+                auto [i, arg] = pair;
+                int64_t outerRank = tiledOp.getOperandOuterRank(numInputs + i);
+                if (outerRank == 0) {
+                  return arg;
+                }
+                SmallVector<int64_t> zeros(outerRank, 0);
+                return vector::ExtractOp::create(b, bLoc, arg, zeros);
+              });
+        });
+    llvm::append_range(newOperands, hoistExtractOp.getResults());
 
     SmallVector<AffineMap> emptyMaps(tiledOp.getNumOperands(),
                                      AffineMap::get(rewriter.getContext()));
     auto newTiledOp = IREE::Codegen::InnerTiledOp::create(
-        rewriter, loc,
-        ValueRange{newOperands}.take_front(tiledOp.getNumInputs()),
-        ValueRange{newOperands}.drop_front(tiledOp.getNumInputs()),
+        rewriter, loc, ValueRange{newOperands}.take_front(numInputs),
+        ValueRange{newOperands}.drop_front(numInputs),
         rewriter.getAffineMapArrayAttr(emptyMaps), rewriter.getArrayAttr({}),
         tiledOp.getKind(), tiledOp.getSemantics());
 
+    // Pull extract / broadcast pairs out of the loop so the hardware
+    // accumulator type becomes loop-carried.
     SmallVector<Value> newResults(newTiledOp.getResults());
-    for (auto [newResult, externalShape] :
-         llvm::zip_equal(newResults, tiledOp.getResultTypes())) {
-      newResult =
-          vector::BroadcastOp::create(rewriter, loc, externalShape, newResult);
-    }
-    rewriter.replaceOp(tiledOp, newResults);
+    auto resultTypes = tiledOp.getResultTypes();
+    auto hoistBroadcastOp = IREE::Util::HoistableConversionOp::create(
+        rewriter, loc, /*tag=*/kAddUnitDims, /*inverseTag=*/kDropUnitDims,
+        newResults,
+        [&resultTypes](OpBuilder &b, Location bLoc, ValueRange args) {
+          return llvm::map_to_vector(
+              llvm::zip_equal(args, resultTypes), [&](auto pair) -> Value {
+                auto [arg, ty] = pair;
+                if (arg.getType() == ty) {
+                  return arg;
+                }
+                return vector::BroadcastOp::create(b, bLoc, ty, arg);
+              });
+        });
+    rewriter.replaceOp(tiledOp, hoistBroadcastOp.getResults());
     return success();
   }
 };
@@ -1689,7 +1799,7 @@ struct OffsetMapInfo {
   }
 };
 
-struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
+struct UnrollInnerTiledPattern final : OpRewritePattern<Codegen::InnerTiledOp> {
   UnrollInnerTiledPattern(MLIRContext *context,
                           const vector::UnrollVectorOptions &options,
                           PatternBenefit benefit = 1)
@@ -1751,11 +1861,42 @@ struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
     AffineMap accPermutationMap = permutationMaps.back();
     ArrayRef<int64_t> innerAccShape = tiledOp.getOperandInnerShape(accIndex);
 
+    SmallVector<int64_t> accTileShape =
+        applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(*targetShape));
+
+    SmallVector<SmallVector<int64_t>> uniqueAccOffsets;
+    for (SmallVector<int64_t> off :
+         StaticTileOffsetRange(originalSize, *targetShape, loopOrder)) {
+      SmallVector<int64_t> accOff =
+          applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(off));
+      if (!llvm::is_contained(uniqueAccOffsets, accOff)) {
+        uniqueAccOffsets.push_back(accOff);
+      }
+    }
+
+    Value accOperand = tiledOp.getOutputs().front();
+    // Distribute the accumulator into per-intrinsic slices; the reassembly
+    // conversion will be hoisted out of the reduction loop.
+    auto distributeOp = IREE::Util::HoistableConversionOp::create(
+        rewriter, loc, /*tag=*/kUnrollAccDistribute,
+        /*inverseTag=*/kUnrollAccReassemble, accOperand,
+        [&](OpBuilder &b, Location bLoc, ValueRange args) {
+          SmallVector<Value> results;
+          for (auto &accOff : uniqueAccOffsets) {
+            SmallVector<int64_t> strides(accOff.size(), 1);
+            results.push_back(vector::ExtractStridedSliceOp::create(
+                b, bLoc, args[0], accOff, accTileShape, strides));
+          }
+          return results;
+        });
+    for (auto [idx, accOff] : llvm::enumerate(uniqueAccOffsets)) {
+      accCache[accOff] = distributeOp.getResult(idx);
+    }
+
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(originalSize, *targetShape, loopOrder)) {
       SmallVector<Value> slicesOperands(tiledOp.getNumOperands());
 
-      // Helper to compute the new shape of each operand and extract the slice.
       auto extractOperand = [&](unsigned index, Value operand,
                                 AffineMap permutationMap,
                                 ArrayRef<int64_t> operandOffsets) {
@@ -1766,7 +1907,6 @@ struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
             rewriter, loc, operand, operandOffsets, operandShape,
             operandStrides);
       };
-      // Extract the new input operands.
       for (auto [inputIndex, input] : llvm::enumerate(tiledOp.getInputs())) {
         SmallVector<int64_t> inOffsets = applyPermutationMap(
             permutationMaps[inputIndex], ArrayRef<int64_t>(offsets));
@@ -1776,41 +1916,46 @@ struct UnrollInnerTiledPattern : OpRewritePattern<Codegen::InnerTiledOp> {
 
       SmallVector<int64_t> accOffsets =
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
-      // If a version of the accumulator has already been computed, use it
-      // otherwise extract the first version from the original operand.
-      auto *accIt = accCache.find(accOffsets);
-      if (accIt != accCache.end()) {
-        slicesOperands[accIndex] = accIt->second;
-      } else {
-        extractOperand(accIndex, tiledOp.getOutputs().front(),
-                       accPermutationMap, accOffsets);
-      }
+      slicesOperands[accIndex] = accCache[accOffsets];
 
       SmallVector<int64_t> dstShape = applyPermutationMap(
           accPermutationMap, ArrayRef<int64_t>(*targetShape));
       dstShape.append(innerAccShape.begin(), innerAccShape.end());
       auto targetType = VectorType::get(dstShape, dstVecType.getElementType());
 
-      // Clone the inner tiled op with the new operands and result type.
       IREE::Codegen::InnerTiledOp newOp =
           mlir::clone(rewriter, tiledOp, targetType, slicesOperands);
 
       SmallVector<int64_t> dstOffsets =
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
-      // Save the accumulated value until all the loops are unrolled since
-      // reduction loop keep updating the accumulator.
       accCache[dstOffsets] = newOp.getResults().front();
     }
-    // Assemble back the accumulator into a single vector.
-    Value result = arith::ConstantOp::create(rewriter, loc, dstVecType,
-                                             rewriter.getZeroAttr(dstVecType));
+
+    SmallVector<Value> accResults;
+    SmallVector<SmallVector<int64_t>> accResultOffsets;
     for (const auto &[offsets, partialResult] : accCache) {
-      SmallVector<int64_t> dstStrides(offsets.size() + innerAccShape.size(), 1);
-      SmallVector<int64_t> fullOffsets(offsets);
-      fullOffsets.append(innerAccShape.size(), 0);
-      result = vector::InsertStridedSliceOp::create(
-          rewriter, loc, partialResult, result, fullOffsets, dstStrides);
+      accResults.push_back(partialResult);
+      accResultOffsets.push_back(SmallVector<int64_t>(offsets));
     }
+
+    Value result =
+        IREE::Util::HoistableConversionOp::create(
+            rewriter, loc, /*tag=*/kUnrollAccReassemble,
+            /*inverseTag=*/kUnrollAccDistribute, accResults,
+            [&](OpBuilder &b, Location bLoc, ValueRange args) {
+              Value res =
+                  arith::ConstantOp::create(b, bLoc, b.getZeroAttr(dstVecType));
+              for (auto [idx, offsets] : llvm::enumerate(accResultOffsets)) {
+                SmallVector<int64_t> dstStrides(
+                    offsets.size() + innerAccShape.size(), 1);
+                SmallVector<int64_t> fullOffsets(offsets);
+                fullOffsets.append(innerAccShape.size(), 0);
+                res = vector::InsertStridedSliceOp::create(
+                    b, bLoc, args[idx], res, fullOffsets, dstStrides);
+              }
+              return SmallVector<Value>{res};
+            })
+            .getResult(0);
     rewriter.replaceOp(tiledOp, result);
     return success();
   }

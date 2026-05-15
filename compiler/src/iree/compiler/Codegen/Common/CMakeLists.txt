@@ -59,6 +59,7 @@ iree_cc_library(
     "FastMathPatterns.h"
     "PassUtils.h"
     "Passes.h"
+    "SMTConstraintUtils.h"
     "TensorDynamicDimAnalysis.h"
     "TileAndFuseUtils.h"
     "TileInferenceUtils.h"
@@ -77,10 +78,12 @@ iree_cc_library(
     "ConfigTrackingCanonicalizer.cpp"
     "ConvertAccGEMMToGEMM.cpp"
     "ConvertBf16ArithToF32.cpp"
+    "ConvertConstraintsToSMT.cpp"
     "ConvertUnsupportedFloatArith.cpp"
     "ConvertUnsupportedFloatToIntBuffers.cpp"
     "ConvertWorkgroupForallToPCF.cpp"
     "ConvolutionToIGEMM.cpp"
+    "CreateDispatchConfig.cpp"
     "DecomposeAffineOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
@@ -104,17 +107,17 @@ iree_cc_library(
     "ForallToFor.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
+    "HoistInnerTiledAccReshapes.cpp"
     "HoistStaticallyBoundAllocations.cpp"
     "HoistUnrolledVectorExtractInsertSlice.cpp"
-    "IREECodegenAffineExpandIndexOps.cpp"
     "IREECodegenCanonicalizer.cpp"
     "IREECodegenFoldMemRefAliasOps.cpp"
-    "IREECodegenLowerAffine.cpp"
     "IREEComprehensiveBufferize.cpp"
     "IREEExpandStridedMetadata.cpp"
     "IREEInjectAssumeAlignment.cpp"
     "IREELoopInvariantCodeMotion.cpp"
     "InsertBatchDimForBatchlessConv.cpp"
+    "InsertSMTConstraints.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LinkTuningSpecs.cpp"
     "LowerExecutableUsingTransformDialect.cpp"
@@ -126,6 +129,7 @@ iree_cc_library(
     "MaterializeEncodingPatterns.cpp"
     "MaterializeTuningSpecs.cpp"
     "MaterializeVectorMasking.cpp"
+    "MaterializeVectorTileSizes.cpp"
     "MathTransform.cpp"
     "MemrefCopyToLinalg.cpp"
     "NormalizeLoopBounds.cpp"
@@ -136,6 +140,7 @@ iree_cc_library(
     "Passes.cpp"
     "PatchFuncOps.cpp"
     "PropagateConstantOffsets.cpp"
+    "PropagateDispatchConfig.cpp"
     "PropagateDispatchSizeBounds.cpp"
     "PropagateReshapesByExpansion.cpp"
     "ReconcileTranslationInfo.cpp"
@@ -146,6 +151,7 @@ iree_cc_library(
     "ReshapePatterns.cpp"
     "ResolveSwizzleHints.cpp"
     "ResolveWorkgroupCountHints.cpp"
+    "SMTConstraintUtils.cpp"
     "SpecializeExports.cpp"
     "SplitFullPartialTransfer.cpp"
     "StripCompilationInfo.cpp"
@@ -165,6 +171,7 @@ iree_cc_library(
     "VectorLayoutAnalysis.cpp"
     "VectorTransferLowering.cpp"
     "VectorizeMemrefCopy.cpp"
+    "VerifyPipelineConstraints.cpp"
     "VerifyWorkgroupDistribution.cpp"
   DEPS
     ::PassHeaders
@@ -192,6 +199,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRInferTypeOpInterface
     MLIRLLVMCommonConversion
     MLIRLLVMDialect
     MLIRLinalgDialect
@@ -210,6 +218,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSMT
     MLIRSideEffectInterfaces
     MLIRSubsetOpInterface
     MLIRSupport
@@ -256,6 +265,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::Transforms
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
   PUBLIC
 )

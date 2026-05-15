@@ -22,7 +22,7 @@
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: hal.executable public @coalesced_dma_to_lds
 hal.executable public @coalesced_dma_to_lds {
@@ -88,7 +88,7 @@ hal.executable public @coalesced_dma_to_lds {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: hal.executable public @coalesced_dma_matmul_operand
 hal.executable public @coalesced_dma_matmul_operand {
@@ -153,7 +153,7 @@ hal.executable public @coalesced_dma_matmul_operand {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: hal.executable public @coalesced_dma_f16
 hal.executable public @coalesced_dma_f16 {
@@ -220,7 +220,7 @@ hal.executable public @coalesced_dma_f16 {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: hal.executable public @coalesced_dma_multi_transfer
 hal.executable public @coalesced_dma_multi_transfer {
@@ -304,7 +304,7 @@ hal.executable public @coalesced_dma_multi_transfer {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-#translation = #iree_codegen.translation_info<pipeline = LLVMGPUTileAndFuse workgroup_size = [64, 1, 1] subgroup_size = 64>
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
 
 // CHECK-LABEL: hal.executable public @coalesced_dma_multi_transfer_128bit
 hal.executable public @coalesced_dma_multi_transfer_128bit {

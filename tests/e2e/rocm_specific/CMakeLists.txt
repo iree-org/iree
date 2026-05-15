@@ -11,3 +11,19 @@
 iree_add_all_subdirs()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# Regression test for RDNA3 WMMA f16/bf16 accumulator layout bug.
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1[12]")
+  iree_check_single_backend_test_suite(
+    NAME
+      check_rocm_hip_wmma_matmul_f16
+    SRCS
+      "wmma_matmul_f16.mlir"
+    TARGET_BACKEND
+      "rocm"
+    DRIVER
+      "hip"
+    LABELS
+      "requires-gpu-rdna3"
+  )
+endif()

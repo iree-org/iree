@@ -23,6 +23,8 @@
 #define IREE_ASYNC_CTS_UTIL_TEST_BASE_H_
 
 #include <functional>
+#include <set>
+#include <string>
 #include <vector>
 
 #include "iree/async/cts/util/registry.h"
@@ -214,9 +216,23 @@ class CtsTestBase : public BaseType {
  protected:
   void SetUp() override {
     BackendInfo backend = this->GetParam();
+
+    // Cache backends that have returned UNAVAILABLE. On systems where
+    // io_uring_setup fails due to memlock rlimits (ENOMEM), the result can
+    // flip between UNAVAILABLE and OK across calls depending on the process's
+    // current locked memory usage. Caching the first UNAVAILABLE prevents a
+    // later call from succeeding with a barely-functional ring that hangs
+    // on operations.
+    static std::set<std::string> unavailable_backends;
+    if (unavailable_backends.count(backend.name)) {
+      GTEST_SKIP() << "Backend '" << backend.name
+                   << "' unavailable on this system (cached)";
+    }
+
     auto result = backend.factory();
     if (!result.ok() &&
         result.status().code() == iree::StatusCode::kUnavailable) {
+      unavailable_backends.insert(backend.name);
       GTEST_SKIP() << "Backend '" << backend.name
                    << "' unavailable on this system";
     }

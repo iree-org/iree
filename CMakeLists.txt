@@ -816,13 +816,6 @@ add_custom_target(iree-test-deps
     iree-sample-deps
 )
 
-# Testing rules that generate test scripts for iree-run-module-test will add
-# dependencies to this target. It is a subset of `iree-test-deps`.
-add_custom_target(iree-run-module-test-deps
-  COMMENT
-    "Building IREE run module test targets"
-)
-
 # Convenience target for running IREE tests.
 add_custom_target(iree-run-tests
   COMMENT

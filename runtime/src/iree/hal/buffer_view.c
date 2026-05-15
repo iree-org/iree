@@ -52,13 +52,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_retain(buffer_view->buffer);
     buffer_view->element_type = element_type;
     buffer_view->encoding_type = encoding_type;
-    buffer_view->byte_length =
-        iree_hal_element_dense_byte_count(buffer_view->element_type);
     buffer_view->shape_rank = shape_rank;
+    iree_device_size_t element_count = 1;
     for (iree_host_size_t i = 0; i < shape_rank; ++i) {
       buffer_view->shape[i] = shape[i];
-      buffer_view->byte_length *= shape[i];
+      element_count *= shape[i];
     }
+    buffer_view->byte_length = iree_hal_element_packed_byte_count(
+        buffer_view->element_type, element_count);
     *out_buffer_view = buffer_view;
   }
 

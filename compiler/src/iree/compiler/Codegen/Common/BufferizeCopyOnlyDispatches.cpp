@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- BufferizeCopyOnlyDispatchesPassPass.cpp ----------------------------===//
+//===- BufferizeCopyOnlyDispatches.cpp ------------------------------------===//
 //
 // This pass converts dispatches that are copy only into a form where backends
 // can tile and distribute them appropriately.

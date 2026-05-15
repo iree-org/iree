@@ -147,6 +147,9 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
         bubbleCollapseShapePatterns, context);
     populateReshapeToInterfaceTensorPatterns(bubbleCollapseShapePatterns);
     populateFoldTensorReshapeIntoBufferPatterns(bubbleCollapseShapePatterns);
+    populateSwapExtractWithExpandPattern(bubbleCollapseShapePatterns,
+                                         bubbleUpExpansionControlFn);
+    populateCollapseDestinationForallPatterns(bubbleCollapseShapePatterns);
     if (failed(applyPatternsGreedily(funcOp,
                                      std::move(bubbleCollapseShapePatterns)))) {
       return failure();

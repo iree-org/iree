@@ -320,9 +320,9 @@ func.func @concretize_WMMAR3_F16_16x16x16_F16(%lhs: tensor<16x16xf16>, %rhs: ten
 // CHECK-INPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled
 // CHECK-INPUTS:        return %[[MMA]]
 
-// CHECK-OUTPUTS:        %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0, 1], [2]] output_shape [16, 1, 16]
+// CHECK-OUTPUTS:        %[[EXPANDED_ACC:.+]] = tensor.expand_shape %[[ACC]] {{\[}}[0, 1], [2]] output_shape [8, 2, 16]
 // CHECK-OUTPUTS:        %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[EXPANDED_ACC]])
-// CHECK-OUTPUTS-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<16x1x16xf16>
+// CHECK-OUTPUTS-SAME:     : tensor<16x16xf16>, tensor<16x16xf16> into tensor<8x2x16xf16>
 // CHECK-OUTPUTS:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMA]] {{\[}}[0, 1], [2]]
 // CHECK-OUTPUTS:        return %[[COLLAPSED]]
 

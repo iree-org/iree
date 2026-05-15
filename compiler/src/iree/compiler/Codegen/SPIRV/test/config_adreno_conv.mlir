@@ -11,7 +11,7 @@ func.func @conv_112x112x512(%3: tensor<1x225x225x3xf32>, %4: tensor<3x3x3x512xf3
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 8, 256], [1, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [64, 1, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [64, 1, 1]>
 //      CHECK: func.func @conv_112x112x512(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -30,7 +30,7 @@ func.func @conv_112x112x32(%3: tensor<1x225x225x3xf32>, %4: tensor<3x3x3x32xf32>
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 16, 32], [1, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [8, 8, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [8, 8, 1]>
 //      CHECK: func.func @conv_112x112x32(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -48,7 +48,7 @@ func.func @conv_16x16x16(%3: tensor<1x33x33x3xf32>, %4: tensor<3x3x3x16xf32>) ->
   return %7 : tensor<1x16x16x16xf32>
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 8, 16], [1, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [4, 4, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [4, 4, 4]>
 //      CHECK: func.func @conv_16x16x16(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
@@ -67,7 +67,7 @@ func.func @dwconv_28x28x144(%3: tensor<1x57x57x144xf32>, %4: tensor<3x3x144xf32>
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 16], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [4, 4, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [4, 4, 4]>
 //      CHECK: func.func @dwconv_28x28x144(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
@@ -86,7 +86,7 @@ func.func @dwconv_4x4x8(%3: tensor<1x9x9x8xf32>, %4: tensor<3x3x8xf32>) -> tenso
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 8], [1, 1, 1, 4], [0, 0, 0, 0, 1, 1], [0, 1, 0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = SPIRVBaseVectorize workgroup_size = [2, 4, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [2, 4, 4]>
 //      CHECK: func.func @dwconv_4x4x8(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc

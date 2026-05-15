@@ -8,11 +8,11 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Transforms/Passes.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -555,10 +555,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // TODO: Maybe this should be a part of Affine lowering pass.
   // Remove if it is added there.
   // https://github.com/llvm/llvm-project/issues/78458
-  passManager.addPass(createIREECodegenAffineExpandIndexOpsPass());
+  passManager.addPass(createIREEAffineExpandIndexOpsPass());
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.
-  passManager.addPass(createIREECodegenLowerAffinePass());
+  passManager.addPass(createIREELowerAffinePass());
 
   // TODO(benvanik): remove the need for this; some cleanup passes such as
   // SimplifyGlobalAccesses are currently broken with scf present.
