@@ -17,7 +17,6 @@ iree_lit_test_suite(
     "absorb_swizzle_hint_to_alloc.mlir"
     "add_fmfs.mlir"
     "affinemin_canonicalization.mlir"
-    "batch_matmuls.mlir"
     "block_dynamic_dims.mlir"
     "bubble_up_ordinal_ops.mlir"
     "bufferize_copy_only_dispatches.mlir"
@@ -35,7 +34,6 @@ iree_lit_test_suite(
     "convert_unsupported_float_to_int_buffers.mlir"
     "convert_workgroup_forall_to_pcf.mlir"
     "convolution_to_igemm.mlir"
-    "convolutions.mlir"
     "create_dispatch_config.mlir"
     "decompose_affine_ops.mlir"
     "decompose_boundary_pack_unpack_ops.mlir"
@@ -116,13 +114,11 @@ iree_lit_test_suite(
     "reconcile_translation_info.mlir"
     "reconcile_translation_info_linearize.mlir"
     "reconcile_translation_info_pure.mlir"
-    "reductions.mlir"
     "reinsert_swizzle_hints.mlir"
     "rematerialize_parallel_ops.mlir"
     "remove_dead_allocs.mlir"
     "remove_index_hints.mlir"
     "remove_single_iteration_loop.mlir"
-    "repeated_matcher_use.mlir"
     "replace_slow_min_max_ops.mlir"
     "resolve_swizzle_hints.mlir"
     "resolve_workgroup_count_hints.mlir"
@@ -136,8 +132,6 @@ iree_lit_test_suite(
     "transform_copy_operand.mlir"
     "transform_flatten_forall.mlir"
     "transform_hoist_forall.mlir"
-    "transform_match_partial_reduction.mlir"
-    "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"
     "unroll_annotated_loops.mlir"
@@ -154,12 +148,8 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
-    batch_matmul_match_spec.mlir
-    convolution_match_spec.mlir
     external_strategy_spec.mlir
     patch_func_ops_spec.mlir
-    reductions_codegen_spec.mlir
-    reductions_match_spec.mlir
     tuning_spec.mlir
     tuning_spec_default.mlir
 )
