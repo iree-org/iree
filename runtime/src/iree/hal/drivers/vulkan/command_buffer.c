@@ -531,7 +531,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_resolve_native_buffer_ref(
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan command buffer %.*s buffer reference is not backed by the "
-        "Vulkan HAL rewrite",
+        "Vulkan HAL",
         (int)usage.size, usage.data);
   }
 

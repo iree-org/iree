@@ -215,7 +215,8 @@ static iree_status_t iree_hal_vulkan_select_physical_device(
       } else {
         status = iree_make_status(
             IREE_STATUS_UNAVAILABLE,
-            "Vulkan physical device %u does not satisfy the rewrite baseline",
+            "Vulkan physical device %u does not satisfy the Vulkan 1.3 "
+            "baseline",
             i);
       }
     }
@@ -228,7 +229,7 @@ static iree_status_t iree_hal_vulkan_select_physical_device(
       case IREE_HAL_VULKAN_PHYSICAL_DEVICE_SELECTOR_DEFAULT:
         status = iree_make_status(
             IREE_STATUS_UNAVAILABLE,
-            "no Vulkan physical device satisfies the rewrite baseline");
+            "no Vulkan physical device satisfies the Vulkan 1.3 baseline");
         break;
       case IREE_HAL_VULKAN_PHYSICAL_DEVICE_SELECTOR_ID:
         status = iree_make_status(IREE_STATUS_NOT_FOUND,
@@ -908,7 +909,7 @@ static iree_hal_vulkan_logical_device_t* iree_hal_vulkan_logical_device_cast(
 static iree_status_t iree_hal_vulkan_unimplemented(
     iree_string_view_t operation) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "Vulkan %.*s is not implemented in the rewrite HAL",
+                          "Vulkan %.*s is not implemented in the Vulkan HAL",
                           (int)operation.size, operation.data);
 }
 
@@ -2277,7 +2278,7 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
   if (!iree_hal_vulkan_physical_device_supports_baseline(snapshot)) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "external Vulkan physical device does not satisfy the rewrite "
+        "external Vulkan physical device does not satisfy the Vulkan 1.3 "
         "baseline");
   }
   if (iree_all_bits_set(enabled_features,

@@ -90,7 +90,7 @@ typedef enum iree_hal_vulkan_feature_bits_t {
   IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT = 1u << 9,
   // Requests and reports subgroup size control on a logical device.
   IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL = 1u << 10,
-  // Required enabled logical-device feature set for the rewrite baseline.
+  // Required enabled logical-device feature set for the Vulkan HAL baseline.
   IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
       IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SYNCHRONIZATION2 |

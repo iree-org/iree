@@ -8394,7 +8394,7 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
       !iree_hal_vulkan_sparse_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "Vulkan queue_dispatch binding %" PRIhsz
-                            " buffer is not backed by the Vulkan HAL rewrite",
+                            " buffer is not backed by the Vulkan HAL",
                             binding_ordinal);
   }
 
@@ -8503,7 +8503,7 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_indirect_parameters(
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan queue_dispatch indirect workgroup parameter buffer is not "
-        "backed by the Vulkan HAL rewrite");
+        "backed by the Vulkan HAL");
   }
 
   VkDeviceMemory memory = VK_NULL_HANDLE;

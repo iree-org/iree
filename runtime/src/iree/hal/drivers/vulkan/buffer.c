@@ -364,7 +364,7 @@ iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
   }
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "buffer is not backed by the Vulkan HAL rewrite");
+                            "buffer is not backed by the Vulkan HAL");
   }
   iree_hal_vulkan_buffer_t* vulkan_buffer =
       iree_hal_vulkan_buffer_cast(allocated_buffer);
@@ -388,7 +388,7 @@ iree_status_t iree_hal_vulkan_buffer_device_address(
   }
   if (!iree_hal_vulkan_buffer_isa(allocated_buffer)) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "buffer is not backed by the Vulkan HAL rewrite");
+                            "buffer is not backed by the Vulkan HAL");
   }
   iree_hal_vulkan_buffer_t* vulkan_buffer =
       iree_hal_vulkan_buffer_cast(allocated_buffer);

@@ -160,7 +160,7 @@ void iree_hal_vulkan_physical_device_snapshot_deinitialize(
 bool iree_hal_vulkan_physical_device_has_compute_queue(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot);
 
-// Returns true if |snapshot| satisfies the current Vulkan rewrite baseline.
+// Returns true if |snapshot| satisfies the current Vulkan HAL baseline.
 bool iree_hal_vulkan_physical_device_supports_baseline(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot);
 
