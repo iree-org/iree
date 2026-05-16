@@ -165,23 +165,26 @@ struct iree_hal_vulkan_logical_device_t {
   // Logical allocator.
   iree_hal_allocator_t* device_allocator;
 
-  // Active HAL-native profile recorder, when profiling is enabled.
-  iree_hal_local_profile_recorder_t* profile_recorder;
+  // Active profiling session state.
+  struct {
+    // Active HAL-native profile recorder, when profiling is enabled.
+    iree_hal_local_profile_recorder_t* recorder;
 
-  // Host time domain selected for calibrated profiling samples.
-  VkTimeDomainEXT profile_host_time_domain;
+    // Host time domain selected for calibrated profiling samples.
+    VkTimeDomainEXT host_time_domain;
 
-  // Next process-local profiling session id.
-  uint64_t next_profile_session_id;
+    // Next process-local profiling session id.
+    uint64_t next_session_id;
 
-  // Next clock-correlation sample id for the active profiling session.
-  uint64_t next_profile_clock_correlation_sample_id;
+    // Next clock-correlation sample id for the active profiling session.
+    uint64_t next_clock_correlation_sample_id;
 
-  // Next profile submission id shared across queue lanes.
-  iree_atomic_int64_t next_profile_submission_id;
+    // Next profile submission id shared across queue lanes.
+    iree_atomic_int64_t next_submission_id;
 
-  // Clock alignment state shared with queue lanes while profiling is active.
-  iree_hal_vulkan_profile_clock_alignment_t profile_clock_alignment;
+    // Clock alignment state shared with queue lanes while profiling is active.
+    iree_hal_vulkan_profile_clock_alignment_t clock_alignment;
+  } profile;
 
   // Optional provider used for creating/configuring collective channels.
   iree_hal_channel_provider_t* channel_provider;
@@ -417,7 +420,7 @@ static bool iree_hal_vulkan_profile_clock_alignment_record_clock_tick(
 static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
     iree_hal_vulkan_logical_device_t* device) {
   if (!iree_hal_local_profile_recorder_is_enabled(
-          device->profile_recorder,
+          device->profile.recorder,
           IREE_HAL_DEVICE_PROFILING_DATA_DEVICE_QUEUE_EVENTS |
               IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS)) {
     return iree_ok_status();
@@ -425,7 +428,7 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
 
   uint64_t host_frequency_hz = 0;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_host_time_domain_frequency(
-      device->profile_host_time_domain, &host_frequency_hz));
+      device->profile.host_time_domain, &host_frequency_hz));
 
   VkCalibratedTimestampInfoEXT timestamp_infos[2] = {
       {
@@ -434,7 +437,7 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
       },
       {
           .sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT,
-          .timeDomain = device->profile_host_time_domain,
+          .timeDomain = device->profile.host_time_domain,
       },
   };
   uint64_t timestamps[2] = {0, 0};
@@ -448,7 +451,7 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
   (void)max_deviation;
   const bool has_invalid_alignment =
       iree_hal_vulkan_profile_clock_alignment_record_clock_tick(
-          &device->profile_clock_alignment, timestamps[0]);
+          &device->profile.clock_alignment, timestamps[0]);
 
   iree_hal_profile_clock_correlation_record_t record =
       iree_hal_profile_clock_correlation_record_default();
@@ -462,7 +465,7 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
   }
   record.physical_device_ordinal =
       device->topology_info.topology ? device->topology_info.topology_index : 0;
-  record.sample_id = ++device->next_profile_clock_correlation_sample_id;
+  record.sample_id = ++device->profile.next_clock_correlation_sample_id;
   record.device_tick = timestamps[0];
   record.host_cpu_timestamp_ns = iree_hal_vulkan_host_time_domain_timestamp_ns(
       timestamps[1], host_frequency_hz);
@@ -471,7 +474,7 @@ static iree_status_t iree_hal_vulkan_logical_device_write_clock_correlation(
   record.host_time_begin_ns = host_time_begin_ns;
   record.host_time_end_ns = host_time_end_ns;
   return iree_hal_local_profile_recorder_write_clock_correlations(
-      device->profile_recorder, 1, &record);
+      device->profile.recorder, 1, &record);
 }
 
 static iree_hal_local_profile_queue_scope_t
@@ -506,7 +509,7 @@ static void iree_hal_vulkan_logical_device_destroy(
   iree_allocator_t host_allocator = device->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_ASSERT(!device->profile_recorder,
+  IREE_ASSERT(!device->profile.recorder,
               "profiling sessions must be ended before device destruction");
 
   iree_hal_vulkan_logical_device_clear_topology_info(device);
@@ -528,7 +531,7 @@ static void iree_hal_vulkan_logical_device_destroy(
   }
   iree_hal_vulkan_libvulkan_deinitialize(&device->libvulkan);
   iree_arena_block_pool_deinitialize(&device->command_buffer_block_pool);
-  iree_slim_mutex_deinitialize(&device->profile_clock_alignment.mutex);
+  iree_slim_mutex_deinitialize(&device->profile.clock_alignment.mutex);
   iree_slim_mutex_deinitialize(&device->queues.handle_mutexes.sparse_binding);
   iree_slim_mutex_deinitialize(&device->queues.handle_mutexes.transfer);
   iree_slim_mutex_deinitialize(&device->queues.handle_mutexes.compute);
@@ -1273,7 +1276,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
     const iree_hal_device_profiling_options_t* options) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
-  if (device->profile_recorder) {
+  if (device->profile.recorder) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "cannot nest Vulkan profile captures");
   }
@@ -1312,7 +1315,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
     }
   }
   iree_hal_vulkan_profile_clock_alignment_reset(
-      &device->profile_clock_alignment);
+      &device->profile.clock_alignment);
 
   const uint32_t physical_device_ordinal =
       device->topology_info.topology ? device->topology_info.topology_index : 0;
@@ -1344,7 +1347,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
 
   iree_hal_local_profile_recorder_options_t recorder_options = {
       .name = device->identifier,
-      .session_id = ++device->next_profile_session_id,
+      .session_id = ++device->profile.next_session_id,
       .device_record_count = 1,
       .device_records = &device_record,
       .queue_record_count = device->queues.lane_count,
@@ -1371,26 +1374,26 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_begin(
   iree_allocator_free(device->host_allocator, queue_records);
   if (!iree_status_is_ok(status) || !recorder) return status;
 
-  device->profile_recorder = recorder;
-  device->profile_host_time_domain = profile_host_time_domain;
-  device->next_profile_clock_correlation_sample_id = 0;
+  device->profile.recorder = recorder;
+  device->profile.host_time_domain = profile_host_time_domain;
+  device->profile.next_clock_correlation_sample_id = 0;
   status = iree_hal_vulkan_logical_device_write_clock_correlation(device);
   if (!iree_status_is_ok(status)) {
-    device->profile_recorder = NULL;
+    device->profile.recorder = NULL;
     status =
         iree_status_join(status, iree_hal_local_profile_recorder_end(recorder));
     iree_hal_local_profile_recorder_destroy(recorder);
     return status;
   }
 
-  iree_atomic_store(&device->next_profile_submission_id, 1,
+  iree_atomic_store(&device->profile.next_submission_id, 1,
                     iree_memory_order_relaxed);
   for (iree_host_size_t i = 0; i < device->queues.lane_count; ++i) {
     iree_hal_vulkan_queue_set_profile_recorder(
         &device->queues.lanes[i], recorder,
         iree_hal_vulkan_logical_device_profile_queue_scope(
             device, iree_hal_vulkan_logical_device_profile_count(i)),
-        &device->next_profile_submission_id, &device->profile_clock_alignment);
+        &device->profile.next_submission_id, &device->profile.clock_alignment);
   }
   return iree_ok_status();
 }
@@ -1405,7 +1408,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_flush(
   iree_status_t status =
       iree_hal_vulkan_logical_device_write_clock_correlation(device);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_local_profile_recorder_flush(device->profile_recorder);
+    status = iree_hal_local_profile_recorder_flush(device->profile.recorder);
   }
   return status;
 }
@@ -1414,7 +1417,7 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
-  iree_hal_local_profile_recorder_t* recorder = device->profile_recorder;
+  iree_hal_local_profile_recorder_t* recorder = device->profile.recorder;
   if (!recorder) return iree_ok_status();
 
   for (iree_host_size_t i = 0; i < device->queues.lane_count; ++i) {
@@ -1430,10 +1433,10 @@ static iree_status_t iree_hal_vulkan_logical_device_profiling_end(
         &device->queues.lanes[i], /*profile_recorder=*/NULL, empty_scope,
         /*submission_counter=*/NULL, /*clock_alignment=*/NULL);
   }
-  device->profile_recorder = NULL;
-  device->profile_host_time_domain = VK_TIME_DOMAIN_DEVICE_EXT;
-  device->next_profile_clock_correlation_sample_id = 0;
-  iree_atomic_store(&device->next_profile_submission_id, 0,
+  device->profile.recorder = NULL;
+  device->profile.host_time_domain = VK_TIME_DOMAIN_DEVICE_EXT;
+  device->profile.next_clock_correlation_sample_id = 0;
+  iree_atomic_store(&device->profile.next_submission_id, 0,
                     iree_memory_order_relaxed);
 
   status =
@@ -1489,9 +1492,9 @@ static iree_status_t iree_hal_vulkan_logical_device_allocate(
     iree_slim_mutex_initialize(&device->queues.handle_mutexes.compute);
     iree_slim_mutex_initialize(&device->queues.handle_mutexes.transfer);
     iree_slim_mutex_initialize(&device->queues.handle_mutexes.sparse_binding);
-    iree_slim_mutex_initialize(&device->profile_clock_alignment.mutex);
+    iree_slim_mutex_initialize(&device->profile.clock_alignment.mutex);
     iree_hal_vulkan_profile_clock_alignment_reset(
-        &device->profile_clock_alignment);
+        &device->profile.clock_alignment);
     *out_device = device;
   } else {
     iree_arena_block_pool_deinitialize(&device->command_buffer_block_pool);
