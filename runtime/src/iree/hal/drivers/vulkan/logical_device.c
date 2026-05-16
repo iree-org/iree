@@ -971,6 +971,130 @@ static iree_status_t iree_hal_vulkan_logical_device_create_channel(
   return iree_hal_vulkan_unimplemented(IREE_SV("collective channels"));
 }
 
+static iree_status_t iree_hal_vulkan_logical_device_queue_lane_for_role(
+    iree_hal_vulkan_logical_device_t* device, iree_hal_vulkan_queue_role_t role,
+    iree_hal_vulkan_queue_t** out_queue) {
+  IREE_ASSERT_ARGUMENT(out_queue);
+  switch (role) {
+    case IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE:
+      *out_queue = device->compute_queue_lane;
+      return iree_ok_status();
+    case IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER:
+      *out_queue = device->transfer_queue_lane;
+      return iree_ok_status();
+    case IREE_HAL_VULKAN_QUEUE_ROLE_SPARSE_BINDING:
+      *out_queue = device->sparse_binding_queue_lane;
+      return iree_ok_status();
+  }
+  *out_queue = NULL;
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "unrecognized Vulkan queue role %u", (uint32_t)role);
+}
+
+static bool iree_hal_vulkan_queue_lane_matches_affinity(
+    const iree_hal_vulkan_queue_t* queue,
+    iree_hal_queue_affinity_t queue_affinity, VkQueueFlags required_flags) {
+  return !iree_hal_queue_affinity_is_empty(queue->queue_affinity) &&
+         iree_any_bit_set(queue_affinity, queue->queue_affinity) &&
+         iree_all_bits_set(queue->queue_flags, required_flags);
+}
+
+static iree_hal_vulkan_queue_role_t
+iree_hal_vulkan_logical_device_preferred_queue_role_for_command_categories(
+    iree_hal_command_category_t command_categories) {
+  if (iree_any_bit_set(command_categories,
+                       IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
+    return IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE;
+  }
+  return IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER;
+}
+
+static VkQueueFlags
+iree_hal_vulkan_logical_device_required_queue_flags_for_command_categories(
+    iree_hal_command_category_t command_categories) {
+  VkQueueFlags queue_flags = 0;
+  if (iree_any_bit_set(command_categories,
+                       IREE_HAL_COMMAND_CATEGORY_DISPATCH)) {
+    queue_flags |= VK_QUEUE_COMPUTE_BIT;
+  }
+  if (iree_any_bit_set(command_categories,
+                       IREE_HAL_COMMAND_CATEGORY_TRANSFER)) {
+    queue_flags |= VK_QUEUE_TRANSFER_BIT;
+  }
+  return queue_flags;
+}
+
+static iree_status_t
+iree_hal_vulkan_logical_device_select_queue_lane_from_normalized_affinity(
+    iree_hal_vulkan_logical_device_t* device,
+    iree_hal_vulkan_queue_role_t preferred_role, VkQueueFlags required_flags,
+    iree_hal_queue_affinity_t normalized_queue_affinity,
+    iree_hal_vulkan_queue_t** out_queue) {
+  IREE_ASSERT_ARGUMENT(out_queue);
+  *out_queue = NULL;
+
+  iree_hal_vulkan_queue_t* preferred_queue = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_queue_lane_for_role(
+      device, preferred_role, &preferred_queue));
+  if (preferred_queue &&
+      iree_hal_vulkan_queue_lane_matches_affinity(
+          preferred_queue, normalized_queue_affinity, required_flags)) {
+    *out_queue = preferred_queue;
+    return iree_ok_status();
+  }
+
+  for (iree_host_size_t i = 0; i < device->queue_lane_count; ++i) {
+    iree_hal_vulkan_queue_t* queue = &device->queue_lanes[i];
+    if (!iree_hal_vulkan_queue_lane_matches_affinity(
+            queue, normalized_queue_affinity, required_flags)) {
+      continue;
+    }
+    *out_queue = queue;
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                          "no Vulkan queue lane matches affinity 0x%016" PRIx64
+                          " with required queue flags 0x%08x",
+                          normalized_queue_affinity, required_flags);
+}
+
+static iree_status_t iree_hal_vulkan_logical_device_select_queue_lane(
+    iree_hal_vulkan_logical_device_t* device,
+    iree_hal_vulkan_queue_role_t preferred_role, VkQueueFlags required_flags,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_vulkan_queue_t** out_queue) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
+      device->queue_affinity_mask, queue_affinity, &queue_affinity));
+  return iree_hal_vulkan_logical_device_select_queue_lane_from_normalized_affinity(
+      device, preferred_role, required_flags, queue_affinity, out_queue);
+}
+
+static iree_status_t
+iree_hal_vulkan_logical_device_resolve_command_buffer_queue_affinity(
+    iree_hal_vulkan_logical_device_t* device,
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_queue_affinity_t queue_affinity,
+    iree_hal_queue_affinity_t* out_queue_affinity) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
+      device->queue_affinity_mask, queue_affinity, &queue_affinity));
+
+  const iree_hal_queue_affinity_t command_buffer_queue_affinity =
+      iree_hal_command_buffer_queue_affinity(command_buffer);
+  const iree_hal_queue_affinity_t requested_queue_affinity = queue_affinity;
+  iree_hal_queue_affinity_and_into(queue_affinity,
+                                   command_buffer_queue_affinity);
+  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "queue_execute affinity does not match command buffer affinity "
+        "(queue=0x%016" PRIx64 ", command_buffer=0x%016" PRIx64 ")",
+        requested_queue_affinity, command_buffer_queue_affinity);
+  }
+
+  *out_queue_affinity = queue_affinity;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_vulkan_logical_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -978,10 +1102,17 @@ static iree_status_t iree_hal_vulkan_logical_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
-      device->queue_affinity_mask, queue_affinity, &queue_affinity));
+  iree_hal_vulkan_queue_t* queue = NULL;
+  const iree_hal_vulkan_queue_role_t preferred_role =
+      iree_hal_vulkan_logical_device_preferred_queue_role_for_command_categories(
+          command_categories);
+  const VkQueueFlags required_queue_flags =
+      iree_hal_vulkan_logical_device_required_queue_flags_for_command_categories(
+          command_categories);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, preferred_role, required_queue_flags, queue_affinity, &queue));
   return iree_hal_vulkan_command_buffer_create(
-      device->device_allocator, mode, command_categories, queue_affinity,
+      device->device_allocator, mode, command_categories, queue->queue_affinity,
       binding_capacity, &device->command_buffer_block_pool,
       device->host_allocator, out_command_buffer);
 }
@@ -1082,29 +1213,6 @@ static iree_status_t iree_hal_vulkan_logical_device_query_queue_pool_backend(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_logical_device_select_queue(
-    iree_hal_vulkan_logical_device_t* device,
-    iree_hal_queue_affinity_t queue_affinity,
-    iree_hal_vulkan_queue_t** out_queue) {
-  IREE_ASSERT_ARGUMENT(out_queue);
-  *out_queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_queue_affinity_normalize(
-      device->queue_affinity_mask, queue_affinity, &queue_affinity));
-  if (iree_any_bit_set(queue_affinity,
-                       device->compute_queue.selection.affinity)) {
-    *out_queue = device->compute_queue_lane;
-    return iree_ok_status();
-  }
-  if (iree_any_bit_set(queue_affinity,
-                       device->transfer_queue.selection.affinity)) {
-    *out_queue = device->transfer_queue_lane;
-    return iree_ok_status();
-  }
-  return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                          "no Vulkan queue lane matches affinity 0x%016" PRIx64,
-                          queue_affinity);
-}
-
 static iree_status_t iree_hal_vulkan_logical_device_queue_alloca(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -1118,8 +1226,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_alloca(
   const iree_device_size_t byte_length = allocation_size;
 
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE, /*required_flags=*/0,
+      queue_affinity, &queue));
   const iree_hal_queue_affinity_t allocation_queue_affinity =
       queue->queue_affinity;
 
@@ -1151,8 +1260,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dealloca(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE, /*required_flags=*/0,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_dealloca(
       queue, wait_semaphore_list, signal_semaphore_list, buffer, flags);
 }
@@ -1167,8 +1277,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_fill(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER, VK_QUEUE_TRANSFER_BIT,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_fill(
       queue, wait_semaphore_list, signal_semaphore_list, target_buffer,
       target_offset, length, pattern, pattern_length, flags);
@@ -1184,8 +1295,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_update(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER, VK_QUEUE_TRANSFER_BIT,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_update(
       queue, wait_semaphore_list, signal_semaphore_list, source_buffer,
       source_offset, target_buffer, target_offset, length, flags);
@@ -1201,8 +1313,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_copy(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER, VK_QUEUE_TRANSFER_BIT,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_copy(
       queue, wait_semaphore_list, signal_semaphore_list, source_buffer,
       source_offset, target_buffer, target_offset, length, flags);
@@ -1218,8 +1331,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_read(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER, VK_QUEUE_TRANSFER_BIT,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_read(
       queue, wait_semaphore_list, signal_semaphore_list, source_file,
       source_offset, target_buffer, target_offset, length, flags);
@@ -1235,8 +1349,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_write(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_TRANSFER, VK_QUEUE_TRANSFER_BIT,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_write(
       queue, wait_semaphore_list, signal_semaphore_list, source_buffer,
       source_offset, target_file, target_offset, length, flags);
@@ -1251,8 +1366,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_host_call(
   iree_hal_vulkan_logical_device_t* device =
       iree_hal_vulkan_logical_device_cast(base_device);
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE, /*required_flags=*/0,
+      queue_affinity, &queue));
   return iree_hal_vulkan_queue_submit_host_call(
       queue, wait_semaphore_list, signal_semaphore_list, call, args, flags);
 }
@@ -1288,8 +1404,9 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dispatch(
   }
 
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+      device, IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE, VK_QUEUE_COMPUTE_BIT,
+      queue_affinity, &queue));
 
   return iree_hal_vulkan_queue_submit_dispatch(
       queue, wait_semaphore_list, signal_semaphore_list, executable,
@@ -1330,12 +1447,29 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_execute(
         binding_table.count);
   }
   iree_hal_vulkan_queue_t* queue = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue(
-      device, queue_affinity, &queue));
+  const iree_hal_vulkan_queue_role_t preferred_role =
+      is_empty_command_buffer
+          ? IREE_HAL_VULKAN_QUEUE_ROLE_COMPUTE
+          : iree_hal_vulkan_logical_device_preferred_queue_role_for_command_categories(
+                iree_hal_command_buffer_allowed_categories(command_buffer));
+  const VkQueueFlags required_queue_flags =
+      is_empty_command_buffer
+          ? 0
+          : iree_hal_vulkan_logical_device_required_queue_flags_for_command_categories(
+                iree_hal_command_buffer_allowed_categories(command_buffer));
   if (is_empty_command_buffer) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_select_queue_lane(
+        device, preferred_role, required_queue_flags, queue_affinity, &queue));
     return iree_hal_vulkan_queue_submit_barrier(queue, wait_semaphore_list,
                                                 signal_semaphore_list);
   }
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_logical_device_resolve_command_buffer_queue_affinity(
+          device, command_buffer, queue_affinity, &queue_affinity));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_logical_device_select_queue_lane_from_normalized_affinity(
+          device, preferred_role, required_queue_flags, queue_affinity,
+          &queue));
   return iree_hal_vulkan_queue_submit_execute(
       queue, wait_semaphore_list, signal_semaphore_list, command_buffer,
       binding_table, flags, IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE);

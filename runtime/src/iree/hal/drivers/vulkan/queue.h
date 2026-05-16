@@ -127,7 +127,7 @@ typedef struct iree_hal_vulkan_queue_params_t {
   // Queue index within the selected family.
   uint32_t queue_index;
 
-  // HAL-visible queue affinity represented by this queue.
+  // HAL-visible queue affinity bits represented by this queue lane.
   iree_hal_queue_affinity_t queue_affinity;
 
   // Queue role used only for diagnostics and profiling labels.
@@ -190,7 +190,7 @@ typedef struct iree_hal_vulkan_queue_t {
   // Queue index within the selected family.
   uint32_t queue_index;
 
-  // HAL-visible queue affinity represented by this queue.
+  // HAL-visible queue affinity bits represented by this queue lane.
   iree_hal_queue_affinity_t queue_affinity;
 
   // Queue role used only for diagnostics and profiling labels.
