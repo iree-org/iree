@@ -746,6 +746,37 @@ util.func private @if_no_timepoint_result_conservative(%cond: i1, %input_tp: !st
 
 // -----
 
+// Tests that duplicate yielded resources are not deallocated through an unused
+// sibling result. A single allocation may be yielded into multiple loop result
+// positions and one result can escape while another is dropped.
+
+// CHECK-LABEL: @loop_duplicate_yielded_resource
+// CHECK-SAME: (%[[INPUT_TP:.+]]: !stream.timepoint, %[[SIZE:.+]]: index, {{.+}}: !stream.resource<transient>, {{.+}}: !stream.resource<transient>)
+util.func private @loop_duplicate_yielded_resource(%input_tp: !stream.timepoint, %size: index, %init_a: !stream.resource<transient>, %init_b: !stream.resource<transient>) -> (!stream.resource<transient>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+
+  // CHECK: %[[LOOP_RESULT:.+]]:3 = scf.for
+  %result_a, %result_b, %result_tp = scf.for %i = %c0 to %c10 step %c1 iter_args(%arg_a = %init_a, %arg_b = %init_b, %arg_tp = %input_tp) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    // CHECK: %[[LOCAL_RESOURCE:.+]], %[[LOCAL_ALLOCA_TP:.+]] = stream.resource.alloca
+    %local_resource, %local_alloca_tp = stream.resource.alloca uninitialized await(%arg_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+
+    // CHECK: %[[CMD_TP:.+]] = stream.test.timeline_op await(%[[LOCAL_ALLOCA_TP]])
+    %cmd_tp = stream.test.timeline_op await(%local_alloca_tp) =>
+      with(%local_resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+
+    // CHECK: scf.yield %[[LOCAL_RESOURCE]], %[[LOCAL_RESOURCE]], %[[CMD_TP]]
+    scf.yield %local_resource, %local_resource, %cmd_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[LOOP_RESULT]]#1
+  // CHECK: util.return %[[LOOP_RESULT]]#0, %[[LOOP_RESULT]]#2
+  util.return %result_a, %result_tp : !stream.resource<transient>, !stream.timepoint
+}
+
+// -----
+
 // Tests that a resource allocated inside a loop, yielded out, but NOT returned
 // from the function is still properly deallocated. This is the "yielded then
 // dropped" scenario.

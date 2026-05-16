@@ -579,6 +579,11 @@ enum iree_hal_profile_clock_correlation_flag_bits_t {
 
   // |host_time_begin_ns| and |host_time_end_ns| bracket the driver sample.
   IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET = 1u << 3,
+
+  // Device ticks were sampled but are not aligned with event timestamp ticks.
+  // Consumers may still use raw device event ordering and tick durations, but
+  // must not fit this device clock to a host timeline.
+  IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED = 1u << 4,
 };
 
 // Correlates a physical device clock-domain tick with host clock domains.
@@ -587,9 +592,11 @@ enum iree_hal_profile_clock_correlation_flag_bits_t {
 // session when device-timestamped event records are present. Consumers should
 // treat the host bracket as uncertainty around the driver-provided sample and
 // should not assume one sample is sufficient to determine clock drift.
-// Producers must only set flags for clock samples that were actually obtained
-// and validated; failed, unsupported, or implausible samples must be omitted or
-// reported as errors instead of encoded as zero-valued correlations.
+// Producers must only set flags for clock samples that were actually obtained.
+// If a sample is known to be implausible for cross-domain correlation,
+// producers must mark the record with
+// IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED so
+// consumers keep raw device events but do not place them on a host timeline.
 typedef struct iree_hal_profile_clock_correlation_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;

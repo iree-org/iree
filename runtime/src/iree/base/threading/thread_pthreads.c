@@ -7,8 +7,7 @@
 // NOTE: must be first to ensure that we can define settings for all includes.
 #include "iree/base/threading/thread_impl.h"
 
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
-    defined(IREE_PLATFORM_LINUX)
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -24,10 +23,6 @@
 #include "iree/base/threading/call_once.h"
 #include "iree/base/threading/notification.h"
 #include "iree/base/threading/thread.h"
-
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
-#include <emscripten/threading.h>
-#endif  // IREE_PLATFORM_EMSCRIPTEN
 
 struct iree_thread_t {
   iree_atomic_ref_count_t ref_count;
@@ -55,15 +50,6 @@ static bool iree_thread_resumed_predicate(void* arg) {
          0;
 }
 
-#if defined(IREE_PLATFORM_EMSCRIPTEN)
-
-static int iree_thread_set_name(pthread_t handle, const char* name) {
-  emscripten_set_thread_name(handle, name);
-  return 0;
-}
-
-#else
-
 typedef int (*pthread_setname_np_fn_t)(pthread_t thread, const char* name);
 
 static pthread_setname_np_fn_t iree_pthread_setname_np_fn = NULL;
@@ -85,8 +71,6 @@ static int iree_thread_set_name(pthread_t handle, const char* name) {
   IREE_TRACE_ZONE_END(z0);
   return rc;
 }
-
-#endif  // IREE_PLATFORM_EMSCRIPTEN
 
 static void* iree_thread_start_routine(void* param) {
   // NOTE: we own a reference to the thread handle so that the creation
@@ -267,9 +251,8 @@ static void iree_thread_set_priority_class(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN)
-  // TODO(benvanik): Some sort of solution on Android, if possible (see above)
-  // TODO(benvanik): Some sort of solution on Emscripten, if possible
+#if defined(IREE_PLATFORM_ANDROID)
+  // TODO(benvanik): Some sort of solution on Android, if possible (see above).
 #else
   int policy = 0;
   struct sched_param param;
@@ -373,7 +356,7 @@ static void iree_thread_make_cpu_set_from_node_id(uint32_t node_id,
   iree_thread_make_cpu_set_all(out_set);
 }
 
-#endif  // IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_ANDROID || IREE_PLATFORM_LINUX
 
 static void iree_thread_make_cpu_set_from_affinity(
     iree_thread_affinity_t affinity, cpu_set_t* out_set) {
@@ -425,8 +408,6 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   pid_t tid = pthread_gettid_np(thread->handle);
   sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
 #endif  // __ANDROID_API__ >= 21
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
-  // TODO(benvanik): Some sort of solution on Emscripten, if possible
 #else
   pthread_setaffinity_np(thread->handle, sizeof(cpu_set), &cpu_set);
 #endif  // IREE_PLATFORM_*

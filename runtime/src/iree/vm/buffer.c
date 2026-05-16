@@ -10,8 +10,9 @@
 #include <string.h>
 
 #include "iree/vm/instance.h"
+#include "iree/vm/module.h"
 
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
+iree_vm_ref_type_t iree_vm_buffer_registration = 0;
 
 static iree_status_t iree_vm_buffer_map(const iree_vm_buffer_t* buffer,
                                         iree_host_size_t offset,
@@ -72,12 +73,32 @@ IREE_API_EXPORT void iree_vm_buffer_initialize(iree_vm_buffer_access_t access,
   out_buffer->access = access;
   out_buffer->data = data;
   out_buffer->allocator = allocator;
+  out_buffer->storage_module = NULL;
+}
+
+IREE_API_EXPORT void iree_vm_buffer_initialize_module_storage(
+    iree_byte_span_t data, iree_vm_module_t* storage_module,
+    iree_vm_buffer_t* out_buffer) {
+  IREE_ASSERT_ARGUMENT(storage_module);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  iree_atomic_ref_count_init_value(&out_buffer->ref_object.counter, 0);
+  out_buffer->access = IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE;
+  out_buffer->data = data;
+  out_buffer->allocator = iree_allocator_null();
+  out_buffer->storage_module = storage_module;
 }
 
 IREE_API_EXPORT void iree_vm_buffer_deinitialize(iree_vm_buffer_t* buffer) {
   IREE_ASSERT_ARGUMENT(buffer);
-  iree_atomic_ref_count_abort_if_uses(&buffer->ref_object.counter);
-  iree_allocator_free(buffer->allocator, buffer->data.data);
+  if (buffer->storage_module) {
+    if (IREE_UNLIKELY(iree_atomic_ref_count_load(&buffer->ref_object.counter) !=
+                      0)) {
+      iree_abort();
+    }
+  } else {
+    iree_atomic_ref_count_abort_if_uses(&buffer->ref_object.counter);
+    iree_allocator_free(buffer->allocator, buffer->data.data);
+  }
 }
 
 IREE_API_EXPORT iree_status_t
@@ -114,20 +135,97 @@ iree_vm_buffer_create(iree_vm_buffer_access_t access, iree_host_size_t length,
 static void iree_vm_buffer_destroy(void* ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Buffers are stored as [prefix | data]; freeing the prefix is all we need
-  // to do to free it all.
   iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)ptr;
-  iree_allocator_free_aligned(buffer->allocator, buffer);
+  if (buffer->storage_module) {
+    // Module-owned buffers are embedded in the bytecode module. Reaching zero
+    // external references releases the owner retain taken by the first retain.
+    iree_vm_module_release(buffer->storage_module);
+  } else {
+    // Buffers are stored as [prefix | data]; freeing the prefix is all we need
+    // to do to free it all.
+    iree_allocator_free_aligned(buffer->allocator, buffer);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT void iree_vm_buffer_retain(iree_vm_buffer_t* buffer) {
-  iree_vm_ref_object_retain(buffer, iree_vm_buffer_type());
+  if (!buffer) return;
+  if (!buffer->storage_module) {
+    iree_vm_ref_object_retain(buffer, iree_vm_buffer_type());
+    return;
+  }
+  const int32_t old_count = iree_atomic_fetch_add(&buffer->ref_object.counter,
+                                                  1, iree_memory_order_relaxed);
+  if (old_count == 0) {
+    iree_vm_module_retain(buffer->storage_module);
+  }
 }
 
 IREE_API_EXPORT void iree_vm_buffer_release(iree_vm_buffer_t* buffer) {
   iree_vm_ref_object_release(buffer, iree_vm_buffer_type());
+}
+
+IREE_API_EXPORT iree_status_t
+iree_vm_buffer_wrap_retain(iree_vm_buffer_t* buffer, iree_vm_ref_t* out_ref) {
+  IREE_VM_REF_ASSERT(iree_vm_buffer_registration);
+  IREE_VM_REF_ASSERT(buffer);
+  IREE_VM_REF_ASSERT(out_ref);
+  if (out_ref->ptr == buffer) return iree_ok_status();
+
+  iree_vm_ref_t old_ref = *out_ref;
+  iree_vm_buffer_retain(buffer);
+  out_ref->ptr = buffer;
+  out_ref->type = iree_vm_buffer_type();
+  if (old_ref.ptr) {
+    iree_vm_ref_release(&old_ref);
+  }
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_vm_ref_t
+iree_vm_buffer_retain_ref(iree_vm_buffer_t* value) {
+  IREE_VM_REF_ASSERT(iree_vm_buffer_registration);
+  iree_vm_ref_t ref = {0};
+  if (value) {
+    iree_vm_buffer_retain(value);
+    ref.ptr = value;
+    ref.type = iree_vm_buffer_type();
+  }
+  return ref;
+}
+
+IREE_API_EXPORT iree_vm_ref_t iree_vm_buffer_move_ref(iree_vm_buffer_t* value) {
+  IREE_VM_REF_ASSERT(iree_vm_buffer_registration);
+  iree_vm_ref_t ref = {0};
+  if (value) {
+    if (value->storage_module) {
+      iree_vm_buffer_retain(value);
+    }
+    ref.ptr = value;
+    ref.type = iree_vm_buffer_type();
+  }
+  return ref;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_buffer_check_deref(
+    const iree_vm_ref_t ref, iree_vm_buffer_t** out_ptr) {
+  IREE_VM_REF_ASSERT(iree_vm_buffer_registration);
+  IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, iree_vm_buffer_type()));
+  *out_ptr = (iree_vm_buffer_t*)ref.ptr;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_buffer_check_deref_or_null(
+    const iree_vm_ref_t ref, iree_vm_buffer_t** out_ptr) {
+  IREE_VM_REF_ASSERT(iree_vm_buffer_registration);
+  if (ref.type != IREE_VM_REF_TYPE_NULL) {
+    IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, iree_vm_buffer_type()));
+    *out_ptr = (iree_vm_buffer_t*)ref.ptr;
+  } else {
+    *out_ptr = NULL;
+  }
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(

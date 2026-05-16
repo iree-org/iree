@@ -94,6 +94,15 @@ static bool hip_registered_ =
                "Blocked by the same iree_hal_hip_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"SemaphoreSubmissionTest.CrossQueueWaitBeforeSignal",
+               "HIP does not implement iree_hal_device_query_queue_pool_"
+               "backend, so CTS cannot prove that explicit cross-queue "
+               "wait-before-signal dependencies are mapped onto distinct HIP "
+               "queue domains."},
+              {"SemaphoreSubmissionTest."
+               "MultiQueueFanOutDifferentValuesBeforeSignal",
+               "Blocked by the same HIP queue pool backend UNIMPLEMENTED "
+               "path as CrossQueueWaitBeforeSignal."},
               {"EventTest.*", "HIP does not implement HAL events"},
               {"ExecutableTest.*",
                "HIP does not implement executable reflection"},

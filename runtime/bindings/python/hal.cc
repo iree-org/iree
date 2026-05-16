@@ -230,7 +230,7 @@ py::object HalAllocator::AllocateBufferCopy(
           IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
     }
   }
-  CheckApiStatus(status, "Failed to allocate device visible buffer");
+  CheckApiStatus(status, "Failed to allocate buffer copy");
 
   if (!raw_element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),

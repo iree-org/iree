@@ -93,6 +93,15 @@ static bool cuda_registered_ =
                "Blocked by the same iree_hal_cuda_device_queue_alloca "
                "non-NULL pool rejection as "
                "ExplicitPassthroughPoolAllocaDealloca."},
+              {"SemaphoreSubmissionTest.CrossQueueWaitBeforeSignal",
+               "CUDA does not implement iree_hal_device_query_queue_pool_"
+               "backend, so CTS cannot prove that explicit cross-queue "
+               "wait-before-signal dependencies are mapped onto distinct CUDA "
+               "queue domains."},
+              {"SemaphoreSubmissionTest."
+               "MultiQueueFanOutDifferentValuesBeforeSignal",
+               "Blocked by the same CUDA queue pool backend UNIMPLEMENTED "
+               "path as CrossQueueWaitBeforeSignal."},
               {"EventTest.*", "CUDA does not implement HAL events"},
               {"ExecutableTest.*",
                "CUDA does not implement executable reflection"},

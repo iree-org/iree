@@ -12,7 +12,7 @@ Configure CMake with the following options:
 -DIREE_BUILD_COMPILER=ON
 -DIREE_TARGET_BACKEND_ROCM=ON
 -DIREE_HAL_DRIVER_AMDGPU=ON
--DIREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS=all
+-DIREE_HAL_AMDGPU_DEVICE_BINARY_TARGETS=all
 -DIREE_ROCM_TEST_TARGET_CHIP=gfx1100
 ```
 
@@ -33,7 +33,7 @@ The ROCM chip target defaults to `gfx1100`. Override for your hardware:
 iree-bazel-test --//build_tools/bazel:rocm_test_target=gfx942 //runtime/src/iree/hal/drivers/amdgpu/cts/...
 ```
 
-Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake) for the target and generic family vocabulary mirrored by the embedded device library build.
+Substitute the architecture with your own. See [therock_amdgpu_targets.cmake](https://github.com/ROCm/TheRock/blob/main/cmake/therock_amdgpu_targets.cmake) for the target and generic family vocabulary mirrored by the embedded device binary build.
 
 Use `amdgpu` to specify devices at runtime:
 
@@ -185,23 +185,51 @@ The `iree-profile att` decoder also needs ROCm decode libraries. Pass
 `--rocm_library_path=/opt/rocm/lib`, set `IREE_HAL_AMDGPU_LIBAQLPROFILE_PATH`,
 or rely on the platform search path.
 
-### Device Library Compilation
+### Device Binary Compilation
 
-**Required CMake Options**: `-DIREE_BUILD_COMPILER=ON -DIREE_TARGET_BACKEND_ROCM=ON`
+**Default CMake Mode**: prebuilt checked-in device code objects.
 
 **Top-level Build Target**: `iree_hal_drivers_amdgpu_device_binaries`
 
-Currently IREE's CMake configuration must have the compiler enabled in order to build the runtime including the AMDGPU HAL implementation. This will be made better in the future (allowing for just building what we need instead of the full MLIR stack, using an existing ROCM install, etc). See [Device Library](#device-library) for more information.
+The device library is embedded inside the runtime binary so that no additional
+files are required at runtime. By default, the runtime consumes checked-in code
+objects from `device/binaries/prebuilt/` and does not require building LLVM or
+having ROCm tools available.
 
-The device library should be compiled automatically when building the AMDGPU HAL driver and gets embedded inside the runtime binary so that no additional files are required at runtime.
+The `IREE_HAL_AMDGPU_DEVICE_BINARY_BUILD_MODE` CMake variable controls the
+producer. `prebuilt` is the default. `source` rebuilds the code objects from the
+device C sources and requires an AMDGPU-capable clang plus `llvm-link`, `lld`,
+and `llvm-objcopy`. Source mode can use an in-tree LLVM build, an out-of-tree
+host tools build, or a ROCm/TheRock SDK. Important CMake knobs are
+`IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN`,
+`IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN_ROCM_PATH`,
+`IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN_LLVM_TOOLS_DIR`, and the per-tool overrides
+documented in
+[`device/binaries/README.md`](device/binaries/README.md).
 
-The `IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGETS` CMake variable defaults to `all`, which embeds LLVM generic ISA code objects covering every currently known AMDGPU device library target. Packagers can set it to a smaller list of exact target architectures, LLVM generic ISA targets, TheRock-style generic target families, or TheRock-style product bundles. Exact targets use the HSA ISA spelling, such as `gfx1100`. LLVM generic ISA targets use spellings such as `gfx11-generic`. Generic families use the TheRock family spelling, such as `gfx110X-all`, and product bundles use spellings such as `dgpu-all` or `igpu-all`. These selectors expand to the smallest known compatible code object set instead of one code object per exact GPU. Architectures not built into the library will fail to instantiate the driver at runtime.
+The `IREE_HAL_AMDGPU_DEVICE_BINARY_TARGETS` CMake variable defaults to
+`gfx9-generic;gfx90a;gfx9-4-generic;gfx10-1-generic;gfx10-3-generic;gfx11-generic;gfx12-generic`,
+which embeds the current checked-in generic-family set plus `gfx90a`. Packagers
+can set it to exact target architectures, LLVM generic ISA targets,
+TheRock-style generic target families, or TheRock-style product bundles. Exact
+targets use the HSA ISA spelling, such as `gfx1100`. LLVM generic ISA targets
+use spellings such as `gfx11-generic`. Generic families use the TheRock family
+spelling, such as `gfx110X-all`, and product bundles use spellings such as
+`dgpu-all` or `igpu-all`. These selectors expand to the smallest known
+compatible code object set instead of one code object per exact GPU.
+Architectures not built into the library will fail to instantiate the driver at
+runtime.
 
 The Bazel build exposes the same selector vocabulary through `//runtime/src/iree/hal/drivers/amdgpu/device/binaries:targets`:
 
 ```sh
 iree-bazel-build --//runtime/src/iree/hal/drivers/amdgpu/device/binaries:targets=igpu-all //runtime/src/iree/hal/drivers/amdgpu:amdgpu
 ```
+
+By default Bazel uses the checked-in prebuilt blobs. Developers editing the HAL
+device kernels can opt into live source rebuilds with
+`--config=amdgpu_device_binaries_source_rocm` or
+`--config=amdgpu_device_binaries_source_llvm_project`.
 
 See [`device/binaries/README.md`](device/binaries/README.md) for the target map
 update flow, the generated Bazel/CMake/runtime fragments, and the TheRock/LLVM

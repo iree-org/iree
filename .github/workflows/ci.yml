@@ -158,6 +158,48 @@ jobs:
       - name: CTest
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
+  runtime_wasm:
+    needs: setup
+    name: "runtime_wasm :: wasm32"
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'runtime_wasm')
+    runs-on: ubuntu-24.04
+    env:
+      BUILD_DIR: build-runtime-wasm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install requirements
+        run: sudo apt update && sudo apt install -y ninja-build
+      - name: Checkout runtime submodules
+        run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        with:
+          key: ${{ github.job }}
+          save: ${{ needs.setup.outputs.write-caches == 1 }}
+      - name: CMake - configure
+        run: |
+          cmake \
+            -G Ninja \
+            -B ${BUILD_DIR} \
+            -DCMAKE_TOOLCHAIN_FILE=build_tools/cmake/wasm32.cmake \
+            -DCMAKE_BUILD_TYPE=MinSizeRel \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DIREE_RUNTIME_OPTIMIZATION_PROFILE=size \
+            -DIREE_ENABLE_LLD=ON
+      - name: CMake - build wasm32 runtime smoke targets
+        run: |
+          cmake --build ${BUILD_DIR} \
+            --target \
+              iree_wasm_libc \
+              iree_samples_hal_hello_hello \
+              iree_async_platform_js_proactor \
+              iree_hal_drivers_local_sync_sync_driver \
+            -- -k 0
+
   runtime_tracing:
     needs: setup
     name: "runtime_tracing :: ${{ matrix.runs-on }} :: ${{ matrix.provider }}"
@@ -306,6 +348,7 @@ jobs:
       # Runtime builds.
       - runtime
       - runtime_small
+      - runtime_wasm
       - runtime_tracing
 
       # Full project builds.

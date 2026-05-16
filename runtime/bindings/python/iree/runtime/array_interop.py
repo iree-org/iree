@@ -267,7 +267,7 @@ def asdevicearray(
     *,
     implicit_host_transfer: bool = False,
     memory_type=MemoryType.DEVICE_LOCAL,
-    allowed_usage=(BufferUsage.DEFAULT | BufferUsage.MAPPING),
+    allowed_usage=BufferUsage.DEFAULT,
     element_type: Optional[HalElementType] = None,
 ) -> DeviceArray:
     """Helper to create a DeviceArray from an arbitrary array like.
@@ -276,8 +276,10 @@ def asdevicearray(
     a device as the first argument. This may not be the best mechanism for
     getting a DeviceArray, depending on your use case, but it is reliable
     and simple. This function may make a defensive copy or cause implicit
-    transfers to satisfy the request. If this is important to you, then a lower
-    level API is likely more appropriate.
+    transfers to satisfy the request. The default creates a device-local buffer;
+    callers that require direct host mapping should request a host-visible
+    memory type and mapping usage explicitly. If this is important to you, then
+    a lower level API is likely more appropriate.
 
     Note that additional flags `memory_type`, `allowed_usage` and `element_type`
     are only hints if creating a new DeviceArray. If `a` is already a DeviceArray,

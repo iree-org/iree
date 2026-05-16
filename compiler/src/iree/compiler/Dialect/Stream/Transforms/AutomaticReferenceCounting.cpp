@@ -673,6 +673,29 @@ static void extendCapturedResourceLifetimes(Region &region,
   }
 }
 
+// Notes that |parentResult| may carry |yieldedResource| out of a region.
+//
+// A region can yield the same resource into multiple result positions. Those
+// parent results alias on that path, but this local ARC analysis cannot express
+// path-dependent aliases between control-flow results. Marking the whole alias
+// group indeterminate is conservative and prevents a deallocation through a
+// seemingly dropped sibling result while another sibling is still live.
+static void noteYieldedResourceResult(
+    Value yieldedResource, Value parentResult, LastUseSet &regionLastUseSet,
+    LastUseSet &parentLastUseSet, DenseMap<Value, Value> &yieldedBaseResultMap,
+    DenseSet<Value> &indeterminateResources,
+    DenseSet<Value> &handledResources) {
+  Value yieldedBaseResource = regionLastUseSet.lookupResource(yieldedResource);
+  handledResources.insert(yieldedBaseResource);
+
+  auto [it, inserted] =
+      yieldedBaseResultMap.try_emplace(yieldedBaseResource, parentResult);
+  if (!inserted) {
+    indeterminateResources.insert(parentLastUseSet.lookupResource(it->second));
+    indeterminateResources.insert(parentResult);
+  }
+}
+
 // Analyzes scf.for loop with captured resource tracking.
 static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
                            LastUseSet &lastUseSet,
@@ -735,10 +758,14 @@ static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
     // happen after the SCF operation completes.
     auto *terminator = block.getTerminator();
     if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+      DenseMap<Value, Value> yieldedBaseResultMap;
       for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
         if (isa<IREE::Stream::ResourceType>(operand.getType())) {
           // Mark as handled to prevent local deallocation.
-          handledResources.insert(operand);
+          Value forResult = forOp.getResult(index);
+          noteYieldedResourceResult(operand, forResult, blockLastUseSet,
+                                    lastUseSet, yieldedBaseResultMap,
+                                    indeterminateResources, handledResources);
           LLVM_DEBUG({
             llvm::dbgs() << "[arc]   resource ";
             operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -749,7 +776,6 @@ static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
           // Register the corresponding scf.for result in the parent scope.
           // This ensures the resource gets deallocated after the loop even if
           // the result is not used (dropped).
-          Value forResult = forOp.getResult(index);
           lastUseSet.produce(forResult, loopResultTimepoint);
           LLVM_DEBUG({
             llvm::dbgs() << "[arc]   registered loop result ";
@@ -828,10 +854,14 @@ static bool analyzeIfOp(scf::IfOp ifOp, AsmState *asmState,
       // happen after the SCF operation completes.
       auto *terminator = block.getTerminator();
       if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
+        DenseMap<Value, Value> yieldedBaseResultMap;
         for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
           if (isa<IREE::Stream::ResourceType>(operand.getType())) {
             // Mark as handled to prevent local deallocation.
-            handledResources.insert(operand);
+            Value ifResult = ifOp.getResult(index);
+            noteYieldedResourceResult(operand, ifResult, blockLastUseSet,
+                                      lastUseSet, yieldedBaseResultMap,
+                                      indeterminateResources, handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -841,7 +871,6 @@ static bool analyzeIfOp(scf::IfOp ifOp, AsmState *asmState,
 
             // Register the corresponding scf.if result in the parent scope.
             // Skip if already registered (e.g., from the other branch).
-            Value ifResult = ifOp.getResult(index);
             if (!registeredIfResults.contains(ifResult)) {
               registeredIfResults.insert(ifResult);
               lastUseSet.produce(ifResult, ifResultTp);
@@ -924,9 +953,13 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
       auto *terminator = block.getTerminator();
       if (auto conditionOp = dyn_cast<scf::ConditionOp>(terminator)) {
         // "before" region ends with scf.condition - args become while results.
+        DenseMap<Value, Value> yieldedBaseResultMap;
         for (auto [index, operand] : llvm::enumerate(conditionOp.getArgs())) {
           if (isa<IREE::Stream::ResourceType>(operand.getType())) {
-            handledResources.insert(operand);
+            Value whileResult = whileOp.getResult(index);
+            noteYieldedResourceResult(operand, whileResult, blockLastUseSet,
+                                      lastUseSet, yieldedBaseResultMap,
+                                      indeterminateResources, handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -935,7 +968,6 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
             });
 
             // Register the corresponding scf.while result in the parent scope.
-            Value whileResult = whileOp.getResult(index);
             lastUseSet.produce(whileResult, whileResultTimepoint);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   registered while result ";
@@ -950,7 +982,7 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
         // Mark as handled to prevent local deallocation (no parent produce).
         for (Value operand : yieldOp.getOperands()) {
           if (isa<IREE::Stream::ResourceType>(operand.getType())) {
-            handledResources.insert(operand);
+            handledResources.insert(blockLastUseSet.lookupResource(operand));
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource yielded from while body back "
                               "to loop; preventing local deallocation\n";

@@ -18,10 +18,11 @@ include(CMakeParseArguments)
 #                compiled as translation units or exposed as interface headers.
 # COPTS: additional flags to pass to clang.
 # LINKOPTS: additional flags to pass to lld.
+# MINIMIZE: hide non-HSA ABI symbols after linking.
 function(iree_amdgpu_binary)
   cmake_parse_arguments(
     _RULE
-    ""
+    "MINIMIZE"
     "NAME;OUT;TARGET;ARCH"
     "SRCS;INTERNAL_HDRS;COPTS;LINKOPTS"
     ${ARGN}
@@ -131,9 +132,22 @@ function(iree_amdgpu_binary)
     VERBATIM
   )
 
+  set(_LINK_OUT "${_OUT}")
+  set(_LINKOPTS ${_RULE_LINKOPTS})
+  if(_RULE_MINIMIZE)
+    if(NOT IREE_LLVM_OBJCOPY_BINARY)
+      message(FATAL_ERROR
+        "iree_amdgpu_binary(MINIMIZE) requires IREE_LLVM_OBJCOPY_BINARY")
+    endif()
+    set(_LINK_OUT "${_RULE_NAME}.linked.so")
+    set(_VERSION_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.local.version")
+    file(WRITE "${_VERSION_SCRIPT}" "{\n  local:\n    *;\n};\n")
+    list(APPEND _LINKOPTS "--version-script=${_VERSION_SCRIPT}")
+  endif()
+
   add_custom_command(
     OUTPUT
-      "${_OUT}"
+      "${_LINK_OUT}"
     COMMAND
       ${IREE_LLD_BINARY}
       "-flavor" "gnu"
@@ -149,15 +163,37 @@ function(iree_amdgpu_binary)
       "--strip-debug"
       "--discard-all"
       "--discard-locals"
+      ${_LINKOPTS}
       "${_LINKED_FILE}"
-      "-o" "${_OUT}"
+      "-o" "${_LINK_OUT}"
     DEPENDS
       "${_LINKED_FILE}"
+      "${IREE_LLD_BINARY}"
       "${IREE_LLD_TARGET}"
     COMMENT
-      "Compiling binary to ${_OUT}"
+      "Compiling binary to ${_LINK_OUT}"
     VERBATIM
   )
+  if(_RULE_MINIMIZE)
+    add_custom_command(
+      OUTPUT
+        "${_OUT}"
+      COMMAND
+        ${IREE_LLVM_OBJCOPY_BINARY}
+        "-R" ".comment"
+        "-R" ".AMDGPU.gpr_maximums"
+        "--discard-all"
+        "-N" "_DYNAMIC"
+        "${_LINK_OUT}"
+        "${_OUT}"
+      DEPENDS
+        "${_LINK_OUT}"
+        "${IREE_LLVM_OBJCOPY_BINARY}"
+      COMMENT
+        "Minimizing AMDGPU binary to ${_OUT}"
+      VERBATIM
+    )
+  endif()
 
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.

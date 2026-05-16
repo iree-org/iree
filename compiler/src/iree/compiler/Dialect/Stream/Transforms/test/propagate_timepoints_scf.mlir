@@ -44,6 +44,40 @@ util.func public @scf_for_pipelined(%arg: !stream.resource<external>) -> !stream
 
 // -----
 
+// Tests that barriers on scf.for results use the propagated result timepoint.
+// This avoids lowering such barriers as immediately satisfied and signaling
+// external fences before loop-carried queue work has completed.
+
+// CHECK-LABEL: @scf_for_result_barrier
+// CHECK-SAME: %[[ARG:.+]]: !stream.resource<external>
+util.func public @scf_for_result_barrier(%arg: !stream.resource<external>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c3 = arith.constant 3 : index
+  %c1 = arith.constant 1 : index
+  %c64 = arith.constant 64 : index
+
+  %init_tp = stream.timepoint.immediate => !stream.timepoint
+  %init_ready = stream.timepoint.await %init_tp => %arg : !stream.resource<external>{%c64}
+
+  // CHECK: %[[FOR_RESULT:.+]]:2 = scf.for
+  // CHECK-SAME: iter_args(%[[ITER:.+]] = %[[ARG]], %[[ITER_TP:.+]] =
+  // CHECK-SAME: -> (!stream.resource<external>, !stream.timepoint)
+  %result = scf.for %i = %c0 to %c3 step %c1 iter_args(%iter = %init_ready) -> !stream.resource<external> {
+    // CHECK: stream.test.timeline_op await(%[[ITER_TP]]) => with(%[[ITER]])
+    %next, %next_tp = stream.test.timeline_op with(%iter) : (!stream.resource<external>{%c64}) -> !stream.resource<external>{%c64} => !stream.timepoint
+    %next_ready = stream.timepoint.await %next_tp => %next : !stream.resource<external>{%c64}
+    // CHECK: scf.yield %{{.+}}, %{{.+}} : !stream.resource<external>, !stream.timepoint
+    scf.yield %next_ready : !stream.resource<external>
+  }
+
+  %barrier_result, %barrier_tp = stream.timepoint.barrier %result : !stream.resource<external>{%c64} => !stream.timepoint
+  // CHECK-NOT: stream.timepoint.barrier
+  // CHECK: util.return %[[FOR_RESULT]]#1 : !stream.timepoint
+  util.return %barrier_tp : !stream.timepoint
+}
+
+// -----
+
 // Tests that scf.for with independent parallel ops preserves concurrency.
 
 // CHECK-LABEL: @scf_for_parallel_selective

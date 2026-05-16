@@ -153,6 +153,8 @@ set(_IREE_HAL_AMDGPU_DEVICE_TARGET_FAMILY_dgpu_all
   "gfx1102"
   "gfx1200"
   "gfx1201"
+  "gfx1250"
+  "gfx1251"
 )
 set(_IREE_HAL_AMDGPU_DEVICE_TARGET_FAMILY_gfx900_dgpu
   "gfx900"

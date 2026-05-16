@@ -35,6 +35,9 @@ DictionaryAttr getTargetConfigAttr(Operation *op);
 /// applicable to the given |op|.
 bool usesIndirectBindingsAttr(Operation *op);
 
+/// Returns whether the Vulkan BDA root dispatch ABI is selected for |op|.
+bool usesBdaRootDispatchAbiAttr(Operation *op);
+
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.
 FailureOr<SmallVector<int64_t>>

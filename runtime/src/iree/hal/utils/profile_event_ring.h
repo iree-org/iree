@@ -81,6 +81,10 @@ void iree_hal_profile_event_ring_clear(iree_hal_profile_event_ring_t* ring);
 void* iree_hal_profile_event_ring_record_at(
     const iree_hal_profile_event_ring_t* ring, uint64_t position);
 
+// Returns the number of records that can be appended without dropping.
+iree_host_size_t iree_hal_profile_event_ring_available_capacity(
+    const iree_hal_profile_event_ring_t* ring);
+
 // Attempts to reserve one event record.
 //
 // Returns false when the ring is disabled. Returns false and accounts one

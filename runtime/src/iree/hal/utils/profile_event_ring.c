@@ -41,6 +41,16 @@ void* iree_hal_profile_event_ring_record_at(
   return (uint8_t*)ring->records + (position & ring->mask) * ring->record_size;
 }
 
+iree_host_size_t iree_hal_profile_event_ring_available_capacity(
+    const iree_hal_profile_event_ring_t* ring) {
+  IREE_ASSERT_ARGUMENT(ring);
+  if (!ring->records || ring->capacity == 0) return 0;
+
+  const uint64_t occupied_count = ring->write_position - ring->read_position;
+  if (occupied_count >= ring->capacity) return 0;
+  return ring->capacity - (iree_host_size_t)occupied_count;
+}
+
 bool iree_hal_profile_event_ring_try_append(iree_hal_profile_event_ring_t* ring,
                                             uint64_t* out_position,
                                             uint64_t* out_event_id) {

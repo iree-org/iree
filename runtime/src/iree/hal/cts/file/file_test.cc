@@ -13,7 +13,6 @@
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/io/file_contents.h"
 #include "iree/io/file_handle.h"
-#include "iree/io/stream.h"
 #include "iree/testing/temp_file.h"
 
 namespace iree::hal::cts {
@@ -89,7 +88,7 @@ class FileTest : public CtsTestBase<> {
     }
 
     std::vector<uint8_t> ReadContents(iree_device_size_t offset,
-                                      iree_device_size_t length) const {
+                                      iree_device_size_t length) {
       std::vector<uint8_t> contents(static_cast<size_t>(length));
       if (memory_contents_) {
         std::memcpy(contents.data(), memory_contents_ + offset,
@@ -97,20 +96,29 @@ class FileTest : public CtsTestBase<> {
         return contents;
       }
 
-      if (native_handle_) {
-        IREE_EXPECT_OK(iree_io_file_handle_flush(native_handle_));
-        iree_io_stream_t* stream = nullptr;
-        IREE_EXPECT_OK(iree_io_stream_open(IREE_IO_STREAM_MODE_READABLE,
-                                           native_handle_, offset,
-                                           iree_allocator_system(), &stream));
-        if (stream) {
-          iree_host_size_t read_length = 0;
-          IREE_EXPECT_OK(
-              iree_io_stream_read(stream, static_cast<iree_host_size_t>(length),
-                                  contents.data(), &read_length));
-          EXPECT_EQ(length, read_length);
+      if (native_path_) {
+        iree_hal_file_release(file_);
+        file_ = nullptr;
+        iree_io_file_handle_release(native_handle_);
+        native_handle_ = nullptr;
+
+        iree_io_file_contents_t* file_contents = nullptr;
+        IREE_EXPECT_OK(iree_io_file_contents_read(
+            native_path_.path_view(), iree_allocator_system(), &file_contents));
+        if (file_contents) {
+          const uint64_t read_end =
+              static_cast<uint64_t>(offset) + static_cast<uint64_t>(length);
+          EXPECT_LE(read_end,
+                    static_cast<uint64_t>(file_contents->buffer.data_length));
+          if (read_end <=
+              static_cast<uint64_t>(file_contents->buffer.data_length)) {
+            std::memcpy(
+                contents.data(),
+                file_contents->buffer.data + static_cast<size_t>(offset),
+                static_cast<size_t>(length));
+          }
         }
-        iree_io_stream_release(stream);
+        iree_io_file_contents_free(file_contents);
         return contents;
       }
 
@@ -142,9 +150,9 @@ class FileTest : public CtsTestBase<> {
     iree_hal_file_t* file_ = nullptr;
     // Host allocation backing memory_file providers, unowned.
     uint8_t* memory_contents_ = nullptr;
-    // Native platform file handle backing native_file providers.
+    // Native platform file handle opened for async HAL import.
     iree_io_file_handle_t* native_handle_ = nullptr;
-    // Path to the native platform file for inspection through IREE file APIs.
+    // Path to the native platform file for independent host inspection.
     iree::testing::TempFilePath native_path_;
   };
 
@@ -285,6 +293,9 @@ class FileTest : public CtsTestBase<> {
         iree_make_byte_span(file_contents, initial_contents.size()),
         release_callback, iree_allocator_system(), &handle);
     if (iree_status_is_ok(status)) {
+      EXPECT_FALSE(iree_io_file_handle_uses_async_io(handle));
+    }
+    if (iree_status_is_ok(status)) {
       status = iree_hal_file_import(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,
           IREE_HAL_EXTERNAL_FILE_FLAG_NONE, out_file->out_file());
@@ -313,8 +324,11 @@ class FileTest : public CtsTestBase<> {
     iree_status_t status = iree_io_file_handle_open(
         IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
             IREE_IO_FILE_MODE_RANDOM_ACCESS | IREE_IO_FILE_MODE_SHARE_READ |
-            IREE_IO_FILE_MODE_SHARE_WRITE,
+            IREE_IO_FILE_MODE_SHARE_WRITE | IREE_IO_FILE_MODE_ASYNC,
         path.path_view(), iree_allocator_system(), &handle);
+    if (iree_status_is_ok(status)) {
+      EXPECT_TRUE(iree_io_file_handle_uses_async_io(handle));
+    }
     if (iree_status_is_ok(status)) {
       status = iree_hal_file_import(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,

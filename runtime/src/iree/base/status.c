@@ -90,14 +90,18 @@ iree_status_code_from_errno(int error_number) {
     case EFAULT:        // Bad address
     case EILSEQ:        // Illegal byte sequence
     case ENOPROTOOPT:   // Protocol not available
-    case ENOSTR:        // Not a STREAM
-    case ENOTSOCK:      // Not a socket
-    case ENOTTY:        // Inappropriate I/O control operation
-    case EPROTOTYPE:    // Protocol wrong type for socket
-    case ESPIPE:        // Invalid seek
+#ifdef ENOSTR
+    case ENOSTR:      // Not a STREAM
+#endif                // ENOSTR
+    case ENOTSOCK:    // Not a socket
+    case ENOTTY:      // Inappropriate I/O control operation
+    case EPROTOTYPE:  // Protocol wrong type for socket
+    case ESPIPE:      // Invalid seek
       return IREE_STATUS_INVALID_ARGUMENT;
     case ETIMEDOUT:  // Connection timed out
-    case ETIME:      // Timer expired
+#ifdef ETIME
+    case ETIME:  // Timer expired
+#endif           // ETIME
       return IREE_STATUS_DEADLINE_EXCEEDED;
     case ENODEV:  // No such device
     case ENOENT:  // No such file or directory
@@ -156,9 +160,13 @@ iree_status_code_from_errno(int error_number) {
     case EMLINK:   // Too many links
     case ENFILE:   // Too many open files in system
     case ENOBUFS:  // No buffer space available
+#ifdef ENODATA
     case ENODATA:  // No message is available on the STREAM read queue
+#endif             // ENODATA
     case ENOMEM:   // Not enough space
-    case ENOSR:    // No STREAM resources
+#ifdef ENOSR
+    case ENOSR:  // No STREAM resources
+#endif           // ENOSR
 #ifdef EUSERS
     case EUSERS:  // Too many users
 #endif

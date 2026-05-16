@@ -174,6 +174,14 @@ set(IREE_ALLOCATOR_SYSTEM "libc" CACHE STRING
     "Default named `iree_allocator_t` library and function base name.")
 
 #-------------------------------------------------------------------------------
+# WebAssembly embedding configuration
+#-------------------------------------------------------------------------------
+
+option(IREE_WASM_BUILD_IREE_LIBC
+  "Build IREE's freestanding WebAssembly libc support library."
+  ON)
+
+#-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
 #-------------------------------------------------------------------------------
 
@@ -338,8 +346,8 @@ option(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS "Sets the default value for all runti
 set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS})
 set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT ${IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS})
 
-# Emscripten builds don't support embedded ELF libraries.
-if(EMSCRIPTEN)
+# Wasm builds don't support embedded ELF libraries.
+if(EMSCRIPTEN OR IREE_ARCH STREQUAL "wasm_32")
   set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT OFF)
   set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT OFF)
 endif()
@@ -667,6 +675,7 @@ include(iree_hal_cts_test_suite)
 include(iree_static_linker_test)
 include(iree_plugin_register)
 include(iree_genrule)
+include(iree_wasm_library)
 
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.
@@ -982,10 +991,25 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_set_googletest_cmake_options()
   add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
+  # gtest's CMakeLists.txt unconditionally adds -fexceptions to its library
+  # targets via the COMPILE_FLAGS property. IREE always builds with
+  # -fno-exceptions (in CMAKE_CXX_FLAGS), but target COMPILE_FLAGS come after
+  # global flags, so gtest's -fexceptions wins. Strip it so our global
+  # -fno-exceptions takes effect.
+  foreach(_gtest_target gtest gtest_main gmock gmock_main)
+    if(TARGET ${_gtest_target})
+      get_target_property(_flags ${_gtest_target} COMPILE_FLAGS)
+      if(_flags)
+        string(REPLACE "-fexceptions" "" _flags "${_flags}")
+        set_target_properties(${_gtest_target} PROPERTIES COMPILE_FLAGS "${_flags}")
+      endif()
+    endif()
+  endforeach()
 endif()
 
-if(IREE_ENABLE_THREADING AND IREE_BUILD_BENCHMARKS)
-  # Benchmark.
+if(IREE_ENABLE_THREADING AND IREE_BUILD_BENCHMARKS AND NOT IREE_ARCH STREQUAL "wasm_32")
+  # Benchmark. Excluded from wasm32 freestanding builds because Google
+  # Benchmark requires a regex library that freestanding doesn't provide.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
   iree_install_targets(
@@ -1015,6 +1039,25 @@ if(IREE_ENABLE_CPUINFO)
       COMPONENT IREEBundledLibraries
       EXPORT_SET Runtime
     )
+  endif()
+endif()
+
+# Freestanding WebAssembly support: libc and JS companion bundler.
+if(IREE_ARCH STREQUAL "wasm_32")
+  if(IREE_WASM_BUILD_IREE_LIBC)
+    add_subdirectory(build_tools/third_party/dlmalloc EXCLUDE_FROM_ALL)
+  endif()
+  add_subdirectory(build_tools/wasm)
+  if(NOT IREE_BUILD_SAMPLES)
+    # Keep broad sample builds disabled for wasm, but expose one real runtime
+    # executable target for CI link coverage. This compiles the HAL hello
+    # sample to a final wasm module without pulling in sample trees that need
+    # host compiler tools.
+    # TODO(benvanik): replace this temporary sample inclusion with a real
+    # browser/Node VMFB runner target once we have one. That runner should be
+    # the canonical wasm runtime link check and should accept VMFBs by URL
+    # parameter, drag/drop, or an equivalent embedding-friendly mechanism.
+    add_subdirectory(samples/hal/hello EXCLUDE_FROM_ALL)
   endif()
 endif()
 

@@ -8,7 +8,9 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
+load("//build_tools/bazel:amdgpu_device_toolchain_repo.bzl", "amdgpu_device_toolchain_repo")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
+load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
@@ -129,6 +131,18 @@ def _iree_extension_impl(module_ctx):
     cuda_auto_configure(
         name = "iree_cuda",
         iree_repo_alias = "@iree_core",
+    )
+
+    # Optional AMDGPU builtin device compiler tools. This repository is only
+    # evaluated by source-mode AMDGPU device binary builds.
+    amdgpu_device_toolchain_repo(
+        name = "iree_amdgpu_device_toolchain",
+    )
+
+    # wasi-sdk: clang + lld + wasi-libc + libc++ + compiler-rt for wasm targets.
+    # Downloads the host-appropriate release from GitHub on first build.
+    wasi_sdk_repo(
+        name = "wasi_sdk",
     )
 
 iree_extension = module_extension(

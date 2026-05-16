@@ -341,7 +341,7 @@ class HostQueueStagingTest : public ::testing::Test {
   iree_status_t ImportFdFile(iree_hal_device_t* device, const std::string& path,
                              iree_hal_memory_access_t access,
                              iree_hal_file_t** out_file) {
-    iree_io_file_mode_t mode = IREE_IO_FILE_MODE_READ;
+    iree_io_file_mode_t mode = IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_ASYNC;
     if (iree_all_bits_set(access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
       mode |= IREE_IO_FILE_MODE_WRITE;
     }

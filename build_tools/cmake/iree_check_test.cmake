@@ -194,7 +194,7 @@ function(iree_check_test)
   endif()
   add_dependencies(iree-test-deps "${_NAME}")
 
-  if(_TEST_DEFINED)
+  if(_TEST_DEFINED AND TARGET "${_RUNNER_TARGET}")
     iree_native_test(
       NAME
         "${_RULE_NAME}"

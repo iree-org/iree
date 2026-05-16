@@ -21,6 +21,9 @@ class TargetConverter:
                 f"{iree_core_repo}//build_tools:pthreads": [],
                 f"{iree_core_repo}//build_tools:dl": ["${CMAKE_DL_LIBS}"],
                 f"{iree_core_repo}//build_tools:rt": [],
+                # CMake test macros set LSAN_OPTIONS from driver labels.
+                f"{iree_core_repo}//build_tools/sanitizer:lsan_suppressions_rocm.txt": [],
+                f"{iree_core_repo}//build_tools/sanitizer:lsan_suppressions_vulkan.txt": [],
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"
                 ],

@@ -19,7 +19,6 @@
 #include "iree/async/frontier.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/pool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,6 +78,26 @@ void iree_hal_local_transient_buffer_commit(iree_hal_buffer_t* buffer);
 // state. Any staged-but-uncommitted backing view is also released. Safe to
 // call on an already-uncommitted wrapper.
 void iree_hal_local_transient_buffer_decommit(iree_hal_buffer_t* buffer);
+
+// Returns true if queue_dealloca has been accepted for the transient buffer.
+bool iree_hal_local_transient_buffer_is_dealloca_queued(
+    iree_hal_buffer_t* buffer);
+
+// Marks the wrapper as queued for deallocation. Returns false if deallocation
+// was already queued. Queue implementations call this before accepting a
+// queue_dealloca so double-deallocation fails before any queue state changes.
+bool iree_hal_local_transient_buffer_begin_dealloca(iree_hal_buffer_t* buffer);
+
+// Clears a queued-deallocation marker after submission failure. Must only be
+// called when no deallocation completion action can still run.
+void iree_hal_local_transient_buffer_abort_dealloca(iree_hal_buffer_t* buffer);
+
+// Returns the staged backing buffer used for queue packet emission, or NULL if
+// no backing has been staged. This is intentionally less strict than committed
+// host access: queue submissions may resolve backing storage before the alloca
+// signal is visible to users, relying on semaphore dependencies for ordering.
+iree_hal_buffer_t* iree_hal_local_transient_buffer_backing_buffer(
+    iree_hal_buffer_t* buffer);
 
 // Returns the attached pool reservation without transferring ownership.
 //

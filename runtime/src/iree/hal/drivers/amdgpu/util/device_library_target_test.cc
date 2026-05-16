@@ -41,7 +41,7 @@ TEST(DeviceLibraryTargetTest,
   EXPECT_EQ(values[3], "gfx9-4-generic");
 }
 
-TEST(DeviceLibraryTargetTest, MapsGfx12_5TargetsToGenericFamily) {
+TEST(DeviceLibraryTargetTest, IncludesGfx12_5GenericFallback) {
   const auto values = CandidateValues("amdgcn-amd-amdhsa--gfx1250");
 
   ASSERT_EQ(values.size(), 2u);

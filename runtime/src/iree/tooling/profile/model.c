@@ -238,6 +238,11 @@ iree_status_t iree_profile_model_ensure_device(
 static void iree_profile_model_record_clock_sample(
     iree_profile_model_device_t* device,
     const iree_hal_profile_clock_correlation_record_t* record) {
+  if (iree_any_bit_set(
+          record->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
+    ++device->invalid_clock_alignment_sample_count;
+  }
   if (device->clock_sample_count == 0) {
     device->first_clock_sample = *record;
   }
@@ -466,6 +471,7 @@ bool iree_profile_model_device_try_fit_clock_exact(
     iree_profile_model_clock_fit_t* out_fit) {
   memset(out_fit, 0, sizeof(*out_fit));
   if (!device || device->clock_sample_count < 2) return false;
+  if (device->invalid_clock_alignment_sample_count != 0) return false;
 
   const iree_hal_profile_clock_correlation_record_t* first =
       &device->first_clock_sample;
@@ -474,7 +480,10 @@ bool iree_profile_model_device_try_fit_clock_exact(
   if (!iree_all_bits_set(first->flags,
                          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
       !iree_all_bits_set(last->flags,
-                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK)) {
+                         IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK) ||
+      iree_any_bit_set(
+          first->flags | last->flags,
+          IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
     return false;
   }
   int64_t first_time_ns = 0;

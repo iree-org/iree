@@ -663,24 +663,43 @@ static iree_status_t iree_encode_create_archives(
       memcpy(path_cstr, archive->path.data, archive->path.size);
       path_cstr[archive->path.size] = '\0';
 
-      // Create output file.
+      // Create the output file with a synchronous handle for header writes and
+      // an async handle for HAL queue transfers into the parameter storage.
+      iree_io_file_handle_t* stream_file_handle = NULL;
       status = iree_io_file_handle_create(
-          IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE,
+          IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
+              IREE_IO_FILE_MODE_SHARE_READ | IREE_IO_FILE_MODE_SHARE_WRITE,
           iree_make_cstring_view(path_cstr), archive_size, host_allocator,
-          &archive->file_handle);
+          &stream_file_handle);
+      if (iree_status_is_ok(status)) {
+        status = iree_io_file_handle_open(
+            IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_WRITE |
+                IREE_IO_FILE_MODE_SHARE_READ | IREE_IO_FILE_MODE_SHARE_WRITE |
+                IREE_IO_FILE_MODE_ASYNC,
+            iree_make_cstring_view(path_cstr), host_allocator,
+            &archive->file_handle);
+      }
       iree_allocator_free(host_allocator, path_cstr);
-      if (!iree_status_is_ok(status)) break;
+      if (!iree_status_is_ok(status)) {
+        iree_io_file_handle_release(stream_file_handle);
+        break;
+      }
 
       // Create stream and index.
       iree_io_stream_t* stream = NULL;
       status =
-          iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE,
-                              archive->file_handle, 0, host_allocator, &stream);
-      if (!iree_status_is_ok(status)) break;
+          iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, stream_file_handle,
+                              0, host_allocator, &stream);
+
+      if (!iree_status_is_ok(status)) {
+        iree_io_file_handle_release(stream_file_handle);
+        break;
+      }
 
       status = iree_io_parameter_index_create(host_allocator, &archive->index);
       if (!iree_status_is_ok(status)) {
         iree_io_stream_release(stream);
+        iree_io_file_handle_release(stream_file_handle);
         break;
       }
 
@@ -688,6 +707,7 @@ static iree_status_t iree_encode_create_archives(
       status = iree_io_parameter_archive_builder_write(
           &archive->builder, archive->file_handle, 0, stream, archive->index);
       iree_io_stream_release(stream);
+      iree_io_file_handle_release(stream_file_handle);
       if (!iree_status_is_ok(status)) break;
 
       // Create provider backed by the archive.

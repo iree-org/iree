@@ -1648,6 +1648,14 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     // Returns true if the op has non-zero output padding.
     bool hasOutputPadding();
 
+    // Returns true iff *this can be lowered via decomposeOperationAsyncCopy.
+    bool canDecomposeAsyncCopy();
+
+    // Decomposes *this into the async-copy form (collapsed source +
+    // linalg.generic index tensor + iree_linalg_ext.gather + expand-shape).
+    // Precondition: canDecomposeAsyncCopy() returns true.
+    FailureOr<SmallVector<Value>> decomposeOperationAsyncCopy(OpBuilder &b);
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {

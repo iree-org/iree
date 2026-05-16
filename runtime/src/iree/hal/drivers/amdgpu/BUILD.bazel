@@ -441,6 +441,11 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_cmake_extra_content(
+    content = "if(TARGET iree::hal::drivers::amdgpu::cts::testdata_amdgpu)",
+    inline = True,
+)
+
 iree_runtime_cc_test(
     name = "host_queue_command_buffer_test",
     srcs = [
@@ -464,6 +469,11 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
+)
+
+iree_cmake_extra_content(
+    content = "endif()",
+    inline = True,
 )
 
 iree_cmake_extra_content(

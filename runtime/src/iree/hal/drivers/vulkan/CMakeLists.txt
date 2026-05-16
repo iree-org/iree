@@ -12,124 +12,129 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    vulkan
+    api
   HDRS
     "api.h"
-    "vulkan_device.h"
-    "vulkan_driver.h"
-  SRCS
-    "api.cc"
-    "base_buffer.c"
-    "base_buffer.h"
-    "builtin_executables.cc"
-    "builtin_executables.h"
-    "command_queue.h"
-    "completion_watcher.cc"
-    "completion_watcher.h"
-    "debug_reporter.cc"
-    "debug_reporter.h"
-    "descriptor_pool_cache.cc"
-    "descriptor_pool_cache.h"
-    "descriptor_set_arena.cc"
-    "descriptor_set_arena.h"
-    "direct_command_buffer.cc"
-    "direct_command_buffer.h"
-    "direct_command_queue.cc"
-    "direct_command_queue.h"
-    "extensibility_util.cc"
-    "extensibility_util.h"
-    "handle_util.h"
-    "native_allocator.cc"
-    "native_allocator.h"
-    "native_buffer.cc"
-    "native_buffer.h"
-    "native_event.cc"
-    "native_event.h"
-    "native_executable.cc"
-    "native_executable.h"
-    "native_semaphore.cc"
-    "native_semaphore.h"
-    "nop_executable_cache.cc"
-    "nop_executable_cache.h"
-    "pipeline_layout.cc"
-    "pipeline_layout.h"
-    "sparse_buffer.cc"
-    "sparse_buffer.h"
-    "status_util.c"
-    "status_util.h"
-    "tracing.cc"
-    "tracing.h"
-    "vulkan_device.cc"
-    "vulkan_driver.cc"
-    "vulkan_headers.h"
   DEPS
-    ::dynamic_symbols
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    headers
+  HDRS
+    "api.h"
+    "command_buffer.h"
+    "executable.h"
+    "physical_device.h"
+    "spirv.h"
+  DEPS
+    ::api
+    Vulkan::Headers
+    iree::base
+    iree::hal
+    iree::hal::drivers::vulkan::util::libvulkan
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    executable_test
+  SRCS
+    "executable_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::base::core_headers
+    iree::base::internal::flatcc::building
+    iree::hal
+    iree::hal::utils::executable_header
+    iree::schemas::vulkan_executable_def_c_fbs
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    spirv_test
+  SRCS
+    "spirv_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_library(
+  NAME
+    vulkan
+  SRCS
+    "allocator.c"
+    "allocator.h"
+    "api.c"
+    "buffer.c"
+    "buffer.h"
+    "builtins.c"
+    "builtins.h"
+    "command_buffer.c"
+    "command_buffer.h"
+    "driver.c"
+    "driver.h"
+    "executable.c"
+    "executable.h"
+    "executable_cache.c"
+    "executable_cache.h"
+    "logical_device.c"
+    "logical_device.h"
+    "physical_device.c"
+    "physical_device.h"
+    "queue.c"
+    "queue.h"
+    "semaphore.c"
+    "semaphore.h"
+    "slab_provider.c"
+    "slab_provider.h"
+    "sparse_buffer.c"
+    "sparse_buffer.h"
+    "spirv.c"
+    "spirv.h"
+    "syms.h"
+  DEPS
+    ::api
     Vulkan::Headers
     iree::async
     iree::async::util::proactor_pool
     iree::base
+    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::threading
     iree::base::threading::thread
     iree::hal
-    iree::hal::drivers::vulkan::builtin
-    iree::hal::drivers::vulkan::util::arena
-    iree::hal::drivers::vulkan::util::intrusive_list
-    iree::hal::drivers::vulkan::util::ref_ptr
-    iree::hal::utils::deferred_command_buffer
+    iree::hal::drivers::vulkan::util::libvulkan
+    iree::hal::local::profile
+    iree::hal::local::transient_buffer
+    iree::hal::memory::passthrough_pool
+    iree::hal::memory::slab_provider
+    iree::hal::memory::tlsf_pool
+    iree::hal::memory::tracing
     iree::hal::utils::executable_debug_info
     iree::hal::utils::executable_header
-    iree::hal::utils::file_transfer
     iree::hal::utils::files
-    iree::hal::utils::queue_emulation
-    iree::hal::utils::queue_host_call_emulation
     iree::hal::utils::resource_set
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::vulkan_executable_def_c_fbs
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    dynamic_symbols
-  HDRS
-    "dynamic_symbols.h"
-  TEXTUAL_HDRS
-    "dynamic_symbol_tables.h"
-  SRCS
-    "dynamic_symbols.cc"
-    "vulkan_headers.h"
-  DEPS
-    Vulkan::Headers
-    iree::base
-    iree::base::internal::dynamic_library
-    iree::hal::drivers::vulkan::util::ref_ptr
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    dynamic_symbols_test
-  SRCS
-    "dynamic_symbols_test.cc"
-  DEPS
-    ::dynamic_symbols
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=vulkan"
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-# If renderdoc support is enabled we can make use of it in the device.
-# Note that we disable this by default as it introduces a backdoor.
-if(IREE_ENABLE_RENDERDOC_PROFILING)
-  target_compile_definitions(iree_hal_drivers_vulkan_vulkan
-    PUBLIC
-      "IREE_HAL_VULKAN_HAVE_RENDERDOC=1"
-  )
-endif()

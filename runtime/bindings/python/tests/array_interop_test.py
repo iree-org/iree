@@ -55,6 +55,26 @@ class DeviceHalTest(unittest.TestCase):
         np.testing.assert_array_equal(cp, init_ary)
         self.assertTrue(ary.is_host_accessible)
 
+    def testCudaDeviceLocalAsDeviceArrayMemoryType(self):
+        try:
+            device = iree.runtime.get_device("cuda")
+        except Exception as e:
+            self.skipTest(f"CUDA device unavailable: {e}")
+
+        init_ary = np.zeros([3, 4], dtype=np.float32) + 2
+        ary = iree.runtime.asdevicearray(
+            device,
+            init_ary,
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+        )
+        memory_type = ary._buffer_view.get_buffer().memory_type()
+        self.assertTrue(memory_type & int(iree.runtime.MemoryType.DEVICE_LOCAL))
+        self.assertFalse(memory_type & int(iree.runtime.MemoryType.HOST_LOCAL))
+
+        cp = ary.to_host()
+        np.testing.assert_array_equal(cp, init_ary)
+
     def testOverrideDtype(self):
         init_ary = np.zeros([3, 4], dtype=np.int32) + 2
         buffer_view = self.allocator.allocate_buffer_copy(

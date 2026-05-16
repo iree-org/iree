@@ -40,6 +40,13 @@ static iree_hal_profile_file_record_t MakeHostExecutionEventsChunk(
   return chunk;
 }
 
+static iree_hal_profile_file_record_t MakeClockCorrelationsChunk(
+    const std::vector<uint8_t>& payload) {
+  iree_hal_profile_file_record_t chunk = MakeChunk(payload);
+  chunk.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS;
+  return chunk;
+}
+
 static iree_hal_profile_file_record_t MakeDeviceMetricSourcesChunk(
     const std::vector<uint8_t>& payload) {
   iree_hal_profile_file_record_t chunk = MakeChunk(payload);
@@ -107,6 +114,47 @@ TEST(ProfileSummaryTest, RejectsMalformedHostExecutionEventRecord) {
   EXPECT_EQ(0u, summary.host_execution_event_record_count);
   EXPECT_EQ(0u, summary.invalid_host_execution_event_record_count);
   EXPECT_EQ(0u, summary.total_host_execution_duration_ns);
+
+  iree_profile_summary_deinitialize(&summary);
+}
+
+TEST(ProfileSummaryTest, CountsInvalidClockAlignmentSamples) {
+  std::vector<uint8_t> payload;
+  iree_hal_profile_clock_correlation_record_t clock_sample =
+      iree_hal_profile_clock_correlation_record_default();
+  clock_sample.flags =
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK |
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_HOST_TIME_BRACKET;
+  clock_sample.sample_id = 1;
+  clock_sample.physical_device_ordinal = 2;
+  clock_sample.device_tick = 1000;
+  clock_sample.host_time_begin_ns = 10;
+  clock_sample.host_time_end_ns = 12;
+  AppendPlainRecord(&payload, clock_sample);
+
+  clock_sample.flags |=
+      IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED;
+  clock_sample.sample_id = 2;
+  clock_sample.device_tick = 2000;
+  clock_sample.host_time_begin_ns = 20;
+  clock_sample.host_time_end_ns = 22;
+  AppendPlainRecord(&payload, clock_sample);
+
+  iree_hal_profile_file_record_t clock_chunk =
+      MakeClockCorrelationsChunk(payload);
+
+  iree_profile_summary_t summary;
+  iree_profile_summary_initialize(iree_allocator_system(), &summary);
+  IREE_ASSERT_OK(iree_profile_summary_process_record(&summary, &clock_chunk));
+
+  EXPECT_EQ(1u, summary.clock_correlation_chunk_count);
+  ASSERT_EQ(1u, summary.device_count);
+  const iree_profile_device_summary_t* device = &summary.devices[0];
+  EXPECT_EQ(2u, device->physical_device_ordinal);
+  EXPECT_EQ(2u, device->clock_sample_count);
+  EXPECT_EQ(1u, device->invalid_clock_alignment_sample_count);
+  EXPECT_EQ(1u, device->first_clock_sample.sample_id);
+  EXPECT_EQ(2u, device->last_clock_sample.sample_id);
 
   iree_profile_summary_deinitialize(&summary);
 }

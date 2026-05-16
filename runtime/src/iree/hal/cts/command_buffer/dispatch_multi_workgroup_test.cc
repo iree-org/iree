@@ -74,7 +74,7 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       break;
@@ -83,7 +83,7 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
       binding_table.bindings = binding_table_values;
       binding_table_values[0] = {
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       binding_refs[0] = {

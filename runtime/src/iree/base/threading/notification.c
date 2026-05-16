@@ -72,6 +72,15 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_wait_token_t wait_token,
                                    iree_duration_t spin_ns,
                                    iree_time_t deadline_ns) {
+  // Single-threaded: no other thread can post, so if the condition wasn't true
+  // before calling commit_wait it won't become true by waiting. Return false
+  // (timed out) unless the deadline is infinite (caller expects to be woken
+  // by an interrupt or callback, which can't happen single-threaded either,
+  // but returning true avoids an infinite spin in iree_notification_await's
+  // condition-check loop for callers that pre-set the condition).
+  if (deadline_ns != IREE_TIME_INFINITE_FUTURE) {
+    return false;
+  }
   return true;
 }
 

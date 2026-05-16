@@ -9,7 +9,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Provides a cross-platform API for NUMA-placed memory allocation with optional
-// huge page support. Platforms without NUMA support (macOS, Emscripten) get
+// huge page support. Platforms without NUMA support (macOS, Wasm) get
 // transparent fallbacks that use standard allocation paths.
 //
 // This centralizes the platform-specific mmap/mbind/VirtualAllocExNuma code
@@ -48,7 +48,7 @@
 //   - Windows: NUMA support via VirtualAllocExNuma(). Supports large pages
 //     (MEM_LARGE_PAGES) when SeLockMemoryPrivilege is granted.
 //
-//   - macOS/Emscripten/Other: Single-node fallback using standard allocation.
+//   - macOS/Wasm/Other: Single-node fallback using standard allocation.
 //     NUMA functions return sensible defaults (1 node, node 0).
 //
 // ## Thread safety
@@ -153,7 +153,7 @@ static inline iree_numa_alloc_options_t iree_numa_alloc_options_default(void) {
 //===----------------------------------------------------------------------===//
 
 // Maximum NUMA nodes supported. 128 for platforms with NUMA support (Linux,
-// Android, Windows), 1 for fallback platforms (macOS, Emscripten, etc).
+// Android, Windows), 1 for fallback platforms (macOS, Wasm, etc).
 #if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_ANDROID) || \
     defined(IREE_PLATFORM_WINDOWS)
 #define IREE_NUMA_MAX_NODES 128
@@ -211,7 +211,7 @@ IREE_API_EXPORT void iree_numa_free(void* ptr,
 
 // Binds existing memory to a NUMA node. Best-effort: returns OK even if the
 // platform does not support post-allocation binding (Windows) or does not have
-// NUMA at all (macOS, Emscripten). On Linux, uses mbind() to migrate pages.
+// NUMA at all (macOS, Wasm). On Linux, uses mbind() to migrate pages.
 //
 // Passing IREE_NUMA_NODE_ANY for |node_id| is a no-op (returns OK).
 IREE_API_EXPORT iree_status_t iree_numa_bind_memory(

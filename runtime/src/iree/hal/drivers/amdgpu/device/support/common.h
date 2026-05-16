@@ -30,7 +30,7 @@
 #define IREE_AMDGPU_ATTRIBUTE_SINGLE_WORK_ITEM
 #define IREE_AMDGPU_ATTRIBUTE_MUSTTAIL [[clang::musttail]]
 #define IREE_AMDGPU_ATTRIBUTE_KERNEL \
-  [[clang::amdgpu_kernel, gnu::visibility("protected")]]
+  [[clang::amdgpu_kernel, gnu::visibility("protected"), gnu::used]]
 
 #define IREE_AMDGPU_LIKELY(x) (__builtin_expect(!!(x), 1))
 #define IREE_AMDGPU_UNLIKELY(x) (__builtin_expect(!!(x), 0))

@@ -10,13 +10,17 @@
 #include "iree/async/platform/io_uring/api.h"
 #endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_ANDROID
 
-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
 #include "iree/async/platform/posix/api.h"
-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM
 
 #if defined(IREE_PLATFORM_WINDOWS)
 #include "iree/async/platform/iocp/api.h"
 #endif  // IREE_PLATFORM_WINDOWS
+
+#if defined(IREE_PLATFORM_WASM)
+#include "iree/async/platform/js/proactor.h"
+#endif  // IREE_PLATFORM_WASM
 
 iree_status_t iree_async_proactor_create_platform(
     iree_async_proactor_options_t options, iree_allocator_t allocator,
@@ -43,7 +47,11 @@ iree_status_t iree_async_proactor_create_platform(
     status = iree_async_proactor_create_posix(options, allocator, out_proactor);
   }
 
-#elif !defined(IREE_PLATFORM_EMSCRIPTEN)  // macOS, BSD, Android, etc.
+#elif defined(IREE_PLATFORM_WASM)
+
+  status = iree_async_proactor_create_js(options, allocator, out_proactor);
+
+#else  // macOS, BSD, Android, etc.
 
   status = iree_async_proactor_create_posix(options, allocator, out_proactor);
 

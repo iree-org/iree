@@ -14,10 +14,12 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
 

@@ -2,11 +2,17 @@
 # Do not edit directly; edit the map in that script and regenerate.
 # Output: runtime/src/iree/hal/drivers/amdgpu/device/binaries/target_map.bzl
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_DEFAULT_TARGETS = [
-    "all",
+IREE_HAL_AMDGPU_DEVICE_BINARY_DEFAULT_TARGETS = [
+    "gfx9-generic",
+    "gfx90a",
+    "gfx9-4-generic",
+    "gfx10-1-generic",
+    "gfx10-3-generic",
+    "gfx11-generic",
+    "gfx12-generic",
 ]
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS = [
+IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS = [
     "gfx900",
     "gfx902",
     "gfx904",
@@ -47,7 +53,7 @@ IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS = [
     "gfx1251",
 ]
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS = [
+IREE_HAL_AMDGPU_DEVICE_BINARY_CODE_OBJECT_TARGETS = [
     "gfx9-generic",
     "gfx908",
     "gfx90a",
@@ -59,7 +65,7 @@ IREE_HAL_AMDGPU_DEVICE_LIBRARY_CODE_OBJECT_TARGETS = [
     "gfx12-5-generic",
 ]
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS = {
+IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGET_CODE_OBJECTS = {
     "gfx900": "gfx9-generic",
     "gfx902": "gfx9-generic",
     "gfx904": "gfx9-generic",
@@ -100,7 +106,7 @@ IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGET_CODE_OBJECTS = {
     "gfx1251": "gfx12-5-generic",
 }
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES = [
+IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILY_NAMES = [
     "all",
     "dcgpu-all",
     "dgpu-all",
@@ -129,8 +135,8 @@ IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILY_NAMES = [
     "igpu-all",
 ]
 
-IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES = {
-    "all": IREE_HAL_AMDGPU_DEVICE_LIBRARY_EXACT_TARGETS,
+IREE_HAL_AMDGPU_DEVICE_BINARY_TARGET_FAMILIES = {
+    "all": IREE_HAL_AMDGPU_DEVICE_BINARY_EXACT_TARGETS,
     "dcgpu-all": [
         "gfx908",
         "gfx90a",
@@ -158,6 +164,8 @@ IREE_HAL_AMDGPU_DEVICE_LIBRARY_TARGET_FAMILIES = {
         "gfx1102",
         "gfx1200",
         "gfx1201",
+        "gfx1250",
+        "gfx1251",
     ],
     "gfx900-dgpu": ["gfx900"],
     "gfx906-dgpu": ["gfx906"],

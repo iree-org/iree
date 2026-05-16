@@ -10,6 +10,23 @@
 
 iree_add_all_subdirs()
 
+add_custom_command(OUTPUT amdgpu_abi_bitcode_hdrs.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch amdgpu_abi_bitcode_hdrs.stamp
+  DEPENDS
+    "command_buffer.h"
+    "common.h"
+    "kernel_args.h"
+    "kernel_descriptor.h"
+    "profile.h"
+    "queue.h"
+    "signal.h"
+    "timestamp.h"
+)
+
+add_custom_target(amdgpu_abi_bitcode_hdrs
+    DEPENDS amdgpu_abi_bitcode_hdrs.stamp
+)
+
 iree_cc_library(
   NAME
     abi

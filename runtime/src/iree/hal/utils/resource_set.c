@@ -220,7 +220,8 @@ static iree_status_t iree_hal_resource_set_insert_retain(
 // single cache line, do all the scanning and shifting in registers, and then
 // store back to the single cache line.
 //
-// Today, though, we leave this as an exercise to whoever comes across this :)
+// The scalar path below keeps the contract simple while preserving the
+// fixed-cost MRU shape required by command recording paths.
 // Notes:
 //   As the MRU is a fixed size we can unroll it entirely and avoid any looping.
 //   On a 32-bit system with uint32x4_t we only need 4 registers.
@@ -260,16 +261,16 @@ static iree_status_t iree_hal_resource_set_insert_retain(
 //   https://github.com/simd-everywhere/simde/blob/master/simde/arm/neon/ceq.h#L591
 static iree_status_t iree_hal_resource_set_insert_1(
     iree_hal_resource_set_t* set, iree_hal_resource_t* resource) {
+  if (set->mru[0] == resource) return iree_ok_status();
+
   // Scan and hope for a hit.
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(set->mru); ++i) {
+  for (iree_host_size_t i = 1; i < IREE_ARRAYSIZE(set->mru); ++i) {
     if (set->mru[i] != resource) continue;
     // Hit - keep the list sorted by most->least recently used.
     // We shift the MRU down to make room at index 0 and store the
     // resource there.
-    if (i > 0) {
-      memmove(&set->mru[1], &set->mru[0], sizeof(set->mru[0]) * i);
-      set->mru[0] = resource;
-    }
+    memmove(&set->mru[1], &set->mru[0], sizeof(set->mru[0]) * i);
+    set->mru[0] = resource;
     return iree_ok_status();
   }
 
@@ -289,8 +290,16 @@ static iree_status_t iree_hal_resource_set_insert_1(
 IREE_API_EXPORT iree_status_t
 iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
                              iree_host_size_t count, const void* resources) {
-  return iree_hal_resource_set_insert_strided(set, count, resources, 0,
-                                              sizeof(iree_hal_resource_t*));
+  if (!set) return iree_ok_status();
+  iree_hal_resource_t* const* resource_ptrs =
+      (iree_hal_resource_t* const*)resources;
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    iree_hal_resource_t* resource = resource_ptrs[i];
+    if (resource) {
+      IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_1(set, resource));
+    }
+  }
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert_strided(

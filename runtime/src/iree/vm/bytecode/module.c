@@ -1018,8 +1018,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
           iree_vm_RodataSegmentDef_external_data_length(segment));
     }
     iree_vm_buffer_t* ref = &module->rodata_ref_table[i];
-    iree_vm_buffer_initialize(IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE, byte_span,
-                              iree_allocator_null(), ref);
+    iree_vm_buffer_initialize_module_storage(byte_span, &module->interface,
+                                             ref);
   }
 
   // Verify functions in the module now that we've verified the metadata that we

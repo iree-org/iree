@@ -166,9 +166,14 @@ typedef struct iree_async_frontier_entry_t {
   /* Reserved bytes preserving the fixed frontier header layout. */ \
   uint8_t reserved[7]
 
+// Frontiers are followed by entries containing uint64_t values. wasm32 keeps
+// pointers at 4-byte alignment but still aligns those entries to 8 bytes.
+#define IREE_ASYNC_FRONTIER_ALIGNMENT 8
+
 // Fixed-size frontier header. Useful for embedding a frontier header before
 // trailing entry storage in another variable-size record.
-typedef struct iree_alignas(IREE_PTR_SIZE) iree_async_frontier_header_t {
+typedef struct iree_alignas(IREE_ASYNC_FRONTIER_ALIGNMENT)
+    iree_async_frontier_header_t {
   IREE_ASYNC_FRONTIER_HEADER_FIELDS;
 } iree_async_frontier_header_t;
 
@@ -292,8 +297,9 @@ typedef struct iree_async_frontier_t {
 static_assert(offsetof(iree_async_frontier_t, entries) ==
                   sizeof(iree_async_frontier_header_t),
               "frontier header must match frontier FAM offset");
-static_assert(IREE_PTR_SIZE == iree_alignof(iree_async_frontier_entry_t),
-              "frontier entry alignment must match pointer alignment");
+static_assert(IREE_ASYNC_FRONTIER_ALIGNMENT >=
+                  iree_alignof(iree_async_frontier_entry_t),
+              "frontier alignment must cover frontier entry alignment");
 static_assert(iree_alignof(iree_async_frontier_header_t) ==
                   iree_alignof(iree_async_frontier_t),
               "frontier header must match frontier alignment");

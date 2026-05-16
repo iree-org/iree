@@ -167,6 +167,49 @@ static iree_status_t TestProfileSinkWrite(
     ++test_sink->executable_export_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_buffer_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_buffer_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_buffer_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_buffer_record_t),
+                records[i].record_length);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      test_sink->command_buffer_ids.push_back(records[i].command_buffer_id);
+    }
+    ++test_sink->command_buffer_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_OPERATIONS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u, iovecs[0].data_length %
+                      sizeof(iree_hal_profile_command_operation_record_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_command_operation_record_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length /
+        sizeof(iree_hal_profile_command_operation_record_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_command_operation_record_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].command_buffer_id);
+      EXPECT_NE(UINT32_MAX, records[i].command_index);
+    }
+    test_sink->command_operations.insert(test_sink->command_operations.end(),
+                                         records, records + record_count);
+    ++test_sink->command_operation_metadata_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_CLOCK_CORRELATIONS)) {
     EXPECT_TRUE(test_sink->saw_device_metadata);
     EXPECT_EQ(0u, iovecs[0].data_length %
@@ -217,7 +260,20 @@ static iree_status_t TestProfileSinkWrite(
       EXPECT_EQ(test_sink->expected_dispatch_flags, records[i].flags);
       EXPECT_NE(0u, records[i].event_id);
       EXPECT_NE(0u, records[i].executable_id);
-      EXPECT_EQ(UINT32_MAX, records[i].command_index);
+      const iree_host_size_t event_index =
+          test_sink->dispatch_events.size() + i;
+      if (test_sink->expected_dispatch_command_indices.empty()) {
+        EXPECT_EQ(UINT32_MAX, records[i].command_index);
+      } else {
+        if (event_index >=
+            test_sink->expected_dispatch_command_indices.size()) {
+          return iree_make_status(
+              IREE_STATUS_DATA_LOSS,
+              "dispatch event index exceeds expected command index count");
+        }
+        EXPECT_EQ(test_sink->expected_dispatch_command_indices[event_index],
+                  records[i].command_index);
+      }
       if (!test_sink->executable_ids.empty() ||
           !test_sink->export_record_executable_ids.empty()) {
         EXPECT_NE(0u, records[i].executable_id);
@@ -304,6 +360,35 @@ static iree_status_t TestProfileSinkWrite(
         test_sink->host_execution_events.end(), records,
         records + record_count);
     ++test_sink->host_execution_event_count;
+  } else if (iree_string_view_equal(
+                 metadata->content_type,
+                 IREE_HAL_PROFILE_CONTENT_TYPE_MEMORY_EVENTS)) {
+    EXPECT_TRUE(test_sink->saw_device_metadata);
+    EXPECT_EQ(0u,
+              iovecs[0].data_length % sizeof(iree_hal_profile_memory_event_t));
+    const auto* records =
+        reinterpret_cast<const iree_hal_profile_memory_event_t*>(
+            iovecs[0].data);
+    const iree_host_size_t record_count =
+        iovecs[0].data_length / sizeof(iree_hal_profile_memory_event_t);
+    EXPECT_GT(record_count, 0u);
+    for (iree_host_size_t i = 0; i < record_count; ++i) {
+      EXPECT_EQ(sizeof(iree_hal_profile_memory_event_t),
+                records[i].record_length);
+      EXPECT_NE(IREE_HAL_PROFILE_MEMORY_EVENT_TYPE_NONE, records[i].type);
+      EXPECT_NE(0u, records[i].event_id);
+      EXPECT_NE(0u, records[i].allocation_id);
+      EXPECT_NE(UINT32_MAX, records[i].physical_device_ordinal);
+      if (iree_all_bits_set(
+              records[i].flags,
+              IREE_HAL_PROFILE_MEMORY_EVENT_FLAG_QUEUE_OPERATION)) {
+        EXPECT_NE(UINT32_MAX, records[i].queue_ordinal);
+        EXPECT_NE(0u, records[i].submission_id);
+      }
+    }
+    test_sink->memory_events.insert(test_sink->memory_events.end(), records,
+                                    records + record_count);
+    ++test_sink->memory_event_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_QUEUE_DEVICE_EVENTS)) {
@@ -398,6 +483,20 @@ bool IsProfilingUnsupported(iree_status_t status) {
          iree_status_is_invalid_argument(status);
 }
 
+static bool HasInvalidDeviceTickAlignment(const TestProfileSink& sink,
+                                          uint32_t physical_device_ordinal) {
+  for (const iree_hal_profile_clock_correlation_record_t& correlation :
+       sink.clock_correlations) {
+    if (correlation.physical_device_ordinal == physical_device_ordinal &&
+        iree_any_bit_set(
+            correlation.flags,
+            IREE_HAL_PROFILE_CLOCK_CORRELATION_FLAG_DEVICE_TICK_UNALIGNED)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ExpectDispatchEventsWithinClockCorrelationRange(
     const TestProfileSink& sink) {
   ASSERT_GE(sink.clock_correlations.size(), 2u);
@@ -407,6 +506,9 @@ void ExpectDispatchEventsWithinClockCorrelationRange(
        event_index < sink.dispatch_events.size(); ++event_index) {
     const uint32_t physical_device_ordinal =
         sink.dispatch_event_physical_device_ordinals[event_index];
+    if (HasInvalidDeviceTickAlignment(sink, physical_device_ordinal)) {
+      continue;
+    }
     uint64_t min_device_tick = UINT64_MAX;
     uint64_t max_device_tick = 0;
     for (const iree_hal_profile_clock_correlation_record_t& correlation :
@@ -433,6 +535,9 @@ void ExpectQueueDeviceEventsWithinClockCorrelationRange(
   ASSERT_GE(sink.clock_correlations.size(), 2u);
   for (const iree_hal_profile_queue_device_event_t& event :
        sink.queue_device_events) {
+    if (HasInvalidDeviceTickAlignment(sink, event.physical_device_ordinal)) {
+      continue;
+    }
     uint64_t min_device_tick = UINT64_MAX;
     uint64_t max_device_tick = 0;
     for (const iree_hal_profile_clock_correlation_record_t& correlation :

@@ -97,28 +97,28 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       negate_binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/0,
           /*buffer=*/output_negate,
-          /*offset=*/iree_hal_buffer_byte_offset(output_negate),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_negate),
       };
       double_binding_refs[0] = {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       double_binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/0,
           /*buffer=*/output_double,
-          /*offset=*/iree_hal_buffer_byte_offset(output_double),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_double),
       };
       break;
@@ -127,17 +127,17 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
       binding_table.bindings = binding_table_values;
       binding_table_values[0] = {
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       binding_table_values[1] = {
           /*buffer=*/output_negate,
-          /*offset=*/iree_hal_buffer_byte_offset(output_negate),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_negate),
       };
       binding_table_values[2] = {
           /*buffer=*/output_double,
-          /*offset=*/iree_hal_buffer_byte_offset(output_double),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_double),
       };
       negate_binding_refs[0] = {

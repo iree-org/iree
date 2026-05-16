@@ -177,6 +177,7 @@ iree_runtime_cc_library(
     srcs = ["dispatch_reuse_test.cc"],
     deps = [
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/cts/util:profile_test_util",
         "//runtime/src/iree/hal/cts/util:test_base",
     ],
     alwayslink = True,
