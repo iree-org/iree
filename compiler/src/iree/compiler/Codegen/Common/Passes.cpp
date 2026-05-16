@@ -48,6 +48,9 @@ void registerCodegenCommonPasses() {
   // Generated.
   registerPasses();
 
+  // Non-tablegen passes that live in this directory.
+  registerDropSchedulePass();
+
   static PassPipelineRegistration<> CodegenConfigurationPreProcessingPipeline(
       "iree-codegen-configuration-preprocessing-pipeline",
       "Runs the variant-scope pre-processing pipeline that precedes the "

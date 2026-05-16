@@ -166,10 +166,6 @@ int ireeOptRunMain(int argc, char **argv) {
   mlir::iree_compiler::registerVMTargets();
   mlir::iree_compiler::registerLLVMIRTranslations(registry);
 
-  // Register the pass to drop embedded transform dialect IR.
-  // TODO: this should be upstreamed.
-  mlir::linalg::transform::registerDropSchedulePass();
-
   if (failed(ireeOptMainFromCL(argc, argv, "IREE modular optimizer driver\n",
                                registry))) {
     return 1;

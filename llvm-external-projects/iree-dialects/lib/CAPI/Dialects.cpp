@@ -6,7 +6,6 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
@@ -25,7 +24,9 @@ using namespace mlir;
 //===--------------------------------------------------------------------===//
 
 void mlirIREELinalgTransformRegisterPasses() {
-  mlir::linalg::transform::registerDropSchedulePass();
+  // DropSchedulePass moved into the IREE codegen common pass library and is
+  // registered via `registerCodegenCommonPasses`. This entry point is kept for
+  // ABI compatibility with existing CAPI / Python consumers.
 }
 
 //===--------------------------------------------------------------------===//
@@ -41,5 +42,7 @@ void ireeRegisterTransformExtensions(MlirContext context) {
 }
 
 void mlirIREETransformRegisterPasses() {
-  mlir::linalg::transform::registerDropSchedulePass();
+  // DropSchedulePass moved into the IREE codegen common pass library and is
+  // registered via `registerCodegenCommonPasses`. This entry point is kept for
+  // ABI compatibility with existing CAPI / Python consumers.
 }

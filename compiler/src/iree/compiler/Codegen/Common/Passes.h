@@ -97,6 +97,16 @@ createIREEComprehensiveBufferizePass(
 std::unique_ptr<Pass>
 createTransformDialectInterpreterPass(StringRef transformSequenceName);
 
+/// Creates a pass that drops the transform dialect schedule (and any empty
+/// modules) from the operation it is run on. Used after the transform
+/// interpreter has applied its sequence.
+std::unique_ptr<Pass> createDropSchedulePass();
+
+/// Registers the drop-schedule pass with the global pass registry. Called from
+/// `iree-opt` tool setup so that `-transform-dialect-drop-schedule` is
+/// available on the command line and in lit RUN lines.
+void registerDropSchedulePass();
+
 // Pass to tile and distribute using scf.forall with workgroup reordering.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDistributeToWorkgroupsWithReordering(bool transposeWorkgroup);

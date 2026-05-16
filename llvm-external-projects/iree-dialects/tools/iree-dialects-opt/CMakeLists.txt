@@ -1,7 +1,6 @@
 set(LIBS
   # Local dialects.
   IREELinalgTransformDialect
-  IREELinalgTransformDialectPasses
   # Core dialects.
   MLIRAffineDialect
   MLIRArithDialect

@@ -13,7 +13,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
