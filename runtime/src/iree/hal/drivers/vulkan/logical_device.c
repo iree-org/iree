@@ -1762,6 +1762,54 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_staging(
   return status;
 }
 
+static iree_status_t iree_hal_vulkan_logical_device_initialize_from_plan(
+    iree_hal_vulkan_logical_device_t* device,
+    const iree_hal_vulkan_device_plan_t* device_plan,
+    const iree_hal_vulkan_device_options_t* device_options,
+    const iree_hal_device_create_params_t* create_params) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(device_plan);
+  IREE_ASSERT_ARGUMENT(device_options);
+  IREE_ASSERT_ARGUMENT(create_params);
+
+  iree_status_t status =
+      iree_hal_vulkan_logical_device_initialize_proactor(device, create_params);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_libvulkan_load_device_syms(
+        &device->instance.syms, device->logical_device, &device->syms);
+  }
+  if (iree_status_is_ok(status)) {
+    device->enabled_features = device_plan->enabled_features;
+    device->enabled_extensions = device_plan->enabled_extensions;
+    device->enabled_dispatch_abis = device_plan->enabled_dispatch_abis;
+    device->max_cached_bda_replay_instances =
+        device_options->max_cached_bda_replay_instances;
+    device->max_cached_bda_replay_publication_bytes =
+        device_options->max_cached_bda_replay_publication_bytes;
+    device->retained_cached_bda_replay_instances =
+        device_options->retained_cached_bda_replay_instances;
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_builtins_initialize(
+        &device->syms, device->logical_device, &device->physical_device,
+        &device->builtins);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_hal_vulkan_logical_device_resolve_queue_assignment(
+        device, &device_plan->queue_assignment);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_initialize_queues(device);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_initialize_allocator(device);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_initialize_queue_staging(device);
+  }
+  return status;
+}
+
 static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
     iree_string_view_t identifier,
     const iree_hal_vulkan_driver_options_t* driver_options,
@@ -1794,10 +1842,6 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
     memset(snapshot, 0, sizeof(*snapshot));
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_proactor(device,
-                                                                create_params);
-  }
-  if (iree_status_is_ok(status)) {
     VkDeviceCreateInfo device_create_info;
     iree_hal_vulkan_device_plan_make_create_info(&device_plan,
                                                  &device_create_info);
@@ -1808,37 +1852,8 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
   }
   if (iree_status_is_ok(status)) {
     device->owns_logical_device = true;
-    status = iree_hal_vulkan_libvulkan_load_device_syms(
-        &device->instance.syms, device->logical_device, &device->syms);
-  }
-  if (iree_status_is_ok(status)) {
-    device->enabled_features = device_plan.enabled_features;
-    device->enabled_extensions = device_plan.enabled_extensions;
-    device->enabled_dispatch_abis = device_plan.enabled_dispatch_abis;
-    device->max_cached_bda_replay_instances =
-        device_options->max_cached_bda_replay_instances;
-    device->max_cached_bda_replay_publication_bytes =
-        device_options->max_cached_bda_replay_publication_bytes;
-    device->retained_cached_bda_replay_instances =
-        device_options->retained_cached_bda_replay_instances;
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_builtins_initialize(
-        &device->syms, device->logical_device, &device->physical_device,
-        &device->builtins);
-  }
-  if (iree_status_is_ok(status)) {
-    iree_hal_vulkan_logical_device_resolve_queue_assignment(
-        device, &device_plan.queue_assignment);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_queues(device);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_allocator(device);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_queue_staging(device);
+    status = iree_hal_vulkan_logical_device_initialize_from_plan(
+        device, &device_plan, device_options, create_params);
   }
 
   if (iree_status_is_ok(status)) {
@@ -2009,41 +2024,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
     device->physical_device = snapshot;
     memset(&snapshot, 0, sizeof(snapshot));
     device->logical_device = logical_device;
-    device->enabled_features = device_plan.enabled_features;
-    device->enabled_dispatch_abis = device_plan.enabled_dispatch_abis;
-    device->enabled_extensions = device_plan.enabled_extensions;
-    device->max_cached_bda_replay_instances =
-        options->max_cached_bda_replay_instances;
-    device->max_cached_bda_replay_publication_bytes =
-        options->max_cached_bda_replay_publication_bytes;
-    device->retained_cached_bda_replay_instances =
-        options->retained_cached_bda_replay_instances;
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_proactor(device,
-                                                                create_params);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_libvulkan_load_device_syms(
-        &device->instance.syms, device->logical_device, &device->syms);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_builtins_initialize(
-        &device->syms, device->logical_device, &device->physical_device,
-        &device->builtins);
-  }
-  if (iree_status_is_ok(status)) {
-    iree_hal_vulkan_logical_device_resolve_queue_assignment(
-        device, &device_plan.queue_assignment);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_queues(device);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_allocator(device);
-  }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_logical_device_initialize_queue_staging(device);
+    status = iree_hal_vulkan_logical_device_initialize_from_plan(
+        device, &device_plan, options, create_params);
   }
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
