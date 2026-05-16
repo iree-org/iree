@@ -22,6 +22,7 @@
 #include "iree/hal/drivers/vulkan/builtins.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
 #include "iree/hal/drivers/vulkan/debug_utils.h"
+#include "iree/hal/drivers/vulkan/device_options.h"
 #include "iree/hal/drivers/vulkan/device_plan.h"
 #include "iree/hal/drivers/vulkan/executable.h"
 #include "iree/hal/drivers/vulkan/executable_cache.h"
@@ -32,76 +33,6 @@
 #include "iree/hal/drivers/vulkan/syms.h"
 #include "iree/hal/local/profile.h"
 #include "iree/hal/utils/file_registry.h"
-
-//===----------------------------------------------------------------------===//
-// Device options
-//===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_vulkan_device_options_parse(
-    iree_hal_vulkan_device_options_t* options, iree_string_pair_list_t params) {
-  IREE_ASSERT_ARGUMENT(options);
-  for (iree_host_size_t i = 0; i < params.count; ++i) {
-    const iree_string_pair_t* param = &params.pairs[i];
-    if (iree_string_view_equal(param->key, IREE_SV("dispatch_abi")) ||
-        iree_string_view_equal(param->key, IREE_SV("vulkan_dispatch_abi"))) {
-      IREE_RETURN_IF_ERROR(iree_hal_vulkan_dispatch_abis_parse(
-          param->value, &options->dispatch_abis));
-    } else if (iree_string_view_equal(param->key,
-                                      IREE_SV("cached_bda_replay_instances")) ||
-               iree_string_view_equal(
-                   param->key, IREE_SV("vulkan_cached_bda_replay_instances"))) {
-      if (!iree_string_view_atoi_uint32(
-              param->value, &options->max_cached_bda_replay_instances)) {
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "invalid Vulkan cached BDA replay instance count '%.*s'",
-            (int)param->value.size, param->value.data);
-      }
-    } else if (iree_string_view_equal(
-                   param->key,
-                   IREE_SV("cached_bda_replay_publication_bytes")) ||
-               iree_string_view_equal(
-                   param->key,
-                   IREE_SV("vulkan_cached_bda_replay_publication_bytes"))) {
-      if (!iree_string_view_atoi_uint64(
-              param->value,
-              &options->max_cached_bda_replay_publication_bytes)) {
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "invalid Vulkan cached BDA replay publication byte limit '%.*s'",
-            (int)param->value.size, param->value.data);
-      }
-    } else if (iree_string_view_equal(
-                   param->key,
-                   IREE_SV("retained_cached_bda_replay_instances")) ||
-               iree_string_view_equal(
-                   param->key,
-                   IREE_SV("vulkan_retained_cached_bda_replay_instances"))) {
-      if (!iree_string_view_atoi_uint32(
-              param->value, &options->retained_cached_bda_replay_instances)) {
-        return iree_make_status(
-            IREE_STATUS_INVALID_ARGUMENT,
-            "invalid Vulkan retained cached BDA replay instance count '%.*s'",
-            (int)param->value.size, param->value.data);
-      }
-    } else {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "unknown Vulkan logical device option '%.*s'",
-                              (int)param->key.size, param->key.data);
-    }
-  }
-  if (options->max_cached_bda_replay_instances != 0 &&
-      options->retained_cached_bda_replay_instances >
-          options->max_cached_bda_replay_instances) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan retained cached BDA replay instances (%u) must be <= maximum "
-        "cached instances (%u)",
-        options->retained_cached_bda_replay_instances,
-        options->max_cached_bda_replay_instances);
-  }
-  return iree_hal_vulkan_dispatch_abis_verify(options->dispatch_abis);
-}
 
 //===----------------------------------------------------------------------===//
 // Resolved queue handles
@@ -2019,17 +1950,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (options->max_cached_bda_replay_instances != 0 &&
-      options->retained_cached_bda_replay_instances >
-          options->max_cached_bda_replay_instances) {
-    IREE_TRACE_ZONE_END(z0);
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan retained cached BDA replay instances (%u) must be <= maximum "
-        "cached instances (%u)",
-        options->retained_cached_bda_replay_instances,
-        options->max_cached_bda_replay_instances);
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_vulkan_device_options_verify(options));
   if (!instance || !physical_device || !logical_device) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(

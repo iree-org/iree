@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/hal/drivers/vulkan/api.h"
+#include "iree/hal/drivers/vulkan/device_options.h"
 #include "iree/hal/drivers/vulkan/logical_device.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 #include "iree/hal/drivers/vulkan/syms.h"
@@ -70,19 +71,8 @@ static iree_status_t iree_hal_vulkan_driver_options_verify(
         "unrecognized Vulkan requested feature bits 0x%08x",
         options->requested_features & ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED);
   }
-  const iree_hal_vulkan_device_flags_t recognized_device_flags =
-      IREE_HAL_VULKAN_DEVICE_FLAG_DEDICATED_COMPUTE_QUEUE;
-  if (iree_status_is_ok(status) &&
-      iree_any_bit_set(options->device_options.flags,
-                       ~recognized_device_flags)) {
-    status = iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "unrecognized Vulkan device option flag bits 0x%08x",
-        options->device_options.flags & ~recognized_device_flags);
-  }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_dispatch_abis_verify(
-        options->device_options.dispatch_abis);
+    status = iree_hal_vulkan_device_options_verify(&options->device_options);
   }
 
   IREE_TRACE_ZONE_END(z0);

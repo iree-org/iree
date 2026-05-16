@@ -28,6 +28,7 @@ iree_cc_library(
     "api.h"
     "command_buffer.h"
     "debug_utils.h"
+    "device_options.h"
     "device_plan.h"
     "executable.h"
     "physical_device.h"
@@ -64,6 +65,21 @@ iree_cc_test(
     debug_utils_test
   SRCS
     "debug_utils_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    device_options_test
+  SRCS
+    "device_options_test.cc"
   DEPS
     ::headers
     ::vulkan
@@ -154,6 +170,8 @@ iree_cc_library(
     "command_buffer.h"
     "debug_utils.c"
     "debug_utils.h"
+    "device_options.c"
+    "device_options.h"
     "device_plan.c"
     "device_plan.h"
     "driver.c"
