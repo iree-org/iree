@@ -97,8 +97,10 @@ TEST(DevicePlanTest, OwnedCreatePrefersDedicatedComputeFamily) {
 
   iree_hal_vulkan_device_plan_t plan;
   IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
-      builder.snapshot(), &options, IREE_HAL_VULKAN_FEATURE_NONE, &plan));
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+      IREE_HAL_VULKAN_FEATURE_NONE, &plan));
 
+  EXPECT_EQ(IREE_HAL_VULKAN_REQUEST_FLAG_NONE, plan.request_flags);
   EXPECT_EQ(1u, plan.queue_assignment.compute.family_index);
   EXPECT_EQ(0u, plan.queue_assignment.compute.queue_index);
   EXPECT_EQ(2u, plan.queue_assignment.transfer.family_index);
@@ -117,7 +119,8 @@ TEST(DevicePlanTest,
 
   iree_hal_vulkan_device_plan_t plan;
   IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
-      builder.snapshot(), &options, IREE_HAL_VULKAN_FEATURE_NONE, &plan));
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+      IREE_HAL_VULKAN_FEATURE_NONE, &plan));
 
   EXPECT_EQ(0u, plan.queue_assignment.compute.family_index);
   EXPECT_EQ(0u, plan.queue_assignment.compute.queue_index);
@@ -138,7 +141,7 @@ TEST(DevicePlanTest, OwnedCreateKeepsSparseBindingSeparateFromSparseResidency) {
 
   iree_hal_vulkan_device_plan_t plan;
   IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
-      builder.snapshot(), &options,
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING, &plan));
 
   EXPECT_TRUE(plan.enabled_features2.features.sparseBinding);
@@ -162,10 +165,11 @@ TEST(DevicePlanTest, OwnedCreateRequiresCompleteSparseResidencyRequest) {
       ~IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING;
 
   iree_hal_vulkan_device_plan_t plan;
-  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
-                        iree_hal_vulkan_device_plan_initialize_for_create(
-                            builder.snapshot(), &options,
-                            sparse_residency_without_sparse_binding, &plan));
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kInvalidArgument,
+      iree_hal_vulkan_device_plan_initialize_for_create(
+          builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+          sparse_residency_without_sparse_binding, &plan));
 }
 
 TEST(DevicePlanTest, OwnedCreateRequiresBdaForBdaOnlyDispatch) {
@@ -179,7 +183,7 @@ TEST(DevicePlanTest, OwnedCreateRequiresBdaForBdaOnlyDispatch) {
   IREE_EXPECT_STATUS_IS(
       StatusCode::kUnavailable,
       iree_hal_vulkan_device_plan_initialize_for_create(
-          builder.snapshot(), &options,
+          builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
           IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES, &plan));
 }
 
@@ -192,12 +196,40 @@ TEST(DevicePlanTest, OwnedCreateEnablesBdaDispatchWhenAvailable) {
 
   iree_hal_vulkan_device_plan_t plan;
   IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
-      builder.snapshot(), &options,
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
       IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES, &plan));
 
   EXPECT_TRUE(plan.enabled_features12.bufferDeviceAddress);
   EXPECT_EQ(IREE_HAL_VULKAN_DISPATCH_ABI_ALL_RECOGNIZED,
             plan.enabled_dispatch_abis);
+}
+
+TEST(DevicePlanTest, OwnedCreateCarriesRequestFlags) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS,
+      IREE_HAL_VULKAN_FEATURE_NONE, &plan));
+
+  EXPECT_EQ(IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS, plan.request_flags);
+}
+
+TEST(DevicePlanTest, OwnedCreateRejectsUnknownRequestFlags) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
+                        iree_hal_vulkan_device_plan_initialize_for_create(
+                            builder.snapshot(), &options,
+                            IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED + 1,
+                            IREE_HAL_VULKAN_FEATURE_NONE, &plan));
 }
 
 TEST(DevicePlanTest, WrapRejectsRequestFlagsInEnabledFeatures) {
@@ -238,6 +270,39 @@ TEST(DevicePlanTest, WrapInfersTransferFromComputeWhenSupported) {
             plan.enabled_dispatch_abis);
 }
 
+TEST(DevicePlanTest, WrapCarriesRequestFlags) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.request_flags = IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_wrap(
+      builder.snapshot(), &options, &params, &plan));
+
+  EXPECT_EQ(IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS, plan.request_flags);
+}
+
+TEST(DevicePlanTest, WrapRejectsUnknownRequestFlags) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.request_flags = IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED + 1;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
+                        iree_hal_vulkan_device_plan_initialize_for_wrap(
+                            builder.snapshot(), &options, &params, &plan));
+}
+
 TEST(DevicePlanTest, WrapRequiresTransferQueueWhenComputeCannotTransfer) {
   PhysicalDeviceSnapshotBuilder builder;
   builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT, 1);
@@ -263,7 +328,7 @@ TEST(DevicePlanTest, MakeCreateInfoRefreshesSelfReferencesAfterCopy) {
 
   iree_hal_vulkan_device_plan_t plan;
   IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
-      builder.snapshot(), &options,
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING, &plan));
 
   iree_hal_vulkan_device_plan_t copied_plan = plan;

@@ -230,6 +230,10 @@ typedef struct iree_hal_vulkan_external_device_params_t {
   // Recognized device extension bits enabled on the VkDevice.
   iree_hal_vulkan_device_extensions_t enabled_extensions;
 
+  // Non-device-feature behavior IREE may use with the wrapped VkInstance and
+  // VkDevice.
+  iree_hal_vulkan_request_flags_t request_flags;
+
   // Compute-capable queue family and indices available to IREE.
   iree_hal_vulkan_queue_set_t compute_queue_set;
 

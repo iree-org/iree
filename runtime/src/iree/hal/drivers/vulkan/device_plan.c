@@ -395,9 +395,22 @@ static iree_status_t iree_hal_vulkan_device_plan_verify_requested_features(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_device_plan_verify_request_flags(
+    iree_hal_vulkan_request_flags_t request_flags) {
+  const iree_hal_vulkan_request_flags_t unknown_request_flags =
+      request_flags & ~IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED;
+  if (unknown_request_flags) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unrecognized Vulkan request flag bits 0x%08x",
+                            unknown_request_flags);
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_device_plan_initialize_for_create(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
     const iree_hal_vulkan_device_options_t* device_options,
+    iree_hal_vulkan_request_flags_t request_flags,
     iree_hal_vulkan_features_t requested_features,
     iree_hal_vulkan_device_plan_t* out_plan) {
   IREE_ASSERT_ARGUMENT(snapshot);
@@ -407,8 +420,11 @@ iree_status_t iree_hal_vulkan_device_plan_initialize_for_create(
 
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_device_plan_verify_device_options(device_options));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_device_plan_verify_request_flags(request_flags));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_plan_verify_requested_features(
       requested_features));
+  out_plan->request_flags = request_flags;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_select_queue_assignment(
       snapshot, device_options, &out_plan->queue_assignment));
   if (!iree_any_bit_set(requested_features,
@@ -644,6 +660,8 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_extensions(
 static iree_status_t iree_hal_vulkan_verify_external_device_contract(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot,
     const iree_hal_vulkan_external_device_params_t* external_device_params) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_plan_verify_request_flags(
+      external_device_params->request_flags));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_verify_external_enabled_features(
       snapshot, external_device_params->enabled_features));
   return iree_hal_vulkan_verify_external_enabled_extensions(
@@ -797,6 +815,7 @@ iree_status_t iree_hal_vulkan_device_plan_initialize_for_wrap(
 
   out_plan->enabled_features = external_device_params->enabled_features;
   out_plan->enabled_extensions = external_device_params->enabled_extensions;
+  out_plan->request_flags = external_device_params->request_flags;
   return iree_ok_status();
 }
 

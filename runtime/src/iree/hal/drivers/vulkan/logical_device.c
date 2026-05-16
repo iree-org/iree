@@ -1826,8 +1826,8 @@ static iree_status_t iree_hal_vulkan_logical_device_create_from_selection(
 
   iree_hal_vulkan_device_plan_t device_plan;
   iree_status_t status = iree_hal_vulkan_device_plan_initialize_for_create(
-      snapshot, device_options, driver_options->requested_features,
-      &device_plan);
+      snapshot, device_options, driver_options->request_flags,
+      driver_options->requested_features, &device_plan);
 
   iree_hal_vulkan_logical_device_t* device = NULL;
   if (iree_status_is_ok(status)) {
