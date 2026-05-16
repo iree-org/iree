@@ -34,6 +34,7 @@ iree_runtime_cc_library(
         "device_plan.h",
         "executable.h",
         "physical_device.h",
+        "physical_device_selection.h",
         "spirv.h",
     ],
     deps = [
@@ -105,6 +106,19 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_test(
+    name = "physical_device_selection_test",
+    srcs = ["physical_device_selection_test.cc"],
+    group = "iree-hal-drivers-vulkan-tests",
+    deps = [
+        ":headers",
+        ":vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "spirv_test",
     srcs = ["spirv_test.cc"],
     group = "iree-hal-drivers-vulkan-tests",
@@ -143,6 +157,8 @@ iree_runtime_cc_library(
         "logical_device.h",
         "physical_device.c",
         "physical_device.h",
+        "physical_device_selection.c",
+        "physical_device_selection.h",
         "queue.c",
         "queue.h",
         "semaphore.c",

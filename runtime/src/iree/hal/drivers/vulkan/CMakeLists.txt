@@ -31,6 +31,7 @@ iree_cc_library(
     "device_plan.h"
     "executable.h"
     "physical_device.h"
+    "physical_device_selection.h"
     "spirv.h"
   DEPS
     ::api
@@ -110,6 +111,21 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    physical_device_selection_test
+  SRCS
+    "physical_device_selection_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
     spirv_test
   SRCS
     "spirv_test.cc"
@@ -150,6 +166,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "physical_device_selection.c"
+    "physical_device_selection.h"
     "queue.c"
     "queue.h"
     "semaphore.c"
