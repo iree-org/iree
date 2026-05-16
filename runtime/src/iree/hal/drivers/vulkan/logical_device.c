@@ -21,6 +21,7 @@
 #include "iree/hal/drivers/vulkan/allocator.h"
 #include "iree/hal/drivers/vulkan/builtins.h"
 #include "iree/hal/drivers/vulkan/command_buffer.h"
+#include "iree/hal/drivers/vulkan/debug_utils.h"
 #include "iree/hal/drivers/vulkan/device_plan.h"
 #include "iree/hal/drivers/vulkan/executable.h"
 #include "iree/hal/drivers/vulkan/executable_cache.h"
@@ -312,6 +313,9 @@ struct iree_hal_vulkan_logical_device_t {
 
   // Device-level Vulkan dispatch table.
   iree_hal_vulkan_device_syms_t syms;
+
+  // Resolved VK_EXT_debug_utils capabilities.
+  iree_hal_vulkan_debug_utils_t debug_utils;
 
   // HAL feature bits enabled on the logical device.
   iree_hal_vulkan_features_t enabled_features;
@@ -1652,6 +1656,66 @@ static void iree_hal_vulkan_logical_device_resolve_queue_assignment(
   device->queue_affinity_mask = (1ull << device->queue_count) - 1;
 }
 
+static iree_hal_vulkan_debug_utils_queue_role_flags_t
+iree_hal_vulkan_logical_device_queue_debug_roles(
+    iree_hal_vulkan_logical_device_t* device,
+    const iree_hal_vulkan_resolved_queue_t* queue) {
+  iree_hal_vulkan_debug_utils_queue_role_flags_t role_flags =
+      IREE_HAL_VULKAN_DEBUG_UTILS_QUEUE_ROLE_NONE;
+  if (iree_hal_vulkan_queue_selection_is_same(
+          &queue->selection, &device->compute_queue.selection)) {
+    role_flags |= IREE_HAL_VULKAN_DEBUG_UTILS_QUEUE_ROLE_COMPUTE;
+  }
+  if (iree_hal_vulkan_queue_selection_is_same(
+          &queue->selection, &device->transfer_queue.selection)) {
+    role_flags |= IREE_HAL_VULKAN_DEBUG_UTILS_QUEUE_ROLE_TRANSFER;
+  }
+  if (device->sparse_binding_queue.handle &&
+      iree_hal_vulkan_queue_selection_is_same(
+          &queue->selection, &device->sparse_binding_queue.selection)) {
+    role_flags |= IREE_HAL_VULKAN_DEBUG_UTILS_QUEUE_ROLE_SPARSE_BINDING;
+  }
+  return role_flags;
+}
+
+static iree_status_t iree_hal_vulkan_logical_device_set_queue_debug_name(
+    iree_hal_vulkan_logical_device_t* device,
+    const iree_hal_vulkan_resolved_queue_t* queue) {
+  const iree_hal_vulkan_debug_utils_queue_role_flags_t role_flags =
+      iree_hal_vulkan_logical_device_queue_debug_roles(device, queue);
+  return iree_hal_vulkan_debug_utils_set_queue_name(
+      &device->debug_utils, &device->syms, device->logical_device,
+      queue->handle, role_flags, queue->selection.family_index,
+      queue->selection.queue_index, device->identifier, device->host_allocator);
+}
+
+static iree_status_t iree_hal_vulkan_logical_device_set_debug_names(
+    iree_hal_vulkan_logical_device_t* device) {
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_debug_utils_set_object_name(
+      &device->debug_utils, &device->syms, device->logical_device,
+      VK_OBJECT_TYPE_DEVICE, (uint64_t)(uintptr_t)device->logical_device,
+      device->identifier, device->host_allocator));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_set_queue_debug_name(
+      device, &device->compute_queue));
+  if (!iree_hal_vulkan_queue_selection_is_same(
+          &device->transfer_queue.selection,
+          &device->compute_queue.selection)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_set_queue_debug_name(
+        device, &device->transfer_queue));
+  }
+  if (device->sparse_binding_queue.handle &&
+      !iree_hal_vulkan_queue_selection_is_same(
+          &device->sparse_binding_queue.selection,
+          &device->compute_queue.selection) &&
+      !iree_hal_vulkan_queue_selection_is_same(
+          &device->sparse_binding_queue.selection,
+          &device->transfer_queue.selection)) {
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_logical_device_set_queue_debug_name(
+        device, &device->sparse_binding_queue));
+  }
+  return iree_ok_status();
+}
+
 static iree_slim_mutex_t* iree_hal_vulkan_logical_device_queue_handle_mutex(
     iree_hal_vulkan_logical_device_t* device,
     const iree_hal_vulkan_resolved_queue_t* queue) {
@@ -1779,6 +1843,10 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_from_plan(
         &device->instance.syms, device->logical_device, &device->syms);
   }
   if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_debug_utils_initialize(
+        device_plan->request_flags, &device->syms, &device->debug_utils);
+  }
+  if (iree_status_is_ok(status)) {
     device->enabled_features = device_plan->enabled_features;
     device->enabled_extensions = device_plan->enabled_extensions;
     device->enabled_dispatch_abis = device_plan->enabled_dispatch_abis;
@@ -1797,6 +1865,9 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_from_plan(
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_logical_device_resolve_queue_assignment(
         device, &device_plan->queue_assignment);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_logical_device_set_debug_names(device);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_logical_device_initialize_queues(device);

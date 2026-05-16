@@ -70,7 +70,7 @@ typedef enum iree_hal_vulkan_request_flag_bits_t {
   IREE_HAL_VULKAN_REQUEST_FLAG_NONE = 0u,
   // Requests validation layers during driver-created instance setup.
   IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS = 1u << 0,
-  // Requests debug utils, object names, command labels, and debug callbacks.
+  // Requests VK_EXT_debug_utils object names and command labels.
   IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS = 1u << 1,
   // Requests Vulkan events in IREE HAL profiling streams.
   IREE_HAL_VULKAN_REQUEST_FLAG_TRACING = 1u << 2,
