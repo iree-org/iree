@@ -2233,10 +2233,11 @@ static iree_status_t iree_hal_vulkan_queue_create_native_replay_under_lock(
           &replay->bda_publication_lease);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_command_buffer_record_native(
-        command_buffer, &queue->syms, queue->logical_device, queue->builtins,
-        replay->native_command_buffer, /*usage_flags=*/0, VK_NULL_HANDLE,
-        binding_table, publication_length != 0 ? &publication : NULL,
-        bda_binding_cache, /*profile_marker=*/NULL, queue->host_allocator);
+        command_buffer, &queue->syms, queue->logical_device,
+        &queue->debug_utils, queue->builtins, replay->native_command_buffer,
+        /*usage_flags=*/0, VK_NULL_HANDLE, binding_table,
+        publication_length != 0 ? &publication : NULL, bda_binding_cache,
+        /*profile_marker=*/NULL, queue->host_allocator);
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_flush_bda_publication_lease(
@@ -5996,6 +5997,7 @@ iree_status_t iree_hal_vulkan_queue_initialize(
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(params->device);
   IREE_ASSERT_ARGUMENT(params->syms);
+  IREE_ASSERT_ARGUMENT(params->debug_utils);
   IREE_ASSERT_ARGUMENT(params->logical_device);
   IREE_ASSERT_ARGUMENT(params->builtins);
   IREE_ASSERT_ARGUMENT(params->queue);
@@ -6008,6 +6010,7 @@ iree_status_t iree_hal_vulkan_queue_initialize(
 
   out_queue->device = params->device;
   out_queue->syms = *params->syms;
+  out_queue->debug_utils = *params->debug_utils;
   out_queue->logical_device = params->logical_device;
   out_queue->builtins = params->builtins;
   out_queue->enabled_dispatch_abis = params->enabled_dispatch_abis;
@@ -9129,7 +9132,7 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
     };
     status = iree_hal_vulkan_command_buffer_record_native(
         submission->execute.command_buffer, &queue->syms, queue->logical_device,
-        queue->builtins, submission->native_command_buffer,
+        &queue->debug_utils, queue->builtins, submission->native_command_buffer,
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, descriptor_pool,
         binding_table, bda_publication_ptr, &bda_binding_cache,
         profile_marker.query_pool ? &profile_marker : NULL,

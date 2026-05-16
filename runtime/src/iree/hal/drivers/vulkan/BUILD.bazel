@@ -46,6 +46,21 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
+    name = "command_buffer_test",
+    srcs = ["command_buffer_test.cc"],
+    group = "iree-hal-drivers-vulkan-tests",
+    deps = [
+        ":headers",
+        ":vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "debug_utils_test",
     srcs = ["debug_utils_test.cc"],
     group = "iree-hal-drivers-vulkan-tests",

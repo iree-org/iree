@@ -85,6 +85,18 @@ iree_status_t iree_hal_vulkan_debug_utils_set_queue_name(
     uint32_t queue_family_index, uint32_t queue_index,
     iree_string_view_t identifier, iree_allocator_t host_allocator);
 
+// Begins a Vulkan command-buffer debug label when command labels are available.
+void iree_hal_vulkan_debug_utils_begin_command_label(
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
+    const iree_hal_vulkan_device_syms_t* syms, VkCommandBuffer command_buffer,
+    const char* label, iree_hal_label_color_t label_color);
+
+// Ends the current Vulkan command-buffer debug label when command labels are
+// available.
+void iree_hal_vulkan_debug_utils_end_command_label(
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
+    const iree_hal_vulkan_device_syms_t* syms, VkCommandBuffer command_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

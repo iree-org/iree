@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/builtins.h"
+#include "iree/hal/drivers/vulkan/debug_utils.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 #include "iree/hal/local/profile.h"
 
@@ -202,6 +203,9 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 
 // Records Vulkan-native commands into |native_command_buffer|.
 //
+// |debug_utils| controls optional VK_EXT_debug_utils labels emitted while
+// replaying recorded debug groups.
+//
 // |profile_marker| may be NULL. When present, the query pool is reset and
 // timestamped inside |native_command_buffer| around the requested queue payload
 // and dispatch commands.
@@ -219,6 +223,7 @@ typedef struct iree_hal_vulkan_command_buffer_profile_marker_t {
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
     const iree_hal_vulkan_builtins_t* builtins,
     VkCommandBuffer native_command_buffer,
     VkCommandBufferUsageFlags usage_flags, VkDescriptorPool descriptor_pool,

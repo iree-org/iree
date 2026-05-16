@@ -181,3 +181,46 @@ iree_status_t iree_hal_vulkan_debug_utils_set_queue_name(
   iree_string_builder_deinitialize(&name_builder);
   return status;
 }
+
+static void iree_hal_vulkan_debug_utils_label_color(
+    iree_hal_label_color_t label_color, float out_color[4]) {
+  out_color[0] = (float)label_color.r / 255.0f;
+  out_color[1] = (float)label_color.g / 255.0f;
+  out_color[2] = (float)label_color.b / 255.0f;
+  out_color[3] = (float)label_color.a / 255.0f;
+}
+
+void iree_hal_vulkan_debug_utils_begin_command_label(
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
+    const iree_hal_vulkan_device_syms_t* syms, VkCommandBuffer command_buffer,
+    const char* label, iree_hal_label_color_t label_color) {
+  IREE_ASSERT_ARGUMENT(debug_utils);
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  if (!iree_hal_vulkan_debug_utils_has(
+          debug_utils, IREE_HAL_VULKAN_DEBUG_UTILS_FLAG_COMMAND_LABELS)) {
+    return;
+  }
+
+  VkDebugUtilsLabelEXT label_info = {
+      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+      .pLabelName = label ? label : "",
+  };
+  iree_hal_vulkan_debug_utils_label_color(label_color, label_info.color);
+  iree_vkCmdBeginDebugUtilsLabelEXT(IREE_VULKAN_DEVICE(syms), command_buffer,
+                                    &label_info);
+}
+
+void iree_hal_vulkan_debug_utils_end_command_label(
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
+    const iree_hal_vulkan_device_syms_t* syms, VkCommandBuffer command_buffer) {
+  IREE_ASSERT_ARGUMENT(debug_utils);
+  IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  if (!iree_hal_vulkan_debug_utils_has(
+          debug_utils, IREE_HAL_VULKAN_DEBUG_UTILS_FLAG_COMMAND_LABELS)) {
+    return;
+  }
+
+  iree_vkCmdEndDebugUtilsLabelEXT(IREE_VULKAN_DEVICE(syms), command_buffer);
+}

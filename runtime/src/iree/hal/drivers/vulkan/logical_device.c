@@ -1746,6 +1746,7 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_queue_lane(
   iree_hal_vulkan_queue_params_t params = {
       .device = device,
       .syms = &device->syms,
+      .debug_utils = &device->debug_utils,
       .logical_device = device->logical_device,
       .builtins = &device->builtins,
       .enabled_dispatch_abis = device->enabled_dispatch_abis,

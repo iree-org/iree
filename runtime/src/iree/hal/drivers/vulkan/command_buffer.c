@@ -21,6 +21,8 @@ typedef enum iree_hal_vulkan_command_type_e {
   IREE_HAL_VULKAN_COMMAND_TYPE_COPY_BUFFER = 2,
   IREE_HAL_VULKAN_COMMAND_TYPE_DISPATCH = 3,
   IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER = 4,
+  IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP = 5,
+  IREE_HAL_VULKAN_COMMAND_TYPE_END_DEBUG_GROUP = 6,
 } iree_hal_vulkan_command_type_t;
 
 typedef struct iree_hal_vulkan_command_t {
@@ -107,6 +109,11 @@ typedef struct iree_hal_vulkan_command_execution_barrier_t {
   // Number of buffer barriers represented by the native barrier.
   iree_host_size_t buffer_barrier_count;
 } iree_hal_vulkan_command_execution_barrier_t;
+
+typedef struct iree_hal_vulkan_command_begin_debug_group_t {
+  // Debug label color captured during recording.
+  iree_hal_label_color_t label_color;
+} iree_hal_vulkan_command_begin_debug_group_t;
 
 typedef struct iree_hal_vulkan_command_block_t {
   // Next command block in recording order.
@@ -306,6 +313,18 @@ iree_hal_vulkan_command_execution_barrier_payload(
     const iree_hal_vulkan_command_t* command) {
   return (const iree_hal_vulkan_command_execution_barrier_t*)
       iree_hal_vulkan_command_buffer_const_command_payload(command);
+}
+
+static const iree_hal_vulkan_command_begin_debug_group_t*
+iree_hal_vulkan_command_begin_debug_group_payload(
+    const iree_hal_vulkan_command_t* command) {
+  return (const iree_hal_vulkan_command_begin_debug_group_t*)
+      iree_hal_vulkan_command_buffer_const_command_payload(command);
+}
+
+static const char* iree_hal_vulkan_command_begin_debug_group_label(
+    const iree_hal_vulkan_command_begin_debug_group_t* begin_debug_group) {
+  return (const char*)begin_debug_group + sizeof(*begin_debug_group);
 }
 
 static iree_hal_vulkan_command_buffer_t* iree_hal_vulkan_command_buffer_cast(
@@ -710,6 +729,9 @@ iree_hal_vulkan_command_buffer_profile_operation_type(
       return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH;
     case IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER:
       return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_BARRIER;
+    case IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP:
+    case IREE_HAL_VULKAN_COMMAND_TYPE_END_DEBUG_GROUP:
+      return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_PROFILE_MARKER;
   }
   return IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_NONE;
 }
@@ -816,6 +838,9 @@ static iree_status_t iree_hal_vulkan_command_buffer_profile_operation(
     }
     case IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER:
       record.flags |= IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_EXECUTION_BARRIER;
+      break;
+    case IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP:
+    case IREE_HAL_VULKAN_COMMAND_TYPE_END_DEBUG_GROUP:
       break;
   }
 
@@ -2242,6 +2267,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_dispatch_native(
 iree_status_t iree_hal_vulkan_command_buffer_record_native(
     iree_hal_command_buffer_t* base_command_buffer,
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
+    const iree_hal_vulkan_debug_utils_t* debug_utils,
     const iree_hal_vulkan_builtins_t* builtins,
     VkCommandBuffer native_command_buffer,
     VkCommandBufferUsageFlags usage_flags, VkDescriptorPool descriptor_pool,
@@ -2251,6 +2277,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
     const iree_hal_vulkan_command_buffer_profile_marker_t* profile_marker,
     iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(syms);
+  IREE_ASSERT_ARGUMENT(debug_utils);
   IREE_ASSERT_ARGUMENT(native_command_buffer);
 
   iree_hal_vulkan_command_buffer_t* command_buffer =
@@ -2368,6 +2395,19 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
         iree_hal_vulkan_command_buffer_record_execution_barrier_native(
             syms, native_command_buffer, command);
         break;
+      case IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP: {
+        const iree_hal_vulkan_command_begin_debug_group_t* begin_debug_group =
+            iree_hal_vulkan_command_begin_debug_group_payload(command);
+        iree_hal_vulkan_debug_utils_begin_command_label(
+            debug_utils, syms, native_command_buffer,
+            iree_hal_vulkan_command_begin_debug_group_label(begin_debug_group),
+            begin_debug_group->label_color);
+        break;
+      }
+      case IREE_HAL_VULKAN_COMMAND_TYPE_END_DEBUG_GROUP:
+        iree_hal_vulkan_debug_utils_end_command_label(debug_utils, syms,
+                                                      native_command_buffer);
+        break;
       default:
         status = iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                                   "Vulkan command buffer contains non-native "
@@ -2442,16 +2482,57 @@ static iree_status_t iree_hal_vulkan_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
-  (void)base_command_buffer;
-  (void)label;
-  (void)label_color;
   (void)location;
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_recording_state(
+      command_buffer, IREE_SV("begin_debug_group")));
+
+  iree_host_size_t payload_length = 0;
+  if (!iree_host_size_checked_add(
+          sizeof(iree_hal_vulkan_command_begin_debug_group_t), label.size,
+          &payload_length) ||
+      !iree_host_size_checked_add(payload_length, 1, &payload_length)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan command buffer debug-group label size overflows");
+  }
+  iree_host_size_t record_length = 0;
+  iree_host_size_t payload_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_ensure_command_capacity(
+      command_buffer, payload_length, &record_length, &payload_offset));
+
+  void* payload = NULL;
+  iree_hal_vulkan_command_buffer_append_command(
+      command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP,
+      record_length, payload_offset, /*out_command=*/NULL, &payload);
+  iree_hal_vulkan_command_begin_debug_group_t* begin_debug_group =
+      (iree_hal_vulkan_command_begin_debug_group_t*)payload;
+  begin_debug_group->label_color = label_color;
+  char* label_data =
+      (char*)payload + sizeof(iree_hal_vulkan_command_begin_debug_group_t);
+  if (label.size != 0) {
+    memcpy(label_data, label.data, label.size);
+  }
+  label_data[label.size] = '\0';
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
-  (void)base_command_buffer;
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_recording_state(
+      command_buffer, IREE_SV("end_debug_group")));
+
+  iree_host_size_t record_length = 0;
+  iree_host_size_t payload_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_ensure_command_capacity(
+      command_buffer, /*payload_length=*/0, &record_length, &payload_offset));
+  iree_hal_vulkan_command_buffer_append_command(
+      command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_END_DEBUG_GROUP,
+      record_length, payload_offset, /*out_command=*/NULL,
+      /*out_payload=*/NULL);
   return iree_ok_status();
 }
 

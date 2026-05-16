@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/vulkan/allocator.h"
 #include "iree/hal/drivers/vulkan/api.h"
 #include "iree/hal/drivers/vulkan/builtins.h"
+#include "iree/hal/drivers/vulkan/debug_utils.h"
 #include "iree/hal/drivers/vulkan/semaphore.h"
 #include "iree/hal/drivers/vulkan/util/libvulkan.h"
 #include "iree/hal/local/profile.h"
@@ -93,6 +94,9 @@ typedef struct iree_hal_vulkan_queue_params_t {
   // Device-level Vulkan dispatch table. Borrowed and copied into the queue.
   const iree_hal_vulkan_device_syms_t* syms;
 
+  // Resolved debug-utils capabilities. Borrowed and copied into the queue.
+  const iree_hal_vulkan_debug_utils_t* debug_utils;
+
   // Vulkan logical device that owns all queue handles and semaphores.
   VkDevice logical_device;
 
@@ -149,6 +153,9 @@ typedef struct iree_hal_vulkan_queue_t {
 
   // Device-level Vulkan dispatch table copied at initialization.
   iree_hal_vulkan_device_syms_t syms;
+
+  // Debug-utils capabilities copied at initialization.
+  iree_hal_vulkan_debug_utils_t debug_utils;
 
   // Vulkan logical device that owns queue resources.
   VkDevice logical_device;
