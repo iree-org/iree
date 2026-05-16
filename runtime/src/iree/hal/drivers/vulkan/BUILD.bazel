@@ -30,6 +30,7 @@ iree_runtime_cc_library(
     hdrs = [
         "api.h",
         "command_buffer.h",
+        "device_plan.h",
         "executable.h",
         "physical_device.h",
         "spirv.h",
@@ -40,6 +41,19 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/vulkan/util:libvulkan",
         "@vulkan_headers",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "device_plan_test",
+    srcs = ["device_plan_test.cc"],
+    group = "iree-hal-drivers-vulkan-tests",
+    deps = [
+        ":headers",
+        ":vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )
 
@@ -86,6 +100,8 @@ iree_runtime_cc_library(
         "builtins.h",
         "command_buffer.c",
         "command_buffer.h",
+        "device_plan.c",
+        "device_plan.h",
         "driver.c",
         "driver.h",
         "executable.c",

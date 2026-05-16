@@ -27,6 +27,7 @@ iree_cc_library(
   HDRS
     "api.h"
     "command_buffer.h"
+    "device_plan.h"
     "executable.h"
     "physical_device.h"
     "spirv.h"
@@ -37,6 +38,21 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    device_plan_test
+  SRCS
+    "device_plan_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
 )
 
 iree_cc_test(
@@ -87,6 +103,8 @@ iree_cc_library(
     "builtins.h"
     "command_buffer.c"
     "command_buffer.h"
+    "device_plan.c"
+    "device_plan.h"
     "driver.c"
     "driver.h"
     "executable.c"
