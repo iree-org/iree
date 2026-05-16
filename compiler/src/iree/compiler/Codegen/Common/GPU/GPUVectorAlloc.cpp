@@ -146,24 +146,14 @@ computeSwizzleFromLayouts(MLIRContext *ctx, VectorType vectorType,
     return std::nullopt;
   }
 
-  // When an element is at least a full bank wide (elemBytes >= bankBytes,
-  // i.e. f32/f64) and the reader is narrower than the writer (typical MFMA:
-  // vector<k> stores, scalar reads), picking accessWidth = max(w, r) yields
-  // an XOR step of `accessWidth * elemBytes` bytes that may not be coprime
-  // with the bank-cycle byte count. The number of unique bank positions the
-  // step produces is `numBanks / gcd(step_banks, numBanks)`. If this is
-  // less than the number of threads fighting for the same column, reads
-  // conflict.
-  //
-  // Capping accessWidth to 2 sets step_banks = 2 (since elemBytes >=
-  // bankBytes implies each element spans at least one bank). For numBanks
-  // that are a power of 2 (typical: 32), gcd(2, numBanks) = 2, giving
-  // numBanks/2 unique positions — enough for a half-wave bijection on
-  // layouts that have up to numBanks/2 row-threads per column-thread.
-  //
-  // This is the minimum cap that eliminates the common-case 2-way conflict;
-  // going lower (accessWidth=1) produces even fewer unique positions due
-  // to XOR output-width truncation.
+  // Full-bank element types often have wider writes than reads in MFMA layouts
+  // (for example vector<4> stores followed by scalar reads). Using
+  // max(writerAccess, readerAccess) makes the XOR stride follow the wide store,
+  // which leaves the scalar reader with too few useful bank rotations in the
+  // shapes this heuristic targets. Cap those cases at accessWidth=2: it keeps
+  // vectorized lowering on the wider side while reducing the stride enough to
+  // avoid the common two-way bank aliasing seen for these full-bank layouts.
+  // This is a narrow policy cap, not a general proof of optimality.
   if (elemBytes >= kSharedMemoryBankWidthBytes && readerAccess < writerAccess &&
       accessWidth > 2 && innerDim % 2 == 0) {
     accessWidth = 2;

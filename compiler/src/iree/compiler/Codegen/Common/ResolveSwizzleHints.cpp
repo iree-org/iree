@@ -51,6 +51,44 @@ static Value createOrFoldNewStaticAdd(RewriterBase &rewriter, Value v,
   return arith::AddIOp::create(rewriter, v.getLoc(), v, offsetVal);
 }
 
+enum class SwizzledAccessKind {
+  Unsupported,
+  SingleElement,
+  Chunked,
+};
+
+static SwizzledAccessKind getSwizzledAccessKind(VectorType type,
+                                                int64_t accessWidth) {
+  if (accessWidth <= 0 || type.getRank() != 1) {
+    return SwizzledAccessKind::Unsupported;
+  }
+  int64_t width = type.getShape()[0];
+  if (width < accessWidth) {
+    // Only a single element is guaranteed not to straddle a swizzle
+    // access-width group. Wider sub-accesses would need static proof that
+    // `(offset % accessWidth) + width <= accessWidth`.
+    return width == 1 ? SwizzledAccessKind::SingleElement
+                      : SwizzledAccessKind::Unsupported;
+  }
+  return width % accessWidth == 0 ? SwizzledAccessKind::Chunked
+                                  : SwizzledAccessKind::Unsupported;
+}
+
+template <typename VectorAccessOp>
+static SwizzledAccessKind getSwizzledAccessKind(VectorAccessOp op,
+                                                int64_t accessWidth) {
+  return getSwizzledAccessKind(op.getVectorType(), accessWidth);
+}
+
+static Value getSwizzledOffset(RewriterBase &rewriter, Location loc,
+                               IREE::Codegen::SwizzleHintOp hintOp,
+                               Value offset) {
+  return getValueOrCreateConstantIndexOp(
+      rewriter, loc,
+      hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(), offset,
+                                        hintOp.getOperand()));
+}
+
 /// Swizzles vector.load(iree_codegen.swizzle_hint, offset). The
 /// SwizzleInterfaceAttr exposes two methods:
 ///   1. getAccessElementCount -> int64_t
@@ -73,22 +111,18 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
   Location hintLoc = hintOp.getLoc();
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   VectorType type = load.getVectorType();
+  SwizzledAccessKind accessKind = getSwizzledAccessKind(load, accessWidth);
+  assert(accessKind != SwizzledAccessKind::Unsupported &&
+         "expected verified swizzled vector load");
+  if (accessKind == SwizzledAccessKind::Unsupported) {
+    return;
+  }
   int64_t loadWidth = type.getShape()[0];
   Value memrefOffset = load.getIndices()[0];
 
-  // For loads narrower than accessWidth, restrict to loadWidth == 1: only a
-  // single element is guaranteed not to straddle a swizzle access-width
-  // group, so the permutation maps the access bijectively. For widths in
-  // (1, accessWidth) we'd need to prove `(offset % accessWidth) + width <=
-  // accessWidth` statically, which we can't do here.
-  if (loadWidth < accessWidth) {
-    if (loadWidth != 1) {
-      return;
-    }
-    Value newOffset = getValueOrCreateConstantIndexOp(
-        rewriter, hintLoc,
-        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
-                                          memrefOffset, hintOp.getOperand()));
+  if (accessKind == SwizzledAccessKind::SingleElement) {
+    Value newOffset =
+        getSwizzledOffset(rewriter, hintLoc, hintOp, memrefOffset);
     auto newLoad = vector::LoadOp::create(rewriter, load.getLoc(), type,
                                           load.getBase(), newOffset);
     rewriter.replaceOp(load, newLoad);
@@ -103,10 +137,8 @@ static void swizzleLoad(RewriterBase &rewriter, vector::LoadOp load,
 
   for (int64_t i = 0; i < loadWidth; i += accessWidth) {
     Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
-    Value newOffset = getValueOrCreateConstantIndexOp(
-        rewriter, hintLoc,
-        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
-                                          newBaseOffset, hintOp.getOperand()));
+    Value newOffset =
+        getSwizzledOffset(rewriter, hintLoc, hintOp, newBaseOffset);
     auto subLoad = vector::LoadOp::create(
         rewriter, load.getLoc(), swizzledLoadType, load.getBase(), newOffset);
 
@@ -134,19 +166,18 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   Location hintLoc = hintOp.getLoc();
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   VectorType type = store.getVectorType();
+  SwizzledAccessKind accessKind = getSwizzledAccessKind(store, accessWidth);
+  assert(accessKind != SwizzledAccessKind::Unsupported &&
+         "expected verified swizzled vector store");
+  if (accessKind == SwizzledAccessKind::Unsupported) {
+    return;
+  }
   int64_t storeWidth = type.getShape()[0];
   Value memrefOffset = store.getIndices()[0];
 
-  // Mirror of swizzleLoad: only storeWidth == 1 is safe; wider sub-accessWidth
-  // stores could straddle a group and break the bijection.
-  if (storeWidth < accessWidth) {
-    if (storeWidth != 1) {
-      return;
-    }
-    Value newOffset = getValueOrCreateConstantIndexOp(
-        rewriter, hintLoc,
-        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
-                                          memrefOffset, hintOp.getOperand()));
+  if (accessKind == SwizzledAccessKind::SingleElement) {
+    Value newOffset =
+        getSwizzledOffset(rewriter, hintLoc, hintOp, memrefOffset);
     vector::StoreOp::create(rewriter, store.getLoc(), store.getValueToStore(),
                             store.getBase(), newOffset);
     rewriter.eraseOp(store);
@@ -159,10 +190,8 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
         ArrayRef<int64_t>{accessWidth}, ArrayRef<int64_t>{1});
     Value newBaseOffset = createOrFoldNewStaticAdd(rewriter, memrefOffset, i);
 
-    Value newOffset = getValueOrCreateConstantIndexOp(
-        rewriter, hintLoc,
-        hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(),
-                                          newBaseOffset, hintOp.getOperand()));
+    Value newOffset =
+        getSwizzledOffset(rewriter, hintLoc, hintOp, newBaseOffset);
     vector::StoreOp::create(rewriter, store.getLoc(), subVec, store.getBase(),
                             newOffset);
   }
@@ -185,15 +214,10 @@ verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
   return success();
 }
 
-static bool isSupportedSwizzledAccess(VectorType type, int64_t accessWidth) {
-  if (type.getRank() != 1) {
-    return false;
-  }
-  int64_t width = type.getShape()[0];
-  if (width < accessWidth) {
-    return width == 1;
-  }
-  return width % accessWidth == 0;
+template <typename VectorAccessOp>
+static bool isSupportedSwizzledAccess(VectorAccessOp op, int64_t accessWidth) {
+  return getSwizzledAccessKind(op, accessWidth) !=
+         SwizzledAccessKind::Unsupported;
 }
 
 /// Traces a memref value backward through defining ops and loop
@@ -244,13 +268,13 @@ static SwizzleState verifyHintUsers(IREE::Codegen::SwizzleHintOp hintOp) {
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
-      if (!isSupportedSwizzledAccess(load.getVectorType(), accessWidth)) {
+      if (!isSupportedSwizzledAccess(load, accessWidth)) {
         state.resolvable = false;
       }
       continue;
     }
     if (auto store = dyn_cast<vector::StoreOp>(user)) {
-      if (!isSupportedSwizzledAccess(store.getVectorType(), accessWidth)) {
+      if (!isSupportedSwizzledAccess(store, accessWidth)) {
         state.resolvable = false;
       }
       continue;
