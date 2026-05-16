@@ -200,13 +200,13 @@ TEST(DevicePlanTest, OwnedCreateEnablesBdaDispatchWhenAvailable) {
             plan.enabled_dispatch_abis);
 }
 
-TEST(DevicePlanTest, WrapRejectsRequestOnlyFeatureBits) {
+TEST(DevicePlanTest, WrapRejectsRequestFlagsInEnabledFeatures) {
   PhysicalDeviceSnapshotBuilder builder;
   builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
 
   iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
   iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
-  params.enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS;
+  params.enabled_features |= IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS;
   params.compute_queue_set.queue_family_index = 0;
   params.compute_queue_set.queue_indices = 1ull << 0;
 

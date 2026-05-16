@@ -540,17 +540,6 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
                             "unrecognized Vulkan enabled feature bits 0x%08x",
                             unknown_features);
   }
-  const iree_hal_vulkan_features_t request_only_features =
-      IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
-  if (iree_any_bit_set(enabled_features, request_only_features)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "external Vulkan enabled feature inventory contains request-only bits "
-        "0x%08x",
-        enabled_features & request_only_features);
-  }
 
 #define IREE_HAL_VULKAN_REQUIRE_ENABLED_FEATURE(bit, name)                \
   if (!iree_all_bits_set(enabled_features, (bit))) {                      \

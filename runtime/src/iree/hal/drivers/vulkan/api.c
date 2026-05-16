@@ -103,7 +103,7 @@ static iree_status_t iree_hal_vulkan_add_extensibility_string(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
-    iree_hal_vulkan_features_t requested_features,
+    iree_hal_vulkan_request_flags_t request_flags,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
     iree_host_size_t* out_string_count, const char** out_string_values) {
   IREE_ASSERT_ARGUMENT(out_string_count);
@@ -114,11 +114,12 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
                             "invalid Vulkan extensibility set %u",
                             (uint32_t)set);
   }
-  if (iree_any_bit_set(requested_features,
-                       ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED)) {
+  if (iree_any_bit_set(request_flags,
+                       ~IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED)) {
     return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT, "unrecognized Vulkan feature bits 0x%08x",
-        requested_features & ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED);
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unrecognized Vulkan request flag bits 0x%08x",
+        request_flags & ~IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED);
   }
 
   iree_status_t status = iree_ok_status();
@@ -133,8 +134,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
 
   switch (set) {
     case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED:
-      if (iree_any_bit_set(requested_features,
-                           IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS)) {
+      if (iree_any_bit_set(request_flags,
+                           IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS)) {
         IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
             IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_REQUIRED,
             "VK_LAYER_KHRONOS_validation");
@@ -143,8 +144,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
     case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_LAYERS_OPTIONAL:
       break;
     case IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED:
-      if (iree_any_bit_set(requested_features,
-                           IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS)) {
+      if (iree_any_bit_set(request_flags,
+                           IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS)) {
         IREE_HAL_VULKAN_ADD_EXTENSIBILITY_STRING(
             IREE_HAL_VULKAN_EXTENSIBILITY_INSTANCE_EXTENSIONS_REQUIRED,
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

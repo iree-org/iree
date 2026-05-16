@@ -55,6 +55,14 @@ static iree_status_t iree_hal_vulkan_driver_options_verify(
     }
   }
   if (iree_status_is_ok(status) &&
+      iree_any_bit_set(options->request_flags,
+                       ~IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED)) {
+    status = iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "unrecognized Vulkan request flag bits 0x%08x",
+        options->request_flags & ~IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED);
+  }
+  if (iree_status_is_ok(status) &&
       iree_any_bit_set(options->requested_features,
                        ~IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED)) {
     status = iree_make_status(

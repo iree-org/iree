@@ -317,8 +317,8 @@ iree_status_t iree_hal_vulkan_instance_initialize(
     instance_flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
   }
   if (iree_status_is_ok(status) &&
-      iree_any_bit_set(options->requested_features,
-                       IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS)) {
+      iree_any_bit_set(options->request_flags,
+                       IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS)) {
     if (iree_hal_vulkan_extension_list_contains(
             available_extension_count, available_extensions,
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
@@ -331,8 +331,8 @@ iree_status_t iree_hal_vulkan_instance_initialize(
     }
   }
   if (iree_status_is_ok(status) &&
-      iree_any_bit_set(options->requested_features,
-                       IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS)) {
+      iree_any_bit_set(options->request_flags,
+                       IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS)) {
     if (iree_hal_vulkan_layer_list_contains(available_layer_count,
                                             available_layers,
                                             "VK_LAYER_KHRONOS_validation")) {

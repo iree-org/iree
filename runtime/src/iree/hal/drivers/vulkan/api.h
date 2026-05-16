@@ -60,19 +60,35 @@ typedef PFN_vkVoidFunction(IREE_HAL_VULKAN_API_PTR* PFN_vkGetInstanceProcAddr)(
 #endif  // !VK_VERSION_1_0
 
 //===----------------------------------------------------------------------===//
-// Feature and extension policy
+// Request, feature, and extension policy
 //===----------------------------------------------------------------------===//
 
-// Bitfield that defines sets of requested Vulkan features.
+// Bitfield that defines non-device-feature behavior requested during Vulkan
+// driver and instance creation.
+typedef enum iree_hal_vulkan_request_flag_bits_t {
+  // No optional behavior requested.
+  IREE_HAL_VULKAN_REQUEST_FLAG_NONE = 0u,
+  // Requests validation layers during driver-created instance setup.
+  IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS = 1u << 0,
+  // Requests debug utils, object names, command labels, and debug callbacks.
+  IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS = 1u << 1,
+  // Requests Vulkan events in IREE HAL profiling streams.
+  IREE_HAL_VULKAN_REQUEST_FLAG_TRACING = 1u << 2,
+  // Recognized request flags accepted by public Vulkan HAL APIs.
+  IREE_HAL_VULKAN_REQUEST_FLAG_ALL_RECOGNIZED =
+      IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS |
+      IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS |
+      IREE_HAL_VULKAN_REQUEST_FLAG_TRACING,
+} iree_hal_vulkan_request_flag_bits_t;
+
+typedef uint32_t iree_hal_vulkan_request_flags_t;
+
+// Bitfield that defines Vulkan features requested or enabled on a logical
+// device.
 typedef enum iree_hal_vulkan_feature_bits_t {
   // No optional features requested.
   IREE_HAL_VULKAN_FEATURE_NONE = 0u,
-  // Requests validation layers during driver-created instance setup.
-  IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1u << 0,
-  // Requests debug utils, object names, command labels, and debug callbacks.
-  IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS = 1u << 1,
-  // Requests Vulkan events in IREE HAL profiling streams.
-  IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING = 1u << 2,
+  // Bit positions 0-2 are reserved for iree_hal_vulkan_request_flags_t.
   // Requests robust buffer access for validation-oriented runs.
   IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS = 1u << 3,
   // Requests sparse binding for large virtual buffers.
@@ -97,9 +113,6 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT,
   // Recognized feature bits accepted by public Vulkan HAL APIs.
   IREE_HAL_VULKAN_FEATURE_ALL_RECOGNIZED =
-      IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING |
       IREE_HAL_VULKAN_FEATURE_ENABLE_ROBUST_BUFFER_ACCESS |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_BINDING |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED |
@@ -165,12 +178,12 @@ typedef enum iree_hal_vulkan_extensibility_set_e {
   IREE_HAL_VULKAN_EXTENSIBILITY_SET_COUNT,
 } iree_hal_vulkan_extensibility_set_t;
 
-// Queries the Vulkan layer or extension names used by a requested feature set.
+// Queries the Vulkan layer or extension names used by a request flag set.
 // Required sets must be enabled by applications wrapping external instances or
 // devices. Optional sets should be enabled when the Vulkan implementation
 // reports them so IREE can use the corresponding strategy bits.
 IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
-    iree_hal_vulkan_features_t requested_features,
+    iree_hal_vulkan_request_flags_t request_flags,
     iree_hal_vulkan_extensibility_set_t set, iree_host_size_t string_capacity,
     iree_host_size_t* out_string_count, const char** out_string_values);
 
@@ -320,7 +333,10 @@ typedef struct iree_hal_vulkan_driver_options_t {
   // Vulkan API version requested by driver-created instances.
   uint32_t api_version;
 
-  // Feature bits requested for driver-created instances and devices.
+  // Non-device-feature behavior requested for driver-created instances.
+  iree_hal_vulkan_request_flags_t request_flags;
+
+  // Feature bits requested for driver-created logical devices.
   iree_hal_vulkan_features_t requested_features;
 
   // Cutoff for debug output: 0=none, 1=errors, 2=warnings, 3=info, 4=debug.
