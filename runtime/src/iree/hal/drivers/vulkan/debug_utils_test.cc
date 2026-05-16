@@ -133,28 +133,6 @@ TEST(DebugUtilsTest, InitializeWithRequestEnablesFamilies) {
       &debug_utils, IREE_HAL_VULKAN_DEBUG_UTILS_FLAG_COMMAND_LABELS));
 }
 
-TEST(DebugUtilsTest, InitializeWithRequestRequiresObjectNames) {
-  iree_hal_vulkan_device_syms_t syms = MakeDebugUtilsSyms();
-  syms.vkSetDebugUtilsObjectNameEXT = nullptr;
-
-  iree_hal_vulkan_debug_utils_t debug_utils;
-  IREE_EXPECT_STATUS_IS(
-      StatusCode::kFailedPrecondition,
-      iree_hal_vulkan_debug_utils_initialize(
-          IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS, &syms, &debug_utils));
-}
-
-TEST(DebugUtilsTest, InitializeWithRequestRequiresCommandLabels) {
-  iree_hal_vulkan_device_syms_t syms = MakeDebugUtilsSyms();
-  syms.vkCmdEndDebugUtilsLabelEXT = nullptr;
-
-  iree_hal_vulkan_debug_utils_t debug_utils;
-  IREE_EXPECT_STATUS_IS(
-      StatusCode::kFailedPrecondition,
-      iree_hal_vulkan_debug_utils_initialize(
-          IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS, &syms, &debug_utils));
-}
-
 TEST(DebugUtilsTest, SetObjectNameNoopsWhenObjectNamesDisabled) {
   iree_hal_vulkan_device_syms_t syms = MakeDebugUtilsSyms();
   iree_hal_vulkan_debug_utils_t debug_utils;

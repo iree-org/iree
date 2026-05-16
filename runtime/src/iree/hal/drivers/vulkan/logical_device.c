@@ -318,14 +318,6 @@ iree_hal_vulkan_logical_device_validate_queue_device_profiling(
                             "Vulkan device queue profiling requires "
                             "VK_EXT_calibrated_timestamps");
   }
-#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  if (!device->syms.vkGetCalibratedTimestampsEXT) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan calibrated timestamp extension is enabled but "
-        "vkGetCalibratedTimestampsEXT is not loaded");
-  }
-#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_logical_device_select_profile_host_time_domain(
           device, out_time_domain));

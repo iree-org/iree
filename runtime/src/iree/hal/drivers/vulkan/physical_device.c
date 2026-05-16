@@ -153,15 +153,6 @@ static iree_status_t iree_hal_vulkan_query_calibrated_timestamp_time_domains(
     iree_hal_vulkan_time_domain_flags_t* out_time_domains) {
   *out_time_domains = IREE_HAL_VULKAN_TIME_DOMAIN_NONE;
 
-#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  if (!instance->syms.vkGetPhysicalDeviceCalibrateableTimeDomainsEXT) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan calibrated timestamp extension is advertised but "
-        "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT is not loaded");
-  }
-#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-
   uint32_t time_domain_count = 0;
   IREE_RETURN_IF_ERROR(iree_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(
       IREE_VULKAN_INSTANCE(&instance->syms), handle, &time_domain_count,

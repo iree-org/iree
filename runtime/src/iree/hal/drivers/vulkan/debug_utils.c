@@ -8,28 +8,6 @@
 
 #include <string.h>
 
-static bool iree_hal_vulkan_debug_utils_has_object_name_symbols(
-    const iree_hal_vulkan_device_syms_t* syms) {
-#if IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  (void)syms;
-  return true;
-#else
-  return syms->vkSetDebugUtilsObjectNameEXT != NULL;
-#endif  // IREE_HAL_VULKAN_LIBVULKAN_STATIC
-}
-
-static bool iree_hal_vulkan_debug_utils_has_command_label_symbols(
-    const iree_hal_vulkan_device_syms_t* syms) {
-#if IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  (void)syms;
-  return true;
-#else
-  return syms->vkCmdBeginDebugUtilsLabelEXT != NULL &&
-         syms->vkCmdEndDebugUtilsLabelEXT != NULL &&
-         syms->vkCmdInsertDebugUtilsLabelEXT != NULL;
-#endif  // IREE_HAL_VULKAN_LIBVULKAN_STATIC
-}
-
 iree_status_t iree_hal_vulkan_debug_utils_initialize(
     iree_hal_vulkan_request_flags_t request_flags,
     const iree_hal_vulkan_device_syms_t* syms,
@@ -48,19 +26,6 @@ iree_status_t iree_hal_vulkan_debug_utils_initialize(
   if (!iree_any_bit_set(request_flags,
                         IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS)) {
     return iree_ok_status();
-  }
-
-  if (!iree_hal_vulkan_debug_utils_has_object_name_symbols(syms)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan debug utils requested but vkSetDebugUtilsObjectNameEXT is not "
-        "loaded");
-  }
-  if (!iree_hal_vulkan_debug_utils_has_command_label_symbols(syms)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan debug utils requested but command label entry points are not "
-        "loaded");
   }
 
   out_debug_utils->flags = IREE_HAL_VULKAN_DEBUG_UTILS_FLAG_OBJECT_NAMES |

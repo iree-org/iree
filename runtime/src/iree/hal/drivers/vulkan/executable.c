@@ -918,16 +918,7 @@ static iree_status_t iree_hal_vulkan_select_push_descriptor_policy(
     return iree_ok_status();
   }
 
-#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  if (!syms->vkCmdPushDescriptorSetKHR) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "VK_KHR_push_descriptor is enabled but vkCmdPushDescriptorSetKHR is "
-        "not loaded");
-  }
-#else
   (void)syms;
-#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
 
   const uint32_t max_push_descriptors =
       physical_device->push_descriptor_properties.maxPushDescriptors;
