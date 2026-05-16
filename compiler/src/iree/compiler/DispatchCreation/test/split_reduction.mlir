@@ -179,6 +179,86 @@ util.func public @argmax_select_style(%arg0: tensor<1x248320xf32>) -> tensor<1xi
 
 // -----
 
+util.func public @argmax_select_style_extf_bf16_to_f32(%arg0: tensor<1x248320xbf16>) -> tensor<1xi32> {
+  %cst = arith.constant 0xFF800000 : f32
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<1xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+  %2 = tensor.empty() : tensor<1xi32>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%2 : tensor<1xi32>) -> tensor<1xi32>
+  %4:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<1x248320xbf16>)
+      outs(%1, %3 : tensor<1xf32>, tensor<1xi32>) {
+  ^bb0(%in: bf16, %out: f32, %out_idx: i32):
+    %idx = linalg.index 1 : index
+    %idx_i32 = arith.index_cast %idx : index to i32
+    %in_f32 = arith.extf %in : bf16 to f32
+    %gt = arith.cmpf ogt, %in_f32, %out : f32
+    %nan = arith.cmpf une, %in_f32, %in_f32 : f32
+    %value_cond = arith.ori %gt, %nan : i1
+    %eq = arith.cmpf oeq, %in_f32, %out : f32
+    %lower_idx = arith.cmpi slt, %idx_i32, %out_idx : i32
+    %tie = arith.andi %eq, %lower_idx : i1
+    %index_cond = arith.ori %value_cond, %tie : i1
+    %value = arith.select %value_cond, %in_f32, %out : f32
+    %index = arith.select %index_cond, %idx_i32, %out_idx : i32
+    linalg.yield %value, %index : f32, i32
+  } -> (tensor<1xf32>, tensor<1xi32>)
+  util.return %4#1 : tensor<1xi32>
+}
+
+// CHECK-LABEL:   util.func public @argmax_select_style_extf_bf16_to_f32
+// CHECK:         tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [1, 1940, 128] : tensor<1x248320xbf16> into tensor<1x1940x128xbf16>
+// CHECK:         iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK:         arith.extf {{.*}} : bf16 to f32
+// CHECK:         iterator_types = ["parallel", "reduction"]
+// CHECK:         util.return
+
+// -----
+
+util.func public @argmax_select_style_swapped_conditions(%arg0: tensor<1x248320xf32>) -> tensor<1xi32> {
+  %cst = arith.constant 0xFF800000 : f32
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<1xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1xf32>) -> tensor<1xf32>
+  %2 = tensor.empty() : tensor<1xi32>
+  %3 = linalg.fill ins(%c0_i32 : i32) outs(%2 : tensor<1xi32>) -> tensor<1xi32>
+  %4:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0 : tensor<1x248320xf32>)
+      outs(%1, %3 : tensor<1xf32>, tensor<1xi32>) {
+  ^bb0(%in: f32, %out: f32, %out_idx: i32):
+    %idx = linalg.index 1 : index
+    %idx_i32 = arith.index_cast %idx : index to i32
+    %gt = arith.cmpf ogt, %in, %out : f32
+    %nan = arith.cmpf une, %in, %in : f32
+    %value_cond = arith.ori %nan, %gt : i1
+    %eq = arith.cmpf oeq, %in, %out : f32
+    %lower_idx = arith.cmpi slt, %idx_i32, %out_idx : i32
+    %tie = arith.andi %lower_idx, %eq : i1
+    %index_cond = arith.ori %tie, %value_cond : i1
+    %value = arith.select %value_cond, %in, %out : f32
+    %index = arith.select %index_cond, %idx_i32, %out_idx : i32
+    linalg.yield %value, %index : f32, i32
+  } -> (tensor<1xf32>, tensor<1xi32>)
+  util.return %4#1 : tensor<1xi32>
+}
+
+// CHECK-LABEL:   util.func public @argmax_select_style_swapped_conditions
+// CHECK:         tensor.expand_shape %arg0 {{\[}}[0], [1, 2]] output_shape [1, 1940, 128] : tensor<1x248320xf32> into tensor<1x1940x128xf32>
+// CHECK:         iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK:         iterator_types = ["parallel", "reduction"]
+// CHECK:         util.return
+
+// -----
+
 util.func public @argmax_select_style_no_nan_no_tie_no_split(%arg0: tensor<1x248320xf32>) -> tensor<1xi32> {
   %cst = arith.constant 0xFF800000 : f32
   %c0_i32 = arith.constant 0 : i32

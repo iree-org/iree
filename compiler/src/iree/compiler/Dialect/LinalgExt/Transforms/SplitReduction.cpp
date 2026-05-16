@@ -22,8 +22,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include <utility>
-
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_DEF_TOPKSPLITREDUCTIONPASS
@@ -477,43 +475,51 @@ static void setPreservedAttrs(Operation *op, DictionaryAttr attrs) {
   }
 }
 
-static std::pair<Value, Value>
-buildArgmaxCombiner(OpBuilder &b, Location loc, const ArgmaxCombinerInfo &info,
-                    Value val, Value idx, Value outVal, Value outIdx) {
+struct ArgmaxCombinerResults {
+  Value maxValue;
+  Value selectedIndex;
+};
+
+static ArgmaxCombinerResults buildArgmaxCombiner(OpBuilder &b, Location loc,
+                                                 const ArgmaxCombinerInfo &info,
+                                                 Value val, Value idx,
+                                                 Value outVal, Value outIdx) {
   // Split reduction creates new reductions over local and global indices, so
   // rebuild the recognized argmax semantics instead of cloning the original
   // combiner ops. Preserve the matched combiner attributes explicitly so
   // frontend flags such as arith fast-math follow the regenerated ops.
   if (info.kind == ArgmaxKind::Canonical) {
     auto maxOp = arith::MaximumFOp::create(b, loc, val, outVal);
-    setPreservedAttrs(maxOp, info.maximumAttrs);
+    setPreservedAttrs(maxOp.getOperation(), info.maximumAttrs);
     auto cmpOp =
         arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-    setPreservedAttrs(cmpOp, info.greaterThanCmpAttrs);
+    setPreservedAttrs(cmpOp.getOperation(), info.greaterThanCmpAttrs);
     auto selectOp = arith::SelectOp::create(b, loc, cmpOp, idx, outIdx);
-    setPreservedAttrs(selectOp, info.indexSelectAttrs);
-    return {maxOp, selectOp};
+    setPreservedAttrs(selectOp.getOperation(), info.indexSelectAttrs);
+    return {/*maxValue=*/maxOp.getResult(),
+            /*selectedIndex=*/selectOp.getResult()};
   }
 
   auto greater =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OGT, val, outVal);
-  setPreservedAttrs(greater, info.greaterThanCmpAttrs);
+  setPreservedAttrs(greater.getOperation(), info.greaterThanCmpAttrs);
   auto isNan =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::UNE, val, val);
-  setPreservedAttrs(isNan, info.isNanCmpAttrs);
+  setPreservedAttrs(isNan.getOperation(), info.isNanCmpAttrs);
   Value valueCond = arith::OrIOp::create(b, loc, greater, isNan);
   auto equal =
       arith::CmpFOp::create(b, loc, arith::CmpFPredicate::OEQ, val, outVal);
-  setPreservedAttrs(equal, info.equalCmpAttrs);
+  setPreservedAttrs(equal.getOperation(), info.equalCmpAttrs);
   Value lowerIndex =
       arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, idx, outIdx);
   Value tieCond = arith::AndIOp::create(b, loc, equal, lowerIndex);
   Value indexCond = arith::OrIOp::create(b, loc, valueCond, tieCond);
   auto valueSelect = arith::SelectOp::create(b, loc, valueCond, val, outVal);
-  setPreservedAttrs(valueSelect, info.valueSelectAttrs);
+  setPreservedAttrs(valueSelect.getOperation(), info.valueSelectAttrs);
   auto indexSelect = arith::SelectOp::create(b, loc, indexCond, idx, outIdx);
-  setPreservedAttrs(indexSelect, info.indexSelectAttrs);
-  return {valueSelect, indexSelect};
+  setPreservedAttrs(indexSelect.getOperation(), info.indexSelectAttrs);
+  return {/*maxValue=*/valueSelect.getResult(),
+          /*selectedIndex=*/indexSelect.getResult()};
 }
 
 FailureOr<linalg::SplitReductionResult>
@@ -521,7 +527,11 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                      linalg::ControlSplitReductionFn controlSplitReductionFn) {
   std::optional<ArgmaxCombinerInfo> argmaxInfo =
       getArgmaxCombinerInfo(genericOp);
-  assert(argmaxInfo && "expected operation to be an argmax op");
+  if (!argmaxInfo) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "operation is not a recognized argmax pattern");
+  }
+  ArgmaxCombinerInfo info = *argmaxInfo;
 
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(genericOp);
@@ -568,12 +578,24 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
                                        "compared to intermediate tensor size");
   }
 
-  auto valueType =
-      cast<FloatType>(genericOp.getRegionOutputArgs()[0].getType());
-  auto identity =
-      FloatAttr::get(valueType, APFloat::getInf(valueType.getFloatSemantics(),
-                                                /*Negative=*/true));
-  ArgmaxCombinerInfo info = *argmaxInfo;
+  std::optional<TypedAttr> identity;
+  if (info.kind == ArgmaxKind::Canonical) {
+    identity = arith::getNeutralElement(info.maximumOp);
+    if (!identity) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "unknown identity value for the reduction");
+    }
+  } else {
+    auto valueType =
+        dyn_cast<FloatType>(genericOp.getRegionOutputArgs()[0].getType());
+    if (!valueType) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "expected floating point value output for argmax");
+    }
+    identity =
+        FloatAttr::get(valueType, APFloat::getInf(valueType.getFloatSemantics(),
+                                                  /*Negative=*/true));
+  }
 
   SmallVector<Value> newInputs;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
@@ -610,7 +632,7 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
   OpOperand *indexInit = genericOp.getDpsInitOperand(1);
   // Value identity.
   Value identityValue =
-      getSplitReductionInit(rewriter, loc, valueInit->get(), identity,
+      getSplitReductionInit(rewriter, loc, valueInit->get(), *identity,
                             outputDimSize, insertSplitIndex);
   // Index identity.
   Type indexElemType = genericOp.getRegionOutputArgs()[1].getType();
@@ -666,9 +688,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
           inCast = arith::TruncFOp::create(b, loc, outVal.getType(), in);
         }
 
-        auto [maxVal, selIdx] = buildArgmaxCombiner(
+        ArgmaxCombinerResults results = buildArgmaxCombiner(
             b, loc, info, inCast, reductionIdx, outVal, outIdx);
-        linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
+        linalg::YieldOp::create(
+            b, loc, ValueRange{results.maxValue, results.selectedIndex});
       });
 
   // Step 2: Final reduction that computes global indices and selects the one
@@ -710,9 +733,10 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         }
         // gidx = outer * ratio + local.
         Value gidx = arith::AddIOp::create(b, loc, offset, local);
-        auto [maxVal, selIdx] =
+        ArgmaxCombinerResults results =
             buildArgmaxCombiner(b, loc, info, val, gidx, outVal, outIdx);
-        linalg::YieldOp::create(b, loc, ValueRange{maxVal, selIdx});
+        linalg::YieldOp::create(
+            b, loc, ValueRange{results.maxValue, results.selectedIndex});
       });
 
   rewriter.replaceOp(genericOp, finalReduction.getResults());

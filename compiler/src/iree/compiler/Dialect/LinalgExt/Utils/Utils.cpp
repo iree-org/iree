@@ -1283,7 +1283,7 @@ bool isaHorizontallyFusedContraction(Operation *op) {
   return true;
 }
 
-static Value stripFloatCast(Value value) {
+static Value stripFloatExtTrunc(Value value) {
   if (auto extOp = value.getDefiningOp<arith::ExtFOp>()) {
     return extOp.getIn();
   }
@@ -1302,11 +1302,11 @@ static bool isCurrentReductionIndex(Value value, unsigned reductionDim) {
 }
 
 static bool isIncomingValue(Value value, Value inVal) {
-  return stripFloatCast(value) == inVal;
+  return stripFloatExtTrunc(value) == inVal;
 }
 
 static bool isCurrentMaxValue(Value value, Value outVal) {
-  return stripFloatCast(value) == outVal;
+  return stripFloatExtTrunc(value) == outVal;
 }
 
 static arith::CmpFOp matchFloatCompare(Value value,
@@ -1316,12 +1316,17 @@ static arith::CmpFOp matchFloatCompare(Value value,
   if (!cmpOp || cmpOp.getPredicate() != predicate) {
     return nullptr;
   }
-  if (stripFloatCast(cmpOp->getOperand(0)) != lhs ||
-      stripFloatCast(cmpOp->getOperand(1)) != rhs) {
+  if (stripFloatExtTrunc(cmpOp->getOperand(0)) != lhs ||
+      stripFloatExtTrunc(cmpOp->getOperand(1)) != rhs) {
     return nullptr;
   }
   return cmpOp;
 }
+
+struct StableHloValueConditionOps {
+  arith::CmpFOp greaterThan;
+  arith::CmpFOp isNan;
+};
 
 static std::optional<ArgmaxCombinerInfo>
 matchCanonicalArgmax(linalg::GenericOp genericOp, unsigned reductionDim) {
@@ -1359,6 +1364,7 @@ matchCanonicalArgmax(linalg::GenericOp genericOp, unsigned reductionDim) {
 
   return ArgmaxCombinerInfo{
       /*kind=*/ArgmaxKind::Canonical,
+      /*maximumOp=*/maxOp,
       /*maximumAttrs=*/maxOp->getAttrDictionary(),
       /*greaterThanCmpAttrs=*/greaterThan->getAttrDictionary(),
       /*isNanCmpAttrs=*/{},
@@ -1367,7 +1373,7 @@ matchCanonicalArgmax(linalg::GenericOp genericOp, unsigned reductionDim) {
       /*indexSelectAttrs=*/indexSelect->getAttrDictionary()};
 }
 
-static std::optional<std::pair<arith::CmpFOp, arith::CmpFOp>>
+static std::optional<StableHloValueConditionOps>
 matchStableHloValueCondition(Value value, Value inVal, Value outVal) {
   auto op = value.getDefiningOp<arith::OrIOp>();
   if (!op) {
@@ -1384,13 +1390,15 @@ matchStableHloValueCondition(Value value, Value inVal, Value outVal) {
   arith::CmpFOp lhsGreaterThan = matchGreaterThan(op->getOperand(0));
   arith::CmpFOp rhsIsNan = matchInputIsNan(op->getOperand(1));
   if (lhsGreaterThan && rhsIsNan) {
-    return std::make_pair(lhsGreaterThan, rhsIsNan);
+    return StableHloValueConditionOps{/*greaterThan=*/lhsGreaterThan,
+                                      /*isNan=*/rhsIsNan};
   }
 
   arith::CmpFOp rhsGreaterThan = matchGreaterThan(op->getOperand(1));
   arith::CmpFOp lhsIsNan = matchInputIsNan(op->getOperand(0));
   if (rhsGreaterThan && lhsIsNan) {
-    return std::make_pair(rhsGreaterThan, lhsIsNan);
+    return StableHloValueConditionOps{/*greaterThan=*/rhsGreaterThan,
+                                      /*isNan=*/lhsIsNan};
   }
 
   return std::nullopt;
@@ -1494,9 +1502,10 @@ matchStableHloSelectStyleArgmax(linalg::GenericOp genericOp,
 
   return ArgmaxCombinerInfo{
       /*kind=*/ArgmaxKind::StableHloSelectStyle,
+      /*maximumOp=*/nullptr,
       /*maximumAttrs=*/{},
-      /*greaterThanCmpAttrs=*/valueCmpOps->first->getAttrDictionary(),
-      /*isNanCmpAttrs=*/valueCmpOps->second->getAttrDictionary(),
+      /*greaterThanCmpAttrs=*/valueCmpOps->greaterThan->getAttrDictionary(),
+      /*isNanCmpAttrs=*/valueCmpOps->isNan->getAttrDictionary(),
       /*equalCmpAttrs=*/(*equalCmpOp)->getAttrDictionary(),
       /*valueSelectAttrs=*/valueSelect->getAttrDictionary(),
       /*indexSelectAttrs=*/indexSelect->getAttrDictionary()};
@@ -1552,16 +1561,8 @@ getArgmaxCombinerInfo(linalg::GenericOp genericOp) {
   return std::nullopt;
 }
 
-std::optional<ArgmaxKind> getArgmaxKind(linalg::GenericOp genericOp) {
-  if (std::optional<ArgmaxCombinerInfo> info =
-          getArgmaxCombinerInfo(genericOp)) {
-    return info->kind;
-  }
-  return std::nullopt;
-}
-
 bool isArgmaxOp(linalg::GenericOp genericOp) {
-  return getArgmaxKind(genericOp).has_value();
+  return getArgmaxCombinerInfo(genericOp).has_value();
 }
 
 bool hasOnlyScalarInputs(linalg::GenericOp linalgOp) {

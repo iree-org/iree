@@ -251,6 +251,7 @@ enum class ArgmaxKind {
 
 struct ArgmaxCombinerInfo {
   ArgmaxKind kind;
+  Operation *maximumOp;
   DictionaryAttr maximumAttrs;
   DictionaryAttr greaterThanCmpAttrs;
   DictionaryAttr isNanCmpAttrs;
@@ -263,9 +264,6 @@ struct ArgmaxCombinerInfo {
 /// any.
 std::optional<ArgmaxCombinerInfo>
 getArgmaxCombinerInfo(linalg::GenericOp genericOp);
-
-/// Returns the argmax kind represented by the given linalg.generic, if any.
-std::optional<ArgmaxKind> getArgmaxKind(linalg::GenericOp genericOp);
 
 /// Check if a linalg.generic is representing an argmax operation.
 bool isArgmaxOp(linalg::GenericOp genericOp);
