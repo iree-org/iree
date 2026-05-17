@@ -128,6 +128,9 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
   // Base and extended feature set.
   VkPhysicalDeviceFeatures2 features2;
 
+  // Vulkan 1.1 feature set.
+  VkPhysicalDeviceVulkan11Features features11;
+
   // Vulkan 1.2 feature set.
   VkPhysicalDeviceVulkan12Features features12;
 

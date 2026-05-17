@@ -710,6 +710,12 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
           device->enabled_features,
           IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS);
       return iree_ok_status();
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("storage_buffer_16bit_access"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS);
+      return iree_ok_status();
     } else if (iree_string_view_equal(key, IREE_SV("shader_float16"))) {
       *out_value = iree_hal_vulkan_feature_query_value(
           device->enabled_features,

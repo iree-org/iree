@@ -27,6 +27,8 @@ class PhysicalDeviceSnapshotBuilder {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     snapshot_.features12.timelineSemaphore = VK_TRUE;
     snapshot_.features12.scalarBlockLayout = VK_TRUE;
+    snapshot_.features11.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
     snapshot_.features13.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     snapshot_.features13.synchronization2 = VK_TRUE;
@@ -62,6 +64,7 @@ class PhysicalDeviceSnapshotBuilder {
 
   void EnableScalarShaderFeatures() {
     snapshot_.features12.storageBuffer8BitAccess = VK_TRUE;
+    snapshot_.features11.storageBuffer16BitAccess = VK_TRUE;
     snapshot_.features12.shaderFloat16 = VK_TRUE;
     snapshot_.features2.features.shaderFloat64 = VK_TRUE;
     snapshot_.features12.shaderInt8 = VK_TRUE;
@@ -257,6 +260,9 @@ TEST(DevicePlanTest, OwnedCreateReportsAvailableScalarShaderFeatures) {
   EXPECT_TRUE(iree_all_bits_set(
       plan.enabled_features,
       IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS));
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS));
   EXPECT_TRUE(iree_all_bits_set(plan.enabled_features,
                                 IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16));
   EXPECT_TRUE(iree_all_bits_set(plan.enabled_features,
@@ -277,6 +283,7 @@ TEST(DevicePlanTest, OwnedCreateReportsAvailableScalarShaderFeatures) {
       plan.enabled_features,
       IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE));
   EXPECT_TRUE(plan.enabled_features12.storageBuffer8BitAccess);
+  EXPECT_TRUE(plan.enabled_features11.storageBuffer16BitAccess);
   EXPECT_TRUE(plan.enabled_features12.shaderFloat16);
   EXPECT_TRUE(plan.enabled_features2.features.shaderFloat64);
   EXPECT_TRUE(plan.enabled_features12.shaderInt8);
@@ -299,6 +306,21 @@ TEST(DevicePlanTest, OwnedCreateRejectsRequestedUnavailableReportedFeature) {
       iree_hal_vulkan_device_plan_initialize_for_create(
           builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
           IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16, &plan));
+}
+
+TEST(DevicePlanTest,
+     OwnedCreateRejectsRequestedUnavailableStorageBuffer16BitAccess) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kUnavailable,
+      iree_hal_vulkan_device_plan_initialize_for_create(
+          builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS, &plan));
 }
 
 TEST(DevicePlanTest, OwnedCreateEnablesCooperativeMatrixWhenAvailable) {
@@ -328,8 +350,10 @@ TEST(DevicePlanTest, OwnedCreateEnablesCooperativeMatrixWhenAvailable) {
   iree_hal_vulkan_device_plan_make_create_info(&copied_plan, &create_info);
 
   EXPECT_EQ(&copied_plan.enabled_features2, create_info.pNext);
-  EXPECT_EQ(&copied_plan.enabled_features12,
+  EXPECT_EQ(&copied_plan.enabled_features11,
             copied_plan.enabled_features2.pNext);
+  EXPECT_EQ(&copied_plan.enabled_features12,
+            copied_plan.enabled_features11.pNext);
   EXPECT_EQ(&copied_plan.enabled_features13,
             copied_plan.enabled_features12.pNext);
   EXPECT_EQ(&copied_plan.enabled_cooperative_matrix_features,
@@ -419,6 +443,45 @@ TEST(DevicePlanTest, WrapCarriesRequestFlags) {
   EXPECT_EQ(IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS, plan.request_flags);
 }
 
+TEST(DevicePlanTest, WrapCarriesStorageBuffer16BitAccessWhenAvailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableScalarShaderFeatures();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.enabled_features |=
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_wrap(
+      builder.snapshot(), &options, &params, &plan));
+
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS));
+}
+
+TEST(DevicePlanTest,
+     WrapRejectsStorageBuffer16BitAccessWhenFeatureIsUnavailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.enabled_features |=
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(StatusCode::kFailedPrecondition,
+                        iree_hal_vulkan_device_plan_initialize_for_wrap(
+                            builder.snapshot(), &options, &params, &plan));
+}
+
 TEST(DevicePlanTest, WrapRejectsCooperativeMatrixWithoutEnabledExtension) {
   PhysicalDeviceSnapshotBuilder builder;
   builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
@@ -504,8 +567,10 @@ TEST(DevicePlanTest, MakeCreateInfoRefreshesSelfReferencesAfterCopy) {
   iree_hal_vulkan_device_plan_make_create_info(&copied_plan, &create_info);
 
   EXPECT_EQ(&copied_plan.enabled_features2, create_info.pNext);
-  EXPECT_EQ(&copied_plan.enabled_features12,
+  EXPECT_EQ(&copied_plan.enabled_features11,
             copied_plan.enabled_features2.pNext);
+  EXPECT_EQ(&copied_plan.enabled_features12,
+            copied_plan.enabled_features11.pNext);
   EXPECT_EQ(&copied_plan.enabled_features13,
             copied_plan.enabled_features12.pNext);
   EXPECT_EQ(copied_plan.queue_create_infos, create_info.pQueueCreateInfos);

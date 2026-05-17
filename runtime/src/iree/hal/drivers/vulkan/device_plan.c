@@ -495,6 +495,15 @@ iree_status_t iree_hal_vulkan_device_plan_initialize_for_create(
           snapshot->features12.vulkanMemoryModel &&
           snapshot->features12.vulkanMemoryModelDeviceScope,
   };
+  out_plan->enabled_features11 = (VkPhysicalDeviceVulkan11Features){
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+      .pNext = &out_plan->enabled_features12,
+      .storageBuffer16BitAccess = snapshot->features11.storageBuffer16BitAccess,
+      .uniformAndStorageBuffer16BitAccess =
+          snapshot->features11.uniformAndStorageBuffer16BitAccess,
+      .storagePushConstant16 = snapshot->features11.storagePushConstant16,
+      .storageInputOutput16 = snapshot->features11.storageInputOutput16,
+  };
   out_plan->enabled_cooperative_matrix_features =
       (VkPhysicalDeviceCooperativeMatrixFeaturesKHR){
           .sType =
@@ -502,7 +511,7 @@ iree_status_t iree_hal_vulkan_device_plan_initialize_for_create(
       };
   out_plan->enabled_features2 = (VkPhysicalDeviceFeatures2){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &out_plan->enabled_features12,
+      .pNext = &out_plan->enabled_features11,
       .features =
           {
               .robustBufferAccess = VK_FALSE,
@@ -585,6 +594,11 @@ iree_status_t iree_hal_vulkan_device_plan_initialize_for_create(
       requested_features,
       IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS,
       snapshot->features12.storageBuffer8BitAccess, "storageBuffer8BitAccess",
+      &out_plan->enabled_features));
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_plan_select_reported_feature(
+      requested_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS,
+      snapshot->features11.storageBuffer16BitAccess, "storageBuffer16BitAccess",
       &out_plan->enabled_features));
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_device_plan_select_reported_feature(
       requested_features, IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16,
@@ -738,6 +752,12 @@ static iree_status_t iree_hal_vulkan_verify_external_enabled_features(
           IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS,
           snapshot->features12.storageBuffer8BitAccess,
           "storageBuffer8BitAccess"));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_device_plan_verify_external_reported_feature(
+          enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS,
+          snapshot->features11.storageBuffer16BitAccess,
+          "storageBuffer16BitAccess"));
   IREE_RETURN_IF_ERROR(
       iree_hal_vulkan_device_plan_verify_external_reported_feature(
           enabled_features, IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16,
@@ -987,7 +1007,8 @@ static void iree_hal_vulkan_device_plan_refresh_feature_chain(
     plan->enabled_features13.pNext = &plan->enabled_cooperative_matrix_features;
   }
   plan->enabled_features12.pNext = &plan->enabled_features13;
-  plan->enabled_features2.pNext = &plan->enabled_features12;
+  plan->enabled_features11.pNext = &plan->enabled_features12;
+  plan->enabled_features2.pNext = &plan->enabled_features11;
 }
 
 void iree_hal_vulkan_device_plan_make_create_info(

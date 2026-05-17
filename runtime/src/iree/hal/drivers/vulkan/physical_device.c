@@ -501,9 +501,13 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
       .pNext = &out_snapshot->features13,
   };
+  out_snapshot->features11 = (VkPhysicalDeviceVulkan11Features){
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+      .pNext = &out_snapshot->features12,
+  };
   out_snapshot->features2 = (VkPhysicalDeviceFeatures2){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &out_snapshot->features12,
+      .pNext = &out_snapshot->features11,
   };
   iree_vkGetPhysicalDeviceFeatures2(IREE_VULKAN_INSTANCE(&instance->syms),
                                     handle, &out_snapshot->features2);
@@ -996,13 +1000,18 @@ iree_status_t iree_hal_vulkan_dump_physical_device_info(
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder,
         "features: bufferDeviceAddress=%s timelineSemaphore=%s "
-        "scalarBlockLayout=%s synchronization2=%s shaderInt8=%s "
-        "shaderFloat16=%s shaderIntegerDotProduct=%s "
-        "subgroupSizeControl=%s cooperativeMatrix=%s\n",
+        "scalarBlockLayout=%s synchronization2=%s storageBuffer8BitAccess=%s "
+        "storageBuffer16BitAccess=%s shaderInt8=%s shaderFloat16=%s "
+        "shaderIntegerDotProduct=%s subgroupSizeControl=%s "
+        "cooperativeMatrix=%s\n",
         iree_hal_vulkan_bool_string(snapshot.features12.bufferDeviceAddress),
         iree_hal_vulkan_bool_string(snapshot.features12.timelineSemaphore),
         iree_hal_vulkan_bool_string(snapshot.features12.scalarBlockLayout),
         iree_hal_vulkan_bool_string(snapshot.features13.synchronization2),
+        iree_hal_vulkan_bool_string(
+            snapshot.features12.storageBuffer8BitAccess),
+        iree_hal_vulkan_bool_string(
+            snapshot.features11.storageBuffer16BitAccess),
         iree_hal_vulkan_bool_string(snapshot.features12.shaderInt8),
         iree_hal_vulkan_bool_string(snapshot.features12.shaderFloat16),
         iree_hal_vulkan_bool_string(
