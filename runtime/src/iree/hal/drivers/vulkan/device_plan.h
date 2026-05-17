@@ -106,6 +106,10 @@ typedef struct iree_hal_vulkan_device_plan_t {
   // Vulkan 1.3 features enabled during driver-owned VkDevice creation.
   VkPhysicalDeviceVulkan13Features enabled_features13;
 
+  // VK_KHR_cooperative_matrix features enabled during VkDevice creation.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR
+      enabled_cooperative_matrix_features;
+
   // Vulkan 1.2 features enabled during driver-owned VkDevice creation.
   VkPhysicalDeviceVulkan12Features enabled_features12;
 

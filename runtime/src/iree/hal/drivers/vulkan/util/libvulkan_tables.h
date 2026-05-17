@@ -94,6 +94,12 @@ IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(
          VkTimeDomainEXT* pTimeDomains),
     ARGS(physicalDevice, pTimeDomainCount, pTimeDomains))
 
+IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(
+    VkResult, vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR,
+    DECL(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+         VkCooperativeMatrixPropertiesKHR* pProperties),
+    ARGS(physicalDevice, pPropertyCount, pProperties))
+
 // Device-level entry points.
 
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDevice,

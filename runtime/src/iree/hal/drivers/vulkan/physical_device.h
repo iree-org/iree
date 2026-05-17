@@ -100,6 +100,18 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
   // VK_KHR_push_descriptor properties, if the extension is available.
   VkPhysicalDevicePushDescriptorPropertiesKHR push_descriptor_properties;
 
+  // VK_KHR_cooperative_matrix feature bits, if the extension is available.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR cooperative_matrix_features;
+
+  // VK_KHR_cooperative_matrix stage properties, if the extension is available.
+  VkPhysicalDeviceCooperativeMatrixPropertiesKHR cooperative_matrix_properties;
+
+  // VK_KHR_cooperative_matrix property row count.
+  uint32_t cooperative_matrix_property_count;
+
+  // VK_KHR_cooperative_matrix property rows, if the extension is available.
+  VkCooperativeMatrixPropertiesKHR* cooperative_matrix_property_rows;
+
   // Stable identity properties.
   VkPhysicalDeviceIDProperties id_properties;
 

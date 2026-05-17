@@ -209,6 +209,11 @@ static iree_hal_vulkan_logical_device_t* iree_hal_vulkan_logical_device_cast(
   return (iree_hal_vulkan_logical_device_t*)base_value;
 }
 
+static bool iree_hal_vulkan_logical_device_isa(iree_hal_device_t* base_value) {
+  return iree_hal_resource_is((const iree_hal_resource_t*)base_value,
+                              &iree_hal_vulkan_logical_device_vtable);
+}
+
 static iree_status_t iree_hal_vulkan_unimplemented(
     iree_string_view_t operation) {
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -603,6 +608,12 @@ static bool iree_hal_vulkan_logical_device_query_queue_i64(
   return has_value;
 }
 
+static int64_t iree_hal_vulkan_feature_query_value(
+    iree_hal_vulkan_features_t enabled_features,
+    iree_hal_vulkan_features_t feature_bit) {
+  return iree_all_bits_set(enabled_features, feature_bit) ? 1 : 0;
+}
+
 static iree_status_t iree_hal_vulkan_logical_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
@@ -640,6 +651,127 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
     } else if (iree_string_view_equal(key, IREE_SV("subgroup_size"))) {
       *out_value = device->physical_device.subgroup_properties.subgroupSize;
       return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_invocations"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupInvocations;
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_size_x"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupSize[0];
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_size_y"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupSize[1];
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_size_z"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupSize[2];
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_count_x"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupCount[0];
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_count_y"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupCount[1];
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("max_compute_workgroup_count_z"))) {
+      *out_value = device->physical_device.properties2.properties.limits
+                       .maxComputeWorkGroupCount[2];
+      return iree_ok_status();
+    }
+  } else if (iree_string_view_equal(category, IREE_SV("vulkan.feature"))) {
+    if (iree_string_view_equal(key, IREE_SV("buffer_device_address")) ||
+        iree_string_view_equal(key, IREE_SV("physical_storage_buffer64"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("subgroup_size_control"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("cooperative_matrix_khr"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("storage_buffer_8bit_access"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_float16"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_float64"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT64);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_int8"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features, IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT8);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_int16"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT16);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_int64"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT64);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("shader_integer_dot_product"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INTEGER_DOT_PRODUCT);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("vulkan_memory_model"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("vulkan_memory_model_device_scope"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE);
+      return iree_ok_status();
+    }
+  } else if (iree_string_view_equal(category,
+                                    IREE_SV("vulkan.cooperative_matrix"))) {
+    const bool has_cooperative_matrix =
+        iree_all_bits_set(device->enabled_features,
+                          IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX);
+    if (iree_string_view_equal(key, IREE_SV("supported"))) {
+      *out_value = has_cooperative_matrix ? 1 : 0;
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("property_count"))) {
+      *out_value =
+          has_cooperative_matrix
+              ? device->physical_device.cooperative_matrix_property_count
+              : 0;
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("supported_stages"))) {
+      *out_value = has_cooperative_matrix
+                       ? device->physical_device.cooperative_matrix_properties
+                             .cooperativeMatrixSupportedStages
+                       : 0;
+      return iree_ok_status();
     }
   } else if (iree_hal_vulkan_logical_device_query_queue_i64(device, category,
                                                             key, out_value)) {
@@ -650,6 +782,71 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
       IREE_STATUS_NOT_FOUND,
       "unknown device configuration key value '%.*s :: %.*s'",
       (int)category.size, category.data, (int)key.size, key.data);
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_vulkan_device_query_cooperative_matrix_properties(
+    iree_hal_device_t* base_device, iree_host_size_t property_capacity,
+    iree_host_size_t* out_property_count,
+    iree_hal_vulkan_cooperative_matrix_property_t* out_properties) {
+  IREE_ASSERT_ARGUMENT(base_device);
+  IREE_ASSERT_ARGUMENT(out_property_count);
+  *out_property_count = 0;
+
+  if (property_capacity != 0 && out_properties == NULL) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan cooperative matrix property storage is "
+                            "NULL for capacity %" PRIhsz,
+                            property_capacity);
+  }
+  if (!iree_hal_vulkan_logical_device_isa(base_device)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "device is not a Vulkan logical device");
+  }
+
+  iree_hal_vulkan_logical_device_t* device =
+      iree_hal_vulkan_logical_device_cast(base_device);
+  if (!iree_all_bits_set(device->enabled_features,
+                         IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX)) {
+    return iree_ok_status();
+  }
+
+  const iree_host_size_t property_count =
+      device->physical_device.cooperative_matrix_property_count;
+  *out_property_count = property_count;
+  if (out_properties == NULL) {
+    return iree_ok_status();
+  }
+  if (property_capacity < property_count) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "Vulkan cooperative matrix property capacity %" PRIhsz
+        " is smaller than required count %" PRIhsz,
+        property_capacity, property_count);
+  }
+
+  const VkCooperativeMatrixPropertiesKHR* source_properties =
+      device->physical_device.cooperative_matrix_property_rows;
+  if (property_count != 0 && source_properties == NULL) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "Vulkan cooperative matrix support has %" PRIhsz
+                            " property rows but no retained row storage",
+                            property_count);
+  }
+  for (iree_host_size_t i = 0; i < property_count; ++i) {
+    out_properties[i] = (iree_hal_vulkan_cooperative_matrix_property_t){
+        .m_size = source_properties[i].MSize,
+        .n_size = source_properties[i].NSize,
+        .k_size = source_properties[i].KSize,
+        .a_type = source_properties[i].AType,
+        .b_type = source_properties[i].BType,
+        .c_type = source_properties[i].CType,
+        .result_type = source_properties[i].ResultType,
+        .saturating_accumulation = source_properties[i].saturatingAccumulation,
+        .scope = source_properties[i].scope,
+    };
+  }
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_query_capabilities(

@@ -106,6 +106,26 @@ typedef enum iree_hal_vulkan_feature_bits_t {
   IREE_HAL_VULKAN_FEATURE_ENABLE_SCALAR_BLOCK_LAYOUT = 1u << 9,
   // Requests and reports subgroup size control on a logical device.
   IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL = 1u << 10,
+  // Requests and reports KHR cooperative matrix support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX = 1u << 11,
+  // Requests and reports storageBuffer8BitAccess support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS = 1u << 12,
+  // Requests and reports shaderFloat16 support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16 = 1u << 13,
+  // Requests and reports shaderFloat64 support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT64 = 1u << 14,
+  // Requests and reports shaderInt8 support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT8 = 1u << 15,
+  // Requests and reports shaderInt16 support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT16 = 1u << 16,
+  // Requests and reports shaderInt64 support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT64 = 1u << 17,
+  // Requests and reports shaderIntegerDotProduct support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INTEGER_DOT_PRODUCT = 1u << 18,
+  // Requests and reports vulkanMemoryModel support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL = 1u << 19,
+  // Requests and reports vulkanMemoryModelDeviceScope support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE = 1u << 20,
   // Required enabled logical-device feature set for the Vulkan HAL baseline.
   IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
       IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES |
@@ -118,7 +138,17 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_SPARSE_RESIDENCY_ALIASED |
       IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES |
       IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SUBGROUP_SIZE_CONTROL |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_8BIT_ACCESS |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT16 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT64 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT8 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT16 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT64 |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INTEGER_DOT_PRODUCT |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE,
 } iree_hal_vulkan_feature_bits_t;
 
 typedef uint32_t iree_hal_vulkan_features_t;
@@ -141,6 +171,8 @@ typedef enum iree_hal_vulkan_device_extension_bits_t {
   IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS = 1u << 5,
   // VK_KHR_push_descriptor.
   IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR = 1u << 6,
+  // VK_KHR_cooperative_matrix.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX = 1u << 7,
   // Recognized extension bits accepted by public Vulkan HAL APIs.
   IREE_HAL_VULKAN_DEVICE_EXTENSION_ALL_RECOGNIZED =
       IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET |
@@ -149,7 +181,8 @@ typedef enum iree_hal_vulkan_device_extension_bits_t {
       IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_EXTERNAL_MEMORY_WIN32 |
       IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST |
       IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS |
-      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR,
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX,
 } iree_hal_vulkan_device_extension_bits_t;
 
 typedef uint32_t iree_hal_vulkan_device_extensions_t;
@@ -246,6 +279,54 @@ typedef struct iree_hal_vulkan_external_device_params_t {
   // binding.
   iree_hal_vulkan_queue_set_t sparse_binding_queue_set;
 } iree_hal_vulkan_external_device_params_t;
+
+// KHR cooperative matrix property row reported by a Vulkan logical device.
+//
+// Enum-valued fields preserve the Vulkan wire values from VkComponentTypeKHR
+// and VkScopeKHR. This keeps the public HAL API independent of full Vulkan
+// headers while allowing compiler targets to compare against their own SPIR-V
+// wire enums without string translation.
+typedef struct iree_hal_vulkan_cooperative_matrix_property_t {
+  // Matrix M dimension.
+  uint32_t m_size;
+
+  // Matrix N dimension.
+  uint32_t n_size;
+
+  // Matrix K dimension.
+  uint32_t k_size;
+
+  // Matrix A component type as VkComponentTypeKHR.
+  uint32_t a_type;
+
+  // Matrix B component type as VkComponentTypeKHR.
+  uint32_t b_type;
+
+  // Matrix C accumulator component type as VkComponentTypeKHR.
+  uint32_t c_type;
+
+  // Result component type as VkComponentTypeKHR.
+  uint32_t result_type;
+
+  // Non-zero if saturating accumulation is supported for this row.
+  uint32_t saturating_accumulation;
+
+  // Cooperative matrix scope as VkScopeKHR.
+  uint32_t scope;
+} iree_hal_vulkan_cooperative_matrix_property_t;
+
+// Queries active KHR cooperative matrix property rows for a Vulkan HAL device.
+//
+// Returns OK with |out_property_count| set to zero when the logical device does
+// not have cooperative matrix support enabled. Passing NULL |out_properties|
+// with zero |property_capacity| performs a count-only query. If non-NULL
+// storage is provided and |property_capacity| is too small, returns
+// OUT_OF_RANGE after writing the required count.
+IREE_API_EXPORT iree_status_t
+iree_hal_vulkan_device_query_cooperative_matrix_properties(
+    iree_hal_device_t* device, iree_host_size_t property_capacity,
+    iree_host_size_t* out_property_count,
+    iree_hal_vulkan_cooperative_matrix_property_t* out_properties);
 
 typedef enum iree_hal_vulkan_device_flag_bits_t {
   // No device flags.

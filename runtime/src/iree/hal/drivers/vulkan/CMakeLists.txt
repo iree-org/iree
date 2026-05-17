@@ -45,6 +45,22 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    api_test
+  SRCS
+    "api_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    Vulkan::Headers
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
     command_buffer_test
   SRCS
     "command_buffer_test.cc"

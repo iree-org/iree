@@ -48,6 +48,20 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
+    name = "api_test",
+    srcs = ["api_test.cc"],
+    group = "iree-hal-drivers-vulkan-tests",
+    deps = [
+        ":headers",
+        ":vulkan",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "@vulkan_headers",
+    ],
+)
+
+iree_runtime_cc_test(
     name = "command_buffer_test",
     srcs = ["command_buffer_test.cc"],
     group = "iree-hal-drivers-vulkan-tests",
