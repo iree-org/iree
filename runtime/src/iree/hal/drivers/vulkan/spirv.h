@@ -25,13 +25,38 @@ typedef struct iree_hal_vulkan_spirv_compute_entry_point_t {
   uint32_t workgroup_size[3];
 } iree_hal_vulkan_spirv_compute_entry_point_t;
 
+typedef enum iree_hal_vulkan_spirv_bda_memory_model_e {
+  // No raw-BDA-compatible OpMemoryModel was declared.
+  IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE = 0u,
+
+  // OpMemoryModel PhysicalStorageBuffer64 GLSL450.
+  IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450 = 1u,
+
+  // OpMemoryModel PhysicalStorageBuffer64 Vulkan.
+  IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_VULKAN = 2u,
+} iree_hal_vulkan_spirv_bda_memory_model_t;
+
+typedef enum iree_hal_vulkan_spirv_module_capability_bits_e {
+  // No recognized OpCapability declarations were found.
+  IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_NONE = 0u,
+
+  // OpCapability PhysicalStorageBufferAddresses.
+  IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES =
+      0x1u,
+
+  // OpCapability VulkanMemoryModel.
+  IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_VULKAN_MEMORY_MODEL = 0x2u,
+} iree_hal_vulkan_spirv_module_capability_bits_t;
+
+typedef uint32_t iree_hal_vulkan_spirv_module_capabilities_t;
+
 // Module-wide SPIR-V facts used while preparing Vulkan executables.
 typedef struct iree_hal_vulkan_spirv_module_analysis_t {
-  // Whether OpMemoryModel declares PhysicalStorageBuffer64 GLSL450.
-  bool uses_physical_storage_buffer64_glsl450;
+  // Raw-BDA-compatible OpMemoryModel variant declared by the module.
+  iree_hal_vulkan_spirv_bda_memory_model_t bda_memory_model;
 
-  // Whether OpCapability declares PhysicalStorageBufferAddresses.
-  bool has_physical_storage_buffer_addresses_capability;
+  // Recognized OpCapability declarations present in the module.
+  iree_hal_vulkan_spirv_module_capabilities_t capabilities;
 
   // Whether any OpDecorate declares DescriptorSet or Binding.
   bool has_descriptor_binding_decorations;
