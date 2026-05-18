@@ -410,6 +410,13 @@ static iree_status_t iree_hal_task_queue_profile_set_dispatch(
       profile_operation->recorder, executable));
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
   profile_operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
   profile_operation->export_ordinal =

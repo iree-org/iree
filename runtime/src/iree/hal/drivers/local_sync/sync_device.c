@@ -569,12 +569,19 @@ static void iree_hal_sync_device_profile_operation_initialize(
   out_operation->export_ordinal = UINT32_MAX;
 }
 
-static void iree_hal_sync_device_profile_operation_set_dispatch(
+static iree_status_t iree_hal_sync_device_profile_operation_set_dispatch(
     iree_hal_sync_device_profile_operation_t* operation,
     iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
   operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
   operation->export_ordinal = iree_hal_executable_function_index(function);
@@ -591,6 +598,7 @@ static void iree_hal_sync_device_profile_operation_set_dispatch(
       config.workgroup_size[1] ? config.workgroup_size[1] : 1;
   operation->workgroup_size[2] =
       config.workgroup_size[2] ? config.workgroup_size[2] : 1;
+  return iree_ok_status();
 }
 
 static void iree_hal_sync_device_profile_operation_set_transient_buffer(
@@ -1352,8 +1360,8 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
       /*operation_count=*/1, &profile_operation);
   IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
       device->profile_recorder, executable));
-  iree_hal_sync_device_profile_operation_set_dispatch(
-      &profile_operation, executable, export_ordinal, config, flags);
+  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profile_operation_set_dispatch(
+      &profile_operation, executable, export_ordinal, config, flags));
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
       device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
   iree_status_t status = iree_hal_local_executable_dispatch_inline(
