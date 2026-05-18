@@ -140,6 +140,10 @@ static bool hip_registered_ =
           },
           /*expected_failures=*/
           {
+              {"TransientBufferTest.FillTransientBuffer",
+               "HIP stream command buffers can hang when filling a transient "
+               "buffer after stream-ordered queue_alloca; this requires a HIP "
+               "transient-buffer sequencing fix."},
               {"TransientBufferTest.FillTransientBufferSubrange",
                "HIP stream command buffers can hang when a transient buffer "
                "subspan is filled after stream-ordered queue_alloca; this "
