@@ -1073,18 +1073,18 @@ iree_hal_vulkan_logical_device_resolve_command_buffer_queue_affinity(
 
   const iree_hal_queue_affinity_t command_buffer_queue_affinity =
       iree_hal_command_buffer_queue_affinity(command_buffer);
-  const iree_hal_queue_affinity_t requested_queue_affinity = queue_affinity;
-  iree_hal_queue_affinity_and_into(queue_affinity,
+  iree_hal_queue_affinity_t resolved_queue_affinity = queue_affinity;
+  iree_hal_queue_affinity_and_into(resolved_queue_affinity,
                                    command_buffer_queue_affinity);
-  if (iree_hal_queue_affinity_is_empty(queue_affinity)) {
+  if (iree_hal_queue_affinity_is_empty(resolved_queue_affinity)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "queue_execute affinity does not match command buffer affinity "
         "(queue=0x%016" PRIx64 ", command_buffer=0x%016" PRIx64 ")",
-        requested_queue_affinity, command_buffer_queue_affinity);
+        queue_affinity, command_buffer_queue_affinity);
   }
 
-  *out_queue_affinity = queue_affinity;
+  *out_queue_affinity = resolved_queue_affinity;
   return iree_ok_status();
 }
 
