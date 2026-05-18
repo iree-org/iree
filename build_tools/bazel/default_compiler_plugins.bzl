@@ -43,6 +43,7 @@ def iree_default_compiler_plugins():
         "hal_target_rocm": "//compiler/plugins/target/ROCM",
         "hal_target_vmvx": "//compiler/plugins/target/VMVX",
         "hal_target_vulkan_spirv": "//compiler/plugins/target/VulkanSPIRV",
+        "hal_target_webgpu_spirv": "//compiler/plugins/target/WebGPUSPIRV",
         # Sample plugins.
         "example": "//samples/compiler_plugins/example:registration",
         "simple_io_sample": "//samples/compiler_plugins/simple_io_sample:registration",

@@ -6,50 +6,101 @@
 
 #include "compiler/plugins/target/WebGPUSPIRV/SPIRVToWGSL.h"
 
-#include "llvm/Support/Debug.h"
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
-#include "tint/tint.h"
+
+#include "src/tint/lang/core/ir/disassembler.h"
+#include "src/tint/lang/spirv/reader/reader.h"
+#include "src/tint/lang/wgsl/program/program.h"
+#include "src/tint/lang/wgsl/writer/writer.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+namespace {
+
+constexpr uint32_t kSPIRVMagicNumber = 0x07230203u;
+
+void printTintFailure(llvm::StringRef stage, llvm::StringRef reason) {
+  llvm::errs() << "Tint failed to " << stage;
+  if (reason.empty()) {
+    llvm::errs() << ".\n";
+    return;
+  }
+  llvm::errs() << ":\n" << reason;
+  if (!reason.ends_with('\n')) {
+    llvm::errs() << "\n";
+  }
+}
+
+void printSPIRVModuleSummary(llvm::ArrayRef<uint32_t> spvBinary) {
+  llvm::errs() << "SPIR-V module summary:\n";
+  llvm::errs() << "  words: " << spvBinary.size() << " ("
+               << spvBinary.size() * sizeof(uint32_t) << " bytes)\n";
+  if (spvBinary.size() < 5) {
+    llvm::errs() << "  header: incomplete; expected at least 5 words\n";
+    return;
+  }
+
+  uint32_t magic = spvBinary[0];
+  uint32_t version = spvBinary[1];
+  llvm::errs() << "  magic: " << llvm::format_hex(magic, 10);
+  if (magic != kSPIRVMagicNumber) {
+    llvm::errs() << " (expected " << llvm::format_hex(kSPIRVMagicNumber, 10)
+                 << ")";
+  }
+  llvm::errs() << "\n";
+  llvm::errs() << "  version: " << ((version >> 16) & 0xFF) << "."
+               << ((version >> 8) & 0xFF) << " ("
+               << llvm::format_hex(version, 10) << ")\n";
+  llvm::errs() << "  generator: " << llvm::format_hex(spvBinary[2], 10) << "\n";
+  llvm::errs() << "  bound: " << spvBinary[3] << "\n";
+  llvm::errs() << "  schema: " << llvm::format_hex(spvBinary[4], 10) << "\n";
+}
+
+void printTintIRAtFailure(const tint::core::ir::Module &irModule) {
+  llvm::errs() << "Tint IR at failure:\n";
+  llvm::errs() << tint::core::ir::Disassembler(irModule).Plain();
+  llvm::errs() << "\n";
+}
+
+} // namespace
 
 std::optional<std::string>
 compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary) {
-  // TODO(scotttodd): reroute to MLIR diagnostics?
-  auto diagPrinter = tint::diag::Printer::create(stderr, true);
-  tint::diag::Formatter diagFormatter;
-
-  // TODO(scotttodd): remove this copy (API for std::span or [uint8_t*, size]?)
-  std::vector<uint32_t> binaryVector(spvBinary.size());
-  std::memcpy(binaryVector.data(), spvBinary.data(),
-              spvBinary.size() * sizeof(uint32_t));
-
-  auto program =
-      std::make_unique<tint::Program>(tint::reader::spirv::Parse(binaryVector));
-  if (!program) {
-    llvm::errs() << "Tint failed to parse SPIR-V program\n";
+  std::vector<uint32_t> binaryVector(spvBinary.begin(), spvBinary.end());
+  auto irResult = tint::spirv::reader::ReadIR(binaryVector);
+  if (irResult != tint::Success) {
+    printTintFailure("parse SPIR-V into IR", irResult.Failure().reason);
+    printSPIRVModuleSummary(spvBinary);
     return std::nullopt;
   }
 
-  if (program->Diagnostics().contains_errors()) {
-    llvm::errs() << "Tint reported " << program->Diagnostics().error_count()
-                 << " error(s) for a SPIR-V program, see diagnostics:\n";
-    diagFormatter.format(program->Diagnostics(), diagPrinter.get());
+  tint::core::ir::Module irModule = irResult.Move();
+  tint::wgsl::writer::Options writerOptions;
+  auto programResult =
+      tint::wgsl::writer::ProgramFromIR(irModule, writerOptions);
+  if (programResult != tint::Success) {
+    printTintFailure("lower Tint IR to a WGSL program",
+                     programResult.Failure().reason);
+    printSPIRVModuleSummary(spvBinary);
+    printTintIRAtFailure(irModule);
     return std::nullopt;
   }
 
-  if (!program->IsValid()) {
-    llvm::errs() << "Tint parsed an invalid SPIR-V program\n";
+  auto wgslResult =
+      tint::wgsl::writer::Generate(programResult.Get(), writerOptions);
+  if (wgslResult != tint::Success) {
+    printTintFailure("print WGSL", wgslResult.Failure().reason);
+    printSPIRVModuleSummary(spvBinary);
+    printTintIRAtFailure(irModule);
     return std::nullopt;
   }
 
-  tint::writer::wgsl::Options genOptions;
-  auto result = tint::writer::wgsl::Generate(program.get(), genOptions);
-  if (!result.success) {
-    llvm::errs() << "Tint failed to generate WGSL: " << result.error << "\n";
-    return std::nullopt;
-  }
-
-  return result.wgsl;
+  return std::move(wgslResult->wgsl);
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

@@ -8,8 +8,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   spirv-tools
-  GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
-  GIT_TAG ${IREE_SPIRV_TOOLS_TAG}
+  URL https://github.com/KhronosGroup/SPIRV-Tools/archive/${IREE_SPIRV_TOOLS_TAG}.zip
 )
 
 set(SKIP_SPIRV_TOOLS_INSTALL OFF CACHE BOOL "" FORCE)

@@ -49,14 +49,18 @@ ENVIRONMENT VARIABLES
     Defaults: local-sync, local-task, vulkan enabled (matches CMake)
 
     Compiler Plugins:
-      IREE_COMPILER_PLUGINS=all      - All buildable plugins (default)
-      IREE_COMPILER_PLUGINS=all,-X   - All except plugin X
+      IREE_COMPILER_PLUGINS=all      - All default buildable plugins (default)
+      IREE_COMPILER_PLUGINS=all,-X   - All default plugins except plugin X
       IREE_COMPILER_PLUGINS=X,Y      - Only plugins X and Y
+      IREE_TARGET_BACKEND_WEBGPU_SPIRV=ON
+                                      - Opt in to WebGPU SPIR-V/Tint support
 
     Plugin detection (for "all"):
       - CUDA: requires IREE_CUDA_TOOLKIT_ROOT/IREE_CUDA_DEPS_DIR,
               CUDA_ROOT/CUDA_HOME/CUDA_PATH/CUDA_TOOLKIT_ROOT_DIR, or nvcc in PATH
       - ROCm: requires ROCM_PATH/ROCM_ROOT/ROCM_HOME/HIP_PATH or hipcc in PATH
+      - WebGPU SPIR-V: excluded from "all" unless
+              IREE_TARGET_BACKEND_WEBGPU_SPIRV=ON is set
       - MetalSPIRV: always buildable
       - StableHLO: requires third_party/stablehlo submodule
       - Torch: requires third_party/torch-mlir submodule

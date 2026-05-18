@@ -376,6 +376,16 @@ build:wasm32_wasi --copt=-fno-sanitize=all
 build:wasm32_wasi --linkopt=-fno-sanitize=all
 
 ###############################################################################
+# Dawn/Tint (WebGPU SPIR-V → WGSL translation).
+# Use with: bazel build --config=webgpu_spirv //some:target
+###############################################################################
+
+build:webgpu_spirv --@dawn//src/tint:tint_build_spv_reader=true
+build:webgpu_spirv --@dawn//src/tint:tint_build_wgsl_writer=true
+# Dawn requires C++20 - scope it to Dawn sources only so IREE tracks LLVM's
+# C++17 baseline.
+build:webgpu_spirv --per_file_copt=external/.*dawn.*@-std=c++20
+
 # Architecture specific options
 ###############################################################################
 
