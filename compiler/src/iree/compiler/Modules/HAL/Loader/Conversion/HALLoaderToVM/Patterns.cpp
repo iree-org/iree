@@ -125,6 +125,37 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+struct ExecutableLookupFunctionOpConversion
+    : OpConversionPattern<IREE::HAL::Loader::ExecutableLookupFunctionOp> {
+  ExecutableLookupFunctionOpConversion(MLIRContext *context,
+                                       SymbolTable &importSymbols,
+                                       TypeConverter &typeConverter,
+                                       StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+  LogicalResult
+  matchAndRewrite(IREE::HAL::Loader::ExecutableLookupFunctionOp lookupOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto functionName = IREE::VM::RodataInlineOp::create(
+        rewriter, lookupOp.getLoc(),
+        rewriter.getStringAttr(
+            lookupOp.getEntryPointAttr().getLeafReference().getValue()));
+
+    auto importType = importOp.getFunctionType();
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        lookupOp, SymbolRefAttr::get(importOp), importType.getResults(),
+        ValueRange{adaptor.getExecutable(), functionName});
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 } // namespace
 
 void populateHALLoaderToVMPatterns(MLIRContext *context,
@@ -140,6 +171,9 @@ void populateHALLoaderToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal_loader.executable.load");
   patterns.insert<ExecutableDispatchOpConversion>(
       context, importSymbols, typeConverter, "hal_loader.executable.dispatch");
+  patterns.insert<ExecutableLookupFunctionOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal_loader.executable.lookup.function");
 }
 
 } // namespace mlir::iree_compiler

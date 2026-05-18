@@ -7,7 +7,7 @@ util.func public @fold_binding_subspans_into_dispatch(
     // CHECK-SAME: %[[BUFFER:.+]]: !util.buffer, %[[SUBSPAN_OFFSET:.+]]: index, %[[SUBSPAN_LENGTH:.+]]: index
     %buffer: !util.buffer, %subspan_offset: index, %subspan_length: index) {
   %c1 = arith.constant 1 : index
-  %c16 = arith.constant 16 : index
+  %c16 = arith.constant 16 : i64
 
   %buffer_size = util.buffer.size %buffer : !util.buffer
   %subspan = util.buffer.subspan %buffer[%subspan_offset] : !util.buffer{%buffer_size} -> !util.buffer{%subspan_length}

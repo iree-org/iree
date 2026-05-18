@@ -111,6 +111,7 @@ util.func public @fold_buffer_subspan_into_dispatch(
     %buffer: !hal.buffer
   ) {
   %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -122,7 +123,7 @@ util.func public @fold_buffer_subspan_into_dispatch(
   //      CHECK: hal.command_buffer.dispatch
   // CHECK-SAME:   bindings([
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
-      target(%executable: !hal.executable)[%c0]
+      target(%executable: !hal.executable)[%c0_i64]
       workgroups([%c1, %c1, %c1])
       bindings([
         // 0 + 4096:
@@ -151,6 +152,7 @@ util.func public @fold_buffer_subspan_into_dispatch_indirect(
     %buffer: !hal.buffer
   ) {
   %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   %c4096 = arith.constant 4096 : index
@@ -158,7 +160,7 @@ util.func public @fold_buffer_subspan_into_dispatch_indirect(
   %subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c4096, %c262144] : !hal.buffer
   // CHECK: hal.command_buffer.dispatch.indirect
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
-      target(%executable: !hal.executable)[%c0]
+      target(%executable: !hal.executable)[%c0_i64]
       // 4096 + 4:
       // CHECK-SAME: workgroups(%[[BASE_BUFFER]] : !hal.buffer)[%c4100]
       workgroups(%subspan : !hal.buffer)[%c4]

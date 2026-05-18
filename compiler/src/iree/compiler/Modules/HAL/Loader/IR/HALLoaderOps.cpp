@@ -139,6 +139,15 @@ LogicalResult ExecutableExportOrdinalOp::verifySymbolUses(
 }
 
 //===----------------------------------------------------------------------===//
+// hal_loader.executable.lookup.function
+//===----------------------------------------------------------------------===//
+
+void ExecutableLookupFunctionOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "function_id");
+}
+
+//===----------------------------------------------------------------------===//
 // hal_loader.executable.dispatch
 //===----------------------------------------------------------------------===//
 

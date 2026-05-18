@@ -260,6 +260,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
                                          host_allocator, &executable->base);
     executable->base.dispatch_attrs = dispatch_attrs;
+    executable->base.export_count = entry_count;
 
     executable->worker_capacity = worker_capacity;
     executable->worker_states =

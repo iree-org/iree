@@ -322,15 +322,16 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
     //  CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup
     // CHECK-SAME:     device(%[[CMD_DEVICE]] : !hal.device)
     // CHECK-SAME:     executable(@ex) : !hal.executable
-    //  CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal
-    // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
+    //  CHECK-DAG: %[[FUNCTION_0:.+]] = hal.executable.lookup.function
+    // CHECK-SAME:     target(%[[EXECUTABLE_0]] : !hal.executable)
+    // CHECK-SAME:     function(@ex::@aarch64::@dispatch) : i64
 
     // Inlined workgroup count calculation:
     // CHECK: %[[X:.+]] = affine.apply #{{.*}}[%c1]
 
     // Dispatch:
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
-    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[FUNCTION_0]]]
     // CHECK-SAME: workgroups([%[[X]], %c1, %c1])
     // CHECK-SAME: constants([%c4_i32, %c5_i32])
     // CHECK-SAME: bindings([
@@ -339,9 +340,10 @@ util.func public @cmdDispatch(%arg_resource: !stream.resource<external>) -> !str
 
     // Other variant, when selected:
     // CHECK: case 1 {
-    // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@x86_64::@dispatch)
+    // CHECK-DAG: %[[FUNCTION_1:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: function(@ex::@x86_64::@dispatch) : i64
     // CHECK: hal.command_buffer.dispatch<%[[CMD]]
-    // CHECK-SAME: target({{.+}})[%[[ORDINAL_1]]]
+    // CHECK-SAME: target({{.+}})[%[[FUNCTION_1]]]
     stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %constant_capture[%c0 for %c128] : !stream.resource<constant>{%constant_size},
       wo %arg_capture[%c0 for %c128] : !stream.resource<external>{%arg_size}
@@ -407,29 +409,32 @@ util.func public @cmdDispatchFallback(%workload: index, %arg_resource: !stream.r
   %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg_resource as %arg_capture: !stream.resource<external>{%arg_size}) {
     // Try @export0:
     // CHECK: %[[EXPORT0_COND:.+]] = arith.cmpi eq, %[[WORKLOAD]], %c0
-    // CHECK: %[[ORDINAL_COUNT:.+]]:4 = scf.if %[[EXPORT0_COND]]
-    // CHECK-DAG: %[[EXPORT0_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export0)
-    // CHECK-DAG: %[[EXPORT0_YZ:.+]] = arith.constant 100
-    // CHECK-NEXT: scf.yield %[[EXPORT0_ORDINAL]], %[[WORKLOAD]], %[[EXPORT0_YZ]], %[[EXPORT0_YZ]]
+    // CHECK: %[[FUNCTION_COUNT:.+]]:4 = scf.if %[[EXPORT0_COND]] -> (i64, index, index, index)
+    // CHECK: %[[EXPORT0_FUNCTION:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: function(@executable::@variant::@export0) : i64
+    // CHECK: %[[EXPORT0_YZ:.+]] = arith.constant 100
+    // CHECK-NEXT: scf.yield %[[EXPORT0_FUNCTION]], %[[WORKLOAD]], %[[EXPORT0_YZ]], %[[EXPORT0_YZ]]
     // CHECK-NEXT: } else {
 
     // Fallback and try @export1:
     // CHECK: %[[EXPORT1_COND:.+]] = arith.cmpi eq, %[[WORKLOAD]], %c1
-    // CHECK: %[[ORDINAL_COUNT12:.+]]:4 = scf.if %[[EXPORT1_COND]]
-    // CHECK-DAG: %[[EXPORT1_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export1)
-    // CHECK-DAG: %[[EXPORT1_YZ:.+]] = arith.constant 101
-    // CHECK-NEXT: scf.yield %[[EXPORT1_ORDINAL]], %[[WORKLOAD]], %[[EXPORT1_YZ]], %[[EXPORT1_YZ]]
+    // CHECK: %[[FUNCTION_COUNT12:.+]]:4 = scf.if %[[EXPORT1_COND]] -> (i64, index, index, index)
+    // CHECK: %[[EXPORT1_FUNCTION:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: function(@executable::@variant::@export1) : i64
+    // CHECK: %[[EXPORT1_YZ:.+]] = arith.constant 101
+    // CHECK-NEXT: scf.yield %[[EXPORT1_FUNCTION]], %[[WORKLOAD]], %[[EXPORT1_YZ]], %[[EXPORT1_YZ]]
     // CHECK-NEXT: } else {
 
     // Finally fallback to @export2 unconditionally:
-    // CHECK-DAG: %[[EXPORT2_ORDINAL:.+]] = hal.executable.export.ordinal target(@executable::@variant::@export2)
-    // CHECK-DAG: %[[EXPORT2_YZ:.+]] = arith.constant 102
-    // CHECK-NEXT: scf.yield %[[EXPORT2_ORDINAL]], %[[WORKLOAD]], %[[EXPORT2_YZ]], %[[EXPORT2_YZ]]
+    // CHECK: %[[EXPORT2_FUNCTION:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: function(@executable::@variant::@export2) : i64
+    // CHECK: %[[EXPORT2_YZ:.+]] = arith.constant 102
+    // CHECK-NEXT: scf.yield %[[EXPORT2_FUNCTION]], %[[WORKLOAD]], %[[EXPORT2_YZ]], %[[EXPORT2_YZ]]
 
-    // CHECK: scf.yield %[[ORDINAL_COUNT12]]#0, %[[ORDINAL_COUNT12]]#1, %[[ORDINAL_COUNT12]]#2, %[[ORDINAL_COUNT12]]#3
+    // CHECK: scf.yield %[[FUNCTION_COUNT12]]#0, %[[FUNCTION_COUNT12]]#1, %[[FUNCTION_COUNT12]]#2, %[[FUNCTION_COUNT12]]#3
 
-    // CHECK: hal.command_buffer.dispatch{{.+}}[%[[ORDINAL_COUNT]]#0]
-    // CHECK-SAME: workgroups([%[[ORDINAL_COUNT]]#1, %[[ORDINAL_COUNT]]#2, %[[ORDINAL_COUNT]]#3])
+    // CHECK: hal.command_buffer.dispatch{{.+}}[%[[FUNCTION_COUNT]]#0]
+    // CHECK-SAME: workgroups([%[[FUNCTION_COUNT]]#1, %[[FUNCTION_COUNT]]#2, %[[FUNCTION_COUNT]]#3])
     stream.cmd.dispatch @executable::@variant::@export0[%workload] {
       wo %arg_capture[%c0 for %arg_size] : !stream.resource<external>{%arg_size}
     }
