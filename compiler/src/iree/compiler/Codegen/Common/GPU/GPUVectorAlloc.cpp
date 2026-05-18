@@ -87,6 +87,30 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
       .getResult();
 }
 
+static void insertWorkgroupBarrierAtBlockStart(OpBuilder &builder,
+                                               Operation *op) {
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(op->getBlock());
+  gpu::BarrierOp::create(builder, op->getLoc(), gpu::AddressSpace::Workgroup);
+}
+
+static LogicalResult
+validateSharedMemoryConversionAttrs(FunctionOpInterface funcOp) {
+  WalkResult result = funcOp.walk([&](IREE::VectorExt::ToLayoutOp op) {
+    Attribute attr = op->getAttr("shared_memory_conversion");
+    if (!attr) {
+      return WalkResult::advance();
+    }
+    if (llvm::isa<IREE::GPU::PromotionAttr>(attr)) {
+      return WalkResult::advance();
+    }
+    op.emitOpError("shared_memory_conversion attribute must implement "
+                   "IREE::GPU::PromotionAttr");
+    return WalkResult::interrupt();
+  });
+  return failure(result.wasInterrupted());
+}
+
 /// Materialize shared memory roundtrip to resolve layout differences. Clears
 /// the shared_memory_conversion attribute after materialization.
 static LogicalResult
@@ -113,8 +137,7 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
     // Synchronize before the write to shared memory to avoid stepping over
     // reads in the previous iteration of a loop. We set this barrier
     // at the start of this block.
-    builder.setInsertionPointToStart(op->getBlock());
-    gpu::BarrierOp::create(builder, op->getLoc(), gpu::AddressSpace::Workgroup);
+    insertWorkgroupBarrierAtBlockStart(builder, op);
 
     builder.setInsertionPoint(op);
     OpOperand &operand = op.getInputMutable();
@@ -235,6 +258,11 @@ materializeSharedMemoryPromotions(FunctionOpInterface funcOp,
     Operation *op = candidate.op;
     builder.setInsertionPointAfter(op);
 
+    // Synchronize before the write to shared memory to avoid stepping over
+    // reads in the previous iteration of a loop. We set this barrier at the
+    // start of this block.
+    insertWorkgroupBarrierAtBlockStart(builder, op);
+
     auto toLayout = IREE::VectorExt::ToLayoutOp::create(builder, op->getLoc(),
                                                         vector, *readLayout);
 
@@ -271,10 +299,14 @@ struct GPUVectorAllocPass final
 
     // Run the promotion propagation to propagate promotion information from
     // compute ops up to the ops accessing memory.
+    if (failed(validateSharedMemoryConversionAttrs(funcOp))) {
+      return signalPassFailure();
+    }
     PromotionTypeMap promotionTypes = analyzePromotionTypes(funcOp);
 
-    // Remove the existing promotion information. All those operations will have
-    // their promotion materialized based on the analysis above.
+    // Remove the existing promotion information. The direct operand promotion
+    // path uses the analysis result above; newly detected layout conflicts
+    // below will get fresh markers.
     funcOp.walk([](IREE::VectorExt::ToLayoutOp op) {
       op.removeSharedMemoryConversionAttr();
     });
