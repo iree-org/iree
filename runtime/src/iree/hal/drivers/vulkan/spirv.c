@@ -21,9 +21,11 @@ enum {
   IREE_HAL_VULKAN_SPIRV_OP_DECORATE = 71u,
   IREE_HAL_VULKAN_SPIRV_OP_MEMBER_DECORATE = 72u,
   IREE_HAL_VULKAN_SPIRV_OP_MODULE_PROCESSED = 330u,
+  IREE_HAL_VULKAN_SPIRV_CAPABILITY_VULKAN_MEMORY_MODEL = 5345u,
   IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES = 5347u,
   IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 = 5348u,
   IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450 = 1u,
+  IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_VULKAN = 3u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODEL_GL_COMPUTE = 5u,
   IREE_HAL_VULKAN_SPIRV_EXECUTION_MODE_LOCAL_SIZE = 17u,
   IREE_HAL_VULKAN_SPIRV_STORAGE_CLASS_UNIFORM_CONSTANT = 0u,
@@ -163,6 +165,23 @@ static bool iree_hal_vulkan_spirv_storage_class_is_descriptor_backed(
       return true;
     default:
       return false;
+  }
+}
+
+static iree_hal_vulkan_spirv_bda_memory_model_t
+iree_hal_vulkan_spirv_bda_memory_model(uint32_t addressing_model,
+                                       uint32_t memory_model) {
+  if (addressing_model !=
+      IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64) {
+    return IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE;
+  }
+  switch (memory_model) {
+    case IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450:
+      return IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450;
+    case IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_VULKAN:
+      return IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_VULKAN;
+    default:
+      return IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE;
   }
 }
 
@@ -392,10 +411,8 @@ static iree_status_t iree_hal_vulkan_spirv_scan_module(
               IREE_STATUS_INVALID_ARGUMENT,
               "SPIR-V OpMemoryModel instruction is truncated");
         }
-        state->analysis->uses_physical_storage_buffer64_glsl450 =
-            operands[0] ==
-                IREE_HAL_VULKAN_SPIRV_ADDRESSING_MODEL_PHYSICAL_STORAGE_BUFFER64 &&
-            operands[1] == IREE_HAL_VULKAN_SPIRV_MEMORY_MODEL_GLSL450;
+        state->analysis->bda_memory_model =
+            iree_hal_vulkan_spirv_bda_memory_model(operands[0], operands[1]);
         break;
       case IREE_HAL_VULKAN_SPIRV_OP_CAPABILITY:
         if (word_count != 2) {
@@ -403,10 +420,17 @@ static iree_status_t iree_hal_vulkan_spirv_scan_module(
               IREE_STATUS_INVALID_ARGUMENT,
               "SPIR-V OpCapability instruction is malformed");
         }
-        if (operands[0] ==
-            IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES) {
-          state->analysis->has_physical_storage_buffer_addresses_capability =
-              true;
+        switch (operands[0]) {
+          case IREE_HAL_VULKAN_SPIRV_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES:
+            state->analysis->capabilities |=
+                IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES;
+            break;
+          case IREE_HAL_VULKAN_SPIRV_CAPABILITY_VULKAN_MEMORY_MODEL:
+            state->analysis->capabilities |=
+                IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_VULKAN_MEMORY_MODEL;
+            break;
+          default:
+            break;
         }
         break;
       case IREE_HAL_VULKAN_SPIRV_OP_DECORATE:
@@ -980,17 +1004,38 @@ iree_status_t iree_hal_vulkan_spirv_verify_bda_module_analysis(
         verification_flags);
   }
 
-  if (!analysis->has_physical_storage_buffer_addresses_capability) {
+  if (!iree_all_bits_set(
+          analysis->capabilities,
+          IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES)) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "Vulkan BDA executable must declare PhysicalStorageBufferAddresses");
   }
 
-  if (!analysis->uses_physical_storage_buffer64_glsl450) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan BDA executable must use PhysicalStorageBuffer64 GLSL450");
+  switch (analysis->bda_memory_model) {
+    case IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450:
+      break;
+    case IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_VULKAN:
+      if (!iree_all_bits_set(
+              analysis->capabilities,
+              IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_VULKAN_MEMORY_MODEL)) {
+        return iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "Vulkan BDA executable using Vulkan memory model must declare "
+            "VulkanMemoryModel");
+      }
+      break;
+    case IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE:
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "Vulkan BDA executable must use PhysicalStorageBuffer64 with "
+          "GLSL450 or Vulkan memory model");
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported Vulkan BDA memory model: %u",
+                              (uint32_t)analysis->bda_memory_model);
   }
+
   if (analysis->has_descriptor_binding_decorations) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,

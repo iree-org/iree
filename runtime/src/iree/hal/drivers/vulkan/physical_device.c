@@ -128,6 +128,18 @@ iree_hal_vulkan_available_device_extensions_from_list(
     available_extensions |=
         IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR;
   }
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX;
+  }
+  if (iree_hal_vulkan_extension_list_contains(
+          extension_count, extensions,
+          IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME)) {
+    available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16;
+  }
   return available_extensions;
 }
 
@@ -153,15 +165,6 @@ static iree_status_t iree_hal_vulkan_query_calibrated_timestamp_time_domains(
     iree_hal_vulkan_time_domain_flags_t* out_time_domains) {
   *out_time_domains = IREE_HAL_VULKAN_TIME_DOMAIN_NONE;
 
-#if !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-  if (!instance->syms.vkGetPhysicalDeviceCalibrateableTimeDomainsEXT) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "Vulkan calibrated timestamp extension is advertised but "
-        "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT is not loaded");
-  }
-#endif  // !IREE_HAL_VULKAN_LIBVULKAN_STATIC
-
   uint32_t time_domain_count = 0;
   IREE_RETURN_IF_ERROR(iree_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(
       IREE_VULKAN_INSTANCE(&instance->syms), handle, &time_domain_count,
@@ -185,6 +188,78 @@ static iree_status_t iree_hal_vulkan_query_calibrated_timestamp_time_domains(
   }
   iree_allocator_free(host_allocator, time_domains);
   return status;
+}
+
+static iree_status_t iree_hal_vulkan_query_cooperative_matrix(
+    const iree_hal_vulkan_instance_t* instance, VkPhysicalDevice handle,
+    iree_allocator_t host_allocator,
+    iree_hal_vulkan_physical_device_snapshot_t* snapshot) {
+  snapshot->cooperative_matrix_features =
+      (VkPhysicalDeviceCooperativeMatrixFeaturesKHR){
+          .sType =
+              VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR,
+      };
+  VkPhysicalDeviceFeatures2 features2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+      .pNext = &snapshot->cooperative_matrix_features,
+  };
+  iree_vkGetPhysicalDeviceFeatures2(IREE_VULKAN_INSTANCE(&instance->syms),
+                                    handle, &features2);
+
+  snapshot->cooperative_matrix_properties =
+      (VkPhysicalDeviceCooperativeMatrixPropertiesKHR){
+          .sType =
+              VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
+      };
+  VkPhysicalDeviceProperties2 properties2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+      .pNext = &snapshot->cooperative_matrix_properties,
+  };
+  iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
+                                      handle, &properties2);
+
+  uint32_t property_count = 0;
+  IREE_RETURN_IF_ERROR(iree_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+      IREE_VULKAN_INSTANCE(&instance->syms), handle, &property_count,
+      /*pProperties=*/NULL));
+  if (!property_count) return iree_ok_status();
+
+  VkCooperativeMatrixPropertiesKHR* properties = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc_array(host_allocator, property_count,
+                                  sizeof(*properties), (void**)&properties));
+  for (uint32_t i = 0; i < property_count; ++i) {
+    properties[i] = (VkCooperativeMatrixPropertiesKHR){
+        .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
+    };
+  }
+
+  iree_status_t status = iree_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+      IREE_VULKAN_INSTANCE(&instance->syms), handle, &property_count,
+      properties);
+  if (iree_status_is_ok(status)) {
+    snapshot->cooperative_matrix_property_count = property_count;
+    snapshot->cooperative_matrix_property_rows = properties;
+  } else {
+    iree_allocator_free(host_allocator, properties);
+  }
+  return status;
+}
+
+static void iree_hal_vulkan_query_shader_bfloat16_features(
+    const iree_hal_vulkan_instance_t* instance, VkPhysicalDevice handle,
+    iree_hal_vulkan_physical_device_snapshot_t* snapshot) {
+  snapshot->shader_bfloat16_features =
+      (VkPhysicalDeviceShaderBfloat16FeaturesKHR){
+          .sType =
+              VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR,
+      };
+  VkPhysicalDeviceFeatures2 features2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+      .pNext = &snapshot->shader_bfloat16_features,
+  };
+  iree_vkGetPhysicalDeviceFeatures2(IREE_VULKAN_INSTANCE(&instance->syms),
+                                    handle, &features2);
 }
 
 static bool iree_hal_vulkan_layer_list_contains(uint32_t layer_count,
@@ -317,8 +392,8 @@ iree_status_t iree_hal_vulkan_instance_initialize(
     instance_flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
   }
   if (iree_status_is_ok(status) &&
-      iree_any_bit_set(options->requested_features,
-                       IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS)) {
+      iree_any_bit_set(options->request_flags,
+                       IREE_HAL_VULKAN_REQUEST_FLAG_DEBUG_UTILS)) {
     if (iree_hal_vulkan_extension_list_contains(
             available_extension_count, available_extensions,
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME)) {
@@ -331,8 +406,8 @@ iree_status_t iree_hal_vulkan_instance_initialize(
     }
   }
   if (iree_status_is_ok(status) &&
-      iree_any_bit_set(options->requested_features,
-                       IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS)) {
+      iree_any_bit_set(options->request_flags,
+                       IREE_HAL_VULKAN_REQUEST_FLAG_VALIDATION_LAYERS)) {
     if (iree_hal_vulkan_layer_list_contains(available_layer_count,
                                             available_layers,
                                             "VK_LAYER_KHRONOS_validation")) {
@@ -448,9 +523,13 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
       .pNext = &out_snapshot->features13,
   };
+  out_snapshot->features11 = (VkPhysicalDeviceVulkan11Features){
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+      .pNext = &out_snapshot->features12,
+  };
   out_snapshot->features2 = (VkPhysicalDeviceFeatures2){
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &out_snapshot->features12,
+      .pNext = &out_snapshot->features11,
   };
   iree_vkGetPhysicalDeviceFeatures2(IREE_VULKAN_INSTANCE(&instance->syms),
                                     handle, &out_snapshot->features2);
@@ -545,8 +624,23 @@ iree_status_t iree_hal_vulkan_physical_device_snapshot_initialize(
     iree_vkGetPhysicalDeviceProperties2(IREE_VULKAN_INSTANCE(&instance->syms),
                                         handle, &properties2);
   }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_physical_device_has_extension(
+          out_snapshot,
+          IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX)) {
+    status = iree_hal_vulkan_query_cooperative_matrix(
+        instance, handle, host_allocator, out_snapshot);
+  }
+  if (iree_status_is_ok(status) &&
+      iree_hal_vulkan_physical_device_has_extension(
+          out_snapshot, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16)) {
+    iree_hal_vulkan_query_shader_bfloat16_features(instance, handle,
+                                                   out_snapshot);
+  }
 
   if (!iree_status_is_ok(status)) {
+    iree_allocator_free(host_allocator,
+                        out_snapshot->cooperative_matrix_property_rows);
     iree_allocator_free(host_allocator, out_snapshot->extensions);
     iree_allocator_free(host_allocator, out_snapshot->queue_families);
     memset(out_snapshot, 0, sizeof(*out_snapshot));
@@ -560,6 +654,8 @@ void iree_hal_vulkan_physical_device_snapshot_deinitialize(
     iree_allocator_t host_allocator,
     iree_hal_vulkan_physical_device_snapshot_t* snapshot) {
   IREE_ASSERT_ARGUMENT(snapshot);
+  iree_allocator_free(host_allocator,
+                      snapshot->cooperative_matrix_property_rows);
   iree_allocator_free(host_allocator, snapshot->extensions);
   iree_allocator_free(host_allocator, snapshot->queue_families);
   memset(snapshot, 0, sizeof(*snapshot));
@@ -932,18 +1028,40 @@ iree_status_t iree_hal_vulkan_dump_physical_device_info(
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder,
         "features: bufferDeviceAddress=%s timelineSemaphore=%s "
-        "scalarBlockLayout=%s synchronization2=%s shaderInt8=%s "
-        "shaderFloat16=%s shaderIntegerDotProduct=%s "
-        "subgroupSizeControl=%s\n",
+        "scalarBlockLayout=%s synchronization2=%s storageBuffer8BitAccess=%s "
+        "storageBuffer16BitAccess=%s shaderInt8=%s shaderFloat16=%s "
+        "shaderBFloat16Type=%s shaderBFloat16DotProduct=%s "
+        "shaderBFloat16CooperativeMatrix=%s shaderIntegerDotProduct=%s "
+        "subgroupSizeControl=%s "
+        "cooperativeMatrix=%s\n",
         iree_hal_vulkan_bool_string(snapshot.features12.bufferDeviceAddress),
         iree_hal_vulkan_bool_string(snapshot.features12.timelineSemaphore),
         iree_hal_vulkan_bool_string(snapshot.features12.scalarBlockLayout),
         iree_hal_vulkan_bool_string(snapshot.features13.synchronization2),
+        iree_hal_vulkan_bool_string(
+            snapshot.features12.storageBuffer8BitAccess),
+        iree_hal_vulkan_bool_string(
+            snapshot.features11.storageBuffer16BitAccess),
         iree_hal_vulkan_bool_string(snapshot.features12.shaderInt8),
         iree_hal_vulkan_bool_string(snapshot.features12.shaderFloat16),
         iree_hal_vulkan_bool_string(
+            snapshot.shader_bfloat16_features.shaderBFloat16Type),
+        iree_hal_vulkan_bool_string(
+            snapshot.shader_bfloat16_features.shaderBFloat16DotProduct),
+        iree_hal_vulkan_bool_string(
+            snapshot.shader_bfloat16_features.shaderBFloat16CooperativeMatrix),
+        iree_hal_vulkan_bool_string(
             snapshot.features13.shaderIntegerDotProduct),
-        iree_hal_vulkan_bool_string(snapshot.features13.subgroupSizeControl)));
+        iree_hal_vulkan_bool_string(snapshot.features13.subgroupSizeControl),
+        iree_hal_vulkan_bool_string(
+            snapshot.cooperative_matrix_features.cooperativeMatrix)));
+    if (snapshot.cooperative_matrix_features.cooperativeMatrix) {
+      IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
+          builder, "cooperative_matrix: stages=0x%08x property_rows=%u\n",
+          snapshot.cooperative_matrix_properties
+              .cooperativeMatrixSupportedStages,
+          snapshot.cooperative_matrix_property_count));
+    }
     IREE_HAL_VULKAN_APPEND(iree_string_builder_append_format(
         builder, "sparse: binding=%s residencyBuffer=%s residencyAliased=%s\n",
         iree_hal_vulkan_bool_string(snapshot.features2.features.sparseBinding),

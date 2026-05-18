@@ -27,8 +27,12 @@ iree_cc_library(
   HDRS
     "api.h"
     "command_buffer.h"
+    "debug_utils.h"
+    "device_options.h"
+    "device_plan.h"
     "executable.h"
     "physical_device.h"
+    "physical_device_selection.h"
     "spirv.h"
   DEPS
     ::api
@@ -37,6 +41,84 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::vulkan::util::libvulkan
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    api_test
+  SRCS
+    "api_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    Vulkan::Headers
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    command_buffer_test
+  SRCS
+    "command_buffer_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::base::internal::arena
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    debug_utils_test
+  SRCS
+    "debug_utils_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    device_options_test
+  SRCS
+    "device_options_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    device_plan_test
+  SRCS
+    "device_plan_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
 )
 
 iree_cc_test(
@@ -53,6 +135,21 @@ iree_cc_test(
     iree::hal
     iree::hal::utils::executable_header
     iree::schemas::vulkan_executable_def_c_fbs
+    iree::testing::gtest
+    iree::testing::gtest_main
+  GROUP
+    "iree-hal-drivers-vulkan-tests"
+)
+
+iree_cc_test(
+  NAME
+    physical_device_selection_test
+  SRCS
+    "physical_device_selection_test.cc"
+  DEPS
+    ::headers
+    ::vulkan
+    iree::base
     iree::testing::gtest
     iree::testing::gtest_main
   GROUP
@@ -87,6 +184,12 @@ iree_cc_library(
     "builtins.h"
     "command_buffer.c"
     "command_buffer.h"
+    "debug_utils.c"
+    "debug_utils.h"
+    "device_options.c"
+    "device_options.h"
+    "device_plan.c"
+    "device_plan.h"
     "driver.c"
     "driver.h"
     "executable.c"
@@ -97,6 +200,8 @@ iree_cc_library(
     "logical_device.h"
     "physical_device.c"
     "physical_device.h"
+    "physical_device_selection.c"
+    "physical_device_selection.h"
     "queue.c"
     "queue.h"
     "semaphore.c"

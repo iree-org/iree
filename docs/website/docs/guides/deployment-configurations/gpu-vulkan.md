@@ -29,16 +29,51 @@ Qualcomm Adreno GPU | Mobile | Reasonable | 640+
 AMD GPU | Desktop/server | Good | RDNA+
 NVIDIA GPU | Desktop/server | Reasonable | Turing+
 
+## :octicons-cpu-16: Device compatibility
+
+IREE's Vulkan HAL targets modern compute-capable Vulkan implementations. The
+runtime baseline is Vulkan 1.3 with a compute queue and the
+`timelineSemaphore`, `scalarBlockLayout`, and `synchronization2` device
+features. Devices missing that baseline still appear in device dumps, but are
+reported below the supported feature tier and are not selected for execution.
+
+Descriptor-set dispatch is the portable baseline executable ABI. Buffer device
+address (BDA) dispatch is an optional faster ABI used when the device exposes
+`bufferDeviceAddress` and the program was compiled with BDA support. The
+runtime default accepts all supported executable ABI variants and prefers BDA
+when available; descriptor executables remain the fallback for devices without
+BDA.
+
+Other Vulkan features are enabled opportunistically when the implementation
+reports them:
+
+* `VK_KHR_push_descriptor` reduces descriptor allocation and update overhead.
+* `VK_EXT_calibrated_timestamps` enables device-side queue and dispatch timing
+  in IREE HAL profile captures.
+* External memory extensions enable native interop and file/staging strategies
+  when the platform and driver expose compatible handle types.
+* Sparse binding and residency features are used only when explicitly requested
+  and supported by an appropriate queue family.
+* Validation layers, debug utils, robust buffer access, object names, and
+  command labels are debug/profiling features rather than execution
+  requirements.
+
+Use `iree-run-module --dump_devices` to inspect the exact Vulkan API version,
+feature tier, device features, queues, and enabled extension opportunities for a
+machine. A supported device reports `feature_tier[vulkan-1.3]: supported`.
+
 ## :octicons-download-16: Prerequisites
 
 In order to use Vulkan to drive the GPU, you need to have a functional Vulkan
-environment. IREE requires Vulkan 1.1 on Android and 1.2 elsewhere. It can be
-verified by the following steps:
+environment. IREE requires a device satisfying the Vulkan 1.3 baseline above.
+It can be verified by the following steps:
 
 === "Android"
 
-    Android mandates Vulkan 1.1 support since Android 10. You just need to
-    make sure the device's Android version is 10 or higher.
+    Android version alone is not enough to determine IREE compatibility. Run
+    `vulkaninfo` or `iree-run-module --dump_devices` on the device and verify
+    that the selected physical device reports Vulkan 1.3 and the required
+    baseline features.
 
 === ":fontawesome-brands-linux: Linux"
 
@@ -53,7 +88,7 @@ verified by the following steps:
     repository is recommended, as it places Vulkan libraries and tools under
     system paths so it's easy to discover.
 
-    If the listed version is lower than Vulkan 1.2, you will need to update the
+    If the listed version is lower than Vulkan 1.3, you will need to update the
     driver for your GPU.
 
 === ":fontawesome-brands-windows: Windows"
@@ -67,7 +102,7 @@ verified by the following steps:
     If `vulkaninfo` does not exist, you will need to [install the latest Vulkan
     SDK](https://vulkan.lunarg.com/sdk/home/).
 
-    If the listed version is lower than Vulkan 1.2, you will need to update the
+    If the listed version is lower than Vulkan 1.3, you will need to update the
     driver for your GPU.
 
 ### Get the IREE compiler
@@ -158,14 +193,26 @@ With the requirements out of the way, we can now compile a model and run it.
 
 Then run the following command to compile with the `vulkan` target device:
 
-``` shell hl_lines="2 3"
+``` shell hl_lines="2 3 4"
 iree-compile \
     --iree-hal-target-device=vulkan \
+    --iree-vulkan-dispatch-abi=all \
     --iree-vulkan-target=<...> \
     mobilenetv2.mlir -o mobilenet_vulkan.vmfb
 ```
 
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-optimization-options.md"
+
+`--iree-vulkan-dispatch-abi` controls which Vulkan executable ABI variants are
+emitted:
+
+* `descriptors` emits the portable descriptor-set ABI.
+* `bda` emits only the BDA root binding table ABI.
+* `all` emits all supported ABI variants in runtime preference order.
+
+Use `all` when producing a program intended to run across multiple Vulkan
+devices. Use `bda` only when the deployment fleet is known to support
+`bufferDeviceAddress`.
 
 #### Choosing Vulkan targets
 

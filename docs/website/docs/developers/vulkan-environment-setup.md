@@ -103,9 +103,12 @@ function together.
 
 ### Android
 
-Please make sure your Android device is Vulkan capable. Vulkan is supported on
-Android since 7, but we track newer Android versions (10+) closely and haven't
-set a clear min version yet.
+Please make sure your Android device is Vulkan capable and exposes the features
+required by the IREE Vulkan HAL. IREE's current runtime baseline is Vulkan 1.3
+with compute queues, timeline semaphores, scalar block layout, and
+synchronization2. Android version alone is not enough to determine
+compatibility; use `vulkaninfo` or `iree-run-module --dump_devices` on the
+device to inspect the selected physical device.
 
 ## Multiple Vulkan SDKs
 

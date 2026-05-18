@@ -94,6 +94,12 @@ IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(
          VkTimeDomainEXT* pTimeDomains),
     ARGS(physicalDevice, pTimeDomainCount, pTimeDomains))
 
+IREE_HAL_VULKAN_INSTANCE_OPTIONAL_PFN(
+    VkResult, vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR,
+    DECL(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+         VkCooperativeMatrixPropertiesKHR* pProperties),
+    ARGS(physicalDevice, pPropertyCount, pProperties))
+
 // Device-level entry points.
 
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkDestroyDevice,
@@ -106,6 +112,11 @@ IREE_HAL_VULKAN_DEVICE_PFN(void, vkGetDeviceQueue2,
                                 const VkDeviceQueueInfo2* pQueueInfo,
                                 VkQueue* pQueue),
                            ARGS(device, pQueueInfo, pQueue))
+
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
+    VkResult, vkSetDebugUtilsObjectNameEXT,
+    DECL(VkDevice device, const VkDebugUtilsObjectNameInfoEXT* pNameInfo),
+    ARGS(device, pNameInfo))
 
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkCreateBuffer,
                            DECL(VkDevice device,
@@ -236,6 +247,20 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkBeginCommandBuffer,
 IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkEndCommandBuffer,
                            DECL(VkCommandBuffer commandBuffer),
                            ARGS(commandBuffer))
+
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
+    void, vkCmdBeginDebugUtilsLabelEXT,
+    DECL(VkCommandBuffer commandBuffer, const VkDebugUtilsLabelEXT* pLabelInfo),
+    ARGS(commandBuffer, pLabelInfo))
+
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(void, vkCmdEndDebugUtilsLabelEXT,
+                                    DECL(VkCommandBuffer commandBuffer),
+                                    ARGS(commandBuffer))
+
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
+    void, vkCmdInsertDebugUtilsLabelEXT,
+    DECL(VkCommandBuffer commandBuffer, const VkDebugUtilsLabelEXT* pLabelInfo),
+    ARGS(commandBuffer, pLabelInfo))
 
 IREE_HAL_VULKAN_DEVICE_PFN(void, vkCmdResetQueryPool,
                            DECL(VkCommandBuffer commandBuffer,

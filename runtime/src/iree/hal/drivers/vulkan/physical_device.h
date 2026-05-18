@@ -20,6 +20,23 @@
   VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
 #endif  // !VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
 
+#if !defined(VK_KHR_shader_bfloat16)
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR \
+  ((VkStructureType)1000141000)
+typedef struct VkPhysicalDeviceShaderBfloat16FeaturesKHR {
+  // Structure type tag.
+  VkStructureType sType;
+  // Next structure in a Vulkan pNext chain.
+  void* pNext;
+  // Non-zero when BFloat16TypeKHR is available.
+  VkBool32 shaderBFloat16Type;
+  // Non-zero when BFloat16DotProductKHR is available.
+  VkBool32 shaderBFloat16DotProduct;
+  // Non-zero when BFloat16CooperativeMatrixKHR is available.
+  VkBool32 shaderBFloat16CooperativeMatrix;
+} VkPhysicalDeviceShaderBfloat16FeaturesKHR;
+#endif  // !VK_KHR_shader_bfloat16
+
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
@@ -100,6 +117,21 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
   // VK_KHR_push_descriptor properties, if the extension is available.
   VkPhysicalDevicePushDescriptorPropertiesKHR push_descriptor_properties;
 
+  // VK_KHR_cooperative_matrix feature bits, if the extension is available.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR cooperative_matrix_features;
+
+  // VK_KHR_cooperative_matrix stage properties, if the extension is available.
+  VkPhysicalDeviceCooperativeMatrixPropertiesKHR cooperative_matrix_properties;
+
+  // VK_KHR_cooperative_matrix property row count.
+  uint32_t cooperative_matrix_property_count;
+
+  // VK_KHR_cooperative_matrix property rows, if the extension is available.
+  VkCooperativeMatrixPropertiesKHR* cooperative_matrix_property_rows;
+
+  // VK_KHR_shader_bfloat16 feature bits, if the extension is available.
+  VkPhysicalDeviceShaderBfloat16FeaturesKHR shader_bfloat16_features;
+
   // Stable identity properties.
   VkPhysicalDeviceIDProperties id_properties;
 
@@ -115,6 +147,9 @@ typedef struct iree_hal_vulkan_physical_device_snapshot_t {
 
   // Base and extended feature set.
   VkPhysicalDeviceFeatures2 features2;
+
+  // Vulkan 1.1 feature set.
+  VkPhysicalDeviceVulkan11Features features11;
 
   // Vulkan 1.2 feature set.
   VkPhysicalDeviceVulkan12Features features12;
@@ -160,7 +195,7 @@ void iree_hal_vulkan_physical_device_snapshot_deinitialize(
 bool iree_hal_vulkan_physical_device_has_compute_queue(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot);
 
-// Returns true if |snapshot| satisfies the current Vulkan rewrite baseline.
+// Returns true if |snapshot| satisfies the current Vulkan HAL baseline.
 bool iree_hal_vulkan_physical_device_supports_baseline(
     const iree_hal_vulkan_physical_device_snapshot_t* snapshot);
 

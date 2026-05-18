@@ -25,17 +25,48 @@ static constexpr uint32_t kComputeBdaModule[] = {
     // Declares OpCapability PhysicalStorageBufferAddresses.
     0x00020011u,
     5347u,
-    // OpMemoryModel PhysicalStorageBuffer64 GLSL450
+    // OpMemoryModel PhysicalStorageBuffer64 GLSL450.
     0x0003000eu,
     5348u,
     1u,
-    // OpEntryPoint GLCompute %1 "main"
+    // OpEntryPoint GLCompute %1 "main".
     0x0005000fu,
     5u,
     1u,
     0x6e69616du,
     0u,
-    // OpExecutionMode %1 LocalSize 4 5 6
+    // OpExecutionMode %1 LocalSize 4 5 6.
+    0x00060010u,
+    1u,
+    17u,
+    4u,
+    5u,
+    6u,
+};
+
+static constexpr uint32_t kComputeBdaVulkanMemoryModelModule[] = {
+    0x07230203u,
+    0x00010600u,
+    0u,
+    8u,
+    0u,
+    // Declares OpCapability PhysicalStorageBufferAddresses.
+    0x00020011u,
+    5347u,
+    // Declares OpCapability VulkanMemoryModel.
+    0x00020011u,
+    5345u,
+    // OpMemoryModel PhysicalStorageBuffer64 Vulkan.
+    0x0003000eu,
+    5348u,
+    3u,
+    // OpEntryPoint GLCompute %1 "main".
+    0x0005000fu,
+    5u,
+    1u,
+    0x6e69616du,
+    0u,
+    // OpExecutionMode %1 LocalSize 4 5 6.
     0x00060010u,
     1u,
     17u,
@@ -101,7 +132,8 @@ TEST(SpirvTest, ParsesComputeEntryPoint) {
   iree_hal_vulkan_spirv_module_analysis_t analysis = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
-  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450,
+            analysis.bda_memory_model);
   EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
   EXPECT_EQ(1u, analysis.compute_entry_point_count);
   EXPECT_EQ(5u, analysis.compute_entry_point_name_storage_size);
@@ -166,8 +198,11 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
   iree_hal_vulkan_spirv_module_analysis_t analysis = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kMixedFactModule, IREE_ARRAYSIZE(kMixedFactModule), &analysis));
-  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
-  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450,
+            analysis.bda_memory_model);
+  EXPECT_TRUE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES));
   EXPECT_TRUE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(1u, analysis.push_constant_variable_count);
   EXPECT_EQ(2u, analysis.single_push_constant_pointer_type_id);
@@ -177,8 +212,11 @@ TEST(SpirvTest, AnalyzesModuleWideFacts) {
 
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
-  EXPECT_TRUE(analysis.uses_physical_storage_buffer64_glsl450);
-  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_GLSL450,
+            analysis.bda_memory_model);
+  EXPECT_TRUE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES));
   EXPECT_FALSE(analysis.has_descriptor_binding_decorations);
   EXPECT_EQ(0u, analysis.push_constant_variable_count);
   EXPECT_EQ(0u, analysis.single_push_constant_pointer_type_id);
@@ -324,7 +362,7 @@ TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {
       0u,
       8u,
       0u,
-      // OpMemoryModel Logical GLSL450
+      // OpMemoryModel Logical GLSL450.
       0x0003000eu,
       0u,
       1u,
@@ -332,21 +370,94 @@ TEST(SpirvTest, ReportsMissingPhysicalStorageBufferMemoryModel) {
   iree_hal_vulkan_spirv_module_analysis_t analysis = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kLogicalModule, IREE_ARRAYSIZE(kLogicalModule), &analysis));
-  EXPECT_FALSE(analysis.uses_physical_storage_buffer64_glsl450);
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE,
+            analysis.bda_memory_model);
+}
+
+TEST(SpirvTest, AcceptsPhysicalStorageBufferVulkanMemoryModel) {
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kComputeBdaVulkanMemoryModelModule,
+      IREE_ARRAYSIZE(kComputeBdaVulkanMemoryModelModule), &analysis));
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_VULKAN,
+            analysis.bda_memory_model);
+  EXPECT_TRUE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES));
+  EXPECT_TRUE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_VULKAN_MEMORY_MODEL));
+
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_verify_bda_module(
+      kComputeBdaVulkanMemoryModelModule,
+      IREE_ARRAYSIZE(kComputeBdaVulkanMemoryModelModule),
+      IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE));
+}
+
+TEST(SpirvTest, RejectsVulkanMemoryModelWithoutCapability) {
+  static constexpr uint32_t kModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpCapability PhysicalStorageBufferAddresses.
+      0x00020011u,
+      5347u,
+      // OpMemoryModel PhysicalStorageBuffer64 Vulkan.
+      0x0003000eu,
+      5348u,
+      3u,
+  };
+  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
+                        iree_hal_vulkan_spirv_verify_bda_module(
+                            kModule, IREE_ARRAYSIZE(kModule),
+                            IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE));
+}
+
+TEST(SpirvTest, RejectsUnsupportedPhysicalStorageBufferMemoryModel) {
+  static constexpr uint32_t kModule[] = {
+      0x07230203u,
+      0x00010600u,
+      0u,
+      8u,
+      0u,
+      // Declares OpCapability PhysicalStorageBufferAddresses.
+      0x00020011u,
+      5347u,
+      // OpMemoryModel PhysicalStorageBuffer64 OpenCL.
+      0x0003000eu,
+      5348u,
+      2u,
+  };
+  iree_hal_vulkan_spirv_module_analysis_t analysis = {};
+  IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
+      kModule, IREE_ARRAYSIZE(kModule), &analysis));
+  EXPECT_EQ(IREE_HAL_VULKAN_SPIRV_BDA_MEMORY_MODEL_NONE,
+            analysis.bda_memory_model);
+
+  IREE_EXPECT_STATUS_IS(StatusCode::kInvalidArgument,
+                        iree_hal_vulkan_spirv_verify_bda_module(
+                            kModule, IREE_ARRAYSIZE(kModule),
+                            IREE_HAL_VULKAN_SPIRV_BDA_VERIFICATION_FLAG_NONE));
 }
 
 TEST(SpirvTest, DetectsPhysicalStorageBufferAddressesCapability) {
   iree_hal_vulkan_spirv_module_analysis_t analysis = {};
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModule, IREE_ARRAYSIZE(kComputeBdaModule), &analysis));
-  EXPECT_TRUE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_TRUE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES));
 
   IREE_ASSERT_OK(iree_hal_vulkan_spirv_analyze_module(
       kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability,
       IREE_ARRAYSIZE(
           kComputeBdaModuleWithoutPhysicalStorageBufferAddressesCapability),
       &analysis));
-  EXPECT_FALSE(analysis.has_physical_storage_buffer_addresses_capability);
+  EXPECT_FALSE(iree_all_bits_set(
+      analysis.capabilities,
+      IREE_HAL_VULKAN_SPIRV_MODULE_CAPABILITY_PHYSICAL_STORAGE_BUFFER_ADDRESSES));
 }
 
 TEST(SpirvTest, VerifiesBdaModuleAbi) {
