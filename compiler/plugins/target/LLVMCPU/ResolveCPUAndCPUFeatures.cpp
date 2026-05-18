@@ -51,17 +51,14 @@ resolveHostCPUAndCPUFeatures(std::string &cpu, std::string &cpuFeatures) {
 ResolveCPUAndCPUFeaturesStatus
 resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
                          std::string &cpuFeatures) {
-  if (!cpuFeatures.empty()) {
-    // Explicitly specified CPU features: not overriding.
-    return ResolveCPUAndCPUFeaturesStatus::OK;
-  }
   if (cpu.empty() || cpu == "generic" ||
       llvm::StringRef(cpu).starts_with("generic-")) {
     // Implicitly (default) or explicitly specified generic CPU: no features.
     // Logging (on unspecified CPU) was already handled, no need for it here.
     return ResolveCPUAndCPUFeaturesStatus::OK;
   }
-  llvm::SubtargetFeatures targetCpuFeatures(cpuFeatures);
+  llvm::SubtargetFeatures originalCpuFeatures(cpuFeatures);
+  llvm::SubtargetFeatures targetCpuFeatures;
   if (triple.isX86()) {
     if (!llvm::X86::parseArchX86(cpu, /*Only64Bit=*/true)) {
       return ResolveCPUAndCPUFeaturesStatus::UnknownCPU;
@@ -117,6 +114,8 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
   } else {
     return ResolveCPUAndCPUFeaturesStatus::UnimplementedMapping;
   }
+
+  targetCpuFeatures.addFeaturesVector(originalCpuFeatures.getFeatures());
   cpuFeatures = targetCpuFeatures.getString();
   return ResolveCPUAndCPUFeaturesStatus::OK;
 }

@@ -70,6 +70,33 @@
 // CHECK-X86-64-V4-SAME: +sse4.2,
 // CHECK-X86-64-V4-SAME: +ssse3
 
+// Test for appending user-specified features from
+// `iree-llvmcpu-target-cpu-features` after the features resolved from
+// `iree-llvmcpu-target-cpu`.
+//
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN:              --iree-llvmcpu-target-cpu=x86-64-v4 \
+// RUN:              --iree-llvmcpu-target-cpu-features="-avx512f" \
+// RUN: | FileCheck %s --check-prefix=CHECK-X86-64-V4-WITH-USER-FEATURES
+//
+// CHECK-X86-64-V4-WITH-USER-FEATURES: #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64",
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: cpu = "x86-64-v4"
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: cpu_features = "
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx2,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx512bw,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx512cd,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx512dq,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx512f,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +avx512vl,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +fma,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse2,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse3,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse4.1,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse4.2,
+// CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: -avx512f
+
 module {
   util.func public @foo(%arg0: tensor<?xf32>) -> tensor<?xf32> {
     util.return %arg0 : tensor<?xf32>
