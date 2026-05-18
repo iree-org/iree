@@ -12,7 +12,8 @@
 #include "iree/vm/api.h"
 
 #define IREE_HAL_LOADER_MODULE_VERSION_0_0 0x00000000u
-#define IREE_HAL_LOADER_MODULE_VERSION_LATEST IREE_HAL_LOADER_MODULE_VERSION_0_0
+#define IREE_HAL_LOADER_MODULE_VERSION_0_1 0x00000001u
+#define IREE_HAL_LOADER_MODULE_VERSION_LATEST IREE_HAL_LOADER_MODULE_VERSION_0_1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions

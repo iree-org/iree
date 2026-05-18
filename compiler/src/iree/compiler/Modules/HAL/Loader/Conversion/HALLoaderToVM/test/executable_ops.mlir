@@ -1,6 +1,9 @@
 // RUN: iree-opt --iree-vm-target-index-bits=64 --split-input-file \
 // RUN:   --iree-vm-conversion --canonicalize %s | FileCheck %s
 
+// CHECK-DAG: vm.import private @hal_loader.executable.dispatch{{\(.+}}attributes {minimum_version = 1 : i32}
+// CHECK-DAG: vm.import private @hal_loader.executable.lookup.function{{.*}}attributes {minimum_version = 1 : i32, nosideeffects}
+
 // CHECK-LABEL: @executableLoad
 // CHECK-SAME: (%[[EXECUTABLE_DATA:.+]]: !vm.buffer)
 util.func public @executableLoad(%executable_data: !util.buffer) -> !hal.executable {

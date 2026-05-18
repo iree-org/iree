@@ -1,5 +1,9 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32},canonicalize)' %s | FileCheck %s
 
+// CHECK-DAG: vm.import private @hal.command_buffer.dispatch{{\(.+}}attributes {minimum_version = 7 : i32}
+// CHECK-DAG: vm.import private @hal.command_buffer.dispatch.indirect{{\(.+}}attributes {minimum_version = 7 : i32}
+// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {minimum_version = 7 : i32, nosideeffects}
+
 // CHECK-LABEL: @command_buffer_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)
 util.func public @command_buffer_create(%device: !hal.device, %affinity: i64) {

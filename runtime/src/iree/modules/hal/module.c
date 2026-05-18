@@ -44,7 +44,8 @@ iree_hal_module_device_policy_default(void) {
 //===----------------------------------------------------------------------===//
 
 #define IREE_HAL_MODULE_VERSION_0_6 0x00000006u
-#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_6
+#define IREE_HAL_MODULE_VERSION_0_7 0x00000007u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_7
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;

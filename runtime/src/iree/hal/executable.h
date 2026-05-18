@@ -165,8 +165,8 @@ typedef struct iree_hal_executable_function_parameter_t {
 // JIT'ed executables across processes or reuse executables across device
 // instances.
 //
-// Executables provide one or more entry points that can be dispatched via
-// iree_hal_command_buffer_dispatch. Some entry points may represent the same
+// Executables provide one or more functions that can be dispatched via
+// iree_hal_command_buffer_dispatch. Some functions may represent the same
 // computation but specialized in different ways such that the runtime can
 // switch strategies and choose between them per-dispatch.
 //

@@ -36,12 +36,13 @@ vm.import private @executable.dispatch(
   // <buffer, offset, length>
   %bindings : tuple<!vm.buffer, i64, i64>...
 )
+attributes {minimum_version = 1 : i32}
 
 // Looks up an executable function by name and returns a runtime function id.
 vm.import private @executable.lookup.function(
   %executable : !vm.ref<!hal.executable>,
   %function_name : !vm.buffer
 ) -> i64
-attributes {nosideeffects}
+attributes {minimum_version = 1 : i32, nosideeffects}
 
 }  // module

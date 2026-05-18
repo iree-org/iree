@@ -340,6 +340,7 @@ vm.import private @command_buffer.dispatch(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
+attributes {minimum_version = 7 : i32}
 
 // Dispatches an execution request with the dispatch parameters loaded from the
 // given buffer.
@@ -355,6 +356,7 @@ vm.import private @command_buffer.dispatch.indirect(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
+attributes {minimum_version = 7 : i32}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
@@ -544,7 +546,7 @@ vm.import private @executable.lookup.function(
   %executable : !vm.ref<!hal.executable>,
   %function_name : !vm.buffer
 ) -> i64
-attributes {nosideeffects}
+attributes {minimum_version = 7 : i32, nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_fence_t

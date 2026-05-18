@@ -38,7 +38,7 @@ enum iree_hal_profile_statistics_row_type_e {
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_NONE = 0u,
 
   // Device-tick dispatch samples grouped by physical device and
-  // executable/export pair.
+  // executable/function pair.
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT = 1u,
 
   // Device-tick dispatch samples grouped by physical device and command buffer.
@@ -56,7 +56,7 @@ enum iree_hal_profile_statistics_row_type_e {
   // operation type.
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_QUEUE_HOST_OPERATION = 5u,
 
-  // Host execution samples grouped by physical device and executable/export
+  // Host execution samples grouped by physical device and executable/function
   // pair.
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT = 6u,
 
@@ -198,8 +198,8 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_for_each_row(
     const iree_hal_profile_statistics_sink_t* sink,
     iree_hal_profile_statistics_row_callback_t callback);
 
-// Resolves an executable/export key to a borrowed export name when metadata was
-// present in the consumed profile stream.
+// Resolves an executable/function key to a borrowed function name when metadata
+// was present in the consumed profile stream.
 IREE_API_EXPORT bool iree_hal_profile_statistics_sink_find_export_name(
     const iree_hal_profile_statistics_sink_t* sink, uint64_t executable_id,
     uint32_t export_ordinal, iree_string_view_t* out_name);
