@@ -6468,9 +6468,12 @@ that building these components separately you need to make sure they are
 consistent with one another (e.g., using the same version of Vulkan headers) to
 function together.</p>
 <h3 id="android">Android<a class="headerlink" href="#android" title="Permanent link">link</a></h3>
-<p>Please make sure your Android device is Vulkan capable. Vulkan is supported on
-Android since 7, but we track newer Android versions (10+) closely and haven't
-set a clear min version yet.</p>
+<p>Please make sure your Android device is Vulkan capable and exposes the features
+required by the IREE Vulkan HAL. IREE's current runtime baseline is Vulkan 1.3
+with compute queues, timeline semaphores, scalar block layout, and
+synchronization2. Android version alone is not enough to determine
+compatibility; use <code>vulkaninfo</code> or <code>iree-run-module --dump_devices</code> on the
+device to inspect the selected physical device.</p>
 <h2 id="multiple-vulkan-sdks">Multiple Vulkan SDKs<a class="headerlink" href="#multiple-vulkan-sdks" title="Permanent link">link</a></h2>
 <p>If you have multiple versions of Vulkan loaders exist, you may also need to set
 <code>LD_LIBRARY_PATH</code> and <code>LD_PRELOAD</code> to load the desired version of the loader.
