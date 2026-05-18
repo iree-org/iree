@@ -6749,13 +6749,15 @@ building, allowing parallel builds in other shells.</p>
 </ul>
 </li>
 <li><code>IREE_COMPILER_PLUGINS</code>: Select statically linked compiler plugins
-    (configure-time, default: <code>all</code> buildable plugins)<ul>
-<li><code>IREE_COMPILER_PLUGINS=all</code>: Enable every plugin whose prerequisites are
-  available</li>
-<li><code>IREE_COMPILER_PLUGINS=all,-input_torch</code>: Enable all buildable plugins
-  except <code>input_torch</code></li>
+    (configure-time, default: <code>all</code> default buildable plugins)<ul>
+<li><code>IREE_COMPILER_PLUGINS=all</code>: Enable every default plugin whose
+  prerequisites are available</li>
+<li><code>IREE_COMPILER_PLUGINS=all,-input_torch</code>: Enable all default buildable
+  plugins except <code>input_torch</code></li>
 <li><code>IREE_COMPILER_PLUGINS=hal_target_llvm_cpu,input_tosa</code>: Enable only the
   listed plugins</li>
+<li><code>IREE_TARGET_BACKEND_WEBGPU_SPIRV=ON</code>: Include WebGPU SPIR-V/Tint support
+  in <code>all</code></li>
 </ul>
 </li>
 <li><code>VULKAN_SDK</code>: Vulkan SDK root for Bazel repository rules. If unset,
