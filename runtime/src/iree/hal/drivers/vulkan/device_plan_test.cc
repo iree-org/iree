@@ -91,6 +91,21 @@ class PhysicalDeviceSnapshotBuilder {
         VK_SHADER_STAGE_COMPUTE_BIT;
   }
 
+  void EnableShaderBfloat16Extension() {
+    snapshot_.available_extensions |=
+        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16;
+  }
+
+  void EnableShaderBfloat16Features() {
+    EnableShaderBfloat16Extension();
+    snapshot_.shader_bfloat16_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_BFLOAT16_FEATURES_KHR;
+    snapshot_.shader_bfloat16_features.shaderBFloat16Type = VK_TRUE;
+    snapshot_.shader_bfloat16_features.shaderBFloat16DotProduct = VK_TRUE;
+    snapshot_.shader_bfloat16_features.shaderBFloat16CooperativeMatrix =
+        VK_TRUE;
+  }
+
   const iree_hal_vulkan_physical_device_snapshot_t* snapshot() const {
     return &snapshot_;
   }
@@ -360,6 +375,93 @@ TEST(DevicePlanTest, OwnedCreateEnablesCooperativeMatrixWhenAvailable) {
             copied_plan.enabled_features13.pNext);
 }
 
+TEST(DevicePlanTest, OwnedCreateEnablesShaderBfloat16WhenAvailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableShaderBfloat16Features();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+      IREE_HAL_VULKAN_FEATURE_NONE, &plan));
+
+  EXPECT_TRUE(
+      iree_all_bits_set(plan.enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE));
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT));
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX));
+  EXPECT_TRUE(
+      iree_all_bits_set(plan.enabled_extensions,
+                        IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16));
+  EXPECT_TRUE(PlanContainsExtension(
+      plan, IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME));
+  EXPECT_TRUE(plan.enabled_shader_bfloat16_features.shaderBFloat16Type);
+  EXPECT_TRUE(plan.enabled_shader_bfloat16_features.shaderBFloat16DotProduct);
+  EXPECT_TRUE(
+      plan.enabled_shader_bfloat16_features.shaderBFloat16CooperativeMatrix);
+
+  iree_hal_vulkan_device_plan_t copied_plan = plan;
+  VkDeviceCreateInfo create_info;
+  iree_hal_vulkan_device_plan_make_create_info(&copied_plan, &create_info);
+
+  EXPECT_EQ(&copied_plan.enabled_features2, create_info.pNext);
+  EXPECT_EQ(&copied_plan.enabled_features11,
+            copied_plan.enabled_features2.pNext);
+  EXPECT_EQ(&copied_plan.enabled_features12,
+            copied_plan.enabled_features11.pNext);
+  EXPECT_EQ(&copied_plan.enabled_features13,
+            copied_plan.enabled_features12.pNext);
+  EXPECT_EQ(&copied_plan.enabled_shader_bfloat16_features,
+            copied_plan.enabled_features13.pNext);
+  EXPECT_EQ(nullptr, copied_plan.enabled_shader_bfloat16_features.pNext);
+}
+
+TEST(DevicePlanTest, OwnedCreateRejectsRequestedShaderBfloat16WhenUnavailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableShaderBfloat16Extension();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(
+      StatusCode::kUnavailable,
+      iree_hal_vulkan_device_plan_initialize_for_create(
+          builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE, &plan));
+}
+
+TEST(DevicePlanTest,
+     OwnedCreateChainsShaderBfloat16BeforeCooperativeMatrixFeatures) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableCooperativeMatrix();
+  builder.EnableShaderBfloat16Features();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_create(
+      builder.snapshot(), &options, IREE_HAL_VULKAN_REQUEST_FLAG_NONE,
+      IREE_HAL_VULKAN_FEATURE_NONE, &plan));
+
+  iree_hal_vulkan_device_plan_t copied_plan = plan;
+  VkDeviceCreateInfo create_info;
+  iree_hal_vulkan_device_plan_make_create_info(&copied_plan, &create_info);
+
+  EXPECT_EQ(&copied_plan.enabled_shader_bfloat16_features,
+            copied_plan.enabled_features13.pNext);
+  EXPECT_EQ(&copied_plan.enabled_cooperative_matrix_features,
+            copied_plan.enabled_shader_bfloat16_features.pNext);
+  EXPECT_EQ(nullptr, copied_plan.enabled_cooperative_matrix_features.pNext);
+}
+
 TEST(DevicePlanTest, OwnedCreateCarriesRequestFlags) {
   PhysicalDeviceSnapshotBuilder builder;
   builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
@@ -509,6 +611,75 @@ TEST(DevicePlanTest, WrapRejectsCooperativeMatrixWhenFeatureIsUnavailable) {
   params.enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_COOPERATIVE_MATRIX;
   params.enabled_extensions |=
       IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(StatusCode::kFailedPrecondition,
+                        iree_hal_vulkan_device_plan_initialize_for_wrap(
+                            builder.snapshot(), &options, &params, &plan));
+}
+
+TEST(DevicePlanTest, WrapCarriesShaderBfloat16WhenAvailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableShaderBfloat16Features();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.enabled_features |=
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX;
+  params.enabled_extensions |=
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_ASSERT_OK(iree_hal_vulkan_device_plan_initialize_for_wrap(
+      builder.snapshot(), &options, &params, &plan));
+
+  EXPECT_TRUE(
+      iree_all_bits_set(plan.enabled_features,
+                        IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE));
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT));
+  EXPECT_TRUE(iree_all_bits_set(
+      plan.enabled_features,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX));
+}
+
+TEST(DevicePlanTest, WrapRejectsShaderBfloat16WithoutEnabledExtension) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableShaderBfloat16Features();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.enabled_features |=
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE;
+  params.compute_queue_set.queue_family_index = 0;
+  params.compute_queue_set.queue_indices = 1ull << 0;
+
+  iree_hal_vulkan_device_plan_t plan;
+  IREE_EXPECT_STATUS_IS(StatusCode::kFailedPrecondition,
+                        iree_hal_vulkan_device_plan_initialize_for_wrap(
+                            builder.snapshot(), &options, &params, &plan));
+}
+
+TEST(DevicePlanTest, WrapRejectsShaderBfloat16WhenFeatureIsUnavailable) {
+  PhysicalDeviceSnapshotBuilder builder;
+  builder.AddQueueFamily(VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT, 1);
+  builder.EnableShaderBfloat16Extension();
+
+  iree_hal_vulkan_device_options_t options = DefaultDeviceOptions();
+  iree_hal_vulkan_external_device_params_t params = DefaultExternalParams();
+  params.enabled_features |=
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE;
+  params.enabled_extensions |=
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16;
   params.compute_queue_set.queue_family_index = 0;
   params.compute_queue_set.queue_indices = 1ull << 0;
 

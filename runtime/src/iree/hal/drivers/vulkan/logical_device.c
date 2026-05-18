@@ -726,6 +726,23 @@ static iree_status_t iree_hal_vulkan_logical_device_query_i64(
           device->enabled_features,
           IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_FLOAT64);
       return iree_ok_status();
+    } else if (iree_string_view_equal(key, IREE_SV("shader_bfloat16_type"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(key,
+                                      IREE_SV("shader_bfloat16_dot_product"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT);
+      return iree_ok_status();
+    } else if (iree_string_view_equal(
+                   key, IREE_SV("shader_bfloat16_cooperative_matrix"))) {
+      *out_value = iree_hal_vulkan_feature_query_value(
+          device->enabled_features,
+          IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX);
+      return iree_ok_status();
     } else if (iree_string_view_equal(key, IREE_SV("shader_int8"))) {
       *out_value = iree_hal_vulkan_feature_query_value(
           device->enabled_features, IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT8);

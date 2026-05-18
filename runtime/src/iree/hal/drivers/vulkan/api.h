@@ -128,6 +128,12 @@ typedef enum iree_hal_vulkan_feature_bits_t {
   IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE = 1u << 20,
   // Requests and reports storageBuffer16BitAccess support.
   IREE_HAL_VULKAN_FEATURE_ENABLE_STORAGE_BUFFER_16BIT_ACCESS = 1u << 21,
+  // Requests and reports shaderBFloat16Type support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE = 1u << 22,
+  // Requests and reports shaderBFloat16DotProduct support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT = 1u << 23,
+  // Requests and reports shaderBFloat16CooperativeMatrix support.
+  IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX = 1u << 24,
   // Required enabled logical-device feature set for the Vulkan HAL baseline.
   IREE_HAL_VULKAN_FEATURE_REQUIRED_BASELINE =
       IREE_HAL_VULKAN_FEATURE_ENABLE_TIMELINE_SEMAPHORES |
@@ -151,7 +157,10 @@ typedef enum iree_hal_vulkan_feature_bits_t {
       IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INT64 |
       IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_INTEGER_DOT_PRODUCT |
       IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL |
-      IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE,
+      IREE_HAL_VULKAN_FEATURE_ENABLE_VULKAN_MEMORY_MODEL_DEVICE_SCOPE |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_TYPE |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_DOT_PRODUCT |
+      IREE_HAL_VULKAN_FEATURE_ENABLE_SHADER_BFLOAT16_COOPERATIVE_MATRIX,
 } iree_hal_vulkan_feature_bits_t;
 
 typedef uint32_t iree_hal_vulkan_features_t;
@@ -176,6 +185,8 @@ typedef enum iree_hal_vulkan_device_extension_bits_t {
   IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR = 1u << 6,
   // VK_KHR_cooperative_matrix.
   IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX = 1u << 7,
+  // VK_KHR_shader_bfloat16.
+  IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16 = 1u << 8,
   // Recognized extension bits accepted by public Vulkan HAL APIs.
   IREE_HAL_VULKAN_DEVICE_EXTENSION_ALL_RECOGNIZED =
       IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PORTABILITY_SUBSET |
@@ -185,10 +196,20 @@ typedef enum iree_hal_vulkan_device_extension_bits_t {
       IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_EXTERNAL_MEMORY_HOST |
       IREE_HAL_VULKAN_DEVICE_EXTENSION_EXT_CALIBRATED_TIMESTAMPS |
       IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR |
-      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX,
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX |
+      IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16,
 } iree_hal_vulkan_device_extension_bits_t;
 
 typedef uint32_t iree_hal_vulkan_device_extensions_t;
+
+#if !defined(VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME)
+// VK_KHR_shader_bfloat16 extension name used when Vulkan headers predate it.
+#define IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME \
+  "VK_KHR_shader_bfloat16"
+#else
+#define IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME \
+  VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME
+#endif  // !VK_KHR_SHADER_BFLOAT16_EXTENSION_NAME
 
 // Populates recognized Vulkan device extension bits from an enabled extension
 // name list. Unknown extension names are ignored.

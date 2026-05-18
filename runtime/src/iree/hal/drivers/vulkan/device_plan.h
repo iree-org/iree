@@ -110,6 +110,9 @@ typedef struct iree_hal_vulkan_device_plan_t {
   VkPhysicalDeviceCooperativeMatrixFeaturesKHR
       enabled_cooperative_matrix_features;
 
+  // VK_KHR_shader_bfloat16 features enabled during VkDevice creation.
+  VkPhysicalDeviceShaderBfloat16FeaturesKHR enabled_shader_bfloat16_features;
+
   // Vulkan 1.1 features enabled during driver-owned VkDevice creation.
   VkPhysicalDeviceVulkan11Features enabled_features11;
 

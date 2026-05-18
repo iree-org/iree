@@ -24,9 +24,10 @@ static bool ContainsString(iree_host_size_t count, const char* const* values,
   return false;
 }
 
-TEST(ApiTest, RecognizesCooperativeMatrixDeviceExtensionName) {
+TEST(ApiTest, RecognizesOptionalDeviceExtensionNames) {
   const char* extension_names[] = {
       VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
+      IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
       VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
       "VK_EXAMPLE_unrecognized",
   };
@@ -35,6 +36,8 @@ TEST(ApiTest, RecognizesCooperativeMatrixDeviceExtensionName) {
       IREE_ARRAYSIZE(extension_names), extension_names, &extensions));
   EXPECT_TRUE(iree_all_bits_set(
       extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX));
+  EXPECT_TRUE(iree_all_bits_set(
+      extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16));
   EXPECT_TRUE(iree_all_bits_set(
       extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR));
 }
@@ -52,6 +55,7 @@ TEST(ApiTest, RecognizesAllPublicDeviceExtensionNames) {
       VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME,
       VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
       VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME,
+      IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME,
   };
   iree_hal_vulkan_device_extensions_t extensions = 0;
   IREE_ASSERT_OK(iree_hal_vulkan_device_extensions_from_names(
@@ -73,6 +77,8 @@ TEST(ApiTest, RecognizesAllPublicDeviceExtensionNames) {
       extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_PUSH_DESCRIPTOR));
   EXPECT_TRUE(iree_all_bits_set(
       extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_COOPERATIVE_MATRIX));
+  EXPECT_TRUE(iree_all_bits_set(
+      extensions, IREE_HAL_VULKAN_DEVICE_EXTENSION_KHR_SHADER_BFLOAT16));
   EXPECT_FALSE(iree_any_bit_set(
       extensions, ~IREE_HAL_VULKAN_DEVICE_EXTENSION_ALL_RECOGNIZED));
 }
@@ -165,6 +171,9 @@ TEST(ApiTest, OptionalDeviceExtensionsIncludeSupportedStrategies) {
                              VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME));
   EXPECT_TRUE(ContainsString(count, values.data(),
                              VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME));
+  EXPECT_TRUE(
+      ContainsString(count, values.data(),
+                     IREE_HAL_VULKAN_KHR_SHADER_BFLOAT16_EXTENSION_NAME));
 }
 
 TEST(ApiTest, ExtensibilitySetReportsRequiredCapacity) {
