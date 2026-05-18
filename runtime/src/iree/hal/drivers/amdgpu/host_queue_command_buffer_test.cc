@@ -1256,7 +1256,7 @@ static iree_status_t AppendConstantsBindingsDispatch(
   iree_const_byte_span_t constants =
       iree_make_const_byte_span(constant_values, sizeof(constant_values));
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE);
 }
@@ -1569,11 +1569,11 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
       /*binding_capacity=*/0, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -1650,7 +1650,8 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
       /*binding_capacity=*/0, one_shot_command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(one_shot_command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      one_shot_command_buffer, executable, /*entry_point=*/0,
+      one_shot_command_buffer, executable,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(one_shot_command_buffer));
@@ -2278,7 +2279,7 @@ TEST_F(HostQueueCommandBufferTest, Pm4MixedDynamicDispatchUsesGpuFixup) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2415,7 +2416,7 @@ TEST_F(HostQueueCommandBufferTest, Pm4DynamicDispatchUsesBindingTableSlots) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2540,7 +2541,7 @@ TEST_F(HostQueueCommandBufferTest,
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2704,7 +2705,7 @@ TEST_F(HostQueueCommandBufferTest, DynamicDispatchUsesBindingTableSlots) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));

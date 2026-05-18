@@ -189,7 +189,7 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
 
   // Dispatch entry_point=0 (negate).
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), negate_bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
@@ -206,7 +206,7 @@ TEST_P(DispatchMultiEntrypointTest, NegateAndDouble) {
 
   // Dispatch entry_point=1 (double_it).
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/1,
+      command_buffer, executable_, iree_hal_executable_function_from_index(1),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), double_bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));

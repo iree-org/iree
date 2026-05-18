@@ -9,8 +9,7 @@
 #include "iree/hal/local/local_executable.h"
 
 iree_status_t iree_hal_local_executable_dispatch_inline(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags) {
@@ -21,6 +20,16 @@ iree_status_t iree_hal_local_executable_dispatch_inline(
   }
   const bool uses_indirect_parameters =
       iree_hal_dispatch_uses_indirect_parameters(flags);
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
+  const uint32_t function_index = iree_hal_executable_function_index(function);
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -90,8 +99,8 @@ iree_status_t iree_hal_local_executable_dispatch_inline(
       dispatch_state.workgroup_count_z = (uint16_t)workgroup_count[2];
     }
     status = iree_hal_local_executable_issue_dispatch_inline(
-        iree_hal_local_executable_cast(executable), export_ordinal,
-        &dispatch_state, /*processor_id=*/0, iree_byte_span_empty());
+        local_executable, function_index, &dispatch_state, /*processor_id=*/0,
+        iree_byte_span_empty());
   }
 
   // Unmap all buffers (even on failure — mappings hold refs).

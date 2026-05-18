@@ -50,11 +50,10 @@ class ExecutableTest : public CtsTestBase<> {
   // Probes whether export_info is available and reports parameter metadata.
   // Returns false without recording a test failure when the backend does not
   // implement reflection — callers use this to GTEST_SKIP().
-  bool ExportHasParameterInfo(
-      iree_hal_executable_export_ordinal_t export_ordinal) {
-    iree_hal_executable_export_info_t info;
+  bool ExportHasParameterInfo(iree_hal_executable_function_t export_ordinal) {
+    iree_hal_executable_function_info_t info;
     iree_status_t status =
-        iree_hal_executable_export_info(executable_, export_ordinal, &info);
+        iree_hal_executable_function_info(executable_, export_ordinal, &info);
     if (!iree_status_is_ok(status)) {
       iree_status_ignore(status);
       return false;
@@ -67,75 +66,83 @@ class ExecutableTest : public CtsTestBase<> {
 };
 
 TEST_P(ExecutableTest, ExportCount) {
-  ASSERT_EQ(iree_hal_executable_export_count(executable_), 1);
+  ASSERT_EQ(iree_hal_executable_function_count(executable_), 1);
 }
 
 TEST_P(ExecutableTest, ExportInfoOutOfRange) {
-  iree_hal_executable_export_info_t info;
-  EXPECT_THAT(Status(iree_hal_executable_export_info(executable_, 100, &info)),
-              StatusIs(StatusCode::kOutOfRange));
+  iree_hal_executable_function_info_t info;
+  EXPECT_THAT(
+      Status(iree_hal_executable_function_info(
+          executable_, iree_hal_executable_function_from_index(100), &info)),
+      StatusIs(StatusCode::kOutOfRange));
 }
 
 TEST_P(ExecutableTest, ExportInfo) {
-  iree_hal_executable_export_info_t info;
+  iree_hal_executable_function_info_t info;
 
   // export0: #hal.pipeline.layout<constants = 2, bindings = [
   //   #hal.pipeline.binding<storage_buffer>,
   //   #hal.pipeline.binding<storage_buffer>
   // ]>
-  IREE_ASSERT_OK(iree_hal_executable_export_info(executable_, 0, &info));
+  IREE_ASSERT_OK(iree_hal_executable_function_info(
+      executable_, iree_hal_executable_function_from_index(0), &info));
   EXPECT_EQ(std::string_view(info.name.data, info.name.size), "export0");
-  EXPECT_EQ(info.flags, IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE);
+  EXPECT_EQ(info.flags, IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE);
   EXPECT_EQ(info.constant_count, 2);
   EXPECT_EQ(info.binding_count, 2);
 }
 
 TEST_P(ExecutableTest, ExportParametersOutOfRange) {
-  if (!ExportHasParameterInfo(0)) {
+  if (!ExportHasParameterInfo(iree_hal_executable_function_from_index(0))) {
     GTEST_SKIP() << "parameter reflection not available";
   }
 
-  iree_hal_executable_export_parameter_t parameters[64];
-  EXPECT_THAT(Status(iree_hal_executable_export_parameters(
-                  executable_, 100, IREE_ARRAYSIZE(parameters), parameters)),
+  iree_hal_executable_function_parameter_t parameters[64];
+  EXPECT_THAT(Status(iree_hal_executable_function_parameters(
+                  executable_, iree_hal_executable_function_from_index(100),
+                  IREE_ARRAYSIZE(parameters), parameters)),
               StatusIs(StatusCode::kOutOfRange));
 }
 
 TEST_P(ExecutableTest, ExportParametersNoCapacity) {
-  if (!ExportHasParameterInfo(0)) {
+  if (!ExportHasParameterInfo(iree_hal_executable_function_from_index(0))) {
     GTEST_SKIP() << "parameter reflection not available";
   }
 
-  iree_hal_executable_export_parameter_t parameters[1];
-  IREE_EXPECT_OK(iree_hal_executable_export_parameters(
-      executable_, 0, /*capacity=*/1, parameters));
+  iree_hal_executable_function_parameter_t parameters[1];
+  IREE_EXPECT_OK(iree_hal_executable_function_parameters(
+      executable_, iree_hal_executable_function_from_index(0), /*capacity=*/1,
+      parameters));
   EXPECT_EQ(parameters[0].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING);
 }
 
 TEST_P(ExecutableTest, ExportParameters) {
-  if (!ExportHasParameterInfo(0)) {
+  if (!ExportHasParameterInfo(iree_hal_executable_function_from_index(0))) {
     GTEST_SKIP() << "parameter reflection not available";
   }
 
-  iree_hal_executable_export_parameter_t parameters[64];
-  IREE_ASSERT_OK(iree_hal_executable_export_parameters(
-      executable_, 0, IREE_ARRAYSIZE(parameters), parameters));
+  iree_hal_executable_function_parameter_t parameters[64];
+  IREE_ASSERT_OK(iree_hal_executable_function_parameters(
+      executable_, iree_hal_executable_function_from_index(0),
+      IREE_ARRAYSIZE(parameters), parameters));
 }
 
 TEST_P(ExecutableTest, LookupExportByNameNotFound) {
-  iree_hal_executable_export_ordinal_t ordinal = 0;
-  EXPECT_THAT(Status(iree_hal_executable_lookup_export_by_name(
+  iree_hal_executable_function_t ordinal =
+      iree_hal_executable_function_from_index(0);
+  EXPECT_THAT(Status(iree_hal_executable_lookup_function_by_name(
                   executable_, IREE_SV("NOT_FOUND"), &ordinal)),
               StatusIs(StatusCode::kNotFound));
 }
 
 TEST_P(ExecutableTest, LookupExportByName) {
-  iree_hal_executable_export_ordinal_t ordinal = 0;
+  iree_hal_executable_function_t ordinal =
+      iree_hal_executable_function_from_index(0);
 
-  IREE_ASSERT_OK(iree_hal_executable_lookup_export_by_name(
+  IREE_ASSERT_OK(iree_hal_executable_lookup_function_by_name(
       executable_, IREE_SV("export0"), &ordinal));
-  EXPECT_EQ(ordinal, 0);
+  EXPECT_EQ(ordinal.value, 0);
 }
 
 TEST_P(ExecutableTest, LookupGlobalByNameNotFoundOrUnsupported) {

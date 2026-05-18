@@ -18,7 +18,7 @@ util.func public @executableLoad(%executable_data: !util.buffer) -> !hal.executa
 // CHECK-SAME: (%[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>,
 // CHECK-SAME:  %[[BUFFER0:.+]]: !vm.buffer, %[[BUFFER1:.+]]: !vm.buffer)
 util.func public @executableDispatch(%executable: !hal.executable, %buffer0: !util.buffer, %buffer1: !util.buffer) {
-  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 16
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i64 16
   %ordinal = arith.constant 16 : index
   // CHECK-DAG: %[[COUNT_X:.+]] = vm.const.i32 1000
   %count_x = arith.constant 1000 : index

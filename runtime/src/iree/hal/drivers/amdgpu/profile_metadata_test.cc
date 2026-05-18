@@ -25,8 +25,8 @@ class ProfileMetadataTest : public ::testing::Test {
     iree_hal_amdgpu_profile_metadata_deinitialize(&registry_);
   }
 
-  iree_hal_executable_export_info_t MakeExportInfo() {
-    iree_hal_executable_export_info_t export_info = {};
+  iree_hal_executable_function_info_t MakeExportInfo() {
+    iree_hal_executable_function_info_t export_info = {};
     export_info.name = IREE_SV("test_dispatch");
     export_info.constant_count = 3;
     export_info.binding_count = 2;
@@ -65,7 +65,7 @@ TEST_F(ProfileMetadataTest, HashCodeObjectGolden) {
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableRecordsOnlyIdentity) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
+  iree_hal_executable_function_info_t export_info = MakeExportInfo();
   iree_host_size_t export_parameter_offsets[] = {0, 0};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x1111111111111111ull, 0x2222222222222222ull};
@@ -85,7 +85,7 @@ TEST_F(ProfileMetadataTest, RegisterExecutableRecordsOnlyIdentity) {
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableComputesStablePipelineHash) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
+  iree_hal_executable_function_info_t export_info = MakeExportInfo();
   iree_host_size_t export_parameter_offsets[] = {0, 3};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x0706050403020100ull, 0x1716151413121110ull};
@@ -117,7 +117,7 @@ TEST_F(ProfileMetadataTest, RegisterExecutableComputesStablePipelineHash) {
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableArtifactsAttachToIdentity) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
+  iree_hal_executable_function_info_t export_info = MakeExportInfo();
   iree_host_size_t export_parameter_offsets[] = {0, 0};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x1111111111111111ull, 0x2222222222222222ull};

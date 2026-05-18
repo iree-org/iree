@@ -316,18 +316,16 @@ static iree_status_t iree_hal_webgpu_command_buffer_collective(
 
 static iree_status_t iree_hal_webgpu_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
 
   iree_hal_webgpu_handle_t pipeline_handle =
-      iree_hal_webgpu_executable_pipeline_handle(executable, export_ordinal);
+      iree_hal_webgpu_executable_pipeline_handle(executable, function);
   iree_hal_webgpu_handle_t bind_group_layout_handle =
-      iree_hal_webgpu_executable_bind_group_layout_handle(executable,
-                                                          export_ordinal);
+      iree_hal_webgpu_executable_bind_group_layout_handle(executable, function);
 
   return iree_hal_webgpu_builder_dispatch(
       &command_buffer->builder, pipeline_handle, bind_group_layout_handle,

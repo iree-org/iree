@@ -137,8 +137,9 @@ TEST_P(VulkanQueueDescriptorCacheTest, DeferredDispatchesExceedOneBlock) {
     };
     IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, gate, signal_list, executable_,
-        /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(1, 1, 1),
-        constants, bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+        iree_hal_executable_function_from_index(0),
+        iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
+        IREE_HAL_DISPATCH_FLAG_NONE));
   }
 
   IREE_ASSERT_OK(
@@ -203,7 +204,7 @@ TEST_P(VulkanQueueDescriptorCacheTest,
                                sizeof(fill_pattern)),
       &fill_pattern, sizeof(fill_pattern), IREE_HAL_FILL_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   const uint32_t update_data = 1;
@@ -230,7 +231,7 @@ TEST_P(VulkanQueueDescriptorCacheTest,
           command_buffer, &requirements));
   const iree_hal_vulkan_pipeline_t* pipeline = nullptr;
   IREE_ASSERT_OK(iree_hal_vulkan_executable_lookup_pipeline(
-      executable_, /*export_ordinal=*/0, &pipeline));
+      executable_, iree_hal_executable_function_from_index(0), &pipeline));
   const uint32_t dispatch_set_count =
       pipeline->push_descriptors.enabled ? 0u : 1u;
   const uint32_t dispatch_storage_buffer_count =
@@ -289,7 +290,7 @@ TEST_P(VulkanQueueDescriptorCacheTest,
       /*binding_capacity=*/2, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));

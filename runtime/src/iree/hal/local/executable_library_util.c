@@ -124,17 +124,19 @@ iree_host_size_t iree_hal_executable_library_export_count(
 
 iree_status_t iree_hal_executable_library_export_info(
     const iree_hal_executable_library_v0_t* library,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   IREE_ASSERT_ARGUMENT(library);
   IREE_ASSERT_ARGUMENT(out_info);
   memset(out_info, 0, sizeof(*out_info));
 
-  if (export_ordinal >= library->exports.count) {
+  if (!iree_hal_executable_function_is_index_in_range(function,
+                                                      library->exports.count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %u out of range (count: %u)",
-                            export_ordinal, library->exports.count);
+                            "function id %" PRIu64 " out of range (count: %u)",
+                            function.value, library->exports.count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   // Set the name if available.
   if (library->exports.names && library->exports.names[export_ordinal]) {
@@ -151,12 +153,13 @@ iree_status_t iree_hal_executable_library_export_info(
 
     if (iree_any_bit_set(attrs->flags,
                          IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL)) {
-      out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_SEQUENTIAL;
+      out_info->flags |= IREE_HAL_EXECUTABLE_FUNCTION_FLAG_SEQUENTIAL;
     }
     if (iree_any_bit_set(
             attrs->flags,
             IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC)) {
-      out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_WORKGROUP_SIZE_DYNAMIC;
+      out_info->flags |=
+          IREE_HAL_EXECUTABLE_FUNCTION_FLAG_WORKGROUP_SIZE_DYNAMIC;
     }
 
     out_info->constant_count = attrs->constant_count;
@@ -176,17 +179,18 @@ iree_status_t iree_hal_executable_library_export_info(
 
 iree_status_t iree_hal_executable_library_export_parameters(
     const iree_hal_executable_library_v0_t* library,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t function, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   IREE_ASSERT_ARGUMENT(library);
   IREE_ASSERT_ARGUMENT(out_parameters || capacity == 0);
 
-  if (export_ordinal >= library->exports.count) {
+  if (!iree_hal_executable_function_is_index_in_range(function,
+                                                      library->exports.count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %u out of range (count: %u)",
-                            export_ordinal, library->exports.count);
+                            "function id %" PRIu64 " out of range (count: %u)",
+                            function.value, library->exports.count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   if (!library->exports.attrs || !library->exports.params ||
       !library->exports.params[export_ordinal]) {
@@ -206,19 +210,19 @@ iree_status_t iree_hal_executable_library_export_parameters(
       iree_min(capacity, (iree_host_size_t)attrs->parameter_count);
   for (iree_host_size_t i = 0; i < count; ++i) {
     const iree_hal_executable_dispatch_parameter_v0_t* src = &export_params[i];
-    iree_hal_executable_export_parameter_t* dst = &out_parameters[i];
+    iree_hal_executable_function_parameter_t* dst = &out_parameters[i];
     switch (src->type) {
       case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_CONSTANT:
-        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
+        dst->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT;
         break;
       case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BINDING:
-        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
+        dst->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING;
         break;
       case IREE_HAL_EXECUTABLE_DISPATCH_PARAM_TYPE_V0_BUFFER_PTR:
-        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BUFFER_PTR;
+        dst->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BUFFER_PTR;
         break;
       default:
-        dst->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
+        dst->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT;
         break;
     }
     dst->size = src->size;
@@ -238,7 +242,7 @@ iree_status_t iree_hal_executable_library_export_parameters(
 
 iree_status_t iree_hal_executable_library_lookup_export_by_name(
     const iree_hal_executable_library_v0_t* library, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   IREE_ASSERT_ARGUMENT(library);
   IREE_ASSERT_ARGUMENT(out_export_ordinal);
 
@@ -254,7 +258,7 @@ iree_status_t iree_hal_executable_library_lookup_export_by_name(
       iree_string_view_t export_name =
           iree_make_cstring_view(library->exports.names[i]);
       if (iree_string_view_equal(export_name, name)) {
-        *out_export_ordinal = i;
+        *out_export_ordinal = iree_hal_executable_function_from_index(i);
         return iree_ok_status();
       }
     }

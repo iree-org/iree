@@ -625,7 +625,7 @@ struct iree_hal_vulkan_queue_pending_submission_t {
       iree_hal_executable_t* executable;
 
       // Export ordinal captured from queue_dispatch.
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      iree_hal_executable_function_t export_ordinal;
 
       // Dispatch workgroup configuration captured from queue_dispatch.
       iree_hal_dispatch_config_t config;
@@ -3255,7 +3255,8 @@ static iree_status_t iree_hal_vulkan_queue_append_dispatch_profile_event(
   event_info.executable_id =
       iree_hal_vulkan_executable_profile_id(submission->dispatch.executable);
   event_info.command_index = UINT32_MAX;
-  event_info.export_ordinal = submission->dispatch.export_ordinal;
+  event_info.export_ordinal =
+      iree_hal_executable_function_index(submission->dispatch.export_ordinal);
   if (iree_hal_dispatch_uses_indirect_parameters(submission->dispatch.flags)) {
     event_info.flags |=
         IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -8910,7 +8911,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {

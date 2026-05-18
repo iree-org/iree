@@ -353,7 +353,7 @@ public:
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getExecutable(),
-        castToImportType(adaptor.getEntryPoint(), i32Type, rewriter),
+        castToImportType(adaptor.getEntryPoint(), i64Type, rewriter),
         castToImportType(adaptor.getWorkgroupX(), i32Type, rewriter),
         castToImportType(adaptor.getWorkgroupY(), i32Type, rewriter),
         castToImportType(adaptor.getWorkgroupZ(), i32Type, rewriter),
@@ -417,7 +417,6 @@ public:
 
     auto importType = importOp.getFunctionType();
 
-    auto i32Type = rewriter.getI32Type();
     auto i64Type = rewriter.getI64Type();
     Value zeroI32 = IREE::VM::ConstI32ZeroOp::create(rewriter, op.getLoc());
 
@@ -426,7 +425,7 @@ public:
     SmallVector<Value, 8> callOperands = {
         adaptor.getCommandBuffer(),
         adaptor.getExecutable(),
-        castToImportType(adaptor.getEntryPoint(), i32Type, rewriter),
+        castToImportType(adaptor.getEntryPoint(), i64Type, rewriter),
         workgroupsBufferSlot,
         workgroupsBuffer,
         castToImportType(adaptor.getWorkgroupsOffset(), i64Type, rewriter),

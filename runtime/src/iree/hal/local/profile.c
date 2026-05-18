@@ -728,9 +728,10 @@ static iree_status_t iree_hal_local_profile_executable_export_data_length(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
        ++i) {
-    iree_hal_executable_export_info_t export_info = {0};
-    status = iree_hal_executable_export_info(
-        executable, (iree_hal_executable_export_ordinal_t)i, &export_info);
+    iree_hal_executable_function_info_t export_info = {0};
+    status = iree_hal_executable_function_info(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
+        &export_info);
     iree_host_size_t record_length = 0;
     if (iree_status_is_ok(status)) {
       status = iree_hal_local_profile_executable_export_record_length(
@@ -753,9 +754,10 @@ static iree_status_t iree_hal_local_profile_append_executable_export_records(
     iree_host_size_t export_count, uint8_t* target_data) {
   uint8_t* cursor = target_data;
   for (iree_host_size_t i = 0; i < export_count; ++i) {
-    iree_hal_executable_export_info_t export_info = {0};
-    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
-        executable, (iree_hal_executable_export_ordinal_t)i, &export_info));
+    iree_hal_executable_function_info_t export_info = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_executable_function_info(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
+        &export_info));
 
     iree_host_size_t record_length = 0;
     IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_export_record_length(
@@ -812,7 +814,7 @@ iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
   }
 
   const iree_host_size_t export_count =
-      iree_hal_executable_export_count(executable);
+      iree_hal_executable_function_count(executable);
   if (IREE_UNLIKELY(export_count > UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "profile executable export count exceeds uint32_t");

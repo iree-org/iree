@@ -367,12 +367,11 @@ static iree_host_size_t FakeLocalExecutableExportCount(
 }
 
 static iree_status_t FakeLocalExecutableExportInfo(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   (void)executable;
   memset(out_info, 0, sizeof(*out_info));
-  switch (export_ordinal) {
+  switch (function.value) {
     case 0:
       out_info->name = IREE_SV("dispatch_a");
       out_info->constant_count = 1;
@@ -396,9 +395,8 @@ static iree_status_t FakeLocalExecutableExportInfo(
 
 static iree_status_t FakeLocalExecutableExportParameters(
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   (void)executable;
   (void)export_ordinal;
   (void)capacity;
@@ -408,14 +406,14 @@ static iree_status_t FakeLocalExecutableExportParameters(
 
 static iree_status_t FakeLocalExecutableLookupExportByName(
     iree_hal_executable_t* executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   (void)executable;
   if (iree_string_view_equal(name, IREE_SV("dispatch_a"))) {
-    *out_export_ordinal = 0;
+    *out_export_ordinal = iree_hal_executable_function_from_index(0);
     return iree_ok_status();
   }
   if (iree_string_view_equal(name, IREE_SV("dispatch_b"))) {
-    *out_export_ordinal = 1;
+    *out_export_ordinal = iree_hal_executable_function_from_index(1);
     return iree_ok_status();
   }
   return iree_make_status(IREE_STATUS_NOT_FOUND, "export not found");

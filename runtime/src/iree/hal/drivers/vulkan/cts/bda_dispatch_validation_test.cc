@@ -338,7 +338,8 @@ TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsBindingCountMismatch) {
   EXPECT_THAT(
       Status(iree_hal_device_queue_dispatch(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), executable_, /*export_ordinal=*/0,
+          iree_hal_semaphore_list_empty(), executable_,
+          iree_hal_executable_function_from_index(0),
           iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
           IREE_HAL_DISPATCH_FLAG_NONE)),
       StatusIs(StatusCode::kInvalidArgument));
@@ -370,7 +371,8 @@ TEST_P(BdaDispatchValidationTest,
   };
 
   EXPECT_THAT(Status(iree_hal_command_buffer_dispatch(
-                  command_buffer, executable_, /*entry_point=*/0,
+                  command_buffer, executable_,
+                  iree_hal_executable_function_from_index(0),
                   iree_hal_make_static_dispatch_config(1, 1, 1), constants(),
                   bindings, IREE_HAL_DISPATCH_FLAG_NONE)),
               StatusIs(StatusCode::kInvalidArgument));
@@ -398,7 +400,8 @@ TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsEmptyBindingRange) {
   EXPECT_THAT(
       Status(iree_hal_device_queue_dispatch(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), executable_, /*export_ordinal=*/0,
+          iree_hal_semaphore_list_empty(), executable_,
+          iree_hal_executable_function_from_index(0),
           iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
           IREE_HAL_DISPATCH_FLAG_NONE)),
       StatusIs(StatusCode::kInvalidArgument));
@@ -430,7 +433,7 @@ TEST_P(BdaDispatchValidationTest,
       /*.values=*/binding_refs,
   };
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -469,7 +472,8 @@ TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsMinimumBindingLength) {
       Status(iree_hal_device_queue_dispatch(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
           iree_hal_semaphore_list_empty(), requirement_executable_,
-          /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(1, 1, 1),
+          iree_hal_executable_function_from_index(0),
+          iree_hal_make_static_dispatch_config(1, 1, 1),
           iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE)),
       StatusIs(StatusCode::kOutOfRange));
 
@@ -503,7 +507,8 @@ TEST_P(BdaDispatchValidationTest,
       /*.values=*/binding_refs,
   };
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, requirement_executable_, /*entry_point=*/0,
+      command_buffer, requirement_executable_,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -544,7 +549,8 @@ TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsMinimumBindingAlignment) {
       Status(iree_hal_device_queue_dispatch(
           device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
           iree_hal_semaphore_list_empty(), requirement_executable_,
-          /*export_ordinal=*/0, iree_hal_make_static_dispatch_config(1, 1, 1),
+          iree_hal_executable_function_from_index(0),
+          iree_hal_make_static_dispatch_config(1, 1, 1),
           iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE)),
       StatusIs(StatusCode::kInvalidArgument));
 
@@ -581,7 +587,8 @@ TEST_P(BdaDispatchValidationTest,
       /*.values=*/binding_refs,
   };
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, requirement_executable_, /*entry_point=*/0,
+      command_buffer, requirement_executable_,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));

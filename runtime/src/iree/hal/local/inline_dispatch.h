@@ -32,8 +32,7 @@ extern "C" {
 // The executable must be a local executable (iree_hal_local_executable_t).
 // Binding buffers must support host-visible mapping.
 iree_status_t iree_hal_local_executable_dispatch_inline(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags);

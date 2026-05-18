@@ -222,6 +222,7 @@ TEST_F(BlockBuilderTest, CommandOpSplitKeepsBindingIndicesBlockLocal) {
   };
   iree_hal_local_executable_t executable = {};
   executable.dispatch_attrs = &dispatch_attrs;
+  executable.export_count = 1;
 
   iree_hal_dispatch_config_t config = {
       /*.workgroup_size=*/{1, 1, 1},
@@ -231,8 +232,9 @@ TEST_F(BlockBuilderTest, CommandOpSplitKeepsBindingIndicesBlockLocal) {
     iree_hal_cmd_fixup_t* fixups = NULL;
     iree_hal_cmd_build_token_t token = {0};
     IREE_ASSERT_OK(iree_hal_cmd_build_dispatch(
-        &builder, (iree_hal_executable_t*)&executable, /*export_ordinal=*/0,
-        config, iree_const_byte_span_empty(), dispatch_attrs.binding_count,
+        &builder, (iree_hal_executable_t*)&executable,
+        iree_hal_executable_function_from_index(0), config,
+        iree_const_byte_span_empty(), dispatch_attrs.binding_count,
         IREE_HAL_DISPATCH_FLAG_NONE, &fixups, &token));
   }
 

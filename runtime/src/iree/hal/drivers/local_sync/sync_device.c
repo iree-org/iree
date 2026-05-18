@@ -571,14 +571,13 @@ static void iree_hal_sync_device_profile_operation_initialize(
 
 static void iree_hal_sync_device_profile_operation_set_dispatch(
     iree_hal_sync_device_profile_operation_t* operation,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
   operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  operation->export_ordinal = export_ordinal;
+  operation->export_ordinal = iree_hal_executable_function_index(function);
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     operation->host_flags |=
         IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -1343,7 +1342,7 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -1369,7 +1368,7 @@ static iree_status_t iree_hal_sync_device_queue_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {

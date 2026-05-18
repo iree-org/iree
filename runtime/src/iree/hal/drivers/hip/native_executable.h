@@ -61,7 +61,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params);
 

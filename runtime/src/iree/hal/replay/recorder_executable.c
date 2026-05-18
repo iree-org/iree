@@ -129,7 +129,7 @@ static iree_host_size_t iree_hal_replay_recorder_executable_export_count(
       executable, IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_COUNT,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record);
   iree_host_size_t count =
-      iree_hal_executable_export_count(executable->base_executable);
+      iree_hal_executable_function_count(executable->base_executable);
   if (iree_status_is_ok(status)) {
     status = iree_hal_replay_recorder_end_operation(&pending_record,
                                                     iree_ok_status());
@@ -142,8 +142,8 @@ static iree_host_size_t iree_hal_replay_recorder_executable_export_count(
 
 static iree_status_t iree_hal_replay_recorder_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_replay_recorder_executable_t* executable =
       iree_hal_replay_recorder_executable_cast(base_executable);
   iree_hal_replay_pending_record_t pending_record;
@@ -152,15 +152,14 @@ static iree_status_t iree_hal_replay_recorder_executable_export_info(
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
   return iree_hal_replay_recorder_end_operation(
       &pending_record,
-      iree_hal_executable_export_info(executable->base_executable,
-                                      export_ordinal, out_info));
+      iree_hal_executable_function_info(executable->base_executable,
+                                        export_ordinal, out_info));
 }
 
 static iree_status_t iree_hal_replay_recorder_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_replay_recorder_executable_t* executable =
       iree_hal_replay_recorder_executable_cast(base_executable);
   iree_hal_replay_pending_record_t pending_record;
@@ -168,14 +167,14 @@ static iree_status_t iree_hal_replay_recorder_executable_export_parameters(
       executable, IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_PARAMETERS,
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
   return iree_hal_replay_recorder_end_operation(
-      &pending_record, iree_hal_executable_export_parameters(
+      &pending_record, iree_hal_executable_function_parameters(
                            executable->base_executable, export_ordinal,
                            capacity, out_parameters));
 }
 
 static iree_status_t iree_hal_replay_recorder_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_replay_recorder_executable_t* executable =
       iree_hal_replay_recorder_executable_cast(base_executable);
   iree_hal_replay_pending_record_t pending_record;
@@ -185,8 +184,8 @@ static iree_status_t iree_hal_replay_recorder_executable_lookup_export_by_name(
       IREE_HAL_REPLAY_PAYLOAD_TYPE_NONE, &pending_record));
   return iree_hal_replay_recorder_end_operation(
       &pending_record,
-      iree_hal_executable_lookup_export_by_name(executable->base_executable,
-                                                name, out_export_ordinal));
+      iree_hal_executable_lookup_function_by_name(executable->base_executable,
+                                                  name, out_export_ordinal));
 }
 
 static iree_status_t iree_hal_replay_recorder_executable_lookup_global_by_name(
@@ -375,16 +374,16 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
   *out_metadata = iree_const_byte_span_empty();
 
   const iree_host_size_t export_count =
-      iree_hal_executable_export_count(executable);
+      iree_hal_executable_function_count(executable);
   iree_host_size_t export_info_size = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-          export_count, sizeof(iree_hal_executable_export_info_t),
+          export_count, sizeof(iree_hal_executable_function_info_t),
           &export_info_size))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "executable export metadata size overflow");
   }
 
-  iree_hal_executable_export_info_t* export_infos = NULL;
+  iree_hal_executable_function_info_t* export_infos = NULL;
   if (export_info_size > 0) {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, export_info_size,
                                                (void**)&export_infos));
@@ -393,8 +392,9 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
   iree_host_size_t parameter_count = 0;
   for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
        ++i) {
-    status = iree_hal_executable_export_info(
-        executable, (iree_hal_executable_export_ordinal_t)i, &export_infos[i]);
+    status = iree_hal_executable_function_info(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
+        &export_infos[i]);
     if (iree_status_is_ok(status)) {
       if (IREE_UNLIKELY(!iree_host_size_checked_add(
               parameter_count, export_infos[i].parameter_count,
@@ -410,11 +410,11 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
     return status;
   }
 
-  iree_hal_executable_export_parameter_t* parameters = NULL;
+  iree_hal_executable_function_parameter_t* parameters = NULL;
   iree_host_size_t parameter_info_size = 0;
   if (parameter_count > 0) {
     if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-            parameter_count, sizeof(iree_hal_executable_export_parameter_t),
+            parameter_count, sizeof(iree_hal_executable_function_parameter_t),
             &parameter_info_size))) {
       iree_allocator_free(host_allocator, export_infos);
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
@@ -434,8 +434,8 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
     const iree_host_size_t export_parameter_count =
         export_infos[i].parameter_count;
     if (export_parameter_count == 0) continue;
-    status = iree_hal_executable_export_parameters(
-        executable, (iree_hal_executable_export_ordinal_t)i,
+    status = iree_hal_executable_function_parameters(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
         export_parameter_count, parameters + parameter_index);
     parameter_index += export_parameter_count;
   }
@@ -495,7 +495,7 @@ static iree_status_t iree_hal_replay_recorder_capture_executable_metadata(
       export_metadata[i].binding_count = export_infos[i].binding_count;
       export_metadata[i].parameter_count = export_infos[i].parameter_count;
       for (iree_host_size_t j = 0; j < export_infos[i].parameter_count; ++j) {
-        const iree_hal_executable_export_parameter_t* parameter =
+        const iree_hal_executable_function_parameter_t* parameter =
             &parameters[parameter_index++];
         parameter_metadata->offset = parameter->offset;
         parameter_metadata->flags = parameter->flags;
@@ -579,11 +579,11 @@ iree_hal_replay_recorder_executable_cache_prepare_executable(
 static const iree_hal_executable_vtable_t
     iree_hal_replay_recorder_executable_vtable = {
         .destroy = iree_hal_replay_recorder_executable_destroy,
-        .export_count = iree_hal_replay_recorder_executable_export_count,
-        .export_info = iree_hal_replay_recorder_executable_export_info,
-        .export_parameters =
+        .function_count = iree_hal_replay_recorder_executable_export_count,
+        .function_info = iree_hal_replay_recorder_executable_export_info,
+        .function_parameters =
             iree_hal_replay_recorder_executable_export_parameters,
-        .lookup_export_by_name =
+        .lookup_function_by_name =
             iree_hal_replay_recorder_executable_lookup_export_by_name,
         .lookup_global_by_name =
             iree_hal_replay_recorder_executable_lookup_global_by_name,

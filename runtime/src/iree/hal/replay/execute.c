@@ -87,8 +87,8 @@ typedef struct iree_hal_replay_plan_command_buffer_dispatch_t {
   iree_hal_replay_object_id_t command_buffer_id;
   // Captured executable object id.
   iree_hal_replay_object_id_t executable_id;
-  // Export ordinal to dispatch.
-  iree_hal_executable_export_ordinal_t export_ordinal;
+  // Function to dispatch.
+  iree_hal_executable_function_t function;
   // Dispatch grid and indirect-count configuration.
   iree_hal_dispatch_config_t config;
   // Serialized indirect workgroup count buffer reference.
@@ -717,7 +717,7 @@ iree_hal_replay_executor_compare_executable_export_parameters(
     iree_hal_replay_object_id_t executable_id,
     iree_hal_executable_t* captured_executable,
     iree_hal_executable_t* replacement_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     iree_host_size_t parameter_count) {
   if (parameter_count == 0) return iree_ok_status();
   iree_host_size_t allocation_count = 0;
@@ -725,31 +725,32 @@ iree_hal_replay_executor_compare_executable_export_parameters(
   if (IREE_UNLIKELY(
           !iree_host_size_checked_mul(parameter_count, 2, &allocation_count) ||
           !iree_host_size_checked_mul(
-              allocation_count, sizeof(iree_hal_executable_export_parameter_t),
+              allocation_count,
+              sizeof(iree_hal_executable_function_parameter_t),
               &allocation_size))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "executable parameter metadata is too large");
   }
 
-  iree_hal_executable_export_parameter_t* captured_parameters = NULL;
+  iree_hal_executable_function_parameter_t* captured_parameters = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       executor->host_allocator, allocation_size, (void**)&captured_parameters));
-  iree_hal_executable_export_parameter_t* replacement_parameters =
+  iree_hal_executable_function_parameter_t* replacement_parameters =
       captured_parameters + parameter_count;
 
-  iree_status_t status = iree_hal_executable_export_parameters(
+  iree_status_t status = iree_hal_executable_function_parameters(
       captured_executable, export_ordinal, parameter_count,
       captured_parameters);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_executable_export_parameters(
+    status = iree_hal_executable_function_parameters(
         replacement_executable, export_ordinal, parameter_count,
         replacement_parameters);
   }
   for (iree_host_size_t i = 0; i < parameter_count && iree_status_is_ok(status);
        ++i) {
-    const iree_hal_executable_export_parameter_t* captured =
+    const iree_hal_executable_function_parameter_t* captured =
         &captured_parameters[i];
-    const iree_hal_executable_export_parameter_t* replacement =
+    const iree_hal_executable_function_parameter_t* replacement =
         &replacement_parameters[i];
     if (captured->type != replacement->type ||
         captured->size != replacement->size ||
@@ -761,11 +762,11 @@ iree_hal_replay_executor_compare_executable_export_parameters(
           " parameter %" PRIhsz
           " ABI mismatch: captured=(type=%u size=%u flags=0x%04x "
           "offset=%u) replacement=(type=%u size=%u flags=0x%04x offset=%u)",
-          executable_id, export_ordinal, i, (uint32_t)captured->type,
-          (uint32_t)captured->size, (uint32_t)captured->flags,
-          (uint32_t)captured->offset, (uint32_t)replacement->type,
-          (uint32_t)replacement->size, (uint32_t)replacement->flags,
-          (uint32_t)replacement->offset);
+          executable_id, (uint32_t)export_ordinal.value, i,
+          (uint32_t)captured->type, (uint32_t)captured->size,
+          (uint32_t)captured->flags, (uint32_t)captured->offset,
+          (uint32_t)replacement->type, (uint32_t)replacement->size,
+          (uint32_t)replacement->flags, (uint32_t)replacement->offset);
     }
   }
   iree_allocator_free(executor->host_allocator, captured_parameters);
@@ -778,9 +779,9 @@ static iree_status_t iree_hal_replay_executor_validate_executable_substitution(
     iree_hal_executable_t* captured_executable,
     iree_hal_executable_t* replacement_executable) {
   iree_host_size_t captured_export_count =
-      iree_hal_executable_export_count(captured_executable);
+      iree_hal_executable_function_count(captured_executable);
   iree_host_size_t replacement_export_count =
-      iree_hal_executable_export_count(replacement_executable);
+      iree_hal_executable_function_count(replacement_executable);
   if (IREE_UNLIKELY(captured_export_count != replacement_export_count)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -795,13 +796,13 @@ static iree_status_t iree_hal_replay_executor_validate_executable_substitution(
   }
 
   for (iree_host_size_t i = 0; i < captured_export_count; ++i) {
-    const iree_hal_executable_export_ordinal_t export_ordinal =
-        (iree_hal_executable_export_ordinal_t)i;
-    iree_hal_executable_export_info_t captured_info;
-    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+    const iree_hal_executable_function_t export_ordinal =
+        iree_hal_executable_function_from_index((uint32_t)i);
+    iree_hal_executable_function_info_t captured_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_function_info(
         captured_executable, export_ordinal, &captured_info));
-    iree_hal_executable_export_info_t replacement_info;
-    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
+    iree_hal_executable_function_info_t replacement_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_function_info(
         replacement_executable, export_ordinal, &replacement_info));
 
     if (captured_info.flags != replacement_info.flags ||
@@ -818,7 +819,7 @@ static iree_status_t iree_hal_replay_executor_validate_executable_substitution(
           " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u]) "
           "replacement=(flags=0x%016" PRIx64
           " constants=%u bindings=%u parameters=%u workgroup_size=[%u,%u,%u])",
-          executable_id, export_ordinal, captured_info.flags,
+          executable_id, (uint32_t)export_ordinal.value, captured_info.flags,
           (uint32_t)captured_info.constant_count,
           (uint32_t)captured_info.binding_count,
           (uint32_t)captured_info.parameter_count,
@@ -902,7 +903,7 @@ iree_hal_replay_executor_validate_executable_substitution_metadata(
           parameter_metadata_data;
 
   iree_host_size_t replacement_export_count =
-      iree_hal_executable_export_count(replacement_executable);
+      iree_hal_executable_function_count(replacement_executable);
   if (IREE_UNLIKELY(captured_export_count != replacement_export_count)) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -926,9 +927,10 @@ iree_hal_replay_executor_validate_executable_substitution_metadata(
                               "replay executable metadata parameter count "
                               "mismatch");
     }
-    iree_hal_executable_export_info_t replacement_info;
-    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
-        replacement_executable, (iree_hal_executable_export_ordinal_t)i,
+    iree_hal_executable_function_info_t replacement_info;
+    IREE_RETURN_IF_ERROR(iree_hal_executable_function_info(
+        replacement_executable,
+        iree_hal_executable_function_from_index((uint32_t)i),
         &replacement_info));
     if (captured->flags != replacement_info.flags ||
         captured->constant_count != replacement_info.constant_count ||
@@ -960,16 +962,18 @@ iree_hal_replay_executor_validate_executable_substitution_metadata(
     iree_host_size_t parameter_size = 0;
     if (IREE_UNLIKELY(!iree_host_size_checked_mul(
             captured->parameter_count,
-            sizeof(iree_hal_executable_export_parameter_t), &parameter_size))) {
+            sizeof(iree_hal_executable_function_parameter_t),
+            &parameter_size))) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "executable parameter metadata is too large");
     }
-    iree_hal_executable_export_parameter_t* replacement_parameters = NULL;
+    iree_hal_executable_function_parameter_t* replacement_parameters = NULL;
     IREE_RETURN_IF_ERROR(
         iree_allocator_malloc(executor->host_allocator, parameter_size,
                               (void**)&replacement_parameters));
-    iree_status_t status = iree_hal_executable_export_parameters(
-        replacement_executable, (iree_hal_executable_export_ordinal_t)i,
+    iree_status_t status = iree_hal_executable_function_parameters(
+        replacement_executable,
+        iree_hal_executable_function_from_index((uint32_t)i),
         captured->parameter_count, replacement_parameters);
     for (iree_host_size_t j = 0;
          j < captured->parameter_count && iree_status_is_ok(status); ++j) {
@@ -981,7 +985,7 @@ iree_hal_replay_executor_validate_executable_substitution_metadata(
                                   "reserved fields must be zero");
         break;
       }
-      const iree_hal_executable_export_parameter_t* replacement_parameter =
+      const iree_hal_executable_function_parameter_t* replacement_parameter =
           &replacement_parameters[j];
       if (captured_parameter->type != replacement_parameter->type ||
           captured_parameter->size != replacement_parameter->size ||
@@ -2641,7 +2645,8 @@ static iree_status_t iree_hal_replay_plan_prepare_command_buffer_dispatch(
   (void)binding_size;
   out_dispatch->command_buffer_id = record->header.object_id;
   out_dispatch->executable_id = payload.executable_id;
-  out_dispatch->export_ordinal = payload.export_ordinal;
+  out_dispatch->function =
+      iree_hal_executable_function_from_index(payload.export_ordinal);
   memset(&out_dispatch->config, 0, sizeof(out_dispatch->config));
   memcpy(out_dispatch->config.workgroup_size, payload.workgroup_size,
          sizeof(out_dispatch->config.workgroup_size));
@@ -2917,10 +2922,12 @@ static iree_status_t iree_hal_replay_executor_command_buffer_dispatch(
     status = iree_hal_replay_executor_make_buffer_ref(
         executor, &payload.workgroup_count_ref, &config.workgroup_count_ref);
     if (iree_status_is_ok(status)) {
+      const iree_hal_executable_function_t function =
+          iree_hal_executable_function_from_index(payload.export_ordinal);
       status = iree_hal_command_buffer_dispatch(
           command_buffer_entry->value.command_buffer,
-          executable_entry->value.executable, payload.export_ordinal, config,
-          constants, binding_storage.list, payload.flags);
+          executable_entry->value.executable, function, config, constants,
+          binding_storage.list, payload.flags);
     }
   }
   iree_hal_replay_buffer_ref_list_storage_deinitialize(
@@ -2999,11 +3006,12 @@ static iree_status_t iree_hal_replay_executor_queue_dispatch(
     status = iree_hal_replay_executor_make_buffer_ref(
         executor, &payload.workgroup_count_ref, &config.workgroup_count_ref);
     if (iree_status_is_ok(status)) {
+      const iree_hal_executable_function_t function =
+          iree_hal_executable_function_from_index(payload.export_ordinal);
       status = iree_hal_device_queue_dispatch(
           device_entry->value.device, payload.queue_affinity, wait_storage.list,
-          signal_storage.list, executable_entry->value.executable,
-          payload.export_ordinal, config, constants, binding_storage.list,
-          payload.flags);
+          signal_storage.list, executable_entry->value.executable, function,
+          config, constants, binding_storage.list, payload.flags);
     }
   }
   if (iree_status_is_ok(status)) {
@@ -3364,7 +3372,7 @@ static iree_status_t iree_hal_replay_plan_execute_command_buffer_dispatch(
     if (iree_status_is_ok(status)) {
       status = iree_hal_command_buffer_dispatch(
           command_buffer_entry->value.command_buffer,
-          executable_entry->value.executable, dispatch->export_ordinal, config,
+          executable_entry->value.executable, dispatch->function, config,
           dispatch->constants, binding_storage.list, dispatch->flags);
     }
   }

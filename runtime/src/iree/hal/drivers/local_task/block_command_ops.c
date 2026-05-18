@@ -183,7 +183,7 @@ iree_status_t iree_hal_cmd_build_update(iree_hal_cmd_block_builder_t* builder,
 
 iree_status_t iree_hal_cmd_build_dispatch(
     iree_hal_cmd_block_builder_t* builder, iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_host_size_t binding_count, iree_hal_dispatch_flags_t flags,
     iree_hal_cmd_fixup_t** out_fixups, iree_hal_cmd_build_token_t* out_token) {
@@ -216,6 +216,14 @@ iree_status_t iree_hal_cmd_build_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs = {0};
   if (local_executable->dispatch_attrs) {

@@ -280,7 +280,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_export_record_length(
 
 static iree_status_t iree_hal_amdgpu_profile_metadata_export_data_length(
     iree_host_size_t export_count,
-    const iree_hal_executable_export_info_t* export_infos,
+    const iree_hal_executable_function_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
     iree_host_size_t* out_data_length) {
   *out_data_length = 0;
@@ -315,7 +315,7 @@ static iree_status_t iree_hal_amdgpu_profile_metadata_export_data_length(
 
 static iree_status_t iree_hal_amdgpu_profile_metadata_append_export_records(
     uint64_t executable_id, iree_host_size_t export_count,
-    const iree_hal_executable_export_info_t* export_infos,
+    const iree_hal_executable_function_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
     const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
@@ -448,7 +448,7 @@ static bool iree_hal_amdgpu_profile_metadata_has_code_object_locked(
 iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
     iree_host_size_t export_count,
-    const iree_hal_executable_export_info_t* export_infos,
+    const iree_hal_executable_function_info_t* export_infos,
     const iree_host_size_t* export_parameter_offsets,
     const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,

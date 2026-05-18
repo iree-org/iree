@@ -466,17 +466,19 @@ static void iree_hal_cuda_native_executable_destroy(
 
 iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_cuda_kernel_params_t** out_params) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
-  if (ordinal >= executable->export_count) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "export ordinal %d out of range; executable contains %" PRIhsz
-        " exports",
-        ordinal, executable->export_count);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range; executable contains %" PRIhsz
+                            " exports",
+                            function.value, executable->export_count);
   }
+  const uint32_t ordinal = iree_hal_executable_function_index(function);
   *out_params = &executable->exports[ordinal];
   return iree_ok_status();
 }
@@ -492,8 +494,8 @@ static iree_host_size_t iree_hal_cuda_native_executable_export_count(
 
 static iree_status_t iree_hal_cuda_native_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   (void)executable;
@@ -504,9 +506,8 @@ static iree_status_t iree_hal_cuda_native_executable_export_info(
 
 static iree_status_t iree_hal_cuda_native_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   (void)executable;
@@ -517,7 +518,7 @@ static iree_status_t iree_hal_cuda_native_executable_export_parameters(
 
 static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   (void)executable;
@@ -610,10 +611,11 @@ static iree_status_t iree_hal_cuda_native_executable_lookup_global_by_name(
 static const iree_hal_executable_vtable_t
     iree_hal_cuda_native_executable_vtable = {
         .destroy = iree_hal_cuda_native_executable_destroy,
-        .export_count = iree_hal_cuda_native_executable_export_count,
-        .export_info = iree_hal_cuda_native_executable_export_info,
-        .export_parameters = iree_hal_cuda_native_executable_export_parameters,
-        .lookup_export_by_name =
+        .function_count = iree_hal_cuda_native_executable_export_count,
+        .function_info = iree_hal_cuda_native_executable_export_info,
+        .function_parameters =
+            iree_hal_cuda_native_executable_export_parameters,
+        .lookup_function_by_name =
             iree_hal_cuda_native_executable_lookup_export_by_name,
         .lookup_global_by_name =
             iree_hal_cuda_native_executable_lookup_global_by_name,

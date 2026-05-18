@@ -3201,7 +3201,7 @@ iree_hal_amdgpu_pm4_command_buffer_register_profile_operations(
 static iree_status_t iree_hal_amdgpu_pm4_command_buffer_record_dispatch(
     iree_hal_amdgpu_pm4_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   IREE_RETURN_IF_ERROR(
@@ -3309,11 +3309,13 @@ static iree_status_t iree_hal_amdgpu_pm4_command_buffer_record_dispatch(
         "PM4 command-buffer command index exceeds uint32_t storage");
   }
   const uint32_t command_index = command_buffer->record_command_count;
+  const uint32_t function_index =
+      iree_hal_executable_function_index(export_ordinal);
   iree_status_t status =
       iree_hal_amdgpu_pm4_command_buffer_append_dispatch_record(
           command_buffer, descriptor,
           iree_hal_amdgpu_executable_profile_id(executable), command_index,
-          export_ordinal, config, constants, bindings, record_flags,
+          function_index, config, constants, bindings, record_flags,
           barrier_acquire_scope, barrier_release_scope);
   if (iree_status_is_ok(status)) {
     ++command_buffer->record_command_count;
@@ -3997,7 +3999,7 @@ static iree_status_t iree_hal_amdgpu_pm4_command_buffer_collective(
 static iree_status_t iree_hal_amdgpu_pm4_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_amdgpu_pm4_command_buffer_t* command_buffer =

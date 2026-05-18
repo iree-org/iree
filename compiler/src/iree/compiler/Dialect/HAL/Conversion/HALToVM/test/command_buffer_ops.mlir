@@ -324,7 +324,7 @@ util.func public @command_buffer_dispatch(
   %buffer: !hal.buffer,
   %slot: index
 ) {
-  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i64 123
   // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
   %ordinal = arith.constant 123 : index
   // CHECK-DAG: %[[X:.+]] = vm.const.i32 100
@@ -377,7 +377,7 @@ util.func public @command_buffer_dispatch(
   %buffer: !hal.buffer,
   %slot: index
 ) {
-  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i64 123
   // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
   %ordinal = arith.constant 123 : index
   // CHECK-DAG: %[[WORKGROUPS_OFFSET:.+]] = vm.const.i64 100

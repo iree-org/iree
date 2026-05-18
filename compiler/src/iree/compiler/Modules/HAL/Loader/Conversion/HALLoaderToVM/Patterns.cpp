@@ -85,7 +85,8 @@ struct ExecutableDispatchOpConversion
                   ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value, 8> callOperands = {
         adaptor.getExecutable(),
-        castToI32(adaptor.getEntryPoint(), rewriter),
+        castToImportType(adaptor.getEntryPoint(), rewriter.getI64Type(),
+                         rewriter),
         castToI32(adaptor.getWorkgroupX(), rewriter),
         castToI32(adaptor.getWorkgroupY(), rewriter),
         castToI32(adaptor.getWorkgroupZ(), rewriter),

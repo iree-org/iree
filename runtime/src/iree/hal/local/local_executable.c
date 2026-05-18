@@ -48,14 +48,17 @@ uint64_t iree_hal_local_executable_profile_id(
 
 iree_string_view_t iree_hal_local_executable_export_name(
     const iree_hal_local_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal) {
+    iree_hal_executable_function_t function) {
   IREE_ASSERT_ARGUMENT(executable);
-  if (export_ordinal >= executable->export_count ||
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->export_count) ||
       executable->export_names == NULL ||
-      executable->export_names[export_ordinal] == NULL) {
+      executable->export_names[iree_hal_executable_function_index(function)] ==
+          NULL) {
     return iree_string_view_empty();
   }
-  return iree_make_cstring_view(executable->export_names[export_ordinal]);
+  const uint32_t function_index = iree_hal_executable_function_index(function);
+  return iree_make_cstring_view(executable->export_names[function_index]);
 }
 
 iree_status_t iree_hal_local_executable_issue_call(

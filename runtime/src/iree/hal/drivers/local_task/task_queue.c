@@ -401,7 +401,7 @@ static void iree_hal_task_queue_profile_add_host_flags(
 
 static iree_status_t iree_hal_task_queue_profile_set_dispatch(
     iree_hal_task_queue_op_t* operation, iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_task_queue_profile_operation_t* profile_operation =
       iree_hal_task_queue_profile_operation(operation);
@@ -412,7 +412,8 @@ static iree_status_t iree_hal_task_queue_profile_set_dispatch(
       iree_hal_local_executable_cast(executable);
   profile_operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  profile_operation->export_ordinal = export_ordinal;
+  profile_operation->export_ordinal =
+      iree_hal_executable_function_index(function);
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     profile_operation->host_flags |=
         IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -3740,7 +3741,7 @@ iree_status_t iree_hal_task_queue_submit_update(
 
 iree_status_t iree_hal_task_queue_submit_dispatch(
     iree_hal_task_queue_t* queue, iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,

@@ -13,7 +13,7 @@
 #include "iree/schemas/webgpu_executable_def_verifier.h"
 
 //===----------------------------------------------------------------------===//
-// Per-export entry
+// Per-function entry
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_webgpu_executable_entry_t {
@@ -21,11 +21,11 @@ typedef struct iree_hal_webgpu_executable_entry_t {
   iree_hal_webgpu_handle_t pipeline_handle;
   // Bridge handle for bind group layout 0 of the compute pipeline.
   iree_hal_webgpu_handle_t bind_group_layout_handle;
-  // Export name used by the command buffer and reflection APIs.
+  // Function name used by the command buffer and reflection APIs.
   iree_string_view_t name;
-  // Static workgroup size for the export.
+  // Static workgroup size for the function.
   uint32_t workgroup_size[3];
-  // Number of resource bindings declared by the export.
+  // Number of resource bindings declared by the function.
   uint16_t binding_count;
   // Number of push constants declared by the executable.
   uint16_t constant_count;
@@ -40,9 +40,9 @@ typedef struct iree_hal_webgpu_executable_t {
   iree_hal_resource_t resource;
   // Host allocator used to allocate the executable and entry storage.
   iree_allocator_t host_allocator;
-  // Number of exports in the executable.
-  iree_host_size_t export_count;
-  // Per-export entry table with |export_count| entries.
+  // Number of functions in the executable.
+  iree_host_size_t function_count;
+  // Per-function entry table with |function_count| entries.
   iree_hal_webgpu_executable_entry_t entries[];
 } iree_hal_webgpu_executable_t;
 
@@ -263,7 +263,7 @@ iree_status_t iree_hal_webgpu_executable_create(
   iree_hal_resource_initialize(&iree_hal_webgpu_executable_vtable,
                                &executable->resource);
   executable->host_allocator = host_allocator;
-  executable->export_count = export_count;
+  executable->function_count = export_count;
   char* name_storage =
       (char*)executable + sizeof(*executable) +
       export_count * sizeof(iree_hal_webgpu_executable_entry_t);
@@ -288,20 +288,24 @@ iree_status_t iree_hal_webgpu_executable_create(
 
 iree_hal_webgpu_handle_t iree_hal_webgpu_executable_pipeline_handle(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal) {
+    iree_hal_executable_function_t function) {
   iree_hal_webgpu_executable_t* executable =
       iree_hal_webgpu_executable_cast(base_executable);
-  IREE_ASSERT((iree_host_size_t)export_ordinal < executable->export_count);
-  return executable->entries[export_ordinal].pipeline_handle;
+  IREE_ASSERT(iree_hal_executable_function_is_index_in_range(
+      function, executable->function_count));
+  const uint32_t function_index = iree_hal_executable_function_index(function);
+  return executable->entries[function_index].pipeline_handle;
 }
 
 iree_hal_webgpu_handle_t iree_hal_webgpu_executable_bind_group_layout_handle(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal) {
+    iree_hal_executable_function_t function) {
   iree_hal_webgpu_executable_t* executable =
       iree_hal_webgpu_executable_cast(base_executable);
-  IREE_ASSERT((iree_host_size_t)export_ordinal < executable->export_count);
-  return executable->entries[export_ordinal].bind_group_layout_handle;
+  IREE_ASSERT(iree_hal_executable_function_is_index_in_range(
+      function, executable->function_count));
+  const uint32_t function_index = iree_hal_executable_function_index(function);
+  return executable->entries[function_index].bind_group_layout_handle;
 }
 
 static void iree_hal_webgpu_executable_destroy(
@@ -311,7 +315,7 @@ static void iree_hal_webgpu_executable_destroy(
   iree_allocator_t host_allocator = executable->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  for (iree_host_size_t i = 0; i < executable->export_count; ++i) {
+  for (iree_host_size_t i = 0; i < executable->function_count; ++i) {
     iree_hal_webgpu_executable_entry_t* entry = &executable->entries[i];
     iree_hal_webgpu_import_handle_release(entry->pipeline_handle);
     iree_hal_webgpu_import_handle_release(entry->bind_group_layout_handle);
@@ -321,27 +325,29 @@ static void iree_hal_webgpu_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_host_size_t iree_hal_webgpu_executable_export_count(
+static iree_host_size_t iree_hal_webgpu_executable_function_count(
     iree_hal_executable_t* base_executable) {
   iree_hal_webgpu_executable_t* executable =
       iree_hal_webgpu_executable_cast(base_executable);
-  return executable->export_count;
+  return executable->function_count;
 }
 
-static iree_status_t iree_hal_webgpu_executable_export_info(
+static iree_status_t iree_hal_webgpu_executable_function_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_webgpu_executable_t* executable =
       iree_hal_webgpu_executable_cast(base_executable);
-  if ((iree_host_size_t)export_ordinal >= executable->export_count) {
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->function_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %u out of range (count=%" PRIhsz
-                            ")",
-                            export_ordinal, executable->export_count);
+                            "function id %" PRIu64
+                            " out of range (count=%" PRIhsz ")",
+                            function.value, executable->function_count);
   }
+  const uint32_t function_index = iree_hal_executable_function_index(function);
   const iree_hal_webgpu_executable_entry_t* entry =
-      &executable->entries[export_ordinal];
+      &executable->entries[function_index];
   memset(out_info, 0, sizeof(*out_info));
   out_info->name = entry->name;
   out_info->binding_count = entry->binding_count;
@@ -352,37 +358,41 @@ static iree_status_t iree_hal_webgpu_executable_export_info(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_executable_export_parameters(
+static iree_status_t iree_hal_webgpu_executable_function_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t function, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
+  (void)base_executable;
+  (void)function;
+  (void)capacity;
+  (void)out_parameters;
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "WebGPU executables do not support parameter "
                           "reflection; WGSL shader metadata does not carry "
                           "per-parameter name/description information");
 }
 
-static iree_status_t iree_hal_webgpu_executable_lookup_export_by_name(
+static iree_status_t iree_hal_webgpu_executable_lookup_function_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_function) {
   iree_hal_webgpu_executable_t* executable =
       iree_hal_webgpu_executable_cast(base_executable);
-  for (iree_host_size_t i = 0; i < executable->export_count; ++i) {
+  for (iree_host_size_t i = 0; i < executable->function_count; ++i) {
     if (iree_string_view_equal(executable->entries[i].name, name)) {
-      *out_export_ordinal = (iree_hal_executable_export_ordinal_t)i;
+      *out_function = iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
     }
   }
   return iree_make_status(IREE_STATUS_NOT_FOUND,
-                          "no export named '%.*s' in executable",
+                          "no function named '%.*s' in executable",
                           (int)name.size, name.data);
 }
 
 static const iree_hal_executable_vtable_t iree_hal_webgpu_executable_vtable = {
     .destroy = iree_hal_webgpu_executable_destroy,
-    .export_count = iree_hal_webgpu_executable_export_count,
-    .export_info = iree_hal_webgpu_executable_export_info,
-    .export_parameters = iree_hal_webgpu_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_webgpu_executable_lookup_export_by_name,
+    .function_count = iree_hal_webgpu_executable_function_count,
+    .function_info = iree_hal_webgpu_executable_function_info,
+    .function_parameters = iree_hal_webgpu_executable_function_parameters,
+    .lookup_function_by_name =
+        iree_hal_webgpu_executable_lookup_function_by_name,
 };

@@ -152,7 +152,8 @@ class DispatchIndirectParametersTest : public CtsTestBase<> {
         /*.values=*/binding_refs,
     };
     IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-        command_buffer, workgroup_id_executable_, /*entry_point=*/0,
+        command_buffer, workgroup_id_executable_,
+        iree_hal_executable_function_from_index(0),
         IndirectDispatchConfig(parameter_buffer, parameter_ref_length),
         iree_const_byte_span_empty(), bindings, flags));
   }
@@ -373,7 +374,8 @@ TEST_P(DispatchIndirectParametersTest, DynamicParametersFromDispatch) {
         /*.values=*/binding_refs,
     };
     IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-        command_buffer, parameter_producer_executable_, /*entry_point=*/0,
+        command_buffer, parameter_producer_executable_,
+        iree_hal_executable_function_from_index(0),
         iree_hal_make_static_dispatch_config(1, 1, 1),
         iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   }

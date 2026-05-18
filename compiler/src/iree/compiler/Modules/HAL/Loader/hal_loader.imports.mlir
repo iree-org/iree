@@ -28,7 +28,7 @@ attributes {nosideeffects}
 // and bindings.
 vm.import private @executable.dispatch(
   %executable : !vm.ref<!hal.executable>,
-  %entry_point : i32,
+  %function_id : i64,
   %workgroup_x : i32,
   %workgroup_y : i32,
   %workgroup_z : i32,
@@ -36,5 +36,12 @@ vm.import private @executable.dispatch(
   // <buffer, offset, length>
   %bindings : tuple<!vm.buffer, i64, i64>...
 )
+
+// Looks up an executable function by name and returns a runtime function id.
+vm.import private @executable.lookup.function(
+  %executable : !vm.ref<!hal.executable>,
+  %function_name : !vm.buffer
+) -> i64
+attributes {nosideeffects}
 
 }  // module

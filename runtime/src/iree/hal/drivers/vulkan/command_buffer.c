@@ -81,7 +81,7 @@ typedef struct iree_hal_vulkan_command_dispatch_t {
   const iree_hal_vulkan_pipeline_t* pipeline;
 
   // Executable export ordinal captured during recording.
-  iree_hal_executable_export_ordinal_t export_ordinal;
+  iree_hal_executable_function_t export_ordinal;
 
   // Dispatch workgroup configuration captured during recording.
   iree_hal_dispatch_config_t config;
@@ -810,7 +810,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_profile_operation(
           dispatch->executable, dispatch->export_ordinal, &pipeline));
       record.executable_id =
           iree_hal_vulkan_executable_profile_id(dispatch->executable);
-      record.export_ordinal = dispatch->export_ordinal;
+      record.export_ordinal =
+          iree_hal_executable_function_index(dispatch->export_ordinal);
       if (dispatch->binding_count > UINT32_MAX) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -1074,7 +1075,8 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     event_info.executable_id =
         iree_hal_vulkan_executable_profile_id(dispatch->executable);
     event_info.command_index = profile_command_index;
-    event_info.export_ordinal = dispatch->export_ordinal;
+    event_info.export_ordinal =
+        iree_hal_executable_function_index(dispatch->export_ordinal);
     if (is_command_buffer_dispatch) {
       event_info.flags |= IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
     }
@@ -2854,7 +2856,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_validate_dispatch_abi(
 static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_vulkan_command_buffer_t* command_buffer =

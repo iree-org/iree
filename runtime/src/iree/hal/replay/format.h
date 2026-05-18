@@ -375,7 +375,7 @@ typedef struct iree_hal_replay_executable_metadata_header_t {
 
 // Captured executable export reflection used to validate substitutions.
 typedef struct iree_hal_replay_executable_export_metadata_t {
-  // Export behavior flags from iree_hal_executable_export_info_t.
+  // Export behavior flags from iree_hal_executable_function_info_t.
   uint64_t flags;
   // Static or minimum workgroup size of the export.
   uint32_t workgroup_size[3];
@@ -393,9 +393,9 @@ typedef struct iree_hal_replay_executable_export_metadata_t {
 typedef struct iree_hal_replay_executable_parameter_metadata_t {
   // Parameter offset in bytes or binding ordinal, depending on type.
   uint16_t offset;
-  // Parameter flags from iree_hal_executable_export_parameter_t.
+  // Parameter flags from iree_hal_executable_function_parameter_t.
   uint16_t flags;
-  // iree_hal_executable_export_parameter_type_t value.
+  // iree_hal_executable_function_parameter_type_t value.
   uint8_t type;
   // Parameter size in bytes.
   uint8_t size;
