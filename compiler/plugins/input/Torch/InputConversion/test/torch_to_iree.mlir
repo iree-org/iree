@@ -49,22 +49,3 @@ func.func @main(%arg0: !torch.vtensor<[2,3,4],f32>) -> (!torch.vtensor<[2,3,4],f
   %3 = torch.aten.copy %arg0, %2, %false_2 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>, !torch.bool -> !torch.vtensor<[2,3,4],f32>
   return %3, %3 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>
 }
-
-// -----
-
-// Verify flex_attention can inline a mask_mod callback even when the callback
-// function appears before the user function in module order.
-func.func private @sdpa_mask(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
-  %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
-  return %0 : !torch.vtensor<[],i1>
-}
-
-// CHECK-LABEL: util.func public @flex_mask$async
-func.func @flex_mask(%arg0: !torch.vtensor<[2,4,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,4,8,16],f32>) -> !torch.vtensor<[2,4,8,16],f32> {
-  %none = torch.constant.none
-  %false = torch.constant.bool false
-  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false {mask_mod_fn = @sdpa_mask} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.none
-  return %output : !torch.vtensor<[2,4,8,16],f32>
-}
-// CHECK:      iree_linalg_ext.online_attention
-// CHECK-SAME: tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32, tensor<2x4x8x8xi1>

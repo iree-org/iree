@@ -66,9 +66,6 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTorchUnstructuredToLinalgExtPass());
-  // Keep this as a module-level barrier so unstructured conversions finish
-  // across the module before later per-function Torch conversions run.
-  pm.addPass(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
