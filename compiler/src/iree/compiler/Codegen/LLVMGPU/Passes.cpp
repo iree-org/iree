@@ -71,6 +71,10 @@ static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
+// Declared in GPUVectorAlloc.cpp; used here to add the flattening pass only
+// when GPUVectorAlloc may have emitted swizzle hints.
+extern llvm::cl::opt<bool> clEnableVectorAllocSwizzle;
+
 static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
@@ -842,6 +846,14 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
+  // FlattenSwizzleHintAllocs rewrites a multi-D memref::AllocOp + SwizzleHintOp
+  // into the flat 1D alloc + SwizzleHintOp + memref.expand_shape form that
+  // ResolveSwizzleHints verifies. Only needed when GPUVectorAlloc emitted a
+  // hint (i.e. the swizzle flag is enabled); skipping preserves the upstream
+  // pipeline bit-for-bit when the flag is off.
+  if (clEnableVectorAllocSwizzle) {
+    funcPassManager.addPass(createFlattenSwizzleHintAllocsPass());
+  }
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
@@ -855,6 +867,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  // The padding pass skips swizzled allocs locally, but can still pad any
+  // shared-memory allocs that did not receive a swizzle hint.
   if (options.enableReduceSharedMemoryBankConflicts) {
     GPUReduceBankConflictsPassOptions options = {};
     options.paddingBits = 64;

@@ -335,6 +335,134 @@ func.func @swizzle_strided_rank1_after_multibuffer(%src: memref<4096xi8, strided
 
 // -----
 
+// Sub-accessWidth scalar load. accessWidth=16 with a vector<1xi8> load:
+// XORShuffleAttr::swizzleOffset strips the (offset % accessWidth) internally,
+// computes the diff on the aligned id, and returns offset + diff — so the
+// scalar offset is preserved within the swizzled group without any extra
+// arithmetic on our side. 1955 = 1952 + 3; swizzle(1952) = 2000; diff = 48;
+// result = 1955 + 48 = 2003.
+func.func @swizzle_load_xor_scalar(%src: memref<?xi8>) -> vector<1xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1955 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<1xi8>
+  return %1: vector<1xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load_xor_scalar
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 2003 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[SWOFF]]] : memref<?xi8>, vector<1xi8>
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
+// Sub-accessWidth scalar store, symmetric to the load above.
+func.func @swizzle_store_xor_scalar(%src: memref<?xi8>, %v: vector<1xi8>) {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1955 : index
+  vector.store %v, %0[%offset] : memref<?xi8>, vector<1xi8>
+  return
+}
+
+// CHECK-LABEL: func @swizzle_store_xor_scalar
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//  CHECK-SAME:   %[[VAL:[A-Za-z0-9]+]]: vector<1xi8>
+//       CHECK:   %[[SWOFF:.+]] = arith.constant 2003 : index
+//       CHECK:   vector.store %[[VAL]], %[[SRC]][%[[SWOFF]]] : memref<?xi8>, vector<1xi8>
+
+// -----
+
+// Sub-accessWidth load with width in (1, accessWidth): we can't statically
+// prove the access doesn't straddle a swizzle group, so the rewrite bails
+// and the load is left untouched (the hint is folded away).
+func.func @swizzle_load_xor_partial(%src: memref<?xi8>) -> vector<2xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1955 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<2xi8>
+  return %1: vector<2xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load_xor_partial
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//   CHECK-NOT:   iree_codegen.swizzle_hint
+//       CHECK:   %[[OFF:.+]] = arith.constant 1955 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<2xi8>
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
+// Sub-accessWidth store with width in (1, accessWidth): also left untouched.
+func.func @swizzle_store_xor_partial(%src: memref<?xi8>, %v: vector<2xi8>) {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1955 : index
+  vector.store %v, %0[%offset] : memref<?xi8>, vector<2xi8>
+  return
+}
+
+// CHECK-LABEL: func @swizzle_store_xor_partial
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//  CHECK-SAME:   %[[VAL:[A-Za-z0-9]+]]: vector<2xi8>
+//   CHECK-NOT:   iree_codegen.swizzle_hint
+//       CHECK:   %[[OFF:.+]] = arith.constant 1955 : index
+//       CHECK:   vector.store %[[VAL]], %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<2xi8>
+
+// -----
+
+// Width greater than accessWidth but not divisible by accessWidth: left
+// untouched so the resolver never creates out-of-bounds vector slices.
+func.func @swizzle_load_xor_non_multiple(%src: memref<?xi8>) -> vector<18xi8> {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1952 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<18xi8>
+  return %1: vector<18xi8>
+}
+
+// CHECK-LABEL: func @swizzle_load_xor_non_multiple
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//   CHECK-NOT:   iree_codegen.swizzle_hint
+//       CHECK:   %[[OFF:.+]] = arith.constant 1952 : index
+//       CHECK:   %[[VECTOR:.+]] = vector.load %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<18xi8>
+//       CHECK:   return %[[VECTOR]]
+
+// -----
+
+func.func @swizzle_store_xor_non_multiple(%src: memref<?xi8>, %v: vector<18xi8>) {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1952 : index
+  vector.store %v, %0[%offset] : memref<?xi8>, vector<18xi8>
+  return
+}
+
+// CHECK-LABEL: func @swizzle_store_xor_non_multiple
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//  CHECK-SAME:   %[[VAL:[A-Za-z0-9]+]]: vector<18xi8>
+//   CHECK-NOT:   iree_codegen.swizzle_hint
+//       CHECK:   %[[OFF:.+]] = arith.constant 1952 : index
+//       CHECK:   vector.store %[[VAL]], %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<18xi8>
+
+// -----
+
+// If any direct access of a hint is unsupported, all accesses for that hint
+// must remain unswizzled. This avoids mixing physical and logical offsets for
+// the same allocation.
+func.func @swizzle_mixed_supported_and_unsupported(%src: memref<?xi8>) -> (vector<1xi8>, vector<2xi8>) {
+  %0 = iree_codegen.swizzle_hint %src[#iree_codegen.xor_shuffle<128, 16>] : memref<?xi8>
+  %offset = arith.constant 1955 : index
+  %1 = vector.load %0[%offset] : memref<?xi8>, vector<1xi8>
+  %2 = vector.load %0[%offset] : memref<?xi8>, vector<2xi8>
+  return %1, %2: vector<1xi8>, vector<2xi8>
+}
+
+// CHECK-LABEL: func @swizzle_mixed_supported_and_unsupported
+//  CHECK-SAME:   %[[SRC:[A-Za-z0-9]+]]: memref<?xi8>
+//   CHECK-NOT:   iree_codegen.swizzle_hint
+//       CHECK:   %[[OFF:.+]] = arith.constant 1955 : index
+//       CHECK:   %[[V0:.+]] = vector.load %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<1xi8>
+//       CHECK:   %[[V1:.+]] = vector.load %[[SRC]][%[[OFF]]] : memref<?xi8>, vector<2xi8>
+//       CHECK:   return %[[V0]], %[[V1]]
+
+// -----
+
 // Verify that swizzle_hint fails on non-flat (rank > 1) memrefs.
 func.func @swizzle_hint_non_flat_memref_error(%src: memref<32x64xf32>) -> vector<4xf32> {
   // expected-error @+1 {{swizzle hint operand must be a contiguous flat memref, got 'memref<32x64xf32>'}}

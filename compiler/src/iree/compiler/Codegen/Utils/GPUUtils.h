@@ -23,6 +23,9 @@ namespace mlir::iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
+// Each shared memory bank is 4 bytes (32 bits) wide on all current GPU
+// architectures (NVIDIA and AMD).
+static constexpr int64_t kSharedMemoryBankWidthBytes = 4;
 
 // Universally-safe ceiling for `gpu.shuffle`-based codegen: at this width or
 // below, every backend's `gpu.shuffle` lowering emits working code. Wider
