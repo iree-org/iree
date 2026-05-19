@@ -9,7 +9,7 @@ iree_cc_library(
       partitioner_api
     HDRS
       "embedding_api.h"
-      "loader.cpp"
+      "loader.h"
     PUBLIC
 )
 
