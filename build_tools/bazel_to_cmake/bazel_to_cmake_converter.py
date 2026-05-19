@@ -1769,6 +1769,7 @@ class BuildFileFunctions(object):
         compiler_flags=None,
         runner_args=None,
         tags=None,
+        timeout=None,
         target_cpu_features_variants=None,
         **kwargs,
     ):
@@ -1803,6 +1804,7 @@ class BuildFileFunctions(object):
         )
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
+        timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         target_cpu_features_variants_block = self._convert_string_list_block(
             "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants
         )
@@ -1819,6 +1821,7 @@ class BuildFileFunctions(object):
             f"{compiler_flags_block}"
             f"{runner_args_block}"
             f"{labels_block}"
+            f"{timeout_block}"
             f"{target_cpu_features_variants_block}"
             f")\n\n"
         )
