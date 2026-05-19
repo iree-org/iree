@@ -305,7 +305,7 @@ class PerfettoTraceConverter:
             int, list[dict[str, Any]]
         ] = collections.defaultdict(list)
         self.command_operations_by_key: dict[tuple[int, int], dict[str, Any]] = {}
-        self.executable_exports_by_key: dict[tuple[int, int], dict[str, Any]] = {}
+        self.executable_functions_by_key: dict[tuple[int, int], dict[str, Any]] = {}
         self.counter_sets_by_id: dict[int, dict[str, Any]] = {}
         self.counters_by_counter_set_id: dict[int, list[dict[str, Any]]] = (
             collections.defaultdict(list)
@@ -360,13 +360,13 @@ class PerfettoTraceConverter:
                     self.command_operations_by_command_buffer_id[
                         command_buffer_id
                     ].append(record)
-            elif record_type == "executable_export":
+            elif record_type == "executable_function":
                 executable_id = parse_integer(record.get("executable_id", 0))
-                export_ordinal = parse_ordinal(record.get("export_ordinal"))
-                if executable_id and export_ordinal >= 0:
-                    self.executable_exports_by_key[(executable_id, export_ordinal)] = (
-                        record
-                    )
+                function_ordinal = parse_ordinal(record.get("function_ordinal"))
+                if executable_id and function_ordinal >= 0:
+                    self.executable_functions_by_key[
+                        (executable_id, function_ordinal)
+                    ] = record
             elif record_type == "counter_set":
                 counter_set_id = parse_integer(record.get("counter_set_id", 0))
                 if counter_set_id:
@@ -972,12 +972,12 @@ class PerfettoTraceConverter:
         op = str(operation.get("op", "op"))
         display_name = str(operation.get("key") or op)
         executable_id = parse_integer(operation.get("executable_id", 0))
-        export_ordinal = parse_ordinal(operation.get("export_ordinal"))
-        export_record = self.executable_exports_by_key.get(
-            (executable_id, export_ordinal)
+        function_ordinal = parse_ordinal(operation.get("function_ordinal"))
+        function_record = self.executable_functions_by_key.get(
+            (executable_id, function_ordinal)
         )
-        if export_record is not None and export_record.get("name"):
-            display_name = str(export_record["name"])
+        if function_record is not None and function_record.get("name"):
+            display_name = str(function_record["name"])
         if include_command_index:
             return f"op{command_index} {op} {display_name}"
         return display_name
@@ -1325,9 +1325,9 @@ class PerfettoTraceConverter:
         time_domain: str,
     ) -> dict[str, Any]:
         executable_id = parse_integer(sample_record.get("executable_id", 0))
-        export_ordinal = parse_ordinal(sample_record.get("export_ordinal"))
-        export_record = self.executable_exports_by_key.get(
-            (executable_id, export_ordinal)
+        function_ordinal = parse_ordinal(sample_record.get("function_ordinal"))
+        function_record = self.executable_functions_by_key.get(
+            (executable_id, function_ordinal)
         )
         return {
             "iree_counter_sample_id": sample_record.get("sample_id"),
@@ -1349,9 +1349,9 @@ class PerfettoTraceConverter:
             "iree_command_buffer_id": sample_record.get("command_buffer_id"),
             "iree_command_index": sample_record.get("command_index"),
             "iree_executable_id": sample_record.get("executable_id"),
-            "iree_export_ordinal": sample_record.get("export_ordinal"),
-            "iree_executable_export_name": (
-                export_record.get("name") if export_record is not None else None
+            "iree_function_ordinal": sample_record.get("function_ordinal"),
+            "iree_executable_function_name": (
+                function_record.get("name") if function_record is not None else None
             ),
             "iree_stream_id": sample_record.get("stream_id"),
             "iree_duration_ticks": sample_record.get("duration_ticks"),

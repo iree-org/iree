@@ -463,8 +463,9 @@ IREE_FLAG(
     "--device_profiling_mode is nonempty. The output is written by tooling\n"
     "using a generic profile sink.");
 IREE_FLAG(
-    string, device_profiling_filter_export, "",
-    "Optional glob pattern selecting executable export names that should emit\n"
+    string, device_profiling_filter_function, "",
+    "Optional glob pattern selecting executable function names that should "
+    "emit\n"
     "heavy profiling artifacts such as dispatch timings or hardware counter\n"
     "samples. Cheap session metadata remains available so filtered captures\n"
     "can still be decoded.");
@@ -580,11 +581,11 @@ static iree_status_t iree_hal_profile_capture_filter_set_u32_from_flag(
 static iree_status_t iree_hal_profile_capture_filter_from_flags(
     iree_hal_profile_capture_filter_t* out_filter) {
   *out_filter = iree_hal_profile_capture_filter_default();
-  if (strlen(FLAG_device_profiling_filter_export) != 0) {
+  if (strlen(FLAG_device_profiling_filter_function) != 0) {
     out_filter->flags |=
-        IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-    out_filter->executable_export_pattern =
-        iree_make_cstring_view(FLAG_device_profiling_filter_export);
+        IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+    out_filter->executable_function_pattern =
+        iree_make_cstring_view(FLAG_device_profiling_filter_function);
   }
   if (FLAG_device_profiling_filter_command_buffer == 0) {
     return iree_make_status(
@@ -716,7 +717,7 @@ iree_hal_profiling_from_flags_requires_retained_command_buffer_metadata(
 }
 
 static bool iree_hal_device_profiling_filter_flags_present(void) {
-  return strlen(FLAG_device_profiling_filter_export) != 0 ||
+  return strlen(FLAG_device_profiling_filter_function) != 0 ||
          FLAG_device_profiling_filter_command_buffer >= 0 ||
          FLAG_device_profiling_filter_command_index >= 0 ||
          FLAG_device_profiling_filter_physical_device >= 0 ||

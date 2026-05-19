@@ -183,14 +183,14 @@ static const iree_profile_command_t kIreeProfileCounterCommand = {
 };
 static const iree_profile_command_t kIreeProfileDispatchCommand = {
     .name = "dispatch",
-    .summary = "Per-export dispatch timing aggregates or event rows.",
+    .summary = "Per-function dispatch timing aggregates or event rows.",
     .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
     .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
     .run = iree_profile_run_dispatch,
 };
 static const iree_profile_command_t kIreeProfileExecutableCommand = {
     .name = "executable",
-    .summary = "Executable/export catalog joined with dispatch timing.",
+    .summary = "Executable/function catalog joined with dispatch timing.",
     .supported_formats = IREE_PROFILE_COMMAND_REPORT_FORMATS,
     .accepted_options = IREE_PROFILE_COMMAND_PROJECTION_OPTIONS,
     .run = iree_profile_run_executable,

@@ -33,8 +33,8 @@ typedef struct iree_profile_dispatch_aggregate_t {
   uint32_t physical_device_ordinal;
   // Producer-local executable identifier for this aggregate row.
   uint64_t executable_id;
-  // Export ordinal for this aggregate row.
-  uint32_t export_ordinal;
+  // Function ordinal for this aggregate row.
+  uint32_t function_ordinal;
   // Total dispatch records matched for this aggregate row.
   uint64_t dispatch_count;
   // Dispatch records with valid start/end timestamps.
@@ -114,8 +114,8 @@ typedef struct iree_profile_host_dispatch_aggregate_t {
   uint32_t physical_device_ordinal;
   // Producer-local executable identifier for this aggregate row.
   uint64_t executable_id;
-  // Export ordinal for this aggregate row.
-  uint32_t export_ordinal;
+  // Function ordinal for this aggregate row.
+  uint32_t function_ordinal;
   // Total host execution dispatch records matched for this aggregate row.
   uint64_t dispatch_count;
   // Host execution dispatch records with valid start/end timestamps.
@@ -206,7 +206,7 @@ typedef struct iree_profile_dispatch_event_row_t {
   const iree_hal_profile_file_record_t* file_record;
   // Dispatch event record valid only for the callback duration.
   const iree_hal_profile_dispatch_event_t* event;
-  // Resolved executable/export key valid only for the callback duration.
+  // Resolved executable/function key valid only for the callback duration.
   iree_string_view_t key;
   // Device clock fit valid only when |has_clock_fit| is true.
   const iree_profile_model_clock_fit_t* clock_fit;
@@ -217,7 +217,7 @@ typedef struct iree_profile_dispatch_event_row_t {
 typedef struct iree_profile_host_dispatch_event_row_t {
   // Host dispatch event record valid only for the callback duration.
   const iree_hal_profile_host_execution_event_t* event;
-  // Resolved executable/export key valid only for the callback duration.
+  // Resolved executable/function key valid only for the callback duration.
   iree_string_view_t key;
 } iree_profile_host_dispatch_event_row_t;
 
@@ -249,7 +249,7 @@ typedef struct iree_profile_dispatch_context_t {
   iree_host_size_t aggregate_count;
   // Capacity of |aggregates| in entries.
   iree_host_size_t aggregate_capacity;
-  // Lookup index from executable export key to |aggregates| entry index.
+  // Lookup index from executable function key to |aggregates| entry index.
   iree_profile_index_t aggregate_index;
   // Dynamic array of command-buffer execution aggregate rows.
   iree_profile_dispatch_command_aggregate_t* command_aggregates;
@@ -274,7 +274,7 @@ typedef struct iree_profile_dispatch_context_t {
   iree_host_size_t host_dispatch_aggregate_count;
   // Capacity of |host_dispatch_aggregates| in entries.
   iree_host_size_t host_dispatch_aggregate_capacity;
-  // Lookup index from executable export key to |host_dispatch_aggregates|.
+  // Lookup index from executable function key to |host_dispatch_aggregates|.
   iree_profile_index_t host_dispatch_aggregate_index;
   // Dynamic array of command-buffer host dispatch aggregate rows.
   iree_profile_host_dispatch_command_aggregate_t* host_command_aggregates;

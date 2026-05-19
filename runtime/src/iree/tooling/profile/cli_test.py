@@ -129,7 +129,7 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertIn("command_execution", _row_type_set(command_rows))
         self.assertIn("command_host_execution", _row_type_set(command_rows))
         self.assertIn(
-            "executable_export_host_dispatch_group", _row_type_set(executable_rows)
+            "executable_function_host_dispatch_group", _row_type_set(executable_rows)
         )
         self.assertIn("host_dispatch_group", _row_type_set(dispatch_rows))
         self.assertIn("statistics_summary", _row_type_set(statistics_rows))
@@ -146,20 +146,20 @@ class IreeProfileCliTest(unittest.TestCase):
         row_types = {
             row["row_type"] for row in rows if row.get("type") == "statistics_row"
         }
-        self.assertIn("dispatch_export", row_types)
+        self.assertIn("dispatch_function", row_types)
         self.assertIn("queue_device_operation", row_types)
         self.assertIn("queue_host_operation", row_types)
-        self.assertIn("host_execution_export", row_types)
+        self.assertIn("host_execution_function", row_types)
         self.assertIn("memory_lifecycle", row_types)
 
-        export_row = next(
+        function_row = next(
             row
             for row in rows
             if row.get("type") == "statistics_row"
-            and row.get("row_type") == "dispatch_export"
+            and row.get("row_type") == "dispatch_function"
         )
-        self.assertEqual(export_row["export_name"], "smoke_export")
-        self.assertGreater(export_row["total_duration_ns"], 0)
+        self.assertEqual(function_row["function_name"], "smoke_function")
+        self.assertGreater(function_row["total_duration_ns"], 0)
 
     def test_queue_projection_separates_host_and_device_time(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -229,10 +229,10 @@ class IreeProfileCliTest(unittest.TestCase):
         self.assertEqual(summary["valid_dispatches"], 0)
         self.assertGreater(summary["valid_host_dispatches"], 0)
 
-        top_export = _find_row(rows, "explain_top_export")
-        self.assertEqual(top_export["timing_source"], "host_execution_event")
-        self.assertGreater(top_export["total_ns"], 0)
-        self.assertGreater(top_export["total_tile_count"], 0)
+        top_function = _find_row(rows, "explain_top_function")
+        self.assertEqual(top_function["timing_source"], "host_execution_event")
+        self.assertGreater(top_function["total_ns"], 0)
+        self.assertGreater(top_function["total_tile_count"], 0)
 
         top_dispatch = _find_row(rows, "explain_top_dispatch")
         self.assertEqual(top_dispatch["timing_source"], "host_execution_event")

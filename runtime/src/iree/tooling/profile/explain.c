@@ -14,7 +14,7 @@
 #include "iree/tooling/profile/reader.h"
 #include "iree/tooling/profile/summary.h"
 
-#define IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT 10
+#define IREE_PROFILE_EXPLAIN_TOP_FUNCTION_COUNT 10
 
 typedef enum iree_profile_explain_timing_source_e {
   // Device dispatch event timestamps.
@@ -23,20 +23,20 @@ typedef enum iree_profile_explain_timing_source_e {
   IREE_PROFILE_EXPLAIN_TIMING_SOURCE_HOST_EXECUTION = 1,
 } iree_profile_explain_timing_source_t;
 
-typedef struct iree_profile_explain_export_rank_t {
-  // Timing source used to rank this export.
+typedef struct iree_profile_explain_function_rank_t {
+  // Timing source used to rank this function.
   iree_profile_explain_timing_source_t timing_source;
-  // Session-local physical device ordinal for this export aggregate.
+  // Session-local physical device ordinal for this function aggregate.
   uint32_t physical_device_ordinal;
-  // Producer-local executable identifier for this export aggregate.
+  // Producer-local executable identifier for this function aggregate.
   uint64_t executable_id;
-  // Export ordinal for this export aggregate.
-  uint32_t export_ordinal;
-  // Total dispatch count for this export aggregate.
+  // Function ordinal for this function aggregate.
+  uint32_t function_ordinal;
+  // Total dispatch count for this function aggregate.
   uint64_t dispatch_count;
-  // Valid dispatch count for this export aggregate.
+  // Valid dispatch count for this function aggregate.
   uint64_t valid_count;
-  // Invalid dispatch count for this export aggregate.
+  // Invalid dispatch count for this function aggregate.
   uint64_t invalid_count;
   // Maximum valid dispatch duration in raw device ticks.
   uint64_t maximum_ticks;
@@ -54,7 +54,7 @@ typedef struct iree_profile_explain_export_rank_t {
   int64_t total_ns;
   // True when nanosecond duration values are available for this rank.
   bool has_duration_ns;
-} iree_profile_explain_export_rank_t;
+} iree_profile_explain_function_rank_t;
 
 typedef struct iree_profile_explain_interval_t {
   // Inclusive dispatch start tick for this interval.
@@ -130,20 +130,20 @@ typedef struct iree_profile_explain_queue_operation_totals_t {
       [IREE_HAL_PROFILE_QUEUE_DEPENDENCY_STRATEGY_SOFTWARE_DEFER + 1];
 } iree_profile_explain_queue_operation_totals_t;
 
-static double iree_profile_explain_export_rank_score(
-    const iree_profile_explain_export_rank_t* rank) {
+static double iree_profile_explain_function_rank_score(
+    const iree_profile_explain_function_rank_t* rank) {
   return rank->has_duration_ns ? (double)rank->total_ns
                                : (double)rank->total_ticks;
 }
 
-static int iree_profile_explain_compare_export_rank(const void* lhs,
-                                                    const void* rhs) {
-  const iree_profile_explain_export_rank_t* a =
-      (const iree_profile_explain_export_rank_t*)lhs;
-  const iree_profile_explain_export_rank_t* b =
-      (const iree_profile_explain_export_rank_t*)rhs;
-  const double a_score = iree_profile_explain_export_rank_score(a);
-  const double b_score = iree_profile_explain_export_rank_score(b);
+static int iree_profile_explain_compare_function_rank(const void* lhs,
+                                                      const void* rhs) {
+  const iree_profile_explain_function_rank_t* a =
+      (const iree_profile_explain_function_rank_t*)lhs;
+  const iree_profile_explain_function_rank_t* b =
+      (const iree_profile_explain_function_rank_t*)rhs;
+  const double a_score = iree_profile_explain_function_rank_score(a);
+  const double b_score = iree_profile_explain_function_rank_score(b);
   if (a_score < b_score) return 1;
   if (a_score > b_score) return -1;
   return 0;
@@ -206,10 +206,10 @@ static const char* iree_profile_explain_timing_source_string(
   return "unknown";
 }
 
-static iree_status_t iree_profile_explain_collect_export_ranks(
+static iree_status_t iree_profile_explain_collect_function_ranks(
     const iree_profile_dispatch_context_t* context,
     iree_allocator_t host_allocator,
-    iree_profile_explain_export_rank_t** out_ranks,
+    iree_profile_explain_function_rank_t** out_ranks,
     iree_host_size_t* out_rank_count) {
   *out_ranks = NULL;
   *out_rank_count = 0;
@@ -220,7 +220,7 @@ static iree_status_t iree_profile_explain_collect_export_ranks(
                          : context->aggregate_count;
   if (candidate_count == 0) return iree_ok_status();
 
-  iree_profile_explain_export_rank_t* ranks = NULL;
+  iree_profile_explain_function_rank_t* ranks = NULL;
   iree_status_t status = iree_allocator_malloc_array_uninitialized(
       host_allocator, candidate_count, sizeof(ranks[0]), (void**)&ranks);
 
@@ -232,12 +232,12 @@ static iree_status_t iree_profile_explain_collect_export_ranks(
         const iree_profile_host_dispatch_aggregate_t* aggregate =
             &context->host_dispatch_aggregates[i];
         if (aggregate->valid_count == 0) continue;
-        iree_profile_explain_export_rank_t* rank = &ranks[rank_count++];
+        iree_profile_explain_function_rank_t* rank = &ranks[rank_count++];
         memset(rank, 0, sizeof(*rank));
         rank->timing_source = IREE_PROFILE_EXPLAIN_TIMING_SOURCE_HOST_EXECUTION;
         rank->physical_device_ordinal = aggregate->physical_device_ordinal;
         rank->executable_id = aggregate->executable_id;
-        rank->export_ordinal = aggregate->export_ordinal;
+        rank->function_ordinal = aggregate->function_ordinal;
         rank->dispatch_count = aggregate->dispatch_count;
         rank->valid_count = aggregate->valid_count;
         rank->invalid_count = aggregate->invalid_count;
@@ -265,13 +265,13 @@ static iree_status_t iree_profile_explain_collect_export_ranks(
                 IREE_PROFILE_MODEL_CLOCK_TIME_DOMAIN_HOST_CPU_TIMESTAMP_NS,
                 &clock_fit);
 
-        iree_profile_explain_export_rank_t* rank = &ranks[rank_count++];
+        iree_profile_explain_function_rank_t* rank = &ranks[rank_count++];
         memset(rank, 0, sizeof(*rank));
         rank->timing_source =
             IREE_PROFILE_EXPLAIN_TIMING_SOURCE_DEVICE_DISPATCH;
         rank->physical_device_ordinal = aggregate->physical_device_ordinal;
         rank->executable_id = aggregate->executable_id;
-        rank->export_ordinal = aggregate->export_ordinal;
+        rank->function_ordinal = aggregate->function_ordinal;
         rank->dispatch_count = aggregate->dispatch_count;
         rank->valid_count = aggregate->valid_count;
         rank->invalid_count = aggregate->invalid_count;
@@ -293,7 +293,7 @@ static iree_status_t iree_profile_explain_collect_export_ranks(
 
   if (iree_status_is_ok(status)) {
     qsort(ranks, rank_count, sizeof(ranks[0]),
-          iree_profile_explain_compare_export_rank);
+          iree_profile_explain_compare_function_rank);
     *out_ranks = ranks;
     *out_rank_count = rank_count;
   } else {
@@ -684,28 +684,28 @@ static iree_status_t iree_profile_explain_print_text_queues(
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_explain_print_text_top_exports(
+static iree_status_t iree_profile_explain_print_text_top_functions(
     const iree_profile_dispatch_context_t* dispatch_context,
-    const iree_profile_explain_export_rank_t* export_ranks,
-    iree_host_size_t export_rank_count, FILE* file) {
-  fprintf(file, "top exports by total dispatch time:\n");
-  const iree_host_size_t top_export_count =
-      iree_min(export_rank_count,
-               (iree_host_size_t)IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT);
-  for (iree_host_size_t i = 0; i < top_export_count; ++i) {
-    const iree_profile_explain_export_rank_t* rank = &export_ranks[i];
+    const iree_profile_explain_function_rank_t* function_ranks,
+    iree_host_size_t function_rank_count, FILE* file) {
+  fprintf(file, "top functions by total dispatch time:\n");
+  const iree_host_size_t top_function_count =
+      iree_min(function_rank_count,
+               (iree_host_size_t)IREE_PROFILE_EXPLAIN_TOP_FUNCTION_COUNT);
+  for (iree_host_size_t i = 0; i < top_function_count; ++i) {
+    const iree_profile_explain_function_rank_t* rank = &function_ranks[i];
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
         &dispatch_context->model, rank->physical_device_ordinal,
-        rank->executable_id, rank->export_ordinal, numeric_buffer,
+        rank->executable_id, rank->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key));
     fprintf(file,
             "  #%" PRIhsz " %.*s device=%u executable=%" PRIu64
-            " export=%u count=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
+            " function=%u count=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
             " timing_source=%s",
             i + 1, (int)key.size, key.data, rank->physical_device_ordinal,
-            rank->executable_id, rank->export_ordinal, rank->dispatch_count,
+            rank->executable_id, rank->function_ordinal, rank->dispatch_count,
             rank->valid_count, rank->invalid_count,
             iree_profile_explain_timing_source_string(rank->timing_source));
     if (rank->timing_source ==
@@ -751,7 +751,7 @@ static iree_status_t iree_profile_explain_print_text_top_dispatches(
       iree_string_view_t key = iree_string_view_empty();
       IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
           &dispatch_context->model, top_event->physical_device_ordinal,
-          top_event->event.executable_id, top_event->event.export_ordinal,
+          top_event->event.executable_id, top_event->event.function_ordinal,
           numeric_buffer, sizeof(numeric_buffer), &key));
       fprintf(file,
               "  #%" PRIhsz " event=%" PRIu64 " submission=%" PRIu64
@@ -783,7 +783,7 @@ static iree_status_t iree_profile_explain_print_text_top_dispatches(
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
         &dispatch_context->model, top_event->physical_device_ordinal,
-        top_event->event.executable_id, top_event->event.export_ordinal,
+        top_event->event.executable_id, top_event->event.function_ordinal,
         numeric_buffer, sizeof(numeric_buffer), &key));
     fprintf(file,
             "  #%" PRIhsz " event=%" PRIu64 " submission=%" PRIu64
@@ -947,10 +947,10 @@ static iree_status_t iree_profile_explain_print_text(
     const iree_profile_dispatch_context_t* dispatch_context,
     const iree_profile_memory_context_t* memory_context,
     iree_allocator_t host_allocator, FILE* file) {
-  iree_profile_explain_export_rank_t* export_ranks = NULL;
-  iree_host_size_t export_rank_count = 0;
-  iree_status_t status = iree_profile_explain_collect_export_ranks(
-      dispatch_context, host_allocator, &export_ranks, &export_rank_count);
+  iree_profile_explain_function_rank_t* function_ranks = NULL;
+  iree_host_size_t function_rank_count = 0;
+  iree_status_t status = iree_profile_explain_collect_function_ranks(
+      dispatch_context, host_allocator, &function_ranks, &function_rank_count);
 
   if (iree_status_is_ok(status)) {
     iree_profile_explain_print_text_header(summary, dispatch_context,
@@ -962,8 +962,8 @@ static iree_status_t iree_profile_explain_print_text(
                                                     host_allocator, file);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_profile_explain_print_text_top_exports(
-        dispatch_context, export_ranks, export_rank_count, file);
+    status = iree_profile_explain_print_text_top_functions(
+        dispatch_context, function_ranks, function_rank_count, file);
   }
   if (iree_status_is_ok(status)) {
     status =
@@ -976,7 +976,7 @@ static iree_status_t iree_profile_explain_print_text(
                                           memory_context, file);
   }
 
-  iree_allocator_free(host_allocator, export_ranks);
+  iree_allocator_free(host_allocator, function_ranks);
   return status;
 }
 
@@ -1101,29 +1101,29 @@ static iree_status_t iree_profile_explain_print_jsonl_queues(
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_explain_print_jsonl_top_exports(
+static iree_status_t iree_profile_explain_print_jsonl_top_functions(
     const iree_profile_dispatch_context_t* dispatch_context,
-    const iree_profile_explain_export_rank_t* export_ranks,
-    iree_host_size_t export_rank_count, FILE* file) {
-  const iree_host_size_t top_export_count =
-      iree_min(export_rank_count,
-               (iree_host_size_t)IREE_PROFILE_EXPLAIN_TOP_EXPORT_COUNT);
-  for (iree_host_size_t i = 0; i < top_export_count; ++i) {
-    const iree_profile_explain_export_rank_t* rank = &export_ranks[i];
+    const iree_profile_explain_function_rank_t* function_ranks,
+    iree_host_size_t function_rank_count, FILE* file) {
+  const iree_host_size_t top_function_count =
+      iree_min(function_rank_count,
+               (iree_host_size_t)IREE_PROFILE_EXPLAIN_TOP_FUNCTION_COUNT);
+  for (iree_host_size_t i = 0; i < top_function_count; ++i) {
+    const iree_profile_explain_function_rank_t* rank = &function_ranks[i];
     char numeric_buffer[128];
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
         &dispatch_context->model, rank->physical_device_ordinal,
-        rank->executable_id, rank->export_ordinal, numeric_buffer,
+        rank->executable_id, rank->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key));
     fprintf(file,
-            "{\"type\":\"explain_top_export\",\"rank\":%" PRIhsz
+            "{\"type\":\"explain_top_function\",\"rank\":%" PRIhsz
             ",\"physical_device_ordinal\":%u"
             ",\"executable_id\":%" PRIu64
-            ",\"export_ordinal\":%u"
+            ",\"function_ordinal\":%u"
             ",\"key\":",
             i + 1, rank->physical_device_ordinal, rank->executable_id,
-            rank->export_ordinal);
+            rank->function_ordinal);
     iree_profile_fprint_json_string(file, key);
     fprintf(file,
             ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
@@ -1168,7 +1168,7 @@ static iree_status_t iree_profile_explain_print_jsonl_top_dispatches(
       iree_string_view_t key = iree_string_view_empty();
       IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
           &dispatch_context->model, top_event->physical_device_ordinal,
-          top_event->event.executable_id, top_event->event.export_ordinal,
+          top_event->event.executable_id, top_event->event.function_ordinal,
           numeric_buffer, sizeof(numeric_buffer), &key));
       fprintf(file,
               "{\"type\":\"explain_top_dispatch\",\"rank\":%" PRIhsz
@@ -1205,7 +1205,7 @@ static iree_status_t iree_profile_explain_print_jsonl_top_dispatches(
     iree_string_view_t key = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(iree_profile_model_resolve_dispatch_key(
         &dispatch_context->model, top_event->physical_device_ordinal,
-        top_event->event.executable_id, top_event->event.export_ordinal,
+        top_event->event.executable_id, top_event->event.function_ordinal,
         numeric_buffer, sizeof(numeric_buffer), &key));
     fprintf(file,
             "{\"type\":\"explain_top_dispatch\",\"rank\":%" PRIhsz
@@ -1378,10 +1378,10 @@ static iree_status_t iree_profile_explain_print_jsonl(
     const iree_profile_dispatch_context_t* dispatch_context,
     const iree_profile_memory_context_t* memory_context,
     iree_allocator_t host_allocator, FILE* file) {
-  iree_profile_explain_export_rank_t* export_ranks = NULL;
-  iree_host_size_t export_rank_count = 0;
-  iree_status_t status = iree_profile_explain_collect_export_ranks(
-      dispatch_context, host_allocator, &export_ranks, &export_rank_count);
+  iree_profile_explain_function_rank_t* function_ranks = NULL;
+  iree_host_size_t function_rank_count = 0;
+  iree_status_t status = iree_profile_explain_collect_function_ranks(
+      dispatch_context, host_allocator, &function_ranks, &function_rank_count);
 
   if (iree_status_is_ok(status)) {
     iree_profile_explain_print_jsonl_summary(summary, dispatch_context,
@@ -1393,8 +1393,8 @@ static iree_status_t iree_profile_explain_print_jsonl(
                                                      host_allocator, file);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_profile_explain_print_jsonl_top_exports(
-        dispatch_context, export_ranks, export_rank_count, file);
+    status = iree_profile_explain_print_jsonl_top_functions(
+        dispatch_context, function_ranks, function_rank_count, file);
   }
   if (iree_status_is_ok(status)) {
     status =
@@ -1407,7 +1407,7 @@ static iree_status_t iree_profile_explain_print_jsonl(
                                            memory_context, file);
   }
 
-  iree_allocator_free(host_allocator, export_ranks);
+  iree_allocator_free(host_allocator, function_ranks);
   return status;
 }
 

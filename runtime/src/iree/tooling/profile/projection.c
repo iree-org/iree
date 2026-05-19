@@ -153,9 +153,9 @@ static void iree_profile_dispatch_print_event_jsonl(
   fprintf(file,
           ",\"command_buffer_id\":%" PRIu64
           ",\"command_index\":%u"
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u",
+          ",\"executable_id\":%" PRIu64 ",\"function_ordinal\":%u",
           event->command_buffer_id, event->command_index, event->executable_id,
-          event->export_ordinal);
+          event->function_ordinal);
   fprintf(file, ",\"key\":");
   iree_profile_fprint_json_string(file, row->key);
   fprintf(file,
@@ -199,9 +199,9 @@ static void iree_profile_dispatch_print_host_event_jsonl(
   fprintf(file,
           ",\"command_buffer_id\":%" PRIu64
           ",\"command_index\":%u"
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u",
+          ",\"executable_id\":%" PRIu64 ",\"function_ordinal\":%u",
           event->command_buffer_id, event->command_index, event->executable_id,
-          event->export_ordinal);
+          event->function_ordinal);
   fprintf(file, ",\"key\":");
   iree_profile_fprint_json_string(file, row->key);
   fprintf(file,
@@ -323,13 +323,13 @@ static iree_status_t iree_profile_command_print_operation_text(
   if (operation->type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
     fprintf(file,
             " executable=%" PRIu64
-            " export=%u key=%.*s bindings=%u"
+            " function=%u key=%.*s bindings=%u"
             " workgroups=[%u,%u,%u] workgroup_size=[%u,%u,%u]",
-            operation->executable_id, operation->export_ordinal, (int)key.size,
-            key.data, operation->binding_count, operation->workgroup_count[0],
-            operation->workgroup_count[1], operation->workgroup_count[2],
-            operation->workgroup_size[0], operation->workgroup_size[1],
-            operation->workgroup_size[2]);
+            operation->executable_id, operation->function_ordinal,
+            (int)key.size, key.data, operation->binding_count,
+            operation->workgroup_count[0], operation->workgroup_count[1],
+            operation->workgroup_count[2], operation->workgroup_size[0],
+            operation->workgroup_size[1], operation->workgroup_size[2]);
   } else if (operation->type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_FILL ||
              operation->type ==
                  IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_UPDATE) {
@@ -386,14 +386,14 @@ static iree_status_t iree_profile_command_print_operation_jsonl(
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u"
+          ",\"function_ordinal\":%u"
           ",\"binding_count\":%u,\"workgroup_count\":[%u,%u,%u]"
           ",\"workgroup_size\":[%u,%u,%u]"
           ",\"source_ordinal\":%u,\"target_ordinal\":%u"
           ",\"source_offset\":%" PRIu64 ",\"target_offset\":%" PRIu64
           ",\"length\":%" PRIu64
           ",\"target_block_ordinal\":%u,\"alternate_block_ordinal\":%u}\n",
-          operation->executable_id, operation->export_ordinal,
+          operation->executable_id, operation->function_ordinal,
           operation->binding_count, operation->workgroup_count[0],
           operation->workgroup_count[1], operation->workgroup_count[2],
           operation->workgroup_size[0], operation->workgroup_size[1],
@@ -435,10 +435,10 @@ static void iree_profile_dispatch_print_text_group(
       iree_profile_projection_dispatch_stddev_ticks(aggregate);
   fprintf(file, "  %.*s\n", (int)key.size, key.data);
   fprintf(file,
-          "    device=%u executable=%" PRIu64 " export=%u count=%" PRIu64
+          "    device=%u executable=%" PRIu64 " function=%u count=%" PRIu64
           " valid=%" PRIu64 " invalid=%" PRIu64 "\n",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal, aggregate->dispatch_count,
+          aggregate->function_ordinal, aggregate->dispatch_count,
           aggregate->valid_count, aggregate->invalid_count);
   if (aggregate->valid_count != 0) {
     fprintf(file,
@@ -475,10 +475,10 @@ static void iree_profile_dispatch_print_text_host_group(
   fprintf(file, "  %.*s\n", (int)key.size, key.data);
   fprintf(file,
           "    timing=host_execution device=%u executable=%" PRIu64
-          " export=%u count=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
+          " function=%u count=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
           "\n",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal, aggregate->dispatch_count,
+          aggregate->function_ordinal, aggregate->dispatch_count,
           aggregate->valid_count, aggregate->invalid_count);
   if (aggregate->valid_count != 0) {
     fprintf(file,
@@ -513,7 +513,7 @@ static iree_status_t iree_profile_dispatch_print_text(
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_model_resolve_dispatch_key(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, numeric_buffer,
+        aggregate->executable_id, aggregate->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       iree_profile_dispatch_print_text_group(context, aggregate, key, file);
@@ -528,7 +528,7 @@ static iree_status_t iree_profile_dispatch_print_text(
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_model_resolve_dispatch_key(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, numeric_buffer,
+        aggregate->executable_id, aggregate->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       iree_profile_dispatch_print_text_host_group(aggregate, key, file);
@@ -570,9 +570,9 @@ static void iree_profile_dispatch_print_jsonl_group(
       iree_profile_projection_dispatch_stddev_ticks(aggregate);
   fprintf(file,
           "{\"type\":\"dispatch_group\",\"physical_device_ordinal\":%u"
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u,\"key\":",
+          ",\"executable_id\":%" PRIu64 ",\"function_ordinal\":%u,\"key\":",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal);
+          aggregate->function_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"count\":%" PRIu64 ",\"valid\":%" PRIu64 ",\"invalid\":%" PRIu64
@@ -617,9 +617,9 @@ static void iree_profile_dispatch_print_jsonl_host_group(
           "\"host_execution_event\",\"time_domain\":\"iree_host_time_ns\""
           ",\"duration_time_domain\":\"iree_host_duration_ns\""
           ",\"physical_device_ordinal\":%u"
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%u,\"key\":",
+          ",\"executable_id\":%" PRIu64 ",\"function_ordinal\":%u,\"key\":",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal);
+          aggregate->function_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(
       file,
@@ -653,7 +653,7 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_model_resolve_dispatch_key(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, numeric_buffer,
+        aggregate->executable_id, aggregate->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       iree_profile_dispatch_print_jsonl_group(context, aggregate, key, file);
@@ -668,7 +668,7 @@ static iree_status_t iree_profile_dispatch_print_jsonl_aggregates(
     iree_string_view_t key = iree_string_view_empty();
     status = iree_profile_model_resolve_dispatch_key(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, numeric_buffer,
+        aggregate->executable_id, aggregate->function_ordinal, numeric_buffer,
         sizeof(numeric_buffer), &key);
     if (iree_status_is_ok(status)) {
       iree_profile_dispatch_print_jsonl_host_group(aggregate, key, file);
@@ -689,12 +689,12 @@ typedef struct iree_profile_projection_row_list_t {
   iree_host_size_t last_index;
 } iree_profile_projection_row_list_t;
 
-typedef struct iree_profile_projection_export_group_t {
-  // Device-timestamped dispatch aggregate rows grouped by export.
+typedef struct iree_profile_projection_function_group_t {
+  // Device-timestamped dispatch aggregate rows grouped by function.
   iree_profile_projection_row_list_t device_dispatches;
-  // Host-timestamped dispatch aggregate rows grouped by export.
+  // Host-timestamped dispatch aggregate rows grouped by function.
   iree_profile_projection_row_list_t host_dispatches;
-} iree_profile_projection_export_group_t;
+} iree_profile_projection_function_group_t;
 
 typedef struct iree_profile_projection_command_buffer_group_t {
   // Device-timestamped command-buffer execution rows grouped by command buffer.
@@ -717,8 +717,8 @@ typedef struct iree_profile_projection_queue_group_t {
 typedef struct iree_profile_projection_index_t {
   // Host allocator used for owner-index arrays.
   iree_allocator_t host_allocator;
-  // Export owner groups parallel to iree_profile_model_t::exports.
-  iree_profile_projection_export_group_t* exports;
+  // Function owner groups parallel to iree_profile_model_t::functions.
+  iree_profile_projection_function_group_t* functions;
   // Next aggregate row indexes parallel to
   // iree_profile_dispatch_context_t::aggregates.
   iree_host_size_t* aggregate_next_indices;
@@ -789,7 +789,7 @@ static void iree_profile_projection_index_deinitialize(
   iree_allocator_free(index->host_allocator, index->queues);
   iree_allocator_free(index->host_allocator, index->host_dispatch_next_indices);
   iree_allocator_free(index->host_allocator, index->aggregate_next_indices);
-  iree_allocator_free(index->host_allocator, index->exports);
+  iree_allocator_free(index->host_allocator, index->functions);
   memset(index, 0, sizeof(*index));
 }
 
@@ -807,21 +807,21 @@ static iree_status_t iree_profile_projection_index_allocate_row_links(
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_projection_index_find_export_index(
+static iree_status_t iree_profile_projection_index_find_function_index(
     const iree_profile_model_t* model, uint32_t physical_device_ordinal,
-    uint64_t executable_id, uint32_t export_ordinal,
-    iree_host_size_t* out_export_index) {
-  *out_export_index = IREE_HOST_SIZE_MAX;
-  const iree_profile_model_export_t* export_info =
-      iree_profile_model_find_export(model, executable_id, export_ordinal);
-  if (!export_info) {
+    uint64_t executable_id, uint32_t function_ordinal,
+    iree_host_size_t* out_function_index) {
+  *out_function_index = IREE_HOST_SIZE_MAX;
+  const iree_profile_model_function_t* function_info =
+      iree_profile_model_find_function(model, executable_id, function_ordinal);
+  if (!function_info) {
     return iree_make_status(
         IREE_STATUS_DATA_LOSS,
-        "aggregate references missing executable export metadata "
-        "device=%u executable=%" PRIu64 " export=%u",
-        physical_device_ordinal, executable_id, export_ordinal);
+        "aggregate references missing executable function metadata "
+        "device=%u executable=%" PRIu64 " function=%u",
+        physical_device_ordinal, executable_id, function_ordinal);
   }
-  *out_export_index = (iree_host_size_t)(export_info - model->exports);
+  *out_function_index = (iree_host_size_t)(function_info - model->functions);
   return iree_ok_status();
 }
 
@@ -861,18 +861,18 @@ static iree_status_t iree_profile_projection_index_find_queue_index(
   return iree_ok_status();
 }
 
-static iree_status_t iree_profile_projection_index_build_exports(
+static iree_status_t iree_profile_projection_index_build_functions(
     const iree_profile_dispatch_context_t* context,
     iree_profile_projection_index_t* index) {
-  if (context->model.export_count != 0) {
+  if (context->model.function_count != 0) {
     IREE_RETURN_IF_ERROR(iree_allocator_malloc_array(
-        index->host_allocator, context->model.export_count,
-        sizeof(index->exports[0]), (void**)&index->exports));
-    for (iree_host_size_t i = 0; i < context->model.export_count; ++i) {
+        index->host_allocator, context->model.function_count,
+        sizeof(index->functions[0]), (void**)&index->functions));
+    for (iree_host_size_t i = 0; i < context->model.function_count; ++i) {
       iree_profile_projection_row_list_initialize(
-          &index->exports[i].device_dispatches);
+          &index->functions[i].device_dispatches);
       iree_profile_projection_row_list_initialize(
-          &index->exports[i].host_dispatches);
+          &index->functions[i].host_dispatches);
     }
   }
 
@@ -886,12 +886,13 @@ static iree_status_t iree_profile_projection_index_build_exports(
   for (iree_host_size_t i = 0; i < context->aggregate_count; ++i) {
     const iree_profile_dispatch_aggregate_t* aggregate =
         &context->aggregates[i];
-    iree_host_size_t export_index = IREE_HOST_SIZE_MAX;
-    IREE_RETURN_IF_ERROR(iree_profile_projection_index_find_export_index(
+    iree_host_size_t function_index = IREE_HOST_SIZE_MAX;
+    IREE_RETURN_IF_ERROR(iree_profile_projection_index_find_function_index(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, &export_index));
+        aggregate->executable_id, aggregate->function_ordinal,
+        &function_index));
     iree_profile_projection_row_list_append(
-        &index->exports[export_index].device_dispatches,
+        &index->functions[function_index].device_dispatches,
         index->aggregate_next_indices, i);
   }
 
@@ -899,12 +900,13 @@ static iree_status_t iree_profile_projection_index_build_exports(
        ++i) {
     const iree_profile_host_dispatch_aggregate_t* aggregate =
         &context->host_dispatch_aggregates[i];
-    iree_host_size_t export_index = IREE_HOST_SIZE_MAX;
-    IREE_RETURN_IF_ERROR(iree_profile_projection_index_find_export_index(
+    iree_host_size_t function_index = IREE_HOST_SIZE_MAX;
+    IREE_RETURN_IF_ERROR(iree_profile_projection_index_find_function_index(
         &context->model, aggregate->physical_device_ordinal,
-        aggregate->executable_id, aggregate->export_ordinal, &export_index));
+        aggregate->executable_id, aggregate->function_ordinal,
+        &function_index));
     iree_profile_projection_row_list_append(
-        &index->exports[export_index].host_dispatches,
+        &index->functions[function_index].host_dispatches,
         index->host_dispatch_next_indices, i);
   }
 
@@ -1051,23 +1053,24 @@ static void iree_profile_executable_print_text_header(
     FILE* file) {
   fprintf(file, "IREE HAL profile executable summary\n");
   fprintf(file, "filter: %.*s\n", (int)filter.size, filter.data);
-  fprintf(
-      file,
-      "executables=%" PRIhsz " exports=%" PRIhsz " matched_dispatches=%" PRIu64
-      " valid=%" PRIu64 " invalid=%" PRIu64 " matched_host_dispatches=%" PRIu64
-      " host_valid=%" PRIu64 " host_invalid=%" PRIu64 "\n",
-      context->model.executable_count, context->model.export_count,
-      context->matched_dispatch_count, context->valid_dispatch_count,
-      context->invalid_dispatch_count, context->matched_host_dispatch_count,
-      context->valid_host_dispatch_count, context->invalid_host_dispatch_count);
+  fprintf(file,
+          "executables=%" PRIhsz " functions=%" PRIhsz
+          " matched_dispatches=%" PRIu64 " valid=%" PRIu64 " invalid=%" PRIu64
+          " matched_host_dispatches=%" PRIu64 " host_valid=%" PRIu64
+          " host_invalid=%" PRIu64 "\n",
+          context->model.executable_count, context->model.function_count,
+          context->matched_dispatch_count, context->valid_dispatch_count,
+          context->invalid_dispatch_count, context->matched_host_dispatch_count,
+          context->valid_host_dispatch_count,
+          context->invalid_host_dispatch_count);
 }
 
 static void iree_profile_executable_print_text_executable(
     const iree_hal_profile_executable_record_t* executable, FILE* file) {
   const bool has_code_object_hash = iree_all_bits_set(
       executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
-  fprintf(file, "executable %" PRIu64 ": exports=%u flags=%u ",
-          executable->executable_id, executable->export_count,
+  fprintf(file, "executable %" PRIu64 ": functions=%u flags=%u ",
+          executable->executable_id, executable->function_count,
           executable->flags);
   fprintf(file, "code_object_hash=");
   if (has_code_object_hash) {
@@ -1078,22 +1081,22 @@ static void iree_profile_executable_print_text_executable(
   fputc('\n', file);
 }
 
-static void iree_profile_executable_print_text_export(
-    const iree_profile_model_export_t* export_info, iree_string_view_t key,
+static void iree_profile_executable_print_text_function(
+    const iree_profile_model_function_t* function_info, iree_string_view_t key,
     FILE* file) {
-  const bool has_pipeline_hash =
-      iree_all_bits_set(export_info->flags,
-                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+  const bool has_function_hash = iree_all_bits_set(
+      function_info->flags,
+      IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_FUNCTION_HASH);
   fprintf(file,
-          "  export %u: %.*s flags=%u constants=%u bindings=%u "
-          "parameters=%u workgroup_size=%ux%ux%u pipeline_hash=",
-          export_info->export_ordinal, (int)key.size, key.data,
-          export_info->flags, export_info->constant_count,
-          export_info->binding_count, export_info->parameter_count,
-          export_info->workgroup_size[0], export_info->workgroup_size[1],
-          export_info->workgroup_size[2]);
-  if (has_pipeline_hash) {
-    iree_profile_fprint_hash_hex(file, export_info->pipeline_hash);
+          "  function %u: %.*s flags=%u constants=%u bindings=%u "
+          "parameters=%u workgroup_size=%ux%ux%u function_hash=",
+          function_info->function_ordinal, (int)key.size, key.data,
+          function_info->flags, function_info->constant_count,
+          function_info->binding_count, function_info->parameter_count,
+          function_info->workgroup_size[0], function_info->workgroup_size[1],
+          function_info->workgroup_size[2]);
+  if (has_function_hash) {
+    iree_profile_fprint_hash_hex(file, function_info->function_hash);
   } else {
     fprintf(file, "unavailable");
   }
@@ -1126,10 +1129,10 @@ static void iree_profile_executable_print_text_dispatch_group(
 
 static bool iree_profile_executable_print_text_dispatch_groups(
     const iree_profile_dispatch_context_t* context,
-    const iree_profile_projection_index_t* index, iree_host_size_t export_index,
-    FILE* file) {
+    const iree_profile_projection_index_t* index,
+    iree_host_size_t function_index, FILE* file) {
   const iree_profile_projection_row_list_t* row_list =
-      &index->exports[export_index].device_dispatches;
+      &index->functions[function_index].device_dispatches;
   bool has_aggregate = false;
   iree_host_size_t i = row_list->first_index;
   while (i != IREE_HOST_SIZE_MAX) {
@@ -1160,10 +1163,10 @@ static void iree_profile_executable_print_text_host_dispatch_group(
 
 static bool iree_profile_executable_print_text_host_dispatch_groups(
     const iree_profile_dispatch_context_t* context,
-    const iree_profile_projection_index_t* index, iree_host_size_t export_index,
-    FILE* file) {
+    const iree_profile_projection_index_t* index,
+    iree_host_size_t function_index, FILE* file) {
   const iree_profile_projection_row_list_t* row_list =
-      &index->exports[export_index].host_dispatches;
+      &index->functions[function_index].host_dispatches;
   bool has_aggregate = false;
   iree_host_size_t i = row_list->first_index;
   while (i != IREE_HOST_SIZE_MAX) {
@@ -1176,23 +1179,24 @@ static bool iree_profile_executable_print_text_host_dispatch_groups(
   return has_aggregate;
 }
 
-static void iree_profile_executable_print_text_exports(
+static void iree_profile_executable_print_text_functions(
     const iree_profile_dispatch_context_t* context,
     const iree_profile_projection_index_t* index,
     const iree_profile_model_executable_t* executable_info,
     iree_string_view_t filter, FILE* file) {
-  iree_host_size_t i = executable_info->first_export_index;
+  iree_host_size_t i = executable_info->first_function_index;
   while (i != IREE_HOST_SIZE_MAX) {
-    const iree_profile_model_export_t* export_info = &context->model.exports[i];
+    const iree_profile_model_function_t* function_info =
+        &context->model.functions[i];
     char numeric_buffer[128];
-    iree_string_view_t key = iree_profile_model_format_export_key(
-        export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
+    iree_string_view_t key = iree_profile_model_format_function_key(
+        function_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
     if (!iree_profile_key_matches(key, filter)) {
-      i = export_info->next_export_index;
+      i = function_info->next_function_index;
       continue;
     }
 
-    iree_profile_executable_print_text_export(export_info, key, file);
+    iree_profile_executable_print_text_function(function_info, key, file);
     const bool has_device_dispatches =
         iree_profile_executable_print_text_dispatch_groups(context, index, i,
                                                            file);
@@ -1202,7 +1206,7 @@ static void iree_profile_executable_print_text_exports(
     if (!has_device_dispatches && !has_host_dispatches) {
       fprintf(file, "    dispatches=0\n");
     }
-    i = export_info->next_export_index;
+    i = function_info->next_function_index;
   }
 }
 
@@ -1221,8 +1225,8 @@ static iree_status_t iree_profile_executable_print_text(
       continue;
     }
     iree_profile_executable_print_text_executable(executable, file);
-    iree_profile_executable_print_text_exports(context, index, executable_info,
-                                               filter, file);
+    iree_profile_executable_print_text_functions(context, index,
+                                                 executable_info, filter, file);
   }
   return iree_ok_status();
 }
@@ -1234,12 +1238,12 @@ static void iree_profile_executable_print_jsonl_summary(
   iree_profile_fprint_json_string(file, filter);
   fprintf(
       file,
-      ",\"executables\":%" PRIhsz ",\"exports\":%" PRIhsz
+      ",\"executables\":%" PRIhsz ",\"functions\":%" PRIhsz
       ",\"matched_dispatches\":%" PRIu64 ",\"valid_dispatches\":%" PRIu64
       ",\"invalid_dispatches\":%" PRIu64 ",\"matched_host_dispatches\":%" PRIu64
       ",\"valid_host_dispatches\":%" PRIu64
       ",\"invalid_host_dispatches\":%" PRIu64 "}\n",
-      context->model.executable_count, context->model.export_count,
+      context->model.executable_count, context->model.function_count,
       context->matched_dispatch_count, context->valid_dispatch_count,
       context->invalid_dispatch_count, context->matched_host_dispatch_count,
       context->valid_host_dispatch_count, context->invalid_host_dispatch_count);
@@ -1263,37 +1267,37 @@ static void iree_profile_executable_print_jsonl_executable(
       executable->flags, IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
   fprintf(file,
           "{\"type\":\"executable\",\"executable_id\":%" PRIu64
-          ",\"flags\":%u,\"export_count\":%u"
+          ",\"flags\":%u,\"function_count\":%u"
           ",\"code_object_hash_present\":%s,\"code_object_hash\":",
           executable->executable_id, executable->flags,
-          executable->export_count, has_code_object_hash ? "true" : "false");
+          executable->function_count, has_code_object_hash ? "true" : "false");
   iree_profile_executable_print_jsonl_hash(executable->code_object_hash,
                                            has_code_object_hash, file);
   fputs("}\n", file);
 }
 
-static void iree_profile_executable_print_jsonl_export(
-    const iree_profile_model_export_t* export_info, iree_string_view_t key,
+static void iree_profile_executable_print_jsonl_function(
+    const iree_profile_model_function_t* function_info, iree_string_view_t key,
     FILE* file) {
-  const bool has_pipeline_hash =
-      iree_all_bits_set(export_info->flags,
-                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
+  const bool has_function_hash = iree_all_bits_set(
+      function_info->flags,
+      IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_FUNCTION_HASH);
   fprintf(file,
-          "{\"type\":\"executable_export\",\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u,\"flags\":%u,\"key\":",
-          export_info->executable_id, export_info->export_ordinal,
-          export_info->flags);
+          "{\"type\":\"executable_function\",\"executable_id\":%" PRIu64
+          ",\"function_ordinal\":%u,\"flags\":%u,\"key\":",
+          function_info->executable_id, function_info->function_ordinal,
+          function_info->flags);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"constant_count\":%u,\"binding_count\":%u"
           ",\"parameter_count\":%u,\"workgroup_size\":[%u,%u,%u]"
-          ",\"pipeline_hash_present\":%s,\"pipeline_hash\":",
-          export_info->constant_count, export_info->binding_count,
-          export_info->parameter_count, export_info->workgroup_size[0],
-          export_info->workgroup_size[1], export_info->workgroup_size[2],
-          has_pipeline_hash ? "true" : "false");
-  iree_profile_executable_print_jsonl_hash(export_info->pipeline_hash,
-                                           has_pipeline_hash, file);
+          ",\"function_hash_present\":%s,\"function_hash\":",
+          function_info->constant_count, function_info->binding_count,
+          function_info->parameter_count, function_info->workgroup_size[0],
+          function_info->workgroup_size[1], function_info->workgroup_size[2],
+          has_function_hash ? "true" : "false");
+  iree_profile_executable_print_jsonl_hash(function_info->function_hash,
+                                           has_function_hash, file);
   fputs("}\n", file);
 }
 
@@ -1304,13 +1308,13 @@ static void iree_profile_executable_print_jsonl_dispatch_group(
   const iree_profile_projection_dispatch_timing_t timing =
       iree_profile_projection_calculate_dispatch_timing(context, aggregate);
   fprintf(file,
-          "{\"type\":\"executable_export_dispatch_group\""
+          "{\"type\":\"executable_function_dispatch_group\""
           ",\"physical_device_ordinal\":%u"
           ",\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u"
+          ",\"function_ordinal\":%u"
           ",\"key\":",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal);
+          aggregate->function_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
@@ -1337,10 +1341,10 @@ static void iree_profile_executable_print_jsonl_dispatch_group(
 
 static void iree_profile_executable_print_jsonl_dispatch_groups(
     const iree_profile_dispatch_context_t* context,
-    const iree_profile_projection_index_t* index, iree_host_size_t export_index,
-    iree_string_view_t key, FILE* file) {
+    const iree_profile_projection_index_t* index,
+    iree_host_size_t function_index, iree_string_view_t key, FILE* file) {
   const iree_profile_projection_row_list_t* row_list =
-      &index->exports[export_index].device_dispatches;
+      &index->functions[function_index].device_dispatches;
   iree_host_size_t i = row_list->first_index;
   while (i != IREE_HOST_SIZE_MAX) {
     const iree_profile_dispatch_aggregate_t* aggregate =
@@ -1357,16 +1361,16 @@ static void iree_profile_executable_print_jsonl_host_dispatch_group(
   const double stddev_ns =
       iree_profile_projection_host_dispatch_stddev_ns(aggregate);
   fprintf(file,
-          "{\"type\":\"executable_export_host_dispatch_group\""
+          "{\"type\":\"executable_function_host_dispatch_group\""
           ",\"timing_source\":\"host_execution_event\""
           ",\"time_domain\":\"iree_host_time_ns\""
           ",\"duration_time_domain\":\"iree_host_duration_ns\""
           ",\"physical_device_ordinal\":%u"
           ",\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u"
+          ",\"function_ordinal\":%u"
           ",\"key\":",
           aggregate->physical_device_ordinal, aggregate->executable_id,
-          aggregate->export_ordinal);
+          aggregate->function_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"dispatches\":%" PRIu64 ",\"valid\":%" PRIu64
@@ -1386,10 +1390,10 @@ static void iree_profile_executable_print_jsonl_host_dispatch_group(
 
 static void iree_profile_executable_print_jsonl_host_dispatch_groups(
     const iree_profile_dispatch_context_t* context,
-    const iree_profile_projection_index_t* index, iree_host_size_t export_index,
-    iree_string_view_t key, FILE* file) {
+    const iree_profile_projection_index_t* index,
+    iree_host_size_t function_index, iree_string_view_t key, FILE* file) {
   const iree_profile_projection_row_list_t* row_list =
-      &index->exports[export_index].host_dispatches;
+      &index->functions[function_index].host_dispatches;
   iree_host_size_t i = row_list->first_index;
   while (i != IREE_HOST_SIZE_MAX) {
     const iree_profile_host_dispatch_aggregate_t* aggregate =
@@ -1400,28 +1404,29 @@ static void iree_profile_executable_print_jsonl_host_dispatch_groups(
   }
 }
 
-static void iree_profile_executable_print_jsonl_exports(
+static void iree_profile_executable_print_jsonl_functions(
     const iree_profile_dispatch_context_t* context,
     const iree_profile_projection_index_t* index,
     const iree_profile_model_executable_t* executable_info,
     iree_string_view_t filter, FILE* file) {
-  iree_host_size_t i = executable_info->first_export_index;
+  iree_host_size_t i = executable_info->first_function_index;
   while (i != IREE_HOST_SIZE_MAX) {
-    const iree_profile_model_export_t* export_info = &context->model.exports[i];
+    const iree_profile_model_function_t* function_info =
+        &context->model.functions[i];
     char numeric_buffer[128];
-    iree_string_view_t key = iree_profile_model_format_export_key(
-        export_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
+    iree_string_view_t key = iree_profile_model_format_function_key(
+        function_info, UINT32_MAX, numeric_buffer, sizeof(numeric_buffer));
     if (!iree_profile_key_matches(key, filter)) {
-      i = export_info->next_export_index;
+      i = function_info->next_function_index;
       continue;
     }
 
-    iree_profile_executable_print_jsonl_export(export_info, key, file);
+    iree_profile_executable_print_jsonl_function(function_info, key, file);
     iree_profile_executable_print_jsonl_dispatch_groups(context, index, i, key,
                                                         file);
     iree_profile_executable_print_jsonl_host_dispatch_groups(context, index, i,
                                                              key, file);
-    i = export_info->next_export_index;
+    i = function_info->next_function_index;
   }
 }
 
@@ -1439,8 +1444,8 @@ static iree_status_t iree_profile_executable_print_jsonl(
       continue;
     }
     iree_profile_executable_print_jsonl_executable(executable, file);
-    iree_profile_executable_print_jsonl_exports(context, index, executable_info,
-                                                filter, file);
+    iree_profile_executable_print_jsonl_functions(
+        context, index, executable_info, filter, file);
   }
   return iree_ok_status();
 }
@@ -2170,7 +2175,7 @@ static void iree_profile_queue_print_jsonl_host_execution_events(
             ",\"op\":\"%s\",\"flags\":%u,\"status_code\":%u"
             ",\"submission_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
             ",\"command_index\":%u,\"executable_id\":%" PRIu64
-            ",\"export_ordinal\":%u,\"allocation_id\":%" PRIu64
+            ",\"function_ordinal\":%u,\"allocation_id\":%" PRIu64
             ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
             ",\"stream_id\":%" PRIu64
             ",\"operation_count\":%u"
@@ -2182,7 +2187,7 @@ static void iree_profile_queue_print_jsonl_host_execution_events(
             event->event_id, iree_profile_queue_event_type_name(event->type),
             event->flags, event->status_code, event->submission_id,
             event->command_buffer_id, event->command_index,
-            event->executable_id, event->export_ordinal, event->allocation_id,
+            event->executable_id, event->function_ordinal, event->allocation_id,
             event->physical_device_ordinal, event->queue_ordinal,
             event->stream_id, event->operation_count, event->payload_length,
             event->tile_count, event->tile_duration_sum_ns,
@@ -2299,7 +2304,7 @@ static iree_status_t iree_profile_projection_print(
         iree_profile_projection_index_initialize(context->host_allocator,
                                                  &index);
         iree_status_t status =
-            iree_profile_projection_index_build_exports(context, &index);
+            iree_profile_projection_index_build_functions(context, &index);
         if (iree_status_is_ok(status)) {
           status = is_text ? iree_profile_executable_print_text(
                                  context, filter, id_filter, &index, file)

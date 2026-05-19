@@ -31,8 +31,8 @@ typedef struct iree_profile_statistics_jsonl_context_t {
 static const char* iree_profile_statistics_row_type_name(
     iree_hal_profile_statistics_row_type_t row_type) {
   switch (row_type) {
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT:
-      return "dispatch_export";
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION:
+      return "dispatch_function";
     case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_COMMAND_BUFFER:
       return "dispatch_command_buffer";
     case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_COMMAND_OPERATION:
@@ -41,8 +41,8 @@ static const char* iree_profile_statistics_row_type_name(
       return "queue_device_operation";
     case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_QUEUE_HOST_OPERATION:
       return "queue_host_operation";
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT:
-      return "host_execution_export";
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION:
+      return "host_execution_function";
     case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_COMMAND_BUFFER:
       return "host_execution_command_buffer";
     case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_COMMAND_OPERATION:
@@ -285,18 +285,18 @@ static iree_status_t iree_profile_statistics_print_jsonl_row(
   }
   fprintf(file,
           ",\"executable_id\":%" PRIu64 ",\"command_buffer_id\":%" PRIu64
-          ",\"export_ordinal\":%u,\"command_index\":%u",
-          row->executable_id, row->command_buffer_id, row->export_ordinal,
+          ",\"function_ordinal\":%u,\"command_index\":%u",
+          row->executable_id, row->command_buffer_id, row->function_ordinal,
           row->command_index);
 
-  iree_string_view_t export_name = iree_string_view_empty();
-  const bool has_export_name =
-      iree_hal_profile_statistics_sink_find_export_name(
-          context->statistics_sink, row->executable_id, row->export_ordinal,
-          &export_name);
-  fprintf(file, ",\"export_name\":");
-  if (has_export_name) {
-    iree_profile_fprint_json_string(file, export_name);
+  iree_string_view_t function_name = iree_string_view_empty();
+  const bool has_function_name =
+      iree_hal_profile_statistics_sink_find_function_name(
+          context->statistics_sink, row->executable_id, row->function_ordinal,
+          &function_name);
+  fprintf(file, ",\"function_name\":");
+  if (has_function_name) {
+    iree_profile_fprint_json_string(file, function_name);
   } else {
     fprintf(file, "null");
   }

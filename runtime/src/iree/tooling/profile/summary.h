@@ -133,10 +133,10 @@ typedef struct iree_profile_summary_t {
   uint64_t executable_code_object_load_chunk_count;
   // Executable code-object load records parsed.
   uint64_t executable_code_object_load_record_count;
-  // Executable export metadata chunks parsed.
-  uint64_t executable_export_chunk_count;
-  // Executable export records parsed.
-  uint64_t executable_export_record_count;
+  // Executable function metadata chunks parsed.
+  uint64_t executable_function_chunk_count;
+  // Executable function records parsed.
+  uint64_t executable_function_record_count;
   // Command-buffer metadata chunks parsed.
   uint64_t command_buffer_chunk_count;
   // Command-buffer records parsed.

@@ -44,16 +44,16 @@ void iree_profile_dispatch_context_deinitialize(
   memset(context, 0, sizeof(*context));
 }
 
-typedef struct iree_profile_dispatch_export_lookup_t {
+typedef struct iree_profile_dispatch_function_lookup_t {
   // Dispatch context owning candidate aggregate rows.
   const iree_profile_dispatch_context_t* context;
   // Session-local physical device ordinal.
   uint32_t physical_device_ordinal;
   // Producer-local executable identifier.
   uint64_t executable_id;
-  // Export ordinal within |executable_id|.
-  uint32_t export_ordinal;
-} iree_profile_dispatch_export_lookup_t;
+  // Function ordinal within |executable_id|.
+  uint32_t function_ordinal;
+} iree_profile_dispatch_function_lookup_t;
 
 typedef struct iree_profile_dispatch_command_lookup_t {
   // Dispatch context owning candidate aggregate rows.
@@ -83,12 +83,12 @@ typedef struct iree_profile_dispatch_queue_lookup_t {
   uint64_t submission_id;
 } iree_profile_dispatch_queue_lookup_t;
 
-static uint64_t iree_profile_dispatch_export_hash(
+static uint64_t iree_profile_dispatch_function_hash(
     uint32_t physical_device_ordinal, uint64_t executable_id,
-    uint32_t export_ordinal) {
+    uint32_t function_ordinal) {
   uint64_t hash = iree_profile_index_mix_u64(physical_device_ordinal);
   hash = iree_profile_index_combine_u64(hash, executable_id);
-  return iree_profile_index_combine_u64(hash, export_ordinal);
+  return iree_profile_index_combine_u64(hash, function_ordinal);
 }
 
 static uint64_t iree_profile_dispatch_command_hash(
@@ -113,14 +113,14 @@ static uint64_t iree_profile_dispatch_queue_hash(
 
 static bool iree_profile_dispatch_aggregate_matches(const void* user_data,
                                                     iree_host_size_t value) {
-  const iree_profile_dispatch_export_lookup_t* lookup =
-      (const iree_profile_dispatch_export_lookup_t*)user_data;
+  const iree_profile_dispatch_function_lookup_t* lookup =
+      (const iree_profile_dispatch_function_lookup_t*)user_data;
   const iree_profile_dispatch_aggregate_t* aggregate =
       &lookup->context->aggregates[value];
   return aggregate->physical_device_ordinal ==
              lookup->physical_device_ordinal &&
          aggregate->executable_id == lookup->executable_id &&
-         aggregate->export_ordinal == lookup->export_ordinal;
+         aggregate->function_ordinal == lookup->function_ordinal;
 }
 
 static bool iree_profile_dispatch_command_aggregate_matches(
@@ -152,14 +152,14 @@ static bool iree_profile_dispatch_queue_aggregate_matches(
 
 static bool iree_profile_dispatch_host_aggregate_matches(
     const void* user_data, iree_host_size_t value) {
-  const iree_profile_dispatch_export_lookup_t* lookup =
-      (const iree_profile_dispatch_export_lookup_t*)user_data;
+  const iree_profile_dispatch_function_lookup_t* lookup =
+      (const iree_profile_dispatch_function_lookup_t*)user_data;
   const iree_profile_host_dispatch_aggregate_t* aggregate =
       &lookup->context->host_dispatch_aggregates[value];
   return aggregate->physical_device_ordinal ==
              lookup->physical_device_ordinal &&
          aggregate->executable_id == lookup->executable_id &&
-         aggregate->export_ordinal == lookup->export_ordinal;
+         aggregate->function_ordinal == lookup->function_ordinal;
 }
 
 static bool iree_profile_dispatch_host_command_aggregate_matches(
@@ -275,18 +275,18 @@ static bool iree_profile_dispatch_host_event_matches_id(
 
 static iree_status_t iree_profile_dispatch_get_aggregate(
     iree_profile_dispatch_context_t* context, uint32_t physical_device_ordinal,
-    uint64_t executable_id, uint32_t export_ordinal,
+    uint64_t executable_id, uint32_t function_ordinal,
     iree_profile_dispatch_aggregate_t** out_aggregate) {
   *out_aggregate = NULL;
 
-  const iree_profile_dispatch_export_lookup_t lookup = {
+  const iree_profile_dispatch_function_lookup_t lookup = {
       .context = context,
       .physical_device_ordinal = physical_device_ordinal,
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
   };
-  const uint64_t hash = iree_profile_dispatch_export_hash(
-      physical_device_ordinal, executable_id, export_ordinal);
+  const uint64_t hash = iree_profile_dispatch_function_hash(
+      physical_device_ordinal, executable_id, function_ordinal);
   iree_host_size_t existing_index = 0;
   if (iree_profile_index_find(&context->aggregate_index, hash,
                               iree_profile_dispatch_aggregate_matches, &lookup,
@@ -312,7 +312,7 @@ static iree_status_t iree_profile_dispatch_get_aggregate(
   memset(aggregate, 0, sizeof(*aggregate));
   aggregate->physical_device_ordinal = physical_device_ordinal;
   aggregate->executable_id = executable_id;
-  aggregate->export_ordinal = export_ordinal;
+  aggregate->function_ordinal = function_ordinal;
   aggregate->earliest_start_tick = UINT64_MAX;
   aggregate->minimum_ticks = UINT64_MAX;
   ++context->aggregate_count;
@@ -425,18 +425,18 @@ static iree_status_t iree_profile_dispatch_get_queue_aggregate(
 
 static iree_status_t iree_profile_dispatch_get_host_aggregate(
     iree_profile_dispatch_context_t* context, uint32_t physical_device_ordinal,
-    uint64_t executable_id, uint32_t export_ordinal,
+    uint64_t executable_id, uint32_t function_ordinal,
     iree_profile_host_dispatch_aggregate_t** out_aggregate) {
   *out_aggregate = NULL;
 
-  const iree_profile_dispatch_export_lookup_t lookup = {
+  const iree_profile_dispatch_function_lookup_t lookup = {
       .context = context,
       .physical_device_ordinal = physical_device_ordinal,
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
   };
-  const uint64_t hash = iree_profile_dispatch_export_hash(
-      physical_device_ordinal, executable_id, export_ordinal);
+  const uint64_t hash = iree_profile_dispatch_function_hash(
+      physical_device_ordinal, executable_id, function_ordinal);
   iree_host_size_t existing_index = 0;
   if (iree_profile_index_find(&context->host_dispatch_aggregate_index, hash,
                               iree_profile_dispatch_host_aggregate_matches,
@@ -466,7 +466,7 @@ static iree_status_t iree_profile_dispatch_get_host_aggregate(
   memset(aggregate, 0, sizeof(*aggregate));
   aggregate->physical_device_ordinal = physical_device_ordinal;
   aggregate->executable_id = executable_id;
-  aggregate->export_ordinal = export_ordinal;
+  aggregate->function_ordinal = function_ordinal;
   aggregate->earliest_start_host_time_ns = INT64_MAX;
   aggregate->minimum_ns = INT64_MAX;
   ++context->host_dispatch_aggregate_count;
@@ -803,7 +803,7 @@ static iree_status_t iree_profile_dispatch_process_event_records(
     if (iree_status_is_ok(status) && id_matches) {
       status = iree_profile_model_resolve_dispatch_key(
           model, record->header.physical_device_ordinal, event.executable_id,
-          event.export_ordinal, numeric_buffer, sizeof(numeric_buffer), &key);
+          event.function_ordinal, numeric_buffer, sizeof(numeric_buffer), &key);
     }
     if (iree_status_is_ok(status) && !iree_string_view_is_empty(key) &&
         iree_profile_key_matches(key, filter)) {
@@ -830,15 +830,15 @@ static iree_status_t iree_profile_dispatch_process_event_records(
         iree_profile_dispatch_aggregate_t* aggregate = NULL;
         status = iree_profile_dispatch_get_aggregate(
             context, record->header.physical_device_ordinal,
-            event.executable_id, event.export_ordinal, &aggregate);
+            event.executable_id, event.function_ordinal, &aggregate);
         if (iree_status_is_ok(status) &&
             !iree_profile_dispatch_record_aggregate_event(aggregate, &event)) {
           status =
               iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                                "dispatch aggregate tick total overflow "
-                               "device=%u executable=%" PRIu64 " export=%u",
+                               "device=%u executable=%" PRIu64 " function=%u",
                                record->header.physical_device_ordinal,
-                               event.executable_id, event.export_ordinal);
+                               event.executable_id, event.function_ordinal);
         }
         if (iree_status_is_ok(status) && event.command_buffer_id != 0) {
           iree_profile_dispatch_command_aggregate_t* command_aggregate = NULL;
@@ -917,7 +917,7 @@ static iree_status_t iree_profile_dispatch_process_host_execution_records(
     if (iree_status_is_ok(status) && id_matches) {
       status = iree_profile_model_resolve_dispatch_key(
           model, event.physical_device_ordinal, event.executable_id,
-          event.export_ordinal, numeric_buffer, sizeof(numeric_buffer), &key);
+          event.function_ordinal, numeric_buffer, sizeof(numeric_buffer), &key);
     }
     if (iree_status_is_ok(status) && !iree_string_view_is_empty(key) &&
         iree_profile_key_matches(key, filter)) {
@@ -941,16 +941,16 @@ static iree_status_t iree_profile_dispatch_process_host_execution_records(
         iree_profile_host_dispatch_aggregate_t* aggregate = NULL;
         status = iree_profile_dispatch_get_host_aggregate(
             context, event.physical_device_ordinal, event.executable_id,
-            event.export_ordinal, &aggregate);
+            event.function_ordinal, &aggregate);
         if (iree_status_is_ok(status) &&
             !iree_profile_dispatch_record_host_aggregate_event(aggregate,
                                                                &event)) {
           status = iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "host dispatch aggregate total overflow device=%u "
-              "executable=%" PRIu64 " export=%u",
+              "executable=%" PRIu64 " function=%u",
               event.physical_device_ordinal, event.executable_id,
-              event.export_ordinal);
+              event.function_ordinal);
         }
         if (iree_status_is_ok(status) && event.command_buffer_id != 0) {
           iree_profile_host_dispatch_command_aggregate_t* command_aggregate =

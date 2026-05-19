@@ -254,12 +254,12 @@ iree_profile_summary_process_executable_code_object_load_records(
       &summary->executable_code_object_load_record_count);
 }
 
-static iree_status_t iree_profile_summary_process_executable_export_records(
+static iree_status_t iree_profile_summary_process_executable_function_records(
     iree_profile_summary_t* summary,
     const iree_hal_profile_file_record_t* record) {
   return iree_profile_summary_count_typed_records(
-      record, sizeof(iree_hal_profile_executable_export_record_t),
-      &summary->executable_export_record_count);
+      record, sizeof(iree_hal_profile_executable_function_record_t),
+      &summary->executable_function_record_count);
 }
 
 static iree_status_t iree_profile_summary_process_command_buffer_records(
@@ -724,9 +724,9 @@ static iree_status_t iree_profile_summary_process_chunk_record(
               executable_code_object_load_chunk_count,
               iree_profile_summary_process_executable_code_object_load_records),
           IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
-              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
-              executable_export_chunk_count,
-              iree_profile_summary_process_executable_export_records),
+              IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS,
+              executable_function_chunk_count,
+              iree_profile_summary_process_executable_function_records),
           IREE_PROFILE_SUMMARY_CHUNK_ROUTE(
               IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS,
               command_buffer_chunk_count,
@@ -996,7 +996,7 @@ static void iree_profile_print_summary_text_chunks(
       file,
       "chunks: devices=%" PRIu64 " queues=%" PRIu64 " executables=%" PRIu64
       " executable_code_objects=%" PRIu64
-      " executable_code_object_loads=%" PRIu64 " executable_exports=%" PRIu64
+      " executable_code_object_loads=%" PRIu64 " executable_functions=%" PRIu64
       " command_buffers=%" PRIu64 " command_operations=%" PRIu64
       " clock_correlations=%" PRIu64 " dispatch_events=%" PRIu64
       " queue_events=%" PRIu64 " queue_device_events=%" PRIu64
@@ -1011,7 +1011,7 @@ static void iree_profile_print_summary_text_chunks(
       summary->executable_chunk_count,
       summary->executable_code_object_chunk_count,
       summary->executable_code_object_load_chunk_count,
-      summary->executable_export_chunk_count,
+      summary->executable_function_chunk_count,
       summary->command_buffer_chunk_count,
       summary->command_operation_chunk_count,
       summary->clock_correlation_chunk_count,
@@ -1035,12 +1035,12 @@ static void iree_profile_print_summary_text_metadata_records(
           "metadata_records: executables=%" PRIu64
           " executable_code_objects=%" PRIu64
           " executable_code_object_loads=%" PRIu64
-          " executable_exports=%" PRIu64 " command_buffers=%" PRIu64
+          " executable_functions=%" PRIu64 " command_buffers=%" PRIu64
           " command_operations=%" PRIu64 "\n",
           summary->executable_record_count,
           summary->executable_code_object_record_count,
           summary->executable_code_object_load_record_count,
-          summary->executable_export_record_count,
+          summary->executable_function_record_count,
           summary->command_buffer_record_count,
           summary->command_operation_record_count);
 }
@@ -1245,8 +1245,8 @@ static void iree_profile_print_summary_jsonl_metadata_fields(
           ",\"executable_code_object_data_bytes\":%" PRIu64
           ",\"executable_code_object_load_chunks\":%" PRIu64
           ",\"executable_code_object_load_records\":%" PRIu64
-          ",\"executable_export_chunks\":%" PRIu64
-          ",\"executable_export_records\":%" PRIu64
+          ",\"executable_function_chunks\":%" PRIu64
+          ",\"executable_function_records\":%" PRIu64
           ",\"command_buffer_chunks\":%" PRIu64
           ",\"command_buffer_records\":%" PRIu64
           ",\"command_operation_chunks\":%" PRIu64
@@ -1259,8 +1259,8 @@ static void iree_profile_print_summary_jsonl_metadata_fields(
           summary->executable_code_object_data_bytes,
           summary->executable_code_object_load_chunk_count,
           summary->executable_code_object_load_record_count,
-          summary->executable_export_chunk_count,
-          summary->executable_export_record_count,
+          summary->executable_function_chunk_count,
+          summary->executable_function_record_count,
           summary->command_buffer_chunk_count,
           summary->command_buffer_record_count,
           summary->command_operation_chunk_count,
