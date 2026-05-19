@@ -66,106 +66,6 @@
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
-// Unwrap trivial [1 x T] aggregate types to bare T throughout the module.
-// The LLVM SPIR-V backend collapses [1 x <N x T>] to <N x T> for vector
-// types but inconsistently handles ConstantNull operands in PHI nodes,
-// producing type mismatches that cause amd-llvm-spirv reverse translation
-// to fail. Eliminating the wrapper before codegen avoids this.
-static void unwrapSingleElementArrayTypes(llvm::Module &M) {
-  // Do a targeted rewrite: find phi [1 x T] and rewrite to phi T.
-  for (auto &F : M) {
-    for (auto &BB : F) {
-      // Users of rewritten phi nodes
-      llvm::SmallVector<llvm::Instruction *, 4> deadInsts;
-      for (auto &PN : BB.phis()) {
-
-        auto *ArrTy = llvm::dyn_cast<llvm::ArrayType>(PN.getType());
-        if (!ArrTy || ArrTy->getNumElements() != 1) {
-          continue;
-        }
-
-        llvm::Type *InnerTy = ArrTy->getElementType();
-        // Create a new PHI with the inner type.
-        auto *NewPN =
-            llvm::PHINode::Create(InnerTy, PN.getNumIncomingValues(),
-                                  PN.getName() + ".unwrap", PN.getIterator());
-        for (unsigned i = 0, e = PN.getNumIncomingValues(); i != e; ++i) {
-          llvm::Value *InVal = PN.getIncomingValue(i);
-          llvm::BasicBlock *InBB = PN.getIncomingBlock(i);
-          if (auto *IV = llvm::dyn_cast<llvm::InsertValueInst>(InVal)) {
-            // insertvalue [1 x T] poison, T %x, 0 → just use %x
-            if (IV->getNumIndices() == 1 && IV->getIndices()[0] == 0) {
-              NewPN->addIncoming(IV->getInsertedValueOperand(), InBB);
-              continue;
-            }
-          }
-          if (auto *C = llvm::dyn_cast<llvm::Constant>(InVal)) {
-            // zeroinitializer [1 x T] → zeroinitializer T
-            // poison [1 x T] → poison T
-            if (llvm::isa<llvm::ConstantAggregateZero>(C)) {
-              NewPN->addIncoming(llvm::Constant::getNullValue(InnerTy), InBB);
-              continue;
-            }
-            if (llvm::isa<llvm::PoisonValue>(C)) {
-              NewPN->addIncoming(llvm::PoisonValue::get(InnerTy), InBB);
-              continue;
-            }
-            if (llvm::isa<llvm::UndefValue>(C)) {
-              NewPN->addIncoming(llvm::UndefValue::get(InnerTy), InBB);
-              continue;
-            }
-            // ConstantArray with one element.
-            if (auto *CA = llvm::dyn_cast<llvm::ConstantArray>(C)) {
-              NewPN->addIncoming(CA->getOperand(0), InBB);
-              continue;
-            }
-          }
-          // Fallback: insert extractvalue at the end of the incoming block.
-          auto *EV = llvm::ExtractValueInst::Create(
-              InVal, {0}, InVal->getName() + ".ev",
-              InBB->getTerminator()->getIterator());
-          NewPN->addIncoming(EV, InBB);
-        }
-
-        // Replace uses of the old PHI. Users are extractvalue [1 x T] %phi, 0
-        // which should become direct uses of the new PHI.
-        for (auto *U : llvm::make_early_inc_range(PN.users())) {
-          if (auto *EV = llvm::dyn_cast<llvm::ExtractValueInst>(U)) {
-            if (EV->getNumIndices() == 1 && EV->getIndices()[0] == 0) {
-              EV->replaceAllUsesWith(NewPN);
-              deadInsts.push_back(EV);
-              continue;
-            }
-          }
-          // For insertvalue users (loop-back edges), the new PHI incoming
-          // values already handle this via the InsertValueInst case above.
-          // Other users: wrap in insertvalue to maintain correctness.
-          if (auto *IV = llvm::dyn_cast<llvm::InsertValueInst>(U)) {
-            // This is the loop-back insertvalue — it will be dead after
-            // the PHI incoming values are rewritten.
-            bool allUsesArePhi = true;
-            for (auto *IVU : IV->users()) {
-              if (IVU != &PN) {
-                allUsesArePhi = false;
-              }
-            }
-            if (allUsesArePhi) {
-              deadInsts.push_back(IV);
-              continue;
-            }
-          }
-        }
-        PN.replaceAllUsesWith(llvm::PoisonValue::get(ArrTy));
-        deadInsts.push_back(&PN);
-      }
-      // Erase dead instructions at the end.
-      for (auto *DI : llvm::reverse(deadInsts)) {
-        DI->eraseFromParent();
-      }
-    }
-  }
-}
-
 enum class ContainerType {
   // Automatically detect the container type from the target ABI attribute.
   Auto,
@@ -1082,24 +982,12 @@ public:
           return variantOp.emitError() << "cannot create SPIR-V target machine";
         }
 
-        // If requested, dump the wrapped .ll just before conversion to
+        // If requested, dump the final .ll just before conversion to
         // SPIRV-binary
         if (!serializationOptions.dumpIntermediatesPath.empty()) {
           dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
                            serializationOptions.dumpBaseName,
-                           variantOp.getName(), ".wrapped.ll", *llvmModule);
-        }
-
-        // Unwrap [1 x T] aggregate types that trip up the SPIR-V backend
-        // and amd-llvm-spirv reverse translator (PHI type mismatches).
-        unwrapSingleElementArrayTypes(*llvmModule);
-
-        // If requested, dump the unwrapped .ll just before conversion to
-        // SPIRV-binary
-        if (!serializationOptions.dumpIntermediatesPath.empty()) {
-          dumpModuleToPath(serializationOptions.dumpIntermediatesPath,
-                           serializationOptions.dumpBaseName,
-                           variantOp.getName(), ".unwrapped.ll", *llvmModule);
+                           variantOp.getName(), ".final.ll", *llvmModule);
         }
 
         // Emit SPIR-V binary (no lld/hsaco needed).
