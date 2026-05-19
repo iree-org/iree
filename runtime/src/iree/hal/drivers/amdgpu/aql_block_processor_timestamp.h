@@ -36,8 +36,8 @@ typedef struct iree_hal_amdgpu_aql_block_processor_timestamp_dispatch_t {
     uint32_t block_ordinal;
     // Program-global command index of this dispatch.
     uint32_t command_index;
-    // Executable export ordinal dispatched.
-    uint32_t export_ordinal;
+    // Executable function ordinal dispatched.
+    uint32_t function_ordinal;
     // Flags from iree_hal_amdgpu_dispatch_timestamp_record_flag_bits_t.
     iree_hal_amdgpu_dispatch_timestamp_record_flags_t flags;
   } metadata;

@@ -800,13 +800,8 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_dispatch(
   memset(&payload, 0, sizeof(payload));
   payload.executable_id =
       iree_hal_replay_recorder_executable_id_or_none(executable);
-  if (IREE_UNLIKELY(function.value > UINT32_MAX)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "replay recording requires a dense 32-bit "
-                            "function index but received %" PRIu64,
-                            function.value);
-  }
-  payload.export_ordinal = (uint32_t)function.value;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_executable_recorded_ordinal(
+      executable, function, &payload.function_ordinal));
   payload.flags = flags;
   memcpy(payload.workgroup_size, config.workgroup_size,
          sizeof(payload.workgroup_size));

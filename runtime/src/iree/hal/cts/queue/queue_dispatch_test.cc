@@ -290,7 +290,7 @@ TEST_P(QueueDispatchTest, DispatchHostQueueEventProfiling) {
       });
   ASSERT_NE(sink.host_execution_events.end(), host_event_it);
   EXPECT_EQ(IREE_STATUS_OK, host_event_it->status_code);
-  EXPECT_EQ(0u, host_event_it->export_ordinal);
+  EXPECT_EQ(0u, host_event_it->function_ordinal);
   EXPECT_EQ(queue_event_it->submission_id, host_event_it->submission_id);
   EXPECT_GE(host_event_it->end_host_time_ns, host_event_it->start_host_time_ns);
 }
@@ -378,8 +378,8 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
       IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
   profiling_options.sink = TestProfileSinkAsBase(&sink);
   profiling_options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-  profiling_options.capture_filter.executable_export_pattern =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+  profiling_options.capture_filter.executable_function_pattern =
       IREE_SV("iree-hal-cts-never-matches-*");
   DeviceProfilingScope profiling(device_);
   iree_status_t profiling_status = profiling.Begin(&profiling_options);

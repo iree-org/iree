@@ -29,7 +29,7 @@ iree_hal_amdgpu_host_queue_should_profile_all_command_buffer_dispatches(
   if (iree_any_bit_set(
           filter->flags,
           IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX |
-              IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN)) {
+              IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN)) {
     return false;
   }
 
@@ -56,7 +56,7 @@ iree_hal_amdgpu_host_queue_should_profile_command_buffer_dispatch_summary(
       (iree_hal_amdgpu_logical_device_t*)queue->logical_device;
   return iree_hal_amdgpu_logical_device_should_profile_dispatch(
       logical_device, summary->metadata.executable_id,
-      summary->metadata.export_ordinal, command_buffer_id,
+      summary->metadata.function_ordinal, command_buffer_id,
       summary->metadata.command_index, physical_device_ordinal, queue_ordinal);
 }
 
@@ -147,7 +147,7 @@ iree_hal_amdgpu_host_queue_initialize_command_buffer_dispatch_summary_event(
         IREE_HAL_AMDGPU_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS;
   }
   event->command_index = summary->metadata.command_index;
-  event->export_ordinal = summary->metadata.export_ordinal;
+  event->function_ordinal = summary->metadata.function_ordinal;
   for (iree_host_size_t dimension_ordinal = 0;
        dimension_ordinal < IREE_ARRAYSIZE(event->workgroup_size);
        ++dimension_ordinal) {

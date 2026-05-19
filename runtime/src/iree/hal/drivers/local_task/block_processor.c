@@ -917,7 +917,7 @@ static void iree_hal_cmd_block_processor_profile_make_dispatch_event(
   event_info.executable_id =
       iree_hal_local_executable_profile_id(dispatch->executable);
   event_info.command_index = dispatch->profile.command_index;
-  event_info.export_ordinal = dispatch->export_ordinal;
+  event_info.function_ordinal = dispatch->export_ordinal;
   memcpy(event_info.workgroup_count, workgroup_count,
          sizeof(event_info.workgroup_count));
   event_info.workgroup_size[0] =

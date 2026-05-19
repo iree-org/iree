@@ -178,8 +178,8 @@ typedef struct iree_hal_task_queue_profile_operation_t {
   // Number of signal semaphores supplied to the queue operation.
   uint32_t signal_count;
 
-  // Executable export ordinal for dispatch-like spans, or UINT32_MAX.
-  uint32_t export_ordinal;
+  // Executable function ordinal for dispatch-like spans, or UINT32_MAX.
+  uint32_t function_ordinal;
 
   // Workgroup counts submitted for dispatch-like spans.
   uint32_t workgroup_count[3];
@@ -264,7 +264,7 @@ static void iree_hal_task_queue_profile_operation_initialize(
       iree_hal_task_queue_profile_operation_count(type);
   profile_operation->signal_count =
       iree_hal_task_queue_profile_count(signal_semaphores->count);
-  profile_operation->export_ordinal = UINT32_MAX;
+  profile_operation->function_ordinal = UINT32_MAX;
   if (iree_hal_local_profile_recorder_is_enabled(
           profile_operation->recorder,
           IREE_HAL_DEVICE_PROFILING_DATA_QUEUE_EVENTS)) {
@@ -419,7 +419,7 @@ static iree_status_t iree_hal_task_queue_profile_set_dispatch(
   }
   profile_operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  profile_operation->export_ordinal =
+  profile_operation->function_ordinal =
       iree_hal_executable_function_index(function);
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     profile_operation->host_flags |=
@@ -576,7 +576,7 @@ static void iree_hal_task_queue_profile_finish_host_execution(
   event_info.command_buffer_id = profile_operation->command_buffer_id;
   event_info.executable_id = profile_operation->executable_id;
   event_info.allocation_id = profile_operation->allocation_id;
-  event_info.export_ordinal = profile_operation->export_ordinal;
+  event_info.function_ordinal = profile_operation->function_ordinal;
   memcpy(event_info.workgroup_count, profile_operation->workgroup_count,
          sizeof(event_info.workgroup_count));
   memcpy(event_info.workgroup_size, profile_operation->workgroup_size,

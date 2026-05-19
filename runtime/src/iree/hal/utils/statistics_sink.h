@@ -39,7 +39,7 @@ enum iree_hal_profile_statistics_row_type_e {
 
   // Device-tick dispatch samples grouped by physical device and
   // executable/function pair.
-  IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT = 1u,
+  IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION = 1u,
 
   // Device-tick dispatch samples grouped by physical device and command buffer.
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_COMMAND_BUFFER = 2u,
@@ -58,7 +58,7 @@ enum iree_hal_profile_statistics_row_type_e {
 
   // Host execution samples grouped by physical device and executable/function
   // pair.
-  IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT = 6u,
+  IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION = 6u,
 
   // Host execution samples grouped by physical device and command buffer.
   IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_COMMAND_BUFFER = 7u,
@@ -128,8 +128,8 @@ typedef struct iree_hal_profile_statistics_row_t {
   uint64_t executable_id;
   // Session-local command-buffer identifier, or zero.
   uint64_t command_buffer_id;
-  // Executable export ordinal, or UINT32_MAX.
-  uint32_t export_ordinal;
+  // Executable function ordinal, or UINT32_MAX.
+  uint32_t function_ordinal;
   // Command ordinal within a command buffer, or UINT32_MAX.
   uint32_t command_index;
   // Number of source samples accumulated into this row.
@@ -200,9 +200,9 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_for_each_row(
 
 // Resolves an executable/function key to a borrowed function name when metadata
 // was present in the consumed profile stream.
-IREE_API_EXPORT bool iree_hal_profile_statistics_sink_find_export_name(
+IREE_API_EXPORT bool iree_hal_profile_statistics_sink_find_function_name(
     const iree_hal_profile_statistics_sink_t* sink, uint64_t executable_id,
-    uint32_t export_ordinal, iree_string_view_t* out_name);
+    uint32_t function_ordinal, iree_string_view_t* out_name);
 
 // Scales |duration| from |row|'s time domain to nanoseconds when possible.
 //

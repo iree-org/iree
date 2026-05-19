@@ -412,7 +412,7 @@ static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
   event->flags = flags;
   event->event_id = event_id;
   event->command_index = UINT32_MAX;
-  event->export_ordinal = iree_hal_executable_function_index(function);
+  event->function_ordinal = iree_hal_executable_function_index(function);
   event->executable_id = executable_id;
   if (!iree_any_bit_set(
           flags,

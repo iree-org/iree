@@ -29,6 +29,12 @@ iree_hal_executable_t* iree_hal_replay_recorder_executable_base_or_self(
 iree_hal_replay_object_id_t iree_hal_replay_recorder_executable_id_or_none(
     iree_hal_executable_t* executable);
 
+// Resolves a live HAL function token to the replay file's captured function
+// ordinal for |executable|.
+iree_status_t iree_hal_replay_recorder_executable_recorded_ordinal(
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
+    uint32_t* out_ordinal);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

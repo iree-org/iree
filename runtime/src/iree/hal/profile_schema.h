@@ -44,9 +44,10 @@ extern "C" {
 #define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_CODE_OBJECT_LOADS \
   IREE_SV("application/vnd.iree.hal.profile.executable-code-object-loads")
 
-// Content type for packed iree_hal_profile_executable_export_record_t records.
-#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS \
-  IREE_SV("application/vnd.iree.hal.profile.executable-exports")
+// Content type for packed iree_hal_profile_executable_function_record_t
+// records.
+#define IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS \
+  IREE_SV("application/vnd.iree.hal.profile.executable-functions")
 
 // Content type for an array of iree_hal_profile_command_buffer_record_t.
 #define IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS \
@@ -242,8 +243,8 @@ typedef struct iree_hal_profile_executable_record_t {
   iree_hal_profile_executable_flags_t flags;
   // Session-local executable identifier referenced by dispatch events.
   uint64_t executable_id;
-  // Number of export records associated with this executable.
-  uint32_t export_count;
+  // Number of function records associated with this executable.
+  uint32_t function_count;
   // Reserved for future executable record fields; must be zero.
   uint32_t reserved0;
   // Producer-defined deterministic code-object content hash words when present
@@ -334,52 +335,54 @@ iree_hal_profile_executable_code_object_load_record_default(void) {
   return record;
 }
 
-// Bitfield specifying which executable export fields are populated.
-typedef uint32_t iree_hal_profile_executable_export_flags_t;
-enum iree_hal_profile_executable_export_flag_bits_t {
-  IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_NONE = 0u,
-  // The |pipeline_hash| field contains a producer-defined deterministic export
-  // identity hash.
-  IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH = 1u << 0,
+// Bitfield specifying which executable function fields are populated.
+typedef uint32_t iree_hal_profile_executable_function_flags_t;
+enum iree_hal_profile_executable_function_flag_bits_t {
+  IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_NONE = 0u,
+  // The |function_hash| field contains a producer-defined deterministic
+  // function identity hash.
+  IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_FUNCTION_HASH = 1u << 0,
 };
 
-// Session-level executable export description followed by |name_length| bytes.
+// Session-level executable function description followed by |name_length|
+// bytes.
 //
-// Producers should emit export records before dispatch event records that
-// reference the pair of |executable_id| and |export_ordinal|. The trailing name
-// is not NUL-terminated.
-typedef struct iree_hal_profile_executable_export_record_t {
+// Producers should emit function records before dispatch event records that
+// reference the pair of |executable_id| and |function_ordinal|. The ordinal is
+// a profile-stream-local table slot, not necessarily the HAL function token
+// used during dispatch. The trailing name is not NUL-terminated.
+typedef struct iree_hal_profile_executable_function_record_t {
   // Size of this record in bytes for forward-compatible parsing.
   uint32_t record_length;
-  // Flags specifying which optional export fields are populated.
-  iree_hal_profile_executable_export_flags_t flags;
-  // Session-local executable identifier owning this export.
+  // Flags specifying which optional function fields are populated.
+  iree_hal_profile_executable_function_flags_t flags;
+  // Session-local executable identifier owning this function.
   uint64_t executable_id;
-  // Export ordinal used by dispatch events.
-  uint32_t export_ordinal;
-  // Number of constant words expected by the HAL ABI export.
+  // Profile-local function ordinal used by dispatch events.
+  uint32_t function_ordinal;
+  // Number of constant words expected by the HAL ABI function.
   uint32_t constant_count;
-  // Number of binding pointer slots expected by the HAL ABI export.
+  // Number of binding pointer slots expected by the HAL ABI function.
   uint32_t binding_count;
-  // Number of reflected export parameters.
+  // Number of reflected function parameters.
   uint32_t parameter_count;
   // Static workgroup size for each dimension, or the minimum dynamic size.
   uint32_t workgroup_size[3];
-  // Byte length of the trailing export name.
+  // Byte length of the trailing function name.
   uint32_t name_length;
-  // Producer-defined deterministic executable-export identity hash words when
+  // Producer-defined deterministic executable-function identity hash words when
   // present in |flags|. Consumers should treat the hash as an opaque equality
   // key unless the producer documents its algorithm and inputs.
-  uint64_t pipeline_hash[2];
-} iree_hal_profile_executable_export_record_t;
+  uint64_t function_hash[2];
+} iree_hal_profile_executable_function_record_t;
 
-// Returns a default executable export record.
-static inline iree_hal_profile_executable_export_record_t
-iree_hal_profile_executable_export_record_default(void) {
-  iree_hal_profile_executable_export_record_t record;
+// Returns a default executable function record.
+static inline iree_hal_profile_executable_function_record_t
+iree_hal_profile_executable_function_record_default(void) {
+  iree_hal_profile_executable_function_record_t record;
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   return record;
 }
 
@@ -512,8 +515,9 @@ typedef struct iree_hal_profile_command_operation_record_t {
   uint32_t block_command_ordinal;
   // Session-local executable identifier, or 0 when not applicable.
   uint64_t executable_id;
-  // Executable export ordinal, or UINT32_MAX when not applicable.
-  uint32_t export_ordinal;
+  // Profile-local executable function ordinal, or UINT32_MAX when not
+  // applicable.
+  uint32_t function_ordinal;
   // Number of binding slots used by the operation, or 0 when not applicable.
   uint32_t binding_count;
   // Static workgroup counts for dispatch operations, or zero when dynamic.
@@ -547,7 +551,7 @@ iree_hal_profile_command_operation_record_default(void) {
   record.command_index = UINT32_MAX;
   record.block_ordinal = UINT32_MAX;
   record.block_command_ordinal = UINT32_MAX;
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   record.source_ordinal = UINT32_MAX;
   record.target_ordinal = UINT32_MAX;
   record.target_block_ordinal = UINT32_MAX;
@@ -665,8 +669,8 @@ typedef struct iree_hal_profile_dispatch_event_t {
   uint64_t executable_id;
   // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
   uint32_t command_index;
-  // Executable export ordinal dispatched.
-  uint32_t export_ordinal;
+  // Profile-local executable function ordinal dispatched.
+  uint32_t function_ordinal;
   // Workgroup counts submitted for each dimension.
   uint32_t workgroup_count[3];
   // Workgroup sizes submitted for each dimension.
@@ -684,7 +688,7 @@ iree_hal_profile_dispatch_event_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   return record;
 }
 
@@ -915,8 +919,8 @@ typedef struct iree_hal_profile_host_execution_event_t {
   uint32_t queue_ordinal;
   // Command ordinal within a command buffer, or UINT32_MAX when absent.
   uint32_t command_index;
-  // Executable export ordinal, or UINT32_MAX when absent.
-  uint32_t export_ordinal;
+  // Profile-local executable function ordinal, or UINT32_MAX when absent.
+  uint32_t function_ordinal;
   // Workgroup counts submitted for dispatch-like spans.
   uint32_t workgroup_count[3];
   // Workgroup sizes submitted for dispatch-like spans.
@@ -949,7 +953,7 @@ iree_hal_profile_host_execution_event_default(void) {
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
   record.command_index = UINT32_MAX;
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   return record;
 }
 
@@ -1545,8 +1549,8 @@ typedef struct iree_hal_profile_counter_sample_record_t {
   uint64_t end_tick;
   // Command ordinal within a command buffer, or UINT32_MAX when absent.
   uint32_t command_index;
-  // Executable export ordinal, or UINT32_MAX when absent.
-  uint32_t export_ordinal;
+  // Profile-local executable function ordinal, or UINT32_MAX when absent.
+  uint32_t function_ordinal;
   // Session-local physical device ordinal associated with this sample.
   uint32_t physical_device_ordinal;
   // Session-local queue ordinal associated with this sample, or UINT32_MAX.
@@ -1564,7 +1568,7 @@ iree_hal_profile_counter_sample_record_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
   return record;
@@ -1908,8 +1912,8 @@ typedef struct iree_hal_profile_executable_trace_record_t {
   uint64_t stream_id;
   // Command ordinal within a command buffer, or UINT32_MAX when absent.
   uint32_t command_index;
-  // Executable export ordinal, or UINT32_MAX when absent.
-  uint32_t export_ordinal;
+  // Profile-local executable function ordinal, or UINT32_MAX when absent.
+  uint32_t function_ordinal;
   // Session-local physical device ordinal associated with this trace.
   uint32_t physical_device_ordinal;
   // Session-local queue ordinal associated with this trace, or UINT32_MAX.
@@ -1925,7 +1929,7 @@ iree_hal_profile_executable_trace_record_default(void) {
   memset(&record, 0, sizeof(record));
   record.record_length = sizeof(record);
   record.command_index = UINT32_MAX;
-  record.export_ordinal = UINT32_MAX;
+  record.function_ordinal = UINT32_MAX;
   record.physical_device_ordinal = UINT32_MAX;
   record.queue_ordinal = UINT32_MAX;
   return record;
@@ -1949,7 +1953,7 @@ IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
     iree_hal_profile_executable_code_object_load_record_t, 40);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
-    iree_hal_profile_executable_export_record_t, 64);
+    iree_hal_profile_executable_function_record_t, 64);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(iree_hal_profile_command_buffer_record_t,
                                       48);
 IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
@@ -1988,7 +1992,7 @@ IREE_HAL_PROFILE_ASSERT_RECORD_LAYOUT(
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
     iree_hal_profile_executable_code_object_record_t, data_length, 24);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(
-    iree_hal_profile_executable_export_record_t, name_length, 44);
+    iree_hal_profile_executable_function_record_t, name_length, 44);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_set_record_t,
                                      name_length, 28);
 IREE_HAL_PROFILE_ASSERT_FIELD_OFFSET(iree_hal_profile_counter_record_t,

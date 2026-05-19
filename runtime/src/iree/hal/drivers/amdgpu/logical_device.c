@@ -450,10 +450,10 @@ bool iree_hal_amdgpu_logical_device_should_profile_dispatch(
   }
   if (iree_any_bit_set(
           filter->flags,
-          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN)) {
-    return iree_hal_amdgpu_profile_metadata_export_matches(
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN)) {
+    return iree_hal_amdgpu_profile_metadata_function_matches(
         &logical_device->profile_metadata, executable_id, export_ordinal,
-        filter->executable_export_pattern);
+        filter->executable_function_pattern);
   }
   return true;
 }

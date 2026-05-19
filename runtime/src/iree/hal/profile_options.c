@@ -51,15 +51,15 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_options_clone(
   *out_options = (iree_hal_device_profiling_options_t){0};
   *out_storage = NULL;
 
-  iree_string_view_t executable_export_pattern = iree_string_view_empty();
+  iree_string_view_t executable_function_pattern = iree_string_view_empty();
   if (iree_any_bit_set(
           source_options->capture_filter.flags,
-          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN)) {
-    executable_export_pattern =
-        source_options->capture_filter.executable_export_pattern;
-    if (iree_string_view_is_empty(executable_export_pattern)) {
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN)) {
+    executable_function_pattern =
+        source_options->capture_filter.executable_function_pattern;
+    if (iree_string_view_is_empty(executable_function_pattern)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "profile capture executable export filter must "
+                              "profile capture executable function filter must "
                               "not be empty");
     }
   }
@@ -73,7 +73,7 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_options_clone(
   iree_host_size_t counter_name_total_count = 0;
   iree_host_size_t string_storage_length = 0;
   IREE_RETURN_IF_ERROR(iree_hal_device_profiling_options_add_string_storage(
-      executable_export_pattern.size, &string_storage_length));
+      executable_function_pattern.size, &string_storage_length));
   for (iree_host_size_t i = 0; i < source_options->counter_set_count; ++i) {
     const iree_hal_profile_counter_set_selection_t* source_counter_set =
         &source_options->counter_sets[i];
@@ -125,12 +125,12 @@ IREE_API_EXPORT iree_status_t iree_hal_device_profiling_options_clone(
   }
 
   char* string_storage = (char*)storage + string_storage_offset;
-  cloned_options.capture_filter.executable_export_pattern =
+  cloned_options.capture_filter.executable_function_pattern =
       iree_string_view_empty();
-  if (!iree_string_view_is_empty(executable_export_pattern)) {
-    cloned_options.capture_filter.executable_export_pattern =
+  if (!iree_string_view_is_empty(executable_function_pattern)) {
+    cloned_options.capture_filter.executable_function_pattern =
         iree_hal_device_profiling_options_clone_string_view(
-            executable_export_pattern, &string_storage);
+            executable_function_pattern, &string_storage);
   }
 
   if (source_options->counter_set_count) {

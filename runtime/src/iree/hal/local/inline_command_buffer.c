@@ -583,7 +583,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
     event_info.command_buffer_id = command_buffer->profile.command_buffer_id;
     event_info.executable_id =
         iree_hal_local_executable_profile_id(local_executable);
-    event_info.export_ordinal = function_index;
+    event_info.function_ordinal = function_index;
     event_info.workgroup_count[0] = dispatch_state->workgroup_count_x;
     event_info.workgroup_count[1] = dispatch_state->workgroup_count_y;
     event_info.workgroup_count[2] = dispatch_state->workgroup_count_z;

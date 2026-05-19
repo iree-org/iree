@@ -504,8 +504,8 @@ typedef struct iree_hal_sync_device_profile_operation_t {
   // Number of encoded payload operations represented by this queue operation.
   uint32_t operation_count;
 
-  // Executable export ordinal for dispatch-like spans, or UINT32_MAX.
-  uint32_t export_ordinal;
+  // Executable function ordinal for dispatch-like spans, or UINT32_MAX.
+  uint32_t function_ordinal;
 
   // Workgroup counts submitted for dispatch-like spans.
   uint32_t workgroup_count[3];
@@ -566,7 +566,7 @@ static void iree_hal_sync_device_profile_operation_initialize(
   out_operation->type = type;
   out_operation->payload_length = payload_length;
   out_operation->operation_count = operation_count;
-  out_operation->export_ordinal = UINT32_MAX;
+  out_operation->function_ordinal = UINT32_MAX;
 }
 
 static iree_status_t iree_hal_sync_device_profile_operation_set_dispatch(
@@ -584,7 +584,7 @@ static iree_status_t iree_hal_sync_device_profile_operation_set_dispatch(
   }
   operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  operation->export_ordinal = iree_hal_executable_function_index(function);
+  operation->function_ordinal = iree_hal_executable_function_index(function);
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     operation->host_flags |=
         IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -736,7 +736,7 @@ static void iree_hal_sync_device_profile_operation_record_end(
   event_info.command_buffer_id = operation->command_buffer_id;
   event_info.executable_id = operation->executable_id;
   event_info.allocation_id = operation->allocation_id;
-  event_info.export_ordinal = operation->export_ordinal;
+  event_info.function_ordinal = operation->function_ordinal;
   memcpy(event_info.workgroup_count, operation->workgroup_count,
          sizeof(event_info.workgroup_count));
   memcpy(event_info.workgroup_size, operation->workgroup_size,

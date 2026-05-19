@@ -2322,7 +2322,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_dispatch_summary(
       first_packet_ordinal + (uses_indirect_parameters ? 1u : 0u);
   summary->metadata.executable_id = dispatch_command->executable_id;
   summary->metadata.command_index = dispatch_command->header.command_index;
-  summary->metadata.export_ordinal = dispatch_command->export_ordinal;
+  summary->metadata.function_ordinal = dispatch_command->export_ordinal;
   summary->metadata.dispatch_flags = dispatch_command->dispatch_flags;
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(summary->workgroup.size);
        ++i) {

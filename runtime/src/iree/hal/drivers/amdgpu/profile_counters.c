@@ -1719,7 +1719,7 @@ static void iree_hal_amdgpu_profile_counter_initialize_sample_record(
   out_record->start_tick = event->start_tick;
   out_record->end_tick = event->end_tick;
   out_record->command_index = event->command_index;
-  out_record->export_ordinal = event->export_ordinal;
+  out_record->function_ordinal = event->function_ordinal;
   out_record->physical_device_ordinal =
       iree_hal_amdgpu_host_queue_profile_device_ordinal(queue);
   out_record->queue_ordinal =

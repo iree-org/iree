@@ -53,7 +53,7 @@ enum iree_hal_device_profiling_data_family_bits_t {
   // individual operations. Requested counters are described by |counter_sets|.
   IREE_HAL_DEVICE_PROFILING_DATA_COUNTER_SAMPLES = 1ull << 4,
 
-  // Executable/code-object/export metadata needed for offline analysis. Some
+  // Executable/code-object/function metadata needed for offline analysis. Some
   // producers also use this as the cheap metadata family for command-buffer
   // records needed to interpret command-index joins. Producers may emit this
   // implicitly when another requested family references executable ids, but
@@ -106,9 +106,9 @@ typedef uint32_t iree_hal_profile_capture_filter_flags_t;
 enum iree_hal_profile_capture_filter_flag_bits_t {
   IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_NONE = 0u,
 
-  // Match only executable exports whose names match
-  // |executable_export_pattern|.
-  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN = 1u << 0,
+  // Match only executable functions whose names match
+  // |executable_function_pattern|.
+  IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN = 1u << 0,
 
   // Match only operations associated with |command_buffer_id|.
   IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_BUFFER_ID = 1u << 1,
@@ -136,9 +136,9 @@ typedef struct iree_hal_profile_capture_filter_t {
   iree_hal_profile_capture_filter_flags_t flags;
 
   // Borrowed glob pattern matched with iree_string_view_match_pattern against
-  // an executable export name. Profile sessions retaining this filter after
+  // an executable function name. Profile sessions retaining this filter after
   // begin must copy the pattern into session-owned storage.
-  iree_string_view_t executable_export_pattern;
+  iree_string_view_t executable_function_pattern;
 
   // Session-local command-buffer identifier to match.
   uint64_t command_buffer_id;

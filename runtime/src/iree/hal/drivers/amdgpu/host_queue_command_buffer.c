@@ -173,7 +173,7 @@ iree_hal_amdgpu_host_queue_should_profile_all_pm4_command_buffer_dispatches(
   if (iree_any_bit_set(
           filter->flags,
           IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_COMMAND_INDEX |
-              IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN)) {
+              IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN)) {
     return false;
   }
 
@@ -197,7 +197,7 @@ iree_hal_amdgpu_host_queue_should_profile_pm4_command_buffer_dispatch(
   iree_hal_amdgpu_logical_device_t* logical_device =
       (iree_hal_amdgpu_logical_device_t*)queue->logical_device;
   return iree_hal_amdgpu_logical_device_should_profile_dispatch(
-      logical_device, operation->executable_id, operation->export_ordinal,
+      logical_device, operation->executable_id, operation->function_ordinal,
       command_buffer_id, operation->command_index, physical_device_ordinal,
       queue_ordinal);
 }
@@ -272,7 +272,7 @@ static void iree_hal_amdgpu_host_queue_initialize_pm4_dispatch_event(
   event->command_buffer_id = operation->command_buffer_id;
   event->executable_id = operation->executable_id;
   event->command_index = operation->command_index;
-  event->export_ordinal = operation->export_ordinal;
+  event->function_ordinal = operation->function_ordinal;
   memcpy(event->workgroup_count, operation->workgroup_count,
          sizeof(event->workgroup_count));
   memcpy(event->workgroup_size, operation->workgroup_size,

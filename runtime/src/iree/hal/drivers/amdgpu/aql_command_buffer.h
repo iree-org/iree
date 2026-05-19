@@ -59,8 +59,8 @@ typedef struct iree_hal_amdgpu_aql_command_buffer_dispatch_summary_t {
     uint64_t executable_id;
     // Program-global command index used for profiling/source attribution.
     uint32_t command_index;
-    // Executable export ordinal used for profiling and diagnostics.
-    uint32_t export_ordinal;
+    // Executable function ordinal used for profiling and diagnostics.
+    uint32_t function_ordinal;
     // Dispatch flags from iree_hal_amdgpu_command_buffer_dispatch_flag_bits_t.
     uint8_t dispatch_flags;
     // Reserved bytes that must be zero.

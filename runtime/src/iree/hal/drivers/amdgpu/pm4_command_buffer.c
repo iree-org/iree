@@ -3103,7 +3103,7 @@ static void iree_hal_amdgpu_pm4_command_buffer_initialize_profile_operation(
         IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_PREPUBLISHED_ARGUMENTS;
   }
   record.executable_id = dispatch_record->executable_id;
-  record.export_ordinal = dispatch_record->export_ordinal;
+  record.function_ordinal = dispatch_record->export_ordinal;
   record.binding_count = dispatch_record->binding_record_count;
   record.workgroup_count[0] = dispatch_record->workgroup_count[0];
   record.workgroup_count[1] = dispatch_record->workgroup_count[1];

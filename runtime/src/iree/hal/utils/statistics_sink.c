@@ -26,16 +26,16 @@ typedef struct iree_hal_profile_statistics_index_t {
   iree_host_size_t capacity;
 } iree_hal_profile_statistics_index_t;
 
-typedef struct iree_hal_profile_statistics_export_t {
-  // Session-local executable identifier owning this export.
+typedef struct iree_hal_profile_statistics_function_t {
+  // Session-local executable identifier owning this function.
   uint64_t executable_id;
-  // Export ordinal within |executable_id|.
-  uint32_t export_ordinal;
+  // Function ordinal within |executable_id|.
+  uint32_t function_ordinal;
   // Reserved for natural alignment.
   uint32_t reserved0;
-  // Export name storage owned by the sink.
+  // Function name storage owned by the sink.
   iree_string_view_t name;
-} iree_hal_profile_statistics_export_t;
+} iree_hal_profile_statistics_function_t;
 
 typedef struct iree_hal_profile_statistics_device_t {
   // Session-local physical device ordinal.
@@ -63,14 +63,14 @@ typedef struct iree_hal_profile_statistics_sink_t {
   iree_host_size_t row_capacity;
   // Lookup index from aggregate row keys to |rows| entry indexes.
   iree_hal_profile_statistics_index_t row_index;
-  // Dynamic array of executable export metadata rows.
-  iree_hal_profile_statistics_export_t* exports;
-  // Number of valid entries in |exports|.
-  iree_host_size_t export_count;
-  // Capacity of |exports| in entries.
-  iree_host_size_t export_capacity;
-  // Lookup index from executable/export keys to |exports| entry indexes.
-  iree_hal_profile_statistics_index_t export_index;
+  // Dynamic array of executable function metadata rows.
+  iree_hal_profile_statistics_function_t* functions;
+  // Number of valid entries in |functions|.
+  iree_host_size_t function_count;
+  // Capacity of |functions| in entries.
+  iree_host_size_t function_capacity;
+  // Lookup index from executable/function keys to |functions| entry indexes.
+  iree_hal_profile_statistics_index_t function_index;
   // Dynamic array of per-device clock-correlation rows.
   iree_hal_profile_statistics_device_t* devices;
   // Number of valid entries in |devices|.
@@ -213,7 +213,7 @@ static uint64_t iree_hal_profile_statistics_row_hash(
   hash = iree_hal_profile_statistics_combine_u64(hash, row->event_type);
   hash = iree_hal_profile_statistics_combine_u64(hash, row->executable_id);
   hash = iree_hal_profile_statistics_combine_u64(hash, row->command_buffer_id);
-  hash = iree_hal_profile_statistics_combine_u64(hash, row->export_ordinal);
+  hash = iree_hal_profile_statistics_combine_u64(hash, row->function_ordinal);
   return iree_hal_profile_statistics_combine_u64(hash, row->command_index);
 }
 
@@ -232,7 +232,7 @@ static bool iree_hal_profile_statistics_row_matches(const void* user_data,
          candidate->event_type == expected->event_type &&
          candidate->executable_id == expected->executable_id &&
          candidate->command_buffer_id == expected->command_buffer_id &&
-         candidate->export_ordinal == expected->export_ordinal &&
+         candidate->function_ordinal == expected->function_ordinal &&
          candidate->command_index == expected->command_index;
 }
 
@@ -242,7 +242,7 @@ static void iree_hal_profile_statistics_row_initialize(
     iree_hal_profile_statistics_time_domain_t time_domain,
     uint32_t physical_device_ordinal, uint32_t queue_ordinal,
     uint32_t event_type, uint64_t executable_id, uint64_t command_buffer_id,
-    uint32_t export_ordinal, uint32_t command_index) {
+    uint32_t function_ordinal, uint32_t command_index) {
   memset(row, 0, sizeof(*row));
   row->row_type = row_type;
   row->time_domain = time_domain;
@@ -251,7 +251,7 @@ static void iree_hal_profile_statistics_row_initialize(
   row->event_type = event_type;
   row->executable_id = executable_id;
   row->command_buffer_id = command_buffer_id;
-  row->export_ordinal = export_ordinal;
+  row->function_ordinal = function_ordinal;
   row->command_index = command_index;
   row->first_start_time = UINT64_MAX;
   row->minimum_duration = UINT64_MAX;
@@ -263,7 +263,7 @@ static iree_status_t iree_hal_profile_statistics_sink_ensure_row(
     iree_hal_profile_statistics_time_domain_t time_domain,
     uint32_t physical_device_ordinal, uint32_t queue_ordinal,
     uint32_t event_type, uint64_t executable_id, uint64_t command_buffer_id,
-    uint32_t export_ordinal, uint32_t command_index,
+    uint32_t function_ordinal, uint32_t command_index,
     iree_hal_profile_statistics_row_t** out_row) {
   *out_row = NULL;
 
@@ -277,7 +277,7 @@ static iree_status_t iree_hal_profile_statistics_sink_ensure_row(
   iree_hal_profile_statistics_row_t* probe = &sink->rows[sink->row_count];
   iree_hal_profile_statistics_row_initialize(
       probe, row_type, time_domain, physical_device_ordinal, queue_ordinal,
-      event_type, executable_id, command_buffer_id, export_ordinal,
+      event_type, executable_id, command_buffer_id, function_ordinal,
       command_index);
   const uint64_t hash = iree_hal_profile_statistics_row_hash(probe);
 
@@ -296,57 +296,59 @@ static iree_status_t iree_hal_profile_statistics_sink_ensure_row(
   return iree_ok_status();
 }
 
-static uint64_t iree_hal_profile_statistics_export_hash(
-    uint64_t executable_id, uint32_t export_ordinal) {
+static uint64_t iree_hal_profile_statistics_function_hash(
+    uint64_t executable_id, uint32_t function_ordinal) {
   uint64_t hash = iree_hal_profile_statistics_mix_u64(executable_id);
-  return iree_hal_profile_statistics_combine_u64(hash, export_ordinal);
+  return iree_hal_profile_statistics_combine_u64(hash, function_ordinal);
 }
 
-typedef struct iree_hal_profile_statistics_export_lookup_t {
-  // Statistics sink owning candidate exports.
+typedef struct iree_hal_profile_statistics_function_lookup_t {
+  // Statistics sink owning candidate functions.
   const iree_hal_profile_statistics_sink_t* sink;
   // Session-local executable identifier.
   uint64_t executable_id;
-  // Export ordinal within |executable_id|.
-  uint32_t export_ordinal;
-} iree_hal_profile_statistics_export_lookup_t;
+  // Function ordinal within |executable_id|.
+  uint32_t function_ordinal;
+} iree_hal_profile_statistics_function_lookup_t;
 
-static bool iree_hal_profile_statistics_export_matches(const void* user_data,
-                                                       iree_host_size_t value) {
-  const iree_hal_profile_statistics_export_lookup_t* lookup =
-      (const iree_hal_profile_statistics_export_lookup_t*)user_data;
-  const iree_hal_profile_statistics_export_t* candidate =
-      &lookup->sink->exports[value];
+static bool iree_hal_profile_statistics_function_matches(
+    const void* user_data, iree_host_size_t value) {
+  const iree_hal_profile_statistics_function_lookup_t* lookup =
+      (const iree_hal_profile_statistics_function_lookup_t*)user_data;
+  const iree_hal_profile_statistics_function_t* candidate =
+      &lookup->sink->functions[value];
   return candidate->executable_id == lookup->executable_id &&
-         candidate->export_ordinal == lookup->export_ordinal;
+         candidate->function_ordinal == lookup->function_ordinal;
 }
 
-static iree_status_t iree_hal_profile_statistics_sink_insert_export(
+static iree_status_t iree_hal_profile_statistics_sink_insert_function(
     iree_hal_profile_statistics_sink_t* sink, uint64_t executable_id,
-    uint32_t export_ordinal, iree_string_view_t name) {
-  const uint64_t hash =
-      iree_hal_profile_statistics_export_hash(executable_id, export_ordinal);
-  const iree_hal_profile_statistics_export_lookup_t lookup = {
+    uint32_t function_ordinal, iree_string_view_t name) {
+  const uint64_t hash = iree_hal_profile_statistics_function_hash(
+      executable_id, function_ordinal);
+  const iree_hal_profile_statistics_function_lookup_t lookup = {
       .sink = sink,
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
   };
   iree_host_size_t existing_index = 0;
   if (iree_hal_profile_statistics_index_find(
-          &sink->export_index, hash, iree_hal_profile_statistics_export_matches,
-          &lookup, &existing_index)) {
+          &sink->function_index, hash,
+          iree_hal_profile_statistics_function_matches, &lookup,
+          &existing_index)) {
     return iree_ok_status();
   }
 
-  if (sink->export_count + 1 > sink->export_capacity) {
+  if (sink->function_count + 1 > sink->function_capacity) {
     IREE_RETURN_IF_ERROR(iree_allocator_grow_array(
         sink->host_allocator,
-        iree_max((iree_host_size_t)16, sink->export_count + 1),
-        sizeof(sink->exports[0]), &sink->export_capacity,
-        (void**)&sink->exports));
+        iree_max((iree_host_size_t)16, sink->function_count + 1),
+        sizeof(sink->functions[0]), &sink->function_capacity,
+        (void**)&sink->functions));
   }
   IREE_RETURN_IF_ERROR(iree_hal_profile_statistics_index_reserve(
-      &sink->export_index, sink->host_allocator, sink->export_index.count + 1));
+      &sink->function_index, sink->host_allocator,
+      sink->function_index.count + 1));
 
   char* name_storage = NULL;
   if (!iree_string_view_is_empty(name)) {
@@ -355,16 +357,16 @@ static iree_status_t iree_hal_profile_statistics_sink_insert_export(
     memcpy(name_storage, name.data, name.size);
   }
 
-  const iree_host_size_t export_index = sink->export_count;
-  iree_hal_profile_statistics_index_insert_existing(&sink->export_index, hash,
-                                                    export_index);
-  sink->exports[export_index] = (iree_hal_profile_statistics_export_t){
+  const iree_host_size_t function_index = sink->function_count;
+  iree_hal_profile_statistics_index_insert_existing(&sink->function_index, hash,
+                                                    function_index);
+  sink->functions[function_index] = (iree_hal_profile_statistics_function_t){
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
       .reserved0 = 0,
       .name = iree_make_string_view(name_storage, name.size),
   };
-  ++sink->export_count;
+  ++sink->function_count;
   return iree_ok_status();
 }
 
@@ -613,14 +615,14 @@ static iree_status_t iree_hal_profile_statistics_sink_add_row_sample(
     iree_hal_profile_statistics_time_domain_t time_domain,
     uint32_t physical_device_ordinal, uint32_t queue_ordinal,
     uint32_t event_type, uint64_t executable_id, uint64_t command_buffer_id,
-    uint32_t export_ordinal, uint32_t command_index, bool has_timing,
+    uint32_t function_ordinal, uint32_t command_index, bool has_timing,
     uint64_t start_time, uint64_t end_time, uint64_t operation_count,
     uint64_t payload_bytes, uint64_t tile_count,
     uint64_t tile_duration_sum_ns) {
   iree_hal_profile_statistics_row_t* row = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_profile_statistics_sink_ensure_row(
       sink, row_type, time_domain, physical_device_ordinal, queue_ordinal,
-      event_type, executable_id, command_buffer_id, export_ordinal,
+      event_type, executable_id, command_buffer_id, function_ordinal,
       command_index, &row));
   return iree_hal_profile_statistics_row_add_sample(
       row, has_timing, start_time, end_time, operation_count, payload_bytes,
@@ -673,13 +675,13 @@ static iree_status_t iree_hal_profile_statistics_process_dispatch_event(
       event->start_tick != 0 && event->end_tick >= event->start_tick;
 
   iree_status_t status = iree_ok_status();
-  if (event->executable_id != 0 && event->export_ordinal != UINT32_MAX) {
+  if (event->executable_id != 0 && event->function_ordinal != UINT32_MAX) {
     status = iree_hal_profile_statistics_sink_add_row_sample(
-        sink, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT,
+        sink, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION,
         IREE_HAL_PROFILE_STATISTICS_TIME_DOMAIN_DEVICE_TICK,
         metadata->physical_device_ordinal, metadata->queue_ordinal,
         /*event_type=*/0, event->executable_id, /*command_buffer_id=*/0,
-        event->export_ordinal, UINT32_MAX, has_timing, event->start_tick,
+        event->function_ordinal, UINT32_MAX, has_timing, event->start_tick,
         event->end_tick, /*operation_count=*/0, /*payload_bytes=*/0,
         /*tile_count=*/0, /*tile_duration_sum_ns=*/0);
   }
@@ -700,7 +702,7 @@ static iree_status_t iree_hal_profile_statistics_process_dispatch_event(
         IREE_HAL_PROFILE_STATISTICS_TIME_DOMAIN_DEVICE_TICK,
         metadata->physical_device_ordinal, metadata->queue_ordinal,
         /*event_type=*/0, event->executable_id, event->command_buffer_id,
-        event->export_ordinal, event->command_index, has_timing,
+        event->function_ordinal, event->command_index, has_timing,
         event->start_tick, event->end_tick, /*operation_count=*/0,
         /*payload_bytes=*/0, /*tile_count=*/0, /*tile_duration_sum_ns=*/0);
   }
@@ -779,13 +781,13 @@ static iree_status_t iree_hal_profile_statistics_process_host_execution_event(
       has_timing, start_time, end_time, event->operation_count,
       event->payload_length, event->tile_count, tile_duration_sum_ns);
   if (iree_status_is_ok(status) && event->executable_id != 0 &&
-      event->export_ordinal != UINT32_MAX) {
+      event->function_ordinal != UINT32_MAX) {
     status = iree_hal_profile_statistics_sink_add_row_sample(
-        sink, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT,
+        sink, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION,
         IREE_HAL_PROFILE_STATISTICS_TIME_DOMAIN_IREE_HOST_TIME_NS,
         event->physical_device_ordinal, event->queue_ordinal,
         /*event_type=*/0, event->executable_id, /*command_buffer_id=*/0,
-        event->export_ordinal, UINT32_MAX, has_timing, start_time, end_time,
+        event->function_ordinal, UINT32_MAX, has_timing, start_time, end_time,
         event->operation_count, event->payload_length, event->tile_count,
         tile_duration_sum_ns);
   }
@@ -808,7 +810,7 @@ static iree_status_t iree_hal_profile_statistics_process_host_execution_event(
         IREE_HAL_PROFILE_STATISTICS_TIME_DOMAIN_IREE_HOST_TIME_NS,
         event->physical_device_ordinal, event->queue_ordinal,
         /*event_type=*/0, event->executable_id, event->command_buffer_id,
-        event->export_ordinal, event->command_index, has_timing, start_time,
+        event->function_ordinal, event->command_index, has_timing, start_time,
         end_time, event->operation_count, event->payload_length,
         event->tile_count, tile_duration_sum_ns);
   }
@@ -831,27 +833,27 @@ static iree_status_t iree_hal_profile_statistics_process_memory_event(
       /*tile_duration_sum_ns=*/0);
 }
 
-static iree_status_t iree_hal_profile_statistics_process_export_iovec(
+static iree_status_t iree_hal_profile_statistics_process_function_iovec(
     iree_hal_profile_statistics_sink_t* sink, iree_const_byte_span_t iovec) {
   iree_status_t status = iree_ok_status();
   iree_host_size_t offset = 0;
   while (iree_status_is_ok(status) && offset < iovec.data_length) {
     const iree_host_size_t remaining_length = iovec.data_length - offset;
     if (remaining_length <
-        sizeof(iree_hal_profile_executable_export_record_t)) {
+        sizeof(iree_hal_profile_executable_function_record_t)) {
       return iree_make_status(
           IREE_STATUS_DATA_LOSS,
-          "profile statistics executable-export chunk has a partial record");
+          "profile statistics executable-function chunk has a partial record");
     }
 
-    iree_hal_profile_executable_export_record_t record;
+    iree_hal_profile_executable_function_record_t record;
     memcpy(&record, iovec.data + offset, sizeof(record));
     if (record.record_length <
-            sizeof(iree_hal_profile_executable_export_record_t) ||
+            sizeof(iree_hal_profile_executable_function_record_t) ||
         record.record_length > remaining_length) {
       return iree_make_status(
           IREE_STATUS_DATA_LOSS,
-          "profile statistics executable-export record length is invalid");
+          "profile statistics executable-function record length is invalid");
     }
 
     const iree_host_size_t trailing_length =
@@ -859,20 +861,20 @@ static iree_status_t iree_hal_profile_statistics_process_export_iovec(
     if ((iree_host_size_t)record.name_length > trailing_length) {
       return iree_make_status(
           IREE_STATUS_DATA_LOSS,
-          "profile statistics executable-export name length is invalid");
+          "profile statistics executable-function name length is invalid");
     }
 
     const char* name_data = (const char*)iovec.data + offset + sizeof(record);
     const iree_string_view_t name =
         iree_make_string_view(name_data, record.name_length);
-    status = iree_hal_profile_statistics_sink_insert_export(
-        sink, record.executable_id, record.export_ordinal, name);
+    status = iree_hal_profile_statistics_sink_insert_function(
+        sink, record.executable_id, record.function_ordinal, name);
     offset += record.record_length;
   }
   return status;
 }
 
-static iree_status_t iree_hal_profile_statistics_process_export_records(
+static iree_status_t iree_hal_profile_statistics_process_function_records(
     iree_hal_profile_statistics_sink_t* sink, iree_host_size_t iovec_count,
     const iree_const_byte_span_t* iovecs) {
   if (iovec_count > 0 && !iovecs) {
@@ -882,7 +884,8 @@ static iree_status_t iree_hal_profile_statistics_process_export_records(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; iree_status_is_ok(status) && i < iovec_count;
        ++i) {
-    status = iree_hal_profile_statistics_process_export_iovec(sink, iovecs[i]);
+    status =
+        iree_hal_profile_statistics_process_function_iovec(sink, iovecs[i]);
   }
   return status;
 }
@@ -890,22 +893,22 @@ static iree_status_t iree_hal_profile_statistics_process_export_records(
 static void iree_hal_profile_statistics_sink_reset(
     iree_hal_profile_statistics_sink_t* sink) {
   iree_allocator_t host_allocator = sink->host_allocator;
-  for (iree_host_size_t i = 0; i < sink->export_count; ++i) {
-    iree_allocator_free(host_allocator, (void*)sink->exports[i].name.data);
+  for (iree_host_size_t i = 0; i < sink->function_count; ++i) {
+    iree_allocator_free(host_allocator, (void*)sink->functions[i].name.data);
   }
-  iree_hal_profile_statistics_index_deinitialize(&sink->export_index,
+  iree_hal_profile_statistics_index_deinitialize(&sink->function_index,
                                                  host_allocator);
   iree_hal_profile_statistics_index_deinitialize(&sink->row_index,
                                                  host_allocator);
-  iree_allocator_free(host_allocator, sink->exports);
+  iree_allocator_free(host_allocator, sink->functions);
   iree_allocator_free(host_allocator, sink->rows);
   iree_allocator_free(host_allocator, sink->devices);
   sink->rows = NULL;
   sink->row_count = 0;
   sink->row_capacity = 0;
-  sink->exports = NULL;
-  sink->export_count = 0;
-  sink->export_capacity = 0;
+  sink->functions = NULL;
+  sink->function_count = 0;
+  sink->function_capacity = 0;
   sink->devices = NULL;
   sink->device_count = 0;
   sink->device_capacity = 0;
@@ -970,27 +973,28 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_for_each_row(
   return status;
 }
 
-IREE_API_EXPORT bool iree_hal_profile_statistics_sink_find_export_name(
+IREE_API_EXPORT bool iree_hal_profile_statistics_sink_find_function_name(
     const iree_hal_profile_statistics_sink_t* sink, uint64_t executable_id,
-    uint32_t export_ordinal, iree_string_view_t* out_name) {
+    uint32_t function_ordinal, iree_string_view_t* out_name) {
   IREE_ASSERT_ARGUMENT(sink);
   IREE_ASSERT_ARGUMENT(out_name);
   *out_name = iree_string_view_empty();
 
-  const uint64_t hash =
-      iree_hal_profile_statistics_export_hash(executable_id, export_ordinal);
-  const iree_hal_profile_statistics_export_lookup_t lookup = {
+  const uint64_t hash = iree_hal_profile_statistics_function_hash(
+      executable_id, function_ordinal);
+  const iree_hal_profile_statistics_function_lookup_t lookup = {
       .sink = sink,
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
   };
-  iree_host_size_t export_index = 0;
+  iree_host_size_t function_index = 0;
   if (!iree_hal_profile_statistics_index_find(
-          &sink->export_index, hash, iree_hal_profile_statistics_export_matches,
-          &lookup, &export_index)) {
+          &sink->function_index, hash,
+          iree_hal_profile_statistics_function_matches, &lookup,
+          &function_index)) {
     return false;
   }
-  *out_name = sink->exports[export_index].name;
+  *out_name = sink->functions[function_index].name;
   return !iree_string_view_is_empty(*out_name);
 }
 
@@ -1024,10 +1028,10 @@ typedef struct iree_hal_profile_statistics_print_context_t {
   const iree_hal_profile_statistics_sink_t* sink;
   // Output stream receiving human-readable statistics.
   FILE* file;
-  // Total scaled dispatch duration across executable export rows.
-  uint64_t dispatch_export_duration_ns;
-  // Total scaled host execution duration across executable export rows.
-  uint64_t host_execution_export_duration_ns;
+  // Total scaled dispatch duration across executable function rows.
+  uint64_t dispatch_function_duration_ns;
+  // Total scaled host execution duration across executable function rows.
+  uint64_t host_execution_function_duration_ns;
   // Total scaled host execution duration across queue operation rows.
   uint64_t host_execution_queue_operation_duration_ns;
   // Total scaled device-queue operation duration.
@@ -1161,17 +1165,18 @@ static iree_status_t iree_hal_profile_statistics_accumulate_row(
   }
 
   switch (row->row_type) {
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT:
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION:
       if (!iree_hal_profile_statistics_add_u64(
-              &context->dispatch_export_duration_ns, total_duration_ns)) {
+              &context->dispatch_function_duration_ns, total_duration_ns)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "profile statistics dispatch duration overflow");
       }
       break;
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT:
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION:
       if (!iree_hal_profile_statistics_add_u64(
-              &context->host_execution_export_duration_ns, total_duration_ns)) {
+              &context->host_execution_function_duration_ns,
+              total_duration_ns)) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
             "profile statistics host execution duration overflow");
@@ -1248,17 +1253,17 @@ static void iree_hal_profile_statistics_fprint_operation_totals(
   }
 }
 
-static void iree_hal_profile_statistics_fprint_export_key(
+static void iree_hal_profile_statistics_fprint_function_key(
     const iree_hal_profile_statistics_print_context_t* context,
     const iree_hal_profile_statistics_row_t* row) {
-  iree_string_view_t export_name = iree_string_view_empty();
-  if (iree_hal_profile_statistics_sink_find_export_name(
-          context->sink, row->executable_id, row->export_ordinal,
-          &export_name)) {
-    fprintf(context->file, "%.*s", (int)export_name.size, export_name.data);
+  iree_string_view_t function_name = iree_string_view_empty();
+  if (iree_hal_profile_statistics_sink_find_function_name(
+          context->sink, row->executable_id, row->function_ordinal,
+          &function_name)) {
+    fprintf(context->file, "%.*s", (int)function_name.size, function_name.data);
   } else {
-    fprintf(context->file, "executable=%" PRIu64 " export=%" PRIu32,
-            row->executable_id, row->export_ordinal);
+    fprintf(context->file, "executable=%" PRIu64 " function=%" PRIu32,
+            row->executable_id, row->function_ordinal);
   }
 }
 
@@ -1268,15 +1273,15 @@ static iree_status_t iree_hal_profile_statistics_print_row(
       (const iree_hal_profile_statistics_print_context_t*)user_data;
   FILE* file = context->file;
   switch (row->row_type) {
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT:
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION:
       fprintf(file, "  dispatch ");
-      iree_hal_profile_statistics_fprint_export_key(context, row);
+      iree_hal_profile_statistics_fprint_function_key(context, row);
       iree_hal_profile_statistics_fprint_row_timing(context, row);
       fprintf(file, "\n");
       break;
-    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT:
+    case IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION:
       fprintf(file, "  host_execute ");
-      iree_hal_profile_statistics_fprint_export_key(context, row);
+      iree_hal_profile_statistics_fprint_function_key(context, row);
       iree_hal_profile_statistics_fprint_row_timing(context, row);
       iree_hal_profile_statistics_fprint_tile_totals(context, row);
       fprintf(file, "\n");
@@ -1353,12 +1358,12 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint(
     fprintf(file, "  dropped_records=%" PRIu64 "\n", dropped_record_count);
   }
   if (row_count == 0) return iree_ok_status();
-  fprintf(file, "  dispatch_export_total=");
+  fprintf(file, "  dispatch_function_total=");
   iree_hal_profile_statistics_fprint_scaled_duration(
-      file, context.dispatch_export_duration_ns);
-  fprintf(file, "\n  host_execution_export_total=");
+      file, context.dispatch_function_duration_ns);
+  fprintf(file, "\n  host_execution_function_total=");
   iree_hal_profile_statistics_fprint_scaled_duration(
-      file, context.host_execution_export_duration_ns);
+      file, context.host_execution_function_duration_ns);
   fprintf(file, "\n  host_execution_queue_total=");
   iree_hal_profile_statistics_fprint_scaled_duration(
       file, context.host_execution_queue_operation_duration_ns);
@@ -1451,9 +1456,9 @@ static iree_status_t iree_hal_profile_statistics_sink_write(
         iree_hal_profile_statistics_process_memory_event);
   } else if (iree_string_view_equal(
                  metadata->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
-    return iree_hal_profile_statistics_process_export_records(sink, iovec_count,
-                                                              iovecs);
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS)) {
+    return iree_hal_profile_statistics_process_function_records(
+        sink, iovec_count, iovecs);
   }
   return iree_ok_status();
 }

@@ -364,7 +364,7 @@ static void iree_hal_block_command_buffer_profile_append_dispatch(
       bindings.count, bindings.values);
   record->executable_id = iree_hal_local_executable_profile_id(
       iree_hal_local_executable_cast(executable));
-  record->export_ordinal = iree_hal_executable_function_index(function);
+  record->function_ordinal = iree_hal_executable_function_index(function);
   record->binding_count =
       (uint32_t)iree_min(bindings.count, (iree_host_size_t)UINT32_MAX);
   record->workgroup_size[0] =
