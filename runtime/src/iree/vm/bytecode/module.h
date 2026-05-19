@@ -9,6 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
+#include "iree/vm/bytecode/isa/isa.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,14 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
     iree_vm_instance_t* instance, iree_vm_bytecode_module_flags_t flags,
     iree_const_byte_span_t archive_contents, iree_allocator_t archive_allocator,
     iree_allocator_t allocator, iree_vm_module_t** out_module);
+
+// Returns the feature bits required by a bytecode module archive.
+//
+// This only validates the archive enough to read module metadata. Use
+// iree_vm_bytecode_module_create to fully verify and load executable modules.
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_query_required_features(
+    iree_const_byte_span_t archive_contents,
+    iree_vm_FeatureBits_enum_t* out_required_features);
 
 // Disassembles an entire function's bytecode.
 // Output is assembly-like by default:
