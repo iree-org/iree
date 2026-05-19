@@ -32,9 +32,9 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_avx512_1x16x1_f32
-//       CHECK:   vector.broadcast {{.*}} : vector<{{1x1|1}}xf32> to vector<16x1xf32>
-//       CHECK:   vector.shape_cast {{.*}} : vector<16x1xf32> to vector<16xf32>
-//       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : f32 from vector<{{1x1|1}}xf32>
+//       CHECK:   %[[BCST:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<16xf32>
+//       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"(%{{.+}}, %[[BCST]], %{{.+}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
 
 // -----
 
@@ -70,8 +70,8 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_avx512_1x16x1_f16_castf32
-//       CHECK:   vector.broadcast {{.*}} : vector<{{1x1|1}}xf16> to vector<16x1xf16>
-//       CHECK:   vector.shape_cast {{.*}} : vector<16x1xf16> to vector<16xf16>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : f16 from vector<{{1x1|1}}xf16>
+//       CHECK:   %[[BCST:.+]] = vector.broadcast %[[SCALAR]] : f16 to vector<16xf16>
 //       CHECK:   arith.extf {{.*}} : vector<16xf16> to vector<16xf32>
 //       CHECK:   arith.extf {{.*}} : vector<16xf16> to vector<16xf32>
 //       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
@@ -112,8 +112,9 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_avx512_1x16x2_i8_casti16
-//       CHECK:   vector.broadcast {{.*}} : vector<{{1x2|2}}xi8> to vector<16x2xi8>
-//       CHECK:   vector.shape_cast {{.*}} : vector<16x2xi8> to vector<32xi8>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : i16 from vector<1xi16>
+//       CHECK:   %[[BCST_I16:.+]] = vector.broadcast %[[SCALAR]] : i16 to vector<16xi16>
+//       CHECK:   vector.bitcast %[[BCST_I16]] : vector<16xi16> to vector<32xi8>
 //       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
 //       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
 //       CHECK:   %[[DOT:.+]] = llvm.call_intrinsic "llvm.x86.avx512.pmaddw.d.512"({{.*}}) : (vector<32xi16>, vector<32xi16>) -> vector<16xi32>
@@ -303,7 +304,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @lower_avx512_16x1x1_f32
 //       CHECK:   util.hoistable_conversion "shape_cast_to_intrinsic"
 //       CHECK:     vector.shape_cast {{.*}} : vector<2x4x16xf32> to vector<2x4x16x1xf32>
-//       CHECK:   vector.broadcast {{.*}} : vector<1xf32> to vector<16x1xf32>
+//       CHECK:   vector.broadcast {{.*}} : f32 to vector<16xf32>
 //       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"
 //       CHECK:   util.hoistable_conversion "shape_cast_from_intrinsic"
 //       CHECK:     vector.shape_cast {{.*}} : vector<2x4x16x1xf32> to vector<2x4x16xf32>
@@ -360,8 +361,8 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[N_LHS:[a-zA-Z0-9]+]]: vector<1x4xi8>
 //  CHECK-SAME:   %[[N_RHS:[a-zA-Z0-9]+]]: vector<16x4xi8>
 //       CHECK:   %[[N_RHS_FLAT:.+]] = vector.shape_cast %[[N_RHS]] : vector<16x4xi8> to vector<64xi8>
-//       CHECK:   %[[N_BCAST:.+]] = vector.broadcast %[[N_LHS]] : vector<1x4xi8> to vector<16x4xi8>
-//       CHECK:   %[[N_LHS_FLAT:.+]] = vector.shape_cast %[[N_BCAST]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   %[[N_BCAST_I32:.+]] = vector.broadcast %{{.+}} : i32 to vector<16xi32>
+//       CHECK:   %[[N_LHS_FLAT:.+]] = vector.bitcast %[[N_BCAST_I32]] : vector<16xi32> to vector<64xi8>
 //       CHECK:   llvm.call_intrinsic "llvm.x86.avx512.vpdpbusd.512"(%{{.+}}, %[[N_LHS_FLAT]], %[[N_RHS_FLAT]])
 
 // Swapped: RHS (ui8, narrow) is broadcast; the lowering swaps arg order at
@@ -370,6 +371,6 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[S_LHS:[a-zA-Z0-9]+]]: vector<16x4xi8>
 //  CHECK-SAME:   %[[S_RHS:[a-zA-Z0-9]+]]: vector<1x4xi8>
 //       CHECK:   %[[S_LHS_FLAT:.+]] = vector.shape_cast %[[S_LHS]] : vector<16x4xi8> to vector<64xi8>
-//       CHECK:   %[[S_BCAST:.+]] = vector.broadcast %[[S_RHS]] : vector<1x4xi8> to vector<16x4xi8>
-//       CHECK:   %[[S_RHS_FLAT:.+]] = vector.shape_cast %[[S_BCAST]] : vector<16x4xi8> to vector<64xi8>
+//       CHECK:   %[[S_BCAST_I32:.+]] = vector.broadcast %{{.+}} : i32 to vector<16xi32>
+//       CHECK:   %[[S_RHS_FLAT:.+]] = vector.bitcast %[[S_BCAST_I32]] : vector<16xi32> to vector<64xi8>
 //       CHECK:   llvm.call_intrinsic "llvm.x86.avx512.vpdpbusd.512"(%{{.+}}, %[[S_RHS_FLAT]], %[[S_LHS_FLAT]])
