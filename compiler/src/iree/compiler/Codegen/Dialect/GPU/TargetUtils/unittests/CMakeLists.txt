@@ -16,10 +16,10 @@ iree_cc_test(
   SRCS
     "KnownTargetsTest.cpp"
   DEPS
+    LLVMSupport
     gmock
     gtest
     iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
-    iree::compiler::Codegen::Utils
     iree::testing::gtest_main
 )
 
