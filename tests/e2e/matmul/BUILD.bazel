@@ -259,6 +259,37 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ("bf16", "f32"),
 ]]
 
+# Mixed unsigned-LHS / signed-RHS i8 matmul: exercises x86 AVX-512 VNNI
+# `vpdpbusd`, our first asymmetric MMA. The `generic` variant exercises
+# the standard codegen fallback (no matching MMA intrinsic).
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_ui8_i8_i32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs=ui8",
+        "--rhs=i8",
+        "--acc_type=i32",
+        # easy_large_static (M=N=512): mixed LHS/RHS types lower to a
+        # `linalg.generic`, and unit-dim folding rewrites narrow-M/N
+        # forms of that into rank-reduced contractions that the
+        # inner_tiled lowering doesn't handle.
+        "--shapes=easy_large_static",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = [
+        "generic",
+        "x86_64:avx512vnni:" + ",".join(X86_64_AVX512_VNNI),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 # LLVMCPU, data-tiling, data-tiling + ukernels + late materialization.
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_cpu_experimental_dt%s_%s_%s" % (

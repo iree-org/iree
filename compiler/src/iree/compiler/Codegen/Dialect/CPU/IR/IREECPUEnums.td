@@ -146,6 +146,14 @@ def MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16
     : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16", 0x13C2>;
 def MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16
     : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16", 0x13C3>;
+// vpdpbusd: 4-byte K dot-product, asymmetric (LHS unsigned, RHS signed in
+// the natural orientation; swapped in the sibling, with arg-routing
+// reversed at lowering). IR storage is signless `i8`; the signedness
+// distinction lives on the encoding's `element_types`.
+def MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8", 0x13C4>;
+def MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8", 0x13C5>;
 
 // AArch64 SVE `fmla` (f32, f32): N×1×1 or 1×N×1 matmul tile; N is a scalable
 // vector of 4 f32 lanes per 128-bit chunk (see `ArmSveVLIn128bitUnits`).
@@ -195,6 +203,8 @@ def IREECPU_MMAIntrinsic
            MMA_X86_AVX512_16x1x2_I32_I8_CASTI16,
            MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16,
            MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
+           MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8,
+           MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8,
 
            // Arm SVE
            MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
