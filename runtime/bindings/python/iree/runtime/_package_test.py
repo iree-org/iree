@@ -36,6 +36,7 @@ print("IREE version:", v.VERSION)
 
 check_tool("iree-benchmark-module", ["--help"], "IREE: iree-benchmark-module")
 check_tool("iree-benchmark-replay", ["--help"], "IREE: iree-benchmark-replay")
+check_tool("iree-as-module", ["--help"], "IREE: iree-as-module")
 check_tool("iree-run-module", ["--help"], "IREE: iree-run-module")
 check_tool("iree-run-replay", ["--help"], "IREE: iree-run-replay")
 check_tool("iree-create-parameters", ["--help"], "IREE: iree-create-parameters")

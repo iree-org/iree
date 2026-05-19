@@ -141,6 +141,7 @@ iree_py_library(
     "iree/runtime/version.py"
     "iree/_runtime/__init__.py"
     "iree/_runtime/libs.py"
+    "iree/_runtime/scripts/iree_as_module/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_executable/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_replay/__main__.py"
@@ -159,6 +160,12 @@ iree_py_library(
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-as-module
+  TO_EXE_NAME iree/_runtime_libs/iree-as-module
 )
 
 iree_symlink_tool(

@@ -653,6 +653,7 @@ setup(
                 f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
                 "*.abi3.so",
                 "*.pyd",
+                "iree-as-module*",
                 "iree-run-module*",
                 "iree-run-replay*",
                 "iree-benchmark-executable*",
@@ -691,6 +692,7 @@ setup(
     ),
     entry_points={
         "console_scripts": [
+            "iree-as-module = iree._runtime.scripts.iree_as_module.__main__:main",
             "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
             "iree-run-replay = iree._runtime.scripts.iree_run_replay.__main__:main",
             "iree-benchmark-executable = iree._runtime.scripts.iree_benchmark_executable.__main__:main",

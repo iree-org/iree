@@ -13,7 +13,8 @@
 # SRC: Source file to assemble into a bytecode module.
 # MODULE_FILE_NAME: Optional output bytecode module file name. Defaults to
 #     ${NAME}.vmfb.
-# ASSEMBLE_TOOL: Assembler tool to invoke. Defaults to iree-as-module.
+# ASSEMBLE_TOOL: Assembler tool target or executable path to invoke. Defaults
+#     to iree-as-module.
 # C_IDENTIFIER: Identifier to use for generated C embed code. If omitted then
 #     no C embed code will be generated.
 # DEPS: Library dependencies to add to the generated embed cc library.
@@ -34,8 +35,16 @@ function(iree_vmasm_module)
 
   if(DEFINED _RULE_ASSEMBLE_TOOL)
     set(_ASSEMBLE_TOOL ${_RULE_ASSEMBLE_TOOL})
+  elseif(IREE_HOST_BIN_DIR)
+    set(_ASSEMBLE_TOOL "${IREE_HOST_BIN_DIR}/iree-as-module")
   else()
     set(_ASSEMBLE_TOOL "iree-as-module")
+  endif()
+
+  if(TARGET "${_ASSEMBLE_TOOL}")
+    set(_ASSEMBLE_TOOL_COMMAND "$<TARGET_FILE:${_ASSEMBLE_TOOL}>")
+  else()
+    set(_ASSEMBLE_TOOL_COMMAND "${_ASSEMBLE_TOOL}")
   endif()
 
   if(DEFINED _RULE_MODULE_FILE_NAME)
@@ -49,7 +58,7 @@ function(iree_vmasm_module)
     OUTPUT
       "${_MODULE_FILE_NAME}"
     COMMAND
-      $<TARGET_FILE:${_ASSEMBLE_TOOL}>
+      ${_ASSEMBLE_TOOL_COMMAND}
       "--output=${_MODULE_FILE_NAME}"
       "${_SRC_PATH}"
     DEPENDS
