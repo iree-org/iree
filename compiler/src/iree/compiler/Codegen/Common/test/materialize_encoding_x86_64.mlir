@@ -175,7 +175,8 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
   %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_result_it> -> tensor<?x?xf32>{%d0, %d1}
   return %5 : tensor<?x?xf32>
 }
-//   CHECK-DAG: #[[$MAP_INNER:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
+//   CHECK-DAG: #[[$MAP_INNER_M:.+]] = affine_map<()[s0] -> (s0 ceildiv 29)>
+//   CHECK-DAG: #[[$MAP_INNER_N:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
 //   CHECK-DAG: #[[$MAP_LHS:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 //   CHECK-DAG: #[[$MAP_RHS:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 //   CHECK-DAG: #[[$MAP_ACC:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -186,8 +187,8 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//   CHECK-DAG:   %[[OUT_D0:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D0]]]
-//   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_INNER]]()[%[[D1]]]
+//   CHECK-DAG:   %[[OUT_D0:.+]] = affine.apply #[[$MAP_INNER_M]]()[%[[D0]]]
+//   CHECK-DAG:   %[[OUT_D1:.+]] = affine.apply #[[$MAP_INNER_N]]()[%[[D1]]]
 //   CHECK-DAG:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}%[[ARG0]]
 // LHS swizzle splits the inner M tile into (intrinsics_m, M_intrinsic),
 // materialized as an `expand_shape` after the pack. ACC swizzle does
@@ -195,7 +196,7 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 //   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[PACK_LHS]]
 //       CHECK:   %[[PACK_RHS:.+]] = linalg.pack
 //  CHECK-SAME:     %[[ARG1]]
-//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[OUT_D0]], %[[OUT_D1]]) : tensor<?x?x16x1x16xf32>
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[OUT_D0]], %[[OUT_D1]]) : tensor<?x?x29x1x16xf32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill
 //  CHECK-SAME:       outs(%[[EMPTY]] :
 //       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[EXPAND_LHS]], %[[PACK_RHS]]) outs(%[[FILL]])
@@ -204,7 +205,7 @@ func.func @pack_gemm_fill_dynamic_inner_tiled_avx512(%arg0 : tensor<?x?xf32>, %a
 // must label its RHS operand with the matching `(d1, d2)` map, otherwise the
 // verifier rejects the op with "shape does not match iteration bounds".
 //  CHECK-SAME:       indexing_maps = [#[[$MAP_LHS]], #[[$MAP_RHS]], #[[$MAP_ACC]]]
-//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>, semantics = #iree_cpu.mma_semantics<>
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 29>, semantics = #iree_cpu.mma_semantics<>
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[INNER]]
 //       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]]
 //       CHECK:   return %[[UNPACK]]
@@ -238,13 +239,13 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 // CHECK-LABEL: func @set_encoding_matmul_LHS_inner_tiled_avx512(
 //  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9]+]]: tensor<127x255xf32>
 //   CHECK-DAG:   %[[CST:.+]] = arith.constant 0.0
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<8x255x16x1xf32>
-//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] padding_value(%[[CST]] : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<8x255x16x1xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x255x29x1xf32>
+//       CHECK:   %[[PACK:.+]] = linalg.pack %[[INPUT]] padding_value(%[[CST]] : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [29, 1] into %[[EMPTY]] : tensor<127x255xf32> -> tensor<5x255x29x1xf32>
 // LHS swizzle splits the inner M tile into (intrinsics_m, M_intrinsic),
 // adding a trailing unit dim from M_intrinsic=1.
 //       CHECK:   %[[EXPAND:.+]] = tensor.expand_shape %[[PACK]]
-//  CHECK-SAME:     : tensor<8x255x16x1xf32> into tensor<8x255x16x1x1xf32>
-//       CHECK:   return %[[EXPAND]] : tensor<8x255x16x1x1xf32>
+//  CHECK-SAME:     : tensor<5x255x29x1xf32> into tensor<5x255x29x1x1xf32>
+//       CHECK:   return %[[EXPAND]] : tensor<5x255x29x1x1xf32>
 // CHECK-LABEL: func @set_encoding_matmul_RHS_inner_tiled_avx512(
 //  CHECK-SAME:   %[[INPUT_R:[a-zA-Z0-9]+]]: tensor<127x255xf32>
 //   CHECK-DAG:   %[[CST_R:.+]] = arith.constant 0.0
@@ -255,11 +256,11 @@ func.func @unset_encoding_matmul_RESULT_inner_tiled_avx512(%arg0: tensor<127x255
 // CHECK-LABEL: func @unset_encoding_matmul_RESULT_inner_tiled_avx512(
 // ACC arrives in the swizzle-expanded rank-5 layout and is collapsed
 // back to rank-2 (M, N) inner before `unpack`.
-//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<8x16x16x1x16xf32>
+//  CHECK-SAME:   %[[PACKED:[a-zA-Z0-9]+]]: tensor<5x16x29x1x16xf32>
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[PACKED]]
-//  CHECK-SAME:     : tensor<8x16x16x1x16xf32> into tensor<8x16x16x16xf32>
+//  CHECK-SAME:     : tensor<5x16x29x1x16xf32> into tensor<5x16x29x16xf32>
 //       CHECK:   %[[EMPTY_U:.+]] = tensor.empty() : tensor<127x255xf32>
-//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %[[EMPTY_U]] : tensor<8x16x16x16xf32> -> tensor<127x255xf32>
+//       CHECK:   %[[UNPACK:.+]] = linalg.unpack %[[COLLAPSE]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [29, 16] into %[[EMPTY_U]] : tensor<5x16x29x16xf32> -> tensor<127x255xf32>
 //       CHECK:   return %[[UNPACK]]
 
 // -----
@@ -292,13 +293,12 @@ func.func @matmul_bf16_f32_avx2_generic(
 // the chosen `_REG*` enum case (16 here). One element per register, so the
 // register pressure is `intrinsics_m * intrinsics_n` (ACC) +
 // `intrinsics_m` (LHS) + `intrinsics_n` (RHS). Matmul dims are dynamic
-// here, so all three dims are free; arithmetic-intensity tie-breaking
-// favors approximately-square tiles. (im=2, in=4) and (im=4, in=2) tie at
-// intensity 8/6 — the search picks (im=2, in=4) (lower im first), packing
-// 8 + 2 + 4 = 14 registers within 16.
+// here, so all three dims are free; the arithmetic-intensity formula
+// `effM*effN/(effM+effN)` lands on (im=3, in=3): 3*3 + 3 + 3 = 15
+// registers within 16, intensity 9/6 = 1.5.
 // CHECK-LABEL: func @matmul_bf16_f32_avx2_generic(
 //       CHECK:   %[[INNER_G:.+]] = iree_codegen.inner_tiled
-//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 4, lhs_type = bf16, rhs_type = bf16, acc_type = f32>
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 3, intrinsics_n = 3, lhs_type = bf16, rhs_type = bf16, acc_type = f32>
 
 // -----
 
@@ -363,8 +363,8 @@ func.func @unset_encoding_RESULT_avx2_generic_no_op_transpose(
 // the packed layout). Smallest power-of-two K with K*4 % 8 == 0 is K = 2.
 // LHS pressure becomes `intrinsics_m * intrinsics_k`, RHS pressure
 // `intrinsics_n * intrinsics_k`, ACC `intrinsics_m * intrinsics_n`. Inside
-// `_REG16`'s budget, (m=2, n=2, k=2) packs 2·2 + 2·2 + 2·2 = 12 registers
-// and wins on arithmetic intensity (4/4 = 1.0).
+// `_REG16`'s budget, (m=2, n=3, k=2) packs 2·3 + 2·2 + 3·2 = 16 registers
+// (saturating the budget), intensity 6/5 = 1.2.
 
 #map_g4 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_g4_1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -385,7 +385,7 @@ func.func @matmul_i4_i32_avx2_generic(
 }
 // CHECK-LABEL: func @matmul_i4_i32_avx2_generic(
 //       CHECK:   %[[INNER_G4:.+]] = iree_codegen.inner_tiled
-//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 2, intrinsics_k = 2, lhs_type = i4, rhs_type = i4, acc_type = i32>
+//  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_m = 2, intrinsics_n = 3, intrinsics_k = 2, lhs_type = i4, rhs_type = i4, acc_type = i32>
 
 // -----
 
@@ -393,11 +393,11 @@ func.func @matmul_i4_i32_avx2_generic(
 // M↔N-swapped orientation MMA_X86_AVX512_16x1x1_F32_F32 (rather than the
 // natural 1x16x1) — the static N=8 caps natural usefulOps to 8, while the
 // transposed orientation fully uses 16 lanes on the M side. Unrolling lands
-// on intrinsics_m=2, intrinsics_n=8 (M_inner=32, N_inner=8). Each operand's
+// on intrinsics_m=3, intrinsics_n=8 (M_inner=48, N_inner=8). Each operand's
 // pack inherits the intrinsic's natural (outer, inner) ordering — for the
 // 16x1x1 intrinsic, the LHS inner is (M=16, K=1), the RHS inner is (N=1, K=1),
 // and the ACC inner is (M=16, N=1). After cross-intrinsic unrolling, the ACC
-// is stored in physical (M=32, N=8) order, the way row-major matmul tiles are.
+// is stored in physical (M=48, N=8) order, the way row-major matmul tiles are.
 
 #map_t = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map_t1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -410,18 +410,18 @@ func.func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(%arg0: tensor<127x2
   return %0 : tensor<127x255xf32>
 }
 // CHECK-LABEL: func @unset_encoding_RESULT_inner_tiled_avx512_narrow_n(
-// The pre-transposed ACC swizzle here is non-identity: with intrinsics_m=2
+// The pre-transposed ACC swizzle here is non-identity: with intrinsics_m=3
 // and intrinsics_n=8, the swizzle's permutation places the cross-intrinsic
 // N dim (size 8) before the M dims. The ACC operand arrives in this
-// layout (`tensor<4x32x2x8x16x1>`: outer M_iter=4, N_iter=32 + inner
-// intrinsics_m=2, intrinsics_n=8, M_intrinsic=16, N_intrinsic=1), and is
-// transposed + collapsed back to rank-2 (M=32, N=8) inner before `unpack`.
-//  CHECK-SAME:   %[[PACKED_T:[a-zA-Z0-9]+]]: tensor<4x32x2x8x16x1xf32>
+// layout (`tensor<3x32x3x8x16x1>`: outer M_iter=3, N_iter=32 + inner
+// intrinsics_m=3, intrinsics_n=8, M_intrinsic=16, N_intrinsic=1), and is
+// transposed + collapsed back to rank-2 (M=48, N=8) inner before `unpack`.
+//  CHECK-SAME:   %[[PACKED_T:[a-zA-Z0-9]+]]: tensor<3x32x3x8x16x1xf32>
 //       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[PACKED_T]]
 //       CHECK:   %[[COLLAPSE_T:.+]] = tensor.collapse_shape %[[TRANSPOSED]]
-//  CHECK-SAME:     into tensor<4x32x32x8xf32>
+//  CHECK-SAME:     into tensor<3x32x48x8xf32>
 //       CHECK:   %[[UNPACK_T:.+]] = linalg.unpack %[[COLLAPSE_T]]
-//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [32, 8]
+//  CHECK-SAME:     outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [48, 8]
 //       CHECK:   return %[[UNPACK_T]]
 
 // -----

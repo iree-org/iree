@@ -52,7 +52,6 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/bit.h"
 #include "llvm/Support/DebugLog.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/IR/AffineMap.h"
@@ -633,27 +632,23 @@ chooseIntrinsic(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   return best;
 }
 
-/// Power-of-two cap on one unroll dim. For a static matmul extent
-/// `matmulSize` divided by `intrinsicSize`, we floor the cover count to a
-/// power of two. For dynamic dims we fall back to `fallback`, which callers
-/// set to something at least as large as the register budget — that budget
-/// itself terminates the enumeration below, so no tighter static cap is
-/// needed.
-static int64_t po2UnrollCap(int64_t matmulSize, int64_t intrinsicSize,
-                            int64_t fallback) {
+/// Per-dim cap on the unroll factor: how many intrinsic-sized tiles fit in
+/// the matmul dim. For dynamic matmul dims we return `fallback` (the
+/// register budget), which the budget check in the enumeration loop bounds
+/// anyway.
+static int64_t unrollCap(int64_t matmulSize, int64_t intrinsicSize,
+                         int64_t fallback) {
   if (ShapedType::isDynamic(matmulSize)) {
     return fallback;
   }
-  uint64_t cover =
-      std::max<int64_t>(1, llvm::divideCeil(matmulSize, intrinsicSize));
-  return llvm::bit_floor(cover);
+  return std::max<int64_t>(1, llvm::divideCeil(matmulSize, intrinsicSize));
 }
 
 // Phase 2 of `chooseCpuInnerTiledMmaForEncoding`: for an already-chosen
-// intrinsic, pick the largest power-of-two unroll factors (intrinsicsM,
-// intrinsicsN) such that the three tiles (ACC + LHS + RHS) still fit in
-// the target's register budget, breaking ties with arithmetic intensity
-// (effM*effN)/(effM+effN) so approximately-square tiles win.
+// intrinsic, pick unroll factors (intrinsicsM, intrinsicsN) such that the
+// three tiles (ACC + LHS + RHS) still fit in the target's register budget,
+// breaking ties with arithmetic intensity (effM*effN)/(effM+effN) so
+// approximately-square tiles win.
 //
 // "Register budget" depends on what the lowering will use:
 //   * Architecture-specific SIMD intrinsics use the vector register file,
@@ -710,28 +705,26 @@ chooseUnrolling(MLIRContext *ctx, ArrayRef<Type> elementTypes,
     lhsUnit = info->lhsBits;
     rhsUnit = info->rhsBits;
   }
-  int64_t capMPo2 = po2UnrollCap(matmulSizes.M, info->intrinsicM, budget);
-  int64_t capNPo2 = po2UnrollCap(matmulSizes.N, info->intrinsicN, budget);
+  int64_t capM = unrollCap(matmulSizes.M, info->intrinsicM, budget);
+  int64_t capN = unrollCap(matmulSizes.N, info->intrinsicN, budget);
   int64_t accTerm = info->intrinsicM * info->intrinsicN * accUnit;
   int64_t lhsTerm = info->intrinsicM * info->intrinsicK * intrinsicsK * lhsUnit;
   int64_t rhsTerm = info->intrinsicN * info->intrinsicK * intrinsicsK * rhsUnit;
   std::optional<std::pair<int64_t, int64_t>> bestMN;
   double bestIntensity = -1.0;
-  // Enumerate power-of-two intrinsicsM; for each, pick the largest feasible
-  // power-of-two intrinsicsN under the budget and the static N cap. The
-  // budget bounds im on its own (im*lhsTerm alone must be < budget), which
-  // terminates the loop without any numRegs-style cap.
-  for (int64_t im = 1; im <= capMPo2; im *= 2) {
+  // Enumerate intrinsicsM; for each, pick the largest feasible intrinsicsN
+  // under the budget and the static N cap. The budget bounds im on its own
+  // (im*lhsTerm alone must be < budget), which terminates the loop.
+  for (int64_t im = 1; im <= capM; ++im) {
     int64_t remaining = budget - im * lhsTerm;
     if (remaining <= 0) {
       break;
     }
     int64_t inMaxBudget = remaining / (im * accTerm + rhsTerm);
-    uint64_t inCap = std::min<int64_t>(capNPo2, inMaxBudget);
-    if (inCap < 1) {
+    int64_t in = std::min<int64_t>(capN, inMaxBudget);
+    if (in < 1) {
       continue;
     }
-    int64_t in = llvm::bit_floor(inCap);
     double effM = static_cast<double>(im) * info->intrinsicM;
     double effN = static_cast<double>(in) * info->intrinsicN;
     double intensity = effM * effN / (effM + effN);
