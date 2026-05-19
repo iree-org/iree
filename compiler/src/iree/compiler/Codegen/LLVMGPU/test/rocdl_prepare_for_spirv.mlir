@@ -18,8 +18,6 @@ module attributes {llvm.target_triple = "amdgcn-amd-amdhsa"} {
   llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
 
   // CHECK-LABEL: llvm.func spir_kernelcc @simple_kernel
-  // CHECK-NOT: target_cpu
-  // CHECK-NOT: target_features
   llvm.func amdgpu_kernelcc @simple_kernel(%arg0: !llvm.ptr<1> {llvm.align = 16 : i64}) attributes {
     target_cpu = "gfx1201",
     target_features = "+wavefrontsize64"

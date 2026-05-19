@@ -91,20 +91,9 @@ static Type remapType(Type type) {
   return type;
 }
 
-// List of AMDGPU function attributes to remove for SPIR-V.
-// Note: MLIR uses underscores in attribute names (target_cpu), while LLVM IR
-// uses hyphens (target-cpu). We remove both forms.
-static constexpr llvm::StringLiteral kAMDGPUAttrsToRemove[] = {
-    "amdgpu-flat-work-group-size",
-    "amdgpu_flat_work_group_size",
-    "uniform-work-group-size",
-    "uniform_work_group_size",
-    "amdgpu-waves-per-eu",
-    "amdgpu_waves_per_eu",
-    "target-cpu",
-    "target_cpu",
-    "target-features",
-    "target_features",
+// List of ROCDL-specific attributes to remove for SPIR-V.
+// Note: AMDGPU attributes are handled by the backend.
+static constexpr llvm::StringLiteral kROCDLGPUAttrsToRemove[] = {
     // ROCDL-specific attributes set by ROCDLAnnotateKernelForTranslationPass.
     "rocdl.kernel",
     "rocdl.flat_work_group_size",
@@ -180,7 +169,7 @@ struct ROCDLPrepareForSPIRVPass final
       }
 
       // Remove AMDGPU attributes from the function's attribute dictionary.
-      for (auto attrName : kAMDGPUAttrsToRemove) {
+      for (auto attrName : kROCDLGPUAttrsToRemove) {
         funcOp->removeAttr(attrName);
       }
 
@@ -189,7 +178,7 @@ struct ROCDLPrepareForSPIRVPass final
               funcOp->getAttrOfType<DictionaryAttr>("llvm_func_attrs")) {
         SmallVector<NamedAttribute> newAttrs;
         for (NamedAttribute attr : funcAttrs) {
-          if (!llvm::is_contained(kAMDGPUAttrsToRemove, attr.getName())) {
+          if (!llvm::is_contained(kROCDLGPUAttrsToRemove, attr.getName())) {
             newAttrs.push_back(attr);
           }
         }
