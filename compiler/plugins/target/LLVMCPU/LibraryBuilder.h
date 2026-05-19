@@ -51,11 +51,10 @@ public:
     V_0_4 = 0x0000'0004u, // v0.4 - ~2024-03-12
     V_0_5 = 0x0000'0005u, // v0.5 - ~2024-08-25
     V_0_6 = 0x0000'0006u, // v0.6 - ~2025-08-15
-    V_0_7 = 0x0000'0007u, // v0.7 - ~2026-05-19
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_7,
+    LATEST = V_0_6,
   };
 
   // iree_hal_executable_library_features_t
