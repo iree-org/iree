@@ -2733,6 +2733,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hal_loaderexecutablelookupfunction-halloaderexecutablelookupfunctionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hal_loader.executable.lookup.function (HAL::Loader::ExecutableLookupFunctionOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6188,6 +6199,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#hal_loaderexecutablelookupfunction-halloaderexecutablelookupfunctionop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        hal_loader.executable.lookup.function (HAL::Loader::ExecutableLookupFunctionOp)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6263,6 +6285,7 @@ restrictions.</p>
 <li><a href="#hal_loaderexecutabledispatch-halloaderexecutabledispatchop">hal_loader.executable.dispatch (HAL::Loader::ExecutableDispatchOp)</a></li>
 <li><a href="#hal_loaderexecutableexportordinal-halloaderexecutableexportordinalop">hal_loader.executable.export.ordinal (HAL::Loader::ExecutableExportOrdinalOp)</a></li>
 <li><a href="#hal_loaderexecutableload-halloaderexecutableloadop">hal_loader.executable.load (HAL::Loader::ExecutableLoadOp)</a></li>
+<li><a href="#hal_loaderexecutablelookupfunction-halloaderexecutablelookupfunctionop">hal_loader.executable.lookup.function (HAL::Loader::ExecutableLookupFunctionOp)</a></li>
 <li><a href="#hal_loaderexecutablelookup-halloaderexecutablelookupop">hal_loader.executable.lookup (HAL::Loader::ExecutableLookupOp)</a></li>
 <li><a href="#hal_loaderexecutablequery_support-halloaderexecutablequerysupportop">hal_loader.executable.query_support (HAL::Loader::ExecutableQuerySupportOp)</a></li>
 </ul>
@@ -6312,7 +6335,7 @@ restrictions.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>entry_point</code></td>
-<td>index</td>
+<td>64-bit signless integer</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workgroup_x</code></td>
@@ -6432,6 +6455,59 @@ runtime-derived parameters.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="hal_loaderexecutablelookupfunction-halloaderexecutablelookupfunctionop"><code>hal_loader.executable.lookup.function</code> (HAL::Loader::ExecutableLookupFunctionOp)<a class="headerlink" href="#hal_loaderexecutablelookupfunction-halloaderexecutablelookupfunctionop" title="Permanent link">link</a></h4>
+<p><em>Executable function lookup pseudo-op.</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `hal_loader.executable.lookup.function` `target` `(` $executable `:` type($executable) `)`
+              `function` `(` $entry_point `)`
+              `:` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Resolves an executable export name to a runtime function id. The result is
+only meaningful for the executable operand and must be treated as opaque by
+compiler IR. The function reference is retained as a SymbolRefAttr so
+executable linking passes can rewrite it, but it may intentionally stop
+resolving after executable serialization strips the original export
+declarations.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>entry_point</code></td><td>::mlir::SymbolRefAttr</td><td>symbol reference attribute</td></tr>
+</table>
+
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>executable</code></td>
+<td>executable</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>64-bit signless integer</td>
+</tr>
+</tbody>
+</table>
 <h4 id="hal_loaderexecutablelookup-halloaderexecutablelookupop"><code>hal_loader.executable.lookup</code> (HAL::Loader::ExecutableLookupOp)<a class="headerlink" href="#hal_loaderexecutablelookup-halloaderexecutablelookupop" title="Permanent link">link</a></h4>
 <p><em>Executable cache lookup pseudo-op.</em></p>
 <p>Syntax:</p>
@@ -6444,13 +6520,13 @@ possibly lazy-initialized executable.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
+<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>executable</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
-<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
+<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6478,13 +6554,13 @@ functionality that cannot be met my the hosting runtime environment.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
+<h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>executable_format</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="results_3">Results:<a class="headerlink" href="#results_3" title="Permanent link">link</a></h5>
+<h5 id="results_4">Results:<a class="headerlink" href="#results_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
