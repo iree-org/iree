@@ -190,7 +190,7 @@ uint64_t iree_hal_vulkan_executable_profile_id(
 // Returns the native pipeline metadata for |export_ordinal|.
 iree_status_t iree_hal_vulkan_executable_lookup_pipeline(
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_vulkan_pipeline_t** out_pipeline);
 
 // Verifies common structural requirements for one BDA pipeline invocation.

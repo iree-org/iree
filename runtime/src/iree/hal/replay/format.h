@@ -20,7 +20,7 @@ extern "C" {
 #define IREE_HAL_REPLAY_FILE_MAGIC 0x50525249u
 
 // Major version of the IREE HAL replay file format.
-#define IREE_HAL_REPLAY_FILE_VERSION_MAJOR 1u
+#define IREE_HAL_REPLAY_FILE_VERSION_MAJOR 2u
 
 // Minor version of the IREE HAL replay file format.
 #define IREE_HAL_REPLAY_FILE_VERSION_MINOR 0u
@@ -152,10 +152,10 @@ enum iree_hal_replay_operation_code_e {
   IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_CAN_PREPARE_FORMAT = 401u,
   IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_PREPARE_EXECUTABLE = 402u,
 
-  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_COUNT = 500u,
-  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_INFO = 501u,
-  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_PARAMETERS = 502u,
-  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_EXPORT_BY_NAME = 503u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_COUNT = 500u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_INFO = 501u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_PARAMETERS = 502u,
+  IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_FUNCTION_BY_NAME = 503u,
 };
 
 // Producer-defined payload schema stored in record headers.
@@ -363,39 +363,39 @@ typedef struct iree_hal_replay_executable_prepare_payload_t {
 
 // Header for executable ABI metadata appended to executable prepare payloads.
 typedef struct iree_hal_replay_executable_metadata_header_t {
-  // Number of export metadata records following this header.
-  uint64_t export_count;
-  // Total number of parameter metadata records after all export records.
+  // Number of function metadata records following this header.
+  uint64_t function_count;
+  // Total number of parameter metadata records after all function records.
   uint64_t parameter_count;
-  // Reserved for future executable metadata; must be zero.
-  uint64_t reserved0;
+  // Total byte length of function names following all parameter records.
+  uint64_t function_name_storage_length;
   // Reserved for future executable metadata; must be zero.
   uint64_t reserved1;
 } iree_hal_replay_executable_metadata_header_t;
 
-// Captured executable export reflection used to validate substitutions.
-typedef struct iree_hal_replay_executable_export_metadata_t {
-  // Export behavior flags from iree_hal_executable_export_info_t.
+// Captured executable function reflection used to validate substitutions.
+typedef struct iree_hal_replay_executable_function_metadata_t {
+  // Function behavior flags from iree_hal_executable_function_info_t.
   uint64_t flags;
-  // Static or minimum workgroup size of the export.
+  // Static or minimum workgroup size of the function.
   uint32_t workgroup_size[3];
-  // Total number of 32-bit constants expected by the export.
+  // Total number of 32-bit constants expected by the function.
   uint16_t constant_count;
-  // Total number of buffer bindings expected by the export.
+  // Total number of buffer bindings expected by the function.
   uint16_t binding_count;
-  // Number of parameter metadata records for this export.
+  // Number of parameter metadata records for this function.
   uint16_t parameter_count;
-  // Reserved for future export metadata; must be zero.
-  uint16_t reserved0;
-} iree_hal_replay_executable_export_metadata_t;
+  // Byte length of this function's name in the trailing name storage.
+  uint16_t name_length;
+} iree_hal_replay_executable_function_metadata_t;
 
-// Captured executable export parameter reflection.
+// Captured executable function parameter reflection.
 typedef struct iree_hal_replay_executable_parameter_metadata_t {
   // Parameter offset in bytes or binding ordinal, depending on type.
   uint16_t offset;
-  // Parameter flags from iree_hal_executable_export_parameter_t.
+  // Parameter flags from iree_hal_executable_function_parameter_t.
   uint16_t flags;
-  // iree_hal_executable_export_parameter_type_t value.
+  // iree_hal_executable_function_parameter_type_t value.
   uint8_t type;
   // Parameter size in bytes.
   uint8_t size;
@@ -560,8 +560,8 @@ typedef struct iree_hal_replay_dispatch_payload_t {
   // Queue affinity for immediate device queue dispatches, or zero when the
   // dispatch is recorded into a command buffer.
   uint64_t queue_affinity;
-  // Executable export ordinal to dispatch.
-  uint32_t export_ordinal;
+  // Captured executable function ordinal to dispatch.
+  uint32_t function_ordinal;
   // Dispatch flags.
   uint32_t flags;
   // Static or minimum workgroup size.

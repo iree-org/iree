@@ -2268,6 +2268,15 @@ void ExecutableLookupOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable.lookup.function
+//===----------------------------------------------------------------------===//
+
+void ExecutableLookupFunctionOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "function_id");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable.export.ordinal
 //===----------------------------------------------------------------------===//
 

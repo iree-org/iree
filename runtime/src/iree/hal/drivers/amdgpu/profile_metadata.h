@@ -24,8 +24,8 @@ typedef struct iree_hal_amdgpu_profile_metadata_cursor_t {
   iree_host_size_t executable_code_object_record_data_length;
   // Number of executable code-object load records already emitted.
   iree_host_size_t executable_code_object_load_record_count;
-  // Byte length of packed executable export records already emitted.
-  iree_host_size_t executable_export_record_data_length;
+  // Byte length of packed executable function records already emitted.
+  iree_host_size_t executable_function_record_data_length;
   // Number of command-buffer records already emitted.
   iree_host_size_t command_buffer_record_count;
   // Number of command-operation records already emitted.
@@ -61,12 +61,12 @@ typedef struct iree_hal_amdgpu_profile_metadata_registry_t {
   iree_host_size_t executable_code_object_load_record_count;
   // Allocated executable code-object load record capacity.
   iree_host_size_t executable_code_object_load_record_capacity;
-  // Packed executable export records in executable id assignment order.
-  uint8_t* executable_export_record_data;
-  // Byte length of valid packed executable export records.
-  iree_host_size_t executable_export_record_data_length;
-  // Allocated byte capacity for packed executable export records.
-  iree_host_size_t executable_export_record_data_capacity;
+  // Packed executable function records in executable id assignment order.
+  uint8_t* executable_function_record_data;
+  // Byte length of valid packed executable function records.
+  iree_host_size_t executable_function_record_data_length;
+  // Allocated byte capacity for packed executable function records.
+  iree_host_size_t executable_function_record_data_capacity;
   // Command-buffer records in id assignment order.
   iree_hal_profile_command_buffer_record_t* command_buffer_records;
   // Number of valid command-buffer records.
@@ -112,27 +112,27 @@ void iree_hal_amdgpu_profile_metadata_hash_code_object(
 // Registers immutable executable identity metadata and assigns
 // |out_executable_id|.
 //
-// This records the cheap executable/export metadata required to attribute
+// This records the cheap executable/function metadata required to attribute
 // dispatch events and aggregate statistics. Code-object image bytes and loader
 // load ranges are registered separately so normal timing profiles can omit the
 // heavy records while executable trace profiles can still emit them.
 //
-// When |code_object_hash| is provided, each export receives an AMDGPU pipeline
-// hash. Inputs are appended in this order: code_object_hash[0] and
-// code_object_hash[1] as little-endian u64 values, export ordinal as a
+// When |code_object_hash| is provided, each function receives an AMDGPU
+// pipeline hash. Inputs are appended in this order: code_object_hash[0] and
+// code_object_hash[1] as little-endian u64 values, function ordinal as a
 // little-endian u32 value, HAL ABI constant count and binding count as
 // little-endian u16 values, static workgroup size x/y/z as little-endian u32
-// values, and export name byte length as a little-endian u64 value followed by
-// the exact export name bytes.
+// values, and function name byte length as a little-endian u64 value followed
+// by the exact function name bytes.
 //
 // Loader-derived kernel-object, kernarg, private-segment, group-segment, ISA,
 // and code-generation facts are intentionally covered by the exact
 // code-object hash rather than duplicated in the pipeline hash.
 iree_status_t iree_hal_amdgpu_profile_metadata_register_executable(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
-    iree_host_size_t export_count,
-    const iree_hal_executable_export_info_t* export_infos,
-    const iree_host_size_t* export_parameter_offsets,
+    iree_host_size_t function_count,
+    const iree_hal_executable_function_info_t* function_infos,
+    const iree_host_size_t* function_parameter_offsets,
     const uint64_t code_object_hash[2],
     const iree_hal_amdgpu_device_kernel_args_t* host_kernel_args,
     uint64_t* out_executable_id);
@@ -173,10 +173,10 @@ iree_status_t iree_hal_amdgpu_profile_metadata_register_command_operations(
     iree_host_size_t operation_count,
     const iree_hal_profile_command_operation_record_t* operations);
 
-// Returns true if the registered executable export name matches |pattern|.
-bool iree_hal_amdgpu_profile_metadata_export_matches(
+// Returns true if the registered executable function name matches |pattern|.
+bool iree_hal_amdgpu_profile_metadata_function_matches(
     iree_hal_amdgpu_profile_metadata_registry_t* registry,
-    uint64_t executable_id, uint32_t export_ordinal,
+    uint64_t executable_id, uint32_t function_ordinal,
     iree_string_view_t pattern);
 
 // Writes metadata records newer than |cursor| and advances |cursor| on success.

@@ -346,7 +346,7 @@ static void iree_hal_block_command_buffer_profile_append_copy(
 static void iree_hal_block_command_buffer_profile_append_dispatch(
     iree_hal_block_command_buffer_t* command_buffer,
     iree_hal_cmd_dispatch_t* dispatch, iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_profile_command_operation_record_t* record =
@@ -364,7 +364,7 @@ static void iree_hal_block_command_buffer_profile_append_dispatch(
       bindings.count, bindings.values);
   record->executable_id = iree_hal_local_executable_profile_id(
       iree_hal_local_executable_cast(executable));
-  record->export_ordinal = export_ordinal;
+  record->function_ordinal = iree_hal_executable_function_index(function);
   record->binding_count =
       (uint32_t)iree_min(bindings.count, (iree_host_size_t)UINT32_MAX);
   record->workgroup_size[0] =
@@ -871,7 +871,7 @@ static iree_status_t iree_hal_block_command_buffer_collective(
 static iree_status_t iree_hal_block_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_block_command_buffer_t* command_buffer =

@@ -1313,7 +1313,7 @@ iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
 iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
     const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel,
     iree_host_size_t parameter_capacity,
-    iree_hal_executable_export_parameter_t* out_parameters,
+    iree_hal_executable_function_parameter_t* out_parameters,
     iree_host_size_t name_storage_capacity, char* name_storage) {
   IREE_ASSERT_ARGUMENT(kernel);
   IREE_ASSERT_ARGUMENT(out_parameters || parameter_capacity == 0);
@@ -1346,10 +1346,10 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
       continue;
     }
 
-    iree_hal_executable_export_parameter_t* parameter =
+    iree_hal_executable_function_parameter_t* parameter =
         &out_parameters[parameter_index++];
     memset(parameter, 0, sizeof(*parameter));
-    parameter->flags = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_FLAG_NONE;
+    parameter->flags = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_FLAG_NONE;
     parameter->size = (uint8_t)arg->size;
     if (!iree_string_view_is_empty(arg->name)) {
       memcpy(name_storage + name_storage_offset, arg->name.data,
@@ -1363,11 +1363,11 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
 
     switch (arg->kind) {
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_GLOBAL_BUFFER:
-        parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
+        parameter->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING;
         parameter->offset = binding_ordinal++;
         break;
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE:
-        parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
+        parameter->type = IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT;
         parameter->offset = (uint16_t)constant_offset;
         constant_offset += arg->size;
         break;

@@ -624,8 +624,8 @@ struct iree_hal_vulkan_queue_pending_submission_t {
       // Executable retained until dispatch completion.
       iree_hal_executable_t* executable;
 
-      // Export ordinal captured from queue_dispatch.
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      // Function ordinal captured from queue_dispatch.
+      iree_hal_executable_function_t function_ordinal;
 
       // Dispatch workgroup configuration captured from queue_dispatch.
       iree_hal_dispatch_config_t config;
@@ -3176,9 +3176,9 @@ static bool iree_hal_vulkan_queue_profile_filter_matches_dispatch(
   }
   if (iree_any_bit_set(
           filter->flags,
-          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN) &&
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN) &&
       !iree_string_view_match_pattern(pipeline->name,
-                                      filter->executable_export_pattern)) {
+                                      filter->executable_function_pattern)) {
     return false;
   }
   return true;
@@ -3196,8 +3196,8 @@ static iree_status_t iree_hal_vulkan_queue_profile_dispatch_count(
     if (submission->kind == IREE_HAL_VULKAN_QUEUE_SUBMISSION_KIND_DISPATCH) {
       const iree_hal_vulkan_pipeline_t* pipeline = NULL;
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
-          submission->dispatch.executable, submission->dispatch.export_ordinal,
-          &pipeline));
+          submission->dispatch.executable,
+          submission->dispatch.function_ordinal, &pipeline));
       if (iree_hal_vulkan_queue_profile_filter_matches_dispatch(
               submission->profile.recorder, submission->profile.scope,
               /*command_buffer_id=*/0, /*command_index=*/UINT32_MAX,
@@ -3225,7 +3225,7 @@ static iree_status_t iree_hal_vulkan_queue_append_dispatch_profile_event(
 
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
-      submission->dispatch.executable, submission->dispatch.export_ordinal,
+      submission->dispatch.executable, submission->dispatch.function_ordinal,
       &pipeline));
   if (!iree_hal_vulkan_queue_profile_filter_matches_dispatch(
           submission->profile.recorder, submission->profile.scope,
@@ -3255,7 +3255,8 @@ static iree_status_t iree_hal_vulkan_queue_append_dispatch_profile_event(
   event_info.executable_id =
       iree_hal_vulkan_executable_profile_id(submission->dispatch.executable);
   event_info.command_index = UINT32_MAX;
-  event_info.export_ordinal = submission->dispatch.export_ordinal;
+  event_info.function_ordinal =
+      iree_hal_executable_function_index(submission->dispatch.function_ordinal);
   if (iree_hal_dispatch_uses_indirect_parameters(submission->dispatch.flags)) {
     event_info.flags |=
         IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -8857,7 +8858,7 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_native(
     iree_hal_vulkan_queue_pending_submission_t* submission) {
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
-      submission->dispatch.executable, submission->dispatch.export_ordinal,
+      submission->dispatch.executable, submission->dispatch.function_ordinal,
       &pipeline));
   switch (pipeline->dispatch_abi) {
     case IREE_HAL_VULKAN_DISPATCH_ABI_DESCRIPTOR:
@@ -8910,7 +8911,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -8953,7 +8954,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_executable_lookup_pipeline(
-        executable, export_ordinal, &pipeline);
+        executable, function_ordinal, &pipeline);
   }
   if (iree_status_is_ok(status) &&
       constants.data_length >
@@ -9005,7 +9006,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
   if (iree_status_is_ok(status)) {
     submission->dispatch.executable = executable;
     iree_hal_executable_retain(executable);
-    submission->dispatch.export_ordinal = export_ordinal;
+    submission->dispatch.function_ordinal = function_ordinal;
     submission->dispatch.config = config;
     submission->dispatch.constants_data_length = constants.data_length;
     submission->dispatch.binding_count = bindings.count;

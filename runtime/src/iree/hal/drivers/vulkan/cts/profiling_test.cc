@@ -199,7 +199,7 @@ TEST_P(VulkanProfilingTest,
   EXPECT_NE(0u, memory_dealloca_it->submission_id);
 }
 
-TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
+TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchFunctions) {
   Ref<iree_hal_executable_cache_t> executable_cache;
   Ref<iree_hal_executable_t> executable;
   IREE_ASSERT_OK(CreateScaleAndOffsetExecutable(executable_cache, executable));
@@ -247,7 +247,7 @@ TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable.get(), /*export_ordinal=*/0,
+      executable.get(), iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -268,12 +268,12 @@ TEST_P(VulkanProfilingTest, ExecutableMetadataRecordsDirectDispatchExports) {
   EXPECT_EQ(1, sink.device_metadata_count);
   EXPECT_EQ(1, sink.queue_metadata_count);
   EXPECT_EQ(1, sink.executable_metadata_count);
-  EXPECT_EQ(1, sink.executable_export_metadata_count);
+  EXPECT_EQ(1, sink.executable_function_metadata_count);
   EXPECT_EQ(0, sink.queue_event_count);
   EXPECT_EQ(0, sink.memory_event_count);
   EXPECT_FALSE(sink.executable_ids.empty());
-  EXPECT_FALSE(sink.export_record_executable_ids.empty());
-  EXPECT_EQ(sink.executable_ids[0], sink.export_record_executable_ids[0]);
+  EXPECT_FALSE(sink.function_record_executable_ids.empty());
+  EXPECT_EQ(sink.executable_ids[0], sink.function_record_executable_ids[0]);
   EXPECT_TRUE(sink.saw_device_metadata);
   EXPECT_TRUE(sink.saw_queue_metadata);
   EXPECT_FALSE(sink.write_after_end);

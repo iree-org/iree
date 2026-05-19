@@ -79,14 +79,16 @@ hal.executable private @ex0 {
 // CHECK-SAME:     target(@ex0::@embedded_elf_x86_64::@dispatch0)
 // CHECK-SAME:     workload([%c512])
 
-// Get executable and target ordinal (outside of the loop).
+// Get executable and target function id (outside of the loop).
 // CHECK-DAG: %[[EXECUTABLE:.+]] = hal.executable.lookup device({{.+}}) executable(@ex0) : !hal.executable
-// CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch0) : index
+// CHECK-DAG: %[[FUNCTION_0:.+]] = hal.executable.lookup.function
+// CHECK-SAME: target(%[[EXECUTABLE]] : !hal.executable)
+// CHECK-SAME: function(@ex0::@embedded_elf_x86_64::@dispatch0) : i64
 
 // Dispatch up to batch size dispatches:
 // CHECK: scf.for %{{.+}} = %c0 to %[[BATCH_SIZE]] step %c1 {
 // CHECK-NEXT: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
-// CHECK-SAME:   target(%[[EXECUTABLE:.+]] : !hal.executable)[%[[ORDINAL_0]]]
+// CHECK-SAME:   target(%[[EXECUTABLE:.+]] : !hal.executable)[%[[FUNCTION_0]]]
 // CHECK-SAME:   workgroups([%[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]])
 // CHECK-SAME:   constants([%c100_i32, %c200_i32])
 // CHECK-SAME:   bindings([
@@ -107,13 +109,13 @@ hal.executable private @ex0 {
 
 // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_512x1_buffer : !hal.buffer
 // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch1_512x1(%arg0: i32)
-// CHECK:   %[[ORDINAL_1A:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch1) : index
-// CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[ORDINAL_1A]]]
+// CHECK:   %[[FUNCTION_1A:.+]] = hal.executable.lookup.function{{.+}}function(@ex0::@embedded_elf_x86_64::@dispatch1) : i64
+// CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[FUNCTION_1A]]]
 
 // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_128x32_buffer : !hal.buffer
 // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch1_128x32(%arg0: i32)
-// CHECK:   %[[ORDINAL_1B:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch1) : index
-// CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[ORDINAL_1B]]]
+// CHECK:   %[[FUNCTION_1B:.+]] = hal.executable.lookup.function{{.+}}function(@ex0::@embedded_elf_x86_64::@dispatch1) : i64
+// CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[FUNCTION_1B]]]
 
 util.func public @main(%dynamic_arg: i32) -> !stream.timepoint attributes {
   stream.affinity = #hal.device.affinity<@device>

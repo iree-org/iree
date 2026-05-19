@@ -96,8 +96,8 @@ static iree_host_size_t iree_hal_null_executable_export_count(
 
 static iree_status_t iree_hal_null_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_null_executable_t* executable =
       iree_hal_null_executable_cast(base_executable);
   (void)executable;
@@ -108,9 +108,8 @@ static iree_status_t iree_hal_null_executable_export_info(
 
 static iree_status_t iree_hal_null_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_null_executable_t* executable =
       iree_hal_null_executable_cast(base_executable);
   (void)executable;
@@ -121,7 +120,7 @@ static iree_status_t iree_hal_null_executable_export_parameters(
 
 static iree_status_t iree_hal_null_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_null_executable_t* executable =
       iree_hal_null_executable_cast(base_executable);
   (void)executable;
@@ -145,9 +144,9 @@ static iree_status_t iree_hal_null_executable_lookup_global_by_name(
 
 static const iree_hal_executable_vtable_t iree_hal_null_executable_vtable = {
     .destroy = iree_hal_null_executable_destroy,
-    .export_count = iree_hal_null_executable_export_count,
-    .export_info = iree_hal_null_executable_export_info,
-    .export_parameters = iree_hal_null_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_null_executable_lookup_export_by_name,
+    .function_count = iree_hal_null_executable_export_count,
+    .function_info = iree_hal_null_executable_export_info,
+    .function_parameters = iree_hal_null_executable_export_parameters,
+    .lookup_function_by_name = iree_hal_null_executable_lookup_export_by_name,
     .lookup_global_by_name = iree_hal_null_executable_lookup_global_by_name,
 };

@@ -402,7 +402,7 @@ TEST(HsacoMetadataTest, PopulatesDefaultExportParameters) {
   EXPECT_EQ(requirements.constant_count, 2);
   EXPECT_EQ(requirements.name_storage_size, 12);
 
-  std::vector<iree_hal_executable_export_parameter_t> parameters(
+  std::vector<iree_hal_executable_function_parameter_t> parameters(
       requirements.parameter_count);
   std::vector<char> name_storage(requirements.name_storage_size);
   IREE_ASSERT_OK(
@@ -411,25 +411,25 @@ TEST(HsacoMetadataTest, PopulatesDefaultExportParameters) {
           name_storage.data()));
 
   EXPECT_EQ(parameters[0].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING);
   EXPECT_EQ(parameters[0].size, 8);
   EXPECT_EQ(parameters[0].offset, 0);
   EXPECT_EQ(ToString(parameters[0].name), "lhs");
 
   EXPECT_EQ(parameters[1].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING);
   EXPECT_EQ(parameters[1].size, 8);
   EXPECT_EQ(parameters[1].offset, 1);
   EXPECT_EQ(ToString(parameters[1].name), "rhs");
 
   EXPECT_EQ(parameters[2].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT);
   EXPECT_EQ(parameters[2].size, 4);
   EXPECT_EQ(parameters[2].offset, 0);
   EXPECT_EQ(ToString(parameters[2].name), "n");
 
   EXPECT_EQ(parameters[3].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT);
   EXPECT_EQ(parameters[3].size, 4);
   EXPECT_EQ(parameters[3].offset, 4);
   EXPECT_EQ(ToString(parameters[3].name), "alpha");
@@ -466,7 +466,7 @@ TEST(HsacoMetadataTest, DefaultExportParametersSkipHiddenArguments) {
   EXPECT_EQ(requirements.constant_count, 1);
   EXPECT_EQ(requirements.name_storage_size, 11);
 
-  std::vector<iree_hal_executable_export_parameter_t> parameters(
+  std::vector<iree_hal_executable_function_parameter_t> parameters(
       requirements.parameter_count);
   std::vector<char> name_storage(requirements.name_storage_size);
   IREE_ASSERT_OK(
@@ -475,10 +475,10 @@ TEST(HsacoMetadataTest, DefaultExportParametersSkipHiddenArguments) {
           name_storage.data()));
   EXPECT_EQ(ToString(parameters[0].name), "buffer");
   EXPECT_EQ(parameters[0].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_BINDING);
   EXPECT_EQ(ToString(parameters[1].name), "value");
   EXPECT_EQ(parameters[1].type,
-            IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT);
+            IREE_HAL_EXECUTABLE_FUNCTION_PARAMETER_TYPE_CONSTANT);
 
   iree_hal_amdgpu_hsaco_metadata_deinitialize(&metadata);
 }

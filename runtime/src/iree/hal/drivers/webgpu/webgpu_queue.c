@@ -1972,17 +1972,15 @@ iree_status_t iree_hal_webgpu_queue_dispatch(
     iree_hal_webgpu_queue_t* queue,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   // Extract pipeline/bgl handles at submit time. These are bridge table
   // indices (uint32 values) that remain valid as long as the executable lives.
   iree_hal_webgpu_handle_t pipeline_handle =
-      iree_hal_webgpu_executable_pipeline_handle(executable, export_ordinal);
+      iree_hal_webgpu_executable_pipeline_handle(executable, function);
   iree_hal_webgpu_handle_t bind_group_layout_handle =
-      iree_hal_webgpu_executable_bind_group_layout_handle(executable,
-                                                          export_ordinal);
+      iree_hal_webgpu_executable_bind_group_layout_handle(executable, function);
 
   // Fast path: waits already satisfied (or FIFO-elided) — execute
   // synchronously.

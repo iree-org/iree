@@ -61,6 +61,10 @@ typedef struct iree_hal_metal_source_location_t {
 
 // Object and launch parameters for a compute function.
 typedef struct iree_hal_metal_pipeline_t {
+  // Executable-local function name used for lookup and reflection.
+  iree_string_view_t name;
+
+  // Metal function handle.
   id<MTLFunction> function;
 
   // Cached pipeline used to dispatch the function.
@@ -106,7 +110,7 @@ iree_status_t iree_hal_metal_executable_create(
 // Returns the function launch parameters for the given |entry_point|.
 iree_status_t iree_hal_metal_executable_lookup_pipeline(
     const iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_metal_pipeline_t** out_pipeline);
 
 #ifdef __cplusplus

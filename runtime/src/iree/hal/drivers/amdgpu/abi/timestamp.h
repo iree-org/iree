@@ -100,8 +100,8 @@ typedef struct IREE_AMDGPU_ALIGNAS(8)
   uint32_t block_ordinal;
   // Program-global command index, or UINT32_MAX for a direct dispatch.
   uint32_t command_index;
-  // Executable export ordinal dispatched.
-  uint32_t export_ordinal;
+  // Executable function ordinal dispatched.
+  uint32_t function_ordinal;
   // Flags from iree_hal_amdgpu_dispatch_timestamp_record_flag_bits_t.
   iree_hal_amdgpu_dispatch_timestamp_record_flags_t flags;
   // Device tick range captured for the dispatch execution.

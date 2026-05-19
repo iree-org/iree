@@ -62,7 +62,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_flags(
 static iree_status_t iree_hal_amdgpu_host_queue_lookup_dispatch_descriptor(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_amdgpu_executable_dispatch_descriptor_t** out_descriptor) {
   return iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
       executable, export_ordinal, queue->device_ordinal, out_descriptor);
@@ -305,7 +305,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch_kernargs(
 static iree_status_t iree_hal_amdgpu_host_queue_prepare_dispatch_plan(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
     iree_hal_amdgpu_host_queue_dispatch_plan_t* out_plan) {
@@ -403,7 +403,7 @@ iree_hal_amdgpu_host_queue_prepare_dispatch_indirect_parameters(
 static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
     iree_hal_amdgpu_profile_dispatch_event_t* event,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
-    iree_hal_executable_export_ordinal_t export_ordinal, uint64_t executable_id,
+    iree_hal_executable_function_t function, uint64_t executable_id,
     const iree_hal_dispatch_config_t config,
     iree_hal_amdgpu_profile_dispatch_event_flags_t flags) {
   const uint64_t event_id = event->event_id;
@@ -412,7 +412,7 @@ static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
   event->flags = flags;
   event->event_id = event_id;
   event->command_index = UINT32_MAX;
-  event->export_ordinal = export_ordinal;
+  event->function_ordinal = iree_hal_executable_function_index(function);
   event->executable_id = executable_id;
   if (!iree_any_bit_set(
           flags,
@@ -427,7 +427,7 @@ static void iree_hal_amdgpu_host_queue_initialize_dispatch_event(
 
 static bool iree_hal_amdgpu_host_queue_should_profile_dispatch(
     iree_hal_amdgpu_host_queue_t* queue, uint64_t executable_id,
-    iree_hal_executable_export_ordinal_t export_ordinal) {
+    iree_hal_executable_function_t function) {
   if (!queue->profiling.dispatch_profiling_enabled) return false;
   if (!queue->profiling.hsa_queue_timestamps_enabled) return false;
   iree_hal_amdgpu_logical_device_t* logical_device =
@@ -437,7 +437,8 @@ static bool iree_hal_amdgpu_host_queue_should_profile_dispatch(
                                                : UINT32_MAX;
   const uint32_t queue_ordinal = iree_async_axis_queue_index(queue->axis);
   return iree_hal_amdgpu_logical_device_should_profile_dispatch(
-      logical_device, executable_id, export_ordinal,
+      logical_device, executable_id,
+      iree_hal_executable_function_index(function),
       /*command_buffer_id=*/0, /*command_index=*/UINT32_MAX,
       physical_device_ordinal, queue_ordinal);
 }
@@ -445,7 +446,7 @@ static bool iree_hal_amdgpu_host_queue_should_profile_dispatch(
 iree_status_t iree_hal_amdgpu_host_queue_validate_dispatch(
     const iree_hal_amdgpu_host_queue_t* queue,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
     iree_host_size_t* out_operation_resource_count) {
@@ -476,7 +477,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_direct_dispatch(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const uint64_t* binding_ptrs,
     iree_hal_resource_t* const* operation_resources,
@@ -585,7 +586,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_submit_indirect_dispatch(
     const iree_hal_semaphore_list_t signal_semaphore_list,
     const iree_hal_amdgpu_host_queue_dispatch_plan_t* plan,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const uint64_t* binding_ptrs, uint64_t workgroup_count_ptr,
     iree_hal_resource_t* const* operation_resources,
@@ -912,7 +913,7 @@ iree_status_t iree_hal_amdgpu_host_queue_submit_dispatch(
     const iree_hal_amdgpu_wait_resolution_t* resolution,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags,
     iree_hal_amdgpu_host_queue_submission_flags_t submission_flags,

@@ -285,28 +285,54 @@ iree_status_t iree_hal_cuda_native_executable_create(
       iree_hal_cuda_ExecutableDef_exports_get(executable_def);
   iree_host_size_t export_count = iree_hal_cuda_ExportDef_vec_len(exports_vec);
 
-  // Calculate the total number of characters across all entry point names. This
-  // is only required when tracing so that we can store copies of the names as
-  // the flatbuffer storing the strings may be released while the executable is
-  // still live.
+  // Calculate the total number of characters across all entry point names so
+  // that we can store copies of the names as the flatbuffer storing the strings
+  // may be released while the executable is still live.
+  iree_host_size_t total_export_name_length = 0;
   iree_host_size_t total_export_info_length = 0;
-  IREE_TRACE({
-    for (iree_host_size_t i = 0; i < export_count; ++i) {
-      iree_hal_cuda_ExportDef_table_t export_def =
-          iree_hal_cuda_ExportDef_vec_at(exports_vec, i);
+  for (iree_host_size_t i = 0; i < export_count; ++i) {
+    iree_hal_cuda_ExportDef_table_t export_def =
+        iree_hal_cuda_ExportDef_vec_at(exports_vec, i);
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            total_export_name_length,
+            flatbuffers_string_len(
+                iree_hal_cuda_ExportDef_kernel_name_get(export_def)),
+            &total_export_name_length))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "export name storage size overflow");
+    }
+    IREE_TRACE({
       total_export_info_length += iree_hal_debug_calculate_export_info_size(
           iree_hal_cuda_ExportDef_debug_info_get(export_def));
-    }
-  });
+    });
+  }
 
   // Allocate storage for the executable and its associated data structures.
   iree_hal_cuda_native_executable_t* executable = NULL;
-  const iree_host_size_t total_size =
-      sizeof(*executable) + module_count * sizeof(executable->modules[0]) +
-      export_count * sizeof(executable->exports[0]) + total_export_info_length;
+  iree_host_size_t module_table_size = 0;
+  iree_host_size_t export_table_size = 0;
+  iree_host_size_t total_size = sizeof(*executable);
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(module_count,
+                                                sizeof(executable->modules[0]),
+                                                &module_table_size) ||
+                    !iree_host_size_checked_mul(export_count,
+                                                sizeof(executable->exports[0]),
+                                                &export_table_size) ||
+                    !iree_host_size_checked_add(total_size, export_table_size,
+                                                &total_size) ||
+                    !iree_host_size_checked_add(total_size, module_table_size,
+                                                &total_size) ||
+                    !iree_host_size_checked_add(
+                        total_size, total_export_name_length, &total_size) ||
+                    !iree_host_size_checked_add(
+                        total_size, total_export_info_length, &total_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable storage size overflow");
+  }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  memset(executable, 0, total_size);
 
   iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
                                &executable->resource);
@@ -315,13 +341,12 @@ iree_status_t iree_hal_cuda_native_executable_create(
   executable->symbols = symbols;
   executable->cu_context = cu_context;
   executable->module_count = module_count;
-  executable->modules =
-      (CUmodule*)((uint8_t*)executable + sizeof(*executable) +
-                  export_count * sizeof(executable->exports[0]));
+  executable->modules = (CUmodule*)((uint8_t*)executable + sizeof(*executable) +
+                                    export_table_size);
   executable->export_count = export_count;
+  char* export_name_ptr = (char*)executable->modules + module_table_size;
   IREE_TRACE(uint8_t* export_info_ptr =
-                 ((uint8_t*)executable->modules +
-                  module_count * sizeof(executable->modules[0])));
+                 (uint8_t*)export_name_ptr + total_export_name_length);
 
   // Publish any embedded source files to the tracing infrastructure.
   iree_hal_debug_publish_source_files(
@@ -408,6 +433,12 @@ iree_status_t iree_hal_cuda_native_executable_create(
 
       // Package required parameters for kernel launches for each entry point.
       iree_hal_cuda_kernel_params_t* kernel_info = &executable->exports[i];
+      const iree_host_size_t kernel_name_length =
+          flatbuffers_string_len(kernel_name);
+      kernel_info->name =
+          iree_make_string_view(export_name_ptr, kernel_name_length);
+      memcpy(export_name_ptr, kernel_name, kernel_name_length);
+      export_name_ptr += kernel_name_length;
       kernel_info->function = function;
       const iree_hal_cuda_BlockDims_t* block_dims =
           iree_hal_cuda_ExportDef_block_dims_get(export_def);
@@ -466,17 +497,19 @@ static void iree_hal_cuda_native_executable_destroy(
 
 iree_status_t iree_hal_cuda_native_executable_lookup_kernel_params(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_cuda_kernel_params_t** out_params) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
-  if (ordinal >= executable->export_count) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "export ordinal %d out of range; executable contains %" PRIhsz
-        " exports",
-        ordinal, executable->export_count);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range; executable contains %" PRIhsz
+                            " exports",
+                            function.value, executable->export_count);
   }
+  const uint32_t ordinal = iree_hal_executable_function_index(function);
   *out_params = &executable->exports[ordinal];
   return iree_ok_status();
 }
@@ -485,28 +518,30 @@ static iree_host_size_t iree_hal_cuda_native_executable_export_count(
     iree_hal_executable_t* base_executable) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
-  // TODO(cuda): return the total number of exports in the executable.
-  (void)executable;
-  return 0;
+  return executable->export_count;
 }
 
 static iree_status_t iree_hal_cuda_native_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
-  iree_hal_cuda_native_executable_t* executable =
-      iree_hal_cuda_native_executable_cast(base_executable);
-  (void)executable;
-  // TODO(cuda): return export information from kernel metadata.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "reflection not implemented");
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
+  const iree_hal_cuda_kernel_params_t* kernel_params = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_lookup_kernel_params(
+      base_executable, function, &kernel_params));
+  memset(out_info, 0, sizeof(*out_info));
+  out_info->name = kernel_params->name;
+  out_info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
+  out_info->constant_count = (uint16_t)kernel_params->constant_count;
+  out_info->binding_count = (uint16_t)kernel_params->binding_count;
+  memcpy(out_info->workgroup_size, kernel_params->block_dims,
+         sizeof(out_info->workgroup_size));
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_native_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   (void)executable;
@@ -517,13 +552,19 @@ static iree_status_t iree_hal_cuda_native_executable_export_parameters(
 
 static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
-  (void)executable;
-  // TODO(cuda): lookup the export ordinal by name.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "reflection not implemented");
+  for (iree_host_size_t i = 0; i < executable->export_count; ++i) {
+    if (iree_string_view_equal(executable->exports[i].name, name)) {
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
+      return iree_ok_status();
+    }
+  }
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "function '%.*s' not found in executable",
+                          (int)name.size, name.data);
 }
 
 #define IREE_HAL_CUDA_MAX_STACK_GLOBAL_NAME_LENGTH \
@@ -610,10 +651,11 @@ static iree_status_t iree_hal_cuda_native_executable_lookup_global_by_name(
 static const iree_hal_executable_vtable_t
     iree_hal_cuda_native_executable_vtable = {
         .destroy = iree_hal_cuda_native_executable_destroy,
-        .export_count = iree_hal_cuda_native_executable_export_count,
-        .export_info = iree_hal_cuda_native_executable_export_info,
-        .export_parameters = iree_hal_cuda_native_executable_export_parameters,
-        .lookup_export_by_name =
+        .function_count = iree_hal_cuda_native_executable_export_count,
+        .function_info = iree_hal_cuda_native_executable_export_info,
+        .function_parameters =
+            iree_hal_cuda_native_executable_export_parameters,
+        .lookup_function_by_name =
             iree_hal_cuda_native_executable_lookup_export_by_name,
         .lookup_global_by_name =
             iree_hal_cuda_native_executable_lookup_global_by_name,

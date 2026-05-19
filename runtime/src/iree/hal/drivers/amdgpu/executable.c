@@ -1219,12 +1219,12 @@ typedef struct iree_hal_amdgpu_executable_t {
   // Total number of exports in the executable.
   iree_host_size_t kernel_count;
   // Host-resident reflection information for each export.
-  iree_hal_executable_export_info_t* export_infos /*[kernel_count]*/;
+  iree_hal_executable_function_info_t* export_infos /*[kernel_count]*/;
   // Prefix-sum offsets into |export_parameters| for each export plus a
   // sentinel.
   iree_host_size_t* export_parameter_offsets /*[kernel_count + 1]*/;
   // Host-resident parameter reflection records for all exports.
-  iree_hal_executable_export_parameter_t* export_parameters;
+  iree_hal_executable_function_parameter_t* export_parameters;
   // Table of kernel args stored in host memory. We have them local so that
   // host-side command buffer recording doesn't need to access device memory.
   // The kernel object specified in each is invalid as it's agent-specific.
@@ -1332,14 +1332,14 @@ static iree_status_t iree_hal_amdgpu_executable_allocate(
       IREE_STRUCT_FIELD_FAM(
           topology->gpu_agent_count,
           IREE_AMDGPU_DEVICE_PTR const iree_hal_amdgpu_device_kernel_args_t*),
-      IREE_STRUCT_FIELD(export_count, iree_hal_executable_export_info_t,
+      IREE_STRUCT_FIELD(export_count, iree_hal_executable_function_info_t,
                         &export_infos_offset),
       IREE_STRUCT_FIELD(export_name_storage_size, char,
                         &export_name_storage_offset),
       IREE_STRUCT_FIELD(export_parameter_offset_count, iree_host_size_t,
                         &export_parameter_offsets_offset),
       IREE_STRUCT_FIELD(export_parameter_count,
-                        iree_hal_executable_export_parameter_t,
+                        iree_hal_executable_function_parameter_t,
                         &export_parameters_offset),
       IREE_STRUCT_FIELD(export_parameter_name_storage_size, char,
                         &export_parameter_name_storage_offset),
@@ -1363,14 +1363,14 @@ static iree_status_t iree_hal_amdgpu_executable_allocate(
   executable->kernel_count = export_count;
   uint8_t* executable_storage = (uint8_t*)executable;
   executable->export_infos =
-      (iree_hal_executable_export_info_t*)(executable_storage +
-                                           export_infos_offset);
+      (iree_hal_executable_function_info_t*)(executable_storage +
+                                             export_infos_offset);
   executable->export_parameter_offsets =
       (iree_host_size_t*)(executable_storage + export_parameter_offsets_offset);
   executable->export_parameters =
       export_parameter_count
-          ? (iree_hal_executable_export_parameter_t*)(executable_storage +
-                                                      export_parameters_offset)
+          ? (iree_hal_executable_function_parameter_t*)(executable_storage +
+                                                        export_parameters_offset)
           : NULL;
   executable->host_kernel_args =
       (iree_hal_amdgpu_device_kernel_args_t*)(executable_storage +
@@ -1704,9 +1704,9 @@ iree_hal_amdgpu_executable_calculate_raw_hsaco_reflection_storage(
 static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
     iree_hal_amdgpu_ExportDef_vec_t export_defs,
     const iree_hal_amdgpu_hsaco_metadata_t* hsaco_metadata,
-    iree_hal_executable_export_info_t* export_infos,
+    iree_hal_executable_function_info_t* export_infos,
     iree_host_size_t* export_parameter_offsets,
-    iree_hal_executable_export_parameter_t* export_parameters,
+    iree_hal_executable_function_parameter_t* export_parameters,
     char* export_name_storage, char* export_parameter_name_storage) {
   iree_host_size_t export_parameter_offset = 0;
   const iree_host_size_t export_count =
@@ -1714,7 +1714,7 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
   for (iree_host_size_t i = 0; i < export_count; ++i) {
     iree_hal_amdgpu_ExportDef_table_t export_def =
         iree_hal_amdgpu_ExportDef_vec_at(export_defs, i);
-    iree_hal_executable_export_info_t* info = &export_infos[i];
+    iree_hal_executable_function_info_t* info = &export_infos[i];
     export_parameter_offsets[i] = export_parameter_offset;
 
     iree_string_view_t symbol_name =
@@ -1744,7 +1744,7 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
 
     memset(info, 0, sizeof(*info));
     info->name = iree_make_string_view(export_name_storage, name.size);
-    info->flags = IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE;
+    info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
     // Preserve the flatbuffer ABI counts even when the HSACO metadata has lost
     // optimized-unused arguments.
     info->constant_count =
@@ -1760,7 +1760,7 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
     info->workgroup_size[1] = workgroup_size->y;
     info->workgroup_size[2] = workgroup_size->z;
 
-    iree_hal_executable_export_parameter_t* export_parameter_base =
+    iree_hal_executable_function_parameter_t* export_parameter_base =
         requirements.parameter_count
             ? &export_parameters[export_parameter_offset]
             : NULL;
@@ -1784,15 +1784,15 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_export_infos(
 static iree_status_t
 iree_hal_amdgpu_executable_initialize_raw_hsaco_export_infos(
     const iree_hal_amdgpu_hsaco_metadata_t* hsaco_metadata,
-    iree_hal_executable_export_info_t* export_infos,
+    iree_hal_executable_function_info_t* export_infos,
     iree_host_size_t* export_parameter_offsets,
-    iree_hal_executable_export_parameter_t* export_parameters,
+    iree_hal_executable_function_parameter_t* export_parameters,
     char* export_name_storage, char* export_parameter_name_storage) {
   iree_host_size_t export_parameter_offset = 0;
   for (iree_host_size_t i = 0; i < hsaco_metadata->kernel_count; ++i) {
     const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel =
         &hsaco_metadata->kernels[i];
-    iree_hal_executable_export_info_t* info = &export_infos[i];
+    iree_hal_executable_function_info_t* info = &export_infos[i];
     export_parameter_offsets[i] = export_parameter_offset;
 
     iree_hal_amdgpu_hsaco_metadata_export_parameter_requirements_t requirements;
@@ -1809,16 +1809,17 @@ iree_hal_amdgpu_executable_initialize_raw_hsaco_export_infos(
 
     memset(info, 0, sizeof(*info));
     info->name = iree_make_string_view(export_name_storage, name.size);
-    info->flags = kernel->has_required_workgroup_size
-                      ? IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE
-                      : IREE_HAL_EXECUTABLE_EXPORT_FLAG_WORKGROUP_SIZE_DYNAMIC;
+    info->flags =
+        kernel->has_required_workgroup_size
+            ? IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE
+            : IREE_HAL_EXECUTABLE_FUNCTION_FLAG_WORKGROUP_SIZE_DYNAMIC;
     info->constant_count = requirements.constant_count;
     info->binding_count = requirements.binding_count;
     info->parameter_count = requirements.parameter_count;
     iree_hal_amdgpu_executable_raw_hsaco_workgroup_size(kernel,
                                                         info->workgroup_size);
 
-    iree_hal_executable_export_parameter_t* export_parameter_base =
+    iree_hal_executable_function_parameter_t* export_parameter_base =
         requirements.parameter_count
             ? &export_parameters[export_parameter_offset]
             : NULL;
@@ -2272,18 +2273,20 @@ static void iree_hal_amdgpu_executable_destroy(
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
   *out_kernel_args = NULL;
 
-  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, executable->kernel_count))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->kernel_count);
+                            function.value, executable->kernel_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   *out_kernel_args = &executable->host_kernel_args[export_ordinal];
 
@@ -2292,18 +2295,18 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_host(
 
 iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t device_ordinal,
+    iree_hal_executable_function_t function, iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_device_kernel_args_t** out_kernel_args) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
   *out_kernel_args = NULL;
 
-  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, executable->kernel_count))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->kernel_count);
+                            function.value, executable->kernel_count);
   } else if (IREE_UNLIKELY(device_ordinal >= executable->device_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "device ordinal %" PRIhsz
@@ -2317,6 +2320,7 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
                             " is not in executable queue affinity 0x%" PRIx64,
                             device_ordinal, executable->queue_affinity);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   *out_kernel_args =
       &executable->device_kernel_args[device_ordinal][export_ordinal];
@@ -2326,18 +2330,18 @@ iree_status_t iree_hal_amdgpu_executable_lookup_kernel_args_for_device(
 
 iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t device_ordinal,
+    iree_hal_executable_function_t function, iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_executable_dispatch_descriptor_t** out_descriptor) {
   const iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_const_cast(base_executable);
   *out_descriptor = NULL;
 
-  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, executable->kernel_count))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->kernel_count);
+                            function.value, executable->kernel_count);
   } else if (IREE_UNLIKELY(device_ordinal >= executable->device_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "device ordinal %" PRIhsz
@@ -2351,6 +2355,7 @@ iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
                             " is not in executable queue affinity 0x%" PRIx64,
                             device_ordinal, executable->queue_affinity);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
 
   const iree_host_size_t descriptor_ordinal =
       device_ordinal * executable->kernel_count + export_ordinal;
@@ -2361,8 +2366,7 @@ iree_status_t iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
 iree_status_t
 iree_hal_amdgpu_executable_lookup_pm4_dispatch_launch_state_for_device(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t device_ordinal,
+    iree_hal_executable_function_t function, iree_host_size_t device_ordinal,
     const iree_hal_amdgpu_pm4_dispatch_launch_state_t** out_state) {
   IREE_ASSERT_ARGUMENT(out_state);
   *out_state = NULL;
@@ -2371,14 +2375,12 @@ iree_hal_amdgpu_executable_lookup_pm4_dispatch_launch_state_for_device(
       NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
-          base_executable, export_ordinal, device_ordinal,
-          &dispatch_descriptor));
+          base_executable, function, device_ordinal, &dispatch_descriptor));
   if (IREE_UNLIKELY(!dispatch_descriptor->pm4_launch_state_valid)) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "export ordinal %" PRIu32
-                            " on device ordinal %" PRIhsz
+                            "function id %" PRIu64 " on device ordinal %" PRIhsz
                             " does not have PM4 dispatch launch metadata",
-                            export_ordinal, device_ordinal);
+                            function.value, device_ordinal);
   }
 
   *out_state = &dispatch_descriptor->pm4_launch_state;
@@ -2394,35 +2396,38 @@ static iree_host_size_t iree_hal_amdgpu_executable_export_count(
 
 static iree_status_t iree_hal_amdgpu_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_cast(base_executable);
   memset(out_info, 0, sizeof(*out_info));
-  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, executable->kernel_count))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->kernel_count);
+                            function.value, executable->kernel_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   *out_info = executable->export_infos[export_ordinal];
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_amdgpu_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t function, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   IREE_ASSERT_ARGUMENT(out_parameters || capacity == 0);
   iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_cast(base_executable);
-  if (IREE_UNLIKELY(export_ordinal >= executable->kernel_count)) {
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, executable->kernel_count))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->kernel_count);
+                            function.value, executable->kernel_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   const iree_host_size_t parameter_begin =
       executable->export_parameter_offsets[export_ordinal];
   const iree_host_size_t parameter_end =
@@ -2438,13 +2443,14 @@ static iree_status_t iree_hal_amdgpu_executable_export_parameters(
 
 static iree_status_t iree_hal_amdgpu_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_amdgpu_executable_t* executable =
       iree_hal_amdgpu_executable_cast(base_executable);
   for (iree_host_size_t i = 0; i < executable->kernel_count; ++i) {
     iree_string_view_t export_name = executable->export_infos[i].name;
     if (iree_string_view_equal(export_name, name)) {
-      *out_export_ordinal = (iree_hal_executable_export_ordinal_t)i;
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
     }
   }
@@ -2526,9 +2532,9 @@ static iree_status_t iree_hal_amdgpu_executable_lookup_global_by_name(
 
 static const iree_hal_executable_vtable_t iree_hal_amdgpu_executable_vtable = {
     .destroy = iree_hal_amdgpu_executable_destroy,
-    .export_count = iree_hal_amdgpu_executable_export_count,
-    .export_info = iree_hal_amdgpu_executable_export_info,
-    .export_parameters = iree_hal_amdgpu_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_amdgpu_executable_lookup_export_by_name,
+    .function_count = iree_hal_amdgpu_executable_export_count,
+    .function_info = iree_hal_amdgpu_executable_export_info,
+    .function_parameters = iree_hal_amdgpu_executable_export_parameters,
+    .lookup_function_by_name = iree_hal_amdgpu_executable_lookup_export_by_name,
     .lookup_global_by_name = iree_hal_amdgpu_executable_lookup_global_by_name,
 };

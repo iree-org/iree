@@ -123,7 +123,8 @@ class DispatchReuseTest : public CtsTestBase<> {
     };
 
     IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-        command_buffer, workgroup_id_executable_, /*entry_point=*/0,
+        command_buffer, workgroup_id_executable_,
+        iree_hal_executable_function_from_index(0),
         iree_hal_make_static_dispatch_config(workgroup_count, 1, 1),
         iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
 
@@ -159,7 +160,8 @@ class DispatchReuseTest : public CtsTestBase<> {
           /*.values=*/binding_refs,
       };
       IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-          command_buffer, workgroup_id_executable_, /*entry_point=*/0,
+          command_buffer, workgroup_id_executable_,
+          iree_hal_executable_function_from_index(0),
           iree_hal_make_static_dispatch_config(workgroup_count, 1, 1),
           iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
       RecordDispatchBarrier(command_buffer);
@@ -356,7 +358,8 @@ TEST_P(DispatchReuseTest, MixedDirectAndIndirectBindings) {
       /*.values=*/binding_refs,
   };
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, absf_executable_, /*entry_point=*/0,
+      command_buffer, absf_executable_,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
@@ -414,7 +417,8 @@ TEST_P(DispatchReuseTest, DeferredExecuteRetainsDispatchBindingTable) {
       /*.values=*/binding_refs,
   };
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, absf_executable_, /*entry_point=*/0,
+      command_buffer, absf_executable_,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(

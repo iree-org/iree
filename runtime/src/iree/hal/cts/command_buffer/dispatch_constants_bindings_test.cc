@@ -141,7 +141,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       constant_data.data(), constant_data.size() * sizeof(constant_data[0]));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(

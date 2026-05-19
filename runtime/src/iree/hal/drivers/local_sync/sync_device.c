@@ -504,8 +504,8 @@ typedef struct iree_hal_sync_device_profile_operation_t {
   // Number of encoded payload operations represented by this queue operation.
   uint32_t operation_count;
 
-  // Executable export ordinal for dispatch-like spans, or UINT32_MAX.
-  uint32_t export_ordinal;
+  // Executable function ordinal for dispatch-like spans, or UINT32_MAX.
+  uint32_t function_ordinal;
 
   // Workgroup counts submitted for dispatch-like spans.
   uint32_t workgroup_count[3];
@@ -566,19 +566,25 @@ static void iree_hal_sync_device_profile_operation_initialize(
   out_operation->type = type;
   out_operation->payload_length = payload_length;
   out_operation->operation_count = operation_count;
-  out_operation->export_ordinal = UINT32_MAX;
+  out_operation->function_ordinal = UINT32_MAX;
 }
 
-static void iree_hal_sync_device_profile_operation_set_dispatch(
+static iree_status_t iree_hal_sync_device_profile_operation_set_dispatch(
     iree_hal_sync_device_profile_operation_t* operation,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
   operation->executable_id =
       iree_hal_local_executable_profile_id(local_executable);
-  operation->export_ordinal = export_ordinal;
+  operation->function_ordinal = iree_hal_executable_function_index(function);
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     operation->host_flags |=
         IREE_HAL_PROFILE_HOST_EXECUTION_EVENT_FLAG_INDIRECT_PARAMETERS;
@@ -592,6 +598,7 @@ static void iree_hal_sync_device_profile_operation_set_dispatch(
       config.workgroup_size[1] ? config.workgroup_size[1] : 1;
   operation->workgroup_size[2] =
       config.workgroup_size[2] ? config.workgroup_size[2] : 1;
+  return iree_ok_status();
 }
 
 static void iree_hal_sync_device_profile_operation_set_transient_buffer(
@@ -729,7 +736,7 @@ static void iree_hal_sync_device_profile_operation_record_end(
   event_info.command_buffer_id = operation->command_buffer_id;
   event_info.executable_id = operation->executable_id;
   event_info.allocation_id = operation->allocation_id;
-  event_info.export_ordinal = operation->export_ordinal;
+  event_info.function_ordinal = operation->function_ordinal;
   memcpy(event_info.workgroup_count, operation->workgroup_count,
          sizeof(event_info.workgroup_count));
   memcpy(event_info.workgroup_size, operation->workgroup_size,
@@ -1343,7 +1350,7 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -1353,8 +1360,8 @@ static iree_status_t iree_hal_sync_device_queue_dispatch_profiled(
       /*operation_count=*/1, &profile_operation);
   IREE_RETURN_IF_ERROR(iree_hal_local_profile_recorder_record_executable(
       device->profile_recorder, executable));
-  iree_hal_sync_device_profile_operation_set_dispatch(
-      &profile_operation, executable, export_ordinal, config, flags);
+  IREE_RETURN_IF_ERROR(iree_hal_sync_device_profile_operation_set_dispatch(
+      &profile_operation, executable, export_ordinal, config, flags));
   IREE_RETURN_IF_ERROR(iree_hal_sync_device_profiled_queue_op_begin(
       device, wait_semaphore_list, signal_semaphore_list, &profile_operation));
   iree_status_t status = iree_hal_local_executable_dispatch_inline(
@@ -1369,7 +1376,7 @@ static iree_status_t iree_hal_sync_device_queue_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {

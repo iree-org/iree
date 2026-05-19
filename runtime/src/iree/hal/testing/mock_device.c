@@ -15,24 +15,26 @@
 static const iree_string_view_t iree_hal_mock_executable_format =
     IREE_SVL("mock-executable");
 
-typedef struct iree_hal_mock_executable_export_record_t {
-  // Number of 32-bit constants reflected for the export.
+typedef struct iree_hal_mock_executable_function_record_t {
+  // Number of 32-bit constants reflected for the function.
   uint8_t constant_count;
-  // Number of buffer bindings reflected for the export.
+  // Number of buffer bindings reflected for the function.
   uint8_t binding_count;
-  // Executable export flags byte.
+  // Executable function flags byte.
   uint8_t flags;
-  // Static workgroup size reflected for the export.
+  // Static workgroup size reflected for the function.
   uint8_t workgroup_size[3];
-  // Reserved bytes; must be zero.
-  uint8_t reserved[2];
-} iree_hal_mock_executable_export_record_t;
+  // Byte length of the function name in the trailing name storage.
+  uint8_t name_length;
+  // Reserved byte; must be zero.
+  uint8_t reserved;
+} iree_hal_mock_executable_function_record_t;
 
 typedef struct iree_hal_mock_executable_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
-  iree_host_size_t export_count;
-  iree_hal_executable_export_info_t exports[];
+  iree_host_size_t function_count;
+  iree_hal_executable_function_info_t functions[];
 } iree_hal_mock_executable_t;
 
 static const iree_hal_executable_vtable_t iree_hal_mock_executable_vtable;
@@ -62,30 +64,59 @@ static iree_status_t iree_hal_mock_executable_create(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "mock executable data is too short");
   }
-  uint32_t export_count = 0;
-  memcpy(&export_count, executable_params->executable_data.data,
-         sizeof(export_count));
-  iree_const_byte_span_t export_data = iree_make_const_byte_span(
-      executable_params->executable_data.data + sizeof(export_count),
-      executable_params->executable_data.data_length - sizeof(export_count));
-  iree_host_size_t expected_export_data_length = 0;
+  uint32_t function_count = 0;
+  memcpy(&function_count, executable_params->executable_data.data,
+         sizeof(function_count));
+  iree_const_byte_span_t function_data = iree_make_const_byte_span(
+      executable_params->executable_data.data + sizeof(function_count),
+      executable_params->executable_data.data_length - sizeof(function_count));
+  iree_host_size_t function_record_data_length = 0;
   if (IREE_UNLIKELY(!iree_host_size_checked_mul(
-                        export_count,
-                        sizeof(iree_hal_mock_executable_export_record_t),
-                        &expected_export_data_length) ||
-                    expected_export_data_length != export_data.data_length)) {
+                        function_count,
+                        sizeof(iree_hal_mock_executable_function_record_t),
+                        &function_record_data_length) ||
+                    function_record_data_length > function_data.data_length)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "mock executable function metadata length mismatch");
+  }
+  iree_const_byte_span_t name_storage = iree_make_const_byte_span(
+      function_data.data + function_record_data_length,
+      function_data.data_length - function_record_data_length);
+
+  const iree_hal_mock_executable_function_record_t* function_records =
+      (const iree_hal_mock_executable_function_record_t*)function_data.data;
+  iree_host_size_t expected_name_storage_length = 0;
+  for (iree_host_size_t i = 0; i < function_count; ++i) {
+    const iree_hal_mock_executable_function_record_t* record =
+        &function_records[i];
+    if (IREE_UNLIKELY(record->reserved != 0)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "mock executable function metadata reserved byte "
+                              "must be zero");
+    }
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            expected_name_storage_length, record->name_length,
+            &expected_name_storage_length))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "mock executable function name storage overflow");
+    }
+  }
+  if (IREE_UNLIKELY(expected_name_storage_length != name_storage.data_length)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "mock executable export metadata length mismatch");
+                            "mock executable function name length mismatch");
   }
 
-  iree_host_size_t export_info_size = 0;
+  iree_host_size_t function_info_size = 0;
   iree_host_size_t total_size = 0;
   if (IREE_UNLIKELY(
-          !iree_host_size_checked_mul(export_count,
-                                      sizeof(iree_hal_executable_export_info_t),
-                                      &export_info_size) ||
+          !iree_host_size_checked_mul(
+              function_count, sizeof(iree_hal_executable_function_info_t),
+              &function_info_size) ||
           !iree_host_size_checked_add(sizeof(iree_hal_mock_executable_t),
-                                      export_info_size, &total_size))) {
+                                      function_info_size, &total_size) ||
+          !iree_host_size_checked_add(total_size, name_storage.data_length,
+                                      &total_size))) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "mock executable metadata is too large");
   }
@@ -96,25 +127,28 @@ static iree_status_t iree_hal_mock_executable_create(
   iree_hal_resource_initialize(&iree_hal_mock_executable_vtable,
                                &executable->resource);
   executable->host_allocator = host_allocator;
-  executable->export_count = export_count;
+  executable->function_count = function_count;
 
-  const iree_hal_mock_executable_export_record_t* export_records =
-      (const iree_hal_mock_executable_export_record_t*)export_data.data;
-  for (iree_host_size_t i = 0; i < export_count; ++i) {
-    const iree_hal_mock_executable_export_record_t* record = &export_records[i];
-    if (IREE_UNLIKELY(record->reserved[0] != 0 || record->reserved[1] != 0)) {
-      iree_allocator_free(host_allocator, executable);
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "mock executable export metadata reserved bytes "
-                              "must be zero");
-    }
-    executable->exports[i].flags = record->flags;
-    executable->exports[i].constant_count = record->constant_count;
-    executable->exports[i].binding_count = record->binding_count;
-    executable->exports[i].parameter_count = 0;
-    executable->exports[i].workgroup_size[0] = record->workgroup_size[0];
-    executable->exports[i].workgroup_size[1] = record->workgroup_size[1];
-    executable->exports[i].workgroup_size[2] = record->workgroup_size[2];
+  char* executable_name_storage =
+      (char*)executable + sizeof(*executable) + function_info_size;
+  if (name_storage.data_length != 0) {
+    memcpy(executable_name_storage, name_storage.data,
+           name_storage.data_length);
+  }
+  iree_host_size_t name_offset = 0;
+  for (iree_host_size_t i = 0; i < function_count; ++i) {
+    const iree_hal_mock_executable_function_record_t* record =
+        &function_records[i];
+    executable->functions[i].name = iree_make_string_view(
+        executable_name_storage + name_offset, record->name_length);
+    name_offset += record->name_length;
+    executable->functions[i].flags = record->flags;
+    executable->functions[i].constant_count = record->constant_count;
+    executable->functions[i].binding_count = record->binding_count;
+    executable->functions[i].parameter_count = 0;
+    executable->functions[i].workgroup_size[0] = record->workgroup_size[0];
+    executable->functions[i].workgroup_size[1] = record->workgroup_size[1];
+    executable->functions[i].workgroup_size[2] = record->workgroup_size[2];
   }
 
   *out_executable = (iree_hal_executable_t*)executable;
@@ -129,44 +163,52 @@ static void iree_hal_mock_executable_destroy(
   iree_allocator_free(host_allocator, executable);
 }
 
-static iree_host_size_t iree_hal_mock_executable_export_count(
+static iree_host_size_t iree_hal_mock_executable_function_count(
     iree_hal_executable_t* base_executable) {
   iree_hal_mock_executable_t* executable =
       iree_hal_mock_executable_cast(base_executable);
-  return executable->export_count;
+  return executable->function_count;
 }
 
-static iree_status_t iree_hal_mock_executable_export_info(
+static iree_status_t iree_hal_mock_executable_function_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_mock_executable_t* executable =
       iree_hal_mock_executable_cast(base_executable);
-  if (export_ordinal >= executable->export_count) {
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->function_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE);
   }
-  *out_info = executable->exports[export_ordinal];
+  const uint32_t function_ordinal =
+      iree_hal_executable_function_index(function);
+  *out_info = executable->functions[function_ordinal];
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_mock_executable_export_parameters(
+static iree_status_t iree_hal_mock_executable_function_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t function, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   (void)base_executable;
-  (void)export_ordinal;
+  (void)function;
   (void)capacity;
   (void)out_parameters;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_mock_executable_lookup_export_by_name(
+static iree_status_t iree_hal_mock_executable_lookup_function_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
-  (void)base_executable;
-  (void)name;
-  (void)out_export_ordinal;
+    iree_hal_executable_function_t* out_function) {
+  iree_hal_mock_executable_t* executable =
+      iree_hal_mock_executable_cast(base_executable);
+  for (iree_host_size_t i = 0; i < executable->function_count; ++i) {
+    if (iree_string_view_equal(executable->functions[i].name, name)) {
+      *out_function = iree_hal_executable_function_from_index((uint32_t)i);
+      return iree_ok_status();
+    }
+  }
+  *out_function = iree_hal_executable_function_invalid();
   return iree_make_status(IREE_STATUS_NOT_FOUND);
 }
 
@@ -182,10 +224,10 @@ static iree_status_t iree_hal_mock_executable_lookup_global_by_name(
 
 static const iree_hal_executable_vtable_t iree_hal_mock_executable_vtable = {
     .destroy = iree_hal_mock_executable_destroy,
-    .export_count = iree_hal_mock_executable_export_count,
-    .export_info = iree_hal_mock_executable_export_info,
-    .export_parameters = iree_hal_mock_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_mock_executable_lookup_export_by_name,
+    .function_count = iree_hal_mock_executable_function_count,
+    .function_info = iree_hal_mock_executable_function_info,
+    .function_parameters = iree_hal_mock_executable_function_parameters,
+    .lookup_function_by_name = iree_hal_mock_executable_lookup_function_by_name,
     .lookup_global_by_name = iree_hal_mock_executable_lookup_global_by_name,
 };
 
@@ -565,8 +607,7 @@ static iree_status_t iree_hal_mock_device_queue_dispatch(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {

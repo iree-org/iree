@@ -542,8 +542,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -590,12 +589,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                export_ordinal, config, constants, bindings, flags));
+                function, config, constants, bindings, flags));
   });
 
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
-      command_buffer, executable, export_ordinal, config, constants, bindings,
-      flags);
+      command_buffer, executable, function, config, constants, bindings, flags);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

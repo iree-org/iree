@@ -100,9 +100,11 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
     // CHECK: scf.index_switch %[[SWITCH0]]
     // CHECK: case 0 {
     // CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup device(%[[DEVICE]] : !hal.device) executable(@ex) : !hal.executable
-    // CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal target(@ex::@embedded_elf_aarch64::@dispatch) : index
+    // CHECK-DAG: %[[FUNCTION_0:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)
+    // CHECK-SAME: function(@ex::@embedded_elf_aarch64::@dispatch) : i64
     // CHECK:   hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[FUNCTION_0]]]
     // CHECK-SAME: workgroups([%c1, %c1, %c1])
     // CHECK-SAME: bindings([
     // CHECK-NEXT:   (%[[ARG0_BUFFER]] : !hal.buffer)[%c0, %c16],
@@ -113,9 +115,11 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
     // CHECK: }
     // CHECK: case 1 {
     // CHECK-DAG: %[[EXECUTABLE_1:.+]] = hal.executable.lookup device(%[[DEVICE]] : !hal.device) executable(@ex) : !hal.executable
-    // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@embedded_elf_x86_64::@dispatch) : index
+    // CHECK-DAG: %[[FUNCTION_1:.+]] = hal.executable.lookup.function
+    // CHECK-SAME: target(%[[EXECUTABLE_1]] : !hal.executable)
+    // CHECK-SAME: function(@ex::@embedded_elf_x86_64::@dispatch) : i64
     // CHECK:   hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: target(%[[EXECUTABLE_1]] : !hal.executable)[%[[ORDINAL_1]]]
+    // CHECK-SAME: target(%[[EXECUTABLE_1]] : !hal.executable)[%[[FUNCTION_1]]]
     // CHECK-SAME: bindings([
     // CHECK-NEXT:   (%[[ARG0_BUFFER]] : !hal.buffer)[%c0, %c16]
     // CHECK-NEXT:   (%[[ARG1_BUFFER]] : !hal.buffer)[%c0, %c16],

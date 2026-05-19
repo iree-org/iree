@@ -25,15 +25,15 @@ class ProfileMetadataTest : public ::testing::Test {
     iree_hal_amdgpu_profile_metadata_deinitialize(&registry_);
   }
 
-  iree_hal_executable_export_info_t MakeExportInfo() {
-    iree_hal_executable_export_info_t export_info = {};
-    export_info.name = IREE_SV("test_dispatch");
-    export_info.constant_count = 3;
-    export_info.binding_count = 2;
-    export_info.workgroup_size[0] = 8;
-    export_info.workgroup_size[1] = 4;
-    export_info.workgroup_size[2] = 1;
-    return export_info;
+  iree_hal_executable_function_info_t MakeFunctionInfo() {
+    iree_hal_executable_function_info_t function_info = {};
+    function_info.name = IREE_SV("test_dispatch");
+    function_info.constant_count = 3;
+    function_info.binding_count = 2;
+    function_info.workgroup_size[0] = 8;
+    function_info.workgroup_size[1] = 4;
+    function_info.workgroup_size[2] = 1;
+    return function_info;
   }
 
   iree_hal_amdgpu_device_kernel_args_t MakeKernelArgs() {
@@ -65,67 +65,70 @@ TEST_F(ProfileMetadataTest, HashCodeObjectGolden) {
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableRecordsOnlyIdentity) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
-  iree_host_size_t export_parameter_offsets[] = {0, 0};
+  iree_hal_executable_function_info_t function_info = MakeFunctionInfo();
+  iree_host_size_t function_parameter_offsets[] = {0, 0};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x1111111111111111ull, 0x2222222222222222ull};
 
   uint64_t executable_id = 0;
   IREE_ASSERT_OK(iree_hal_amdgpu_profile_metadata_register_executable(
-      &registry_, /*export_count=*/1, &export_info, export_parameter_offsets,
-      code_object_hash, &kernel_args, &executable_id));
+      &registry_, /*function_count=*/1, &function_info,
+      function_parameter_offsets, code_object_hash, &kernel_args,
+      &executable_id));
 
   EXPECT_EQ(executable_id, 1u);
   ASSERT_EQ(registry_.executable_record_count, 1u);
   EXPECT_EQ(registry_.executable_records[0].executable_id, executable_id);
-  EXPECT_EQ(registry_.executable_records[0].export_count, 1u);
-  EXPECT_NE(registry_.executable_export_record_data_length, 0u);
+  EXPECT_EQ(registry_.executable_records[0].function_count, 1u);
+  EXPECT_NE(registry_.executable_function_record_data_length, 0u);
   EXPECT_EQ(registry_.executable_code_object_record_data_length, 0u);
   EXPECT_EQ(registry_.executable_code_object_load_record_count, 0u);
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableComputesStablePipelineHash) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
-  iree_host_size_t export_parameter_offsets[] = {0, 3};
+  iree_hal_executable_function_info_t function_info = MakeFunctionInfo();
+  iree_host_size_t function_parameter_offsets[] = {0, 3};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x0706050403020100ull, 0x1716151413121110ull};
 
   uint64_t executable_id = 0;
   IREE_ASSERT_OK(iree_hal_amdgpu_profile_metadata_register_executable(
-      &registry_, /*export_count=*/1, &export_info, export_parameter_offsets,
-      code_object_hash, &kernel_args, &executable_id));
+      &registry_, /*function_count=*/1, &function_info,
+      function_parameter_offsets, code_object_hash, &kernel_args,
+      &executable_id));
 
-  ASSERT_EQ(registry_.executable_export_record_data_length,
-            sizeof(iree_hal_profile_executable_export_record_t) +
-                export_info.name.size);
-  const auto* export_record =
-      reinterpret_cast<const iree_hal_profile_executable_export_record_t*>(
-          registry_.executable_export_record_data);
-  ASSERT_NE(export_record, nullptr);
-  EXPECT_EQ(export_record->flags,
-            IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
-  EXPECT_EQ(export_record->executable_id, executable_id);
-  EXPECT_EQ(export_record->export_ordinal, 0u);
-  EXPECT_EQ(export_record->constant_count, 3u);
-  EXPECT_EQ(export_record->binding_count, 2u);
-  EXPECT_EQ(export_record->parameter_count, 3u);
-  EXPECT_EQ(export_record->workgroup_size[0], 8u);
-  EXPECT_EQ(export_record->workgroup_size[1], 4u);
-  EXPECT_EQ(export_record->workgroup_size[2], 1u);
-  EXPECT_EQ(export_record->pipeline_hash[0], 0x12dbd8b44277f553ull);
-  EXPECT_EQ(export_record->pipeline_hash[1], 0x873c5d1c5596dce4ull);
+  ASSERT_EQ(registry_.executable_function_record_data_length,
+            sizeof(iree_hal_profile_executable_function_record_t) +
+                function_info.name.size);
+  const auto* function_record =
+      reinterpret_cast<const iree_hal_profile_executable_function_record_t*>(
+          registry_.executable_function_record_data);
+  ASSERT_NE(function_record, nullptr);
+  EXPECT_EQ(function_record->flags,
+            IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_FUNCTION_HASH);
+  EXPECT_EQ(function_record->executable_id, executable_id);
+  EXPECT_EQ(function_record->function_ordinal, 0u);
+  EXPECT_EQ(function_record->constant_count, 3u);
+  EXPECT_EQ(function_record->binding_count, 2u);
+  EXPECT_EQ(function_record->parameter_count, 3u);
+  EXPECT_EQ(function_record->workgroup_size[0], 8u);
+  EXPECT_EQ(function_record->workgroup_size[1], 4u);
+  EXPECT_EQ(function_record->workgroup_size[2], 1u);
+  EXPECT_EQ(function_record->function_hash[0], 0x12dbd8b44277f553ull);
+  EXPECT_EQ(function_record->function_hash[1], 0x873c5d1c5596dce4ull);
 }
 
 TEST_F(ProfileMetadataTest, RegisterExecutableArtifactsAttachToIdentity) {
-  iree_hal_executable_export_info_t export_info = MakeExportInfo();
-  iree_host_size_t export_parameter_offsets[] = {0, 0};
+  iree_hal_executable_function_info_t function_info = MakeFunctionInfo();
+  iree_host_size_t function_parameter_offsets[] = {0, 0};
   iree_hal_amdgpu_device_kernel_args_t kernel_args = MakeKernelArgs();
   uint64_t code_object_hash[2] = {0x1111111111111111ull, 0x2222222222222222ull};
 
   uint64_t executable_id = 0;
   IREE_ASSERT_OK(iree_hal_amdgpu_profile_metadata_register_executable(
-      &registry_, /*export_count=*/1, &export_info, export_parameter_offsets,
-      code_object_hash, &kernel_args, &executable_id));
+      &registry_, /*function_count=*/1, &function_info,
+      function_parameter_offsets, code_object_hash, &kernel_args,
+      &executable_id));
 
   const uint8_t code_object_data[] = {0x7f, 'E', 'L', 'F', 0x01};
   const iree_hal_amdgpu_profile_code_object_load_info_t load_infos[] = {

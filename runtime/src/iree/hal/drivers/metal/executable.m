@@ -424,32 +424,46 @@ iree_status_t iree_hal_metal_executable_create(
       iree_hal_metal_ExecutableDef_pipelines_get(executable_def);
   iree_host_size_t pipeline_count = flatbuffers_string_vec_len(pipelines_vec);
 
-  // Calculate the total number of characters across all entry point names. This
-  // is only required when tracing so that we can store copies of the names as
-  // the flatbuffer storing the strings may be released while the executable is
-  // still live.
+  // Calculate the total number of characters across all entry point names so
+  // that we can store copies of the names as the flatbuffer storing the strings
+  // may be released while the executable is still live.
+  iree_host_size_t total_pipeline_name_length = 0;
   iree_host_size_t total_debug_info_length = 0;
-  IREE_TRACE({
-    for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
-      iree_hal_metal_PipelineDef_table_t pipeline_def =
-          iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
+  for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
+    iree_hal_metal_PipelineDef_table_t pipeline_def =
+        iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            total_pipeline_name_length,
+            flatbuffers_string_len(iree_hal_metal_PipelineDef_entry_point_get(pipeline_def)),
+            &total_pipeline_name_length))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "pipeline name storage size overflow");
+    }
+    IREE_TRACE({
       total_debug_info_length += iree_hal_debug_calculate_export_info_size(
           iree_hal_metal_PipelineDef_debug_info_get(pipeline_def));
-    }
-  });
+    });
+  }
 
   // Allocate storage for the executable and its associated data structures.
   iree_hal_metal_executable_t* executable = NULL;
-  iree_host_size_t total_size = sizeof(*executable) +
-                                pipeline_count * sizeof(executable->pipelines[0]) +
-                                total_debug_info_length;
+  iree_host_size_t pipeline_table_size = 0;
+  iree_host_size_t total_size = sizeof(*executable);
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(pipeline_count, sizeof(executable->pipelines[0]),
+                                      &pipeline_table_size) ||
+          !iree_host_size_checked_add(total_size, pipeline_table_size, &total_size) ||
+          !iree_host_size_checked_add(total_size, total_pipeline_name_length, &total_size) ||
+          !iree_host_size_checked_add(total_size, total_debug_info_length, &total_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "executable storage size overflow");
+  }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  memset(executable, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_metal_executable_vtable, &executable->resource);
   executable->host_allocator = host_allocator;
   executable->pipeline_count = pipeline_count;
-  IREE_TRACE(uint8_t* export_info_ptr = ((uint8_t*)executable->pipelines +
-                                         pipeline_count * sizeof(executable->pipelines[0])));
+  char* pipeline_name_ptr = (char*)executable->pipelines + pipeline_table_size;
+  IREE_TRACE(uint8_t* export_info_ptr = (uint8_t*)pipeline_name_ptr + total_pipeline_name_length);
 
   // Publish any embedded source files to the tracing infrastructure.
   iree_hal_debug_publish_source_files(
@@ -472,6 +486,12 @@ iree_status_t iree_hal_metal_executable_create(
       iree_hal_metal_pipeline_t* pipeline = &executable->pipelines[i];
       status = iree_hal_metal_create_pipeline(device, library, pipeline_def, pipeline);
       if (!iree_status_is_ok(status)) break;
+
+      flatbuffers_string_t entry_point = iree_hal_metal_PipelineDef_entry_point_get(pipeline_def);
+      const iree_host_size_t entry_point_length = flatbuffers_string_len(entry_point);
+      pipeline->name = iree_make_string_view(pipeline_name_ptr, entry_point_length);
+      memcpy(pipeline_name_ptr, entry_point, entry_point_length);
+      pipeline_name_ptr += entry_point_length;
 
       IREE_TRACE({
         iree_hal_debug_export_info_t* export_info = (iree_hal_debug_export_info_t*)export_info_ptr;
@@ -512,15 +532,16 @@ static void iree_hal_metal_executable_destroy(iree_hal_executable_t* base_execut
 }
 
 iree_status_t iree_hal_metal_executable_lookup_pipeline(
-    const iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    const iree_hal_executable_t* base_executable, iree_hal_executable_function_t function,
     const iree_hal_metal_pipeline_t** out_pipeline) {
   const iree_hal_metal_executable_t* executable =
       iree_hal_metal_executable_const_cast(base_executable);
-  if (export_ordinal >= executable->pipeline_count) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "invalid entry point ordinal %u",
-                            export_ordinal);
+  if (!iree_hal_executable_function_is_index_in_range(function, executable->pipeline_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64 " out of range (count: %" PRIhsz ")",
+                            function.value, executable->pipeline_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   *out_pipeline = &executable->pipelines[export_ordinal];
   return iree_ok_status();
 }
@@ -528,27 +549,38 @@ iree_status_t iree_hal_metal_executable_lookup_pipeline(
 static iree_host_size_t iree_hal_metal_executable_export_count(
     iree_hal_executable_t* base_executable) {
   iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
-  // TODO(metal): return the total number of exports in the executable.
-  (void)executable;
-  return 0;
+  return executable->pipeline_count;
 }
 
 static iree_status_t iree_hal_metal_executable_export_info(
-    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
-  iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
-  (void)executable;
-  // TODO(metal): return export information from Metal kernel metadata.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "reflection not implemented");
+    iree_hal_executable_t* base_executable, iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
+  const iree_hal_metal_pipeline_t* pipeline = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_metal_executable_lookup_pipeline(base_executable, export_ordinal, &pipeline));
+  memset(out_info, 0, sizeof(*out_info));
+  out_info->name = pipeline->name;
+  out_info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
+  out_info->constant_count = (uint16_t)pipeline->constant_count;
+  out_info->binding_count = (uint16_t)pipeline->binding_count;
+  out_info->workgroup_size[0] = (uint32_t)pipeline->threadgroup_size.width;
+  out_info->workgroup_size[1] = (uint32_t)pipeline->threadgroup_size.height;
+  out_info->workgroup_size[2] = (uint32_t)pipeline->threadgroup_size.depth;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_metal_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
-  (void)executable;
-  // TODO(metal): lookup the export ordinal by name.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "reflection not implemented");
+  for (iree_host_size_t i = 0; i < executable->pipeline_count; ++i) {
+    if (iree_string_view_equal(executable->pipelines[i].name, name)) {
+      *out_export_ordinal = iree_hal_executable_function_from_index((uint32_t)i);
+      return iree_ok_status();
+    }
+  }
+  return iree_make_status(IREE_STATUS_NOT_FOUND, "function '%.*s' not found in executable",
+                          (int)name.size, name.data);
 }
 
 static iree_status_t iree_hal_metal_executable_lookup_global_by_name(
@@ -563,8 +595,8 @@ static iree_status_t iree_hal_metal_executable_lookup_global_by_name(
 }
 
 static iree_status_t iree_hal_metal_executable_export_parameters(
-    iree_hal_executable_t* base_executable, iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity, iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_t* base_executable, iree_hal_executable_function_t export_ordinal,
+    iree_host_size_t capacity, iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_metal_executable_t* executable = iree_hal_metal_executable_cast(base_executable);
   (void)executable;
   // TODO(metal): return export parameter information from kernel metadata.
@@ -573,9 +605,9 @@ static iree_status_t iree_hal_metal_executable_export_parameters(
 
 static const iree_hal_executable_vtable_t iree_hal_metal_executable_vtable = {
     .destroy = iree_hal_metal_executable_destroy,
-    .export_count = iree_hal_metal_executable_export_count,
-    .export_info = iree_hal_metal_executable_export_info,
-    .export_parameters = iree_hal_metal_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_metal_executable_lookup_export_by_name,
+    .function_count = iree_hal_metal_executable_export_count,
+    .function_info = iree_hal_metal_executable_export_info,
+    .function_parameters = iree_hal_metal_executable_export_parameters,
+    .lookup_function_by_name = iree_hal_metal_executable_lookup_export_by_name,
     .lookup_global_by_name = iree_hal_metal_executable_lookup_global_by_name,
 };

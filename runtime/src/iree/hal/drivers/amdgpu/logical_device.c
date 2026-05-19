@@ -450,10 +450,10 @@ bool iree_hal_amdgpu_logical_device_should_profile_dispatch(
   }
   if (iree_any_bit_set(
           filter->flags,
-          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN)) {
-    return iree_hal_amdgpu_profile_metadata_export_matches(
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN)) {
+    return iree_hal_amdgpu_profile_metadata_function_matches(
         &logical_device->profile_metadata, executable_id, export_ordinal,
-        filter->executable_export_pattern);
+        filter->executable_function_pattern);
   }
   return true;
 }
@@ -2731,7 +2731,7 @@ static iree_status_t iree_hal_amdgpu_logical_device_queue_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {

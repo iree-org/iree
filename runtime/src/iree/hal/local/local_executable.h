@@ -72,7 +72,7 @@ uint64_t iree_hal_local_executable_profile_id(
 // Returns the export name if available or an empty string view otherwise.
 iree_string_view_t iree_hal_local_executable_export_name(
     const iree_hal_local_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal);
+    iree_hal_executable_function_t function);
 
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,

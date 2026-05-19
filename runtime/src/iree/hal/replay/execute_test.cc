@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
@@ -167,15 +168,58 @@ static iree_status_t RecordReplayScopeEvent(
 static std::vector<uint8_t> MakeMockExecutableData(uint8_t constant_count,
                                                    uint8_t binding_count,
                                                    uint8_t workgroup_size_x) {
-  std::vector<uint8_t> data(12, 0);
-  const uint32_t export_count = 1;
-  std::memcpy(data.data(), &export_count, sizeof(export_count));
+  const char name[] = "main";
+  std::vector<uint8_t> data(12 + sizeof(name) - 1, 0);
+  const uint32_t function_count = 1;
+  std::memcpy(data.data(), &function_count, sizeof(function_count));
   data[4] = constant_count;
   data[5] = binding_count;
   data[6] = 0;  // flags
   data[7] = workgroup_size_x;
   data[8] = 1;
   data[9] = 1;
+  data[10] = sizeof(name) - 1;
+  std::memcpy(data.data() + 12, name, sizeof(name) - 1);
+  return data;
+}
+
+typedef struct MockExecutableFunction {
+  const char* name;
+  uint8_t constant_count;
+  uint8_t binding_count;
+  uint8_t workgroup_size_x;
+} MockExecutableFunction;
+
+static std::vector<uint8_t> MakeNamedMockExecutableData(
+    std::initializer_list<MockExecutableFunction> functions) {
+  const uint32_t function_count = (uint32_t)functions.size();
+  std::vector<uint8_t> data(4 + functions.size() * 8, 0);
+  std::memcpy(data.data(), &function_count, sizeof(function_count));
+
+  size_t function_ordinal = 0;
+  size_t name_offset = data.size();
+  for (const MockExecutableFunction& function_record : functions) {
+    const size_t name_length = strlen(function_record.name);
+    if (name_length > UINT8_MAX) {
+      ADD_FAILURE() << "mock function name too long";
+      return {};
+    }
+    data.resize(data.size() + name_length);
+
+    uint8_t* record = data.data() + 4 + function_ordinal * 8;
+    record[0] = function_record.constant_count;
+    record[1] = function_record.binding_count;
+    record[2] = 0;  // flags
+    record[3] = function_record.workgroup_size_x;
+    record[4] = 1;
+    record[5] = 1;
+    record[6] = (uint8_t)name_length;
+    if (name_length != 0) {
+      std::memcpy(data.data() + name_offset, function_record.name, name_length);
+      name_offset += name_length;
+    }
+    ++function_ordinal;
+  }
   return data;
 }
 
@@ -246,9 +290,9 @@ static void CorruptFirstCapturedExecutableData(std::vector<uint8_t>* storage) {
     ASSERT_LE(data_offset + sizeof(uint32_t), record.payload.data_length);
     auto* mutable_payload =
         storage->data() + (record.payload.data - file_contents.data);
-    const uint32_t impossible_export_count = 0xFFFFFFFFu;
-    std::memcpy(mutable_payload + data_offset, &impossible_export_count,
-                sizeof(impossible_export_count));
+    const uint32_t impossible_function_count = 0xFFFFFFFFu;
+    std::memcpy(mutable_payload + data_offset, &impossible_function_count,
+                sizeof(impossible_function_count));
     return;
   }
 
@@ -412,6 +456,64 @@ TEST(ReplayExecuteTest, UsesRecordedExecutableMetadataForSubstitution) {
   std::vector<uint8_t> replacement_data =
       MakeMockExecutableData(/*constant_count=*/2, /*binding_count=*/3,
                              /*workgroup_size_x=*/4);
+  std::vector<uint8_t> storage(32768, 0);
+  CaptureMockExecutablePrepare(
+      iree_make_const_byte_span(captured_data.data(), captured_data.size()),
+      &storage);
+  CorruptFirstCapturedExecutableData(&storage);
+
+  TestExecutableSubstitutionState substitution_state = {
+      /*.source=*/iree_make_cstring_view("replacement.mock"),
+      /*.executable_format=*/iree_make_cstring_view("mock-executable"),
+      /*.executable_data=*/
+      iree_make_const_byte_span(replacement_data.data(),
+                                replacement_data.size()),
+      /*.invocation_count=*/0,
+      /*.executable_id=*/IREE_HAL_REPLAY_OBJECT_ID_NONE,
+  };
+  iree_hal_replay_execute_options_t options =
+      iree_hal_replay_execute_options_default();
+  options.executable_substitution_callback.fn =
+      TestExecutableSubstitutionCallback;
+  options.executable_substitution_callback.user_data = &substitution_state;
+
+  iree_hal_device_group_t* replay_group = CreateMockExecutableDeviceGroup();
+  IREE_EXPECT_OK(iree_hal_replay_execute_file(GetCapturedFileContents(storage),
+                                              replay_group, &options,
+                                              iree_allocator_system()));
+  EXPECT_EQ(substitution_state.invocation_count, 1u);
+  iree_hal_device_group_release(replay_group);
+}
+
+TEST(ReplayExecuteTest, SubstitutesRecordedExecutablePayloadByName) {
+  std::vector<uint8_t> captured_data = MakeNamedMockExecutableData({
+      {
+          /*.name=*/"first",
+          /*.constant_count=*/2,
+          /*.binding_count=*/3,
+          /*.workgroup_size_x=*/4,
+      },
+      {
+          /*.name=*/"second",
+          /*.constant_count=*/5,
+          /*.binding_count=*/6,
+          /*.workgroup_size_x=*/7,
+      },
+  });
+  std::vector<uint8_t> replacement_data = MakeNamedMockExecutableData({
+      {
+          /*.name=*/"second",
+          /*.constant_count=*/5,
+          /*.binding_count=*/6,
+          /*.workgroup_size_x=*/7,
+      },
+      {
+          /*.name=*/"first",
+          /*.constant_count=*/2,
+          /*.binding_count=*/3,
+          /*.workgroup_size_x=*/4,
+      },
+  });
   std::vector<uint8_t> storage(32768, 0);
   CaptureMockExecutablePrepare(
       iree_make_const_byte_span(captured_data.data(), captured_data.size()),

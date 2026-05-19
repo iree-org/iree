@@ -156,9 +156,11 @@ struct DeviceBundle {
   std::array<iree_hal_buffer_binding_t, kMaximumBindingTableCount>
       binding_table = {};
   // Export ordinal for the first benchmark entrypoint.
-  iree_hal_executable_export_ordinal_t model_a = 0;
+  iree_hal_executable_function_t model_a =
+      iree_hal_executable_function_from_index(0);
   // Export ordinal for the second benchmark entrypoint.
-  iree_hal_executable_export_ordinal_t model_b = 0;
+  iree_hal_executable_function_t model_b =
+      iree_hal_executable_function_from_index(0);
   // Completion semaphore reused across iterations for this device.
   iree_hal_semaphore_t* completion_semaphore = nullptr;
   // Next completion payload value for |completion_semaphore|.
@@ -373,11 +375,11 @@ class Pm4CommandBufferBenchmark : public benchmark::Fixture {
           bundle->executable_cache, &executable_params, &bundle->executable);
     }
     if (iree_status_is_ok(status)) {
-      status = iree_hal_executable_lookup_export_by_name(
+      status = iree_hal_executable_lookup_function_by_name(
           bundle->executable, IREE_SV("model_a"), &bundle->model_a);
     }
     if (iree_status_is_ok(status)) {
-      status = iree_hal_executable_lookup_export_by_name(
+      status = iree_hal_executable_lookup_function_by_name(
           bundle->executable, IREE_SV("model_b"), &bundle->model_b);
     }
     return status;
@@ -449,7 +451,7 @@ class Pm4CommandBufferBenchmark : public benchmark::Fixture {
           dispatch_index, spec.operation_count, spec.overlap_percent);
       for (int64_t i = 0; i < group_size && iree_status_is_ok(status); ++i) {
         const int64_t current_dispatch = dispatch_index + i;
-        const iree_hal_executable_export_ordinal_t export_ordinal =
+        const iree_hal_executable_function_t export_ordinal =
             (current_dispatch & 1) ? bundle.model_b : bundle.model_a;
         const uint32_t slot0 =
             (uint32_t)(current_dispatch % spec.binding_table_count);

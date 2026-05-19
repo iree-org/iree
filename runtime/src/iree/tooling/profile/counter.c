@@ -66,8 +66,8 @@ typedef struct iree_profile_counter_aggregate_lookup_t {
   uint32_t counter_ordinal;
   // Producer-local executable identifier.
   uint64_t executable_id;
-  // Export ordinal within |executable_id|.
-  uint32_t export_ordinal;
+  // Function ordinal within |executable_id|.
+  uint32_t function_ordinal;
   // Process-local command-buffer identifier.
   uint64_t command_buffer_id;
 } iree_profile_counter_aggregate_lookup_t;
@@ -86,7 +86,7 @@ static uint64_t iree_profile_counter_aggregate_hash(
     uint32_t physical_device_ordinal, uint32_t queue_ordinal,
     uint64_t stream_id, iree_hal_profile_counter_sample_scope_t scope,
     uint64_t counter_set_id, uint32_t counter_ordinal, uint64_t executable_id,
-    uint32_t export_ordinal, uint64_t command_buffer_id) {
+    uint32_t function_ordinal, uint64_t command_buffer_id) {
   uint64_t hash = iree_profile_index_mix_u64(physical_device_ordinal);
   hash = iree_profile_index_combine_u64(hash, queue_ordinal);
   hash = iree_profile_index_combine_u64(hash, stream_id);
@@ -94,7 +94,7 @@ static uint64_t iree_profile_counter_aggregate_hash(
   hash = iree_profile_index_combine_u64(hash, counter_set_id);
   hash = iree_profile_index_combine_u64(hash, counter_ordinal);
   hash = iree_profile_index_combine_u64(hash, executable_id);
-  hash = iree_profile_index_combine_u64(hash, export_ordinal);
+  hash = iree_profile_index_combine_u64(hash, function_ordinal);
   return iree_profile_index_combine_u64(hash, command_buffer_id);
 }
 
@@ -129,7 +129,7 @@ static bool iree_profile_counter_aggregate_matches(const void* user_data,
          aggregate->counter_set_id == lookup->counter_set_id &&
          aggregate->counter_ordinal == lookup->counter_ordinal &&
          aggregate->executable_id == lookup->executable_id &&
-         aggregate->export_ordinal == lookup->export_ordinal &&
+         aggregate->function_ordinal == lookup->function_ordinal &&
          aggregate->command_buffer_id == lookup->command_buffer_id;
 }
 
@@ -269,7 +269,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
     iree_profile_counter_context_t* context, uint32_t physical_device_ordinal,
     uint32_t queue_ordinal, uint64_t stream_id,
     iree_hal_profile_counter_sample_scope_t scope, uint64_t counter_set_id,
-    uint32_t counter_ordinal, uint64_t executable_id, uint32_t export_ordinal,
+    uint32_t counter_ordinal, uint64_t executable_id, uint32_t function_ordinal,
     uint64_t command_buffer_id,
     iree_profile_counter_aggregate_t** out_aggregate) {
   *out_aggregate = NULL;
@@ -283,12 +283,12 @@ static iree_status_t iree_profile_counter_get_aggregate(
       .counter_set_id = counter_set_id,
       .counter_ordinal = counter_ordinal,
       .executable_id = executable_id,
-      .export_ordinal = export_ordinal,
+      .function_ordinal = function_ordinal,
       .command_buffer_id = command_buffer_id,
   };
   const uint64_t hash = iree_profile_counter_aggregate_hash(
       physical_device_ordinal, queue_ordinal, stream_id, scope, counter_set_id,
-      counter_ordinal, executable_id, export_ordinal, command_buffer_id);
+      counter_ordinal, executable_id, function_ordinal, command_buffer_id);
   iree_host_size_t existing_index = 0;
   if (iree_profile_index_find(&context->aggregate_index, hash,
                               iree_profile_counter_aggregate_matches, &lookup,
@@ -319,7 +319,7 @@ static iree_status_t iree_profile_counter_get_aggregate(
   aggregate->counter_set_id = counter_set_id;
   aggregate->counter_ordinal = counter_ordinal;
   aggregate->executable_id = executable_id;
-  aggregate->export_ordinal = export_ordinal;
+  aggregate->function_ordinal = function_ordinal;
   aggregate->command_buffer_id = command_buffer_id;
   aggregate->minimum_value = DBL_MAX;
   ++context->aggregate_count;
@@ -509,12 +509,13 @@ static iree_status_t iree_profile_counter_resolve_sample_key(
     char* numeric_buffer, iree_host_size_t numeric_buffer_capacity,
     iree_string_view_t* out_key) {
   *out_key = IREE_SV("unattributed");
-  if (sample->executable_id == 0 || sample->export_ordinal == UINT32_MAX) {
+  if (sample->executable_id == 0 || sample->function_ordinal == UINT32_MAX) {
     return iree_ok_status();
   }
   return iree_profile_model_resolve_dispatch_key(
       model, sample->physical_device_ordinal, sample->executable_id,
-      sample->export_ordinal, numeric_buffer, numeric_buffer_capacity, out_key);
+      sample->function_ordinal, numeric_buffer, numeric_buffer_capacity,
+      out_key);
 }
 
 static iree_status_t iree_profile_counter_sum_value(
@@ -616,10 +617,10 @@ static void iree_profile_counter_print_sample_jsonl(
           ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
           ",\"command_buffer_id\":%" PRIu64
           ",\"command_index\":%u,\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u,\"key\":",
+          ",\"function_ordinal\":%u,\"key\":",
           sample->scope, sample->dispatch_event_id, sample->submission_id,
           sample->command_buffer_id, sample->command_index,
-          sample->executable_id, sample->export_ordinal);
+          sample->executable_id, sample->function_ordinal);
   iree_profile_fprint_json_string(file, key);
   fprintf(file,
           ",\"physical_device_ordinal\":%u,\"queue_ordinal\":%u"
@@ -655,7 +656,7 @@ typedef struct iree_profile_counter_sample_state_t {
   iree_hal_profile_counter_sample_record_t sample;
   // Counter set metadata referenced by |sample|.
   const iree_profile_counter_set_t* counter_set;
-  // Resolved executable export key for filtering and reporting.
+  // Resolved executable function key for filtering and reporting.
   iree_string_view_t key;
   // Raw uint64_t counter sample values trailing |sample|.
   iree_const_byte_span_t sample_values;
@@ -738,7 +739,7 @@ static iree_status_t iree_profile_counter_process_sample_counter(
       counter_context, state->sample.physical_device_ordinal,
       state->sample.queue_ordinal, state->sample.stream_id, state->sample.scope,
       state->sample.counter_set_id, counter->record.counter_ordinal,
-      state->sample.executable_id, state->sample.export_ordinal,
+      state->sample.executable_id, state->sample.function_ordinal,
       state->sample.command_buffer_id, &aggregate));
   iree_profile_counter_record_aggregate_sample(aggregate, counter,
                                                &state->sample, value_sum);
@@ -864,12 +865,12 @@ static iree_status_t iree_profile_counter_resolve_aggregate_key(
     iree_host_size_t numeric_buffer_capacity, iree_string_view_t* out_key) {
   *out_key = IREE_SV("unattributed");
   if (aggregate->executable_id == 0 ||
-      aggregate->export_ordinal == UINT32_MAX) {
+      aggregate->function_ordinal == UINT32_MAX) {
     return iree_ok_status();
   }
   return iree_profile_model_resolve_dispatch_key(
       model, aggregate->physical_device_ordinal, aggregate->executable_id,
-      aggregate->export_ordinal, numeric_buffer, numeric_buffer_capacity,
+      aggregate->function_ordinal, numeric_buffer, numeric_buffer_capacity,
       out_key);
 }
 
@@ -880,7 +881,7 @@ typedef struct iree_profile_counter_aggregate_row_t {
   const iree_profile_counter_set_t* counter_set;
   // Counter metadata referenced by |aggregate|.
   const iree_profile_counter_t* counter;
-  // Resolved executable export key for the aggregate.
+  // Resolved executable function key for the aggregate.
   iree_string_view_t key;
   // Sample standard deviation for the aggregate's summed counter value.
   double stddev;
@@ -1036,7 +1037,7 @@ static void iree_profile_counter_print_text_group(
           "  %.*s / %.*s.%.*s\n"
           "    scope=%s device=%u queue=%u stream=%" PRIu64
           " command_buffer=%" PRIu64 " executable=%" PRIu64
-          " export=%u key=%.*s\n"
+          " function=%u key=%.*s\n"
           "    samples=%" PRIu64 " raw_values=%" PRIu64
           " value[min/avg/stddev/max/total]=%.3f/%.3f/%.3f/%.3f/%.3f "
           "unit=%s first_sample=%" PRIu64 " last_sample=%" PRIu64 "\n",
@@ -1046,7 +1047,7 @@ static void iree_profile_counter_print_text_group(
           iree_profile_counter_sample_scope_name(aggregate->scope),
           aggregate->physical_device_ordinal, aggregate->queue_ordinal,
           aggregate->stream_id, aggregate->command_buffer_id,
-          aggregate->executable_id, aggregate->export_ordinal,
+          aggregate->executable_id, aggregate->function_ordinal,
           (int)row->key.size, row->key.data, aggregate->sample_count,
           aggregate->raw_value_count,
           aggregate->sample_count ? aggregate->minimum_value : 0.0,
@@ -1137,10 +1138,10 @@ static void iree_profile_counter_print_jsonl_group(
                 iree_profile_counter_unit_name(counter->record.unit)));
   fprintf(file,
           ",\"command_buffer_id\":%" PRIu64 ",\"executable_id\":%" PRIu64
-          ",\"export_ordinal\":%u"
+          ",\"function_ordinal\":%u"
           ",\"key\":",
           aggregate->command_buffer_id, aggregate->executable_id,
-          aggregate->export_ordinal);
+          aggregate->function_ordinal);
   iree_profile_fprint_json_string(file, row->key);
   fprintf(file,
           ",\"samples\":%" PRIu64 ",\"raw_values\":%" PRIu64
@@ -1186,7 +1187,7 @@ static iree_status_t iree_profile_counter_print_jsonl(
 }
 
 typedef struct iree_profile_counter_parse_context_t {
-  // Shared profile metadata used to resolve executable export keys.
+  // Shared profile metadata used to resolve executable function keys.
   iree_profile_model_t* model;
   // Counter metadata and aggregate state.
   iree_profile_counter_context_t* counter_context;

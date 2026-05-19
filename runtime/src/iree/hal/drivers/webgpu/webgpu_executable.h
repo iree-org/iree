@@ -33,18 +33,16 @@ iree_status_t iree_hal_webgpu_executable_create(
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
 
-// Returns the bridge handle for the compute pipeline at |export_ordinal|.
+// Returns the bridge handle for the compute pipeline for |function|.
 // The caller does not take ownership — the pipeline handle remains valid for
 // the lifetime of the executable.
 iree_hal_webgpu_handle_t iree_hal_webgpu_executable_pipeline_handle(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal);
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function);
 
-// Returns the bridge handle for the bind group layout at |export_ordinal|.
+// Returns the bridge handle for the bind group layout for |function|.
 // Used by the command buffer to create bind groups for dispatch.
 iree_hal_webgpu_handle_t iree_hal_webgpu_executable_bind_group_layout_handle(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal);
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function);
 
 #ifdef __cplusplus
 }  // extern "C"

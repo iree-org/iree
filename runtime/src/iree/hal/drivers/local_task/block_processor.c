@@ -744,9 +744,12 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
                             worker_context->local_memory.data_length);
   }
 
+  IREE_TRACE(
+      const iree_hal_executable_function_t trace_function =
+          iree_hal_executable_function_from_index(dispatch->export_ordinal));
   IREE_TRACE(iree_string_view_t trace_name =
-                 iree_hal_local_executable_export_name(
-                     dispatch->executable, dispatch->export_ordinal));
+                 iree_hal_local_executable_export_name(dispatch->executable,
+                                                       trace_function));
   IREE_TRACE(if (iree_string_view_is_empty(trace_name)) {
     trace_name = iree_make_cstring_view("iree_hal_local_task_dispatch");
   });
@@ -917,7 +920,7 @@ static void iree_hal_cmd_block_processor_profile_make_dispatch_event(
   event_info.executable_id =
       iree_hal_local_executable_profile_id(dispatch->executable);
   event_info.command_index = dispatch->profile.command_index;
-  event_info.export_ordinal = dispatch->export_ordinal;
+  event_info.function_ordinal = dispatch->export_ordinal;
   memcpy(event_info.workgroup_count, workgroup_count,
          sizeof(event_info.workgroup_count));
   event_info.workgroup_size[0] =

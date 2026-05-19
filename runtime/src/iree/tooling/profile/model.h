@@ -13,41 +13,41 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Executable export metadata indexed by executable id and export ordinal.
-typedef struct iree_profile_model_export_t {
-  // Session-local executable identifier owning this export.
+// Executable function metadata indexed by executable id and function ordinal.
+typedef struct iree_profile_model_function_t {
+  // Session-local executable identifier owning this function.
   uint64_t executable_id;
-  // Flags specifying which optional export fields are populated.
-  iree_hal_profile_executable_export_flags_t flags;
-  // Export ordinal used by dispatch event records.
-  uint32_t export_ordinal;
-  // Number of HAL ABI constant words expected by this export.
+  // Flags specifying which optional function fields are populated.
+  iree_hal_profile_executable_function_flags_t flags;
+  // Function ordinal used by dispatch event records.
+  uint32_t function_ordinal;
+  // Number of HAL ABI constant words expected by this function.
   uint32_t constant_count;
-  // Number of HAL ABI binding pointer slots expected by this export.
+  // Number of HAL ABI binding pointer slots expected by this function.
   uint32_t binding_count;
-  // Number of reflected parameters associated with this export.
+  // Number of reflected parameters associated with this function.
   uint32_t parameter_count;
   // Static workgroup size for each dispatch dimension.
   uint32_t workgroup_size[3];
-  // Deterministic executable-export identity hash words when present in
+  // Deterministic executable-function identity hash words when present in
   // |flags|.
-  uint64_t pipeline_hash[2];
-  // Borrowed export name from the mapped profile bundle.
+  uint64_t function_hash[2];
+  // Borrowed function name from the mapped profile bundle.
   iree_string_view_t name;
-  // Next export row owned by the same executable, or IREE_HOST_SIZE_MAX.
-  iree_host_size_t next_export_index;
-} iree_profile_model_export_t;
+  // Next function row owned by the same executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t next_function_index;
+} iree_profile_model_function_t;
 
 // Executable metadata indexed by session-local executable id.
 typedef struct iree_profile_model_executable_t {
   // Immutable executable metadata record borrowed from the profile bundle.
   iree_hal_profile_executable_record_t record;
-  // First export row owned by this executable, or IREE_HOST_SIZE_MAX.
-  iree_host_size_t first_export_index;
-  // Last export row owned by this executable, or IREE_HOST_SIZE_MAX.
-  iree_host_size_t last_export_index;
-  // Number of export rows linked to this executable.
-  iree_host_size_t export_row_count;
+  // First function row owned by this executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t first_function_index;
+  // Last function row owned by this executable, or IREE_HOST_SIZE_MAX.
+  iree_host_size_t last_function_index;
+  // Number of function rows linked to this executable.
+  iree_host_size_t function_row_count;
 } iree_profile_model_executable_t;
 
 // Command-buffer metadata indexed by session-local command-buffer id.
@@ -150,15 +150,15 @@ typedef struct iree_profile_model_t {
   iree_host_size_t executable_capacity;
   // Lookup index from executable id to |executables| entry index.
   iree_profile_index_t executable_index;
-  // Dynamic array of executable export side-table entries.
-  iree_profile_model_export_t* exports;
-  // Number of valid entries in |exports|.
-  iree_host_size_t export_count;
-  // Capacity of |exports| in entries.
-  iree_host_size_t export_capacity;
-  // Lookup index from executable id and export ordinal to |exports| entry
+  // Dynamic array of executable function side-table entries.
+  iree_profile_model_function_t* functions;
+  // Number of valid entries in |functions|.
+  iree_host_size_t function_count;
+  // Capacity of |functions| in entries.
+  iree_host_size_t function_capacity;
+  // Lookup index from executable id and function ordinal to |functions| entry
   // index.
-  iree_profile_index_t export_index;
+  iree_profile_index_t function_index;
   // Dynamic array of command-buffer side-table entries.
   iree_profile_model_command_buffer_t* command_buffers;
   // Number of valid entries in |command_buffers|.
@@ -234,11 +234,11 @@ const iree_profile_model_queue_t* iree_profile_model_find_queue(
 const iree_profile_model_executable_t* iree_profile_model_find_executable(
     const iree_profile_model_t* model, uint64_t executable_id);
 
-// Returns the executable export metadata row for |executable_id| and
-// |export_ordinal|.
-const iree_profile_model_export_t* iree_profile_model_find_export(
+// Returns the executable function metadata row for |executable_id| and
+// |function_ordinal|.
+const iree_profile_model_function_t* iree_profile_model_find_function(
     const iree_profile_model_t* model, uint64_t executable_id,
-    uint32_t export_ordinal);
+    uint32_t function_ordinal);
 
 // Returns the command-buffer metadata row for |command_buffer_id|.
 const iree_profile_model_command_buffer_t*
@@ -301,16 +301,16 @@ double iree_profile_model_clock_fit_ns_per_tick(
 double iree_profile_model_clock_fit_tick_frequency_hz(
     const iree_profile_model_clock_fit_t* fit);
 
-// Formats an executable export key into |numeric_buffer| when unnamed.
-iree_string_view_t iree_profile_model_format_export_key(
-    const iree_profile_model_export_t* export_info,
+// Formats an executable function key into |numeric_buffer| when unnamed.
+iree_string_view_t iree_profile_model_format_function_key(
+    const iree_profile_model_function_t* function_info,
     uint32_t physical_device_ordinal, char* numeric_buffer,
     iree_host_size_t numeric_buffer_capacity);
 
-// Resolves an executable/export pair into a human-readable dispatch key.
+// Resolves an executable/function pair into a human-readable dispatch key.
 iree_status_t iree_profile_model_resolve_dispatch_key(
     const iree_profile_model_t* model, uint32_t physical_device_ordinal,
-    uint64_t executable_id, uint32_t export_ordinal, char* numeric_buffer,
+    uint64_t executable_id, uint32_t function_ordinal, char* numeric_buffer,
     iree_host_size_t numeric_buffer_capacity, iree_string_view_t* out_key);
 
 // Resolves a command operation into a human-readable operation key.

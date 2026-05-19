@@ -216,7 +216,7 @@ iree_status_t iree_hal_amdgpu_profile_trace_session_allocate(
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "AMDGPU executable trace profiling requires a capture filter; use an "
-        "export pattern, command buffer/id, physical device, or queue filter "
+        "function pattern, command buffer/id, physical device, or queue filter "
         "to avoid tracing every dispatch");
   }
 #if defined(IREE_SANITIZER_ADDRESS)
@@ -568,7 +568,7 @@ static iree_status_t iree_hal_amdgpu_profile_trace_write_chunk(
   record.executable_id = event->executable_id;
   record.stream_id = iree_hal_amdgpu_host_queue_profile_stream_id(queue);
   record.command_index = event->command_index;
-  record.export_ordinal = event->export_ordinal;
+  record.function_ordinal = event->function_ordinal;
   record.physical_device_ordinal =
       iree_hal_amdgpu_host_queue_profile_device_ordinal(queue);
   record.queue_ordinal =

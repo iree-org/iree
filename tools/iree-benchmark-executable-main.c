@@ -188,6 +188,7 @@ IREE_FLAG_CALLBACK(
 typedef struct iree_benchmark_executable_args_t {
   iree_hal_device_t* device;
   iree_hal_executable_t* executable;
+  iree_hal_executable_function_t function;
   const iree_hal_buffer_ref_t* bindings;
   uint32_t workgroup_count[3];
 } iree_benchmark_executable_args_t;
@@ -236,7 +237,7 @@ static iree_status_t iree_benchmark_executable_run(
       args->workgroup_count[2]);
   for (int32_t i = 0; i < FLAG_batch_size && iree_status_is_ok(status); ++i) {
     status = iree_hal_command_buffer_dispatch(
-        command_buffer, args->executable, FLAG_entry_point, config, constants,
+        command_buffer, args->executable, args->function, config, constants,
         bindings, IREE_HAL_DISPATCH_FLAG_NONE);
     if (iree_status_is_ok(status)) {
       status = iree_hal_command_buffer_execution_barrier(
@@ -342,6 +343,11 @@ static iree_status_t iree_parse_workgroup_count(
 // and input/output buffers.
 static iree_status_t iree_benchmark_executable_from_flags(
     iree_allocator_t host_allocator) {
+  if (FLAG_entry_point < 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--entry_point must be non-negative");
+  }
+
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                                                host_allocator, &instance));
@@ -456,6 +462,8 @@ static iree_status_t iree_benchmark_executable_from_flags(
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_executable_cache_prepare_executable(
       executable_cache, &executable_params, &executable));
+  iree_hal_executable_function_t function =
+      iree_hal_executable_function_from_index((uint32_t)FLAG_entry_point);
 
   // Register one benchmark per workgroup count specified.
   iree_benchmark_executable_args_t* args = NULL;
@@ -466,6 +474,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
     args[i] = (iree_benchmark_executable_args_t){
         .device = device,
         .executable = executable,
+        .function = function,
         .bindings = bindings,
         .workgroup_count = {1, 1, 1},
     };

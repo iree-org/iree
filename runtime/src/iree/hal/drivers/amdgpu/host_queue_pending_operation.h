@@ -151,7 +151,7 @@ struct iree_hal_amdgpu_pending_op_t {
       // Executable retained until the deferred dispatch operation issues.
       iree_hal_executable_t* executable;
       // Export ordinal captured from queue_dispatch.
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      iree_hal_executable_function_t export_ordinal;
       // Dispatch workgroup configuration captured from queue_dispatch.
       iree_hal_dispatch_config_t config;
       // Arena-owned copy of dispatch constants.

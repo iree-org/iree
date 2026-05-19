@@ -312,44 +312,90 @@ iree_status_t iree_hal_hip_native_executable_create(
       iree_hal_hip_ExecutableDef_exports_get(executable_def);
   iree_host_size_t export_count = iree_hal_hip_ExportDef_vec_len(exports_vec);
 
-  // Calculate the total number of characters across all entry point names. This
-  // is only required when tracing so that we can store copies of the names as
-  // the flatbuffer storing the strings may be released while the executable is
-  // still live.
+  // Calculate the total number of characters across all entry point names so
+  // that we can store copies of the names as the flatbuffer storing the strings
+  // may be released while the executable is still live.
+  iree_host_size_t total_export_name_length = 0;
   iree_host_size_t total_export_info_length = 0;
-  IREE_TRACE({
-    for (iree_host_size_t i = 0; i < export_count; ++i) {
-      iree_hal_hip_ExportDef_table_t export_def =
-          iree_hal_hip_ExportDef_vec_at(exports_vec, i);
+  for (iree_host_size_t i = 0; i < export_count; ++i) {
+    iree_hal_hip_ExportDef_table_t export_def =
+        iree_hal_hip_ExportDef_vec_at(exports_vec, i);
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(
+            total_export_name_length,
+            flatbuffers_string_len(
+                iree_hal_hip_ExportDef_kernel_name_get(export_def)),
+            &total_export_name_length))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "export name storage size overflow");
+    }
+    IREE_TRACE({
       total_export_info_length += iree_hal_debug_calculate_export_info_size(
           iree_hal_hip_ExportDef_debug_info_get(export_def));
-    }
-  });
+    });
+  }
 
   // Allocate storage for the executable and its associated data structures.
   iree_hal_hip_native_executable_t* executable = NULL;
+  iree_host_size_t module_table_size = 0;
+  iree_host_size_t export_table_size = 0;
   iree_host_size_t native_executable_device_info_size =
-      sizeof(*executable->per_device_data[0]) +
-      module_count * sizeof(executable->per_device_data[0]->modules[0]) +
-      export_count * sizeof(executable->per_device_data[0]->exports[0]) +
-      total_export_info_length;
+      sizeof(*executable->per_device_data[0]);
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(
+              module_count, sizeof(executable->per_device_data[0]->modules[0]),
+              &module_table_size) ||
+          !iree_host_size_checked_mul(
+              export_count, sizeof(executable->per_device_data[0]->exports[0]),
+              &export_table_size) ||
+          !iree_host_size_checked_add(native_executable_device_info_size,
+                                      export_table_size,
+                                      &native_executable_device_info_size) ||
+          !iree_host_size_checked_add(native_executable_device_info_size,
+                                      module_table_size,
+                                      &native_executable_device_info_size) ||
+          !iree_host_size_checked_add(native_executable_device_info_size,
+                                      total_export_name_length,
+                                      &native_executable_device_info_size) ||
+          !iree_host_size_checked_add(native_executable_device_info_size,
+                                      total_export_info_length,
+                                      &native_executable_device_info_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable storage size overflow");
+  }
+  if (IREE_UNLIKELY(native_executable_device_info_size >
+                    IREE_HOST_SIZE_MAX - iree_max_align_t)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable storage size overflow");
+  }
   native_executable_device_info_size =
       iree_host_align(native_executable_device_info_size, iree_max_align_t);
-  const iree_host_size_t total_size =
-      sizeof(*executable) +
-      topology.count * sizeof(executable->per_device_data[0]) +
-      topology.count * native_executable_device_info_size;
+  iree_host_size_t per_device_data_size = 0;
+  iree_host_size_t native_executable_device_infos_size = 0;
+  iree_host_size_t total_size = sizeof(*executable);
+  if (IREE_UNLIKELY(
+          !iree_host_size_checked_mul(topology.count,
+                                      sizeof(executable->per_device_data[0]),
+                                      &per_device_data_size) ||
+          !iree_host_size_checked_mul(topology.count,
+                                      native_executable_device_info_size,
+                                      &native_executable_device_infos_size) ||
+          !iree_host_size_checked_add(total_size, per_device_data_size,
+                                      &total_size) ||
+          !iree_host_size_checked_add(
+              total_size, native_executable_device_infos_size, &total_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "executable storage size overflow");
+  }
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
       iree_allocator_malloc(host_allocator, total_size, (void**)&executable));
+  memset(executable, 0, total_size);
   iree_hal_resource_initialize(&iree_hal_hip_native_executable_vtable,
                                &executable->resource);
   executable->host_allocator = host_allocator;
   executable->device = device;
   executable->symbols = symbols;
   executable->num_devices = topology.count;
-  const iree_host_size_t per_device_data_size =
-      topology.count * sizeof(executable->per_device_data[0]);
   const uint8_t* per_device_data_location =
       (uint8_t*)executable + sizeof(*executable);
 
@@ -370,14 +416,12 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t j = 0; j < topology.count && iree_status_is_ok(status);
        ++j) {
-    IREE_RETURN_IF_ERROR(IREE_HIP_CALL_TO_STATUS(
-        symbols, hipCtxPushCurrent(topology.devices[j].hip_context)));
-
+    status = IREE_HIP_CALL_TO_STATUS(
+        symbols, hipCtxPushCurrent(topology.devices[j].hip_context));
     if (!iree_status_is_ok(status)) {
-      IREE_RETURN_IF_ERROR(
-          IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL)));
       break;
     }
+
     iree_hal_hip_native_executable_per_device_data_t* per_device_data =
         executable->per_device_data[j];
 
@@ -385,14 +429,15 @@ iree_status_t iree_hal_hip_native_executable_create(
     per_device_data->module_count = module_count;
     per_device_data->modules =
         (hipModule_t*)((uint8_t*)per_device_data + sizeof(*per_device_data) +
-                       (export_count * sizeof(per_device_data->exports[0])));
+                       export_table_size);
     per_device_data->export_count = export_count;
+    char* export_name_ptr = (char*)per_device_data->modules + module_table_size;
     IREE_TRACE(uint8_t* export_info_ptr =
-                   ((uint8_t*)per_device_data->modules +
-                    module_count * sizeof(per_device_data->modules[0])));
+                   (uint8_t*)export_name_ptr + total_export_name_length);
 
     // Load each module first so that exports can reference them.
-    for (iree_host_size_t i = 0; i < module_count; ++i) {
+    for (iree_host_size_t i = 0; i < module_count && iree_status_is_ok(status);
+         ++i) {
       iree_hal_hip_ModuleDef_table_t module_def =
           iree_hal_hip_ModuleDef_vec_at(modules_vec, i);
 
@@ -433,81 +478,82 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
 
       per_device_data->modules[i] = module;
+    }
 
-      if (!iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
+         ++i) {
+      iree_hal_hip_ExportDef_table_t export_def =
+          iree_hal_hip_ExportDef_vec_at(exports_vec, i);
+
+      // Lookup the function in the module; this should always succeed but
+      // we cannot trust that the input was generated by our compiler.
+      uint32_t module_ordinal =
+          iree_hal_hip_ExportDef_module_ordinal_get(export_def);
+      hipModule_t module = per_device_data->modules[module_ordinal];
+      flatbuffers_string_t kernel_name =
+          iree_hal_hip_ExportDef_kernel_name_get(export_def);
+      hipFunction_t function = NULL;
+      status = IREE_HIP_CALL_TO_STATUS(
+          symbols, hipModuleGetFunction(&function, module, kernel_name),
+          "hipModuleGetFunction");
+      if (!iree_status_is_ok(status)) break;
+      if (!function) {
+        status = iree_make_status(IREE_STATUS_NOT_FOUND,
+                                  "exports[%" PRIhsz
+                                  "] kernel `%s` not found in modules[%u]",
+                                  i, kernel_name, module_ordinal);
         break;
       }
-      for (iree_host_size_t i = 0; i < export_count; ++i) {
-        iree_hal_hip_ExportDef_table_t export_def =
-            iree_hal_hip_ExportDef_vec_at(exports_vec, i);
 
-        // Lookup the function in the module; this should always succeed but
-        // we cannot trust that the input was generated by our compiler.
-        uint32_t module_ordinal =
-            iree_hal_hip_ExportDef_module_ordinal_get(export_def);
-        hipModule_t module = per_device_data->modules[module_ordinal];
-        flatbuffers_string_t kernel_name =
-            iree_hal_hip_ExportDef_kernel_name_get(export_def);
-        hipFunction_t function = NULL;
-        status = IREE_HIP_CALL_TO_STATUS(
-            symbols, hipModuleGetFunction(&function, module, kernel_name),
-            "hipModuleGetFunction");
-        if (!iree_status_is_ok(status)) break;
-        if (!function) {
-          status = iree_make_status(IREE_STATUS_NOT_FOUND,
-                                    "exports[%" PRIhsz
-                                    "] kernel `%s` not found in modules[%u]",
-                                    i, kernel_name, module_ordinal);
-          break;
-        }
+      status = iree_hal_hip_function_attributes_verify(i, symbols, function,
+                                                       &limits);
+      if (!iree_status_is_ok(status)) break;
 
-        status = iree_hal_hip_function_attributes_verify(i, symbols, function,
-                                                         &limits);
-        if (!iree_status_is_ok(status)) break;
+      // Package required parameters for kernel launches for each entry point.
+      iree_hal_hip_kernel_params_t* kernel_info = &per_device_data->exports[i];
+      const iree_host_size_t kernel_name_length =
+          flatbuffers_string_len(kernel_name);
+      kernel_info->name =
+          iree_make_string_view(export_name_ptr, kernel_name_length);
+      memcpy(export_name_ptr, kernel_name, kernel_name_length);
+      export_name_ptr += kernel_name_length;
+      kernel_info->function = function;
+      const iree_hal_hip_BlockDims_t* block_dims =
+          iree_hal_hip_ExportDef_block_dims_get(export_def);
+      kernel_info->block_dims[0] = block_dims->x;
+      kernel_info->block_dims[1] = block_dims->y;
+      kernel_info->block_dims[2] = block_dims->z;
+      kernel_info->constant_count =
+          iree_hal_hip_ExportDef_constant_count_get(export_def);
+      iree_hal_hip_BindingBits_vec_t binding_flags_vec =
+          iree_hal_hip_ExportDef_binding_flags_get(export_def);
+      kernel_info->binding_count =
+          iree_hal_hip_BindingBits_vec_len(binding_flags_vec);
 
-        // Package required parameters for kernel launches for each entry
-        // point.
-        iree_hal_hip_kernel_params_t* kernel_info =
-            &per_device_data->exports[i];
-        kernel_info->function = function;
-        const iree_hal_hip_BlockDims_t* block_dims =
-            iree_hal_hip_ExportDef_block_dims_get(export_def);
-        kernel_info->block_dims[0] = block_dims->x;
-        kernel_info->block_dims[1] = block_dims->y;
-        kernel_info->block_dims[2] = block_dims->z;
-        kernel_info->constant_count =
-            iree_hal_hip_ExportDef_constant_count_get(export_def);
-        iree_hal_hip_BindingBits_vec_t binding_flags_vec =
-            iree_hal_hip_ExportDef_binding_flags_get(export_def);
-        kernel_info->binding_count =
-            iree_hal_hip_BindingBits_vec_len(binding_flags_vec);
-
-        if (iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def) !=
-            0) {
-          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                    "exports[%" PRIhsz
-                                    "] for kernel `%s` specified non-zero "
-                                    "deprecated field block_shared_memory_size "
-                                    "in modules[%u]. Verify matching compiler "
-                                    "and runtime versions.",
-                                    i, kernel_name, module_ordinal);
-          break;
-        }
-
-        IREE_TRACE({
-          iree_hal_debug_export_info_t* export_info =
-              (iree_hal_debug_export_info_t*)export_info_ptr;
-          export_info_ptr += iree_hal_debug_copy_export_info(
-              iree_hal_hip_ExportDef_debug_info_get(export_def), export_info);
-          kernel_info->debug_info.function_name = export_info->function_name;
-          kernel_info->debug_info.source_filename =
-              export_info->source_filename;
-          kernel_info->debug_info.source_line = export_info->source_line;
-        });
+      if (iree_hal_hip_ExportDef_block_shared_memory_size_get(export_def) !=
+          0) {
+        status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "exports[%" PRIhsz
+                                  "] for kernel `%s` specified non-zero "
+                                  "deprecated field block_shared_memory_size "
+                                  "in modules[%u]. Verify matching compiler "
+                                  "and runtime versions.",
+                                  i, kernel_name, module_ordinal);
+        break;
       }
+
+      IREE_TRACE({
+        iree_hal_debug_export_info_t* export_info =
+            (iree_hal_debug_export_info_t*)export_info_ptr;
+        export_info_ptr += iree_hal_debug_copy_export_info(
+            iree_hal_hip_ExportDef_debug_info_get(export_def), export_info);
+        kernel_info->debug_info.function_name = export_info->function_name;
+        kernel_info->debug_info.source_filename = export_info->source_filename;
+        kernel_info->debug_info.source_line = export_info->source_line;
+      });
     }
-    IREE_RETURN_IF_ERROR(
-        IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL)));
+    status = iree_status_join(
+        status, IREE_HIP_CALL_TO_STATUS(symbols, hipCtxPopCurrent(NULL)));
   }
 
   if (iree_status_is_ok(status)) {
@@ -545,7 +591,7 @@ static void iree_hal_hip_native_executable_destroy(
 
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t ordinal,
+    iree_hal_executable_function_t function,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params) {
   *out_params = NULL;
@@ -555,20 +601,22 @@ iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
   if (queue_affinity) {
     device_ordinal = iree_math_count_trailing_zeros_u64(queue_affinity);
   }
-  if (device_ordinal > executable->num_devices) {
+  if (device_ordinal >= executable->num_devices) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "affinity for non-existent queue was provided.");
   }
 
   const iree_hal_hip_native_executable_per_device_data_t* data =
       executable->per_device_data[device_ordinal];
-  if (ordinal >= data->export_count) {
-    return iree_make_status(
-        IREE_STATUS_OUT_OF_RANGE,
-        "export ordinal %d out of range; executable contains %" PRIhsz
-        " exports",
-        ordinal, data->export_count);
+  if (!iree_hal_executable_function_is_index_in_range(function,
+                                                      data->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range; executable contains %" PRIhsz
+                            " exports",
+                            function.value, data->export_count);
   }
+  const uint32_t ordinal = iree_hal_executable_function_index(function);
   *out_params = &data->exports[ordinal];
   return iree_ok_status();
 }
@@ -577,28 +625,30 @@ static iree_host_size_t iree_hal_hip_native_executable_export_count(
     iree_hal_executable_t* base_executable) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
-  // TODO(hip): return the total number of exports in the executable.
-  (void)executable;
-  return 0;
+  return executable->per_device_data[0]->export_count;
 }
 
 static iree_status_t iree_hal_hip_native_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
-  iree_hal_hip_native_executable_t* executable =
-      iree_hal_hip_native_executable_cast(base_executable);
-  (void)executable;
-  // TODO(hip): return export information from kernel metadata.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "reflection not implemented");
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
+  const iree_hal_hip_kernel_params_t* kernel_params = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_hip_native_executable_lookup_kernel_params(
+      base_executable, function, /*queue_affinity=*/0, &kernel_params));
+  memset(out_info, 0, sizeof(*out_info));
+  out_info->name = kernel_params->name;
+  out_info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
+  out_info->constant_count = (uint16_t)kernel_params->constant_count;
+  out_info->binding_count = (uint16_t)kernel_params->binding_count;
+  memcpy(out_info->workgroup_size, kernel_params->block_dims,
+         sizeof(out_info->workgroup_size));
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_hip_native_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
   (void)executable;
@@ -609,13 +659,21 @@ static iree_status_t iree_hal_hip_native_executable_export_parameters(
 
 static iree_status_t iree_hal_hip_native_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
-  (void)executable;
-  // TODO(hip): lookup the export ordinal by name.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "reflection not implemented");
+  const iree_hal_hip_native_executable_per_device_data_t* data =
+      executable->per_device_data[0];
+  for (iree_host_size_t i = 0; i < data->export_count; ++i) {
+    if (iree_string_view_equal(data->exports[i].name, name)) {
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
+      return iree_ok_status();
+    }
+  }
+  return iree_make_status(IREE_STATUS_NOT_FOUND,
+                          "function '%.*s' not found in executable",
+                          (int)name.size, name.data);
 }
 
 #define IREE_HAL_HIP_MAX_STACK_GLOBAL_NAME_LENGTH ((iree_host_size_t)(4 * 1024))
@@ -743,10 +801,10 @@ static iree_status_t iree_hal_hip_native_executable_lookup_global_by_name(
 static const iree_hal_executable_vtable_t
     iree_hal_hip_native_executable_vtable = {
         .destroy = iree_hal_hip_native_executable_destroy,
-        .export_count = iree_hal_hip_native_executable_export_count,
-        .export_info = iree_hal_hip_native_executable_export_info,
-        .export_parameters = iree_hal_hip_native_executable_export_parameters,
-        .lookup_export_by_name =
+        .function_count = iree_hal_hip_native_executable_export_count,
+        .function_info = iree_hal_hip_native_executable_export_info,
+        .function_parameters = iree_hal_hip_native_executable_export_parameters,
+        .lookup_function_by_name =
             iree_hal_hip_native_executable_lookup_export_by_name,
         .lookup_global_by_name =
             iree_hal_hip_native_executable_lookup_global_by_name,

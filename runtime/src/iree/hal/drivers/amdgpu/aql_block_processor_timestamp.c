@@ -185,7 +185,7 @@ static void iree_hal_amdgpu_aql_block_processor_timestamp_emit_dispatches(
     record->executable_id = dispatch->metadata.executable_id;
     record->block_ordinal = dispatch->metadata.block_ordinal;
     record->command_index = dispatch->metadata.command_index;
-    record->export_ordinal = dispatch->metadata.export_ordinal;
+    record->function_ordinal = dispatch->metadata.function_ordinal;
     record->flags = dispatch->metadata.flags;
 
     iree_hal_amdgpu_aql_packet_t* packet = iree_hal_amdgpu_aql_ring_packet(
@@ -263,7 +263,7 @@ iree_hal_amdgpu_aql_block_processor_timestamp_dispatch_list_initialize(
     dispatch->metadata.executable_id = summary->metadata.executable_id;
     dispatch->metadata.block_ordinal = params->metadata.block_ordinal;
     dispatch->metadata.command_index = summary->metadata.command_index;
-    dispatch->metadata.export_ordinal = summary->metadata.export_ordinal;
+    dispatch->metadata.function_ordinal = summary->metadata.function_ordinal;
     dispatch->metadata.flags =
         iree_hal_amdgpu_aql_block_processor_timestamp_dispatch_flags(summary);
     dispatch->target.completion_signal =

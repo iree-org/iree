@@ -92,7 +92,7 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindings) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -133,7 +133,7 @@ TEST_P(QueueDispatchTest, DispatchWithBorrowedResourceLifetimes) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -185,7 +185,7 @@ TEST_P(QueueDispatchTest, DispatchWithConstantsAndBindingsWhileProfiling) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -252,7 +252,7 @@ TEST_P(QueueDispatchTest, DispatchHostQueueEventProfiling) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -290,7 +290,7 @@ TEST_P(QueueDispatchTest, DispatchHostQueueEventProfiling) {
       });
   ASSERT_NE(sink.host_execution_events.end(), host_event_it);
   EXPECT_EQ(IREE_STATUS_OK, host_event_it->status_code);
-  EXPECT_EQ(0u, host_event_it->export_ordinal);
+  EXPECT_EQ(0u, host_event_it->function_ordinal);
   EXPECT_EQ(queue_event_it->submission_id, host_event_it->submission_id);
   EXPECT_GE(host_event_it->end_host_time_ns, host_event_it->start_host_time_ns);
 }
@@ -338,7 +338,7 @@ TEST_P(QueueDispatchTest, DispatchDeviceQueueEventProfiling) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -378,8 +378,8 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
       IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
   profiling_options.sink = TestProfileSinkAsBase(&sink);
   profiling_options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-  profiling_options.capture_filter.executable_export_pattern =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+  profiling_options.capture_filter.executable_function_pattern =
       IREE_SV("iree-hal-cts-never-matches-*");
   DeviceProfilingScope profiling(device_);
   iree_status_t profiling_status = profiling.Begin(&profiling_options);
@@ -416,7 +416,7 @@ TEST_P(QueueDispatchTest, DispatchProfileFilterCanSkipDirectDispatchEvents) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -464,7 +464,7 @@ TEST_P(QueueDispatchTest, NoopDispatchSignalsAndDoesNotTouchBuffers) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(0, 0, 0), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
@@ -504,7 +504,7 @@ TEST_P(QueueDispatchTest, DeferredNoopDispatch) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, dispatch_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(0, 0, 0), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
 
@@ -552,7 +552,7 @@ TEST_P(QueueDispatchTest, DeferredWaitBeforeSignalDispatch) {
   SemaphoreList dispatch_signal(device_, {0}, {1});
   IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
       device_, IREE_HAL_QUEUE_AFFINITY_ANY, dispatch_wait, dispatch_signal,
-      executable_, /*export_ordinal=*/0,
+      executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
 
@@ -660,8 +660,8 @@ class QueueDispatchIndirectParametersTest : public CtsTestBase<> {
     SemaphoreList dispatch_signal(device_, {0}, {1});
     IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, update_signal, dispatch_signal,
-        executable_, /*export_ordinal=*/0, config, iree_const_byte_span_empty(),
-        bindings, flags));
+        executable_, iree_hal_executable_function_from_index(0), config,
+        iree_const_byte_span_empty(), bindings, flags));
     IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
         dispatch_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
 

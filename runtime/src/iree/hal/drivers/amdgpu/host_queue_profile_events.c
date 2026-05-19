@@ -300,7 +300,7 @@ iree_status_t iree_hal_amdgpu_host_queue_reserve_profile_dispatch_events(
       event->record_length = sizeof(*event);
       event->event_id = queue->profiling.dispatch_events.next_event_id++;
       event->command_index = UINT32_MAX;
-      event->export_ordinal = UINT32_MAX;
+      event->function_ordinal = UINT32_MAX;
     }
   } else {
     is_exhausted = true;
@@ -485,7 +485,7 @@ static iree_status_t iree_hal_amdgpu_host_queue_copy_dispatch_events(
     target->command_buffer_id = source->command_buffer_id;
     target->executable_id = source->executable_id;
     target->command_index = source->command_index;
-    target->export_ordinal = source->export_ordinal;
+    target->function_ordinal = source->function_ordinal;
     memcpy(target->workgroup_count, source->workgroup_count,
            sizeof(target->workgroup_count));
     memcpy(target->workgroup_size, source->workgroup_size,

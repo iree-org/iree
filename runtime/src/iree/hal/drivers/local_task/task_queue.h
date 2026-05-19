@@ -234,7 +234,7 @@ struct iree_hal_task_queue_op_t {
     } update;
     struct {
       iree_hal_executable_t* executable;
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      iree_hal_executable_function_t export_ordinal;
       iree_hal_dispatch_config_t config;
       // Constants arena-allocated (pointer into operation arena).
       const uint32_t* constants;
@@ -633,7 +633,7 @@ iree_status_t iree_hal_task_queue_submit_update(
 
 iree_status_t iree_hal_task_queue_submit_dispatch(
     iree_hal_task_queue_t* queue, iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_t* bindings, iree_host_size_t binding_count,
     iree_hal_dispatch_flags_t flags, iree_hal_semaphore_list_t wait_semaphores,

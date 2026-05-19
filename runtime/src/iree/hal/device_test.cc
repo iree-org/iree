@@ -141,10 +141,10 @@ TEST_F(DeviceProfilingTest, BeginRejectsReservedCaptureFilterFields) {
                         Begin(&profiling_options));
 }
 
-TEST_F(DeviceProfilingTest, BeginRejectsEmptyExecutableExportFilter) {
+TEST_F(DeviceProfilingTest, BeginRejectsEmptyExecutableFunctionFilter) {
   iree_hal_device_profiling_options_t profiling_options = {0};
   profiling_options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         Begin(&profiling_options));
 }
@@ -266,7 +266,7 @@ TEST_F(DeviceProfilingTest, BeginLightweightStatisticsReachesBackend) {
 }
 
 TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
-  std::string executable_export_pattern = "scale_*";
+  std::string executable_function_pattern = "scale_*";
   std::string counter_set_name = "set0";
   std::string counter_name0 = "counter0";
   std::string counter_name1 = "counter1";
@@ -284,10 +284,10 @@ TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   iree_hal_device_profiling_options_t source_options = {0};
   source_options.flags = IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
   source_options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-  source_options.capture_filter.executable_export_pattern =
-      iree_make_string_view(executable_export_pattern.data(),
-                            executable_export_pattern.size());
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+  source_options.capture_filter.executable_function_pattern =
+      iree_make_string_view(executable_function_pattern.data(),
+                            executable_function_pattern.size());
   source_options.counter_set_count = 1;
   source_options.counter_sets = &counter_set;
 
@@ -297,7 +297,7 @@ TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
       &source_options, iree_allocator_system(), &cloned_options, &storage));
   ASSERT_NE(nullptr, storage);
 
-  executable_export_pattern.assign("changed_*");
+  executable_function_pattern.assign("changed_*");
   counter_set_name.assign("changed_set");
   counter_name0.assign("changed0");
   counter_name1.assign("changed1");
@@ -305,7 +305,7 @@ TEST(DeviceProfilingOptionsTest, CloneOwnsBorrowedStringsAndArrays) {
   EXPECT_EQ(cloned_options.flags,
             IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS);
   EXPECT_TRUE(iree_string_view_equal(
-      cloned_options.capture_filter.executable_export_pattern,
+      cloned_options.capture_filter.executable_function_pattern,
       IREE_SV("scale_*")));
   ASSERT_NE(source_options.counter_sets, cloned_options.counter_sets);
   EXPECT_TRUE(iree_string_view_equal(cloned_options.counter_sets[0].name,

@@ -55,8 +55,8 @@ EXPORT_FN("command_buffer.begin_debug_group", iree_hal_module_command_buffer_beg
 EXPORT_FN("command_buffer.collective", iree_hal_module_command_buffer_collective, rriiiirrIIIII, v)
 EXPORT_FN("command_buffer.copy_buffer", iree_hal_module_command_buffer_copy_buffer, riirIrIII, v)
 EXPORT_FN("command_buffer.create", iree_hal_module_command_buffer_create, riiIi, r)
-EXPORT_FN_CUSTOM("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rriiiiICiDCiirIID, v)
-EXPORT_FN_CUSTOM("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dispatch_indirect, rriirIICiDCiirIID, v)
+EXPORT_FN_CUSTOM("command_buffer.dispatch", iree_hal_module_command_buffer_dispatch, rrIiiiICiDCiirIID, v)
+EXPORT_FN_CUSTOM("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dispatch_indirect, rrIirIICiDCiirIID, v)
 EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_debug_group, r, v)
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riiI, v)
 EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rrIIiIiI, v)
@@ -83,6 +83,7 @@ EXPORT_FN("devices.get", iree_hal_module_devices_get, i, r)
 EXPORT_FN("ex.file.from_memory", iree_hal_module_ex_file_from_memory, rIirIIi, r)
 
 EXPORT_FN("executable.create", iree_hal_module_executable_create, rIrrr, r)
+EXPORT_FN("executable.lookup.function", iree_hal_module_executable_lookup_function, rr, I)
 
 EXPORT_FN("fence.await", iree_hal_module_fence_await, iICrD, i)
 EXPORT_FN("fence.create", iree_hal_module_fence_create, rI, r)

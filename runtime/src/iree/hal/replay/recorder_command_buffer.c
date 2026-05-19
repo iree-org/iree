@@ -789,8 +789,7 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_collective(
 
 static iree_status_t iree_hal_replay_recorder_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -801,7 +800,8 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_dispatch(
   memset(&payload, 0, sizeof(payload));
   payload.executable_id =
       iree_hal_replay_recorder_executable_id_or_none(executable);
-  payload.export_ordinal = export_ordinal;
+  IREE_RETURN_IF_ERROR(iree_hal_replay_recorder_executable_recorded_ordinal(
+      executable, function, &payload.function_ordinal));
   payload.flags = flags;
   memcpy(payload.workgroup_size, config.workgroup_size,
          sizeof(payload.workgroup_size));
@@ -887,7 +887,7 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_dispatch(
         iree_hal_command_buffer_dispatch(
             command_buffer->base_command_buffer,
             iree_hal_replay_recorder_executable_base_or_self(executable),
-            export_ordinal, config, constants, base_bindings, flags),
+            function, config, constants, base_bindings, flags),
         IREE_ARRAYSIZE(iovecs), iovecs);
   }
 

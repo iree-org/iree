@@ -36,14 +36,14 @@ typedef struct iree_profile_att_code_object_load_t {
   uint64_t load_size;
 } iree_profile_att_code_object_load_t;
 
-typedef struct iree_profile_att_export_t {
-  // Producer-local executable identifier that owns this export.
+typedef struct iree_profile_att_function_t {
+  // Producer-local executable identifier that owns this function.
   uint64_t executable_id;
-  // Export ordinal referenced by dispatch and trace records.
-  uint32_t export_ordinal;
-  // Borrowed export name bytes from the mapped profile bundle.
+  // Function ordinal referenced by dispatch and trace records.
+  uint32_t function_ordinal;
+  // Borrowed function name bytes from the mapped profile bundle.
   iree_string_view_t name;
-} iree_profile_att_export_t;
+} iree_profile_att_function_t;
 
 typedef struct iree_profile_att_dispatch_t {
   // Dispatch event record copied from the profile bundle.
@@ -78,12 +78,12 @@ typedef struct iree_profile_att_profile_t {
   iree_host_size_t code_object_load_count;
   // Capacity of |code_object_loads| in entries.
   iree_host_size_t code_object_load_capacity;
-  // Dynamic array of executable export names.
-  iree_profile_att_export_t* exports;
-  // Number of valid entries in |exports|.
-  iree_host_size_t export_count;
-  // Capacity of |exports| in entries.
-  iree_host_size_t export_capacity;
+  // Dynamic array of executable function names.
+  iree_profile_att_function_t* functions;
+  // Number of valid entries in |functions|.
+  iree_host_size_t function_count;
+  // Capacity of |functions| in entries.
+  iree_host_size_t function_capacity;
   // Dynamic array of dispatch events.
   iree_profile_att_dispatch_t* dispatches;
   // Number of valid entries in |dispatches|.
@@ -112,8 +112,8 @@ iree_status_t iree_profile_att_profile_parse_record(
 
 // Opens |path| and indexes ATT-relevant records into |profile|.
 //
-// Borrowed code-object, export-name, and trace payload spans remain valid until
-// |profile| is deinitialized.
+// Borrowed code-object, function-name, and trace payload spans remain valid
+// until |profile| is deinitialized.
 iree_status_t iree_profile_att_profile_parse_file(
     iree_string_view_t path, iree_profile_att_profile_t* profile);
 
@@ -121,9 +121,9 @@ const iree_profile_att_code_object_t* iree_profile_att_profile_find_code_object(
     const iree_profile_att_profile_t* profile, uint64_t executable_id,
     uint64_t code_object_id);
 
-const iree_profile_att_export_t* iree_profile_att_profile_find_export(
+const iree_profile_att_function_t* iree_profile_att_profile_find_function(
     const iree_profile_att_profile_t* profile, uint64_t executable_id,
-    uint32_t export_ordinal);
+    uint32_t function_ordinal);
 
 const iree_profile_att_dispatch_t* iree_profile_att_profile_find_dispatch(
     const iree_profile_att_profile_t* profile,

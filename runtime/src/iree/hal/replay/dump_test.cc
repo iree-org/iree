@@ -149,20 +149,24 @@ static std::vector<uint8_t> MakeExecutablePrepareReplayFileStorage() {
   const uint8_t executable_data[] = {0x00, 0x01, 0x02, 0x03};
   const uint32_t constants[] = {0xABCD1234u};
   iree_hal_replay_executable_metadata_header_t metadata_header = {};
-  metadata_header.export_count = 1;
-  iree_hal_replay_executable_export_metadata_t export_metadata = {};
-  export_metadata.binding_count = 2;
-  export_metadata.workgroup_size[0] = 3;
-  export_metadata.workgroup_size[1] = 1;
-  export_metadata.workgroup_size[2] = 1;
+  metadata_header.function_count = 1;
+  const char function_name[] = "main";
+  metadata_header.function_name_storage_length = sizeof(function_name) - 1;
+  iree_hal_replay_executable_function_metadata_t function_metadata = {};
+  function_metadata.binding_count = 2;
+  function_metadata.workgroup_size[0] = 3;
+  function_metadata.workgroup_size[1] = 1;
+  function_metadata.workgroup_size[2] = 1;
+  function_metadata.name_length = sizeof(function_name) - 1;
   iree_hal_replay_executable_prepare_payload_t payload = {};
   payload.queue_affinity = 0x1234;
   payload.executable_data_length = sizeof(executable_data);
   payload.constant_count = IREE_ARRAYSIZE(constants);
   payload.caching_mode = IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
   payload.executable_format_length = sizeof(executable_format) - 1;
-  payload.executable_metadata_length =
-      sizeof(metadata_header) + sizeof(export_metadata);
+  payload.executable_metadata_length = sizeof(metadata_header) +
+                                       sizeof(function_metadata) +
+                                       sizeof(function_name) - 1;
   iree_const_byte_span_t iovecs[] = {
       iree_make_const_byte_span(&payload, sizeof(payload)),
       iree_make_const_byte_span(executable_format,
@@ -170,7 +174,8 @@ static std::vector<uint8_t> MakeExecutablePrepareReplayFileStorage() {
       iree_make_const_byte_span(executable_data, sizeof(executable_data)),
       iree_make_const_byte_span(constants, sizeof(constants)),
       iree_make_const_byte_span(&metadata_header, sizeof(metadata_header)),
-      iree_make_const_byte_span(&export_metadata, sizeof(export_metadata)),
+      iree_make_const_byte_span(&function_metadata, sizeof(function_metadata)),
+      iree_make_const_byte_span(function_name, sizeof(function_name) - 1),
   };
   iree_hal_replay_file_record_metadata_t metadata = {};
   metadata.sequence_ordinal = 0;
@@ -198,7 +203,7 @@ TEST(ReplayDumpTest, EmitsTextSummary) {
   IREE_ASSERT_OK(
       DumpReplayToString(MakeReplayFileContents(storage), &options, &output));
 
-  EXPECT_THAT(output, HasSubstr("IREE HAL replay v1.0"));
+  EXPECT_THAT(output, HasSubstr("IREE HAL replay v2.0"));
   EXPECT_THAT(output, HasSubstr("summary:"));
   EXPECT_THAT(output, HasSubstr("hermetic: yes"));
   EXPECT_THAT(output, HasSubstr("strict_replay_supported: yes"));
@@ -268,7 +273,7 @@ TEST(ReplayDumpTest, EmitsExecutableMetadataRanges) {
 
   EXPECT_THAT(text_output, HasSubstr("payload=executable_prepare"));
   EXPECT_THAT(text_output, HasSubstr("metadata_range=["));
-  EXPECT_THAT(text_output, HasSubstr("metadata_exports=1"));
+  EXPECT_THAT(text_output, HasSubstr("metadata_functions=1"));
   EXPECT_THAT(text_output, HasSubstr("metadata_parameters=0"));
 
   options.format = IREE_HAL_REPLAY_DUMP_FORMAT_JSONL;
@@ -278,7 +283,7 @@ TEST(ReplayDumpTest, EmitsExecutableMetadataRanges) {
 
   EXPECT_THAT(jsonl_output, HasSubstr("\"executable_metadata_length\":"));
   EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_range\""));
-  EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_export_count\":1"));
+  EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_function_count\":1"));
   EXPECT_THAT(jsonl_output, HasSubstr("\"metadata_parameter_count\":0"));
 }
 

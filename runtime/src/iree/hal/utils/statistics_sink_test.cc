@@ -39,11 +39,11 @@ static CollectedRows CollectRows(
 
 static const iree_hal_profile_statistics_row_t* FindRow(
     const CollectedRows& rows, iree_hal_profile_statistics_row_type_t row_type,
-    uint64_t executable_id, uint32_t export_ordinal, uint64_t command_buffer_id,
-    uint32_t command_index, uint32_t event_type) {
+    uint64_t executable_id, uint32_t function_ordinal,
+    uint64_t command_buffer_id, uint32_t command_index, uint32_t event_type) {
   for (const auto& row : rows.rows) {
     if (row.row_type == row_type && row.executable_id == executable_id &&
-        row.export_ordinal == export_ordinal &&
+        row.function_ordinal == function_ordinal &&
         row.command_buffer_id == command_buffer_id &&
         row.command_index == command_index && row.event_type == event_type) {
       return &row;
@@ -65,24 +65,24 @@ static void WriteChunk(iree_hal_profile_sink_t* sink,
   IREE_ASSERT_OK(iree_hal_profile_sink_write(sink, &metadata, 1, &iovec));
 }
 
-static std::vector<uint8_t> MakeExportRecord(uint64_t executable_id,
-                                             uint32_t export_ordinal,
-                                             const char* name) {
+static std::vector<uint8_t> MakeFunctionRecord(uint64_t executable_id,
+                                               uint32_t function_ordinal,
+                                               const char* name) {
   const iree_host_size_t name_length = strlen(name);
   std::vector<uint8_t> storage(
-      sizeof(iree_hal_profile_executable_export_record_t) + name_length);
-  iree_hal_profile_executable_export_record_t record =
-      iree_hal_profile_executable_export_record_default();
+      sizeof(iree_hal_profile_executable_function_record_t) + name_length);
+  iree_hal_profile_executable_function_record_t record =
+      iree_hal_profile_executable_function_record_default();
   record.record_length = static_cast<uint32_t>(storage.size());
   record.executable_id = executable_id;
-  record.export_ordinal = export_ordinal;
+  record.function_ordinal = function_ordinal;
   record.name_length = static_cast<uint32_t>(name_length);
   memcpy(storage.data(), &record, sizeof(record));
   memcpy(storage.data() + sizeof(record), name, name_length);
   return storage;
 }
 
-TEST(StatisticsSinkTest, AggregatesDispatchEventsByExport) {
+TEST(StatisticsSinkTest, AggregatesDispatchEventsByFunction) {
   iree_hal_profile_statistics_sink_t* statistics_sink = nullptr;
   IREE_ASSERT_OK(iree_hal_profile_statistics_sink_create(
       iree_allocator_system(), &statistics_sink));
@@ -94,11 +94,11 @@ TEST(StatisticsSinkTest, AggregatesDispatchEventsByExport) {
   session_metadata.content_type = IREE_HAL_PROFILE_CONTENT_TYPE_SESSION;
   IREE_ASSERT_OK(iree_hal_profile_sink_begin_session(sink, &session_metadata));
 
-  std::vector<uint8_t> export_record = MakeExportRecord(
-      /*executable_id=*/7, /*export_ordinal=*/3, "kernel_main");
-  WriteChunk(sink, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
+  std::vector<uint8_t> function_record = MakeFunctionRecord(
+      /*executable_id=*/7, /*function_ordinal=*/3, "kernel_main");
+  WriteChunk(sink, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS,
              /*physical_device_ordinal=*/0, /*queue_ordinal=*/0,
-             export_record.data(), export_record.size());
+             function_record.data(), function_record.size());
 
   iree_hal_profile_clock_correlation_record_t clock_samples[2];
   clock_samples[0] = iree_hal_profile_clock_correlation_record_default();
@@ -124,12 +124,12 @@ TEST(StatisticsSinkTest, AggregatesDispatchEventsByExport) {
   iree_hal_profile_dispatch_event_t events[2];
   events[0] = iree_hal_profile_dispatch_event_default();
   events[0].executable_id = 7;
-  events[0].export_ordinal = 3;
+  events[0].function_ordinal = 3;
   events[0].start_tick = 10;
   events[0].end_tick = 30;
   events[1] = iree_hal_profile_dispatch_event_default();
   events[1].executable_id = 7;
-  events[1].export_ordinal = 3;
+  events[1].function_ordinal = 3;
   events[1].start_tick = 35;
   events[1].end_tick = 45;
   WriteChunk(sink, IREE_HAL_PROFILE_CONTENT_TYPE_DISPATCH_EVENTS,
@@ -139,8 +139,8 @@ TEST(StatisticsSinkTest, AggregatesDispatchEventsByExport) {
   CollectedRows rows = CollectRows(statistics_sink);
   ASSERT_EQ(rows.rows.size(), 1u);
   const iree_hal_profile_statistics_row_t* row = FindRow(
-      rows, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_EXPORT,
-      /*executable_id=*/7, /*export_ordinal=*/3, /*command_buffer_id=*/0,
+      rows, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_DISPATCH_FUNCTION,
+      /*executable_id=*/7, /*function_ordinal=*/3, /*command_buffer_id=*/0,
       /*command_index=*/UINT32_MAX, /*event_type=*/0);
   ASSERT_NE(row, nullptr);
   EXPECT_EQ(row->time_domain,
@@ -159,8 +159,8 @@ TEST(StatisticsSinkTest, AggregatesDispatchEventsByExport) {
   EXPECT_EQ(total_duration_ns, 150u);
 
   iree_string_view_t name = iree_string_view_empty();
-  ASSERT_TRUE(iree_hal_profile_statistics_sink_find_export_name(
-      statistics_sink, /*executable_id=*/7, /*export_ordinal=*/3, &name));
+  ASSERT_TRUE(iree_hal_profile_statistics_sink_find_function_name(
+      statistics_sink, /*executable_id=*/7, /*function_ordinal=*/3, &name));
   EXPECT_TRUE(iree_string_view_equal(name, IREE_SV("kernel_main")));
 
   iree_hal_profile_statistics_sink_release(statistics_sink);
@@ -182,7 +182,7 @@ TEST(StatisticsSinkTest, AggregatesHostAndQueueDeviceEvents) {
       iree_hal_profile_host_execution_event_default();
   host_event.type = IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_DISPATCH;
   host_event.executable_id = 5;
-  host_event.export_ordinal = 2;
+  host_event.function_ordinal = 2;
   host_event.command_buffer_id = 11;
   host_event.command_index = 4;
   host_event.physical_device_ordinal = 0;
@@ -212,19 +212,19 @@ TEST(StatisticsSinkTest, AggregatesHostAndQueueDeviceEvents) {
              sizeof(queue_event));
 
   CollectedRows rows = CollectRows(statistics_sink);
-  const iree_hal_profile_statistics_row_t* export_row = FindRow(
-      rows, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_EXPORT,
-      /*executable_id=*/5, /*export_ordinal=*/2, /*command_buffer_id=*/0,
+  const iree_hal_profile_statistics_row_t* function_row = FindRow(
+      rows, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION,
+      /*executable_id=*/5, /*function_ordinal=*/2, /*command_buffer_id=*/0,
       /*command_index=*/UINT32_MAX, /*event_type=*/0);
-  ASSERT_NE(export_row, nullptr);
-  EXPECT_EQ(export_row->total_duration, 60u);
-  EXPECT_EQ(export_row->tile_count, 3u);
-  EXPECT_EQ(export_row->tile_duration_sum_ns, 90u);
+  ASSERT_NE(function_row, nullptr);
+  EXPECT_EQ(function_row->total_duration, 60u);
+  EXPECT_EQ(function_row->tile_count, 3u);
+  EXPECT_EQ(function_row->tile_duration_sum_ns, 90u);
 
   const iree_hal_profile_statistics_row_t* command_row = FindRow(
       rows,
       IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_COMMAND_OPERATION,
-      /*executable_id=*/5, /*export_ordinal=*/2, /*command_buffer_id=*/11,
+      /*executable_id=*/5, /*function_ordinal=*/2, /*command_buffer_id=*/11,
       /*command_index=*/4, /*event_type=*/0);
   ASSERT_NE(command_row, nullptr);
   EXPECT_EQ(command_row->sample_count, 1u);
@@ -232,7 +232,7 @@ TEST(StatisticsSinkTest, AggregatesHostAndQueueDeviceEvents) {
 
   const iree_hal_profile_statistics_row_t* queue_row =
       FindRow(rows, IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_QUEUE_DEVICE_OPERATION,
-              /*executable_id=*/0, /*export_ordinal=*/UINT32_MAX,
+              /*executable_id=*/0, /*function_ordinal=*/UINT32_MAX,
               /*command_buffer_id=*/11, /*command_index=*/UINT32_MAX,
               IREE_HAL_PROFILE_QUEUE_EVENT_TYPE_EXECUTE);
   ASSERT_NE(queue_row, nullptr);

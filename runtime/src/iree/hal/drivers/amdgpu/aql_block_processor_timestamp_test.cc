@@ -246,7 +246,7 @@ TEST(AqlBlockProcessorTimestampTest,
   dispatch.metadata.executable_id = 0xFEED;
   dispatch.metadata.block_ordinal = 9;
   dispatch.metadata.command_index = block.dispatch_command.header.command_index;
-  dispatch.metadata.export_ordinal = 4;
+  dispatch.metadata.function_ordinal = 4;
   dispatch.target.completion_signal = &completion_signal;
   dispatch.target.record = &record;
 
@@ -278,7 +278,7 @@ TEST(AqlBlockProcessorTimestampTest,
   EXPECT_EQ(record.executable_id, 0xFEEDull);
   EXPECT_EQ(record.block_ordinal, 9u);
   EXPECT_EQ(record.command_index, block.dispatch_command.header.command_index);
-  EXPECT_EQ(record.export_ordinal, 4u);
+  EXPECT_EQ(record.function_ordinal, 4u);
   EXPECT_EQ(record.flags, IREE_HAL_AMDGPU_DISPATCH_TIMESTAMP_RECORD_FLAG_NONE);
   EXPECT_EQ(record.ticks.start_tick, 0u);
   EXPECT_EQ(record.ticks.end_tick, 0u);
@@ -306,14 +306,14 @@ TEST(AqlBlockProcessorTimestampTest,
   summaries[0].packets.dispatch_ordinal = 0;
   summaries[0].metadata.executable_id = 0xA0;
   summaries[0].metadata.command_index = 12;
-  summaries[0].metadata.export_ordinal = 2;
+  summaries[0].metadata.function_ordinal = 2;
   summaries[0].metadata.dispatch_flags =
       IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE;
   summaries[1].packets.first_ordinal = 1;
   summaries[1].packets.dispatch_ordinal = 2;
   summaries[1].metadata.executable_id = 0xB0;
   summaries[1].metadata.command_index = 13;
-  summaries[1].metadata.export_ordinal = 4;
+  summaries[1].metadata.function_ordinal = 4;
   summaries[1].metadata.dispatch_flags =
       IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS;
 
@@ -354,7 +354,7 @@ TEST(AqlBlockProcessorTimestampTest,
   EXPECT_EQ(dispatches[0].metadata.executable_id, 0xA0ull);
   EXPECT_EQ(dispatches[0].metadata.block_ordinal, 5u);
   EXPECT_EQ(dispatches[0].metadata.command_index, 12u);
-  EXPECT_EQ(dispatches[0].metadata.export_ordinal, 2u);
+  EXPECT_EQ(dispatches[0].metadata.function_ordinal, 2u);
   EXPECT_EQ(dispatches[0].metadata.flags,
             IREE_HAL_AMDGPU_DISPATCH_TIMESTAMP_RECORD_FLAG_NONE);
   EXPECT_EQ(dispatches[0].target.completion_signal, &completion_signals[0]);
@@ -366,7 +366,7 @@ TEST(AqlBlockProcessorTimestampTest,
   EXPECT_EQ(dispatches[1].metadata.executable_id, 0xB0ull);
   EXPECT_EQ(dispatches[1].metadata.block_ordinal, 5u);
   EXPECT_EQ(dispatches[1].metadata.command_index, 13u);
-  EXPECT_EQ(dispatches[1].metadata.export_ordinal, 4u);
+  EXPECT_EQ(dispatches[1].metadata.function_ordinal, 4u);
   EXPECT_EQ(dispatches[1].metadata.flags,
             IREE_HAL_AMDGPU_DISPATCH_TIMESTAMP_RECORD_FLAG_INDIRECT_PARAMETERS);
   EXPECT_EQ(dispatches[1].target.completion_signal, &completion_signals[1]);

@@ -232,13 +232,13 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[FUNCTION_ID:[a-z0-9]+]]: i64,
 //  CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index,
 //  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:  %[[SLOT:.+]]: index)
 util.func public @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
-    %executable: !hal.executable, %ordinal: index,
+    %executable: !hal.executable, %function_id: i64,
     %x: index, %y: index, %z: index,
     %buffer: !hal.buffer,
     %slot: index) {
@@ -249,8 +249,8 @@ util.func public @command_buffer_dispatch(
   %c8000 = arith.constant 8000 : index
   // CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
-      // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
-      target(%executable: !hal.executable)[%ordinal]
+      // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[FUNCTION_ID]]
+      target(%executable: !hal.executable)[%function_id]
       // CHECK-SAME: workgroups([%[[X]], %[[Y]], %[[Z]]])
       workgroups([%x, %y, %z])
       // CHECK-SAME: bindings([
@@ -278,20 +278,20 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[FUNCTION_ID:[a-z0-9]+]]: i64,
 //  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
 util.func public @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
-    %executable: !hal.executable, %ordinal: index,
+    %executable: !hal.executable, %function_id: i64,
     %buffer: !hal.buffer, %offset: index, %length: index) {
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[FUNCTION_ID]]
   // CHECK-SAME:   workgroups(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]]]
   // CHECK-SAME:   bindings([
   // CHECK-NEXT:     (%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-NEXT:   ]) flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
-      target(%executable: !hal.executable)[%ordinal]
+      target(%executable: !hal.executable)[%function_id]
       workgroups(%buffer : !hal.buffer)[%offset]
       bindings([
         (%buffer : !hal.buffer)[%offset, %length]
@@ -313,20 +313,20 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[EXECUTABLE:[a-z0-9]+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[EXECUTABLE:[a-z0-9]+]]: !hal.executable, %[[FUNCTION_ID:[a-z0-9]+]]: i64,
 //  CHECK-SAME:  %[[BUFFER_SLOT:[a-z0-9]+]]: index, %[[OFFSET:[a-z0-9]+]]: index, %[[LENGTH:[a-z0-9]+]]: index)
 util.func public @command_buffer_dispatch_indirect_indirect(
     %cmd: !hal.command_buffer,
-    %executable: !hal.executable, %ordinal: index,
+    %executable: !hal.executable, %function_id: i64,
     %buffer_slot: index, %offset: index, %length: index) {
   //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[FUNCTION_ID]]
   // CHECK-SAME:   workgroups(%[[BUFFER_SLOT]] : index)[%[[OFFSET]]]
   // CHECK-SAME:   bindings([
   // CHECK-NEXT:     (%[[BUFFER_SLOT]] : index)[%[[OFFSET]], %[[LENGTH]]]
   // CHECK-NEXT:   ]) flags("None")
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
-      target(%executable: !hal.executable)[%ordinal]
+      target(%executable: !hal.executable)[%function_id]
       workgroups(%buffer_slot : index)[%offset]
       bindings([
         (%buffer_slot : index)[%offset, %length]

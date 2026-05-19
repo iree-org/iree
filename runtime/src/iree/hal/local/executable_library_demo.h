@@ -20,7 +20,7 @@ extern "C" {
 // example for the demo: the real HAL does not require this header as it
 // dlsym's the function pointer and packs the push constants itself.
 
-// Push constants used in the 'dispatch_tile_a' entry point.
+// Push constants used in the 'dispatch_tile_a' function.
 typedef union {
   uint32_t values[1];
   struct {

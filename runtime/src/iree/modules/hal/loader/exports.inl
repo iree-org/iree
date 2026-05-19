@@ -24,8 +24,9 @@
 
 // clang-format off
 
-EXPORT_FN("executable.dispatch", iree_hal_loader_module_executable_dispatch, dispatch, riiiiCiDCrIID, v)
+EXPORT_FN("executable.dispatch", iree_hal_loader_module_executable_dispatch, dispatch, rIiiiCiDCrIID, v)
 EXPORT_FN("executable.load", iree_hal_loader_module_executable_load, rrr, rrr, r)
+EXPORT_FN("executable.lookup.function", iree_hal_loader_module_executable_lookup_function, rr, rr, I)
 EXPORT_FN("executable.query_support", iree_hal_loader_module_executable_query_support, r, r, i)
 
 // clang-format on

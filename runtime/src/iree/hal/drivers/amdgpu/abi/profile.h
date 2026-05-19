@@ -43,8 +43,8 @@ typedef struct iree_hal_amdgpu_profile_dispatch_event_t {
   uint64_t executable_id;
   // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
   uint32_t command_index;
-  // Executable export ordinal dispatched.
-  uint32_t export_ordinal;
+  // Executable function ordinal dispatched.
+  uint32_t function_ordinal;
   // Workgroup counts submitted for each dimension.
   uint32_t workgroup_count[3];
   // Workgroup sizes submitted for each dimension.

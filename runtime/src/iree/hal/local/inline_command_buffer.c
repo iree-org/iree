@@ -412,8 +412,7 @@ static iree_status_t iree_hal_inline_command_buffer_collective(
 
 static iree_status_t iree_hal_inline_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_inline_command_buffer_t* command_buffer =
@@ -429,10 +428,18 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
+  const uint32_t function_index = iree_hal_executable_function_index(function);
 
   // Dispatch attrs are always present after validation.
   iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
-      local_executable->dispatch_attrs[export_ordinal];
+      local_executable->dispatch_attrs[function_index];
   const iree_host_size_t local_memory_size =
       dispatch_attrs.local_memory_pages *
           IREE_HAL_EXECUTABLE_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE +
@@ -554,7 +561,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
-      local_executable, export_ordinal, dispatch_state,
+      local_executable, function_index, dispatch_state,
       command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
   const iree_time_t end_host_time_ns =
@@ -576,7 +583,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
     event_info.command_buffer_id = command_buffer->profile.command_buffer_id;
     event_info.executable_id =
         iree_hal_local_executable_profile_id(local_executable);
-    event_info.export_ordinal = export_ordinal;
+    event_info.function_ordinal = function_index;
     event_info.workgroup_count[0] = dispatch_state->workgroup_count_x;
     event_info.workgroup_count[1] = dispatch_state->workgroup_count_y;
     event_info.workgroup_count[2] = dispatch_state->workgroup_count_z;

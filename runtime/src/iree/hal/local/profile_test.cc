@@ -61,12 +61,12 @@ struct RecordingProfileSink {
   // Executable records copied from metadata chunks.
   std::vector<iree_hal_profile_executable_record_t> executable_records;
 
-  // Executable export records copied from metadata chunks.
-  std::vector<iree_hal_profile_executable_export_record_t>
-      executable_export_records;
+  // Executable function records copied from metadata chunks.
+  std::vector<iree_hal_profile_executable_function_record_t>
+      executable_function_records;
 
-  // Executable export names copied from trailing packed record data.
-  std::vector<std::string> executable_export_names;
+  // Executable function names copied from trailing packed record data.
+  std::vector<std::string> executable_function_names;
 
   // Queue event records copied from data chunks.
   std::vector<iree_hal_profile_queue_event_t> queue_events;
@@ -144,29 +144,29 @@ static iree_status_t CopyProfileRecords(iree_const_byte_span_t iovec,
   return iree_ok_status();
 }
 
-static iree_status_t CopyExecutableExportProfileRecords(
+static iree_status_t CopyExecutableFunctionProfileRecords(
     iree_const_byte_span_t iovec,
-    std::vector<iree_hal_profile_executable_export_record_t>* out_records,
+    std::vector<iree_hal_profile_executable_function_record_t>* out_records,
     std::vector<std::string>* out_names) {
   iree_host_size_t offset = 0;
   while (offset < iovec.data_length) {
     const iree_host_size_t remaining_length = iovec.data_length - offset;
     if (remaining_length <
-        sizeof(iree_hal_profile_executable_export_record_t)) {
+        sizeof(iree_hal_profile_executable_function_record_t)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "truncated executable export record");
+                              "truncated executable function record");
     }
     const auto* record =
-        reinterpret_cast<const iree_hal_profile_executable_export_record_t*>(
+        reinterpret_cast<const iree_hal_profile_executable_function_record_t*>(
             iovec.data + offset);
     if (record->record_length < sizeof(*record) ||
         record->record_length > remaining_length) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "invalid executable export record length");
+                              "invalid executable function record length");
     }
     if (record->name_length > record->record_length - sizeof(*record)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "invalid executable export name length");
+                              "invalid executable function name length");
     }
     out_records->push_back(*record);
     out_names->emplace_back(
@@ -230,11 +230,11 @@ static iree_status_t RecordingProfileSinkWrite(
   }
   if (iree_string_view_equal(
           metadata->content_type,
-          IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+          IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS)) {
     for (iree_host_size_t i = 0; i < iovec_count; ++i) {
-      IREE_RETURN_IF_ERROR(CopyExecutableExportProfileRecords(
-          iovecs[i], &test_sink->executable_export_records,
-          &test_sink->executable_export_names));
+      IREE_RETURN_IF_ERROR(CopyExecutableFunctionProfileRecords(
+          iovecs[i], &test_sink->executable_function_records,
+          &test_sink->executable_function_names));
     }
     return iree_ok_status();
   }
@@ -360,19 +360,18 @@ static void FakeLocalExecutableDestroy(iree_hal_executable_t* executable) {
   (void)executable;
 }
 
-static iree_host_size_t FakeLocalExecutableExportCount(
+static iree_host_size_t FakeLocalExecutableFunctionCount(
     iree_hal_executable_t* executable) {
   (void)executable;
   return 2;
 }
 
-static iree_status_t FakeLocalExecutableExportInfo(
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+static iree_status_t FakeLocalExecutableFunctionInfo(
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   (void)executable;
   memset(out_info, 0, sizeof(*out_info));
-  switch (export_ordinal) {
+  switch (function.value) {
     case 0:
       out_info->name = IREE_SV("dispatch_a");
       out_info->constant_count = 1;
@@ -390,35 +389,34 @@ static iree_status_t FakeLocalExecutableExportInfo(
       return iree_ok_status();
     default:
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                              "export ordinal out of range");
+                              "function ordinal out of range");
   }
 }
 
-static iree_status_t FakeLocalExecutableExportParameters(
+static iree_status_t FakeLocalExecutableFunctionParameters(
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t function_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   (void)executable;
-  (void)export_ordinal;
+  (void)function_ordinal;
   (void)capacity;
   (void)out_parameters;
   return iree_ok_status();
 }
 
-static iree_status_t FakeLocalExecutableLookupExportByName(
+static iree_status_t FakeLocalExecutableLookupFunctionByName(
     iree_hal_executable_t* executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_function_ordinal) {
   (void)executable;
   if (iree_string_view_equal(name, IREE_SV("dispatch_a"))) {
-    *out_export_ordinal = 0;
+    *out_function_ordinal = iree_hal_executable_function_from_index(0);
     return iree_ok_status();
   }
   if (iree_string_view_equal(name, IREE_SV("dispatch_b"))) {
-    *out_export_ordinal = 1;
+    *out_function_ordinal = iree_hal_executable_function_from_index(1);
     return iree_ok_status();
   }
-  return iree_make_status(IREE_STATUS_NOT_FOUND, "export not found");
+  return iree_make_status(IREE_STATUS_NOT_FOUND, "function not found");
 }
 
 static iree_status_t FakeLocalExecutableIssueCall(
@@ -437,10 +435,10 @@ static iree_status_t FakeLocalExecutableIssueCall(
 static const iree_hal_local_executable_vtable_t kFakeLocalExecutableVTable = {
     {
         FakeLocalExecutableDestroy,
-        FakeLocalExecutableExportCount,
-        FakeLocalExecutableExportInfo,
-        FakeLocalExecutableExportParameters,
-        FakeLocalExecutableLookupExportByName,
+        FakeLocalExecutableFunctionCount,
+        FakeLocalExecutableFunctionInfo,
+        FakeLocalExecutableFunctionParameters,
+        FakeLocalExecutableLookupFunctionByName,
     },
     FakeLocalExecutableIssueCall,
 };
@@ -539,7 +537,7 @@ TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsDispatchEvents) {
   event_info.command_buffer_id = 8;
   event_info.executable_id = 9;
   event_info.command_index = 10;
-  event_info.export_ordinal = 11;
+  event_info.function_ordinal = 11;
   event_info.workgroup_size[0] = 4;
   event_info.workgroup_size[1] = 5;
   event_info.workgroup_size[2] = 6;
@@ -561,7 +559,7 @@ TEST_F(LocalProfileRecorderTest, ProducerFamilyAppendsDispatchEvents) {
   EXPECT_EQ(8u, recorded_event.command_buffer_id);
   EXPECT_EQ(9u, recorded_event.executable_id);
   EXPECT_EQ(10u, recorded_event.command_index);
-  EXPECT_EQ(11u, recorded_event.export_ordinal);
+  EXPECT_EQ(11u, recorded_event.function_ordinal);
   EXPECT_EQ(4u, recorded_event.workgroup_size[0]);
   EXPECT_EQ(5u, recorded_event.workgroup_size[1]);
   EXPECT_EQ(6u, recorded_event.workgroup_size[2]);
@@ -582,7 +580,7 @@ TEST_F(LocalProfileRecorderTest, FullDispatchRingAutoFlushes) {
   event_info.command_buffer_id = 8;
   event_info.executable_id = 9;
   event_info.command_index = 10;
-  event_info.export_ordinal = 11;
+  event_info.function_ordinal = 11;
   event_info.workgroup_size[0] = 4;
   event_info.start_tick = 1000;
   event_info.end_tick = 1200;
@@ -622,7 +620,7 @@ TEST_F(LocalProfileRecorderTest, DispatchAutoFlushFailurePreservesRecords) {
   event_info.command_buffer_id = 8;
   event_info.executable_id = 9;
   event_info.command_index = 10;
-  event_info.export_ordinal = 11;
+  event_info.function_ordinal = 11;
   event_info.workgroup_size[0] = 4;
   event_info.start_tick = 1000;
   event_info.end_tick = 1200;
@@ -765,8 +763,8 @@ TEST_F(LocalProfileRecorderTest,
   iree_hal_device_profiling_options_t options =
       MakeProfilingOptions(IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS);
   options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-  options.capture_filter.executable_export_pattern = IREE_SV("dispatch_*");
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+  options.capture_filter.executable_function_pattern = IREE_SV("dispatch_*");
   IREE_EXPECT_OK(iree_hal_local_profile_recorder_create(
       &recorder_options_, &options, iree_allocator_system(), &recorder_));
 }
@@ -802,12 +800,12 @@ TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataOnce) {
       recorder_, base_executable));
 
   ASSERT_EQ(1u, sink_.executable_records.size());
-  ASSERT_EQ(2u, sink_.executable_export_records.size());
-  EXPECT_EQ(2u, sink_.executable_records[0].export_count);
+  ASSERT_EQ(2u, sink_.executable_function_records.size());
+  EXPECT_EQ(2u, sink_.executable_records[0].function_count);
   EXPECT_EQ(sink_.executable_records[0].executable_id,
-            sink_.executable_export_records[0].executable_id);
-  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
-  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+            sink_.executable_function_records[0].executable_id);
+  EXPECT_EQ("dispatch_a", sink_.executable_function_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_function_names[1]);
 
   iree_hal_local_executable_deinitialize(&executable.base);
 }
@@ -827,11 +825,11 @@ TEST_F(LocalProfileRecorderTest, RecordsExecutableMetadataWithExplicitId) {
       recorder_, base_executable, 42));
 
   ASSERT_EQ(1u, sink_.executable_records.size());
-  ASSERT_EQ(2u, sink_.executable_export_records.size());
+  ASSERT_EQ(2u, sink_.executable_function_records.size());
   EXPECT_EQ(42u, sink_.executable_records[0].executable_id);
-  EXPECT_EQ(42u, sink_.executable_export_records[0].executable_id);
-  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
-  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+  EXPECT_EQ(42u, sink_.executable_function_records[0].executable_id);
+  EXPECT_EQ("dispatch_a", sink_.executable_function_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_function_names[1]);
 
   iree_hal_local_executable_deinitialize(&executable.base);
 }
@@ -851,9 +849,9 @@ TEST_F(LocalProfileRecorderTest, HostExecutionEnablesExecutableMetadata) {
       recorder_, base_executable));
 
   ASSERT_EQ(1u, sink_.executable_records.size());
-  ASSERT_EQ(2u, sink_.executable_export_records.size());
-  EXPECT_EQ("dispatch_a", sink_.executable_export_names[0]);
-  EXPECT_EQ("dispatch_b", sink_.executable_export_names[1]);
+  ASSERT_EQ(2u, sink_.executable_function_records.size());
+  EXPECT_EQ("dispatch_a", sink_.executable_function_names[0]);
+  EXPECT_EQ("dispatch_b", sink_.executable_function_names[1]);
 
   iree_hal_local_executable_deinitialize(&executable.base);
 }
@@ -905,7 +903,7 @@ TEST_F(LocalProfileRecorderTest, AppendsAndFlushesQueueAndHostEvents) {
   host_info.scope = QueueScope();
   host_info.submission_id = queue_info.submission_id;
   host_info.executable_id = 5;
-  host_info.export_ordinal = 3;
+  host_info.function_ordinal = 3;
   host_info.workgroup_count[0] = 4;
   host_info.workgroup_size[0] = 16;
   host_info.start_host_time_ns = 110;

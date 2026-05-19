@@ -463,7 +463,7 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
 // Configuration defining how a dispatch is performed.
 typedef struct iree_hal_dispatch_config_t {
   // Optional workgroup size for targets that have workgroup sizes specified by
-  // their exports. If all zeros the default workgroup size of the export is
+  // their functions. If all zeros the default workgroup size of the function is
   // used and otherwise must be at least 1x1x1.
   uint32_t workgroup_size[3];
   // Static workgroup count, used when one of the _INDIRECT_PARAMETERS flags is
@@ -487,7 +487,7 @@ typedef struct iree_hal_dispatch_config_t {
   iree_hal_buffer_ref_t workgroup_count_ref;
   // Size, in bytes, of any dynamically-sized workgroup local memory required.
   // This is added on top of the static workgroup local memory declared by the
-  // export metadata.
+  // function metadata.
   uint32_t dynamic_workgroup_local_memory;
 } iree_hal_dispatch_config_t;
 
@@ -989,13 +989,12 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 // IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
 //
 // May fail during recording if validation is enabled and the dispatch
-// configuration is not supported by the device or exported entry point. Some
+// configuration is not supported by the device or function. Some
 // implementations cannot verify statically and may fail asynchronously during
 // execution.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
@@ -1147,7 +1146,7 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable,
-      iree_hal_executable_export_ordinal_t export_ordinal,
+      iree_hal_executable_function_t function,
       const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
       iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;

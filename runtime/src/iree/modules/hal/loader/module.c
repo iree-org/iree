@@ -12,7 +12,8 @@
 #include "iree/vm/api.h"
 
 #define IREE_HAL_LOADER_MODULE_VERSION_0_0 0x00000000u
-#define IREE_HAL_LOADER_MODULE_VERSION_LATEST IREE_HAL_LOADER_MODULE_VERSION_0_0
+#define IREE_HAL_LOADER_MODULE_VERSION_0_1 0x00000001u
+#define IREE_HAL_LOADER_MODULE_VERSION_LATEST IREE_HAL_LOADER_MODULE_VERSION_0_1
 
 //===----------------------------------------------------------------------===//
 // Module type definitions
@@ -229,16 +230,35 @@ IREE_HAL_ABI_EXPORT(iree_hal_loader_module_executable_load,  //
   return status;
 }
 
+IREE_HAL_ABI_EXPORT(iree_hal_loader_module_executable_lookup_function,  //
+                    rr, I) {
+  iree_hal_executable_t* executable = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_executable_check_deref(args->r0, &executable));
+  iree_vm_buffer_t* function_name = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &function_name));
+
+  iree_hal_executable_function_t function =
+      iree_hal_executable_function_invalid();
+  IREE_RETURN_IF_ERROR(iree_hal_executable_lookup_function_by_name(
+      executable, iree_vm_buffer_as_string(function_name), &function));
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_valid(function))) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "executable returned an invalid function handle");
+  }
+  rets->i0 = (int64_t)function.value;
+  return iree_ok_status();
+}
+
 typedef struct {
   union {
     struct {
       iree_vm_ref_t executable;
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      int64_t function_id;
       int32_t workgroup_x;
       int32_t workgroup_y;
       int32_t workgroup_z;
     };
-    iree_vm_abi_riiii_t params;
+    iree_vm_abi_rIiii_t params;
   };
   iree_vm_size_t constant_count;
   const uint32_t* constants;
@@ -253,6 +273,18 @@ static iree_status_t iree_hal_loader_module_executable_dispatch(
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_executable_check_deref(args->executable, &executable));
+  iree_hal_local_executable_t* local_executable =
+      iree_hal_local_executable_cast(executable);
+  const iree_hal_executable_function_t function =
+      iree_hal_executable_function_from_value((uint64_t)args->function_id);
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_index_in_range(
+          function, local_executable->export_count))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "function id %" PRIu64
+                            " out of range (count: %" PRIhsz ")",
+                            function.value, local_executable->export_count);
+  }
+  const uint32_t function_index = iree_hal_executable_function_index(function);
 
   if (args->binding_count > 32) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -298,8 +330,8 @@ static iree_status_t iree_hal_loader_module_executable_dispatch(
   iree_byte_span_t local_memory = iree_byte_span_empty();
 
   return iree_hal_local_executable_issue_dispatch_inline(
-      (iree_hal_local_executable_t*)executable, args->export_ordinal,
-      &dispatch_state, processor_id, local_memory);
+      local_executable, function_index, &dispatch_state, processor_id,
+      local_memory);
 }
 
 static iree_status_t iree_vm_shim_dispatch_v(
@@ -311,13 +343,13 @@ static iree_status_t iree_vm_shim_dispatch_v(
   // For now we inline what it would do in a very painful way.
   bool args_ok = true;
   if (args_storage.data_length <
-      (sizeof(iree_vm_abi_riiii_t) + sizeof(iree_vm_size_t) +
+      (sizeof(iree_vm_abi_rIiii_t) + sizeof(iree_vm_size_t) +
        sizeof(iree_vm_size_t))) {
     // Can't fit even with zero lengths.
     args_ok = false;
   }
   iree_hal_loader_dispatch_args_t args = {
-      .params = *(const iree_vm_abi_riiii_t*)args_storage.data,
+      .params = *(const iree_vm_abi_rIiii_t*)args_storage.data,
   };
   if (args_ok) {
     const uint8_t* constants_ptr = args_storage.data + sizeof(args.params);

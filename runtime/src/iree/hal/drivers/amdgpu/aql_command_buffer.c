@@ -1852,7 +1852,7 @@ typedef struct iree_hal_amdgpu_aql_dispatch_inputs_t {
   iree_hal_executable_t* executable;
 
   // Export ordinal within |executable|.
-  iree_hal_executable_export_ordinal_t export_ordinal;
+  iree_hal_executable_function_t export_ordinal;
 
   // HAL dispatch configuration.
   iree_hal_dispatch_config_t config;
@@ -2235,7 +2235,8 @@ static void iree_hal_amdgpu_aql_command_buffer_initialize_dispatch_command(
           ? IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_INDIRECT_PARAMETERS
           : IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE;
   dispatch_command->setup = plan->kernel_args->setup;
-  dispatch_command->export_ordinal = inputs->export_ordinal;
+  dispatch_command->export_ordinal =
+      iree_hal_executable_function_index(inputs->export_ordinal);
   dispatch_command->workgroup_size[0] = plan->kernel_args->workgroup_size[0];
   dispatch_command->workgroup_size[1] = plan->kernel_args->workgroup_size[1];
   dispatch_command->workgroup_size[2] = plan->kernel_args->workgroup_size[2];
@@ -2321,7 +2322,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_record_dispatch_summary(
       first_packet_ordinal + (uses_indirect_parameters ? 1u : 0u);
   summary->metadata.executable_id = dispatch_command->executable_id;
   summary->metadata.command_index = dispatch_command->header.command_index;
-  summary->metadata.export_ordinal = dispatch_command->export_ordinal;
+  summary->metadata.function_ordinal = dispatch_command->export_ordinal;
   summary->metadata.dispatch_flags = dispatch_command->dispatch_flags;
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(summary->workgroup.size);
        ++i) {
@@ -2658,7 +2659,7 @@ static iree_status_t iree_hal_amdgpu_aql_command_buffer_collective(
 static iree_status_t iree_hal_amdgpu_aql_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_amdgpu_aql_command_buffer_t* command_buffer =

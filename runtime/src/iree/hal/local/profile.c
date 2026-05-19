@@ -700,83 +700,86 @@ static bool iree_hal_local_profile_recorder_has_emitted_id(
   return has_emitted;
 }
 
-static iree_status_t iree_hal_local_profile_executable_export_record_length(
+static iree_status_t iree_hal_local_profile_executable_function_record_length(
     iree_string_view_t name, iree_host_size_t* out_record_length) {
   *out_record_length = 0;
   if (IREE_UNLIKELY(name.size > UINT32_MAX)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "profile executable export name is too long");
+                            "profile executable function name is too long");
   }
   iree_host_size_t record_length = 0;
   IREE_RETURN_IF_ERROR(IREE_STRUCT_LAYOUT(
-      sizeof(iree_hal_profile_executable_export_record_t), &record_length,
+      sizeof(iree_hal_profile_executable_function_record_t), &record_length,
       IREE_STRUCT_FIELD(name.size, uint8_t, NULL)));
   if (IREE_UNLIKELY(record_length > UINT32_MAX)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "profile executable export record length exceeds uint32_t");
+        "profile executable function record length exceeds uint32_t");
   }
   *out_record_length = record_length;
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_local_profile_executable_export_data_length(
-    iree_hal_executable_t* executable, iree_host_size_t export_count,
+static iree_status_t iree_hal_local_profile_executable_function_data_length(
+    iree_hal_executable_t* executable, iree_host_size_t function_count,
     iree_host_size_t* out_data_length) {
   *out_data_length = 0;
   iree_host_size_t data_length = 0;
   iree_status_t status = iree_ok_status();
-  for (iree_host_size_t i = 0; i < export_count && iree_status_is_ok(status);
+  for (iree_host_size_t i = 0; i < function_count && iree_status_is_ok(status);
        ++i) {
-    iree_hal_executable_export_info_t export_info = {0};
-    status = iree_hal_executable_export_info(
-        executable, (iree_hal_executable_export_ordinal_t)i, &export_info);
+    iree_hal_executable_function_info_t function_info = {0};
+    status = iree_hal_executable_function_info(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
+        &function_info);
     iree_host_size_t record_length = 0;
     if (iree_status_is_ok(status)) {
-      status = iree_hal_local_profile_executable_export_record_length(
-          export_info.name, &record_length);
+      status = iree_hal_local_profile_executable_function_record_length(
+          function_info.name, &record_length);
     }
     if (iree_status_is_ok(status) &&
         IREE_UNLIKELY(!iree_host_size_checked_add(data_length, record_length,
                                                   &data_length))) {
       status = iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
-          "profile executable export metadata length overflow");
+          "profile executable function metadata length overflow");
     }
   }
   if (iree_status_is_ok(status)) *out_data_length = data_length;
   return status;
 }
 
-static iree_status_t iree_hal_local_profile_append_executable_export_records(
+static iree_status_t iree_hal_local_profile_append_executable_function_records(
     uint64_t executable_id, iree_hal_executable_t* executable,
-    iree_host_size_t export_count, uint8_t* target_data) {
+    iree_host_size_t function_count, uint8_t* target_data) {
   uint8_t* cursor = target_data;
-  for (iree_host_size_t i = 0; i < export_count; ++i) {
-    iree_hal_executable_export_info_t export_info = {0};
-    IREE_RETURN_IF_ERROR(iree_hal_executable_export_info(
-        executable, (iree_hal_executable_export_ordinal_t)i, &export_info));
+  for (iree_host_size_t i = 0; i < function_count; ++i) {
+    iree_hal_executable_function_info_t function_info = {0};
+    IREE_RETURN_IF_ERROR(iree_hal_executable_function_info(
+        executable, iree_hal_executable_function_from_index((uint32_t)i),
+        &function_info));
 
     iree_host_size_t record_length = 0;
-    IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_export_record_length(
-        export_info.name, &record_length));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_local_profile_executable_function_record_length(
+            function_info.name, &record_length));
 
-    iree_hal_profile_executable_export_record_t record =
-        iree_hal_profile_executable_export_record_default();
+    iree_hal_profile_executable_function_record_t record =
+        iree_hal_profile_executable_function_record_default();
     record.record_length = (uint32_t)record_length;
     record.executable_id = executable_id;
-    record.export_ordinal = (uint32_t)i;
-    record.constant_count = export_info.constant_count;
-    record.binding_count = export_info.binding_count;
-    record.parameter_count = export_info.parameter_count;
-    memcpy(record.workgroup_size, export_info.workgroup_size,
+    record.function_ordinal = (uint32_t)i;
+    record.constant_count = function_info.constant_count;
+    record.binding_count = function_info.binding_count;
+    record.parameter_count = function_info.parameter_count;
+    memcpy(record.workgroup_size, function_info.workgroup_size,
            sizeof(record.workgroup_size));
-    record.name_length = (uint32_t)export_info.name.size;
+    record.name_length = (uint32_t)function_info.name.size;
 
     memcpy(cursor, &record, sizeof(record));
-    if (export_info.name.size > 0) {
-      memcpy(cursor + sizeof(record), export_info.name.data,
-             export_info.name.size);
+    if (function_info.name.size > 0) {
+      memcpy(cursor + sizeof(record), function_info.name.data,
+             function_info.name.size);
     }
     cursor += record_length;
   }
@@ -811,30 +814,31 @@ iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
     return iree_ok_status();
   }
 
-  const iree_host_size_t export_count =
-      iree_hal_executable_export_count(executable);
-  if (IREE_UNLIKELY(export_count > UINT32_MAX)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "profile executable export count exceeds uint32_t");
+  const iree_host_size_t function_count =
+      iree_hal_executable_function_count(executable);
+  if (IREE_UNLIKELY(function_count > UINT32_MAX)) {
+    return iree_make_status(
+        IREE_STATUS_OUT_OF_RANGE,
+        "profile executable function count exceeds uint32_t");
   }
 
   iree_hal_profile_executable_record_t executable_record =
       iree_hal_profile_executable_record_default();
   executable_record.executable_id = executable_id;
-  executable_record.export_count = (uint32_t)export_count;
+  executable_record.function_count = (uint32_t)function_count;
 
-  iree_host_size_t export_data_length = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_export_data_length(
-      executable, export_count, &export_data_length));
-  uint8_t* export_data = NULL;
+  iree_host_size_t function_data_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_local_profile_executable_function_data_length(
+      executable, function_count, &function_data_length));
+  uint8_t* function_data = NULL;
   iree_status_t status = iree_ok_status();
-  if (export_data_length != 0) {
-    status = iree_allocator_malloc(recorder->host_allocator, export_data_length,
-                                   (void**)&export_data);
+  if (function_data_length != 0) {
+    status = iree_allocator_malloc(
+        recorder->host_allocator, function_data_length, (void**)&function_data);
   }
-  if (iree_status_is_ok(status) && export_data_length != 0) {
-    status = iree_hal_local_profile_append_executable_export_records(
-        executable_id, executable, export_count, export_data);
+  if (iree_status_is_ok(status) && function_data_length != 0) {
+    status = iree_hal_local_profile_append_executable_function_records(
+        executable_id, executable, function_count, function_data);
   }
 
   bool should_emit = false;
@@ -850,11 +854,12 @@ iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_local_profile_recorder_write_span(
-        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
-        should_emit ? iree_make_const_byte_span(export_data, export_data_length)
-                    : iree_const_byte_span_empty());
+        recorder, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS,
+        should_emit
+            ? iree_make_const_byte_span(function_data, function_data_length)
+            : iree_const_byte_span_empty());
   }
-  iree_allocator_free(recorder->host_allocator, export_data);
+  iree_allocator_free(recorder->host_allocator, function_data);
   return status;
 }
 
@@ -966,7 +971,7 @@ iree_status_t iree_hal_local_profile_recorder_append_dispatch_event(
   const bool is_valid =
       iree_hal_local_profile_queue_scope_is_valid(&event_info->scope) &&
       event_info->executable_id != 0 &&
-      event_info->export_ordinal != UINT32_MAX &&
+      event_info->function_ordinal != UINT32_MAX &&
       event_info->workgroup_size[0] != 0 &&
       event_info->start_tick <= event_info->end_tick;
   IREE_ASSERT(is_valid);
@@ -1010,7 +1015,7 @@ iree_status_t iree_hal_local_profile_recorder_append_dispatch_event(
   record->event.command_buffer_id = event_info->command_buffer_id;
   record->event.executable_id = event_info->executable_id;
   record->event.command_index = event_info->command_index;
-  record->event.export_ordinal = event_info->export_ordinal;
+  record->event.function_ordinal = event_info->function_ordinal;
   memcpy(record->event.workgroup_count, event_info->workgroup_count,
          sizeof(record->event.workgroup_count));
   memcpy(record->event.workgroup_size, event_info->workgroup_size,
@@ -1188,7 +1193,7 @@ void iree_hal_local_profile_recorder_append_host_execution_event(
   event->physical_device_ordinal = event_info->scope.physical_device_ordinal;
   event->queue_ordinal = event_info->scope.queue_ordinal;
   event->command_index = event_info->command_index;
-  event->export_ordinal = event_info->export_ordinal;
+  event->function_ordinal = event_info->function_ordinal;
   memcpy(event->workgroup_count, event_info->workgroup_count,
          sizeof(event->workgroup_count));
   memcpy(event->workgroup_size, event_info->workgroup_size,

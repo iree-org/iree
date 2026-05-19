@@ -136,35 +136,35 @@ static iree_status_t TestProfileSinkWrite(
       EXPECT_EQ(sizeof(iree_hal_profile_executable_record_t),
                 records[i].record_length);
       EXPECT_NE(0u, records[i].executable_id);
-      EXPECT_GT(records[i].export_count, 0u);
+      EXPECT_GT(records[i].function_count, 0u);
       test_sink->executable_ids.push_back(records[i].executable_id);
     }
     ++test_sink->executable_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS)) {
     iree_host_size_t payload_offset = 0;
     while (payload_offset < iovecs[0].data_length) {
       if (iovecs[0].data_length - payload_offset <
-          sizeof(iree_hal_profile_executable_export_record_t)) {
+          sizeof(iree_hal_profile_executable_function_record_t)) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
-                                "truncated executable export profile record");
+                                "truncated executable function profile record");
       }
-      iree_hal_profile_executable_export_record_t record;
+      iree_hal_profile_executable_function_record_t record;
       memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
       if (record.record_length < sizeof(record) ||
           record.record_length > iovecs[0].data_length - payload_offset) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
-                                "invalid executable export profile record");
+                                "invalid executable function profile record");
       }
       EXPECT_NE(0u, record.executable_id);
-      EXPECT_NE(UINT32_MAX, record.export_ordinal);
+      EXPECT_NE(UINT32_MAX, record.function_ordinal);
       EXPECT_EQ(record.name_length,
                 record.record_length - (uint32_t)sizeof(record));
-      test_sink->export_record_executable_ids.push_back(record.executable_id);
+      test_sink->function_record_executable_ids.push_back(record.executable_id);
       payload_offset += record.record_length;
     }
-    ++test_sink->executable_export_metadata_count;
+    ++test_sink->executable_function_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
@@ -275,18 +275,18 @@ static iree_status_t TestProfileSinkWrite(
                   records[i].command_index);
       }
       if (!test_sink->executable_ids.empty() ||
-          !test_sink->export_record_executable_ids.empty()) {
+          !test_sink->function_record_executable_ids.empty()) {
         EXPECT_NE(0u, records[i].executable_id);
         EXPECT_NE(test_sink->executable_ids.end(),
                   std::find(test_sink->executable_ids.begin(),
                             test_sink->executable_ids.end(),
                             records[i].executable_id));
-        EXPECT_NE(test_sink->export_record_executable_ids.end(),
-                  std::find(test_sink->export_record_executable_ids.begin(),
-                            test_sink->export_record_executable_ids.end(),
+        EXPECT_NE(test_sink->function_record_executable_ids.end(),
+                  std::find(test_sink->function_record_executable_ids.begin(),
+                            test_sink->function_record_executable_ids.end(),
                             records[i].executable_id));
       }
-      EXPECT_EQ(0u, records[i].export_ordinal);
+      EXPECT_EQ(0u, records[i].function_ordinal);
       if (test_sink->validate_dispatch_workgroup_count) {
         EXPECT_EQ(test_sink->expected_workgroup_count[0],
                   records[i].workgroup_count[0]);

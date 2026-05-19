@@ -171,7 +171,7 @@ iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
 iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
     const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel,
     iree_host_size_t parameter_capacity,
-    iree_hal_executable_export_parameter_t* out_parameters,
+    iree_hal_executable_function_parameter_t* out_parameters,
     iree_host_size_t name_storage_capacity, char* name_storage);
 
 // Finds a decoded kernel by its descriptor symbol name.

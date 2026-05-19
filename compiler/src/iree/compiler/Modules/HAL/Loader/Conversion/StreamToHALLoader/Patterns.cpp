@@ -127,16 +127,16 @@ struct CmdDispatchOpPattern : OpConversionPattern<IREE::Stream::CmdDispatchOp> {
         SymbolRefAttr::get(builder.getContext(), executableOp.getName(),
                            {SymbolRefAttr::get(exportOp->getParentOp()),
                             SymbolRefAttr::get(exportOp)});
-    Value ordinal = IREE::HAL::Loader::ExecutableExportOrdinalOp::create(
-        builder, loc, builder.getIndexType(), entryPointAttr);
+    Value functionId = IREE::HAL::Loader::ExecutableLookupFunctionOp::create(
+        builder, loc, builder.getI64Type(), executable, entryPointAttr);
 
     // Dispatch with a target-specific workgroup count.
     auto workgroupCount = exportOp.calculateWorkgroupCount(
         loc, /*device=*/nullptr, adaptor.getWorkload(), builder);
     IREE::HAL::Loader::ExecutableDispatchOp::create(
-        builder, loc, executable, ordinal, workgroupCount[0], workgroupCount[1],
-        workgroupCount[2], pushConstants, bindingBuffers, bindingOffsets,
-        bindingLengths);
+        builder, loc, executable, functionId, workgroupCount[0],
+        workgroupCount[1], workgroupCount[2], pushConstants, bindingBuffers,
+        bindingOffsets, bindingLengths);
   }
 };
 

@@ -331,7 +331,7 @@ vm.import private @command_buffer.collective(
 vm.import private @command_buffer.dispatch(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable : !vm.ref<!hal.executable>,
-  %entry_point : i32,
+  %function_id : i64,
   %workgroup_x : i32,
   %workgroup_y : i32,
   %workgroup_z : i32,
@@ -340,13 +340,14 @@ vm.import private @command_buffer.dispatch(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
+attributes {minimum_version = 7 : i32}
 
 // Dispatches an execution request with the dispatch parameters loaded from the
 // given buffer.
 vm.import private @command_buffer.dispatch.indirect(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %executable : !vm.ref<!hal.executable>,
-  %entry_point : i32,
+  %function_id : i64,
   %workgroups_buffer_slot : i32,
   %workgroups_buffer : !vm.ref<!hal.buffer>,
   %workgroups_offset : i64,
@@ -355,6 +356,7 @@ vm.import private @command_buffer.dispatch.indirect(
   // <reserved, slot, buffer, offset, length>
   %bindings : tuple<i32, i32, !vm.ref<!hal.buffer>, i64, i64>...
 )
+attributes {minimum_version = 7 : i32}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_device_t
@@ -538,6 +540,13 @@ vm.import private @executable.create(
   %constants : !vm.buffer
 ) -> !vm.ref<!hal.executable>
 attributes {nosideeffects}
+
+// Looks up an executable function by name and returns a runtime function id.
+vm.import private @executable.lookup.function(
+  %executable : !vm.ref<!hal.executable>,
+  %function_name : !vm.buffer
+) -> i64
+attributes {minimum_version = 7 : i32, nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_fence_t

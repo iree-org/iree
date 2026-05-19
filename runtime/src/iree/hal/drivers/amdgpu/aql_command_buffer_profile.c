@@ -137,7 +137,7 @@ static void iree_hal_amdgpu_aql_command_buffer_initialize_profile_operation(
             IREE_HAL_PROFILE_COMMAND_OPERATION_FLAG_PREPUBLISHED_ARGUMENTS;
       }
       record.executable_id = dispatch_command->executable_id;
-      record.export_ordinal = dispatch_command->export_ordinal;
+      record.function_ordinal = dispatch_command->export_ordinal;
       record.binding_count = dispatch_command->binding_count;
       record.workgroup_size[0] = dispatch_command->workgroup_size[0];
       record.workgroup_size[1] = dispatch_command->workgroup_size[1];

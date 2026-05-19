@@ -2103,18 +2103,20 @@ static void iree_hal_vulkan_executable_destroy(
 
 iree_status_t iree_hal_vulkan_executable_lookup_pipeline(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function,
     const iree_hal_vulkan_pipeline_t** out_pipeline) {
   IREE_ASSERT_ARGUMENT(out_pipeline);
   *out_pipeline = NULL;
   iree_hal_vulkan_executable_t* executable =
       iree_hal_vulkan_executable_cast(base_executable);
-  if (export_ordinal >= executable->pipeline_count) {
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->pipeline_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRIu32
+                            "function id %" PRIu64
                             " out of range; executable has %" PRIhsz " exports",
-                            export_ordinal, executable->pipeline_count);
+                            function.value, executable->pipeline_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   *out_pipeline = &executable->pipelines[export_ordinal];
   return iree_ok_status();
 }
@@ -2128,8 +2130,8 @@ static iree_host_size_t iree_hal_vulkan_executable_export_count(
 
 static iree_status_t iree_hal_vulkan_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
   memset(out_info, 0, sizeof(*out_info));
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
@@ -2144,9 +2146,8 @@ static iree_status_t iree_hal_vulkan_executable_export_info(
 
 static iree_status_t iree_hal_vulkan_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   IREE_ASSERT_ARGUMENT(out_parameters || capacity == 0);
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   return iree_hal_vulkan_executable_lookup_pipeline(base_executable,
@@ -2155,12 +2156,13 @@ static iree_status_t iree_hal_vulkan_executable_export_parameters(
 
 static iree_status_t iree_hal_vulkan_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_vulkan_executable_t* executable =
       iree_hal_vulkan_executable_cast(base_executable);
   for (iree_host_size_t i = 0; i < executable->pipeline_count; ++i) {
     if (iree_string_view_equal(executable->pipelines[i].name, name)) {
-      *out_export_ordinal = (iree_hal_executable_export_ordinal_t)i;
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
     }
   }
@@ -2182,9 +2184,9 @@ static iree_status_t iree_hal_vulkan_executable_lookup_global_by_name(
 
 static const iree_hal_executable_vtable_t iree_hal_vulkan_executable_vtable = {
     .destroy = iree_hal_vulkan_executable_destroy,
-    .export_count = iree_hal_vulkan_executable_export_count,
-    .export_info = iree_hal_vulkan_executable_export_info,
-    .export_parameters = iree_hal_vulkan_executable_export_parameters,
-    .lookup_export_by_name = iree_hal_vulkan_executable_lookup_export_by_name,
+    .function_count = iree_hal_vulkan_executable_export_count,
+    .function_info = iree_hal_vulkan_executable_export_info,
+    .function_parameters = iree_hal_vulkan_executable_export_parameters,
+    .lookup_function_by_name = iree_hal_vulkan_executable_lookup_export_by_name,
     .lookup_global_by_name = iree_hal_vulkan_executable_lookup_global_by_name,
 };

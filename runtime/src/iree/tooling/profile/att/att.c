@@ -33,31 +33,31 @@ static bool iree_profile_att_trace_matches(
       trace->record.dispatch_event_id != (uint64_t)id) {
     return false;
   }
-  const iree_profile_att_export_t* export_info =
-      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
-                                           trace->record.export_ordinal);
+  const iree_profile_att_function_t* function_info =
+      iree_profile_att_profile_find_function(
+          profile, trace->record.executable_id, trace->record.function_ordinal);
   if (iree_string_view_is_empty(filter) ||
       iree_string_view_equal(filter, IREE_SV("*"))) {
     return true;
   }
-  return export_info &&
-         iree_string_view_match_pattern(export_info->name, filter);
+  return function_info &&
+         iree_string_view_match_pattern(function_info->name, filter);
 }
 
 static void iree_profile_att_print_trace_header_text(
     const iree_profile_att_profile_t* profile,
     const iree_profile_att_trace_t* trace,
     const iree_profile_att_decoded_trace_t* decoded_trace, FILE* file) {
-  const iree_profile_att_export_t* export_info =
-      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
-                                           trace->record.export_ordinal);
+  const iree_profile_att_function_t* function_info =
+      iree_profile_att_profile_find_function(
+          profile, trace->record.executable_id, trace->record.function_ordinal);
   const iree_profile_att_dispatch_t* dispatch =
       iree_profile_att_profile_find_dispatch(profile, trace);
   fprintf(file, "ATT trace %" PRIu64 "\n", trace->record.trace_id);
-  fprintf(file, "  executable=%" PRIu64 " export=%" PRIu32 " name=%.*s\n",
-          trace->record.executable_id, trace->record.export_ordinal,
-          export_info ? (int)export_info->name.size : 9,
-          export_info ? export_info->name.data : "<unknown>");
+  fprintf(file, "  executable=%" PRIu64 " function=%" PRIu32 " name=%.*s\n",
+          trace->record.executable_id, trace->record.function_ordinal,
+          function_info ? (int)function_info->name.size : 9,
+          function_info ? function_info->name.data : "<unknown>");
   fprintf(file,
           "  device=%" PRIu32 " queue=%" PRIu32 " submission=%" PRIu64
           " command_buffer=%" PRIu64 " command_index=%" PRIu32 "\n",
@@ -126,25 +126,25 @@ static iree_status_t iree_profile_att_print_trace_jsonl(
     const iree_profile_att_profile_t* profile,
     const iree_profile_att_trace_t* trace,
     iree_profile_att_decoded_trace_t* decoded_trace, FILE* file) {
-  const iree_profile_att_export_t* export_info =
-      iree_profile_att_profile_find_export(profile, trace->record.executable_id,
-                                           trace->record.export_ordinal);
+  const iree_profile_att_function_t* function_info =
+      iree_profile_att_profile_find_function(
+          profile, trace->record.executable_id, trace->record.function_ordinal);
   const iree_profile_att_dispatch_t* dispatch =
       iree_profile_att_profile_find_dispatch(profile, trace);
   fprintf(file,
           "{\"type\":\"att_trace\",\"trace_id\":%" PRIu64
           ",\"dispatch_event_id\":%" PRIu64 ",\"submission_id\":%" PRIu64
           ",\"command_buffer_id\":%" PRIu64 ",\"command_index\":%" PRIu32
-          ",\"executable_id\":%" PRIu64 ",\"export_ordinal\":%" PRIu32
+          ",\"executable_id\":%" PRIu64 ",\"function_ordinal\":%" PRIu32
           ",\"physical_device_ordinal\":%" PRIu32 ",\"queue_ordinal\":%" PRIu32
           ",\"stream_id\":%" PRIu64 ",\"key\":",
           trace->record.trace_id, trace->record.dispatch_event_id,
           trace->record.submission_id, trace->record.command_buffer_id,
           trace->record.command_index, trace->record.executable_id,
-          trace->record.export_ordinal, trace->record.physical_device_ordinal,
+          trace->record.function_ordinal, trace->record.physical_device_ordinal,
           trace->record.queue_ordinal, trace->record.stream_id);
   iree_profile_fprint_json_string(
-      file, export_info ? export_info->name : IREE_SV("<unknown>"));
+      file, function_info ? function_info->name : IREE_SV("<unknown>"));
   fprintf(file,
           ",\"raw_bytes\":%" PRIhsz ",\"gfxip\":%" PRIu64 ",\"waves\":%" PRIu64
           ",\"occupancy\":%" PRIu64 ",\"instruction_events\":%" PRIu64
@@ -230,10 +230,10 @@ static iree_status_t iree_profile_att_report_file(
       iree_string_view_equal(format, IREE_SV("text"))) {
     fprintf(
         file,
-        "profile: code_objects=%" PRIhsz " loads=%" PRIhsz " exports=%" PRIhsz
+        "profile: code_objects=%" PRIhsz " loads=%" PRIhsz " functions=%" PRIhsz
         " dispatches=%" PRIhsz " traces=%" PRIhsz "\n\n",
         profile->code_object_count, profile->code_object_load_count,
-        profile->export_count, profile->dispatch_count, profile->trace_count);
+        profile->function_count, profile->dispatch_count, profile->trace_count);
   }
 
   for (iree_host_size_t i = 0;

@@ -195,14 +195,14 @@ IREE_API_EXPORT const char* iree_hal_replay_operation_code_string(
       return "executable_cache.can_prepare_format";
     case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_PREPARE_EXECUTABLE:
       return "executable_cache.prepare_executable";
-    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_COUNT:
-      return "executable.export_count";
-    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_INFO:
-      return "executable.export_info";
-    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_EXPORT_PARAMETERS:
-      return "executable.export_parameters";
-    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_EXPORT_BY_NAME:
-      return "executable.lookup_export_by_name";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_COUNT:
+      return "executable.function_count";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_INFO:
+      return "executable.function_info";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_FUNCTION_PARAMETERS:
+      return "executable.function_parameters";
+    case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_LOOKUP_FUNCTION_BY_NAME:
+      return "executable.lookup_function_by_name";
     default:
       return "unknown";
   }

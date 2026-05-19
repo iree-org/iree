@@ -620,14 +620,14 @@ class QueueBenchmark : public benchmark::Fixture {
       };
       return iree_hal_device_queue_dispatch(
           device_, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-          dispatch_executable_, /*export_ordinal=*/0,
+          dispatch_executable_, iree_hal_executable_function_from_index(0),
           iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
           IREE_HAL_DISPATCH_FLAG_NONE);
     }
     if (payload_kind == PayloadKind::kNoopDispatch) {
       return iree_hal_device_queue_dispatch(
           device_, queue_affinity, wait_semaphore_list, signal_semaphore_list,
-          dispatch_executable_, /*export_ordinal=*/0,
+          dispatch_executable_, iree_hal_executable_function_from_index(0),
           iree_hal_make_static_dispatch_config(0, 0, 0),
           iree_const_byte_span_empty(), iree_hal_buffer_ref_list_empty(),
           IREE_HAL_DISPATCH_FLAG_NONE);
@@ -1517,7 +1517,7 @@ class QueueBenchmark : public benchmark::Fixture {
         nullptr;
     IREE_RETURN_IF_ERROR(
         iree_hal_amdgpu_executable_lookup_dispatch_descriptor_for_device(
-            dispatch_executable_, /*export_ordinal=*/0,
+            dispatch_executable_, iree_hal_executable_function_from_index(0),
             host_queue->device_ordinal, &descriptor));
     if (IREE_UNLIKELY(!descriptor)) {
       return iree_make_status(
@@ -1655,7 +1655,8 @@ class QueueBenchmark : public benchmark::Fixture {
         /*values=*/binding_refs,
     };
     return iree_hal_amdgpu_host_queue_validate_dispatch(
-        host_queue, dispatch_executable_, /*export_ordinal=*/0,
+        host_queue, dispatch_executable_,
+        iree_hal_executable_function_from_index(0),
         iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
         IREE_HAL_DISPATCH_FLAG_NONE, out_operation_resource_count);
   }
@@ -1704,14 +1705,14 @@ class QueueBenchmark : public benchmark::Fixture {
 
   iree_status_t BindingCountExportOrdinal(
       int64_t binding_count,
-      iree_hal_executable_export_ordinal_t* out_export_ordinal) {
-    *out_export_ordinal = 0;
+      iree_hal_executable_function_t* out_export_ordinal) {
+    *out_export_ordinal = iree_hal_executable_function_invalid();
     char export_name_buffer[32] = {0};
     iree_string_view_t export_name = iree_string_view_empty();
     IREE_RETURN_IF_ERROR(BindingCountExportName(
         binding_count, export_name_buffer, IREE_ARRAYSIZE(export_name_buffer),
         &export_name));
-    return iree_hal_executable_lookup_export_by_name(
+    return iree_hal_executable_lookup_function_by_name(
         binding_count_executable_, export_name, out_export_ordinal);
   }
 
@@ -1731,7 +1732,8 @@ class QueueBenchmark : public benchmark::Fixture {
   iree_status_t ValidateBindingCountDispatchOnce(
       iree_hal_amdgpu_host_queue_t* host_queue, int64_t binding_count,
       iree_host_size_t* out_operation_resource_count) {
-    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    iree_hal_executable_function_t export_ordinal =
+        iree_hal_executable_function_from_index(0);
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
     iree_hal_dispatch_config_t dispatch_config;
@@ -1747,7 +1749,8 @@ class QueueBenchmark : public benchmark::Fixture {
       iree_hal_queue_affinity_t queue_affinity,
       iree_hal_semaphore_list_t wait_semaphore_list,
       iree_hal_semaphore_list_t signal_semaphore_list, int64_t binding_count) {
-    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    iree_hal_executable_function_t export_ordinal =
+        iree_hal_executable_function_from_index(0);
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
     iree_hal_dispatch_config_t dispatch_config;
@@ -1763,7 +1766,8 @@ class QueueBenchmark : public benchmark::Fixture {
   iree_status_t RecordBindingCountCommandBuffer(
       int64_t binding_count, iree_hal_command_buffer_t** out_command_buffer) {
     *out_command_buffer = nullptr;
-    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    iree_hal_executable_function_t export_ordinal =
+        iree_hal_executable_function_from_index(0);
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
     iree_hal_dispatch_config_t dispatch_config;
@@ -1819,7 +1823,8 @@ class QueueBenchmark : public benchmark::Fixture {
                               "operation count must be positive");
     }
 
-    iree_hal_executable_export_ordinal_t export_ordinal = 0;
+    iree_hal_executable_function_t export_ordinal =
+        iree_hal_executable_function_from_index(0);
     IREE_RETURN_IF_ERROR(
         BindingCountExportOrdinal(binding_count, &export_ordinal));
     iree_hal_dispatch_config_t dispatch_config;

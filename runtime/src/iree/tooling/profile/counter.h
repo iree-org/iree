@@ -56,8 +56,8 @@ typedef struct iree_profile_counter_aggregate_t {
   uint32_t counter_ordinal;
   // Producer-local executable identifier for this aggregate row.
   uint64_t executable_id;
-  // Export ordinal for this aggregate row.
-  uint32_t export_ordinal;
+  // Function ordinal for this aggregate row.
+  uint32_t function_ordinal;
   // Process-local command-buffer identifier for this aggregate row.
   uint64_t command_buffer_id;
   // Number of matched counter samples contributing to this aggregate row.
@@ -122,7 +122,7 @@ typedef struct iree_profile_counter_sample_row_t {
   const iree_profile_counter_set_t* counter_set;
   // Counter metadata for the sampled value represented by this row.
   const iree_profile_counter_t* counter;
-  // Resolved executable/export key valid only for the callback duration.
+  // Resolved executable/function key valid only for the callback duration.
   iree_string_view_t key;
   // Raw sample values valid only for the callback duration.
   iree_const_byte_span_t sample_values;
@@ -161,10 +161,11 @@ iree_status_t iree_profile_counter_process_metadata_record(
 // Counter-set and counter metadata must be processed into |context| before
 // sample records are processed.
 // Non-counter-sample records are ignored. |filter| matches counter names,
-// counter-set names, and resolved executable/export keys. |id_filter| restricts
-// matched sample/dispatch/submission/command-buffer ids when non-negative.
-// When |sample_callback.fn| is non-NULL, each matched counter sample value row
-// is delivered to the callback after the aggregate state has been updated.
+// counter-set names, and resolved executable/function keys. |id_filter|
+// restricts matched sample/dispatch/submission/command-buffer ids when
+// non-negative. When |sample_callback.fn| is non-NULL, each matched counter
+// sample value row is delivered to the callback after the aggregate state has
+// been updated.
 iree_status_t iree_profile_counter_process_sample_records(
     iree_profile_counter_context_t* counter_context,
     const iree_profile_model_t* model,

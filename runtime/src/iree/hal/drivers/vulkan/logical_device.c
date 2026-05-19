@@ -1371,7 +1371,7 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dispatch(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -1403,7 +1403,7 @@ static iree_status_t iree_hal_vulkan_logical_device_queue_dispatch(
 
   return iree_hal_vulkan_queue_submit_dispatch(
       queue, wait_semaphore_list, signal_semaphore_list, executable,
-      export_ordinal, config, constants, bindings, flags);
+      function_ordinal, config, constants, bindings, flags);
 }
 
 static iree_status_t iree_hal_vulkan_logical_device_queue_execute(

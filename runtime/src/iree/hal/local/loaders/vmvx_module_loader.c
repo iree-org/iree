@@ -260,6 +260,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
                                          host_allocator, &executable->base);
     executable->base.dispatch_attrs = dispatch_attrs;
+    executable->base.export_count = entry_count;
 
     executable->worker_capacity = worker_capacity;
     executable->worker_states =
@@ -559,16 +560,18 @@ static iree_host_size_t iree_hal_vmvx_executable_export_count(
 
 static iree_status_t iree_hal_vmvx_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
-  if (export_ordinal >= executable->entry_fn_count) {
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->entry_fn_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRId32 " out of bounds (%" PRIhsz
+                            "function id %" PRIu64 " out of bounds (%" PRIhsz
                             " exports available)",
-                            export_ordinal, executable->entry_fn_count);
+                            function.value, executable->entry_fn_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs =
       &executable->base.dispatch_attrs[export_ordinal];
 
@@ -578,15 +581,15 @@ static iree_status_t iree_hal_vmvx_executable_export_info(
       executable->entry_fn_ordinals[export_ordinal], &fn));
   out_info->name = iree_vm_function_name(&fn);
 
-  out_info->flags = IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE;
+  out_info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
   if (iree_all_bits_set(dispatch_attrs->flags,
                         IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL)) {
-    out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_SEQUENTIAL;
+    out_info->flags |= IREE_HAL_EXECUTABLE_FUNCTION_FLAG_SEQUENTIAL;
   }
   if (iree_all_bits_set(
           dispatch_attrs->flags,
           IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC)) {
-    out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_WORKGROUP_SIZE_DYNAMIC;
+    out_info->flags |= IREE_HAL_EXECUTABLE_FUNCTION_FLAG_WORKGROUP_SIZE_DYNAMIC;
   }
   out_info->constant_count = dispatch_attrs->constant_count;
   out_info->binding_count = dispatch_attrs->binding_count;
@@ -603,9 +606,8 @@ static iree_status_t iree_hal_vmvx_executable_export_info(
 
 static iree_status_t iree_hal_vmvx_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
   (void)executable;
@@ -616,10 +618,10 @@ static iree_status_t iree_hal_vmvx_executable_export_parameters(
 
 static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
-  *out_export_ordinal = 0;
+  *out_export_ordinal = iree_hal_executable_function_invalid();
 
   iree_vm_function_t fn;
   IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
@@ -630,7 +632,8 @@ static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
   // dispatch export table built during initialization.
   for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
     if (executable->entry_fn_ordinals[i] == fn.ordinal) {
-      *out_export_ordinal = i;
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
     }
   }
@@ -657,10 +660,11 @@ static const iree_hal_local_executable_vtable_t
         .base =
             {
                 .destroy = iree_hal_vmvx_executable_destroy,
-                .export_count = iree_hal_vmvx_executable_export_count,
-                .export_info = iree_hal_vmvx_executable_export_info,
-                .export_parameters = iree_hal_vmvx_executable_export_parameters,
-                .lookup_export_by_name =
+                .function_count = iree_hal_vmvx_executable_export_count,
+                .function_info = iree_hal_vmvx_executable_export_info,
+                .function_parameters =
+                    iree_hal_vmvx_executable_export_parameters,
+                .lookup_function_by_name =
                     iree_hal_vmvx_executable_lookup_export_by_name,
                 .lookup_global_by_name =
                     iree_hal_vmvx_executable_lookup_global_by_name,

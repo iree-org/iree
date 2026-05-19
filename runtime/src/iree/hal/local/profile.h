@@ -131,8 +131,8 @@ typedef struct iree_hal_local_profile_dispatch_event_info_t {
   // Command ordinal within a command buffer, or UINT32_MAX for direct dispatch.
   uint32_t command_index;
 
-  // Executable export ordinal dispatched.
-  uint32_t export_ordinal;
+  // Executable function ordinal dispatched.
+  uint32_t function_ordinal;
 
   // Workgroup counts submitted for each dimension.
   uint32_t workgroup_count[3];
@@ -154,7 +154,7 @@ iree_hal_local_profile_dispatch_event_info_default(void) {
   memset(&info, 0, sizeof(info));
   info.scope = iree_hal_local_profile_queue_scope_default();
   info.command_index = UINT32_MAX;
-  info.export_ordinal = UINT32_MAX;
+  info.function_ordinal = UINT32_MAX;
   return info;
 }
 
@@ -283,8 +283,8 @@ typedef struct iree_hal_local_profile_host_execution_event_info_t {
   // Command ordinal within a command buffer, or UINT32_MAX when absent.
   uint32_t command_index;
 
-  // Executable export ordinal, or UINT32_MAX when absent.
-  uint32_t export_ordinal;
+  // Executable function ordinal, or UINT32_MAX when absent.
+  uint32_t function_ordinal;
 
   // Workgroup counts submitted for dispatch-like spans.
   uint32_t workgroup_count[3];
@@ -320,7 +320,7 @@ iree_hal_local_profile_host_execution_event_info_default(void) {
   info.status_code = UINT32_MAX;
   info.scope = iree_hal_local_profile_queue_scope_default();
   info.command_index = UINT32_MAX;
-  info.export_ordinal = UINT32_MAX;
+  info.function_ordinal = UINT32_MAX;
   return info;
 }
 
@@ -470,7 +470,7 @@ const iree_hal_device_profiling_options_t*
 iree_hal_local_profile_recorder_options(
     const iree_hal_local_profile_recorder_t* recorder);
 
-// Emits executable/export metadata for |executable_id| once per recorder
+// Emits executable function metadata for |executable_id| once per recorder
 // session.
 //
 // |executable_id| must be a producer-defined nonzero identifier that remains
@@ -480,11 +480,12 @@ iree_status_t iree_hal_local_profile_recorder_record_executable_with_id(
     iree_hal_local_profile_recorder_t* recorder,
     iree_hal_executable_t* executable, uint64_t executable_id);
 
-// Emits local executable/export metadata once per recorder session.
+// Emits local executable function metadata once per recorder session.
 //
 // Returns OK without work when executable metadata is not enabled. This is a
 // cold-path helper for queue submission/replay sites that produce events with
-// executable ids and need offline tools to resolve those ids into export names.
+// executable ids and need offline tools to resolve those ids into function
+// names.
 iree_status_t iree_hal_local_profile_recorder_record_executable(
     iree_hal_local_profile_recorder_t* recorder,
     iree_hal_executable_t* executable);

@@ -225,10 +225,10 @@ util.func public @memoize_command_buffer() -> !hal.command_buffer {
   // CHECK: %[[CMD:.+]] = util.call @__memoize_command_buffer_memoize_lookup
   %result = hal.device.memoize<%device : !hal.device> affinity(%affinity) -> !hal.command_buffer {
     %cmd = hal.command_buffer.create device(%device : !hal.device) mode(None) categories("Transfer|Dispatch") affinity(%affinity) : !hal.command_buffer
-    %dispatch_ordinal = arith.constant 123 : index
+    %function_id = arith.constant 123 : i64
     %offset = arith.constant 100 : index
     hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
-        target(%executable : !hal.executable)[%dispatch_ordinal]
+        target(%executable : !hal.executable)[%function_id]
         workgroups(%buffer : !hal.buffer)[%offset]
         bindings([
           (%buffer : !hal.buffer)[%c0, %c1]

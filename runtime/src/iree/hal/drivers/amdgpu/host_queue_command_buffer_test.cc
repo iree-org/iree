@@ -360,8 +360,8 @@ struct CommandBufferProfileSink {
   // Number of executable metadata chunks observed.
   int executable_metadata_count = 0;
 
-  // Number of executable export metadata chunks observed.
-  int executable_export_metadata_count = 0;
+  // Number of executable function metadata chunks observed.
+  int executable_function_metadata_count = 0;
 
   // Number of command-buffer metadata chunks observed.
   int command_buffer_metadata_count = 0;
@@ -605,7 +605,7 @@ static iree_status_t CommandBufferProfileSinkWrite(
       EXPECT_EQ(sizeof(iree_hal_profile_executable_record_t),
                 records[i].record_length);
       EXPECT_NE(0u, records[i].executable_id);
-      EXPECT_GT(records[i].export_count, 0u);
+      EXPECT_GT(records[i].function_count, 0u);
       EXPECT_NE(0u, records[i].flags &
                         IREE_HAL_PROFILE_EXECUTABLE_FLAG_CODE_OBJECT_HASH);
       EXPECT_NE(
@@ -615,32 +615,33 @@ static iree_status_t CommandBufferProfileSinkWrite(
     ++test_sink->executable_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
-                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS)) {
+                 IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS)) {
     iree_host_size_t payload_offset = 0;
     while (payload_offset < iovecs[0].data_length) {
       if (iovecs[0].data_length - payload_offset <
-          sizeof(iree_hal_profile_executable_export_record_t)) {
+          sizeof(iree_hal_profile_executable_function_record_t)) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
-                                "truncated executable export profile record");
+                                "truncated executable function profile record");
       }
-      iree_hal_profile_executable_export_record_t record;
+      iree_hal_profile_executable_function_record_t record;
       memcpy(&record, iovecs[0].data + payload_offset, sizeof(record));
       if (record.record_length < sizeof(record) ||
           record.record_length > iovecs[0].data_length - payload_offset) {
         return iree_make_status(IREE_STATUS_DATA_LOSS,
-                                "invalid executable export profile record");
+                                "invalid executable function profile record");
       }
       EXPECT_NE(0u, record.executable_id);
-      EXPECT_NE(UINT32_MAX, record.export_ordinal);
-      EXPECT_NE(0u, record.flags &
-                        IREE_HAL_PROFILE_EXECUTABLE_EXPORT_FLAG_PIPELINE_HASH);
-      EXPECT_NE(0u, record.pipeline_hash[0] | record.pipeline_hash[1]);
+      EXPECT_NE(UINT32_MAX, record.function_ordinal);
+      EXPECT_NE(0u,
+                record.flags &
+                    IREE_HAL_PROFILE_EXECUTABLE_FUNCTION_FLAG_FUNCTION_HASH);
+      EXPECT_NE(0u, record.function_hash[0] | record.function_hash[1]);
       EXPECT_EQ(record.name_length,
                 record.record_length - (uint32_t)sizeof(record));
       test_sink->executable_export_ids.push_back(record.executable_id);
       payload_offset += record.record_length;
     }
-    ++test_sink->executable_export_metadata_count;
+    ++test_sink->executable_function_metadata_count;
   } else if (iree_string_view_equal(
                  metadata->content_type,
                  IREE_HAL_PROFILE_CONTENT_TYPE_COMMAND_BUFFERS)) {
@@ -688,7 +689,7 @@ static iree_status_t CommandBufferProfileSinkWrite(
       }
       if (records[i].type == IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH) {
         EXPECT_NE(0u, records[i].executable_id);
-        EXPECT_NE(UINT32_MAX, records[i].export_ordinal);
+        EXPECT_NE(UINT32_MAX, records[i].function_ordinal);
         EXPECT_NE(0u, records[i].binding_count);
         EXPECT_NE(0u, records[i].workgroup_size[0]);
       }
@@ -1256,7 +1257,7 @@ static iree_status_t AppendConstantsBindingsDispatch(
   iree_const_byte_span_t constants =
       iree_make_const_byte_span(constant_values, sizeof(constant_values));
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE);
 }
@@ -1405,7 +1406,7 @@ TEST_F(HostQueueCommandBufferTest, DispatchSummariesRetainPacketOrdinals) {
   EXPECT_EQ(summary->packets.first_ordinal, 0u);
   EXPECT_EQ(summary->packets.dispatch_ordinal, 0u);
   EXPECT_EQ(summary->metadata.command_index, 0u);
-  EXPECT_EQ(summary->metadata.export_ordinal, 0u);
+  EXPECT_EQ(summary->metadata.function_ordinal, 0u);
   EXPECT_EQ(summary->metadata.dispatch_flags,
             IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE);
 
@@ -1414,7 +1415,7 @@ TEST_F(HostQueueCommandBufferTest, DispatchSummariesRetainPacketOrdinals) {
   EXPECT_EQ(summary->packets.first_ordinal, 1u);
   EXPECT_EQ(summary->packets.dispatch_ordinal, 1u);
   EXPECT_EQ(summary->metadata.command_index, 1u);
-  EXPECT_EQ(summary->metadata.export_ordinal, 0u);
+  EXPECT_EQ(summary->metadata.function_ordinal, 0u);
   EXPECT_EQ(summary->metadata.dispatch_flags,
             IREE_HAL_AMDGPU_COMMAND_BUFFER_DISPATCH_FLAG_NONE);
   EXPECT_EQ(summary->next, nullptr);
@@ -1569,11 +1570,11 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
       /*binding_capacity=*/0, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -1650,7 +1651,8 @@ TEST_F(HostQueueCommandBufferTest, DirectDispatchUsesPrepublishedKernargs) {
       /*binding_capacity=*/0, one_shot_command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(one_shot_command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      one_shot_command_buffer, executable, /*entry_point=*/0,
+      one_shot_command_buffer, executable,
+      iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(one_shot_command_buffer));
@@ -1840,7 +1842,7 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
     EXPECT_EQ((uint32_t)i, operation.command_index);
     EXPECT_NE(0u, operation.executable_id);
-    EXPECT_EQ(0u, operation.export_ordinal);
+    EXPECT_EQ(0u, operation.function_ordinal);
     EXPECT_EQ(2u, operation.binding_count);
     EXPECT_EQ(1u, operation.workgroup_count[0]);
     EXPECT_EQ(1u, operation.workgroup_count[1]);
@@ -1857,7 +1859,7 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_EQ(sink.command_buffer_ids[0], event.command_buffer_id);
     EXPECT_NE(0u, event.executable_id);
     EXPECT_EQ((uint32_t)i, event.command_index);
-    EXPECT_EQ(0u, event.export_ordinal);
+    EXPECT_EQ(0u, event.function_ordinal);
     EXPECT_EQ(1u, event.workgroup_count[0]);
     EXPECT_EQ(1u, event.workgroup_count[1]);
     EXPECT_EQ(1u, event.workgroup_count[2]);
@@ -1949,7 +1951,7 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_EQ(i, operation.command_index);
     EXPECT_EQ(sink.command_buffer_ids[0], operation.command_buffer_id);
     EXPECT_NE(0u, operation.executable_id);
-    EXPECT_EQ(0u, operation.export_ordinal);
+    EXPECT_EQ(0u, operation.function_ordinal);
     EXPECT_EQ(2u, operation.binding_count);
     EXPECT_EQ(1u, operation.workgroup_count[0]);
     EXPECT_EQ(1u, operation.workgroup_count[1]);
@@ -2278,7 +2280,7 @@ TEST_F(HostQueueCommandBufferTest, Pm4MixedDynamicDispatchUsesGpuFixup) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2415,7 +2417,7 @@ TEST_F(HostQueueCommandBufferTest, Pm4DynamicDispatchUsesBindingTableSlots) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2540,7 +2542,7 @@ TEST_F(HostQueueCommandBufferTest,
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -2704,7 +2706,7 @@ TEST_F(HostQueueCommandBufferTest, DynamicDispatchUsesBindingTableSlots) {
       /*binding_capacity=*/4, command_buffer.out()));
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable, /*entry_point=*/0,
+      command_buffer, executable, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants,
       dispatch_bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -3256,7 +3258,7 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
   EXPECT_EQ(1, sink.device_metadata_count);
   EXPECT_EQ(1, sink.queue_metadata_count);
   EXPECT_EQ(1, sink.executable_metadata_count);
-  EXPECT_EQ(1, sink.executable_export_metadata_count);
+  EXPECT_EQ(1, sink.executable_function_metadata_count);
   EXPECT_EQ(1, sink.command_buffer_metadata_count);
   EXPECT_EQ(1, sink.command_operation_metadata_count);
   EXPECT_GE(sink.clock_correlation_count, 2);
@@ -3276,7 +3278,7 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
             sink.executable_ids.end(),
             std::find(sink.executable_ids.begin(), sink.executable_ids.end(),
                       operation.executable_id));
-        EXPECT_EQ(0u, operation.export_ordinal);
+        EXPECT_EQ(0u, operation.function_ordinal);
         EXPECT_EQ(2u, operation.binding_count);
         EXPECT_EQ(1u, operation.workgroup_count[0]);
         EXPECT_EQ(1u, operation.workgroup_count[1]);
@@ -3328,8 +3330,8 @@ TEST_F(HostQueueCommandBufferTest, CommandBufferDispatchesEmitProfileEvents) {
     EXPECT_EQ(IREE_HAL_PROFILE_COMMAND_OPERATION_TYPE_DISPATCH,
               operation->type);
     EXPECT_EQ(event.executable_id, operation->executable_id);
-    EXPECT_EQ(event.export_ordinal, operation->export_ordinal);
-    EXPECT_EQ(0u, event.export_ordinal);
+    EXPECT_EQ(event.function_ordinal, operation->function_ordinal);
+    EXPECT_EQ(0u, event.function_ordinal);
     EXPECT_EQ(1u, event.workgroup_count[0]);
     EXPECT_EQ(1u, event.workgroup_count[1]);
     EXPECT_EQ(1u, event.workgroup_count[2]);
@@ -3528,7 +3530,7 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_EQ(sample.start_tick, event.start_tick);
     EXPECT_EQ(sample.end_tick, event.end_tick);
     EXPECT_EQ(sample.command_index, event.command_index);
-    EXPECT_EQ(sample.export_ordinal, event.export_ordinal);
+    EXPECT_EQ(sample.function_ordinal, event.function_ordinal);
     sample_value_count += sample.sample_value_count;
   }
   ASSERT_EQ(sample_value_count, sink.counter_sample_values.size());
@@ -3586,7 +3588,7 @@ TEST_F(HostQueueCommandBufferTest,
     EXPECT_EQ(0u, sample.command_buffer_id);
     EXPECT_EQ(0u, sample.executable_id);
     EXPECT_EQ(UINT32_MAX, sample.command_index);
-    EXPECT_EQ(UINT32_MAX, sample.export_ordinal);
+    EXPECT_EQ(UINT32_MAX, sample.function_ordinal);
     ASSERT_LT(sample.physical_device_ordinal,
               logical_device->physical_device_count);
     const iree_hal_amdgpu_physical_device_t* physical_device =
@@ -3745,8 +3747,8 @@ TEST_F(HostQueueCommandBufferTest,
       IREE_HAL_DEVICE_PROFILING_DATA_DISPATCH_EVENTS;
   profiling_options.sink = CommandBufferProfileSinkAsBase(&sink);
   profiling_options.capture_filter.flags =
-      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN;
-  profiling_options.capture_filter.executable_export_pattern =
+      IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN;
+  profiling_options.capture_filter.executable_function_pattern =
       iree_make_string_view(export_pattern.data(), export_pattern.size());
   DeviceProfilingScope profiling(test_device.base_device());
   iree_status_t profiling_status = profiling.Begin(&profiling_options);
@@ -3769,7 +3771,7 @@ TEST_F(HostQueueCommandBufferTest,
   const uint64_t executable_id =
       iree_hal_amdgpu_executable_profile_id(executable);
   EXPECT_TRUE(iree_hal_amdgpu_logical_device_should_profile_dispatch(
-      test_device.logical_device(), executable_id, /*export_ordinal=*/0,
+      test_device.logical_device(), executable_id, /*function_ordinal=*/0,
       /*command_buffer_id=*/0, /*command_index=*/0,
       /*physical_device_ordinal=*/0, /*queue_ordinal=*/0));
 

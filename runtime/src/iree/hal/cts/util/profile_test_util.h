@@ -57,8 +57,8 @@ struct TestProfileSink {
   // Number of executable metadata chunks observed.
   int executable_metadata_count = 0;
 
-  // Number of executable export metadata chunks observed.
-  int executable_export_metadata_count = 0;
+  // Number of executable function metadata chunks observed.
+  int executable_function_metadata_count = 0;
 
   // Number of command-buffer metadata chunks observed.
   int command_buffer_metadata_count = 0;
@@ -111,8 +111,8 @@ struct TestProfileSink {
   // Executable identifiers copied from EXECUTABLES chunks.
   std::vector<uint64_t> executable_ids;
 
-  // Executable identifiers referenced by EXECUTABLE_EXPORTS chunks.
-  std::vector<uint64_t> export_record_executable_ids;
+  // Executable identifiers referenced by EXECUTABLE_FUNCTIONS chunks.
+  std::vector<uint64_t> function_record_executable_ids;
 
   // Command-buffer identifiers copied from COMMAND_BUFFERS chunks.
   std::vector<uint64_t> command_buffer_ids;

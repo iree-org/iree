@@ -20,7 +20,7 @@ static const uint64_t kSmokeStreamId = 11;
 static const uint64_t kSmokeCommandBufferId = 7;
 static const uint32_t kSmokeCommandIndex = 2;
 static const uint64_t kSmokeExecutableId = 13;
-static const uint32_t kSmokeExportOrdinal = 1;
+static const uint32_t kSmokeFunctionOrdinal = 1;
 static const uint64_t kSmokeAllocationId = 31;
 static const uint64_t kSmokeMetricSourceId = 41;
 static const uint64_t kSmokeSourceSpecificMetricId =
@@ -100,32 +100,32 @@ static iree_status_t write_smoke_profile(iree_string_view_t path,
     iree_hal_profile_executable_record_t executable =
         iree_hal_profile_executable_record_default();
     executable.executable_id = kSmokeExecutableId;
-    executable.export_count = 1;
+    executable.function_count = 1;
     status = write_profile_chunk(
         sink, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLES, IREE_SV("executables"),
         iree_make_const_byte_span(&executable, sizeof(executable)));
   }
 
   if (iree_status_is_ok(status)) {
-    const char export_name[] = "smoke_export";
-    iree_hal_profile_executable_export_record_t export_record =
-        iree_hal_profile_executable_export_record_default();
-    export_record.executable_id = kSmokeExecutableId;
-    export_record.export_ordinal = kSmokeExportOrdinal;
-    export_record.binding_count = 3;
-    export_record.workgroup_size[0] = 7;
-    export_record.workgroup_size[1] = 8;
-    export_record.workgroup_size[2] = 9;
-    export_record.name_length = sizeof(export_name) - 1;
-    export_record.record_length =
-        sizeof(export_record) + export_record.name_length;
+    const char function_name[] = "smoke_function";
+    iree_hal_profile_executable_function_record_t function_record =
+        iree_hal_profile_executable_function_record_default();
+    function_record.executable_id = kSmokeExecutableId;
+    function_record.function_ordinal = kSmokeFunctionOrdinal;
+    function_record.binding_count = 3;
+    function_record.workgroup_size[0] = 7;
+    function_record.workgroup_size[1] = 8;
+    function_record.workgroup_size[2] = 9;
+    function_record.name_length = sizeof(function_name) - 1;
+    function_record.record_length =
+        sizeof(function_record) + function_record.name_length;
     iree_const_byte_span_t iovecs[2] = {
-        iree_make_const_byte_span(&export_record, sizeof(export_record)),
-        iree_make_const_byte_span(export_name, export_record.name_length),
+        iree_make_const_byte_span(&function_record, sizeof(function_record)),
+        iree_make_const_byte_span(function_name, function_record.name_length),
     };
     status = write_profile_chunk_iovecs(
-        sink, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_EXPORTS,
-        IREE_SV("executable-exports"), IREE_ARRAYSIZE(iovecs), iovecs);
+        sink, IREE_HAL_PROFILE_CONTENT_TYPE_EXECUTABLE_FUNCTIONS,
+        IREE_SV("executable-functions"), IREE_ARRAYSIZE(iovecs), iovecs);
   }
 
   if (iree_status_is_ok(status)) {
@@ -147,7 +147,7 @@ static iree_status_t write_smoke_profile(iree_string_view_t path,
     command_operation.command_index = kSmokeCommandIndex;
     command_operation.command_buffer_id = kSmokeCommandBufferId;
     command_operation.executable_id = kSmokeExecutableId;
-    command_operation.export_ordinal = kSmokeExportOrdinal;
+    command_operation.function_ordinal = kSmokeFunctionOrdinal;
     command_operation.binding_count = 3;
     command_operation.workgroup_count[0] = 4;
     command_operation.workgroup_count[1] = 5;
@@ -196,7 +196,7 @@ static iree_status_t write_smoke_profile(iree_string_view_t path,
     dispatch.command_buffer_id = kSmokeCommandBufferId;
     dispatch.executable_id = kSmokeExecutableId;
     dispatch.command_index = kSmokeCommandIndex;
-    dispatch.export_ordinal = kSmokeExportOrdinal;
+    dispatch.function_ordinal = kSmokeFunctionOrdinal;
     dispatch.workgroup_count[0] = 4;
     dispatch.workgroup_count[1] = 5;
     dispatch.workgroup_count[2] = 6;
@@ -269,7 +269,7 @@ static iree_status_t write_smoke_profile(iree_string_view_t path,
     host_events[0].physical_device_ordinal = kSmokePhysicalDevice;
     host_events[0].queue_ordinal = kSmokeQueueOrdinal;
     host_events[0].command_index = kSmokeCommandIndex;
-    host_events[0].export_ordinal = kSmokeExportOrdinal;
+    host_events[0].function_ordinal = kSmokeFunctionOrdinal;
     host_events[0].start_host_time_ns = 3100;
     host_events[0].end_host_time_ns = 3150;
     host_events[0].payload_length = 4096;

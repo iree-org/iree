@@ -80,8 +80,8 @@ typedef struct iree_hal_vulkan_command_dispatch_t {
   // Pipeline metadata borrowed from executable and stable while retained.
   const iree_hal_vulkan_pipeline_t* pipeline;
 
-  // Executable export ordinal captured during recording.
-  iree_hal_executable_export_ordinal_t export_ordinal;
+  // Executable function ordinal captured during recording.
+  iree_hal_executable_function_t function_ordinal;
 
   // Dispatch workgroup configuration captured during recording.
   iree_hal_dispatch_config_t config;
@@ -807,10 +807,11 @@ static iree_status_t iree_hal_vulkan_command_buffer_profile_operation(
           iree_hal_vulkan_command_dispatch_payload(command);
       const iree_hal_vulkan_pipeline_t* pipeline = NULL;
       IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
-          dispatch->executable, dispatch->export_ordinal, &pipeline));
+          dispatch->executable, dispatch->function_ordinal, &pipeline));
       record.executable_id =
           iree_hal_vulkan_executable_profile_id(dispatch->executable);
-      record.export_ordinal = dispatch->export_ordinal;
+      record.function_ordinal =
+          iree_hal_executable_function_index(dispatch->function_ordinal);
       if (dispatch->binding_count > UINT32_MAX) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
@@ -936,9 +937,9 @@ static bool iree_hal_vulkan_command_buffer_profile_filter_matches_dispatch(
   }
   if (iree_any_bit_set(
           filter->flags,
-          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_EXPORT_PATTERN) &&
+          IREE_HAL_PROFILE_CAPTURE_FILTER_FLAG_EXECUTABLE_FUNCTION_PATTERN) &&
       !iree_string_view_match_pattern(pipeline->name,
-                                      filter->executable_export_pattern)) {
+                                      filter->executable_function_pattern)) {
     return false;
   }
   return true;
@@ -1074,7 +1075,8 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
     event_info.executable_id =
         iree_hal_vulkan_executable_profile_id(dispatch->executable);
     event_info.command_index = profile_command_index;
-    event_info.export_ordinal = dispatch->export_ordinal;
+    event_info.function_ordinal =
+        iree_hal_executable_function_index(dispatch->function_ordinal);
     if (is_command_buffer_dispatch) {
       event_info.flags |= IREE_HAL_PROFILE_DISPATCH_EVENT_FLAG_COMMAND_BUFFER;
     }
@@ -2854,7 +2856,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_validate_dispatch_abi(
 static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t function_ordinal,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_vulkan_command_buffer_t* command_buffer =
@@ -2920,7 +2922,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
 
   const iree_hal_vulkan_pipeline_t* pipeline = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_vulkan_executable_lookup_pipeline(
-      executable, export_ordinal, &pipeline));
+      executable, function_ordinal, &pipeline));
 
   if (iree_hal_vulkan_command_buffer_validates(command_buffer)) {
     if (constants.data_length % sizeof(uint32_t) != 0) {
@@ -3008,7 +3010,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
     }
     dispatch->executable = executable;
     dispatch->pipeline = pipeline;
-    dispatch->export_ordinal = export_ordinal;
+    dispatch->function_ordinal = function_ordinal;
     dispatch->config = config;
     dispatch->constants_data_length = constants.data_length;
     dispatch->binding_count = bindings.count;
