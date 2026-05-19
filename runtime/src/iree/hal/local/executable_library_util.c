@@ -32,8 +32,12 @@ iree_status_t iree_hal_executable_library_verify(
         IREE_STATUS_FAILED_PRECONDITION,
         "executable exports must provide dispatch attributes");
   }
+  if (library->exports.count && !library->exports.names) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable exports must provide function names");
+  }
 
-  // Validate dispatch attributes are in range.
+  // Validate dispatch attributes are in range and names are usable.
   for (uint32_t i = 0; i < library->exports.count; ++i) {
     const iree_hal_executable_dispatch_attrs_v0_t dispatch_attrs =
         library->exports.attrs[i];
@@ -50,6 +54,10 @@ iree_status_t iree_hal_executable_library_verify(
           IREE_STATUS_OUT_OF_RANGE,
           "dispatch requiring %u bindings exceeds limit of %d",
           dispatch_attrs.binding_count, IREE_HAL_EXECUTABLE_MAX_BINDING_COUNT);
+    }
+    if (!library->exports.names[i] || !library->exports.names[i][0]) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "executable export %u missing function name", i);
     }
   }
 
@@ -246,13 +254,12 @@ iree_status_t iree_hal_executable_library_lookup_export_by_name(
   IREE_ASSERT_ARGUMENT(library);
   IREE_ASSERT_ARGUMENT(out_export_ordinal);
 
-  // Names array must exist for lookup by name.
   if (!library->exports.names) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "export names not available in library");
+                            "function names not available in library");
   }
 
-  // Linear search through export names.
+  // Linear search through function names.
   for (uint32_t i = 0; i < library->exports.count; ++i) {
     if (library->exports.names[i]) {
       iree_string_view_t export_name =
@@ -286,7 +293,7 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
     iree_string_view_t executable_identifier,
     const iree_hal_executable_library_v0_t* library, iree_host_size_t ordinal) {
   iree_string_view_t entry_point_name = iree_string_view_empty();
-  if (library->exports.names != NULL) {
+  if (library->exports.names != NULL && library->exports.names[ordinal]) {
     entry_point_name = iree_make_cstring_view(library->exports.names[ordinal]);
   }
   if (iree_string_view_is_empty(entry_point_name)) {

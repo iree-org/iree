@@ -35,9 +35,9 @@ public:
   // Builder mode setting.
   enum class Mode : uint32_t {
     NONE = 0u,
-    // Include entry point names and tags.
-    // If not specified then the reflection strings will be excluded to reduce
-    // binary size.
+    // Include debug/reflection strings beyond required function names.
+    // If not specified then tags and source locations will be excluded to
+    // reduce binary size.
     INCLUDE_REFLECTION_ATTRS = 1 << 0u,
   };
 
@@ -51,10 +51,11 @@ public:
     V_0_4 = 0x0000'0004u, // v0.4 - ~2024-03-12
     V_0_5 = 0x0000'0005u, // v0.5 - ~2024-08-25
     V_0_6 = 0x0000'0006u, // v0.6 - ~2025-08-15
+    V_0_7 = 0x0000'0007u, // v0.7 - ~2026-05-19
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_6,
+    LATEST = V_0_7,
   };
 
   // iree_hal_executable_library_features_t

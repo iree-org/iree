@@ -744,9 +744,12 @@ static iree_status_t iree_hal_cmd_execute_dispatch_tiles(
                             worker_context->local_memory.data_length);
   }
 
+  IREE_TRACE(
+      const iree_hal_executable_function_t trace_function =
+          iree_hal_executable_function_from_index(dispatch->export_ordinal));
   IREE_TRACE(iree_string_view_t trace_name =
-                 iree_hal_local_executable_export_name(
-                     dispatch->executable, dispatch->export_ordinal));
+                 iree_hal_local_executable_export_name(dispatch->executable,
+                                                       trace_function));
   IREE_TRACE(if (iree_string_view_is_empty(trace_name)) {
     trace_name = iree_make_cstring_view("iree_hal_local_task_dispatch");
   });
