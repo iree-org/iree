@@ -225,14 +225,6 @@ struct ROCDLPrepareForSPIRVPass final
       }
     });
 
-    // Remove llvm.intr.assume calls. The SPIR-V backend's SPIRVEmitIntrinsics
-    // crashes on llvm.assume with operand bundles (paramHasAttr out-of-bounds).
-    SmallVector<LLVM::AssumeOp> assumeOps;
-    moduleOp->walk([&](LLVM::AssumeOp op) { assumeOps.push_back(op); });
-    for (auto op : assumeOps) {
-      op.erase();
-    }
-
     // Remap address spaces on all operations.
     moduleOp->walk([&](Operation *op) {
       // Skip function ops — they were already handled above.

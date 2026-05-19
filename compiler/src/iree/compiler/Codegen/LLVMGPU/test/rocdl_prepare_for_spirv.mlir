@@ -71,32 +71,6 @@ module {
 
 // -----
 
-// Test that llvm.intr.assume calls are stripped (SPIR-V backend workaround).
-// The SPIR-V backend crashes on llvm.assume with operand bundles
-// (SPIRVEmitIntrinsics::paramHasAttr out-of-bounds).
-
-module {
-  // CHECK-LABEL: llvm.func spir_kernelcc @kernel_with_assumes
-  llvm.func amdgpu_kernelcc @kernel_with_assumes(%arg0: !llvm.ptr<1>) {
-    %true = llvm.mlir.constant(true) : i1
-    %c64 = llvm.mlir.constant(64 : i32) : i32
-    // CHECK-NOT:   llvm.intr.assume
-    // Simple assume (no operand bundles).
-    llvm.intr.assume %true : i1
-    // Assume with operand bundles — this is the case that crashes the SPIR-V
-    // backend (paramHasAttr on bundle operands).
-    llvm.intr.assume %true ["align"(%arg0, %c64 : !llvm.ptr<1>, i32)] : i1
-    %c0 = llvm.mlir.constant(0 : i64) : i64
-    // CHECK:       llvm.getelementptr
-    %gep = llvm.getelementptr %arg0[%c0] : (!llvm.ptr<1>, i64) -> !llvm.ptr<1>, f32
-    // CHECK:       llvm.load
-    %val = llvm.load %gep : !llvm.ptr<1> -> f32
-    llvm.return
-  }
-}
-
-// -----
-
 // Test that rocdl.kernel attribute triggers spir_kernel CC.
 // After ROCDLAnnotateKernelForTranslation, kernels have rocdl.kernel
 // instead of amdgpu_kernel CC.
