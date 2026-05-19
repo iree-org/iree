@@ -1,0 +1,141 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "source",
+    srcs = ["source.c"],
+    hdrs = ["source.h"],
+    deps = [
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "module",
+    srcs = ["module.c"],
+    hdrs = ["module.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/vm/bytecode/isa",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "bytecode",
+    srcs = ["bytecode.c"],
+    hdrs = ["bytecode.h"],
+    deps = [
+        ":module",
+        ":source",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/vm/bytecode/isa",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "parser",
+    srcs = ["parser.c"],
+    hdrs = ["parser.h"],
+    deps = [
+        ":bytecode",
+        ":module",
+        ":source",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/vm/bytecode/isa",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "archive",
+    srcs = ["archive.c"],
+    hdrs = ["archive.h"],
+    deps = [
+        ":module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal/flatcc:building",
+        "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm/bytecode/isa",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "assembler",
+    srcs = ["assembler.c"],
+    hdrs = ["assembler.h"],
+    deps = [
+        ":archive",
+        ":module",
+        ":parser",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "source_test",
+    srcs = ["source_test.cc"],
+    deps = [
+        ":source",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "module_test",
+    srcs = ["module_test.cc"],
+    deps = [
+        ":module",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "bytecode_test",
+    srcs = ["bytecode_test.cc"],
+    deps = [
+        ":bytecode",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm/bytecode/isa",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "parser_test",
+    srcs = ["parser_test.cc"],
+    deps = [
+        ":parser",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "assembler_test",
+    srcs = ["assembler_test.cc"],
+    deps = [
+        ":assembler",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm/bytecode:module",
+    ],
+)

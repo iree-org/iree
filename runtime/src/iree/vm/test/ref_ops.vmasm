@@ -1,0 +1,827 @@
+vm.module @ref_ops version 0
+vm.type i32
+vm.type !vm.buffer
+vm.type !vm.list<?>
+vm.type !vm.opaque
+vm.rodata[0] = 010203
+vm.rodata[1] = 040506
+
+vm.export @test_zero_ref_eq
+vm.func @test_zero_ref_eq() -> () {
+^bb0:
+  %r0 = vm.const.ref.zero
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @test_ref_eq
+vm.func @test_ref_eq() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.eq.ref %r0, %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, ""
+}
+
+vm.export @test_ref_ne
+vm.func @test_ref_ne() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %i2 = vm.cmp.ne.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, ""
+}
+
+vm.export @test_ref_nz
+vm.func @test_ref_nz() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, ""
+}
+
+vm.export @test_ref_survives_call
+vm.func @test_ref_survives_call() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  vm.call @ref_ops:5(%R0)
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "ref valid after call"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid before call"
+}
+
+vm.func @fn5(%r0: !vm.ref<?>) -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ref valid in callee"
+}
+
+vm.export @test_same_ref_multiple_args
+vm.func @test_same_ref_multiple_args() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.call @ref_ops:7(%r0, %r0)
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ref valid after call with same ref twice"
+}
+
+vm.func @fn7(%r0: !vm.ref<?>, %r1: !vm.ref<?>) -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.cmp.nz.ref %r0
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb6(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "both args are same ref"
+^bb5:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "second arg valid"
+^bb6:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "first arg valid"
+}
+
+vm.export @test_ref_returned_from_call
+vm.func @test_ref_returned_from_call() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.call @ref_ops:9()
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "returned ref is valid"
+}
+
+vm.func @fn9() -> (!vm.ref<?>) {
+^bb0:
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.return %R0
+}
+
+vm.export @test_ref_passthrough
+vm.func @test_ref_passthrough() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.call @ref_ops:11(%r0)
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "passthrough returns same ref"
+}
+
+vm.func @fn11(%r0: !vm.ref<?>) -> (!vm.ref<?>) {
+^bb0:
+  vm.return %R0
+}
+
+vm.export @test_ref_cond_br_both_paths
+vm.func @test_ref_cond_br_both_paths() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.cond_br %i1, ^bb1(), ^bb4()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "ref valid in bb1"
+^bb4:
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb5(), ^bb2()
+^bb5:
+  vm.fail %i0, "ref valid in bb2"
+}
+
+vm.export @test_ref_cond_br_one_path
+vm.func @test_ref_cond_br_one_path() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.cond_br %i1, ^bb1(), ^bb2()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb2:
+  vm.discard.refs %r0
+  vm.br ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "ref valid in bb1"
+}
+
+vm.export @test_ref_in_loop
+vm.func @test_ref_in_loop() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 3  // 0x00000003
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.br ^bb1()
+^bb1:
+  %i4 = vm.cmp.nz.ref %r0
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb3(), ^bb2()
+^bb2:
+  %i3 = vm.add.i32 %i3, %i2
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  vm.cond_br %i4, ^bb1(), ^bb4()
+^bb3:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid in loop"
+^bb4:
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @test_multiple_refs_in_loop
+vm.func @test_multiple_refs_in_loop() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 3  // 0x00000003
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  vm.br ^bb1()
+^bb1:
+  %i4 = vm.cmp.nz.ref %r0
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb7(), ^bb2()
+^bb2:
+  %i4 = vm.cmp.nz.ref %r1
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb6(), ^bb3()
+^bb3:
+  %i4 = vm.cmp.ne.ref %r0, %r1
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb5(), ^bb4()
+^bb4:
+  %i3 = vm.add.i32 %i3, %i2
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  vm.cond_br %i4, ^bb1(), ^bb8()
+^bb5:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "refs are different"
+^bb6:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "ref_b valid in loop"
+^bb7:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "ref_a valid in loop"
+^bb8:
+  vm.discard.refs %r0, %r1
+  vm.return
+}
+
+vm.export @test_global_store_load_ref
+vm.func @test_global_store_load_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.global.store.ref %r0, .refs[0] : !vm.buffer
+  %r1 = vm.global.load.ref .refs[0] : !vm.buffer
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "loaded ref equals stored ref"
+}
+
+vm.export @test_ref_valid_after_global_store
+vm.func @test_ref_valid_after_global_store() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  vm.global.store.ref %R0, .refs[0] : !vm.buffer
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "ref valid after store to global"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid before store"
+}
+
+vm.export @test_list_set_get_ref
+vm.func @test_list_set_get_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.list.alloc %i2 : !vm.list<!vm.opaque>
+  vm.list.resize %r1, %i2
+  vm.list.set.ref %r1, %i1, %r0
+  %r2 = vm.list.get.ref %r1, %i1 : !vm.buffer
+  vm.discard.refs %r1
+  %i1 = vm.cmp.eq.ref %r0, %r2
+  vm.discard.refs %r0, %r2
+  %i2 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i2, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "retrieved ref equals set ref"
+}
+
+vm.export @test_list_multiple_refs
+vm.func @test_list_multiple_refs() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 2  // 0x00000002
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r2 = vm.list.alloc %i3 : !vm.list<!vm.opaque>
+  vm.list.resize %r2, %i3
+  vm.list.set.ref %r2, %i1, %r0
+  vm.list.set.ref %r2, %i2, %r1
+  %r3 = vm.list.get.ref %r2, %i1 : !vm.buffer
+  %r4 = vm.list.get.ref %r2, %i2 : !vm.buffer
+  vm.discard.refs %r2
+  %i1 = vm.cmp.eq.ref %r0, %r3
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i1, ^bb6(), ^bb1()
+^bb1:
+  %i1 = vm.cmp.eq.ref %r1, %r4
+  vm.discard.refs %r1
+  %i1 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i1, ^bb5(), ^bb2()
+^bb2:
+  %i1 = vm.cmp.ne.ref %r3, %r4
+  vm.discard.refs %r3, %r4
+  %i2 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i2, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "refs are different"
+^bb5:
+  vm.discard.refs %r3, %r4
+  vm.fail %i0, "retrieved ref_b equals set ref_b"
+^bb6:
+  vm.discard.refs %r1, %r3, %r4
+  vm.fail %i0, "retrieved ref_a equals set ref_a"
+}
+
+vm.export @test_list_get_ref_multiple_uses
+vm.func @test_list_get_ref_multiple_uses() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.list.alloc %i2 : !vm.list<!vm.opaque>
+  vm.list.resize %r1, %i2
+  vm.list.set.ref %r1, %i1, %r0
+  %r2 = vm.list.get.ref %r1, %i1 : !vm.buffer
+  vm.discard.refs %r1
+  %i1 = vm.cmp.nz.ref %r2
+  %i1 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i1, ^bb6(), ^bb1()
+^bb1:
+  vm.cond_br %i1, ^bb5(), ^bb2()
+^bb2:
+  %i1 = vm.cmp.eq.ref %r0, %r2
+  vm.discard.refs %r0, %r2
+  %i2 = vm.xor.i32 %i1, %i2
+  vm.cond_br %i2, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "retrieved ref equals original"
+^bb5:
+  vm.discard.refs %r0, %r2
+  vm.fail %i0, "retrieved ref valid (use 2)"
+^bb6:
+  vm.discard.refs %r0, %r2
+  vm.fail %i0, "retrieved ref valid (use 1)"
+}
+
+vm.export @test_ref_valid_after_list_set
+vm.func @test_ref_valid_after_list_set() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i3 = vm.cmp.nz.ref %r0
+  %i3 = vm.xor.i32 %i3, %i2
+  vm.cond_br %i3, ^bb4(), ^bb1()
+^bb1:
+  %r1 = vm.list.alloc %i2 : !vm.list<!vm.opaque>
+  vm.list.resize %r1, %i2
+  vm.list.set.ref %r1, %i1, %R0
+  vm.discard.refs %r1
+  vm.cond_br %i3, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "ref valid after list set"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid before list set"
+}
+
+vm.export @test_select_ref_true
+vm.func @test_select_ref_true() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r1 = vm.select.ref %i1 ? %r0 : %R1 -> !vm.buffer
+  %i2 = vm.cmp.eq.ref %r1, %r0
+  vm.discard.refs %r1, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "select true returns first ref"
+}
+
+vm.export @test_select_ref_false
+vm.func @test_select_ref_false() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r0 = vm.select.ref %i2 ? %R0 : %r1 -> !vm.buffer
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "select false returns second ref"
+}
+
+vm.export @test_select_ref_input_survives
+vm.func @test_select_ref_input_survives() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r2 = vm.select.ref %i1 ? %r0 : %r1 -> !vm.buffer
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb6(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r1
+  vm.discard.refs %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i2 = vm.cmp.nz.ref %r2
+  vm.discard.refs %r2
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "result valid"
+^bb5:
+  vm.discard.refs %r2
+  vm.fail %i0, "ref_b valid after select"
+^bb6:
+  vm.discard.refs %r1, %r2
+  vm.fail %i0, "ref_a valid after select"
+}
+
+vm.export @test_ref_multiple_sequential_uses
+vm.func @test_ref_multiple_sequential_uses() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb1()
+^bb1:
+  vm.call @ref_ops:5(%r0)
+  vm.cond_br %i1, ^bb5(), ^bb2()
+^bb2:
+  vm.global.store.ref %R0, .refs[0] : !vm.buffer
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "use 5"
+^bb5:
+  vm.discard.refs %r0
+  vm.fail %i0, "use 3"
+^bb6:
+  vm.discard.refs %r0
+  vm.fail %i0, "use 1"
+}
+
+vm.export @test_ref_call_chain
+vm.func @test_ref_call_chain() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.call @ref_ops:27(%r0)
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "chain returns same ref"
+}
+
+vm.func @fn27(%r0: !vm.ref<?>) -> (!vm.ref<?>) {
+^bb0:
+  %r0 = vm.call @ref_ops:28(%R0)
+  vm.return %R0
+}
+
+vm.func @fn28(%r0: !vm.ref<?>) -> (!vm.ref<?>) {
+^bb0:
+  vm.return %R0
+}
+
+vm.export @test_return_multiple_refs
+vm.func @test_return_multiple_refs() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r2, %r3 = vm.call @ref_ops:30(%r0, %r1)
+  %i2 = vm.cmp.eq.ref %r2, %r0
+  vm.discard.refs %r2, %r0
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.eq.ref %r3, %r1
+  vm.discard.refs %r3, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "second result is ref_b"
+^bb4:
+  vm.discard.refs %r1, %r3
+  vm.fail %i0, "first result is ref_a"
+}
+
+vm.func @fn30(%r0: !vm.ref<?>, %r1: !vm.ref<?>) -> (!vm.ref<?>, !vm.ref<?>) {
+^bb0:
+  vm.return %R0, %R1
+}
+
+vm.export @test_return_refs_swapped
+vm.func @test_return_refs_swapped() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %r2, %r3 = vm.call @ref_ops:32(%r0, %r1)
+  %i2 = vm.cmp.eq.ref %r2, %r1
+  vm.discard.refs %r2, %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.eq.ref %r3, %r0
+  vm.discard.refs %r3, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "second result is ref_a (swapped)"
+^bb4:
+  vm.discard.refs %r0, %r3
+  vm.fail %i0, "first result is ref_b (swapped)"
+}
+
+vm.func @fn32(%r0: !vm.ref<?>, %r1: !vm.ref<?>) -> (!vm.ref<?>, !vm.ref<?>) {
+^bb0:
+  vm.return %R1, %R0
+}
+
+vm.export @test_discard_empty
+vm.func @test_discard_empty() -> () {
+^bb0:
+  vm.return
+}
+
+vm.export @test_discard_single_ref
+vm.func @test_discard_single_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.discard.refs %r0
+  vm.return
+^bb2:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid before discard"
+}
+
+vm.export @test_discard_multiple_refs
+vm.func @test_discard_multiple_refs() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  %i2 = vm.cmp.nz.ref %r0
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.discard.refs %r0, %r1
+  vm.return
+^bb3:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "ref_b valid before discard"
+^bb4:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "ref_a valid before discard"
+}
+
+vm.export @test_discard_in_branch
+vm.func @test_discard_in_branch() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.cond_br %i0, ^bb1(), ^bb2()
+^bb1:
+  vm.discard.refs %r0
+  vm.br ^bb3()
+^bb2:
+  vm.discard.refs %r0
+  vm.br ^bb3()
+^bb3:
+  vm.return
+}
+
+vm.export @test_nested_loop_outer_ref
+vm.func @test_nested_loop_outer_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.br ^bb1(%i3->%i4)
+^bb1:
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i2
+  vm.cond_br %i5, ^bb3(), ^bb2()
+^bb2:
+  vm.br ^bb4(%i3->%i5)
+^bb3:
+  vm.discard.refs %r0
+  vm.fail %i0, "ref valid in outer loop"
+^bb4:
+  %i5 = vm.add.i32 %i5, %i2
+  %i6 = vm.cmp.lt.i32.s %i5, %i1
+  vm.cond_br %i6, ^bb4(), ^bb5()
+^bb5:
+  %i4 = vm.add.i32 %i4, %i2
+  %i5 = vm.cmp.lt.i32.s %i4, %i1
+  vm.cond_br %i5, ^bb1(), ^bb6()
+^bb6:
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @test_ping_pong_swap
+vm.func @test_ping_pong_swap() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 3  // 0x00000003
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  %r1 = vm.const.ref.rodata 1  // 3b
+  vm.br ^bb1()
+^bb1:
+  %i4 = vm.cmp.nz.ref %r0
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb7(), ^bb2()
+^bb2:
+  %i4 = vm.cmp.nz.ref %r1
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb6(), ^bb3()
+^bb3:
+  %i4 = vm.cmp.ne.ref %r0, %r1
+  %i4 = vm.xor.i32 %i4, %i2
+  vm.cond_br %i4, ^bb5(), ^bb4()
+^bb4:
+  %i3 = vm.add.i32 %i3, %i2
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  vm.cond_br %i4, ^bb1(%r0->%r2, %R1->%r0, %R2->%r1), ^bb8()
+^bb5:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "x and y are different"
+^bb6:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "y valid in loop"
+^bb7:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "x valid in loop"
+^bb8:
+  vm.discard.refs %r0, %r1
+  vm.return
+}
+
+vm.export @test_diamond_asymmetric_use
+vm.func @test_diamond_asymmetric_use() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.cond_br %i1, ^bb1(), ^bb2()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb2:
+  vm.discard.refs %r0
+  vm.br ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "ref valid in use_path"
+}
+
+vm.export @test_diamond_asymmetric_nouse
+vm.func @test_diamond_asymmetric_nouse() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.cond_br %i2, ^bb1(), ^bb2()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb2:
+  vm.discard.refs %r0
+  vm.br ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "ref valid in use_path"
+}

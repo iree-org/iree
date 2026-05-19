@@ -1,0 +1,205 @@
+vm.module @comparison_ops version 0
+vm.type i32
+
+vm.export @test_cmp_lt_s_0
+vm.func @test_cmp_lt_s_0() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i1 = vm.cmp.lt.i32.s %i2, %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2 < -2"
+}
+
+vm.export @test_cmp_lt_s_1
+vm.func @test_cmp_lt_s_1() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i2 = vm.cmp.lt.i32.s %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-2 < 2"
+}
+
+vm.export @test_cmp_lt_s_2
+vm.func @test_cmp_lt_s_2() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.cmp.lt.i32.s %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4294967295 (UINT_MAX) < 2"
+}
+
+vm.export @test_cmp_lt_u_0
+vm.func @test_cmp_lt_u_0() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i3 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.cmp.lt.i32.u %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2 < -2 (as unsigned)"
+}
+
+vm.export @test_cmp_lt_u_1
+vm.func @test_cmp_lt_u_1() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i1 = vm.cmp.lt.i32.u %i2, %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-2 < 2 (as unsigned)"
+}
+
+vm.export @test_cmp_lt_u_2
+vm.func @test_cmp_lt_u_2() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i1 = vm.cmp.lt.i32.u %i2, %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4294967295 (UINT_MAX) < 2 (as unsigned)"
+}
+
+vm.export @test_cmp_lte
+vm.func @test_cmp_lte() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i4 = vm.cmp.lt.i32.s %i1, %i3
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i4, ^bb8(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb7(), ^bb2()
+^bb2:
+  %i4 = vm.cmp.lt.i32.u %i1, %i3
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb6(), ^bb3()
+^bb3:
+  %i1 = vm.cmp.lt.i32.u %i3, %i1
+  %i1 = vm.xor.i32 %i1, %i2
+  %i2 = vm.cmp.ne.i32 %i1, %i2
+  vm.cond_br %i2, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 <= -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 <= 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 <= -2"
+^bb8:
+  vm.fail %i0, "-2 <= 2"
+}
+
+vm.export @test_cmp_gt
+vm.func @test_cmp_gt() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i4 = vm.cmp.lt.i32.s %i1, %i3
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb8(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  %i4 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i4, ^bb7(), ^bb2()
+^bb2:
+  %i4 = vm.cmp.lt.i32.u %i1, %i3
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb6(), ^bb3()
+^bb3:
+  %i1 = vm.cmp.lt.i32.u %i3, %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 > -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 > 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 > -2"
+^bb8:
+  vm.fail %i0, "-2 > 2"
+}
+
+vm.export @test_cmp_gte
+vm.func @test_cmp_gte() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i4 = vm.cmp.lt.i32.s %i3, %i1
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb8(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.lt.i32.s %i1, %i3
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i4, ^bb7(), ^bb2()
+^bb2:
+  %i4 = vm.cmp.lt.i32.u %i3, %i1
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i4, ^bb6(), ^bb3()
+^bb3:
+  %i3 = vm.cmp.lt.i32.u %i1, %i3
+  %i2 = vm.xor.i32 %i3, %i2
+  %i2 = vm.cmp.nz.i32 %i2
+  vm.cond_br %i2, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 >= -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 >= 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 >= -2"
+^bb8:
+  vm.fail %i0, "-2 >= 2"
+}

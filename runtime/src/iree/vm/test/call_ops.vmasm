@@ -1,0 +1,215 @@
+vm.module @call_ops version 0
+vm.type i32
+vm.type !vm.buffer
+vm.type !vm.opaque
+vm.rodata[0] = 010203
+
+vm.export @fail_call_v_v
+vm.func @fail_call_v_v() -> () {
+^bb0:
+  vm.call @call_ops:17()
+  vm.return
+}
+
+vm.export @test_call_i_v
+vm.func @test_call_i_v() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  vm.call @call_ops:9(%i0)
+  vm.return
+}
+
+vm.export @test_call_r_v
+vm.func @test_call_r_v() -> () {
+^bb0:
+  %r0 = vm.const.ref.zero
+  vm.call @call_ops:10(%R0)
+  vm.return
+}
+
+vm.export @test_call_r_v_reuse_reg
+vm.func @test_call_r_v_reuse_reg() -> () {
+^bb0:
+  %r0 = vm.const.ref.zero
+  vm.call @call_ops:11(%r0, %R0)
+  vm.return
+}
+
+vm.export @test_call_r_v_preserve_ref
+vm.func @test_call_r_v_preserve_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.zero
+  %r1 = vm.const.ref.rodata 0  // 3b
+  %i2 = vm.cmp.nz.ref %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb3(), ^bb1()
+^bb1:
+  vm.call @call_ops:12(%R0, %r1)
+  %i2 = vm.cmp.nz.ref %r1
+  vm.discard.refs %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.discard.refs %r0, %r1
+  vm.br ^bb4()
+^bb4:
+  vm.fail %i0, ""
+}
+
+vm.export @test_call_v_i
+vm.func @test_call_v_i() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.call @call_ops:13()
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "_v_i()=1"
+}
+
+vm.export @test_call_v_r
+vm.func @test_call_v_r() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.zero
+  %r1 = vm.call @call_ops:14()
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "_v_r()=NULL"
+}
+
+vm.export @test_call_v_ii
+vm.func @test_call_v_ii() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3, %i4 = vm.call @call_ops:15()
+  %i1 = vm.cmp.ne.i32 %i3, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "_v_ii()#1=2"
+^bb4:
+  vm.fail %i0, "_v_ii()#0=1"
+}
+
+vm.export @test_call_v_v
+vm.func @test_call_v_v() -> () {
+^bb0:
+  vm.call @call_ops:16()
+  vm.return
+}
+
+vm.func @fn9(%i0: i32) -> () {
+^bb0:
+  %i1 = vm.const.i32 9  // 0x00000009
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.cmp.ne.i32 %i0, %i2
+  vm.cond_br %i2, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i1, "Expected %arg to be 1"
+}
+
+vm.func @fn10(%r0: !vm.ref<?>) -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r1 = vm.const.ref.zero
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "Expected %arg to be NULL"
+}
+
+vm.func @fn11(%r0: !vm.ref<?>, %r1: !vm.ref<?>) -> () {
+^bb0:
+  vm.discard.refs %r1
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r1 = vm.const.ref.zero
+  %i2 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r0, %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "Expected %arg to be NULL"
+}
+
+vm.func @fn12(%r0: !vm.ref<?>, %r1: !vm.ref<?>) -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r2 = vm.const.ref.zero
+  %i2 = vm.cmp.eq.ref %r0, %r2
+  vm.discard.refs %r0, %r2
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.nz.ref %r1
+  vm.discard.refs %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "Expected %arg2 to be not NULL"
+^bb4:
+  vm.discard.refs %r1
+  vm.fail %i0, "Expected %arg1 to be NULL"
+}
+
+vm.func @fn13() -> (i32) {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  vm.return %i0
+}
+
+vm.func @fn14() -> (!vm.ref<?>) {
+^bb0:
+  %r0 = vm.const.ref.zero
+  vm.return %R0
+}
+
+vm.func @fn15() -> (i32, i32) {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.const.i32 2  // 0x00000002
+  vm.return %i0, %i1
+}
+
+vm.func @fn16() -> () {
+^bb0:
+  vm.return
+}
+
+vm.func @fn17() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  vm.fail %i0, ""
+}

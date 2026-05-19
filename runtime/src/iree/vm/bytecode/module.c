@@ -1045,6 +1045,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
 
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
     iree_vm_module_t* module, uint16_t function_ordinal,
+    iree_vm_bytecode_disassembly_format_t format,
     iree_string_builder_t* string_builder) {
   IREE_ASSERT_ARGUMENT(module);
   IREE_ASSERT_ARGUMENT(string_builder);
@@ -1052,8 +1053,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
   iree_vm_bytecode_module_t* bytecode_module =
       (iree_vm_bytecode_module_t*)module;
   iree_status_t status = iree_vm_bytecode_disassemble_function(
-      bytecode_module, /*module_state=*/NULL, function_ordinal,
-      IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT, string_builder);
+      bytecode_module, /*module_state=*/NULL, function_ordinal, format,
+      string_builder);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

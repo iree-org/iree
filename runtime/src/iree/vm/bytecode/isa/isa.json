@@ -1,0 +1,3756 @@
+{
+  "schema_version": 0,
+  "description": "Runtime-owned VM bytecode ISA schema. This first version records opcode sets, numeric opcode assignments, reusable operation classes, named instruction encodings, and per-instruction encoding references; detailed documentation and assembler grammar will be added as VMASM coverage grows.",
+  "bytecode_version": {
+    "major": 17,
+    "minor": 0
+  },
+  "operation_classes": {
+    "unary": {
+      "description": "One operand register followed by one result register in the same register bank.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the operand and result fields."
+        }
+      },
+      "fields": [
+        {
+          "name": "operand",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "binary": {
+      "description": "Two operand registers followed by one result register in the same register bank.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for both operand fields and the result field."
+        }
+      },
+      "fields": [
+        {
+          "name": "left",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "right",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "ternary": {
+      "description": "Three operand registers followed by one result register in the same register bank.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for all operand fields and the result field."
+        }
+      },
+      "fields": [
+        {
+          "name": "first",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "second",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "third",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "shift": {
+      "description": "One shifted operand register, one i32 shift amount register, and one result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the shifted operand and result fields."
+        }
+      },
+      "fields": [
+        {
+          "name": "operand",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "amount",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "select": {
+      "description": "One i32 condition register, two value registers, and one selected result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for both value operands and the result field."
+        }
+      },
+      "fields": [
+        {
+          "name": "condition",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "true_value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "false_value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "unary_comparison": {
+      "description": "One operand register followed by one i32 predicate result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the predicate operand field."
+        }
+      },
+      "fields": [
+        {
+          "name": "operand",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i32",
+          "access": "write"
+        }
+      ]
+    },
+    "binary_comparison": {
+      "description": "Two operand registers followed by one i32 predicate result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for both predicate operand fields."
+        }
+      },
+      "fields": [
+        {
+          "name": "left",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "right",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i32",
+          "access": "write"
+        }
+      ]
+    },
+    "conversion": {
+      "description": "One operand register followed by one result register in another register bank.",
+      "parameters": {
+        "input_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the operand field."
+        },
+        "output_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the result field."
+        }
+      },
+      "fields": [
+        {
+          "name": "operand",
+          "kind": "register",
+          "bank": "$input_type",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$output_type",
+          "access": "write"
+        }
+      ]
+    },
+    "global_load": {
+      "description": "One global byte-offset attribute followed by one loaded result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "byte_offset",
+          "kind": "global_attr"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "global_store": {
+      "description": "One global byte-offset attribute followed by one stored value register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "byte_offset",
+          "kind": "global_attr"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        }
+      ]
+    },
+    "global_load_indirect": {
+      "description": "One i32 byte-offset register followed by one loaded result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "byte_offset",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "global_store_indirect": {
+      "description": "One i32 byte-offset register followed by one stored value register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "byte_offset",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        }
+      ]
+    },
+    "constant": {
+      "description": "One immediate attribute followed by one result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "value",
+          "kind": "attribute",
+          "type": "$value_type"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "zero_constant": {
+      "description": "One zero-valued result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "list_get": {
+      "description": "One list register and one i32 index register followed by one result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "list_set": {
+      "description": "One list register, one i32 index register, and one stored value register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        }
+      ]
+    },
+    "buffer_load": {
+      "description": "One source buffer register and one i64 byte-offset register followed by one result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "source_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "source_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "buffer_store": {
+      "description": "One target buffer register, one i64 byte-offset register, and one stored value register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "target_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "target_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        }
+      ]
+    },
+    "buffer_fill": {
+      "description": "One target buffer register, i64 byte-offset and length registers, and one fill value register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for the value field."
+        }
+      },
+      "fields": [
+        {
+          "name": "target_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "target_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        }
+      ]
+    },
+    "switch": {
+      "description": "One i32 index register, one default value register, variadic value registers, and one result register.",
+      "parameters": {
+        "value_type": {
+          "kind": "register_bank",
+          "description": "Register bank used for switch values."
+        }
+      },
+      "fields": [
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "default_value",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "read"
+        },
+        {
+          "name": "values",
+          "kind": "variadic_operands",
+          "type": "$value_type"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "$value_type",
+          "access": "write"
+        }
+      ]
+    },
+    "branch": {
+      "description": "One branch target followed by remapped branch operands.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "operands",
+          "kind": "branch_operands"
+        }
+      ]
+    },
+    "conditional_branch": {
+      "description": "One i32 condition register followed by true and false branch targets and operands.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "condition",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "true_dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "true_operands",
+          "kind": "branch_operands"
+        },
+        {
+          "name": "false_dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "false_operands",
+          "kind": "branch_operands"
+        }
+      ]
+    },
+    "conditional_break": {
+      "description": "One i32 condition register followed by one branch target and operand list.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "condition",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "operands",
+          "kind": "branch_operands"
+        }
+      ]
+    },
+    "call": {
+      "description": "One function attribute followed by variadic operands and variadic results.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "callee_ordinal",
+          "kind": "func_attr"
+        },
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        },
+        {
+          "name": "results",
+          "kind": "variadic_results",
+          "type": "any"
+        }
+      ]
+    },
+    "yieldable_call": {
+      "description": "One function attribute, variadic operands, a continuation target, and variadic results.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "callee_ordinal",
+          "kind": "func_attr"
+        },
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        },
+        {
+          "name": "dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "results",
+          "kind": "variadic_results",
+          "type": "any"
+        }
+      ]
+    },
+    "trace": {
+      "description": "One string attribute followed by variadic operands.",
+      "parameters": {},
+      "fields": [
+        {
+          "name": "event_name",
+          "kind": "string_attr"
+        },
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        }
+      ]
+    }
+  },
+  "encodings": {
+    "i32_global_load": {
+      "class": "global_load",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_global_store": {
+      "class": "global_store",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_global_load_indirect": {
+      "class": "global_load_indirect",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_global_store_indirect": {
+      "class": "global_store_indirect",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_global_load": {
+      "class": "global_load",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_global_store": {
+      "class": "global_store",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_global_load_indirect": {
+      "class": "global_load_indirect",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_global_store_indirect": {
+      "class": "global_store_indirect",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_zero_constant": {
+      "class": "zero_constant",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_constant": {
+      "class": "constant",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_zero_constant": {
+      "class": "zero_constant",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_constant": {
+      "class": "constant",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_list_get": {
+      "class": "list_get",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_list_set": {
+      "class": "list_set",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_list_get": {
+      "class": "list_get",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_list_set": {
+      "class": "list_set",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_buffer_load": {
+      "class": "buffer_load",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_buffer_load": {
+      "class": "buffer_load",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_buffer_store": {
+      "class": "buffer_store",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_buffer_store": {
+      "class": "buffer_store",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_buffer_fill": {
+      "class": "buffer_fill",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_buffer_fill": {
+      "class": "buffer_fill",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i32_select": {
+      "class": "select",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_unary": {
+      "class": "unary",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_binary": {
+      "class": "binary",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_ternary": {
+      "class": "ternary",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_shift": {
+      "class": "shift",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_unary_comparison": {
+      "class": "unary_comparison",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i32_binary_comparison": {
+      "class": "binary_comparison",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_select": {
+      "class": "select",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_unary": {
+      "class": "unary",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_binary": {
+      "class": "binary",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_ternary": {
+      "class": "ternary",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_shift": {
+      "class": "shift",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_unary_comparison": {
+      "class": "unary_comparison",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_binary_comparison": {
+      "class": "binary_comparison",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "i64_to_i32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i64",
+        "output_type": "i32"
+      }
+    },
+    "i32_to_i64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i32",
+        "output_type": "i64"
+      }
+    },
+    "ref_unary_comparison": {
+      "class": "unary_comparison",
+      "parameters": {
+        "value_type": "ref"
+      }
+    },
+    "ref_binary_comparison": {
+      "class": "binary_comparison",
+      "parameters": {
+        "value_type": "ref"
+      }
+    },
+    "f32_global_load": {
+      "class": "global_load",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_global_store": {
+      "class": "global_store",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_global_load_indirect": {
+      "class": "global_load_indirect",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_global_store_indirect": {
+      "class": "global_store_indirect",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_zero_constant": {
+      "class": "zero_constant",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_constant": {
+      "class": "constant",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_list_get": {
+      "class": "list_get",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_list_set": {
+      "class": "list_set",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_buffer_load": {
+      "class": "buffer_load",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_buffer_store": {
+      "class": "buffer_store",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_buffer_fill": {
+      "class": "buffer_fill",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_select": {
+      "class": "select",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_unary": {
+      "class": "unary",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_binary": {
+      "class": "binary",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_ternary": {
+      "class": "ternary",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_unary_comparison": {
+      "class": "unary_comparison",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f32_binary_comparison": {
+      "class": "binary_comparison",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "i32_to_f32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i32",
+        "output_type": "f32"
+      }
+    },
+    "i64_to_f32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i64",
+        "output_type": "f32"
+      }
+    },
+    "f32_to_i32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f32",
+        "output_type": "i32"
+      }
+    },
+    "f32_to_i64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f32",
+        "output_type": "i64"
+      }
+    },
+    "f64_global_load": {
+      "class": "global_load",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_global_store": {
+      "class": "global_store",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_global_load_indirect": {
+      "class": "global_load_indirect",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_global_store_indirect": {
+      "class": "global_store_indirect",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_zero_constant": {
+      "class": "zero_constant",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_constant": {
+      "class": "constant",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_list_get": {
+      "class": "list_get",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_list_set": {
+      "class": "list_set",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_buffer_load": {
+      "class": "buffer_load",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_buffer_store": {
+      "class": "buffer_store",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_buffer_fill": {
+      "class": "buffer_fill",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_select": {
+      "class": "select",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_unary": {
+      "class": "unary",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_binary": {
+      "class": "binary",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_ternary": {
+      "class": "ternary",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_unary_comparison": {
+      "class": "unary_comparison",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_binary_comparison": {
+      "class": "binary_comparison",
+      "parameters": {
+        "value_type": "f64"
+      }
+    },
+    "f64_to_f32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f64",
+        "output_type": "f32"
+      }
+    },
+    "f32_to_f64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f32",
+        "output_type": "f64"
+      }
+    },
+    "i32_to_f64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i32",
+        "output_type": "f64"
+      }
+    },
+    "i64_to_f64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "i64",
+        "output_type": "f64"
+      }
+    },
+    "f64_to_i32_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f64",
+        "output_type": "i32"
+      }
+    },
+    "f64_to_i64_conversion": {
+      "class": "conversion",
+      "parameters": {
+        "input_type": "f64",
+        "output_type": "i64"
+      }
+    },
+    "global_load_ref": {
+      "fields": [
+        {
+          "name": "global",
+          "kind": "global_attr"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "global_store_ref": {
+      "fields": [
+        {
+          "name": "global",
+          "kind": "global_attr"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        }
+      ]
+    },
+    "global_load_indirect_ref": {
+      "fields": [
+        {
+          "name": "global",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "global_store_indirect_ref": {
+      "fields": [
+        {
+          "name": "global",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        }
+      ]
+    },
+    "const_ref_zero": {
+      "fields": [
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "const_ref_rodata": {
+      "fields": [
+        {
+          "name": "rodata",
+          "kind": "rodata_attr"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "list_alloc": {
+      "fields": [
+        {
+          "name": "element_type",
+          "kind": "type_of"
+        },
+        {
+          "name": "initial_capacity",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "list_reserve": {
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "minimum_capacity",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        }
+      ]
+    },
+    "list_size": {
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i32",
+          "access": "write"
+        }
+      ]
+    },
+    "list_resize": {
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "new_size",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        }
+      ]
+    },
+    "list_get_ref": {
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "list_set_ref": {
+      "fields": [
+        {
+          "name": "list",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        }
+      ]
+    },
+    "select_ref": {
+      "fields": [
+        {
+          "name": "condition",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "true_value_type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "true_value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        },
+        {
+          "name": "false_value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "i32_switch": {
+      "class": "switch",
+      "parameters": {
+        "value_type": "i32"
+      }
+    },
+    "i64_switch": {
+      "class": "switch",
+      "parameters": {
+        "value_type": "i64"
+      }
+    },
+    "switch_ref": {
+      "fields": [
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "type_def",
+          "kind": "type_of"
+        },
+        {
+          "name": "default_value",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        },
+        {
+          "name": "values",
+          "kind": "variadic_operands",
+          "type": "ref",
+          "move": "allow"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "branch": {
+      "class": "branch",
+      "parameters": {}
+    },
+    "conditional_branch": {
+      "class": "conditional_branch",
+      "parameters": {}
+    },
+    "call": {
+      "class": "call",
+      "parameters": {}
+    },
+    "call_variadic": {
+      "fields": [
+        {
+          "name": "callee_ordinal",
+          "kind": "func_attr"
+        },
+        {
+          "name": "segment_sizes",
+          "kind": "variadic_operands",
+          "type": "i32"
+        },
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        },
+        {
+          "name": "results",
+          "kind": "variadic_results",
+          "type": "any"
+        }
+      ]
+    },
+    "return": {
+      "fields": [
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        }
+      ]
+    },
+    "fail": {
+      "fields": [
+        {
+          "name": "status",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "message",
+          "kind": "string_attr"
+        }
+      ]
+    },
+    "import_resolved": {
+      "fields": [
+        {
+          "name": "import_ordinal",
+          "kind": "func_attr"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i32",
+          "access": "write"
+        }
+      ]
+    },
+    "trace": {
+      "class": "trace",
+      "parameters": {}
+    },
+    "conditional_break": {
+      "class": "conditional_break",
+      "parameters": {}
+    },
+    "buffer_alloc": {
+      "fields": [
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "alignment",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "buffer_clone": {
+      "fields": [
+        {
+          "name": "source",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "alignment",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "buffer_length": {
+      "fields": [
+        {
+          "name": "buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i64",
+          "access": "write"
+        }
+      ]
+    },
+    "buffer_copy": {
+      "fields": [
+        {
+          "name": "source_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "source_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "target_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "target_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        }
+      ]
+    },
+    "buffer_compare": {
+      "fields": [
+        {
+          "name": "lhs_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "lhs_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "rhs_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "rhs_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i32",
+          "access": "write"
+        }
+      ]
+    },
+    "cast_any_ref": {
+      "fields": [
+        {
+          "name": "operand",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        },
+        {
+          "name": "result_type",
+          "kind": "type_of"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "branch_table": {
+      "fields": [
+        {
+          "name": "index",
+          "kind": "register",
+          "bank": "i32",
+          "access": "read"
+        },
+        {
+          "name": "default_dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "default_operands",
+          "kind": "branch_operands"
+        },
+        {
+          "name": "table_size",
+          "kind": "const_i16"
+        },
+        {
+          "name": "cases",
+          "kind": "branch_table_cases"
+        }
+      ]
+    },
+    "buffer_hash": {
+      "fields": [
+        {
+          "name": "source_buffer",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read"
+        },
+        {
+          "name": "source_offset",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "length",
+          "kind": "register",
+          "bank": "i64",
+          "access": "read"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "i64",
+          "access": "write"
+        }
+      ]
+    },
+    "discard_refs": {
+      "fields": [
+        {
+          "name": "refs",
+          "kind": "variadic_operands",
+          "type": "any"
+        }
+      ]
+    },
+    "assign_ref": {
+      "fields": [
+        {
+          "name": "source",
+          "kind": "register",
+          "bank": "ref",
+          "access": "read",
+          "move": "allow"
+        },
+        {
+          "name": "result",
+          "kind": "register",
+          "bank": "ref",
+          "access": "write",
+          "move": "allow"
+        }
+      ]
+    },
+    "yieldable_call": {
+      "class": "yieldable_call",
+      "parameters": {}
+    },
+    "call_variadic_yieldable": {
+      "fields": [
+        {
+          "name": "callee_ordinal",
+          "kind": "func_attr"
+        },
+        {
+          "name": "segment_sizes",
+          "kind": "variadic_operands",
+          "type": "i32"
+        },
+        {
+          "name": "operands",
+          "kind": "variadic_operands",
+          "type": "any"
+        },
+        {
+          "name": "dest_pc",
+          "kind": "branch_target"
+        },
+        {
+          "name": "results",
+          "kind": "variadic_results",
+          "type": "any"
+        }
+      ]
+    },
+    "f32_switch": {
+      "class": "switch",
+      "parameters": {
+        "value_type": "f32"
+      }
+    },
+    "f64_switch": {
+      "class": "switch",
+      "parameters": {
+        "value_type": "f64"
+      }
+    }
+  },
+  "opcode_sets": [
+    {
+      "id": "core",
+      "description": "runtime core VM bytecode opcode set",
+      "c_tag": "CORE",
+      "enum_name": "iree_vm_core_op_t",
+      "prefix": null,
+      "feature": null
+    },
+    {
+      "id": "ext_f32",
+      "description": "optional f32 VM bytecode opcode extension",
+      "c_tag": "EXT_F32",
+      "enum_name": "iree_vm_ext_f32_op_t",
+      "prefix": "PrefixExtF32",
+      "feature": "EXT_F32"
+    },
+    {
+      "id": "ext_f64",
+      "description": "optional f64 VM bytecode opcode extension",
+      "c_tag": "EXT_F64",
+      "enum_name": "iree_vm_ext_f64_op_t",
+      "prefix": "PrefixExtF64",
+      "feature": "EXT_F64"
+    }
+  ],
+  "instructions": [
+    {
+      "opcode_set": "core",
+      "opcode": 0,
+      "symbol": "GlobalLoadI32",
+      "mnemonic": "global.load.i32",
+      "encoding": "i32_global_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 1,
+      "symbol": "GlobalStoreI32",
+      "mnemonic": "global.store.i32",
+      "encoding": "i32_global_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 2,
+      "symbol": "GlobalLoadIndirectI32",
+      "mnemonic": "global.load.indirect.i32",
+      "encoding": "i32_global_load_indirect"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 3,
+      "symbol": "GlobalStoreIndirectI32",
+      "mnemonic": "global.store.indirect.i32",
+      "encoding": "i32_global_store_indirect"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 4,
+      "symbol": "GlobalLoadI64",
+      "mnemonic": "global.load.i64",
+      "encoding": "i64_global_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 5,
+      "symbol": "GlobalStoreI64",
+      "mnemonic": "global.store.i64",
+      "encoding": "i64_global_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 6,
+      "symbol": "GlobalLoadIndirectI64",
+      "mnemonic": "global.load.indirect.i64",
+      "encoding": "i64_global_load_indirect"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 7,
+      "symbol": "GlobalStoreIndirectI64",
+      "mnemonic": "global.store.indirect.i64",
+      "encoding": "i64_global_store_indirect"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 8,
+      "symbol": "GlobalLoadRef",
+      "mnemonic": "global.load.ref",
+      "encoding": "global_load_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 9,
+      "symbol": "GlobalStoreRef",
+      "mnemonic": "global.store.ref",
+      "encoding": "global_store_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 10,
+      "symbol": "GlobalLoadIndirectRef",
+      "mnemonic": "global.load.indirect.ref",
+      "encoding": "global_load_indirect_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 11,
+      "symbol": "GlobalStoreIndirectRef",
+      "mnemonic": "global.store.indirect.ref",
+      "encoding": "global_store_indirect_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 12,
+      "symbol": "ConstI32Zero",
+      "mnemonic": "const.i32.zero",
+      "encoding": "i32_zero_constant"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 13,
+      "symbol": "ConstI32",
+      "mnemonic": "const.i32",
+      "encoding": "i32_constant"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 14,
+      "symbol": "ConstI64Zero",
+      "mnemonic": "const.i64.zero",
+      "encoding": "i64_zero_constant"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 15,
+      "symbol": "ConstI64",
+      "mnemonic": "const.i64",
+      "encoding": "i64_constant"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 16,
+      "symbol": "ConstRefZero",
+      "mnemonic": "const.ref.zero",
+      "encoding": "const_ref_zero"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 17,
+      "symbol": "ConstRefRodata",
+      "mnemonic": "const.ref.rodata",
+      "encoding": "const_ref_rodata"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 18,
+      "symbol": "ListAlloc",
+      "mnemonic": "list.alloc",
+      "encoding": "list_alloc"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 19,
+      "symbol": "ListReserve",
+      "mnemonic": "list.reserve",
+      "encoding": "list_reserve"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 20,
+      "symbol": "ListSize",
+      "mnemonic": "list.size",
+      "encoding": "list_size"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 21,
+      "symbol": "ListResize",
+      "mnemonic": "list.resize",
+      "encoding": "list_resize"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 22,
+      "symbol": "ListGetI32",
+      "mnemonic": "list.get.i32",
+      "encoding": "i32_list_get"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 23,
+      "symbol": "ListSetI32",
+      "mnemonic": "list.set.i32",
+      "encoding": "i32_list_set"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 24,
+      "symbol": "ListGetI64",
+      "mnemonic": "list.get.i64",
+      "encoding": "i64_list_get"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 25,
+      "symbol": "ListSetI64",
+      "mnemonic": "list.set.i64",
+      "encoding": "i64_list_set"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 26,
+      "symbol": "ListGetRef",
+      "mnemonic": "list.get.ref",
+      "encoding": "list_get_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 27,
+      "symbol": "ListSetRef",
+      "mnemonic": "list.set.ref",
+      "encoding": "list_set_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 28,
+      "symbol": "SelectI32",
+      "mnemonic": "select.i32",
+      "encoding": "i32_select"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 29,
+      "symbol": "SelectI64",
+      "mnemonic": "select.i64",
+      "encoding": "i64_select"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 30,
+      "symbol": "SelectRef",
+      "mnemonic": "select.ref",
+      "encoding": "select_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 31,
+      "symbol": "SwitchI32",
+      "mnemonic": "switch.i32",
+      "encoding": "i32_switch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 32,
+      "symbol": "SwitchI64",
+      "mnemonic": "switch.i64",
+      "encoding": "i64_switch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 33,
+      "symbol": "SwitchRef",
+      "mnemonic": "switch.ref",
+      "encoding": "switch_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 34,
+      "symbol": "AddI32",
+      "mnemonic": "add.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 35,
+      "symbol": "SubI32",
+      "mnemonic": "sub.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 36,
+      "symbol": "MulI32",
+      "mnemonic": "mul.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 37,
+      "symbol": "DivI32S",
+      "mnemonic": "div.i32.s",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 38,
+      "symbol": "DivI32U",
+      "mnemonic": "div.i32.u",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 39,
+      "symbol": "RemI32S",
+      "mnemonic": "rem.i32.s",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 40,
+      "symbol": "RemI32U",
+      "mnemonic": "rem.i32.u",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 41,
+      "symbol": "FMAI32",
+      "mnemonic": "fma.i32",
+      "encoding": "i32_ternary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 42,
+      "symbol": "AddI64",
+      "mnemonic": "add.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 43,
+      "symbol": "SubI64",
+      "mnemonic": "sub.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 44,
+      "symbol": "MulI64",
+      "mnemonic": "mul.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 45,
+      "symbol": "DivI64S",
+      "mnemonic": "div.i64.s",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 46,
+      "symbol": "DivI64U",
+      "mnemonic": "div.i64.u",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 47,
+      "symbol": "RemI64S",
+      "mnemonic": "rem.i64.s",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 48,
+      "symbol": "RemI64U",
+      "mnemonic": "rem.i64.u",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 49,
+      "symbol": "FMAI64",
+      "mnemonic": "fma.i64",
+      "encoding": "i64_ternary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 50,
+      "symbol": "NotI32",
+      "mnemonic": "not.i32",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 51,
+      "symbol": "AndI32",
+      "mnemonic": "and.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 52,
+      "symbol": "OrI32",
+      "mnemonic": "or.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 53,
+      "symbol": "XorI32",
+      "mnemonic": "xor.i32",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 54,
+      "symbol": "NotI64",
+      "mnemonic": "not.i64",
+      "encoding": "i64_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 55,
+      "symbol": "AndI64",
+      "mnemonic": "and.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 56,
+      "symbol": "OrI64",
+      "mnemonic": "or.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 57,
+      "symbol": "XorI64",
+      "mnemonic": "xor.i64",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 58,
+      "symbol": "ShlI32",
+      "mnemonic": "shl.i32",
+      "encoding": "i32_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 59,
+      "symbol": "ShrI32S",
+      "mnemonic": "shr.i32.s",
+      "encoding": "i32_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 60,
+      "symbol": "ShrI32U",
+      "mnemonic": "shr.i32.u",
+      "encoding": "i32_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 61,
+      "symbol": "ShlI64",
+      "mnemonic": "shl.i64",
+      "encoding": "i64_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 62,
+      "symbol": "ShrI64S",
+      "mnemonic": "shr.i64.s",
+      "encoding": "i64_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 63,
+      "symbol": "ShrI64U",
+      "mnemonic": "shr.i64.u",
+      "encoding": "i64_shift"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 64,
+      "symbol": "TruncI32I8",
+      "mnemonic": "trunc.i32.i8",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 65,
+      "symbol": "TruncI32I16",
+      "mnemonic": "trunc.i32.i16",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 66,
+      "symbol": "TruncI64I32",
+      "mnemonic": "trunc.i64.i32",
+      "encoding": "i64_to_i32_conversion"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 67,
+      "symbol": "ExtI8I32S",
+      "mnemonic": "ext.i8.i32.s",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 68,
+      "symbol": "ExtI8I32U",
+      "mnemonic": "ext.i8.i32.u",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 69,
+      "symbol": "ExtI16I32S",
+      "mnemonic": "ext.i16.i32.s",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 70,
+      "symbol": "ExtI16I32U",
+      "mnemonic": "ext.i16.i32.u",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 71,
+      "symbol": "ExtI32I64S",
+      "mnemonic": "ext.i32.i64.s",
+      "encoding": "i32_to_i64_conversion"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 72,
+      "symbol": "ExtI32I64U",
+      "mnemonic": "ext.i32.i64.u",
+      "encoding": "i32_to_i64_conversion"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 73,
+      "symbol": "CmpEQI32",
+      "mnemonic": "cmp.eq.i32",
+      "encoding": "i32_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 74,
+      "symbol": "CmpNEI32",
+      "mnemonic": "cmp.ne.i32",
+      "encoding": "i32_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 75,
+      "symbol": "CmpLTI32S",
+      "mnemonic": "cmp.lt.i32.s",
+      "encoding": "i32_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 76,
+      "symbol": "CmpLTI32U",
+      "mnemonic": "cmp.lt.i32.u",
+      "encoding": "i32_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 77,
+      "symbol": "CmpNZI32",
+      "mnemonic": "cmp.nz.i32",
+      "encoding": "i32_unary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 78,
+      "symbol": "CmpEQI64",
+      "mnemonic": "cmp.eq.i64",
+      "encoding": "i64_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 79,
+      "symbol": "CmpNEI64",
+      "mnemonic": "cmp.ne.i64",
+      "encoding": "i64_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 80,
+      "symbol": "CmpLTI64S",
+      "mnemonic": "cmp.lt.i64.s",
+      "encoding": "i64_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 81,
+      "symbol": "CmpLTI64U",
+      "mnemonic": "cmp.lt.i64.u",
+      "encoding": "i64_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 82,
+      "symbol": "CmpNZI64",
+      "mnemonic": "cmp.nz.i64",
+      "encoding": "i64_unary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 83,
+      "symbol": "CmpEQRef",
+      "mnemonic": "cmp.eq.ref",
+      "encoding": "ref_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 84,
+      "symbol": "CmpNERef",
+      "mnemonic": "cmp.ne.ref",
+      "encoding": "ref_binary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 85,
+      "symbol": "CmpNZRef",
+      "mnemonic": "cmp.nz.ref",
+      "encoding": "ref_unary_comparison"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 86,
+      "symbol": "Branch",
+      "mnemonic": "br",
+      "encoding": "branch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 87,
+      "symbol": "CondBranch",
+      "mnemonic": "cond_br",
+      "encoding": "conditional_branch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 88,
+      "symbol": "Call",
+      "mnemonic": "call",
+      "encoding": "call"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 89,
+      "symbol": "CallVariadic",
+      "mnemonic": "call.variadic",
+      "encoding": "call_variadic"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 90,
+      "symbol": "Return",
+      "mnemonic": "return",
+      "encoding": "return"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 91,
+      "symbol": "Fail",
+      "mnemonic": "fail",
+      "encoding": "fail"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 92,
+      "symbol": "ImportResolved",
+      "mnemonic": "import.resolved",
+      "encoding": "import_resolved"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 93,
+      "symbol": "Yield",
+      "mnemonic": "yield",
+      "encoding": "branch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 94,
+      "symbol": "Trace",
+      "mnemonic": "trace",
+      "encoding": "trace"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 95,
+      "symbol": "Print",
+      "mnemonic": "print",
+      "encoding": "trace"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 96,
+      "symbol": "CondBreak",
+      "mnemonic": "cond_break",
+      "encoding": "conditional_break"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 97,
+      "symbol": "Break",
+      "mnemonic": "break",
+      "encoding": "branch"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 98,
+      "symbol": "BufferLoadI8U",
+      "mnemonic": "buffer.load.i8.u",
+      "encoding": "i32_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 99,
+      "symbol": "BufferLoadI8S",
+      "mnemonic": "buffer.load.i8.s",
+      "encoding": "i32_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 100,
+      "symbol": "BufferLoadI16U",
+      "mnemonic": "buffer.load.i16.u",
+      "encoding": "i32_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 101,
+      "symbol": "BufferLoadI16S",
+      "mnemonic": "buffer.load.i16.s",
+      "encoding": "i32_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 102,
+      "symbol": "BufferLoadI32",
+      "mnemonic": "buffer.load.i32",
+      "encoding": "i32_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 103,
+      "symbol": "BufferLoadI64",
+      "mnemonic": "buffer.load.i64",
+      "encoding": "i64_buffer_load"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 104,
+      "symbol": "BufferStoreI8",
+      "mnemonic": "buffer.store.i8",
+      "encoding": "i32_buffer_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 105,
+      "symbol": "BufferStoreI16",
+      "mnemonic": "buffer.store.i16",
+      "encoding": "i32_buffer_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 106,
+      "symbol": "BufferStoreI32",
+      "mnemonic": "buffer.store.i32",
+      "encoding": "i32_buffer_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 107,
+      "symbol": "BufferStoreI64",
+      "mnemonic": "buffer.store.i64",
+      "encoding": "i64_buffer_store"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 108,
+      "symbol": "BufferAlloc",
+      "mnemonic": "buffer.alloc",
+      "encoding": "buffer_alloc"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 109,
+      "symbol": "BufferClone",
+      "mnemonic": "buffer.clone",
+      "encoding": "buffer_clone"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 110,
+      "symbol": "BufferLength",
+      "mnemonic": "buffer.length",
+      "encoding": "buffer_length"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 111,
+      "symbol": "BufferCopy",
+      "mnemonic": "buffer.copy",
+      "encoding": "buffer_copy"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 112,
+      "symbol": "BufferCompare",
+      "mnemonic": "buffer.compare",
+      "encoding": "buffer_compare"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 113,
+      "symbol": "BufferFillI8",
+      "mnemonic": "buffer.fill.i8",
+      "encoding": "i32_buffer_fill"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 114,
+      "symbol": "BufferFillI16",
+      "mnemonic": "buffer.fill.i16",
+      "encoding": "i32_buffer_fill"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 115,
+      "symbol": "BufferFillI32",
+      "mnemonic": "buffer.fill.i32",
+      "encoding": "i32_buffer_fill"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 116,
+      "symbol": "BufferFillI64",
+      "mnemonic": "buffer.fill.i64",
+      "encoding": "i64_buffer_fill"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 117,
+      "symbol": "CtlzI32",
+      "mnemonic": "ctlz.i32",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 118,
+      "symbol": "CtlzI64",
+      "mnemonic": "ctlz.i64",
+      "encoding": "i64_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 119,
+      "symbol": "AbsI32",
+      "mnemonic": "abs.i32",
+      "encoding": "i32_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 120,
+      "symbol": "AbsI64",
+      "mnemonic": "abs.i64",
+      "encoding": "i64_unary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 121,
+      "symbol": "Block",
+      "mnemonic": null,
+      "kind": "marker"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 122,
+      "symbol": "MinI32S",
+      "mnemonic": "min.i32.s",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 123,
+      "symbol": "MinI32U",
+      "mnemonic": "min.i32.u",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 124,
+      "symbol": "MaxI32S",
+      "mnemonic": "max.i32.s",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 125,
+      "symbol": "MaxI32U",
+      "mnemonic": "max.i32.u",
+      "encoding": "i32_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 126,
+      "symbol": "MinI64S",
+      "mnemonic": "min.i64.s",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 127,
+      "symbol": "MinI64U",
+      "mnemonic": "min.i64.u",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 128,
+      "symbol": "MaxI64S",
+      "mnemonic": "max.i64.s",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 129,
+      "symbol": "MaxI64U",
+      "mnemonic": "max.i64.u",
+      "encoding": "i64_binary"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 130,
+      "symbol": "CastAnyRef",
+      "mnemonic": "cast.any.ref",
+      "encoding": "cast_any_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 131,
+      "symbol": "BranchTable",
+      "mnemonic": "br_table",
+      "encoding": "branch_table"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 132,
+      "symbol": "BufferHash",
+      "mnemonic": "buffer.hash",
+      "encoding": "buffer_hash"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 133,
+      "symbol": "DiscardRefs",
+      "mnemonic": "discard.refs",
+      "encoding": "discard_refs"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 134,
+      "symbol": "AssignRef",
+      "mnemonic": "assign.ref",
+      "encoding": "assign_ref"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 135,
+      "symbol": "CallYieldable",
+      "mnemonic": "call.yieldable",
+      "encoding": "yieldable_call"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 136,
+      "symbol": "CallVariadicYieldable",
+      "mnemonic": "call.variadic.yieldable",
+      "encoding": "call_variadic_yieldable"
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 224,
+      "symbol": "PrefixExtF32",
+      "kind": "prefix",
+      "target_opcode_set": "ext_f32",
+      "mnemonic": null
+    },
+    {
+      "opcode_set": "core",
+      "opcode": 225,
+      "symbol": "PrefixExtF64",
+      "kind": "prefix",
+      "target_opcode_set": "ext_f64",
+      "mnemonic": null
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 0,
+      "symbol": "GlobalLoadF32",
+      "mnemonic": "global.load.f32",
+      "encoding": "f32_global_load"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 1,
+      "symbol": "GlobalStoreF32",
+      "mnemonic": "global.store.f32",
+      "encoding": "f32_global_store"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 2,
+      "symbol": "GlobalLoadIndirectF32",
+      "mnemonic": "global.load.indirect.f32",
+      "encoding": "f32_global_load_indirect"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 3,
+      "symbol": "GlobalStoreIndirectF32",
+      "mnemonic": "global.store.indirect.f32",
+      "encoding": "f32_global_store_indirect"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 4,
+      "symbol": "ConstF32Zero",
+      "mnemonic": "const.f32.zero",
+      "encoding": "f32_zero_constant"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 5,
+      "symbol": "ConstF32",
+      "mnemonic": "const.f32",
+      "encoding": "f32_constant"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 6,
+      "symbol": "ListGetF32",
+      "mnemonic": "list.get.f32",
+      "encoding": "f32_list_get"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 7,
+      "symbol": "ListSetF32",
+      "mnemonic": "list.set.f32",
+      "encoding": "f32_list_set"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 8,
+      "symbol": "SelectF32",
+      "mnemonic": "select.f32",
+      "encoding": "f32_select"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 9,
+      "symbol": "SwitchF32",
+      "mnemonic": "switch.f32",
+      "encoding": "f32_switch"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 10,
+      "symbol": "AddF32",
+      "mnemonic": "add.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 11,
+      "symbol": "SubF32",
+      "mnemonic": "sub.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 12,
+      "symbol": "MulF32",
+      "mnemonic": "mul.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 13,
+      "symbol": "DivF32",
+      "mnemonic": "div.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 14,
+      "symbol": "RemF32",
+      "mnemonic": "rem.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 15,
+      "symbol": "FMAF32",
+      "mnemonic": "fma.f32",
+      "encoding": "f32_ternary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 16,
+      "symbol": "AbsF32",
+      "mnemonic": "abs.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 17,
+      "symbol": "NegF32",
+      "mnemonic": "neg.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 18,
+      "symbol": "CeilF32",
+      "mnemonic": "ceil.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 19,
+      "symbol": "FloorF32",
+      "mnemonic": "floor.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 20,
+      "symbol": "CastSI32F32",
+      "mnemonic": "cast.si32.f32",
+      "encoding": "i32_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 21,
+      "symbol": "CastUI32F32",
+      "mnemonic": "cast.ui32.f32",
+      "encoding": "i32_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 22,
+      "symbol": "CastF32SI32",
+      "mnemonic": "cast.f32.si32",
+      "encoding": "f32_to_i32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 23,
+      "symbol": "CastF32UI32",
+      "mnemonic": "cast.f32.ui32",
+      "encoding": "f32_to_i32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 24,
+      "symbol": "BitcastI32F32",
+      "mnemonic": "bitcast.i32.f32",
+      "encoding": "i32_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 25,
+      "symbol": "BitcastF32I32",
+      "mnemonic": "bitcast.f32.i32",
+      "encoding": "f32_to_i32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 26,
+      "symbol": "AtanF32",
+      "mnemonic": "atan.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 27,
+      "symbol": "Atan2F32",
+      "mnemonic": "atan2.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 28,
+      "symbol": "CosF32",
+      "mnemonic": "cos.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 29,
+      "symbol": "SinF32",
+      "mnemonic": "sin.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 30,
+      "symbol": "ExpF32",
+      "mnemonic": "exp.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 31,
+      "symbol": "Exp2F32",
+      "mnemonic": "exp2.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 32,
+      "symbol": "ExpM1F32",
+      "mnemonic": "expm1.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 33,
+      "symbol": "LogF32",
+      "mnemonic": "log.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 34,
+      "symbol": "Log10F32",
+      "mnemonic": "log10.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 35,
+      "symbol": "Log1pF32",
+      "mnemonic": "log1p.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 36,
+      "symbol": "Log2F32",
+      "mnemonic": "log2.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 37,
+      "symbol": "PowF32",
+      "mnemonic": "pow.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 38,
+      "symbol": "RsqrtF32",
+      "mnemonic": "rsqrt.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 39,
+      "symbol": "SqrtF32",
+      "mnemonic": "sqrt.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 40,
+      "symbol": "TanhF32",
+      "mnemonic": "tanh.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 41,
+      "symbol": "ErfF32",
+      "mnemonic": "erf.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 42,
+      "symbol": "CmpEQF32O",
+      "mnemonic": "cmp.eq.f32.o",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 43,
+      "symbol": "CmpEQF32U",
+      "mnemonic": "cmp.eq.f32.u",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 44,
+      "symbol": "CmpNEF32O",
+      "mnemonic": "cmp.ne.f32.o",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 45,
+      "symbol": "CmpNEF32U",
+      "mnemonic": "cmp.ne.f32.u",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 46,
+      "symbol": "CmpLTF32O",
+      "mnemonic": "cmp.lt.f32.o",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 47,
+      "symbol": "CmpLTF32U",
+      "mnemonic": "cmp.lt.f32.u",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 48,
+      "symbol": "CmpLTEF32O",
+      "mnemonic": "cmp.lte.f32.o",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 49,
+      "symbol": "CmpLTEF32U",
+      "mnemonic": "cmp.lte.f32.u",
+      "encoding": "f32_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 50,
+      "symbol": "CmpNaNF32",
+      "mnemonic": "cmp.nan.f32",
+      "encoding": "f32_unary_comparison"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 51,
+      "symbol": "BufferLoadF32",
+      "mnemonic": "buffer.load.f32",
+      "encoding": "f32_buffer_load"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 52,
+      "symbol": "BufferStoreF32",
+      "mnemonic": "buffer.store.f32",
+      "encoding": "f32_buffer_store"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 53,
+      "symbol": "BufferFillF32",
+      "mnemonic": "buffer.fill.f32",
+      "encoding": "f32_buffer_fill"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 54,
+      "symbol": "RoundF32",
+      "mnemonic": "round.f32",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 55,
+      "symbol": "MinF32",
+      "mnemonic": "min.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 56,
+      "symbol": "MaxF32",
+      "mnemonic": "max.f32",
+      "encoding": "f32_binary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 57,
+      "symbol": "RoundF32Even",
+      "mnemonic": "round.f32.even",
+      "encoding": "f32_unary"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 58,
+      "symbol": "CastF32SI64",
+      "mnemonic": "cast.f32.si64",
+      "encoding": "f32_to_i64_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 59,
+      "symbol": "CastF32UI64",
+      "mnemonic": "cast.f32.ui64",
+      "encoding": "f32_to_i64_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 60,
+      "symbol": "CastSI64F32",
+      "mnemonic": "cast.si64.f32",
+      "encoding": "i64_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f32",
+      "opcode": 61,
+      "symbol": "CastUI64F32",
+      "mnemonic": "cast.ui64.f32",
+      "encoding": "i64_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 0,
+      "symbol": "GlobalLoadF64",
+      "mnemonic": "global.load.f64",
+      "encoding": "f64_global_load"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 1,
+      "symbol": "GlobalStoreF64",
+      "mnemonic": "global.store.f64",
+      "encoding": "f64_global_store"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 2,
+      "symbol": "GlobalLoadIndirectF64",
+      "mnemonic": "global.load.indirect.f64",
+      "encoding": "f64_global_load_indirect"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 3,
+      "symbol": "GlobalStoreIndirectF64",
+      "mnemonic": "global.store.indirect.f64",
+      "encoding": "f64_global_store_indirect"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 4,
+      "symbol": "ConstF64Zero",
+      "mnemonic": "const.f64.zero",
+      "encoding": "f64_zero_constant"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 5,
+      "symbol": "ConstF64",
+      "mnemonic": "const.f64",
+      "encoding": "f64_constant"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 6,
+      "symbol": "ListGetF64",
+      "mnemonic": "list.get.f64",
+      "encoding": "f64_list_get"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 7,
+      "symbol": "ListSetF64",
+      "mnemonic": "list.set.f64",
+      "encoding": "f64_list_set"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 8,
+      "symbol": "SelectF64",
+      "mnemonic": "select.f64",
+      "encoding": "f64_select"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 9,
+      "symbol": "SwitchF64",
+      "mnemonic": "switch.f64",
+      "encoding": "f64_switch"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 10,
+      "symbol": "AddF64",
+      "mnemonic": "add.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 11,
+      "symbol": "SubF64",
+      "mnemonic": "sub.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 12,
+      "symbol": "MulF64",
+      "mnemonic": "mul.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 13,
+      "symbol": "DivF64",
+      "mnemonic": "div.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 14,
+      "symbol": "RemF64",
+      "mnemonic": "rem.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 15,
+      "symbol": "FMAF64",
+      "mnemonic": "fma.f64",
+      "encoding": "f64_ternary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 16,
+      "symbol": "AbsF64",
+      "mnemonic": "abs.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 17,
+      "symbol": "NegF64",
+      "mnemonic": "neg.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 18,
+      "symbol": "CeilF64",
+      "mnemonic": "ceil.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 19,
+      "symbol": "FloorF64",
+      "mnemonic": "floor.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 20,
+      "symbol": "TruncF64F32",
+      "mnemonic": "trunc.f64.f32",
+      "encoding": "f64_to_f32_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 21,
+      "symbol": "ExtF32F64",
+      "mnemonic": "ext.f32.f64",
+      "encoding": "f32_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 22,
+      "symbol": "CastSI32F64",
+      "mnemonic": "cast.si32.f64",
+      "encoding": "i32_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 23,
+      "symbol": "CastUI32F64",
+      "mnemonic": "cast.ui32.f64",
+      "encoding": "i32_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 24,
+      "symbol": "CastF64SI32",
+      "mnemonic": "cast.f64.si32",
+      "encoding": "f64_to_i32_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 25,
+      "symbol": "CastF64UI32",
+      "mnemonic": "cast.f64.ui32",
+      "encoding": "f64_to_i32_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 26,
+      "symbol": "CastSI64F64",
+      "mnemonic": "cast.si64.f64",
+      "encoding": "i64_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 27,
+      "symbol": "CastUI64F64",
+      "mnemonic": "cast.ui64.f64",
+      "encoding": "i64_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 28,
+      "symbol": "CastF64SI64",
+      "mnemonic": "cast.f64.si64",
+      "encoding": "f64_to_i64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 29,
+      "symbol": "CastF64UI64",
+      "mnemonic": "cast.f64.ui64",
+      "encoding": "f64_to_i64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 30,
+      "symbol": "BitcastI64F64",
+      "mnemonic": "bitcast.i64.f64",
+      "encoding": "i64_to_f64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 31,
+      "symbol": "BitcastF64I64",
+      "mnemonic": "bitcast.f64.i64",
+      "encoding": "f64_to_i64_conversion"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 32,
+      "symbol": "AtanF64",
+      "mnemonic": "atan.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 33,
+      "symbol": "Atan2F64",
+      "mnemonic": "atan2.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 34,
+      "symbol": "CosF64",
+      "mnemonic": "cos.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 35,
+      "symbol": "SinF64",
+      "mnemonic": "sin.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 36,
+      "symbol": "ExpF64",
+      "mnemonic": "exp.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 37,
+      "symbol": "Exp2F64",
+      "mnemonic": "exp2.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 38,
+      "symbol": "ExpM1F64",
+      "mnemonic": "expm1.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 39,
+      "symbol": "LogF64",
+      "mnemonic": "log.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 40,
+      "symbol": "Log10F64",
+      "mnemonic": "log10.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 41,
+      "symbol": "Log1pF64",
+      "mnemonic": "log1p.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 42,
+      "symbol": "Log2F64",
+      "mnemonic": "log2.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 43,
+      "symbol": "PowF64",
+      "mnemonic": "pow.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 44,
+      "symbol": "RsqrtF64",
+      "mnemonic": "rsqrt.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 45,
+      "symbol": "SqrtF64",
+      "mnemonic": "sqrt.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 46,
+      "symbol": "TanhF64",
+      "mnemonic": "tanh.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 47,
+      "symbol": "ErfF64",
+      "mnemonic": "erf.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 48,
+      "symbol": "CmpEQF64O",
+      "mnemonic": "cmp.eq.f64.o",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 49,
+      "symbol": "CmpEQF64U",
+      "mnemonic": "cmp.eq.f64.u",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 50,
+      "symbol": "CmpNEF64O",
+      "mnemonic": "cmp.ne.f64.o",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 51,
+      "symbol": "CmpNEF64U",
+      "mnemonic": "cmp.ne.f64.u",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 52,
+      "symbol": "CmpLTF64O",
+      "mnemonic": "cmp.lt.f64.o",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 53,
+      "symbol": "CmpLTF64U",
+      "mnemonic": "cmp.lt.f64.u",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 54,
+      "symbol": "CmpLTEF64O",
+      "mnemonic": "cmp.lte.f64.o",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 55,
+      "symbol": "CmpLTEF64U",
+      "mnemonic": "cmp.lte.f64.u",
+      "encoding": "f64_binary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 56,
+      "symbol": "CmpNaNF64",
+      "mnemonic": "cmp.nan.f64",
+      "encoding": "f64_unary_comparison"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 57,
+      "symbol": "BufferLoadF64",
+      "mnemonic": "buffer.load.f64",
+      "encoding": "f64_buffer_load"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 58,
+      "symbol": "BufferStoreF64",
+      "mnemonic": "buffer.store.f64",
+      "encoding": "f64_buffer_store"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 59,
+      "symbol": "BufferFillF64",
+      "mnemonic": "buffer.fill.f64",
+      "encoding": "f64_buffer_fill"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 60,
+      "symbol": "RoundF64",
+      "mnemonic": "round.f64",
+      "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 61,
+      "symbol": "MinF64",
+      "mnemonic": "min.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 62,
+      "symbol": "MaxF64",
+      "mnemonic": "max.f64",
+      "encoding": "f64_binary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 63,
+      "symbol": "RoundF64Even",
+      "mnemonic": "round.f64.even",
+      "encoding": "f64_unary"
+    }
+  ]
+}

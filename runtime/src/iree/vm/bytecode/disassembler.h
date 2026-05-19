@@ -12,15 +12,8 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/dispatch_util.h"
+#include "iree/vm/bytecode/module.h"
 #include "iree/vm/bytecode/module_impl.h"
-
-// Controls how bytecode disassembly is formatted.
-typedef enum iree_vm_bytecode_disassembly_format_e {
-  IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT = 0,
-  // Includes the input register values inline in the op text.
-  // Example: `%i0 <= ShrI32U %i2(5), %i3(6)`
-  IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES = 1u << 0,
-} iree_vm_bytecode_disassembly_format_t;
 
 // Disassembles the bytecode operation at |pc| using the provided module state.
 // Appends the disassembled op to |string_builder| in a format based on
@@ -45,9 +38,9 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
 
 // Disassembles an entire function's bytecode.
 // |module_state| may be NULL for static disassembly (no inline values).
-// Output mostly matches --trace_execution format:
-//   [00000000]    <block>
-//   [00000001]    %i0 = vm.const.i32 9  // 0x00000009
+// Output is assembly-like by default:
+// ^bb0:
+//   %i0 = vm.const.i32 9  // 0x00000009
 iree_status_t iree_vm_bytecode_disassemble_function(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,

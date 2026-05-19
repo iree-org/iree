@@ -1,0 +1,24 @@
+vm.module @list_ops_i64 version 0
+vm.type i32
+vm.type i64
+vm.type !vm.list<i64>
+
+vm.export @test_i64
+vm.func @test_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 42  // 0x0000002A
+  %i2 = vm.const.i32 41  // 0x00000029
+  %i4:5 = vm.const.i64 2147483648  // 0x0000000080000000
+  %r0 = vm.list.alloc %i1 : !vm.list<i64>
+  vm.list.resize %r0, %i1
+  vm.list.set.i64 %r0, %i2, %i4:5
+  %i6:7 = vm.list.get.i64 %r0, %i2
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i64 %i6:7, %i4:5
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "list<i64>.empty.set(41, MAX_INT_PLUS_1).get(41)=MAX_INT_PLUS_1"
+}

@@ -1,0 +1,139 @@
+vm.module @conversion_ops_f64 version 0
+vm.type f64
+vm.type i32
+vm.type i64
+
+vm.export @test_bitcast_i64_f64
+vm.func @test_bitcast_i64_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 5.5
+  %i4:5 = vm.const.i64 4617878467915022336  // 0x4016000000000000
+  %i6:7 = vm.bitcast.i64.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "bitcast i64 to f64"
+}
+
+vm.export @test_bitcast_f64_i64
+vm.func @test_bitcast_f64_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 4617878467915022336  // 0x4016000000000000
+  %i4:5 = vm.const.f64 5.5
+  %i6:7 = vm.bitcast.f64.i64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "bitcast f64 to i64"
+}
+
+vm.export @test_cast_si64_f64_int_max
+vm.func @test_cast_si64_f64_int_max() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2147483647
+  %i4:5 = vm.const.i64 2147483647  // 0x000000007FFFFFFF
+  %i6:7 = vm.cast.si64.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast signed integer to a floating-point value"
+}
+
+vm.export @test_cast_si64_f64_int_min
+vm.func @test_cast_si64_f64_int_min() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 -2147483648
+  %i4:5 = vm.const.i64 -2147483648  // 0xFFFFFFFF80000000
+  %i6:7 = vm.cast.si64.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast signed integer to a floating-point value"
+}
+
+vm.export @test_cast_ui64_f64_int_max
+vm.func @test_cast_ui64_f64_int_max() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 4294967295
+  %i4:5 = vm.const.i64 4294967295  // 0x00000000FFFFFFFF
+  %i6:7 = vm.cast.ui64.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast unsigned integer to a floating-point value"
+}
+
+vm.export @test_cast_f64_si64_int_min
+vm.func @test_cast_f64_si64_int_min() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -2147483648  // 0xFFFFFFFF80000000
+  %i4:5 = vm.const.f64 -2147483648
+  %i6:7 = vm.cast.f64.si64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast floating-point value to a signed integer"
+}
+
+vm.export @test_cast_f64_si64_away_from_zero_pos
+vm.func @test_cast_f64_si64_away_from_zero_pos() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 3  // 0x0000000000000003
+  %i4:5 = vm.const.f64 2.5
+  %i6:7 = vm.cast.f64.si64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast floating-point value to a signed integer"
+}
+
+vm.export @test_cast_f64_si64_away_from_zero_neg
+vm.func @test_cast_f64_si64_away_from_zero_neg() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i4:5 = vm.const.f64 -2.5
+  %i6:7 = vm.cast.f64.si64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast floating-point value to a signed integer"
+}
+
+vm.export @test_cast_f64_ui64_away_from_zero
+vm.func @test_cast_f64_ui64_away_from_zero() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 3  // 0x0000000000000003
+  %i4:5 = vm.const.f64 2.5
+  %i6:7 = vm.cast.f64.ui64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i6:7, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast floating-point value to a signed integer"
+}

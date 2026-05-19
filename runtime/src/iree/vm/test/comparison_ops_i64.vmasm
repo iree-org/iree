@@ -1,0 +1,206 @@
+vm.module @comparison_ops_i64 version 0
+vm.type i32
+vm.type i64
+
+vm.export @test_cmp_lt_s_0_i64
+vm.func @test_cmp_lt_s_0_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -4294967295  // 0xFFFFFFFF00000001
+  %i4:5 = vm.const.i64 4294967295  // 0x00000000FFFFFFFF
+  %i1 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4294967295 (UINT_MAX) < -4294967295 (UINT_MAX)"
+}
+
+vm.export @test_cmp_lt_s_1_i64
+vm.func @test_cmp_lt_s_1_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 4294967295  // 0x00000000FFFFFFFF
+  %i4:5 = vm.const.i64 -4294967295  // 0xFFFFFFFF00000001
+  %i6 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-4294967295 (UINT_MAX) < 4294967295 (UINT_MAX)"
+}
+
+vm.export @test_cmp_lt_s_2_i64
+vm.func @test_cmp_lt_s_2_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i6 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "18446744073709551615 (ULONG_MAX) < 2"
+}
+
+vm.export @test_cmp_lt_u_0_i64
+vm.func @test_cmp_lt_u_0_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i4:5 = vm.const.i64 2  // 0x0000000000000002
+  %i6 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2 < -2 (as unsigned)"
+}
+
+vm.export @test_cmp_lt_u_1_i64
+vm.func @test_cmp_lt_u_1_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i1 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-2 < 2 (as unsigned)"
+}
+
+vm.export @test_cmp_lt_u_2_i64
+vm.func @test_cmp_lt_u_2_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i1 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "18446744073709551615 (ULONG_MAX) < 2 (as unsigned)"
+}
+
+vm.export @test_cmp_lte_i64
+vm.func @test_cmp_lte_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i6 = vm.cmp.lt.i64.s %i2:3, %i4:5
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i6, ^bb8(), ^bb1()
+^bb1:
+  %i6 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb7(), ^bb2()
+^bb2:
+  %i6 = vm.cmp.lt.i64.u %i2:3, %i4:5
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb6(), ^bb3()
+^bb3:
+  %i6 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i6 = vm.xor.i32 %i6, %i1
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 <= -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 <= 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 <= -2"
+^bb8:
+  vm.fail %i0, "-2 <= 2"
+}
+
+vm.export @test_cmp_gt_i64
+vm.func @test_cmp_gt_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i6 = vm.cmp.lt.i64.s %i2:3, %i4:5
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb8(), ^bb1()
+^bb1:
+  %i6 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i6 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i6, ^bb7(), ^bb2()
+^bb2:
+  %i6 = vm.cmp.lt.i64.u %i2:3, %i4:5
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb6(), ^bb3()
+^bb3:
+  %i1 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 > -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 > 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 > -2"
+^bb8:
+  vm.fail %i0, "-2 > 2"
+}
+
+vm.export @test_cmp_gte_i64
+vm.func @test_cmp_gte_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i6 = vm.cmp.lt.i64.s %i4:5, %i2:3
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb8(), ^bb1()
+^bb1:
+  %i6 = vm.cmp.lt.i64.s %i2:3, %i4:5
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i6, ^bb7(), ^bb2()
+^bb2:
+  %i6 = vm.cmp.lt.i64.u %i4:5, %i2:3
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i6, ^bb6(), ^bb3()
+^bb3:
+  %i6 = vm.cmp.lt.i64.u %i2:3, %i4:5
+  %i1 = vm.xor.i32 %i6, %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "2 >= -2 (unsigned)"
+^bb6:
+  vm.fail %i0, "-2 >= 2 (unsigned)"
+^bb7:
+  vm.fail %i0, "2 >= -2"
+^bb8:
+  vm.fail %i0, "-2 >= 2"
+}

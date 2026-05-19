@@ -1,0 +1,201 @@
+vm.module @list_variant_ops version 0
+vm.type i32
+vm.type i64
+vm.type i8
+vm.type !vm.buffer
+vm.type !vm.list<!vm.list<i32>>
+vm.type !vm.list<?>
+vm.type !vm.list<i32>
+vm.type !vm.list<i8>
+vm.type !vm.opaque
+vm.rodata[0] = 010000000200000003000000
+
+vm.export @test_listception
+vm.func @test_listception() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 8  // 0x00000008
+  %i2 = vm.const.i32.zero
+  %i3 = vm.const.i32 1  // 0x00000001
+  %i4 = vm.const.i32 2  // 0x00000002
+  %i5 = vm.const.i32 3  // 0x00000003
+  %i6 = vm.const.i32 100  // 0x00000064
+  %i7 = vm.const.i32 101  // 0x00000065
+  %i8 = vm.const.i32 102  // 0x00000066
+  %r0 = vm.list.alloc %i5 : !vm.list<i32>
+  vm.list.resize %r0, %i5
+  vm.list.set.i32 %r0, %i2, %i6
+  vm.list.set.i32 %r0, %i3, %i7
+  vm.list.set.i32 %r0, %i4, %i8
+  %r1 = vm.list.alloc %i5 : !vm.list<i32>
+  vm.list.resize %r1, %i5
+  vm.list.set.i32 %r1, %i2, %i8
+  vm.list.set.i32 %r1, %i3, %i7
+  vm.list.set.i32 %r1, %i4, %i6
+  %r2 = vm.list.alloc %i1 : !vm.list<!vm.list<i32>>
+  vm.list.resize %r2, %i4
+  vm.list.set.ref %r2, %i2, %r0
+  vm.list.set.ref %r2, %i3, %r1
+  %r3 = vm.list.get.ref %r2, %i2 : !vm.list<i32>
+  %i1 = vm.cmp.eq.ref %r3, %r0
+  vm.discard.refs %r0
+  %i1 = vm.xor.i32 %i1, %i3
+  vm.cond_br %i1, ^bb5(), ^bb1()
+^bb1:
+  %i1 = vm.list.get.i32 %r3, %i4
+  vm.discard.refs %r3
+  %i8 = vm.cmp.ne.i32 %i1, %i8
+  vm.cond_br %i8, ^bb6(), ^bb2()
+^bb2:
+  %r0 = vm.list.get.ref %r2, %i3 : !vm.list<i32>
+  vm.discard.refs %r2
+  %i1 = vm.cmp.eq.ref %r0, %r1
+  vm.discard.refs %r1
+  %i3 = vm.xor.i32 %i1, %i3
+  vm.cond_br %i3, ^bb7(), ^bb3()
+^bb3:
+  %i4 = vm.list.get.i32 %r0, %i4
+  vm.discard.refs %r0
+  %i6 = vm.cmp.ne.i32 %i4, %i6
+  vm.cond_br %i6, ^bb8(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.discard.refs %r1, %r2, %r3
+  vm.br ^bb8()
+^bb6:
+  vm.discard.refs %r1, %r2
+  vm.br ^bb8()
+^bb7:
+  vm.discard.refs %r0
+  vm.br ^bb8()
+^bb8:
+  vm.fail %i0, ""
+}
+
+vm.export @test_variant
+vm.func @test_variant() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.const.i32 9  // 0x00000009
+  %i2 = vm.const.i32 11  // 0x0000000B
+  %i4:5 = vm.const.i64 1234  // 0x00000000000004D2
+  %i3 = vm.const.i32 1234  // 0x000004D2
+  %i6 = vm.const.i32 10  // 0x0000000A
+  %i7 = vm.const.i32 42  // 0x0000002A
+  %r0 = vm.list.alloc %i7 : !vm.list<!vm.opaque>
+  vm.list.resize %r0, %i7
+  vm.list.set.i32 %r0, %i6, %i3
+  %i7 = vm.list.get.i32 %r0, %i6
+  %i3 = vm.cmp.ne.i32 %i7, %i3
+  vm.cond_br %i3, ^bb5(), ^bb1()
+^bb1:
+  vm.list.set.i64 %r0, %i6, %i4:5
+  %i8:9 = vm.list.get.i64 %r0, %i6
+  %i3 = vm.cmp.ne.i64 %i8:9, %i4:5
+  vm.cond_br %i3, ^bb6(), ^bb2()
+^bb2:
+  %r1 = vm.const.ref.rodata 0  // 12b
+  vm.list.set.ref %r0, %i2, %r1
+  %r2 = vm.list.get.ref %r0, %i2 : !vm.buffer
+  %i3 = vm.cmp.eq.ref %r2, %r1
+  vm.discard.refs %r2, %r1
+  %i3 = vm.xor.i32 %i3, %i0
+  vm.cond_br %i3, ^bb7(), ^bb3()
+^bb3:
+  %r1 = vm.list.get.ref %r0, %i2 : !vm.list<i8>
+  vm.discard.refs %r0
+  %i2 = vm.cmp.nz.ref %r1
+  vm.discard.refs %r1
+  %i2 = vm.xor.i32 %i2, %i0
+  %i0 = vm.xor.i32 %i2, %i0
+  vm.cond_br %i0, ^bb8(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.discard.refs %r0
+  vm.br ^bb8()
+^bb6:
+  vm.discard.refs %r0
+  vm.br ^bb8()
+^bb7:
+  vm.discard.refs %r0
+  vm.br ^bb8()
+^bb8:
+  vm.fail %i1, ""
+}
+
+vm.export @fail_uninitialized_access
+vm.func @fail_uninitialized_access() -> () {
+^bb0:
+  %i0 = vm.const.i32.zero
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.list.alloc %i1 : !vm.list<!vm.opaque>
+  vm.list.set.ref %r1, %i0, %R0
+  vm.discard.refs %r1
+  vm.return
+}
+
+vm.export @fail_out_of_bounds_read
+vm.func @fail_out_of_bounds_read() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.list.alloc %i0 : !vm.list<!vm.opaque>
+  vm.list.resize %r0, %i0
+  %r1 = vm.list.get.ref %r0, %i0 : !vm.buffer
+  vm.discard.refs %r1
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @fail_out_of_bounds_write
+vm.func @fail_out_of_bounds_write() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.list.alloc %i0 : !vm.list<!vm.opaque>
+  vm.list.resize %r1, %i0
+  vm.list.set.ref %r1, %i0, %R0
+  vm.discard.refs %r1
+  vm.return
+}
+
+vm.export @fail_variant_slot_change
+vm.func @fail_variant_slot_change() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.const.i32 9  // 0x00000009
+  %i2 = vm.const.i32 1234  // 0x000004D2
+  %i3 = vm.const.i32 10  // 0x0000000A
+  %i4 = vm.const.i32 42  // 0x0000002A
+  %r0 = vm.list.alloc %i4 : !vm.list<!vm.opaque>
+  vm.list.resize %r0, %i4
+  vm.list.set.i32 %r0, %i3, %i2
+  %i4 = vm.list.get.i32 %r0, %i3
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %r1 = vm.const.ref.rodata 0  // 12b
+  vm.list.set.ref %r0, %i3, %r1
+  %r2 = vm.list.get.ref %r0, %i3 : !vm.buffer
+  %i2 = vm.cmp.eq.ref %r2, %r1
+  vm.discard.refs %r2, %r1
+  %i0 = vm.xor.i32 %i2, %i0
+  vm.cond_br %i0, ^bb5(), ^bb2()
+^bb2:
+  %i3 = vm.list.get.i32 %r0, %i3
+  vm.discard.refs %r0
+  %i3 = vm.cmp.nz.i32 %i3
+  vm.cond_br %i3, ^bb6(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.discard.refs %r0
+  vm.br ^bb6()
+^bb5:
+  vm.discard.refs %r0
+  vm.br ^bb6()
+^bb6:
+  vm.fail %i1, ""
+}

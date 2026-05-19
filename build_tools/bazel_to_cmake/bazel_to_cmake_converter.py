@@ -1288,6 +1288,40 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
+    def iree_vmasm_module(
+        self,
+        name,
+        src,
+        module_name=None,
+        assemble_tool=None,
+        c_identifier=None,
+        deps=None,
+        testonly=None,
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        src_block = self._convert_string_arg_block("SRC", src)
+        module_name_block = self._convert_string_arg_block(
+            "MODULE_FILE_NAME", module_name
+        )
+        assemble_tool_block = self._convert_target_block("ASSEMBLE_TOOL", assemble_tool)
+        c_identifier_block = self._convert_string_arg_block(
+            "C_IDENTIFIER", c_identifier
+        )
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._converter.body += (
+            f"iree_vmasm_module(\n"
+            f"{name_block}"
+            f"{src_block}"
+            f"{module_name_block}"
+            f"{assemble_tool_block}"
+            f"{c_identifier_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+
     def iree_hal_executable(
         self,
         name,
