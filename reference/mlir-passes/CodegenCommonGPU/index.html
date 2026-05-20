@@ -3870,6 +3870,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-codegen-gpu-promote-matmul-operands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3885,7 +3902,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_5" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -3935,7 +3952,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -3963,7 +3980,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -4046,7 +4063,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -4085,7 +4102,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7091,6 +7108,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-codegen-gpu-promote-matmul-operands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -7106,7 +7140,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_5" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7156,7 +7190,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7184,7 +7218,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_7" class="md-nav__link">
+  <a href="#options_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7267,7 +7301,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_8" class="md-nav__link">
+  <a href="#options_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7306,7 +7340,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_9" class="md-nav__link">
+  <a href="#options_10" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -7454,9 +7488,12 @@ optimized for coalesced loads.</p>
 <p>If the matmul is also annotated with <code>promotion_types = ArrayAttr</code>, the
 logic for "promoting" an operand is deferred to an attribute interface
 allowing for custom logic.</p>
+<h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-skip-operand-promotion : Skip promotion of DPS input operands, promoting only results.
+</code></pre></div>
 <h3 id="-iree-codegen-gpu-reduce-bank-conflicts"><code>-iree-codegen-gpu-reduce-bank-conflicts</code><a class="headerlink" href="#-iree-codegen-gpu-reduce-bank-conflicts" title="Permanent link">link</a></h3>
 <p><em>Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.</em></p>
-<h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
+<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-padding-bits : Padding size (in bits) to introduce between rows.
 </code></pre></div>
 <h3 id="-iree-codegen-gpu-reuse-shared-memory-allocs"><code>-iree-codegen-gpu-reuse-shared-memory-allocs</code><a class="headerlink" href="#-iree-codegen-gpu-reuse-shared-memory-allocs" title="Permanent link">link</a></h3>
@@ -7465,12 +7502,12 @@ allowing for custom logic.</p>
 <p><em>Pass to create allocations for some tensor values to useGPU shared memory</em></p>
 <h3 id="-iree-codegen-gpu-tensor-tile"><code>-iree-codegen-gpu-tensor-tile</code><a class="headerlink" href="#-iree-codegen-gpu-tensor-tile" title="Permanent link">link</a></h3>
 <p><em>Pass to tile tensor (linalg) ops within a GPU workgroup</em></p>
-<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
+<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-distribute-to-subgroup : Distribute the workloads to subgroup if true, otherwise distribute to threads.
 </code></pre></div>
 <h3 id="-iree-codegen-gpu-tensor-tile-to-serial-loops"><code>-iree-codegen-gpu-tensor-tile-to-serial-loops</code><a class="headerlink" href="#-iree-codegen-gpu-tensor-tile-to-serial-loops" title="Permanent link">link</a></h3>
 <p><em>Pass to tile reduction dimensions for certain GPU ops</em></p>
-<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
+<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-coalesce-loops : Collapse the loops that are generated to a single loops
 </code></pre></div>
 <h3 id="-iree-codegen-gpu-tile"><code>-iree-codegen-gpu-tile</code><a class="headerlink" href="#-iree-codegen-gpu-tile" title="Permanent link">link</a></h3>
@@ -7485,14 +7522,14 @@ allowing for custom logic.</p>
 <p><em>Pass to verify writes before resolving distributed contexts.</em></p>
 <h3 id="-iree-codegen-reorder-workgroups"><code>-iree-codegen-reorder-workgroups</code><a class="headerlink" href="#-iree-codegen-reorder-workgroups" title="Permanent link">link</a></h3>
 <p><em>Reorder workgroup ids for better cache reuse</em></p>
-<h4 id="options_8">Options<a class="headerlink" href="#options_8" title="Permanent link">link</a></h4>
+<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-strategy : Workgroup reordering strategy, one of: &#39;&#39; (none),  &#39;transpose&#39;
 </code></pre></div>
 <h3 id="-iree-codegen-test-gpu-promotion-analysis"><code>-iree-codegen-test-gpu-promotion-analysis</code><a class="headerlink" href="#-iree-codegen-test-gpu-promotion-analysis" title="Permanent link">link</a></h3>
 <p><em>Test the GPU promotion type backward analysis.</em></p>
 <h3 id="-iree-codegen-vector-reduction-to-gpu"><code>-iree-codegen-vector-reduction-to-gpu</code><a class="headerlink" href="#-iree-codegen-vector-reduction-to-gpu" title="Permanent link">link</a></h3>
 <p><em>Convert vector reduction to GPU ops.</em></p>
-<h4 id="options_9">Options<a class="headerlink" href="#options_9" title="Permanent link">link</a></h4>
+<h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-expand-subgroup-reduction : Lower subgroup reductions to gpu ops immediately where possible.
 </code></pre></div>
 
