@@ -965,6 +965,7 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_kernel_args_from_symbol(
 
   out_kernel_args->binding_count = binding_count;
   out_kernel_args->constant_count = constant_count;
+  out_kernel_args->implicit_args_offset = UINT16_MAX;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -1141,6 +1142,21 @@ static iree_status_t iree_hal_amdgpu_executable_initialize_dispatch_descriptor(
   out_descriptor->custom_kernarg_layout =
       iree_hal_amdgpu_device_dispatch_make_custom_kernarg_layout(
           kernel_args->kernarg_size);
+  const uint16_t custom_implicit_args_offset =
+      kernel_args->implicit_args_offset != UINT16_MAX
+          ? kernel_args->implicit_args_offset
+          : kernel_args->kernarg_size;
+  if (custom_implicit_args_offset != UINT16_MAX) {
+    out_descriptor->custom_kernarg_layout.explicit_kernarg_size =
+        custom_implicit_args_offset;
+    out_descriptor->custom_kernarg_layout.implicit_args_offset =
+        custom_implicit_args_offset;
+    out_descriptor->custom_kernarg_layout.total_kernarg_size = iree_max(
+        (size_t)kernel_args->kernarg_size,
+        (size_t)custom_implicit_args_offset +
+            IREE_AMDGPU_KERNEL_IMPLICIT_ARGS_SIZE);
+    out_descriptor->custom_kernarg_layout.has_implicit_args = true;
+  }
   IREE_RETURN_IF_ERROR(iree_hal_amdgpu_executable_calculate_kernarg_block_count(
       &out_descriptor->custom_kernarg_layout,
       &out_descriptor->custom_kernarg_block_count));
@@ -1656,13 +1672,6 @@ iree_hal_amdgpu_executable_calculate_raw_hsaco_reflection_storage(
     iree_host_size_t* out_export_name_storage_size,
     iree_host_size_t* out_export_parameter_count,
     iree_host_size_t* out_export_parameter_name_storage_size) {
-  if (iree_string_view_is_empty(hsaco_metadata->target)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "raw HSACO metadata is missing `amdhsa.target`; direct loading "
-        "requires the code object to declare its target ISA");
-  }
-
   iree_host_size_t export_name_storage_size = 0;
   iree_host_size_t export_parameter_count = 0;
   iree_host_size_t export_parameter_name_storage_size = 0;
@@ -1922,6 +1931,60 @@ static iree_status_t iree_hal_amdgpu_executable_resolve_raw_hsaco_kernel_args(
             requirements.binding_count, &host_kernel_args[kernel_ordinal]),
         "resolving kernel args for raw kernel `%.*s`", (int)symbol_name.size,
         symbol_name.data);
+    // Raw HSACO metadata is the source of truth for caller-visible kernargs:
+    // some code objects report a smaller HSA symbol size than the metadata
+    // segment needed by pre-packed HIP launch buffers.
+    if (host_kernel_args[kernel_ordinal].kernarg_size <
+        kernel->kernarg_segment_size) {
+      host_kernel_args[kernel_ordinal].kernarg_size =
+          kernel->kernarg_segment_size;
+    }
+    if (host_kernel_args[kernel_ordinal].kernarg_alignment <
+        kernel->kernarg_segment_alignment) {
+      host_kernel_args[kernel_ordinal].kernarg_alignment =
+          kernel->kernarg_segment_alignment;
+    }
+
+    uint16_t implicit_args_offset = UINT16_MAX;
+    uint32_t explicit_args_end = 0;
+    for (iree_host_size_t arg_i = 0; arg_i < kernel->arg_count; ++arg_i) {
+      const iree_hal_amdgpu_hsaco_metadata_arg_t* arg =
+          &kernel->args[arg_i];
+      if (arg->kind == IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_HIDDEN ||
+          arg->kind == IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_HIDDEN_NONE) {
+        if (arg->offset <= UINT16_MAX &&
+            (implicit_args_offset == UINT16_MAX ||
+             arg->offset < implicit_args_offset)) {
+          implicit_args_offset = (uint16_t)arg->offset;
+        }
+      } else {
+        iree_host_size_t arg_end = 0;
+        if (!iree_host_size_checked_add(arg->offset, arg->size, &arg_end) ||
+            arg_end > UINT32_MAX) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "AMDGPU kernel `%.*s` argument offset overflows",
+              (int)symbol_name.size, symbol_name.data);
+        }
+        explicit_args_end = iree_max(explicit_args_end, (uint32_t)arg_end);
+      }
+    }
+    if (implicit_args_offset != UINT16_MAX && implicit_args_offset > 0) {
+      host_kernel_args[kernel_ordinal].implicit_args_offset =
+          implicit_args_offset;
+    } else if (explicit_args_end <= UINT16_MAX &&
+               host_kernel_args[kernel_ordinal].kernarg_size >=
+                   explicit_args_end + IREE_AMDGPU_KERNEL_IMPLICIT_ARGS_SIZE) {
+      host_kernel_args[kernel_ordinal].implicit_args_offset =
+          (uint16_t)explicit_args_end;
+    } else if (kernel->uses_borrowed_arg_layout &&
+               host_kernel_args[kernel_ordinal].kernarg_size > 0) {
+      // ELF-synthesized exports borrow a template arg layout, so its hidden arg
+      // offsets may not apply. Preserve the full caller-provided raw kernarg
+      // blob and append the implicit suffix after the HSA-reported segment.
+      host_kernel_args[kernel_ordinal].implicit_args_offset =
+          host_kernel_args[kernel_ordinal].kernarg_size;
+    }
   }
   return iree_ok_status();
 }

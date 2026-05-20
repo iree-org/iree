@@ -22,9 +22,16 @@
 #define IREE_HAL_AMDGPU_ELF_MACHINE_AMDGPU 224
 #define IREE_HAL_AMDGPU_ELF_PT_NOTE 4
 #define IREE_HAL_AMDGPU_ELF_NOTE_AMDGPU_METADATA 32
+#define IREE_HAL_AMDGPU_ELF_SHT_SYMTAB 2
+#define IREE_HAL_AMDGPU_ELF_SHT_DYNSYM 11
+#define IREE_HAL_AMDGPU_ELF_STT_FUNC 2
+#define IREE_HAL_AMDGPU_ELF_STB_GLOBAL 1
+#define IREE_HAL_AMDGPU_ELF_STB_WEAK 2
 
 #define IREE_HAL_AMDGPU_ELF64_HEADER_SIZE 64
 #define IREE_HAL_AMDGPU_ELF64_PROGRAM_HEADER_SIZE 56
+#define IREE_HAL_AMDGPU_ELF64_SECTION_HEADER_SIZE 64
+#define IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE 24
 
 static uint16_t iree_hal_amdgpu_hsaco_metadata_load_le_u16(const uint8_t* ptr) {
   return iree_unaligned_load_le((const uint16_t*)ptr);
@@ -1143,6 +1150,418 @@ static iree_status_t iree_hal_amdgpu_hsaco_metadata_allocate_storage(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_amdgpu_hsaco_metadata_elf_section(
+    iree_const_byte_span_t elf_data, uint16_t section_index,
+    const uint8_t** out_section) {
+  *out_section = NULL;
+  if (elf_data.data_length < IREE_HAL_AMDGPU_ELF64_HEADER_SIZE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "AMDGPU ELF data too small");
+  }
+  const uint8_t* header = elf_data.data;
+  uint64_t section_offset =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(header + 40);
+  uint16_t section_entry_size =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 58);
+  uint16_t section_count =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 60);
+  if (section_index >= section_count ||
+      section_entry_size < IREE_HAL_AMDGPU_ELF64_SECTION_HEADER_SIZE) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "AMDGPU ELF section index out of range");
+  }
+  uint64_t selected_offset =
+      section_offset + (uint64_t)section_index * section_entry_size;
+  if (selected_offset > elf_data.data_length ||
+      IREE_HAL_AMDGPU_ELF64_SECTION_HEADER_SIZE >
+          elf_data.data_length - selected_offset) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "AMDGPU ELF section header out of bounds");
+  }
+  *out_section = elf_data.data + selected_offset;
+  return iree_ok_status();
+}
+
+static iree_string_view_t iree_hal_amdgpu_hsaco_metadata_elf_symbol_name(
+    iree_const_byte_span_t elf_data, const uint8_t* symbol_section,
+    iree_host_size_t symbol_index) {
+  uint64_t symbol_section_offset =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(symbol_section + 24);
+  uint64_t symbol_section_size =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(symbol_section + 32);
+  uint64_t symbol_entry_size =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(symbol_section + 56);
+  if (symbol_entry_size < IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE) {
+    return iree_string_view_empty();
+  }
+  uint64_t symbol_offset =
+      symbol_section_offset + (uint64_t)symbol_index * symbol_entry_size;
+  if (symbol_offset > elf_data.data_length ||
+      IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE >
+          elf_data.data_length - symbol_offset ||
+      symbol_offset >= symbol_section_offset + symbol_section_size) {
+    return iree_string_view_empty();
+  }
+  const uint8_t* symbol = elf_data.data + symbol_offset;
+  uint32_t name_offset = iree_hal_amdgpu_hsaco_metadata_load_le_u32(symbol);
+  uint32_t string_section_index =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u32(symbol_section + 40);
+  const uint8_t* string_section = NULL;
+  if (!iree_status_is_ok(iree_hal_amdgpu_hsaco_metadata_elf_section(
+          elf_data, (uint16_t)string_section_index, &string_section))) {
+    return iree_string_view_empty();
+  }
+  uint64_t string_offset =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(string_section + 24);
+  uint64_t string_size =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(string_section + 32);
+  if (name_offset >= string_size ||
+      string_offset + name_offset >= elf_data.data_length) {
+    return iree_string_view_empty();
+  }
+  const char* name = (const char*)elf_data.data + string_offset + name_offset;
+  const char* end = (const char*)elf_data.data + string_offset + string_size;
+  const char* p = name;
+  while (p < end && *p) ++p;
+  return iree_make_string_view(name, (iree_host_size_t)(p - name));
+}
+
+static bool iree_hal_amdgpu_hsaco_metadata_kernel_name_exists(
+    const iree_hal_amdgpu_hsaco_metadata_t* metadata,
+    iree_host_size_t kernel_count, iree_string_view_t name) {
+  for (iree_host_size_t i = 0; i < kernel_count; ++i) {
+    const iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel =
+        &metadata->kernels[i];
+    if (iree_string_view_equal(kernel->symbol_name, name) ||
+        iree_string_view_equal(kernel->reflection_name, name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool iree_hal_amdgpu_hsaco_metadata_is_kernel_descriptor_name(
+    iree_string_view_t descriptor_name, iree_string_view_t kernel_name) {
+  return descriptor_name.size == kernel_name.size + 3 &&
+         iree_string_view_starts_with(descriptor_name, kernel_name) &&
+         iree_string_view_ends_with(descriptor_name, IREE_SV(".kd"));
+}
+
+static bool iree_hal_amdgpu_hsaco_metadata_has_kernel_descriptor_symbol(
+    iree_const_byte_span_t elf_data, iree_string_view_t kernel_name) {
+  if (iree_string_view_is_empty(kernel_name) ||
+      elf_data.data_length < IREE_HAL_AMDGPU_ELF64_HEADER_SIZE) {
+    return false;
+  }
+  const uint8_t* header = elf_data.data;
+  uint16_t section_count =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 60);
+  for (uint16_t section_index = 0; section_index < section_count;
+       ++section_index) {
+    const uint8_t* section = NULL;
+    if (!iree_status_is_ok(iree_hal_amdgpu_hsaco_metadata_elf_section(
+            elf_data, section_index, &section))) {
+      return false;
+    }
+    uint32_t section_type =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u32(section + 4);
+    if (section_type != IREE_HAL_AMDGPU_ELF_SHT_DYNSYM &&
+        section_type != IREE_HAL_AMDGPU_ELF_SHT_SYMTAB) {
+      continue;
+    }
+    uint64_t symbol_section_offset =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 24);
+    uint64_t symbol_section_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 32);
+    uint64_t symbol_entry_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 56);
+    if (symbol_entry_size < IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE ||
+        symbol_section_offset > elf_data.data_length ||
+        symbol_section_size > elf_data.data_length - symbol_section_offset) {
+      continue;
+    }
+    iree_host_size_t symbol_count =
+        (iree_host_size_t)(symbol_section_size / symbol_entry_size);
+    for (iree_host_size_t i = 0; i < symbol_count; ++i) {
+      const uint8_t* symbol =
+          elf_data.data + symbol_section_offset + (uint64_t)i * symbol_entry_size;
+      uint8_t binding = symbol[4] >> 4;
+      if (binding != IREE_HAL_AMDGPU_ELF_STB_GLOBAL &&
+          binding != IREE_HAL_AMDGPU_ELF_STB_WEAK) {
+        continue;
+      }
+      iree_string_view_t name =
+          iree_hal_amdgpu_hsaco_metadata_elf_symbol_name(elf_data, section, i);
+      if (iree_hal_amdgpu_hsaco_metadata_is_kernel_descriptor_name(
+              name, kernel_name)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool iree_hal_amdgpu_hsaco_metadata_is_elf_kernel_symbol(
+    iree_const_byte_span_t elf_data, const uint8_t* symbol_section,
+    const uint8_t* symbol, iree_host_size_t symbol_index,
+    iree_string_view_t* out_name) {
+  *out_name = iree_string_view_empty();
+  uint8_t binding = symbol[4] >> 4;
+  uint8_t type = symbol[4] & 0x0F;
+  if (type != IREE_HAL_AMDGPU_ELF_STT_FUNC ||
+      (binding != IREE_HAL_AMDGPU_ELF_STB_GLOBAL &&
+       binding != IREE_HAL_AMDGPU_ELF_STB_WEAK)) {
+    return false;
+  }
+  iree_string_view_t name = iree_hal_amdgpu_hsaco_metadata_elf_symbol_name(
+      elf_data, symbol_section, symbol_index);
+  if (iree_string_view_is_empty(name) ||
+      !iree_hal_amdgpu_hsaco_metadata_has_kernel_descriptor_symbol(elf_data,
+                                                                   name)) {
+    return false;
+  }
+  *out_name = name;
+  return true;
+}
+
+static bool iree_hal_amdgpu_hsaco_metadata_has_kernel_function_symbol(
+    iree_const_byte_span_t elf_data, iree_string_view_t kernel_name) {
+  if (iree_string_view_is_empty(kernel_name) ||
+      elf_data.data_length < IREE_HAL_AMDGPU_ELF64_HEADER_SIZE) {
+    return false;
+  }
+  const uint8_t* header = elf_data.data;
+  uint16_t section_count =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 60);
+  for (uint16_t section_index = 0; section_index < section_count;
+       ++section_index) {
+    const uint8_t* section = NULL;
+    if (!iree_status_is_ok(iree_hal_amdgpu_hsaco_metadata_elf_section(
+            elf_data, section_index, &section))) {
+      return false;
+    }
+    uint32_t section_type =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u32(section + 4);
+    if (section_type != IREE_HAL_AMDGPU_ELF_SHT_DYNSYM &&
+        section_type != IREE_HAL_AMDGPU_ELF_SHT_SYMTAB) {
+      continue;
+    }
+    uint64_t symbol_section_offset =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 24);
+    uint64_t symbol_section_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 32);
+    uint64_t symbol_entry_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 56);
+    if (symbol_entry_size < IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE ||
+        symbol_section_offset > elf_data.data_length ||
+        symbol_section_size > elf_data.data_length - symbol_section_offset) {
+      continue;
+    }
+    iree_host_size_t symbol_count =
+        (iree_host_size_t)(symbol_section_size / symbol_entry_size);
+    for (iree_host_size_t i = 0; i < symbol_count; ++i) {
+      const uint8_t* symbol =
+          elf_data.data + symbol_section_offset + (uint64_t)i * symbol_entry_size;
+      iree_string_view_t name = iree_string_view_empty();
+      if (iree_hal_amdgpu_hsaco_metadata_is_elf_kernel_symbol(
+              elf_data, section, symbol, i, &name) &&
+          iree_string_view_equal(name, kernel_name)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static iree_status_t
+iree_hal_amdgpu_hsaco_metadata_append_elf_kernel_symbols(
+    iree_hal_amdgpu_hsaco_metadata_t* metadata) {
+  iree_const_byte_span_t elf_data = metadata->elf_data;
+  if (elf_data.data_length < IREE_HAL_AMDGPU_ELF64_HEADER_SIZE) {
+    return iree_ok_status();
+  }
+  const uint8_t* header = elf_data.data;
+  uint64_t section_offset =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u64(header + 40);
+  uint16_t section_entry_size =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 58);
+  uint16_t section_count =
+      iree_hal_amdgpu_hsaco_metadata_load_le_u16(header + 60);
+  if (section_entry_size < IREE_HAL_AMDGPU_ELF64_SECTION_HEADER_SIZE ||
+      section_offset > elf_data.data_length) {
+    return iree_ok_status();
+  }
+
+  iree_host_size_t extra_count = 0;
+  iree_host_size_t extra_symbol_name_storage_size = 0;
+  for (uint16_t section_index = 0; section_index < section_count;
+       ++section_index) {
+    const uint8_t* section = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_hsaco_metadata_elf_section(
+        elf_data, section_index, &section));
+    uint32_t section_type = iree_hal_amdgpu_hsaco_metadata_load_le_u32(section + 4);
+    if (section_type != IREE_HAL_AMDGPU_ELF_SHT_DYNSYM &&
+        section_type != IREE_HAL_AMDGPU_ELF_SHT_SYMTAB) {
+      continue;
+    }
+    uint64_t symbol_section_offset =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 24);
+    uint64_t symbol_section_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 32);
+    uint64_t symbol_entry_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 56);
+    if (symbol_entry_size < IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE ||
+        symbol_section_offset > elf_data.data_length) {
+      continue;
+    }
+    iree_host_size_t symbol_count =
+        (iree_host_size_t)(symbol_section_size / symbol_entry_size);
+    for (iree_host_size_t i = 0; i < symbol_count; ++i) {
+      const uint8_t* symbol =
+          elf_data.data + symbol_section_offset + (uint64_t)i * symbol_entry_size;
+      iree_string_view_t name = iree_string_view_empty();
+      if (!iree_hal_amdgpu_hsaco_metadata_is_elf_kernel_symbol(
+              elf_data, section, symbol, i, &name) ||
+          iree_hal_amdgpu_hsaco_metadata_kernel_name_exists(
+              metadata, metadata->kernel_count, name)) {
+        continue;
+      }
+      ++extra_count;
+      IREE_RETURN_IF_ERROR(iree_host_size_checked_add(
+          extra_symbol_name_storage_size, name.size + 3,
+          &extra_symbol_name_storage_size)
+                            ? iree_ok_status()
+                            : iree_make_status(
+                                  IREE_STATUS_OUT_OF_RANGE,
+                                  "AMDGPU metadata symbol name storage "
+                                  "size overflow"));
+    }
+  }
+  if (extra_count == 0) return iree_ok_status();
+
+  iree_host_size_t template_kernel_index = IREE_HOST_SIZE_MAX;
+  for (iree_host_size_t i = 0; i < metadata->kernel_count; ++i) {
+    iree_string_view_t template_name = iree_string_view_strip_suffix(
+        metadata->kernels[i].symbol_name, IREE_SV(".kd"));
+    if (metadata->kernels[i].arg_count > 0 &&
+        iree_hal_amdgpu_hsaco_metadata_has_kernel_function_symbol(
+            elf_data, template_name)) {
+      template_kernel_index = i;
+      break;
+    }
+  }
+  if (template_kernel_index == IREE_HOST_SIZE_MAX) {
+    return iree_ok_status();
+  }
+
+  iree_hal_amdgpu_hsaco_metadata_t expanded = *metadata;
+  iree_hal_amdgpu_hsaco_metadata_count_t expanded_count = {
+      .kernel_count = metadata->kernel_count + extra_count,
+      .arg_count = metadata->arg_count,
+  };
+  expanded.kernels = NULL;
+  expanded.args = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_hsaco_metadata_allocate_storage(
+      expanded_count, metadata->host_allocator, &expanded));
+  char* extra_symbol_name_storage = NULL;
+  if (extra_symbol_name_storage_size) {
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        metadata->host_allocator, extra_symbol_name_storage_size,
+        (void**)&extra_symbol_name_storage));
+    expanded.owned_string_storage = extra_symbol_name_storage;
+  }
+  if (metadata->arg_count) {
+    memcpy(expanded.args, metadata->args,
+           metadata->arg_count * sizeof(metadata->args[0]));
+  }
+  for (iree_host_size_t i = 0; i < metadata->kernel_count; ++i) {
+    expanded.kernels[i] = metadata->kernels[i];
+    if (metadata->kernels[i].args) {
+      iree_host_size_t arg_offset =
+          (iree_host_size_t)(metadata->kernels[i].args - metadata->args);
+      expanded.kernels[i].args = &expanded.args[arg_offset];
+    }
+  }
+
+  iree_host_size_t write_index = metadata->kernel_count;
+  iree_host_size_t extra_symbol_name_storage_offset = 0;
+  for (uint16_t section_index = 0; section_index < section_count;
+       ++section_index) {
+    const uint8_t* section = NULL;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_hsaco_metadata_elf_section(
+        elf_data, section_index, &section));
+    uint32_t section_type = iree_hal_amdgpu_hsaco_metadata_load_le_u32(section + 4);
+    if (section_type != IREE_HAL_AMDGPU_ELF_SHT_DYNSYM &&
+        section_type != IREE_HAL_AMDGPU_ELF_SHT_SYMTAB) {
+      continue;
+    }
+    uint64_t symbol_section_offset =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 24);
+    uint64_t symbol_section_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 32);
+    uint64_t symbol_entry_size =
+        iree_hal_amdgpu_hsaco_metadata_load_le_u64(section + 56);
+    if (symbol_entry_size < IREE_HAL_AMDGPU_ELF64_SYMBOL_SIZE ||
+        symbol_section_offset > elf_data.data_length) {
+      continue;
+    }
+    iree_host_size_t symbol_count =
+        (iree_host_size_t)(symbol_section_size / symbol_entry_size);
+    for (iree_host_size_t i = 0; i < symbol_count; ++i) {
+      const uint8_t* symbol =
+          elf_data.data + symbol_section_offset + (uint64_t)i * symbol_entry_size;
+      iree_string_view_t name = iree_string_view_empty();
+      if (!iree_hal_amdgpu_hsaco_metadata_is_elf_kernel_symbol(
+              elf_data, section, symbol, i, &name) ||
+          iree_hal_amdgpu_hsaco_metadata_kernel_name_exists(
+              &expanded, write_index, name)) {
+        continue;
+      }
+      iree_hal_amdgpu_hsaco_metadata_kernel_t* kernel =
+          &expanded.kernels[write_index++];
+      memset(kernel, 0, sizeof(*kernel));
+      char* symbol_name_storage =
+          extra_symbol_name_storage + extra_symbol_name_storage_offset;
+      memcpy(symbol_name_storage, name.data, name.size);
+      memcpy(symbol_name_storage + name.size, ".kd", 3);
+      extra_symbol_name_storage_offset += name.size + 3;
+      kernel->name = name;
+      kernel->symbol_name =
+          iree_make_string_view(symbol_name_storage, name.size + 3);
+      kernel->reflection_name = name;
+      const iree_hal_amdgpu_hsaco_metadata_kernel_t* template_kernel =
+          &expanded.kernels[template_kernel_index];
+      kernel->arg_name_storage_size = template_kernel->arg_name_storage_size;
+      kernel->kernarg_segment_size = template_kernel->kernarg_segment_size;
+      kernel->kernarg_segment_alignment =
+          template_kernel->kernarg_segment_alignment;
+      kernel->group_segment_fixed_size =
+          template_kernel->group_segment_fixed_size;
+      kernel->private_segment_fixed_size =
+          template_kernel->private_segment_fixed_size;
+      memcpy(kernel->required_workgroup_size,
+             template_kernel->required_workgroup_size,
+             sizeof(kernel->required_workgroup_size));
+      kernel->has_required_workgroup_size =
+          template_kernel->has_required_workgroup_size;
+      kernel->arg_count = template_kernel->arg_count;
+      kernel->args = template_kernel->args;
+      kernel->uses_borrowed_arg_layout = true;
+    }
+  }
+  expanded.kernel_count = write_index;
+
+  if (metadata->owned_string_storage) {
+    iree_allocator_free(metadata->host_allocator, metadata->owned_string_storage);
+  }
+  iree_allocator_free(metadata->host_allocator, metadata->kernels);
+  metadata->kernels = expanded.kernels;
+  metadata->args = expanded.args;
+  metadata->owned_string_storage = expanded.owned_string_storage;
+  metadata->kernel_count = expanded.kernel_count;
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
     iree_const_byte_span_t elf_data, iree_allocator_t host_allocator,
     iree_hal_amdgpu_hsaco_metadata_t* out_metadata) {
@@ -1169,6 +1588,10 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_initialize_from_elf(
     status = iree_hal_amdgpu_hsaco_metadata_parse_message_pack(
         out_metadata->message_pack_data, out_metadata);
   }
+  if (iree_status_is_ok(status)) {
+    status =
+        iree_hal_amdgpu_hsaco_metadata_append_elf_kernel_symbols(out_metadata);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_hsaco_metadata_deinitialize(out_metadata);
   }
@@ -1182,6 +1605,9 @@ void iree_hal_amdgpu_hsaco_metadata_deinitialize(
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+  if (metadata->owned_string_storage) {
+    iree_allocator_free(metadata->host_allocator, metadata->owned_string_storage);
+  }
   if (metadata->kernels) {
     iree_allocator_free(metadata->host_allocator, metadata->kernels);
   }
@@ -1242,7 +1668,7 @@ iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
                 arg, &name_storage_size));
         break;
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE: {
-        if (arg->size > UINT8_MAX) {
+        if (arg->size > UINT16_MAX) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "AMDGPU kernel `%.*s` by_value argument %" PRIhsz
@@ -1250,19 +1676,11 @@ iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
               (int)kernel->symbol_name.size, kernel->symbol_name.data, i,
               arg->size);
         }
-        if (!iree_host_size_has_alignment(arg->size, sizeof(uint32_t))) {
-          return iree_make_status(
-              IREE_STATUS_INVALID_ARGUMENT,
-              "AMDGPU kernel `%.*s` by_value argument %" PRIhsz
-              " size %u is not a whole number of 32-bit HAL constants",
-              (int)kernel->symbol_name.size, kernel->symbol_name.data, i,
-              arg->size);
-        }
-        if (constant_byte_count > UINT16_MAX) {
+        if (arg->offset > UINT16_MAX) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "AMDGPU kernel `%.*s` by_value argument %" PRIhsz
-              " constant offset exceeds HAL parameter offset range",
+              " kernarg offset exceeds HAL parameter offset range",
               (int)kernel->symbol_name.size, kernel->symbol_name.data, i);
         }
         ++parameter_count;
@@ -1288,11 +1706,12 @@ iree_hal_amdgpu_hsaco_metadata_calculate_default_export_parameter_requirements(
   }
 
   iree_host_size_t aligned_constant_byte_count = 0;
-  if (!iree_host_size_checked_align(constant_byte_count, sizeof(uint32_t),
+  if (!iree_host_size_checked_align(kernel->kernarg_segment_size,
+                                    sizeof(uint32_t),
                                     &aligned_constant_byte_count)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
-        "AMDGPU metadata reflected constant byte count alignment overflow");
+        "AMDGPU metadata kernarg segment size alignment overflow");
   }
   const iree_host_size_t constant_count =
       aligned_constant_byte_count / sizeof(uint32_t);
@@ -1338,8 +1757,6 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
 
   iree_host_size_t parameter_index = 0;
   iree_host_size_t name_storage_offset = 0;
-  uint16_t binding_ordinal = 0;
-  iree_host_size_t constant_offset = 0;
   for (iree_host_size_t i = 0; i < kernel->arg_count; ++i) {
     const iree_hal_amdgpu_hsaco_metadata_arg_t* arg = &kernel->args[i];
     if (iree_hal_amdgpu_hsaco_metadata_arg_kind_is_hidden(arg->kind)) {
@@ -1350,7 +1767,7 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
         &out_parameters[parameter_index++];
     memset(parameter, 0, sizeof(*parameter));
     parameter->flags = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_FLAG_NONE;
-    parameter->size = (uint8_t)arg->size;
+    parameter->size = (uint16_t)arg->size;
     if (!iree_string_view_is_empty(arg->name)) {
       memcpy(name_storage + name_storage_offset, arg->name.data,
              arg->name.size);
@@ -1361,15 +1778,14 @@ iree_status_t iree_hal_amdgpu_hsaco_metadata_populate_default_export_parameters(
       parameter->name = iree_string_view_empty();
     }
 
+    parameter->offset = (uint16_t)arg->offset;
+    parameter->kernarg_offset = (uint16_t)arg->offset;
     switch (arg->kind) {
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_GLOBAL_BUFFER:
         parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_BINDING;
-        parameter->offset = binding_ordinal++;
         break;
       case IREE_HAL_AMDGPU_HSACO_METADATA_ARG_KIND_BY_VALUE:
         parameter->type = IREE_HAL_EXECUTABLE_EXPORT_PARAMETER_TYPE_CONSTANT;
-        parameter->offset = (uint16_t)constant_offset;
-        constant_offset += arg->size;
         break;
       default:
         return iree_make_status(

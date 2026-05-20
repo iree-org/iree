@@ -96,14 +96,34 @@ void iree_hal_amdgpu_device_dispatch_emplace_hal_kernargs(
 }
 
 void iree_hal_amdgpu_device_dispatch_emplace_custom_kernargs(
+    const iree_hal_amdgpu_device_kernel_args_t* IREE_AMDGPU_RESTRICT
+        kernel_args,
+    const uint32_t workgroup_count[3], uint32_t dynamic_workgroup_local_memory,
     const iree_hal_amdgpu_device_dispatch_kernarg_layout_t* IREE_AMDGPU_RESTRICT
         layout,
     const void* IREE_AMDGPU_RESTRICT custom_kernarg_ptr,
+    size_t custom_kernarg_length,
     void* IREE_AMDGPU_RESTRICT kernarg_ptr) {
-  if (layout->total_kernarg_size > 0) {
-    iree_amdgpu_memcpy(kernarg_ptr, custom_kernarg_ptr,
-                       layout->total_kernarg_size);
+  const size_t total_kernarg_size =
+      layout->total_kernarg_size ? layout->total_kernarg_size
+                                 : custom_kernarg_length;
+  if (total_kernarg_size > 0) {
+    iree_amdgpu_memset(kernarg_ptr, 0, total_kernarg_size);
+    const size_t explicit_bytes =
+        layout->has_implicit_args
+            ? layout->implicit_args_offset
+            : total_kernarg_size;
+    const size_t copy_bytes =
+        custom_kernarg_length < explicit_bytes ? custom_kernarg_length
+                                               : explicit_bytes;
+    if (copy_bytes > 0) {
+      iree_amdgpu_memcpy(kernarg_ptr, custom_kernarg_ptr, copy_bytes);
+    }
   }
+
+  iree_hal_amdgpu_device_dispatch_emplace_implicit_args(
+      kernel_args, workgroup_count, dynamic_workgroup_local_memory, layout,
+      kernarg_ptr);
 }
 
 //===----------------------------------------------------------------------===//
