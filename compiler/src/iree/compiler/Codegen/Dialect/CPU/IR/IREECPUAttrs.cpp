@@ -692,6 +692,46 @@ DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
 static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                                        MMAIntrinsic intrinsic, Value lhs,
                                        Value rhs, Value acc) {
+  // Sign-/float-extend a vector to a wider element type. Used by the
+  // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
+  // intrinsic only exists at the wider type.
+  auto widen = [&builder, loc](Value v, Type wider) -> Value {
+    auto vt = cast<VectorType>(v.getType());
+    auto wideTy = VectorType::get(vt.getShape(), wider);
+    if (isa<FloatType>(vt.getElementType())) {
+      return arith::ExtFOp::create(builder, loc, wideTy, v);
+    }
+    return arith::ExtSIOp::create(builder, loc, wideTy, v);
+  };
+
+  // For *_CAST* intrinsics, widen lhs/rhs to the intrinsic's element type
+  // *before* the broadcast below. The alternative — widening after the
+  // broadcast, when the smaller operand has already been replicated to the
+  // full lane count — would re-do the i8 → i16 (or f16 → f32) extension on
+  // every M row of the unrolled tile and force LLVM to scalarize the widen
+  // into a per-row `vpbroadcastw` + `vpandq` + `vpsrlvw` sequence around
+  // each FMA. Widening the narrow source vector once before the broadcast
+  // keeps the per-row inner loop down to just the FMA (with `m_bcst`).
+  Type widenTo;
+  switch (intrinsic) {
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
+    widenTo = builder.getF32Type();
+    break;
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
+    widenTo = builder.getI16Type();
+    break;
+  default:
+    break;
+  }
+  if (widenTo) {
+    lhs = widen(lhs, widenTo);
+    rhs = widen(rhs, widenTo);
+  }
+
   // Replicate whichever of LHS/RHS has fewer lanes up to the other's lane
   // count, so both reach the intrinsic's flat lane width. In the natural
   // 1×N×K orientation that's the LHS (M=1) broadcast across the N lanes of
@@ -769,18 +809,6 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     *bcastSrc = vector::BitCastOp::create(builder, loc, bcastDstType, splatted);
   }
 
-  // Sign-/float-extend a vector to a wider element type. Used by the
-  // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
-  // intrinsic only exists at the wider type.
-  auto widen = [&builder, loc](Value v, Type wider) -> Value {
-    auto vt = cast<VectorType>(v.getType());
-    auto wideTy = VectorType::get(vt.getShape(), wider);
-    if (isa<FloatType>(vt.getElementType())) {
-      return arith::ExtFOp::create(builder, loc, wideTy, v);
-    }
-    return arith::ExtSIOp::create(builder, loc, wideTy, v);
-  };
-
   // Emit llvm.call_intrinsic.
   auto call = [&builder, loc](StringRef name, Type resultType,
                               ValueRange args) -> Value {
@@ -789,8 +817,6 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
         .getResult(0);
   };
 
-  Type f32 = builder.getF32Type();
-  Type i16 = builder.getI16Type();
   Type accType = acc.getType();
   // Most x86 MMAs supported here are LHS/RHS-symmetric (FMA, dpbf16ps,
   // vpdpwssd, pmaddw): natural and swapped orientations share the same LLVM
@@ -802,6 +828,10 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
   // broadcast happens to land in the signed slot, that maps to vpdpbusd's
   // m_bcst-foldable slot too; when it lands on the unsigned side, no fold is
   // available (the ISA's m_bcst is on the signed operand).
+  //
+  // For *_CAST* variants (f16 → f32, i8 → i16), the widening already ran at
+  // the top of this function, so lhs/rhs reach the intrinsic call at the
+  // wider type without any per-row widen in the unrolled tile.
   Value bcst = lhsIsBroadcast ? lhs : rhs;
   Value full = lhsIsBroadcast ? rhs : lhs;
   switch (intrinsic) {
@@ -813,11 +843,9 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     return call("llvm.fma.v8f64", accType, ValueRange{full, bcst, acc});
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
-    return call("llvm.fma.v16f32", accType, ValueRange{full, bcst, acc});
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
-    return call("llvm.fma.v16f32", accType,
-                ValueRange{widen(full, f32), widen(bcst, f32), acc});
+    return call("llvm.fma.v16f32", accType, ValueRange{full, bcst, acc});
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
   case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
     return call("llvm.fma.v32f16", accType, ValueRange{full, bcst, acc});
@@ -827,24 +855,17 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                 ValueRange{acc, full, bcst});
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I16:
-    return call("llvm.x86.avx512.vpdpwssd.512", accType,
-                ValueRange{acc, full, bcst});
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
     return call("llvm.x86.avx512.vpdpwssd.512", accType,
-                ValueRange{acc, widen(full, i16), widen(bcst, i16)});
+                ValueRange{acc, full, bcst});
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
-  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16: {
-    return arith::AddIOp::create(
-        builder, loc, acc,
-        call("llvm.x86.avx512.pmaddw.d.512", accType, ValueRange{full, bcst}));
-  }
+  case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16: {
     return arith::AddIOp::create(
         builder, loc, acc,
-        call("llvm.x86.avx512.pmaddw.d.512", accType,
-             ValueRange{widen(full, i16), widen(bcst, i16)}));
+        call("llvm.x86.avx512.pmaddw.d.512", accType, ValueRange{full, bcst}));
   }
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
     // LHS unsigned, RHS signed — vpdpbusd takes (acc, unsigned, signed).

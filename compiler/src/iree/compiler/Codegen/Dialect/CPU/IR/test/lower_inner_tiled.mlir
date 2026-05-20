@@ -70,10 +70,10 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_avx512_1x16x1_f16_castf32
-//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : f16 from vector<{{1x1|1}}xf16>
-//       CHECK:   %[[BCST:.+]] = vector.broadcast %[[SCALAR]] : f16 to vector<16xf16>
+//       CHECK:   arith.extf {{.*}} : vector<1xf16> to vector<1xf32>
 //       CHECK:   arith.extf {{.*}} : vector<16xf16> to vector<16xf32>
-//       CHECK:   arith.extf {{.*}} : vector<16xf16> to vector<16xf32>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : f32 from vector<1xf32>
+//       CHECK:   %[[BCST:.+]] = vector.broadcast %[[SCALAR]] : f32 to vector<16xf32>
 //       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
 
 // -----
@@ -112,11 +112,11 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_avx512_1x16x2_i8_casti16
-//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : i16 from vector<1xi16>
-//       CHECK:   %[[BCST_I16:.+]] = vector.broadcast %[[SCALAR]] : i16 to vector<16xi16>
-//       CHECK:   vector.bitcast %[[BCST_I16]] : vector<16xi16> to vector<32xi8>
+//       CHECK:   arith.extsi {{.*}} : vector<2xi8> to vector<2xi16>
 //       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
-//       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : i32 from vector<1xi32>
+//       CHECK:   %[[BCST:.+]] = vector.broadcast %[[SCALAR]] : i32 to vector<16xi32>
+//       CHECK:   vector.bitcast %[[BCST]] : vector<16xi32> to vector<32xi16>
 //       CHECK:   %[[DOT:.+]] = llvm.call_intrinsic "llvm.x86.avx512.pmaddw.d.512"({{.*}}) : (vector<32xi16>, vector<32xi16>) -> vector<16xi32>
 //       CHECK:   arith.addi {{.*}}, %[[DOT]] : vector<16xi32>
 
