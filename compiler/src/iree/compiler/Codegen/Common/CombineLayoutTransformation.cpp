@@ -930,6 +930,29 @@ getCombineRelayoutOpsControlFn(IREE::Codegen::RelayoutCombinationScope scope) {
       return isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin());
     };
     break;
+  // Control function for DispatchReshape scope. Like Dispatch, but additionally
+  // requires the backward relayout slice to contain a `tensor.expand_shape` or
+  // `tensor.collapse_shape` — the non-tileable reshape whose presence is what
+  // makes folding into a `map_store` necessary (see the enum doc comment).
+  case IREE::Codegen::RelayoutCombinationScope::DispatchReshape:
+    controlFn = [](OpResult leaf) {
+      if (leaf.getNumUses() != 1) {
+        return false;
+      }
+      if (!isa<IREE::Codegen::StoreToBufferOp>(*leaf.getUsers().begin())) {
+        return false;
+      }
+      llvm::SetVector<Operation *> slice;
+      BackwardSliceOptions options;
+      options.filter = isSupportedSingleInputRelayoutOpForResult;
+      options.inclusive = true;
+      if (failed(getBackwardSlice(leaf, &slice, options))) {
+        return false;
+      }
+      return llvm::any_of(
+          slice, llvm::IsaPred<tensor::CollapseShapeOp, tensor::ExpandShapeOp>);
+    };
+    break;
   // Control function for Workgroup scope. Filters to only relayout ops with
   // a single tensor.parallel_insert_slice user inside of a workgroup
   // scf.forall op. Relayout chains of only reshapes are also filtered out,

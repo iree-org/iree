@@ -652,7 +652,25 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       .addPass(createConvertAccGEMMToGEMMPass)
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
-      .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+      .addPass(createEraseHALDescriptorTypeFromMemRefPass)
+      // Fold reshape-containing relayout chains (`pack` -> `expand_shape` ->
+      // `transpose`) emitted by encoding materialization for non-row-major
+      // swizzles into a single `iree_linalg_ext.map_store`, before the
+      // dispatch is tiled. This mirrors the GPU configuration pipeline.
+      // Without it, the intervening `tensor.expand_shape` (not a
+      // `TilingInterface` op) blocks producer fusion and leaves an untiled,
+      // whole-tensor `pack` intermediate whose dynamic `tensor.empty`
+      // bufferizes to a bogus unbounded allocation (iree-org/iree#24483);
+      // `map_store` is a scatter with no intermediate buffer. The
+      // `DispatchReshape` scope restricts this to reshape-containing chains so
+      // plain `pack` encodings (which tile fine) are left untouched.
+      .addPass(createBufferizeDispatchTensorLoadStorePass)
+      .addPass([] {
+        CombineResultLayoutTransformationPassOptions options;
+        options.scope =
+            IREE::Codegen::RelayoutCombinationScope::DispatchReshape;
+        return createCombineResultLayoutTransformationPass(options);
+      });
   modulePassManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen configuration pass pipeline:\n";

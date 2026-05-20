@@ -44,10 +44,18 @@ namespace IREE::Codegen {
 /// Enum defining the scope of the CombineResultLayoutTransformationPass.
 ///  - The `Dispatch` scope will combine layout transformation chains that are
 ///    consumed by an `iree_codegen.store_to_buffer` op.
+///  - The `DispatchReshape` scope is like `Dispatch`, but additionally
+///    restricted to chains whose backward slice contains a
+///    `tensor.expand_shape` or `tensor.collapse_shape`. Such a reshape does not
+///    implement `TilingInterface`, so when it sits between two tileable
+///    relayout ops it blocks producer fusion and leaves an untiled,
+///    whole-tensor intermediate (iree-org/iree#24483). Pure
+///    pack/unpack/transpose/pad chains tile fine via tile-and-fuse and do not
+///    need a `map_store`.
 ///  - The `Workgroup` scope will combine layout transformation chains that are
 ///    consumed by a `tensor.parallel_insert_slice` op at the end of an
 ///    scf.forall with an `iree_codegen.workgroup_mapping` attribute.
-enum class RelayoutCombinationScope { Dispatch, Workgroup };
+enum class RelayoutCombinationScope { Dispatch, DispatchReshape, Workgroup };
 } // namespace IREE::Codegen
 
 /// Get the corresponding control function for the given scope. The control

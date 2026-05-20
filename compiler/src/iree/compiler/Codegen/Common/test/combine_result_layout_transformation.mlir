@@ -2,6 +2,8 @@
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=DISPATCH-SCOPE
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=workgroup},canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=WORKGROUP-SCOPE
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=dispatch-reshape},canonicalize,cse))" \
+// RUN:   -split-input-file %s | FileCheck %s --check-prefixes=RESHAPE-SCOPE
 
 func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref<8x16xf32>) {
   %collapse = tensor.collapse_shape %source [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
@@ -555,3 +557,46 @@ func.func @fold_pack_op_dynamic_inner_tiles(%source : tensor<250x250xf32>, %resu
 // Verify no second padding loop (inner tile size 1 needs no padding)
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   return
+
+// -----
+
+// The `dispatch-reshape` scope folds a relayout chain only when its backward
+// slice contains a non-tileable `expand_shape`/`collapse_shape`. Here the
+// chain is `expand_shape` -> `transpose`, so it folds into a single map_store.
+func.func @reshape_chain_folds_under_dispatch_reshape(
+    %source : tensor<8x16xf32>, %result : memref<4x16x2xf32>) {
+  %expand = tensor.expand_shape %source [[0, 1], [2]] output_shape [2, 4, 16]
+      : tensor<8x16xf32> into tensor<2x4x16xf32>
+  %init = tensor.empty() : tensor<4x16x2xf32>
+  %transposed = linalg.transpose ins(%expand : tensor<2x4x16xf32>)
+      outs(%init : tensor<4x16x2xf32>) permutation = [1, 2, 0]
+  iree_codegen.store_to_buffer %transposed, %result
+      : tensor<4x16x2xf32> into memref<4x16x2xf32>
+  return
+}
+// RESHAPE-SCOPE-LABEL: @reshape_chain_folds_under_dispatch_reshape
+//   RESHAPE-SCOPE-NOT:   tensor.expand_shape
+//   RESHAPE-SCOPE-NOT:   linalg.transpose
+//       RESHAPE-SCOPE:   iree_linalg_ext.map_store
+
+// -----
+
+// A pure transpose chain carries no reshape, so the `dispatch-reshape` scope
+// leaves it untouched for tile-and-fuse. The plain `dispatch` scope, which is
+// not gated on a reshape, still folds it into a map_store -- this contrast is
+// the whole point of the `dispatch-reshape` scope.
+func.func @pure_transpose_skipped_under_dispatch_reshape(
+    %source : tensor<2x4x16xf32>, %result : memref<4x16x2xf32>) {
+  %init = tensor.empty() : tensor<4x16x2xf32>
+  %transposed = linalg.transpose ins(%source : tensor<2x4x16xf32>)
+      outs(%init : tensor<4x16x2xf32>) permutation = [1, 2, 0]
+  iree_codegen.store_to_buffer %transposed, %result
+      : tensor<4x16x2xf32> into memref<4x16x2xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @pure_transpose_skipped_under_dispatch_reshape
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_store
+//
+// RESHAPE-SCOPE-LABEL: @pure_transpose_skipped_under_dispatch_reshape
+//       RESHAPE-SCOPE:   linalg.transpose
+//   RESHAPE-SCOPE-NOT:   iree_linalg_ext.map_store
