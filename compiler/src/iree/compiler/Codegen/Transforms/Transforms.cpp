@@ -123,6 +123,24 @@ cloneOffsetsSizesAndStrides(OpBuilder &builder,
       loadOp.getMixedSizes(), loadOp.getMixedStrides(), loadOp.getSourceDims());
 }
 
+// Upper bound, in bytes, on an allocation that hoisting is allowed to pad to
+// static bounds. Hoisting replaces a dynamic allocation with a static one of
+// its computed upper bound; when a dynamic dimension is unconstrained, that
+// bound defaults to the `index` type maximum and the padded allocation becomes
+// absurdly large (see iree-org/iree#24483). Past this cap we decline to hoist
+// and leave the allocation dynamic instead.
+static int64_t getHoistedAllocationByteCap(mlir::FunctionOpInterface funcOp) {
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
+    if (auto attr = targetAttr.getConfiguration().getAs<IntegerAttr>(
+            "max_stack_allocation_size")) {
+      return attr.getInt();
+    }
+  }
+  // No target budget available (e.g. unit tests): fall back to a cap far above
+  // any realistic tile allocation but far below a bogus unbounded one.
+  return int64_t{1} << 30;
+}
+
 template <typename AllocLikeOpType>
 std::optional<Value> hoistOneStaticallyBoundAllocation(
     mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
@@ -217,6 +235,36 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
       allocSizes.push_back(*ub);
       subviewSizes.push_back(dynamicSize);
+    }
+
+    // Decline to hoist if padding to the computed bounds would exceed the
+    // target's allocation budget. An unconstrained dynamic dimension carries
+    // only the `index` type maximum as its bound, which would pad the
+    // allocation to a bogus multi-petabyte size (iree-org/iree#24483).
+    // Leaving the allocation dynamic is always correct; it just isn't hoisted.
+    {
+      int64_t capElements =
+          getHoistedAllocationByteCap(funcOp) /
+          std::max<int64_t>(
+              1, llvm::divideCeil(allocLikeType.getElementTypeBitWidth(), 8));
+      int64_t numElements = 1;
+      bool boundsAreConstant = true, exceedsCap = false;
+      for (OpFoldResult allocSize : allocSizes) {
+        std::optional<int64_t> dimSize = getConstantIntValue(allocSize);
+        if (!dimSize) {
+          // A non-constant bound (e.g. a scalable-vector bound) — skip the cap.
+          boundsAreConstant = false;
+          break;
+        }
+        if (*dimSize > 0 && numElements > capElements / *dimSize) {
+          exceedsCap = true;
+          break;
+        }
+        numElements *= *dimSize;
+      }
+      if (boundsAreConstant && exceedsCap) {
+        return std::nullopt;
+      }
     }
 
     // FIXME: The `AllocLikeOp::build()` method for OpFoldResult drops the

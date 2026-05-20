@@ -249,3 +249,28 @@ func.func @nested_op_scalable_alloc_linalg_use(%arg0 : index) {
 // CHECK-UNBOUNDED-VSCALE-LABEL: func @nested_op_scalable_alloc_linalg_use(
 //       CHECK-UNBOUNDED-VSCALE: scf.for
 //       CHECK-UNBOUNDED-VSCALE:   memref.alloc
+
+// -----
+
+// An unconstrained dynamic dimension bounds only to the `index` umax, so
+// padding the alloca to that bound would be a multi-petabyte stack allocation
+// (iree-org/iree#24483). The pass must decline to hoist such an allocation and
+// leave it dynamic, in the loop, instead of materializing a bogus static one.
+func.func @no_hoist_umax_bounded_alloca(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c42 = arith.constant 42 : i32
+  %assumed = util.assume.int %arg0<umin = 0, umax = 9007199254740991> : index
+  %dim = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%assumed]
+  scf.for %iv = %c0 to %c1 step %c1 {
+    %1 = memref.alloca(%dim) : memref<?xi32>
+    memref.store %c42, %1[%iv] : memref<?xi32>
+    scf.yield
+  }
+  return
+}
+// CHECK-LABEL: func @no_hoist_umax_bounded_alloca(
+//   CHECK-NOT:   memref.alloca() :
+//       CHECK:   scf.for
+//       CHECK:     memref.alloca(%{{.+}}) : memref<?xi32>
+//   CHECK-NOT:   memref.alloca() :
