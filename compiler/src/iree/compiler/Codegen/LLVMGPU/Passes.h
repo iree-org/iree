@@ -79,7 +79,8 @@ void buildLLVMGPUCodegenConfigurationPassPipeline(
 /// module within the IREE::HAL::ExecutableOp.
 void buildLLVMGPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      bool useROCM, bool preserveDebugInfo,
-                                     bool includeLLVMLowering = true);
+                                     bool includeLLVMLowering = true,
+                                     bool useSPIRV = false);
 
 /// Wraps GPUPipelineOptions and forROCDL for passing through
 /// PipelineAttrInterface::buildPipeline.

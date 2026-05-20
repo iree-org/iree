@@ -766,7 +766,10 @@ static iree_status_t iree_hal_hip_device_query_i64(
   }
 
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
-    *out_value = iree_string_view_equal(key, IREE_SV("rocm-hsaco-fb")) ? 1 : 0;
+    *out_value = (iree_string_view_equal(key, IREE_SV("rocm-hsaco-fb")) ||
+                  iree_string_view_equal(key, IREE_SV("rocm-spirv-fb")))
+                     ? 1
+                     : 0;
     return iree_ok_status();
   }
 

@@ -108,6 +108,7 @@ llvm_configure(
         "ARM",
         "NVPTX",
         "RISCV",
+        "SPIRV",
         "WebAssembly",
         "X86",
     ],
