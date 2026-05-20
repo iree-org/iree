@@ -180,6 +180,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgTransformDialect
+    LLVMCore
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAMDGPUTransforms

@@ -155,7 +155,9 @@ func.func @transpose_mask() {
 //   CHECK-NOT:   vector.shuffle
 //   CHECK-DAG:   %[[MASK:.+]] = arith.constant dense<true>
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan
-//       CHECK:   vector.store %[[MASK]], %[[OUTPUT]]
+// VectorTransferLoweringPass flattens the contiguous 4x2 trailing dims of
+// the store into a single `vector<8xi1>` store over the collapsed memref.
+//       CHECK:   vector.store %[[MASK]], %{{.+}}
 
 // -----
 
