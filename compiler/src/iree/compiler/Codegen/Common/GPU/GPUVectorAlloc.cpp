@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <limits>
-
 #include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPromotionAnalysis.h"
@@ -214,41 +212,37 @@ static bool hasAllInBounds(vector::TransferReadOp readOp) {
          });
 }
 
-static bool isDMAAlignedForWorkgroup(FunctionOpInterface funcOp,
-                                     IREE::GPU::TargetAttr target,
-                                     Type elementType,
-                                     int64_t availableElements) {
+static bool hasLowerableAsyncDMALayout(
+    FunctionOpInterface funcOp, IREE::GPU::TargetAttr target,
+    VectorType vectorType,
+    std::optional<int64_t> swizzleAccessElems = std::nullopt) {
   std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
       getWorkgroupSize(funcOp);
   if (!maybeWorkgroupSize) {
     return false;
   }
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
+    return false;
+  }
 
   int64_t numThreads = ShapedType::getNumElements(*maybeWorkgroupSize);
-  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+  int64_t elementBits = vectorType.getElementTypeBitWidth();
 
   ArrayRef<int64_t> dmaSizes;
   if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
     dmaSizes = dmaSizesAttr.asArrayRef();
   }
 
-  int64_t minElementsPerWorkgroup = std::numeric_limits<int64_t>::max();
-  for (int64_t dmaSize : dmaSizes) {
-    if (dmaSize % elementBits != 0) {
-      continue;
-    }
-    int64_t elementsPerLane = dmaSize / elementBits;
-    minElementsPerWorkgroup =
-        std::min(minElementsPerWorkgroup, numThreads * elementsPerLane);
-  }
-
-  return minElementsPerWorkgroup != std::numeric_limits<int64_t>::max() &&
-         availableElements % minElementsPerWorkgroup == 0;
+  return succeeded(getGlobalLoadDMALayout(
+      funcOp->getContext(), vectorType.getShape(), numThreads, *subgroupSize,
+      elementBits, dmaSizes, swizzleAccessElems));
 }
 
-static bool isAsyncDMAEligible(FunctionOpInterface funcOp,
-                               vector::TransferReadOp readOp,
-                               IREE::GPU::TargetAttr target) {
+static bool
+isAsyncDMAEligible(FunctionOpInterface funcOp, vector::TransferReadOp readOp,
+                   IREE::GPU::TargetAttr target,
+                   std::optional<int64_t> swizzleAccessElems = std::nullopt) {
   if (!target || !targetSupportsGlobalLoadDMA(target)) {
     return false;
   }
@@ -261,8 +255,8 @@ static bool isAsyncDMAEligible(FunctionOpInterface funcOp,
     return false;
   }
 
-  return isDMAAlignedForWorkgroup(funcOp, target, vectorType.getElementType(),
-                                  vectorType.getNumElements());
+  return hasLowerableAsyncDMALayout(funcOp, target, vectorType,
+                                    swizzleAccessElems);
 }
 
 static FailureOr<IREE::Codegen::XORShuffleAttr>
@@ -311,7 +305,18 @@ static FailureOr<Value> materializeAsyncDMARead(
     vector::TransferReadOp readOp,
     IREE::VectorExt::VectorLayoutInterface allocationLayout) {
   IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!isAsyncDMAEligible(funcOp, readOp, target)) {
+  VectorType vectorType = readOp.getVectorType();
+  FailureOr<IREE::Codegen::XORShuffleAttr> swizzle = failure();
+  std::optional<int64_t> swizzleAccessElems;
+  if (target && targetSupportsGlobalLoadDMA(target) &&
+      !vectorType.isScalable()) {
+    swizzle = deriveDMASwizzle(builder.getContext(), target, vectorType,
+                               allocationLayout);
+    if (succeeded(swizzle)) {
+      swizzleAccessElems = swizzle->getAccessElementCount();
+    }
+  }
+  if (!isAsyncDMAEligible(funcOp, readOp, target, swizzleAccessElems)) {
     return failure();
   }
   // Synchronize before the write to shared memory to avoid stepping over
@@ -320,13 +325,10 @@ static FailureOr<Value> materializeAsyncDMARead(
   insertWorkgroupBarrierAtBlockStart(builder, readOp);
 
   Location loc = readOp.getLoc();
-  VectorType vectorType = readOp.getVectorType();
   builder.setInsertionPoint(readOp);
   Value dest = allocateWorkgroupTensor(builder, loc,
                                        allocationLayout.getUndistributedShape(),
                                        vectorType.getElementType());
-  FailureOr<IREE::Codegen::XORShuffleAttr> swizzle = deriveDMASwizzle(
-      builder.getContext(), target, vectorType, allocationLayout);
   if (succeeded(swizzle)) {
     dest = IREE::Codegen::SwizzleHintOp::create(builder, loc, dest, *swizzle);
   }

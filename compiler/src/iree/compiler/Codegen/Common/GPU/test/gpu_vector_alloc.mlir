@@ -226,6 +226,66 @@ func.func @promote_global_transfer_read_with_async_dma(
 // CHECK-NOT: shared_memory_conversion
 // CHECK: return %[[OUT]]
 
+#translation_dma_no_subgroup = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<VectorDistribute> workgroup_size = [64, 1, 1]>
+
+func.func @promote_global_transfer_read_with_async_dma_no_subgroup(
+    %src: memref<4x64xf16>) -> vector<4x64xf16>
+    attributes {hal.executable.target = #exec_target_dma, translation_info = #translation_dma_no_subgroup} {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %read = vector.transfer_read %src[%c0, %c0], %cst {in_bounds = [true, true]}
+      : memref<4x64xf16>, vector<4x64xf16>
+  %out = iree_vector_ext.to_layout %read to layout(#consumer_layout_dma)
+      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<4x64xf16>
+  return %out : vector<4x64xf16>
+}
+
+// CHECK-LABEL: func.func @promote_global_transfer_read_with_async_dma_no_subgroup
+// CHECK: gpu.barrier
+// CHECK: %[[GLOBAL:.+]] = vector.transfer_read
+// CHECK-NOT: iree_gpu.async_dma
+// CHECK: %[[READ_LAYOUT_VALUE:.+]] = iree_vector_ext.to_layout %[[GLOBAL]]
+// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>}
+// CHECK: %[[WRITE:.+]] = vector.transfer_write %[[READ_LAYOUT_VALUE]], %[[ALLOC]]
+// CHECK: %[[BARRIER:.+]] = iree_gpu.value_barrier %[[WRITE]]
+// CHECK: %[[LDS_READ:.+]] = vector.transfer_read %[[BARRIER]]
+// CHECK: %[[OUT:.+]] = iree_vector_ext.to_layout %[[LDS_READ]]
+// CHECK: return %[[OUT]]
+
+#consumer_layout_dma_shape_fallback = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [32, 2],
+  element_tile = [1, 6],
+  subgroup_strides = [0, 0],
+  thread_strides   = [2, 1]
+>
+
+func.func @promote_global_transfer_read_with_async_dma_shape_fallback(
+    %src: memref<32x12xf16>) -> vector<32x12xf16>
+    attributes {hal.executable.target = #exec_target_dma, translation_info = #translation_dma} {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %read = vector.transfer_read %src[%c0, %c0], %cst {in_bounds = [true, true]}
+      : memref<32x12xf16>, vector<32x12xf16>
+  %out = iree_vector_ext.to_layout %read to layout(#consumer_layout_dma_shape_fallback)
+      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<32x12xf16>
+  return %out : vector<32x12xf16>
+}
+
+// CHECK-LABEL: func.func @promote_global_transfer_read_with_async_dma_shape_fallback
+// CHECK: gpu.barrier
+// CHECK: %[[GLOBAL:.+]] = vector.transfer_read
+// CHECK-NOT: iree_gpu.async_dma
+// CHECK: %[[READ_LAYOUT_VALUE:.+]] = iree_vector_ext.to_layout %[[GLOBAL]]
+// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>}
+// CHECK: %[[WRITE:.+]] = vector.transfer_write %[[READ_LAYOUT_VALUE]], %[[ALLOC]]
+// CHECK: %[[BARRIER:.+]] = iree_gpu.value_barrier %[[WRITE]]
+// CHECK: %[[LDS_READ:.+]] = vector.transfer_read %[[BARRIER]]
+// CHECK: %[[OUT:.+]] = iree_vector_ext.to_layout %[[LDS_READ]]
+// CHECK: return %[[OUT]]
+
 // -----
 
 #gpu_target_dma_fallback = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
