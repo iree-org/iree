@@ -48,6 +48,8 @@ hal.executable @matmul_f32_ex {
 // CHECK:           linalg.fill
 // CHECK-NOT:       iree_codegen.smt.constraints
 // CHECK:           linalg.matmul
+// CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>
+// CHECK-NEXT{LITERAL}: knobs = {mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>, reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">], subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, 0], subgroup_size = #iree_codegen.smt.int_knob<"sg_size">, workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0], workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]}
 //
 // CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK-NEXT{LITERAL}: knobs = {mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>, reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">], subgroup_basis = [[#iree_codegen.smt.int_knob<"sg_m_cnt">, #iree_codegen.smt.int_knob<"sg_n_cnt">, 1], [0, 1, 2]], subgroup_size = #iree_codegen.smt.int_knob<"sg_size">, workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0], workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]}
