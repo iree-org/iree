@@ -77,8 +77,16 @@ static MapStoreOp foldTransposePermIntoMapStore(RewriterBase &rewriter,
 }
 
 /// Fold a tensor::ExpandShapeOp or tensor::CollapseShapeOp into a consumer
-/// `mapStoreOp`, by linearizing and then delinearizing the source indices
-/// of the `mapStoreOp`s index transformation.
+/// `mapStoreOp` by composing the reshape's index transformation into the
+/// front of the `mapStoreOp`'s.
+///
+/// Each reassociation group is folded independently: an `expand_shape` splits
+/// one source index via a `delinearize` over just that group's result sizes,
+/// and a `collapse_shape` merges a group of source indices via a `linearize`.
+/// This keeps the split/merge factors per-group — typically static tile sizes
+/// — rather than routing every index through one global `linearize` +
+/// `delinearize` over the full (dynamic) shapes, which would force a dynamic
+/// integer division per element when the transformation is later scalarized.
 template <typename ReshapeOpTy>
 static FailureOr<IREE::LinalgExt::MapStoreOp>
 foldReshapeIntoMapStore(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
@@ -92,6 +100,7 @@ foldReshapeIntoMapStore(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
       cast<RankedTensorType>(reshapeOp.getResult().getType()).getRank() == 0) {
     return failure();
   }
+  constexpr bool isExpand = std::is_same_v<ReshapeOpTy, tensor::ExpandShapeOp>;
   Location loc = reshapeOp->getLoc();
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointAfter(reshapeOp);
@@ -102,20 +111,53 @@ foldReshapeIntoMapStore(RewriterBase &rewriter, ReshapeOpTy reshapeOp,
   // sizes by later cleanup patterns.
   SmallVector<OpFoldResult> resultDims =
       tensor::getMixedSizes(rewriter, loc, reshapeOp.getResult());
+  SmallVector<ReassociationIndices> reassociation =
+      reshapeOp.getReassociationIndices();
 
   Location mapStoreLoc = mapStoreOp->getLoc();
   rewriter.modifyOpInPlace(mapStoreOp, [&]() {
     mapStoreOp.insertTransformationAtStart(
         rewriter,
-        [&rewriter, mapStoreLoc, srcDims,
-         resultDims](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
-          SmallVector<Value> indexValues(indices.begin(), indices.end());
-          auto linearizeIndexOp = affine::AffineLinearizeIndexOp::create(
-              rewriter, mapStoreLoc, indexValues, srcDims, /*disjoint=*/true);
-          auto delinearizeIndexOp = affine::AffineDelinearizeIndexOp::create(
-              rewriter, mapStoreLoc, linearizeIndexOp.getResult(), resultDims,
-              /*hasOuterBound=*/true);
-          return delinearizeIndexOp->getResults();
+        [&rewriter, mapStoreLoc, srcDims, resultDims, reassociation,
+         isExpand](ArrayRef<BlockArgument> indices) -> SmallVector<Value> {
+          // `indices` are in the reshape's source index space; produce the
+          // reshape's result index space.
+          SmallVector<Value> result(resultDims.size());
+          for (auto [groupIdx, group] : llvm::enumerate(reassociation)) {
+            if (isExpand) {
+              // Source index `groupIdx` splits into result dims `group`.
+              if (group.size() == 1) {
+                result[group[0]] = indices[groupIdx];
+                continue;
+              }
+              SmallVector<OpFoldResult> groupSizes;
+              for (int64_t resultDim : group) {
+                groupSizes.push_back(resultDims[resultDim]);
+              }
+              auto delinearizeOp = affine::AffineDelinearizeIndexOp::create(
+                  rewriter, mapStoreLoc, indices[groupIdx], groupSizes,
+                  /*hasOuterBound=*/true);
+              for (auto [i, resultDim] : llvm::enumerate(group)) {
+                result[resultDim] = delinearizeOp.getResult(i);
+              }
+            } else {
+              // Source dims `group` merge into result index `groupIdx`.
+              if (group.size() == 1) {
+                result[groupIdx] = indices[group[0]];
+                continue;
+              }
+              SmallVector<Value> groupIndices;
+              SmallVector<OpFoldResult> groupSizes;
+              for (int64_t srcDim : group) {
+                groupIndices.push_back(indices[srcDim]);
+                groupSizes.push_back(srcDims[srcDim]);
+              }
+              result[groupIdx] = affine::AffineLinearizeIndexOp::create(
+                  rewriter, mapStoreLoc, groupIndices, groupSizes,
+                  /*disjoint=*/true);
+            }
+          }
+          return result;
         },
         srcDims.size());
     mapStoreOp.getInputMutable().assign(reshapeOp->getOperand(0));
