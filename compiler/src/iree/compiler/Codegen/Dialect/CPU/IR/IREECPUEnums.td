@@ -154,6 +154,16 @@ def MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8
     : I32EnumAttrCase<"MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8", 0x13C4>;
 def MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8
     : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8", 0x13C5>;
+// vpdpwssd-based i8 matmul on a full 16x16x2 tile. Unlike the 1x16x2 / 16x1x2
+// CASTI16 variants — which process one M (or N) row per intrinsic and pay an
+// i8->i16 widen + broadcast per row — this consumes whole 16x2 i8 panels:
+// one `vpmovsxbw` widen per panel, 4 `vpshufd` + 4 128-bit-block broadcasts to
+// fan the panels across the 4x4 grid, then 16 `vpdpwssd`. This mirrors the
+// mmt4d ukernel's hot loop. The 16x16 ACC tile is not row-major: it uses a
+// custom TileSwizzle (see `getIntrinsicSwizzle`). Square shape + identical
+// LHS/RHS types make it self-symmetric, so it has no M<->N-swapped sibling.
+def MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16", 0x13C6>;
 
 // AArch64 SVE `fmla` (f32, f32): N×1×1 or 1×N×1 matmul tile; N is a scalable
 // vector of 4 f32 lanes per 128-bit chunk (see `ArmSveVLIn128bitUnits`).
@@ -205,6 +215,7 @@ def IREECPU_MMAIntrinsic
            MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
            MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8,
            MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8,
+           MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16,
 
            // Arm SVE
            MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,

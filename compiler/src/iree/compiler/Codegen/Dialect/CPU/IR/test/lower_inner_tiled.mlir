@@ -374,3 +374,48 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[S_BCAST_I32:.+]] = vector.broadcast %{{.+}} : i32 to vector<16xi32>
 //       CHECK:   %[[S_RHS_FLAT:.+]] = vector.bitcast %[[S_BCAST_I32]] : vector<16xi32> to vector<64xi8>
 //       CHECK:   llvm.call_intrinsic "llvm.x86.avx512.vpdpbusd.512"(%{{.+}}, %[[S_RHS_FLAT]], %[[S_LHS_FLAT]])
+
+// -----
+
+// AVX-512 VNNI 16×16×2 i8 → i32. Unlike the 1×16×2 / 16×1×2 CASTI16 variants
+// (one row per intrinsic, with a per-row i8→i16 widen + broadcast), this
+// processes whole 16×2 i8 panels: one `vpmovsxbw` widen per panel, 4 in-lane
+// `vector.shuffle`s (→ `vpshufd`) fanning the LHS rows, 4 128-bit-block
+// `vector.shuffle`s (→ `vbroadcasti32x4`) fanning the RHS columns, then 16
+// `vpdpwssd` over the 4×4 grid. The ACC tile is the block-interleaved
+// `vector<4x4x4x4xi32>` from `getIntrinsicSwizzle`.
+
+#contraction_accesses_16x16 = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_avx512vnni_16x16x2_i8(
+    %lhs: vector<16x2xi8>, %rhs: vector<16x2xi8>, %acc: vector<4x4x4x4xi32>)
+    -> vector<4x4x4x4xi32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses_16x16,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<16x2xi8>, vector<16x2xi8> into vector<4x4x4x4xi32>
+  return %0 : vector<4x4x4x4xi32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_avx512vnni_16x16x2_i8
+//       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
+//       CHECK:   arith.extsi {{.*}} : vector<32xi8> to vector<32xi16>
+//   CHECK-DAG:   vector.shuffle %{{.+}} [0, 0, 0, 0, 4, 4, 4, 4, 8, 8, 8, 8, 12, 12, 12, 12]
+//   CHECK-DAG:   vector.shuffle %{{.+}} [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
+//       CHECK-COUNT-16:   llvm.call_intrinsic "llvm.x86.avx512.vpdpwssd.512"

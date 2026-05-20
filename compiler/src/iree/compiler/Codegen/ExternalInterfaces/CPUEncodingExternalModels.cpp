@@ -357,6 +357,7 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return {"+avx512vnni"};
   default:
     return {};
@@ -513,6 +514,7 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16,
         MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8,
         MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8,
+        MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16,
     };
     for (MMAIntrinsic intr : kAllX86) {
       SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
