@@ -38,6 +38,20 @@ void VectorTransferLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   mlir::FunctionOpInterface funcOp = getOperation();
 
+  // First, flatten the inner contiguous dims of multi-dim transfers so that
+  // contiguous trailing chunks (e.g. a packed `<16x2xbf16>` RHS tile whose
+  // 32 elements sit in 32 contiguous bytes) become a single 1-D transfer
+  // and lower to one wide vector load. If we skipped this and went straight
+  // to the rank-reduction unrolling below, the multi-dim transfer would
+  // unroll into one rank-1 load per outer iteration (e.g. 16 separate
+  // `<2 x bfloat>` loads), which then have to be reassembled into the wide
+  // vector via a chain of `shufflevector`s/`vpermt2` in the inner loop.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateFlattenVectorTransferPatterns(patterns);
+    (void)applyPatternsGreedily(funcOp, std::move(patterns));
+  }
+
   RewritePatternSet patterns(ctx);
   // Explicitly materialize the mask on transfer_read/transfer_write.
   // Assume we don't have 4 GB vectors.

@@ -80,8 +80,10 @@ module {
 // CHECK-LABEL:     func.func @aligned_unpack_generic
 // CHECK:             %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK:             %[[ASSUMED_SRC:.+]] = memref.assume_alignment %[[SRC]], 64
-// CHECK-COUNT-15:        vector.load %[[ASSUMED_SRC]]
-// CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[ASSUMED_SRC]]
+// VectorTransferLoweringPass flattens the contiguous 16x16 trailing dims of
+// the unpack source into a single `vector<256xf32>` load (over the collapsed
+// memref view), instead of one `vector<16xf32>` load per row.
+// CHECK:                 vector.load %{{.+}} : memref<24x32x256xf32{{.*}}>, vector<256xf32>
 // CHECK:                 %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
 // CHECK:                 %[[T0:.+]] = arith.addf %[[IN_0]], %{{.+}} : vector<16x16xf32>
 // CHECK:                 %[[T1:.+]] = arith.minimumf %[[T0]], %{{.+}} : vector<16x16xf32>
