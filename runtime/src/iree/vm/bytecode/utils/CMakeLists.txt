@@ -16,8 +16,6 @@ iree_cc_library(
   HDRS
     "block_list.h"
     "features.h"
-    "generated/op_table.h"
-    "isa.h"
     "isa_decoder.h"
     "isa_decoder.inl"
   SRCS
@@ -26,9 +24,8 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
-    iree::base::internal::flatcc::parsing
-    iree::schemas::bytecode_module_def_c_fbs
     iree::vm
+    iree::vm::bytecode::isa
   PUBLIC
 )
 

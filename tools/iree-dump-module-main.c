@@ -190,6 +190,115 @@ static void iree_tooling_print_function_cconv(flatbuffers_string_t cconv) {
   fprintf(stdout, ")");
 }
 
+static iree_status_t iree_tooling_append_cconv_type_name(
+    iree_string_builder_t* builder, char cconv_type) {
+  switch (cconv_type) {
+    case IREE_VM_CCONV_TYPE_VOID:
+      return iree_ok_status();
+    case IREE_VM_CCONV_TYPE_I32:
+      return iree_string_builder_append_cstring(builder, "i32");
+    case IREE_VM_CCONV_TYPE_I64:
+      return iree_string_builder_append_cstring(builder, "i64");
+    case IREE_VM_CCONV_TYPE_F32:
+      return iree_string_builder_append_cstring(builder, "f32");
+    case IREE_VM_CCONV_TYPE_F64:
+      return iree_string_builder_append_cstring(builder, "f64");
+    case IREE_VM_CCONV_TYPE_REF:
+      return iree_string_builder_append_cstring(builder, "!vm.ref<?>");
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unsupported cconv type '%c'", cconv_type);
+  }
+}
+
+static iree_status_t iree_tooling_append_function_arguments(
+    iree_string_builder_t* builder, iree_string_view_t arguments) {
+  uint32_t i32_ordinal = 0;
+  uint32_t ref_ordinal = 0;
+  bool first = true;
+  for (iree_host_size_t i = 0; i < arguments.size; ++i) {
+    char cconv_type = arguments.data[i];
+    if (cconv_type == IREE_VM_CCONV_TYPE_VOID) continue;
+    if (!first) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ", "));
+    }
+    first = false;
+
+    switch (cconv_type) {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder, "%%i%" PRIu32 ": ", i32_ordinal++));
+        IREE_RETURN_IF_ERROR(
+            iree_tooling_append_cconv_type_name(builder, cconv_type));
+        break;
+      }
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder, "%%i%" PRIu32 ":%" PRIu32 ": ", i32_ordinal,
+            i32_ordinal + 1));
+        i32_ordinal += 2;
+        IREE_RETURN_IF_ERROR(
+            iree_tooling_append_cconv_type_name(builder, cconv_type));
+        break;
+      }
+      case IREE_VM_CCONV_TYPE_REF: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder, "%%r%" PRIu32 ": ", ref_ordinal++));
+        IREE_RETURN_IF_ERROR(
+            iree_tooling_append_cconv_type_name(builder, cconv_type));
+        break;
+      }
+      default:
+        return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                "unsupported cconv argument type '%c'",
+                                cconv_type);
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_append_function_results(
+    iree_string_builder_t* builder, iree_string_view_t results) {
+  bool first = true;
+  for (iree_host_size_t i = 0; i < results.size; ++i) {
+    char cconv_type = results.data[i];
+    if (cconv_type == IREE_VM_CCONV_TYPE_VOID) continue;
+    if (!first) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ", "));
+    }
+    first = false;
+    IREE_RETURN_IF_ERROR(
+        iree_tooling_append_cconv_type_name(builder, cconv_type));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_append_function_signature(
+    iree_string_builder_t* builder,
+    iree_vm_FunctionSignatureDef_table_t signature_def) {
+  iree_string_view_t arguments = iree_string_view_empty();
+  iree_string_view_t results = iree_string_view_empty();
+  if (signature_def &&
+      iree_vm_FunctionSignatureDef_calling_convention_is_present(
+          signature_def)) {
+    iree_vm_function_signature_t signature = {
+        .calling_convention = iree_make_cstring_view(
+            iree_vm_FunctionSignatureDef_calling_convention(signature_def)),
+    };
+    IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+        &signature, &arguments, &results));
+  }
+
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "("));
+  IREE_RETURN_IF_ERROR(
+      iree_tooling_append_function_arguments(builder, arguments));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, ") -> ("));
+  IREE_RETURN_IF_ERROR(iree_tooling_append_function_results(builder, results));
+  return iree_string_builder_append_cstring(builder, ")");
+}
+
 static void iree_tooling_print_imported_function_def(
     iree_vm_ImportFunctionDef_table_t function_def, int indent) {
   if (iree_vm_ImportFunctionDef_flags(function_def) &
@@ -553,8 +662,137 @@ static iree_status_t iree_tooling_dump_module_flatbuffer_json(
 // --output=disassembly
 //===----------------------------------------------------------------------===//
 
+static iree_status_t iree_tooling_append_hex_bytes(
+    iree_string_builder_t* builder, const uint8_t* data,
+    iree_host_size_t data_length) {
+  for (iree_host_size_t i = 0; i < data_length; ++i) {
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_format(builder, "%02X", data[i]));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_append_type_directives(
+    iree_string_builder_t* builder, iree_vm_TypeDef_vec_t type_defs) {
+  for (iree_host_size_t i = 0; i < iree_vm_TypeDef_vec_len(type_defs); ++i) {
+    iree_vm_TypeDef_table_t type_def = iree_vm_TypeDef_vec_at(type_defs, i);
+    if (!iree_vm_TypeDef_full_name_is_present(type_def)) continue;
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "vm.type %s\n", iree_vm_TypeDef_full_name(type_def)));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_append_import_directives(
+    iree_string_builder_t* builder,
+    iree_vm_ImportFunctionDef_vec_t import_defs) {
+  for (iree_host_size_t i = 0;
+       i < iree_vm_ImportFunctionDef_vec_len(import_defs); ++i) {
+    iree_vm_ImportFunctionDef_table_t import_def =
+        iree_vm_ImportFunctionDef_vec_at(import_defs, i);
+    const bool optional =
+        iree_any_bit_set(iree_vm_ImportFunctionDef_flags(import_def),
+                         iree_vm_ImportFlagBits_OPTIONAL);
+    iree_vm_FunctionSignatureDef_table_t signature_def =
+        iree_vm_ImportFunctionDef_signature(import_def);
+    const char* calling_convention =
+        signature_def &&
+                iree_vm_FunctionSignatureDef_calling_convention_is_present(
+                    signature_def)
+            ? iree_vm_FunctionSignatureDef_calling_convention(signature_def)
+            : "";
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "vm.import %s@%s cconv \"%s\"\n", optional ? "optional " : "",
+        iree_vm_ImportFunctionDef_full_name(import_def), calling_convention));
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_tooling_append_rodata_directives(
+    iree_string_builder_t* builder, iree_vm_RodataSegmentDef_vec_t segment_defs,
+    iree_const_byte_span_t rodata_contents) {
+  for (iree_host_size_t i = 0;
+       i < iree_vm_RodataSegmentDef_vec_len(segment_defs); ++i) {
+    iree_vm_RodataSegmentDef_table_t segment_def =
+        iree_vm_RodataSegmentDef_vec_at(segment_defs, i);
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "vm.rodata[%" PRIhsz "] = ", i));
+    if (iree_vm_RodataSegmentDef_embedded_data_is_present(segment_def)) {
+      flatbuffers_uint8_vec_t data =
+          iree_vm_RodataSegmentDef_embedded_data(segment_def);
+      IREE_RETURN_IF_ERROR(iree_tooling_append_hex_bytes(
+          builder, data, flatbuffers_uint8_vec_len(data)));
+    } else {
+      const uint64_t external_offset =
+          iree_vm_RodataSegmentDef_external_data_offset(segment_def);
+      const uint64_t external_length =
+          iree_vm_RodataSegmentDef_external_data_length(segment_def);
+      if (external_offset > rodata_contents.data_length ||
+          external_length > rodata_contents.data_length - external_offset) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "external rodata segment is out of range");
+      }
+      IREE_RETURN_IF_ERROR(iree_tooling_append_hex_bytes(
+          builder, rodata_contents.data + external_offset,
+          (iree_host_size_t)external_length));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  }
+  return iree_ok_status();
+}
+
+// Ensures the next top-level item starts after exactly one blank line.
+static iree_status_t iree_tooling_append_top_level_spacing(
+    iree_string_builder_t* builder) {
+  iree_host_size_t size = iree_string_builder_size(builder);
+  if (size == 0) return iree_ok_status();
+  const char* buffer = iree_string_builder_buffer(builder);
+  if (size >= 2 && buffer[size - 1] == '\n' && buffer[size - 2] == '\n') {
+    return iree_ok_status();
+  }
+  if (buffer[size - 1] == '\n') {
+    return iree_string_builder_append_cstring(builder, "\n");
+  }
+  return iree_string_builder_append_cstring(builder, "\n\n");
+}
+
+static iree_status_t iree_tooling_append_module_directives(
+    iree_string_builder_t* builder,
+    iree_vm_BytecodeModuleDef_table_t module_def,
+    iree_const_byte_span_t rodata_contents) {
+  bool has_directives = false;
+  if (iree_vm_BytecodeModuleDef_types_is_present(module_def)) {
+    IREE_RETURN_IF_ERROR(iree_tooling_append_type_directives(
+        builder, iree_vm_BytecodeModuleDef_types(module_def)));
+    has_directives = iree_vm_TypeDef_vec_len(
+                         iree_vm_BytecodeModuleDef_types(module_def)) > 0;
+  }
+  if (iree_vm_BytecodeModuleDef_imported_functions_is_present(module_def)) {
+    IREE_RETURN_IF_ERROR(iree_tooling_append_import_directives(
+        builder, iree_vm_BytecodeModuleDef_imported_functions(module_def)));
+    has_directives =
+        has_directives ||
+        iree_vm_ImportFunctionDef_vec_len(
+            iree_vm_BytecodeModuleDef_imported_functions(module_def)) > 0;
+  }
+  if (iree_vm_BytecodeModuleDef_rodata_segments_is_present(module_def)) {
+    IREE_RETURN_IF_ERROR(iree_tooling_append_rodata_directives(
+        builder, iree_vm_BytecodeModuleDef_rodata_segments(module_def),
+        rodata_contents));
+    has_directives =
+        has_directives ||
+        iree_vm_RodataSegmentDef_vec_len(
+            iree_vm_BytecodeModuleDef_rodata_segments(module_def)) > 0;
+  }
+  if (has_directives) {
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_tooling_dump_module_disassembly(
     iree_const_byte_span_t archive_contents, iree_string_view_t function_filter,
+    iree_vm_bytecode_disassembly_format_t format,
     iree_allocator_t host_allocator) {
   // Create a VM instance for type registration.
   iree_vm_instance_t* instance = NULL;
@@ -568,10 +806,16 @@ static iree_status_t iree_tooling_dump_module_disassembly(
       instance, IREE_VM_BYTECODE_MODULE_FLAG_ALLOW_PLACEHOLDER_TYPES,
       archive_contents, iree_allocator_null(), host_allocator, &module);
   iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_const_byte_span_t rodata_contents = iree_const_byte_span_empty();
   iree_host_size_t rodata_offset = 0;
   if (iree_status_is_ok(status)) {
     status = iree_vm_bytecode_archive_parse_header(
         archive_contents, &flatbuffer_contents, &rodata_offset);
+    if (iree_status_is_ok(status)) {
+      rodata_contents = iree_make_const_byte_span(
+          archive_contents.data + rodata_offset,
+          archive_contents.data_length - rodata_offset);
+    }
   }
   if (iree_status_is_ok(status)) {
     iree_string_builder_t builder;
@@ -582,10 +826,23 @@ static iree_status_t iree_tooling_dump_module_disassembly(
         iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
     iree_vm_ExportFunctionDef_vec_t export_defs =
         iree_vm_BytecodeModuleDef_exported_functions(module_def);
+    iree_vm_FunctionSignatureDef_vec_t function_signature_defs =
+        iree_vm_BytecodeModuleDef_function_signatures(module_def);
+    iree_string_view_t module_name = iree_vm_module_name(module);
+
+    status = iree_string_builder_append_format(
+        &builder, "vm.module @%.*s version %u\n", (int)module_name.size,
+        module_name.data, iree_vm_BytecodeModuleDef_version(module_def));
+    if (iree_status_is_ok(status)) {
+      status = iree_tooling_append_module_directives(&builder, module_def,
+                                                     rodata_contents);
+    }
 
     // Iterate over internal functions and build the disassembly output.
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);
-    for (iree_host_size_t i = 0; i < signature.internal_function_count; ++i) {
+    for (iree_host_size_t i = 0;
+         iree_status_is_ok(status) && i < signature.internal_function_count;
+         ++i) {
       iree_vm_function_t function;
       status = iree_vm_module_lookup_function_by_ordinal(
           module, IREE_VM_FUNCTION_LINKAGE_INTERNAL, i, &function);
@@ -598,6 +855,13 @@ static iree_status_t iree_tooling_dump_module_disassembly(
       iree_string_view_t function_name = iree_string_view_is_empty(export_name)
                                              ? iree_vm_function_name(&function)
                                              : export_name;
+      char ordinal_name_buffer[32] = {0};
+      if (iree_string_view_is_empty(function_name)) {
+        int ordinal_name_length = snprintf(
+            ordinal_name_buffer, sizeof(ordinal_name_buffer), "fn%" PRIhsz, i);
+        function_name = iree_make_string_view(
+            ordinal_name_buffer, (iree_host_size_t)ordinal_name_length);
+      }
 
       // Apply filter (ordinal or name) if provided.
       if (!iree_string_view_is_empty(function_filter)) {
@@ -609,35 +873,55 @@ static iree_status_t iree_tooling_dump_module_disassembly(
         }
       }
 
-      // Print function header.
-      status = iree_string_builder_append_string(
-          &builder, IREE_SV("//"
-                            "===-----------------------------------------------"
-                            "-----------------------===//\n"));
+      status = iree_tooling_append_top_level_spacing(&builder);
       if (!iree_status_is_ok(status)) break;
-      iree_string_view_t module_name = iree_vm_module_name(module);
-      status = iree_string_builder_append_format(
-          &builder, "// Disassembly: %.*s.%.*s (#%" PRIhsz ")\n",
-          (int)module_name.size, module_name.data, (int)function_name.size,
-          function_name.data, i);
+
+      for (size_t j = 0; j < iree_vm_ExportFunctionDef_vec_len(export_defs);
+           ++j) {
+        iree_vm_ExportFunctionDef_table_t export_def =
+            iree_vm_ExportFunctionDef_vec_at(export_defs, j);
+        if (iree_vm_ExportFunctionDef_internal_ordinal(export_def) != i) {
+          continue;
+        }
+        iree_string_view_t local_name = iree_make_cstring_view(
+            iree_vm_ExportFunctionDef_local_name(export_def));
+        if (iree_string_view_equal(local_name, function_name)) {
+          status = iree_string_builder_append_format(
+              &builder, "vm.export @%.*s\n", (int)local_name.size,
+              local_name.data);
+        } else {
+          status = iree_string_builder_append_format(
+              &builder, "vm.export @%.*s = @%.*s\n", (int)local_name.size,
+              local_name.data, (int)function_name.size, function_name.data);
+        }
+        if (!iree_status_is_ok(status)) break;
+      }
       if (!iree_status_is_ok(status)) break;
-      status = iree_string_builder_append_string(
-          &builder, IREE_SV("//"
-                            "===-----------------------------------------------"
-                            "-----------------------===//\n"));
+
+      status = iree_string_builder_append_format(&builder, "vm.func @%.*s",
+                                                 (int)function_name.size,
+                                                 function_name.data);
+      if (!iree_status_is_ok(status)) break;
+      iree_vm_FunctionSignatureDef_table_t function_signature_def =
+          i < iree_vm_FunctionSignatureDef_vec_len(function_signature_defs)
+              ? iree_vm_FunctionSignatureDef_vec_at(function_signature_defs, i)
+              : NULL;
+      status = iree_tooling_append_function_signature(&builder,
+                                                      function_signature_def);
+      if (!iree_status_is_ok(status)) break;
+      status = iree_string_builder_append_cstring(&builder, " {\n");
       if (!iree_status_is_ok(status)) break;
 
       // Disassemble the function.
-      status =
-          iree_vm_bytecode_module_disassemble_function(module, i, &builder);
+      status = iree_vm_bytecode_module_disassemble_function(module, i, format,
+                                                            &builder);
       if (!iree_status_is_ok(status)) break;
-
-      // Flush output to stdout.
-      fprintf(stdout, "%.*s\n", (int)iree_string_builder_size(&builder),
-              iree_string_builder_buffer(&builder));
-      iree_string_builder_reset(&builder);
+      status = iree_string_builder_append_cstring(&builder, "}\n");
+      if (!iree_status_is_ok(status)) break;
     }
 
+    fprintf(stdout, "%.*s", (int)iree_string_builder_size(&builder),
+            iree_string_builder_buffer(&builder));
     iree_string_builder_deinitialize(&builder);
   }
 
@@ -662,6 +946,9 @@ IREE_FLAG(string, function, "",
           "Filter disassembly to a specific function name (exact match).\n"
           "Only used with --output=disassembly.");
 
+IREE_FLAG(bool, bytecode_offsets, false,
+          "Include bytecode offsets in disassembly output.");
+
 int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
 
@@ -684,6 +971,7 @@ int main(int argc, char** argv) {
       "\n"
       "Example dumping VM ISA disassembly for all functions:\n"
       "  iree-dump-module --output=disassembly module.vmfb\n"
+      "  iree-dump-module --output=disassembly --bytecode_offsets module.vmfb\n"
       "\n"
       "Example dumping VM ISA disassembly for a single function by name:\n"
       "  iree-dump-module --output=disassembly --function=fn2 module.vmfb\n"
@@ -726,6 +1014,13 @@ int main(int argc, char** argv) {
     }
   }
   if (iree_status_is_ok(status)) {
+    iree_vm_bytecode_disassembly_format_t disassembly_format =
+        IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT;
+    if (FLAG_bytecode_offsets) {
+      disassembly_format |=
+          IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_BYTECODE_OFFSETS;
+    }
+
     if (strcmp(FLAG_output, "all") == 0) {
       status = iree_tooling_dump_module_metadata(flatbuffer_contents,
                                                  rodata_contents);
@@ -733,7 +1028,7 @@ int main(int argc, char** argv) {
         fprintf(stdout, "\n");
         status = iree_tooling_dump_module_disassembly(
             file_contents->const_buffer, iree_make_cstring_view(FLAG_function),
-            host_allocator);
+            disassembly_format, host_allocator);
       }
     } else if (strcmp(FLAG_output, "metadata") == 0) {
       status = iree_tooling_dump_module_metadata(flatbuffer_contents,
@@ -741,7 +1036,7 @@ int main(int argc, char** argv) {
     } else if (strcmp(FLAG_output, "disassembly") == 0) {
       status = iree_tooling_dump_module_disassembly(
           file_contents->const_buffer, iree_make_cstring_view(FLAG_function),
-          host_allocator);
+          disassembly_format, host_allocator);
     } else if (strcmp(FLAG_output, "flatbuffer-binary") == 0) {
       status = iree_tooling_dump_module_flatbuffer_binary(flatbuffer_contents);
     } else if (strcmp(FLAG_output, "flatbuffer-json") == 0) {

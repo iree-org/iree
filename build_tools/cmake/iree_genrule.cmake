@@ -33,8 +33,27 @@ function(iree_genrule)
 
   set(_CMD "${_RULE_CMD}")
 
+  # Replace Bazel syntax $(rootpath //package:file) with the path into the
+  # source tree from the repository root.
+  string(REGEX REPLACE "\\$\\(rootpath //([^:)]+):([^)]+)\\)" "${IREE_ROOT_DIR}/\\1/\\2" _CMD "${_CMD}")
+
+  # Replace Bazel syntax $(rootpath //path/to/file) with the path into the
+  # source tree from the repository root.
+  string(REGEX REPLACE "\\$\\(rootpath //([^)]+)\\)" "${IREE_ROOT_DIR}/\\1" _CMD "${_CMD}")
+
   # Replace Bazel syntax $(rootpath x) with the path into the source dir.
   string(REGEX REPLACE "\\$\\(rootpath ([^)]+)\\)" "${CMAKE_CURRENT_SOURCE_DIR}/\\1" _CMD "${_CMD}")
+
+  # Replace Bazel syntax $(execpath //package:file) with the path into the
+  # binary tree from the repository root.
+  string(REGEX REPLACE "\\$\\(execpath //([^:)]+):([^)]+)\\)" "${IREE_BINARY_DIR}/\\1/\\2" _CMD "${_CMD}")
+
+  # Replace Bazel syntax $(execpath //path/to/file) with the path into the
+  # binary tree from the repository root.
+  string(REGEX REPLACE "\\$\\(execpath //([^)]+)\\)" "${IREE_BINARY_DIR}/\\1" _CMD "${_CMD}")
+
+  # Replace Bazel syntax $(execpath :x) with x in the binary dir.
+  string(REGEX REPLACE "\\$\\(execpath :([^)]+)\\)" "\\1" _CMD "${_CMD}")
 
   # Simply drop Bazel syntax $(execpath x) as Bazel custom commands are executed
   # by default in the build directory.
@@ -56,17 +75,17 @@ function(iree_genrule)
 
   add_custom_command(
     OUTPUT
-      "${_RULE_OUTS}"
+      ${_RULE_OUTS}
     COMMAND
       ${_CMD}
     DEPENDS
-      "${_RULE_SRCS}"
+      ${_RULE_SRCS}
     COMMENT
       "Generating ${_RULE_OUTS}"
     VERBATIM
   )
 
   add_custom_target("${_RULE_NAME}"
-    DEPENDS "${_RULE_OUTS}"
+    DEPENDS ${_RULE_OUTS}
   )
 endfunction()

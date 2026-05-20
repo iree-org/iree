@@ -29,6 +29,17 @@ exports_files([
 ])
 
 iree_runtime_cc_binary(
+    name = "iree-as-module",
+    srcs = ["iree-as-module-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/io:file_handle",
+        "//runtime/src/iree/vm/bytecode/assembler",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-benchmark-executable",
     srcs = ["iree-benchmark-executable-main.c"],
     deps = [

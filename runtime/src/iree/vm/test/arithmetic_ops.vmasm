@@ -1,0 +1,309 @@
+vm.module @arithmetic_ops version 0
+vm.type i32
+
+vm.export @test_add_i32
+vm.func @test_add_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.add.i32 %i2, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "1+1=2"
+}
+
+vm.export @test_sub_i32
+vm.func @test_sub_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3 = vm.const.i32 3  // 0x00000003
+  %i2 = vm.sub.i32 %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3-2=1"
+}
+
+vm.export @test_mul_i32
+vm.func @test_mul_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 4  // 0x00000004
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.mul.i32 %i2, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2*2=4"
+}
+
+vm.export @test_div_i32s
+vm.func @test_div_i32s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i2 = vm.const.i32 4  // 0x00000004
+  %i2 = vm.div.i32.s %i2, %i1
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4/-2=-2"
+}
+
+vm.export @test_div_i32u
+vm.func @test_div_i32u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 4  // 0x00000004
+  %i2 = vm.div.i32.u %i2, %i1
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4/2=2"
+}
+
+vm.export @test_rem_i32s
+vm.func @test_rem_i32s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.const.i32 -2  // 0xFFFFFFFE
+  %i3 = vm.const.i32 -3  // 0xFFFFFFFD
+  %i2 = vm.rem.i32.s %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-3%-2=-1"
+}
+
+vm.export @test_rem_i32u
+vm.func @test_rem_i32u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3 = vm.const.i32 3  // 0x00000003
+  %i2 = vm.rem.i32.u %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3%2=1"
+}
+
+vm.export @test_fma_i32
+vm.func @test_fma_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 11  // 0x0000000B
+  %i2 = vm.const.i32 5  // 0x00000005
+  %i3 = vm.const.i32 3  // 0x00000003
+  %i4 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.fma.i32 %i4, %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2*3+5=11"
+}
+
+vm.export @test_abs_i32
+vm.func @test_abs_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.abs.i32 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "abs(-1)=1"
+}
+
+vm.export @test_min_i32s
+vm.func @test_min_i32s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -3  // 0xFFFFFFFD
+  %i1 = vm.min.i32.s %i2, %i1
+  %i2 = vm.cmp.ne.i32 %i1, %i2
+  vm.cond_br %i2, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "smin(-3,2)=-3"
+}
+
+vm.export @test_min_i32u
+vm.func @test_min_i32u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -3  // 0xFFFFFFFD
+  %i2 = vm.min.i32.u %i2, %i1
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "umin(-3,2)=2"
+}
+
+vm.export @test_max_i32s
+vm.func @test_max_i32s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -3  // 0xFFFFFFFD
+  %i2 = vm.max.i32.s %i2, %i1
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "smax(-3,2)=2"
+}
+
+vm.export @test_max_i32u
+vm.func @test_max_i32u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -3  // 0xFFFFFFFD
+  %i1 = vm.max.i32.u %i2, %i1
+  %i2 = vm.cmp.ne.i32 %i1, %i2
+  vm.cond_br %i2, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "umax(-3,2)=-3"
+}
+
+vm.export @test_not_i32
+vm.func @test_not_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.const.i32.zero
+  %i2 = vm.not.i32 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "~0=-1"
+}
+
+vm.export @test_and_i32
+vm.func @test_and_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 3  // 0x00000003
+  %i3 = vm.const.i32 5  // 0x00000005
+  %i2 = vm.and.i32 %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5&3=1"
+}
+
+vm.export @test_or_i32
+vm.func @test_or_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 7  // 0x00000007
+  %i2 = vm.const.i32 3  // 0x00000003
+  %i3 = vm.const.i32 5  // 0x00000005
+  %i2 = vm.or.i32 %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5|3=7"
+}
+
+vm.export @test_xor_i32
+vm.func @test_xor_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 6  // 0x00000006
+  %i2 = vm.const.i32 3  // 0x00000003
+  %i3 = vm.const.i32 5  // 0x00000005
+  %i2 = vm.xor.i32 %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5^3=6"
+}
+
+vm.export @test_ctlz_i32_const_zero
+vm.func @test_ctlz_i32_const_zero() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 32  // 0x00000020
+  %i2 = vm.const.i32.zero
+  %i2 = vm.ctlz.i32 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(0)=32"
+}
+
+vm.export @test_ctlz_i32_const_1
+vm.func @test_ctlz_i32_const_1() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 31  // 0x0000001F
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.ctlz.i32 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(1)=31"
+}
+
+vm.export @test_ctlz_i32_const_ffffffff
+vm.func @test_ctlz_i32_const_ffffffff() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i1 = vm.ctlz.i32 %i1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(0xFFFFFFFF)=0"
+}

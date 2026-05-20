@@ -109,6 +109,20 @@ endif()
 
 iree_cc_binary(
   NAME
+    iree-as-module
+  SRCS
+    "iree-as-module-main.c"
+  DEPS
+    iree::base
+    iree::base::tooling::flags
+    iree::io::file_handle
+    iree::vm::bytecode::assembler
+  COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-check-module
   SRCS
     "iree-check-module-main.cc"

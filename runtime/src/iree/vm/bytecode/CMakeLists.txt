@@ -29,13 +29,13 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::internal
+    iree::schemas::bytecode_module_def_c_fbs
     iree::vm
+    iree::vm::bytecode::isa
     iree::vm::bytecode::utils
     iree::vm::ops
   PUBLIC
 )
-
-if(IREE_BUILD_COMPILER)
 
 iree_cc_test(
   NAME
@@ -51,15 +51,13 @@ iree_cc_test(
     iree::vm
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     module_test_module
   SRC
-    "module_test.mlir"
+    "module_test.vmasm"
   C_IDENTIFIER
     "iree_vm_bytecode_module_test_module"
-  FLAGS
-    "--compile-mode=vm"
   TESTONLY
   PUBLIC
 )
@@ -79,15 +77,13 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     module_benchmark_module
   SRC
-    "module_benchmark.mlir"
+    "module_benchmark.vmasm"
   C_IDENTIFIER
     "iree_vm_bytecode_module_benchmark_module"
-  FLAGS
-    "--compile-mode=vm"
   TESTONLY
   PUBLIC
 )
@@ -105,19 +101,15 @@ iree_cc_binary_benchmark(
   TESTONLY
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     module_size_benchmark_module
   SRC
-    "module_size_benchmark.mlir"
+    "module_size_benchmark.vmasm"
   C_IDENTIFIER
     "iree_vm_bytecode_module_size_benchmark_module"
-  FLAGS
-    "--compile-mode=vm"
   TESTONLY
   PUBLIC
 )
-
-endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

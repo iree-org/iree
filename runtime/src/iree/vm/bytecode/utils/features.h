@@ -9,7 +9,7 @@
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm/bytecode/utils/isa.h"
+#include "iree/vm/bytecode/isa/isa.h"
 
 #ifdef __cplusplus
 extern "C" {

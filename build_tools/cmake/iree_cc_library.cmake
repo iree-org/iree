@@ -126,11 +126,33 @@ function(iree_cc_library)
     iree_redirect_llvm_dylib_deps(_RULE_DEPS)
   endif()
 
+  # Bazel srcs can name generated files. Point missing sources at the binary
+  # tree so target_sources can attach the producer custom command edge.
+  set(_RULE_SRC_TARGET_SRCS)
+  set(_RULE_GENERATED_SRC_TARGET_SRCS)
+  foreach(_SRC_FILE IN LISTS _RULE_SRCS)
+    if(IS_ABSOLUTE "${_SRC_FILE}" OR "${_SRC_FILE}" MATCHES "^\\$<")
+      list(APPEND _RULE_SRC_TARGET_SRCS "${_SRC_FILE}")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_SRC_FILE}")
+      list(APPEND _RULE_SRC_TARGET_SRCS "${_SRC_FILE}")
+    else()
+      set(_SRC_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_SRC_FILE}")
+      list(APPEND _RULE_SRC_TARGET_SRCS "${_SRC_BINARY_FILE}")
+      list(APPEND _RULE_GENERATED_SRC_TARGET_SRCS "${_SRC_BINARY_FILE}")
+    endif()
+  endforeach()
+  if(_RULE_GENERATED_SRC_TARGET_SRCS)
+    set_source_files_properties(${_RULE_GENERATED_SRC_TARGET_SRCS}
+      PROPERTIES
+        GENERATED TRUE
+    )
+  endif()
+
   # Check if this is a header-only library.
   # Note that as of February 2019, many popular OS's (for example, Ubuntu
   # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
   # use list(FILTER...)
-  set(_CC_SRCS "${_RULE_SRCS}")
+  set(_CC_SRCS "${_RULE_SRC_TARGET_SRCS}")
   foreach(_SRC_FILE IN LISTS _CC_SRCS)
     if(${_SRC_FILE} MATCHES ".*\\.(h|inc)")
       list(REMOVE_ITEM _CC_SRCS "${_SRC_FILE}")
@@ -148,6 +170,30 @@ function(iree_cc_library)
   list(TRANSFORM _RULE_INCLUDES APPEND ">")
   list(TRANSFORM _RULE_SYSTEM_INCLUDES PREPEND "$<BUILD_INTERFACE:")
   list(TRANSFORM _RULE_SYSTEM_INCLUDES APPEND ">")
+
+  # Bazel hdrs can name generated files. Point missing headers at the binary
+  # tree so target_sources can attach the producer custom command edge.
+  set(_RULE_HDR_TARGET_SRCS)
+  set(_RULE_GENERATED_HDR_TARGET_SRCS)
+  set(_RULE_GENERATED_HDR_FILES)
+  foreach(_HDR_FILE IN LISTS _RULE_HDRS _RULE_TEXTUAL_HDRS)
+    if(IS_ABSOLUTE "${_HDR_FILE}" OR "${_HDR_FILE}" MATCHES "^\\$<")
+      list(APPEND _RULE_HDR_TARGET_SRCS "${_HDR_FILE}")
+    elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_HDR_FILE}")
+      list(APPEND _RULE_HDR_TARGET_SRCS "${_HDR_FILE}")
+    else()
+      set(_HDR_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/${_HDR_FILE}")
+      list(APPEND _RULE_HDR_TARGET_SRCS "${_HDR_BINARY_FILE}")
+      list(APPEND _RULE_GENERATED_HDR_TARGET_SRCS "$<BUILD_INTERFACE:${_HDR_BINARY_FILE}>")
+      list(APPEND _RULE_GENERATED_HDR_FILES "${_HDR_BINARY_FILE}")
+    endif()
+  endforeach()
+  if(_RULE_GENERATED_HDR_FILES)
+    set_source_files_properties(${_RULE_GENERATED_HDR_FILES}
+      PROPERTIES
+        GENERATED TRUE
+    )
+  endif()
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
@@ -172,9 +218,8 @@ function(iree_cc_library)
     # Sources get added to the object library.
     target_sources(${_OBJECTS_NAME}
       PRIVATE
-        ${_RULE_SRCS}
-        ${_RULE_TEXTUAL_HDRS}
-        ${_RULE_HDRS}
+        ${_RULE_SRC_TARGET_SRCS}
+        ${_RULE_HDR_TARGET_SRCS}
     )
 
     # Keep track of objects transitively in our special property.
@@ -288,9 +333,8 @@ function(iree_cc_library)
 
     target_sources(${_OBJECTS_NAME}
       PRIVATE
-        ${_RULE_SRCS}
-        ${_RULE_TEXTUAL_HDRS}
-        ${_RULE_HDRS}
+        ${_RULE_SRC_TARGET_SRCS}
+        ${_RULE_HDR_TARGET_SRCS}
     )
 
     set_property(TARGET ${_NAME} PROPERTY
@@ -394,6 +438,12 @@ function(iree_cc_library)
         ${IREE_DEFAULT_LINKOPTS}
         ${_RULE_LINKOPTS}
     )
+    if(_RULE_GENERATED_HDR_TARGET_SRCS)
+      target_sources(${_NAME}
+        INTERFACE
+          ${_RULE_GENERATED_HDR_TARGET_SRCS}
+      )
+    endif()
     target_link_libraries(${_NAME}
       INTERFACE
         ${_RULE_DEPS}

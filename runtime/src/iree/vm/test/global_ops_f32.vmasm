@@ -1,0 +1,42 @@
+vm.module @global_ops_f32 version 0
+vm.type f32
+vm.type i32
+
+vm.export @test_global_load_f32
+vm.func @test_global_load_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 42.5
+  %i2 = vm.global.load.f32 .rwdata[0]
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c42 != 42.5"
+}
+
+vm.export @test_global_store_f32
+vm.func @test_global_store_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 17.5
+  vm.global.store.f32 %i1, .rwdata[4]
+  %i2 = vm.global.load.f32 .rwdata[4]
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c107_mut != 17.5"
+}
+
+vm.export @__init
+vm.func @__init() -> () {
+^bb0:
+  %i0 = vm.const.f32 107.5
+  %i1 = vm.const.f32 42.5
+  vm.global.store.f32 %i1, .rwdata[0]
+  vm.global.store.f32 %i0, .rwdata[4]
+  vm.return
+}

@@ -209,6 +209,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 # (the new MMA-intrinsic path) instead of linalg.mmt4d.
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_cpu_dt_inner_tiled_%s_%s" % (lhs_rhs_type, acc_type),
+    timeout = "moderate" if lhs_rhs_type == "f32" and acc_type == "f32" else None,
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-llvmcpu-enable-inner-tiled",

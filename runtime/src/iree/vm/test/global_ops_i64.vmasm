@@ -1,0 +1,42 @@
+vm.module @global_ops_i64 version 0
+vm.type i32
+vm.type i64
+
+vm.export @test_global_load_i64
+vm.func @test_global_load_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 42  // 0x000000000000002A
+  %i4:5 = vm.global.load.i64 .rwdata[0]
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c42 != 42"
+}
+
+vm.export @test_global_store_i64
+vm.func @test_global_store_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 17  // 0x0000000000000011
+  vm.global.store.i64 %i2:3, .rwdata[8]
+  %i4:5 = vm.global.load.i64 .rwdata[8]
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c107_mut != 17"
+}
+
+vm.export @__init
+vm.func @__init() -> () {
+^bb0:
+  %i0:1 = vm.const.i64 107  // 0x000000000000006B
+  %i2:3 = vm.const.i64 42  // 0x000000000000002A
+  vm.global.store.i64 %i2:3, .rwdata[0]
+  vm.global.store.i64 %i0:1, .rwdata[8]
+  vm.return
+}

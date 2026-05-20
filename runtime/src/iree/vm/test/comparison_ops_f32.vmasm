@@ -1,0 +1,195 @@
+vm.module @comparison_ops_f32 version 0
+vm.type f32
+vm.type i32
+
+vm.export @test_cmp_lt_0_f32
+vm.func @test_cmp_lt_0_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 -4
+  %i2 = vm.const.f32 4
+  %i3 = vm.cmp.lt.f32.o %i2, %i1
+  %i3 = vm.cmp.nz.i32 %i3
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4.0 < -4.0"
+}
+
+vm.export @test_cmp_lt_1_f32
+vm.func @test_cmp_lt_1_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.f32 4
+  %i3 = vm.const.f32 -4
+  %i4 = vm.cmp.lt.f32.o %i3, %i2
+  %i1 = vm.cmp.ne.i32 %i4, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-4.0 < 4.0"
+}
+
+vm.export @test_cmp_eq_f32_near
+vm.func @test_cmp_eq_f32_near() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 100  // 0x00000064
+  %i2 = vm.const.f32.zero
+  %i3 = vm.const.f32 1.00003004
+  %i4 = vm.const.f32 1.00002003
+  %i5 = vm.const.f32 2
+  %i6 = vm.const.i32 1  // 0x00000001
+  %i7 = vm.const.f32 -2
+  %i8 = vm.cmp.lt.f32.o %i7, %i2
+  %i8 = vm.xor.i32 %i8, %i6
+  %i9 = vm.cmp.lt.f32.o %i5, %i2
+  %i9 = vm.xor.i32 %i9, %i6
+  %i8 = vm.cmp.ne.i32 %i8, %i9
+  vm.cond_br %i8, ^bb1(), ^bb2()
+^bb1:
+  %i10 = vm.cmp.eq.f32.o %i7, %i5
+  vm.br ^bb3()
+^bb2:
+  %i10 = vm.bitcast.f32.i32 %i7
+  %i11 = vm.bitcast.f32.i32 %i5
+  %i11 = vm.sub.i32 %i10, %i11
+  %i11 = vm.abs.i32 %i11
+  %i11 = vm.cmp.lt.i32.s %i11, %i1
+  vm.br ^bb3(%i11->%i10)
+^bb3:
+  %i10 = vm.cmp.nz.i32 %i10
+  vm.cond_br %i10, ^bb20(), ^bb4()
+^bb4:
+  vm.cond_br %i8, ^bb5(), ^bb6()
+^bb5:
+  %i8 = vm.cmp.eq.f32.o %i5, %i7
+  vm.br ^bb7(%i8->%i7)
+^bb6:
+  %i8 = vm.bitcast.f32.i32 %i5
+  %i10 = vm.bitcast.f32.i32 %i7
+  %i10 = vm.sub.i32 %i8, %i10
+  %i10 = vm.abs.i32 %i10
+  %i10 = vm.cmp.lt.i32.s %i10, %i1
+  vm.br ^bb7(%i10->%i7)
+^bb7:
+  %i7 = vm.cmp.nz.i32 %i7
+  vm.cond_br %i7, ^bb19(), ^bb8()
+^bb8:
+  %i7 = vm.cmp.lt.f32.o %i4, %i2
+  %i7 = vm.xor.i32 %i7, %i6
+  %i8 = vm.cmp.lt.f32.o %i3, %i2
+  %i8 = vm.xor.i32 %i8, %i6
+  %i8 = vm.cmp.ne.i32 %i7, %i8
+  vm.cond_br %i8, ^bb9(), ^bb10()
+^bb9:
+  %i2 = vm.cmp.eq.f32.o %i4, %i3
+  vm.br ^bb11()
+^bb10:
+  %i2 = vm.bitcast.f32.i32 %i4
+  %i8 = vm.bitcast.f32.i32 %i3
+  %i8 = vm.sub.i32 %i2, %i8
+  %i8 = vm.abs.i32 %i8
+  %i8 = vm.cmp.lt.i32.s %i8, %i1
+  vm.br ^bb11(%i8->%i2)
+^bb11:
+  %i6 = vm.cmp.ne.i32 %i2, %i6
+  vm.cond_br %i6, ^bb18(), ^bb12()
+^bb12:
+  %i9 = vm.cmp.ne.i32 %i7, %i9
+  vm.cond_br %i9, ^bb13(), ^bb14()
+^bb13:
+  %i2 = vm.cmp.eq.f32.o %i4, %i5
+  vm.br ^bb15(%i2->%i1)
+^bb14:
+  %i2 = vm.bitcast.f32.i32 %i4
+  %i3 = vm.bitcast.f32.i32 %i5
+  %i3 = vm.sub.i32 %i2, %i3
+  %i3 = vm.abs.i32 %i3
+  %i1 = vm.cmp.lt.i32.s %i3, %i1
+  vm.br ^bb15()
+^bb15:
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb17(), ^bb16()
+^bb16:
+  vm.return
+^bb17:
+  vm.fail %i0, "1.00002 !~ 2"
+^bb18:
+  vm.fail %i0, "1.00002 ~ 1.00003"
+^bb19:
+  vm.fail %i0, "2 !~ -2"
+^bb20:
+  vm.fail %i0, "-2 !~ 2"
+}
+
+vm.export @test_cmp_lte_f32
+vm.func @test_cmp_lte_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.f32 -2
+  %i4 = vm.cmp.lte.f32.o %i3, %i1
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.lte.f32.o %i1, %i3
+  %i2 = vm.cmp.nz.i32 %i2
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 <= -2"
+^bb4:
+  vm.fail %i0, "-2 <= 2"
+}
+
+vm.export @test_cmp_gt_f32
+vm.func @test_cmp_gt_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.f32 -2
+  %i4 = vm.cmp.lt.f32.o %i1, %i3
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb4(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.lt.f32.o %i3, %i1
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 > -2"
+^bb4:
+  vm.fail %i0, "-2 > 2"
+}
+
+vm.export @test_cmp_gte_f32
+vm.func @test_cmp_gte_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.f32 -2
+  %i4 = vm.cmp.lt.f32.o %i3, %i1
+  %i4 = vm.xor.i32 %i4, %i2
+  %i4 = vm.cmp.nz.i32 %i4
+  vm.cond_br %i4, ^bb4(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.lt.f32.o %i1, %i3
+  %i4 = vm.xor.i32 %i4, %i2
+  %i2 = vm.cmp.ne.i32 %i4, %i2
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 >= -2"
+^bb4:
+  vm.fail %i0, "-2 >= 2"
+}

@@ -12,14 +12,14 @@
 
 // CHECK: fn0
 func.func @fn0(%input : tensor<f32>) -> (tensor<f32>) {
-  // CHECK: [{{[0-9]+}}]{{.*}}<block>
+  // CHECK: ^bb0:
   %result = math.absf %input : tensor<f32>
   return %result : tensor<f32>
 }
 
 // CHECK: fn1
 func.func @fn1(%input : tensor<f32>) -> (tensor<f32>) {
-  // CHECK: [{{[0-9]+}}]{{.*}}<block>
+  // CHECK: ^bb0:
   %result = arith.mulf %input, %input : tensor<f32>
   return %result : tensor<f32>
 }

@@ -1043,8 +1043,41 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   return verify_status;
 }
 
+IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_query_required_features(
+    iree_const_byte_span_t archive_contents,
+    iree_vm_FeatureBits_enum_t* out_required_features) {
+  IREE_ASSERT_ARGUMENT(out_required_features);
+  *out_required_features = 0;
+
+  iree_const_byte_span_t flatbuffer_contents = iree_const_byte_span_empty();
+  iree_host_size_t archive_rodata_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_archive_parse_header(
+      archive_contents, &flatbuffer_contents, &archive_rodata_offset));
+
+  int verify_ret = iree_vm_BytecodeModuleDef_verify_as_root(
+      flatbuffer_contents.data, flatbuffer_contents.data_length);
+  if (verify_ret != flatcc_verify_ok) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "FlatBuffer verification failed: %s",
+                            flatcc_verify_error_string(verify_ret));
+  }
+
+  iree_vm_BytecodeModuleDef_table_t module_def =
+      iree_vm_BytecodeModuleDef_as_root(flatbuffer_contents.data);
+  if (!module_def) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "failed getting root from FlatBuffer; expected identifier "
+        "'" iree_vm_BytecodeModuleDef_file_identifier "' not found");
+  }
+
+  *out_required_features = iree_vm_BytecodeModuleDef_requirements(module_def);
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
     iree_vm_module_t* module, uint16_t function_ordinal,
+    iree_vm_bytecode_disassembly_format_t format,
     iree_string_builder_t* string_builder) {
   IREE_ASSERT_ARGUMENT(module);
   IREE_ASSERT_ARGUMENT(string_builder);
@@ -1052,8 +1085,8 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_disassemble_function(
   iree_vm_bytecode_module_t* bytecode_module =
       (iree_vm_bytecode_module_t*)module;
   iree_status_t status = iree_vm_bytecode_disassemble_function(
-      bytecode_module, /*module_state=*/NULL, function_ordinal,
-      IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_DEFAULT, string_builder);
+      bytecode_module, /*module_state=*/NULL, function_ordinal, format,
+      string_builder);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

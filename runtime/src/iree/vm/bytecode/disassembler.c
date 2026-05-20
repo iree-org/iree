@@ -7,8 +7,35 @@
 #include "iree/vm/bytecode/disassembler.h"
 
 #include <inttypes.h>
+#include <stdio.h>
 
+#include "iree/schemas/bytecode_module_def_reader.h"
+#include "iree/vm/bytecode/utils/block_list.h"
 #include "iree/vm/ops.h"
+
+static iree_status_t iree_vm_bytecode_disassembler_append_f32(
+    iree_string_builder_t* builder, float value) {
+  char buffer[32] = {0};
+  int length = snprintf(buffer, sizeof(buffer), "%.9g", value);
+  if (length < 0 || (size_t)length >= sizeof(buffer)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "f32 literal formatting failed");
+  }
+  return iree_string_builder_append_string(
+      builder, iree_make_string_view(buffer, (iree_host_size_t)length));
+}
+
+static iree_status_t iree_vm_bytecode_disassembler_append_f64(
+    iree_string_builder_t* builder, double value) {
+  char buffer[64] = {0};
+  int length = snprintf(buffer, sizeof(buffer), "%.17g", value);
+  if (length < 0 || (size_t)length >= sizeof(buffer)) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "f64 literal formatting failed");
+  }
+  return iree_string_builder_append_string(
+      builder, iree_make_string_view(buffer, (iree_host_size_t)length));
+}
 
 // ISA decoding policy for the disassembler.
 // NOTE: the disassembler is a debugging tool and assumes verified bytecode.
@@ -122,6 +149,44 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
   IREE_RETURN_IF_ERROR(                      \
       iree_vm_bytecode_disassembler_emit_type_name(type_def, b))
 
+static iree_status_t iree_vm_bytecode_disassembler_emit_type_name_by_id(
+    iree_vm_bytecode_module_t* module, uint32_t type_id,
+    iree_string_builder_t* b) {
+  iree_vm_TypeDef_vec_t type_defs =
+      iree_vm_BytecodeModuleDef_types(module->def);
+  if (type_id < iree_vm_TypeDef_vec_len(type_defs)) {
+    iree_vm_TypeDef_table_t type_def =
+        iree_vm_TypeDef_vec_at(type_defs, type_id);
+    if (iree_vm_TypeDef_full_name_is_present(type_def)) {
+      const char* full_name = iree_vm_TypeDef_full_name(type_def);
+      return iree_string_builder_append_cstring(b, full_name);
+    }
+  }
+
+  iree_vm_type_def_t type_def = iree_vm_map_type(module, (int32_t)type_id);
+  if (iree_vm_type_def_is_ref(type_def)) {
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "!"));
+  }
+  return iree_vm_bytecode_disassembler_emit_type_name(type_def, b);
+}
+#define IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_id) \
+  IREE_RETURN_IF_ERROR(                           \
+      iree_vm_bytecode_disassembler_emit_type_name_by_id(module, type_id, b))
+
+static iree_status_t iree_vm_bytecode_disassembler_emit_u16_list(
+    const iree_vm_register_list_t* list, iree_string_builder_t* b) {
+  for (uint16_t i = 0; i < list->size; ++i) {
+    if (i > 0) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+    }
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        b, "%u", (uint32_t)list->registers[i]));
+  }
+  return iree_ok_status();
+}
+#define IREE_VM_ISA_EMIT_U16_LIST(list) \
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_u16_list(list, b))
+
 static iree_status_t iree_vm_bytecode_disassembler_emit_operand_list(
     const iree_vm_registers_t* regs, const iree_vm_register_list_t* list,
     iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
@@ -196,13 +261,17 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
   }
 #define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));         \
     IREE_RETURN_IF_ERROR(                                                     \
-        iree_string_builder_append_format(b, "(%f)", *(float*)&(expr)));      \
+        iree_vm_bytecode_disassembler_append_f32(b, *(float*)&(expr)));       \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));         \
   }
 #define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));         \
     IREE_RETURN_IF_ERROR(                                                     \
-        iree_string_builder_append_format(b, "(%f)", *(double*)&(expr)));     \
+        iree_vm_bytecode_disassembler_append_f64(b, *(double*)&(expr)));      \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));         \
   }
 #define IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(expr)                             \
   if (regs && (format & IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_INLINE_VALUES)) { \
@@ -455,12 +524,38 @@ static iree_status_t iree_vm_bytecode_disassembler_print_function_name(
   return iree_ok_status();
 }
 
+static iree_status_t iree_vm_bytecode_disassembler_emit_block_ref(
+    const iree_vm_bytecode_block_list_t* block_list, uint32_t block_pc,
+    iree_string_builder_t* b) {
+  if (!block_list) {
+    return iree_string_builder_append_format(b, "^%08X", block_pc);
+  }
+
+  iree_host_size_t block_ordinal = 0;
+  IREE_RETURN_IF_ERROR(iree_status_annotate_f(
+      iree_vm_bytecode_block_list_find(block_list, block_pc, &block_ordinal),
+      "block target %08X is not defined", block_pc));
+  return iree_string_builder_append_format(b, "^bb%" PRIhsz, block_ordinal);
+}
+
+static iree_status_t iree_vm_bytecode_disassembler_emit_block_definition(
+    const iree_vm_bytecode_block_list_t* block_list, uint32_t block_pc,
+    iree_string_builder_t* b) {
+  if (!block_list) {
+    return iree_string_builder_append_string(b, IREE_SV("<block>"));
+  }
+  IREE_RETURN_IF_ERROR(
+      iree_vm_bytecode_disassembler_emit_block_ref(block_list, block_pc, b));
+  return iree_string_builder_append_cstring(b, ":");
+}
+
 // Internal implementation that also returns the next PC.
 static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
     iree_vm_source_offset_t pc, const iree_vm_registers_t* regs,
     iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b,
+    const iree_vm_bytecode_block_list_t* block_list,
     iree_vm_source_offset_t* out_next_pc) {
   const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
@@ -527,11 +622,12 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadI64) {
       IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
       IREE_VM_ISA_DECODE_RESULT_I64(value_reg);
-      IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.i64 .rwdata[%u]", byte_offset));
-      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(
-          module_state->rwdata_storage.data[byte_offset]);
+      int64_t value =
+          vm_global_load_i64(module_state->rwdata_storage.data, byte_offset);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(value);
       break;
     }
 
@@ -556,8 +652,9 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_I32_REG_NAME(byte_offset_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
-      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(
-          module_state->rwdata_storage.data[regs->i32[byte_offset_reg]]);
+      int64_t value = vm_global_load_i64(module_state->rwdata_storage.data,
+                                         regs->i32[byte_offset_reg]);
+      IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(value);
       break;
     }
 
@@ -578,34 +675,37 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadRef) {
       IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value_reg);
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, " = vm.global.load.ref .refs[%u]", global));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(
           &module_state->global_ref_table[global]);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : !"));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
     IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreRef) {
       IREE_VM_ISA_DECODE_GLOBAL_ATTR(global);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, "vm.global.store.ref "));
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[value_reg]);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", .refs[%u] : !", global));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+          iree_string_builder_append_format(b, ", .refs[%u] : ", global));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
     IREE_VM_ISA_EMIT_OP(CORE, GlobalLoadIndirectRef) {
       IREE_VM_ISA_DECODE_OPERAND_I32(global_reg);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(value_reg);
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
@@ -615,14 +715,15 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(
           &module_state->global_ref_table[regs->i32[global_reg]]);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : !"));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
     IREE_VM_ISA_EMIT_OP(CORE, GlobalStoreIndirectRef) {
       IREE_VM_ISA_DECODE_OPERAND_I32(global_reg);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
           b, "vm.global.store.indirect.ref "));
@@ -631,8 +732,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, ", .refs["));
       IREE_VM_ISA_EMIT_I32_REG_NAME(global_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[global_reg]);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, "] : !"));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(b, "] : "));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
@@ -707,8 +808,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       iree_vm_buffer_t* buffer = &module->rodata_ref_table[rodata_ordinal];
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(value_reg, value_reg_is_move);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.const.ref.rodata %u  // %p %" PRIhsz "b", rodata_ordinal,
-          buffer->data.data, buffer->data.data_length));
+          b, " = vm.const.ref.rodata %u  // %" PRIhsz "b", rodata_ordinal,
+          buffer->data.data_length));
       break;
     }
 
@@ -1054,7 +1155,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_OPERAND_I64(offset_reg);
       IREE_VM_ISA_DECODE_OPERAND_I64(length_reg);
       IREE_VM_ISA_DECODE_RESULT_I64(result_reg);
-      IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.buffer.hash "));
       IREE_VM_ISA_EMIT_REF_REG_NAME(buffer_reg);
@@ -1074,6 +1175,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
 
     IREE_VM_ISA_EMIT_OP(CORE, ListAlloc) {
       IREE_VM_ISA_DECODE_TYPE_OF(element_type_def);
+      (void)element_type_def;
       IREE_VM_ISA_DECODE_OPERAND_I32(initial_capacity_reg);
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
@@ -1083,7 +1185,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[initial_capacity_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " : !vm.list<"));
-      IREE_VM_ISA_EMIT_TYPE_NAME(element_type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(element_type_def_type_id);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ">"));
       break;
     }
@@ -1193,6 +1295,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_OPERAND_REF(list_reg);
       IREE_VM_ISA_DECODE_OPERAND_I32(index_reg);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
@@ -1202,7 +1305,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
       IREE_VM_ISA_EMIT_I32_REG_NAME(index_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
@@ -1268,6 +1372,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, SelectRef) {
       IREE_VM_ISA_DECODE_OPERAND_I32(condition_reg);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(true_value_reg);
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(false_value_reg);
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
@@ -1284,8 +1389,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(false_value_reg,
                                          false_value_reg_is_move);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[false_value_reg]);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " -> !"));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " -> "));
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
@@ -1431,6 +1536,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, CastAnyRef) {
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(operand_reg);
       IREE_VM_ISA_DECODE_TYPE_OF(type_def);
+      (void)type_def;
       IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result_reg);
       IREE_VM_ISA_EMIT_REF_REG_NAME_MOVE(result_reg, result_reg_is_move);
       IREE_RETURN_IF_ERROR(
@@ -1439,7 +1545,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_REF(&regs->ref[operand_reg]);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " : !vm.ref<?> -> "));
-      IREE_VM_ISA_EMIT_TYPE_NAME(type_def);
+      IREE_VM_ISA_EMIT_TYPE_NAME_BY_ID(type_def_type_id);
       break;
     }
 
@@ -1572,16 +1678,18 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     //===------------------------------------------------------------------===//
 
     IREE_VM_ISA_EMIT_OP(CORE, Block) {
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_string(b, IREE_SV("<block>")));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_definition(
+          block_list, start_pc, b));
       break;
     }
 
     IREE_VM_ISA_EMIT_OP(CORE, Branch) {
       IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
       IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "vm.br ^%08X(", block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.br "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1597,11 +1705,15 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           iree_string_builder_append_cstring(b, "vm.cond_br "));
       IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", ^%08X(", true_block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, true_block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(true_remap_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "), ^%08X(", false_block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "), "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, false_block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(false_remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1615,15 +1727,21 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
       IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(default_block_pc);
       IREE_VM_ISA_DECODE_BRANCH_OPERANDS(default_remap_list);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " { default: ^%08X(", default_block_pc));
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " { default: "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, default_block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(default_remap_list);
       IREE_VM_ISA_DECODE_CONST_I16(table_size);
       for (uint16_t i = 0; i < table_size; ++i) {
         IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(case_block_pc);
         IREE_VM_ISA_DECODE_BRANCH_OPERANDS(case_remap_list);
-        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-            b, "), %u: ^%08X(", i, case_block_pc));
+        IREE_RETURN_IF_ERROR(
+            iree_string_builder_append_format(b, "), %u: ", i));
+        IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+            block_list, case_block_pc, b));
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
         IREE_VM_ISA_EMIT_REMAP_LIST(case_remap_list);
       }
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ") }"));
@@ -1649,9 +1767,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
 
     IREE_VM_ISA_EMIT_OP(CORE, CallVariadic) {
       IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
-      // TODO(benvanik): print segment sizes.
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
-      (void)segment_size_list;
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
       if (dst_reg_list->size > 0) {
@@ -1662,6 +1778,9 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           iree_string_builder_append_cstring(b, "vm.call.variadic @"));
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " segments["));
+      IREE_VM_ISA_EMIT_U16_LIST(segment_size_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
@@ -1679,8 +1798,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           module, module_state, function_ordinal, b));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ") -> ^%08X(", resume_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ") -> "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, resume_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_RESULT_REG_LIST(dst_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1688,9 +1809,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
 
     IREE_VM_ISA_EMIT_OP(CORE, CallVariadicYieldable) {
       IREE_VM_ISA_DECODE_FUNC_ATTR(function_ordinal);
-      // TODO(benvanik): print segment sizes.
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(segment_size_list);
-      (void)segment_size_list;
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
       IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(resume_pc);
       IREE_VM_ISA_DECODE_VARIADIC_RESULTS(dst_reg_list);
@@ -1698,10 +1817,15 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           b, "vm.call.variadic.yieldable @"));
       IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_print_function_name(
           module, module_state, function_ordinal, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " segments["));
+      IREE_VM_ISA_EMIT_U16_LIST(segment_size_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ") -> ^%08X(", resume_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ") -> "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, resume_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_RESULT_REG_LIST(dst_reg_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1709,8 +1833,11 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
 
     IREE_VM_ISA_EMIT_OP(CORE, Return) {
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(src_reg_list);
-      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.return "));
-      IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.return"));
+      if (src_reg_list->size > 0) {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " "));
+        IREE_VM_ISA_EMIT_OPERAND_REG_LIST(src_reg_list);
+      }
       break;
     }
 
@@ -1730,7 +1857,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_I32(result_reg);
       IREE_VM_ISA_EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, " = vm.import.exists @"));
+          iree_string_builder_append_cstring(b, " = vm.import.resolved @"));
       int is_import = iree_vm_isa_function_ordinal_is_import(function_ordinal);
       if (IREE_UNLIKELY(!is_import)) {
         IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
@@ -1763,8 +1890,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, Yield) {
       IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
       IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "vm.yield ^%08X(", block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.yield "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1797,8 +1926,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP(CORE, Break) {
       IREE_VM_ISA_DECODE_BRANCH_TARGET_PC(block_pc);
       IREE_VM_ISA_DECODE_BRANCH_OPERANDS(remap_list);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, "vm.break ^%08X(", block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "vm.break "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1812,8 +1943,10 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
           iree_string_builder_append_cstring(b, "vm.cond_break "));
       IREE_VM_ISA_EMIT_I32_REG_NAME(condition_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", ^%08X(", block_pc));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_emit_block_ref(
+          block_list, block_pc, b));
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "("));
       IREE_VM_ISA_EMIT_REMAP_LIST(remap_list);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
@@ -1890,7 +2023,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_F32(result_reg);
       IREE_VM_ISA_EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, " = vm.const.f32 %f", value));
+          iree_string_builder_append_cstring(b, " = vm.const.f32 "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_append_f32(b, value));
       break;
     }
 
@@ -2278,7 +2412,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_F64(result_reg);
       IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, " = vm.const.f64 %f", value));
+          iree_string_builder_append_cstring(b, " = vm.const.f64 "));
+      IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassembler_append_f64(b, value));
       break;
     }
 
@@ -2513,7 +2648,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_F64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
           iree_string_builder_append_cstring(b, " = vm.bitcast.i64.f64 "));
-      IREE_VM_ISA_EMIT_I32_REG_NAME(operand_reg);
+      IREE_VM_ISA_EMIT_I64_REG_NAME(operand_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
       break;
     }
@@ -2644,7 +2779,8 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     iree_vm_bytecode_disassembly_format_t format, iree_string_builder_t* b) {
   return iree_vm_bytecode_disassemble_op_impl(module, module_state,
                                               function_ordinal, pc, regs,
-                                              format, b, /*out_next_pc=*/NULL);
+                                              format, b, /*block_list=*/NULL,
+                                              /*out_next_pc=*/NULL);
 }
 
 iree_status_t iree_vm_bytecode_trace_disassembly(
@@ -2743,26 +2879,72 @@ iree_status_t iree_vm_bytecode_disassemble_function(
   const iree_vm_FunctionDescriptor_t* descriptor =
       &module->function_descriptor_table[function_ordinal];
   uint32_t bytecode_length = descriptor->bytecode_length;
+  const uint8_t* bytecode_data =
+      module->bytecode_data.data + descriptor->bytecode_offset;
 
-  // Iterate through bytecode.
+  iree_vm_bytecode_block_list_t block_list;
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_block_list_initialize(
+      descriptor->block_count, string_builder->allocator, &block_list));
+
+  iree_string_builder_t scan_builder;
+  iree_string_builder_initialize(iree_allocator_null(), &scan_builder);
+
+  iree_status_t status = iree_ok_status();
   iree_vm_source_offset_t pc = 0;
-  while (pc < bytecode_length) {
-    // Emit prefix: [module.function+PC]
-    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-        string_builder, "[%08" PRIX64 "]    ", pc));
+  while (iree_status_is_ok(status) && pc < bytecode_length) {
+    if (bytecode_data[pc] == IREE_VM_OP_CORE_Block) {
+      iree_vm_bytecode_block_t* block = NULL;
+      status = iree_vm_bytecode_block_list_insert(&block_list, pc, &block);
+      if (iree_status_is_ok(status)) {
+        block->defined = 1;
+      }
+    }
+    if (!iree_status_is_ok(status)) break;
+
+    iree_vm_source_offset_t next_pc = 0;
+    iree_string_builder_reset(&scan_builder);
+    status = iree_vm_bytecode_disassemble_op_impl(
+        module, module_state, function_ordinal, pc, /*regs=*/NULL, format,
+        &scan_builder, /*block_list=*/NULL, &next_pc);
+    if (iree_status_is_ok(status)) {
+      pc = next_pc;
+    }
+  }
+  iree_string_builder_deinitialize(&scan_builder);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_bytecode_block_list_verify(
+        &block_list, iree_make_const_byte_span(bytecode_data, bytecode_length));
+  }
+
+  pc = 0;
+  while (iree_status_is_ok(status) && pc < bytecode_length) {
+    // Emit optional address context. Assembly treats this as non-semantic.
+    const char* indent = bytecode_data[pc] == IREE_VM_OP_CORE_Block ? "" : "  ";
+    if (iree_all_bits_set(
+            format, IREE_VM_BYTECODE_DISASSEMBLY_FORMAT_BYTECODE_OFFSETS)) {
+      status = iree_string_builder_append_format(
+          string_builder, "[%08" PRIX64 "]%s", pc, indent);
+    } else {
+      status = iree_string_builder_append_cstring(string_builder, indent);
+    }
+    if (!iree_status_is_ok(status)) break;
 
     // Disassemble the op and get the next PC.
     iree_vm_source_offset_t next_pc = 0;
-    IREE_RETURN_IF_ERROR(iree_vm_bytecode_disassemble_op_impl(
+    status = iree_vm_bytecode_disassemble_op_impl(
         module, module_state, function_ordinal, pc, /*regs=*/NULL, format,
-        string_builder, &next_pc));
+        string_builder, &block_list, &next_pc);
+    if (!iree_status_is_ok(status)) break;
 
     // Append newline.
-    IREE_RETURN_IF_ERROR(
-        iree_string_builder_append_cstring(string_builder, "\n"));
+    status = iree_string_builder_append_cstring(string_builder, "\n");
+    if (!iree_status_is_ok(status)) break;
 
     pc = next_pc;
   }
 
-  return iree_ok_status();
+  iree_vm_bytecode_block_list_deinitialize(&block_list,
+                                           string_builder->allocator);
+  return status;
 }

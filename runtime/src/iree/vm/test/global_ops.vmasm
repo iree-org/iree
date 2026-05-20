@@ -1,0 +1,78 @@
+vm.module @global_ops version 0
+vm.type i32
+vm.type !vm.buffer
+vm.rodata[0] = 010203
+
+vm.export @test_global_load_i32
+vm.func @test_global_load_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 42  // 0x0000002A
+  %i2 = vm.global.load.i32 .rwdata[0]
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c42 != 42"
+}
+
+vm.export @test_global_load_ref
+vm.func @test_global_load_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.zero
+  %r1 = vm.global.load.ref .refs[0] : !vm.buffer
+  %i2 = vm.cmp.eq.ref %r1, %r0
+  vm.discard.refs %r1, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, ""
+}
+
+vm.export @test_global_store_i32
+vm.func @test_global_store_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 17  // 0x00000011
+  vm.global.store.i32 %i1, .rwdata[4]
+  %i2 = vm.global.load.i32 .rwdata[4]
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@c107_mut != 17"
+}
+
+vm.export @test_global_store_ref
+vm.func @test_global_store_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 3b
+  vm.global.store.ref %r0, .refs[0] : !vm.buffer
+  %r1 = vm.global.load.ref .refs[0] : !vm.buffer
+  %i2 = vm.cmp.eq.ref %r1, %r0
+  vm.discard.refs %r1, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "@g0 != buffer"
+}
+
+vm.export @__init
+vm.func @__init() -> () {
+^bb0:
+  %i0 = vm.const.i32 107  // 0x0000006B
+  %i1 = vm.const.i32 42  // 0x0000002A
+  vm.global.store.i32 %i1, .rwdata[0]
+  vm.global.store.i32 %i0, .rwdata[4]
+  vm.return
+}

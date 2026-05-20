@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
-load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_vmasm_module.bzl", "iree_vmasm_module")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
 package(
@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
+if(NOT IREE_BUILD_TESTS)
   return()
 endif()
 """,
@@ -62,252 +62,152 @@ iree_c_embed_data(
     h_file_output = "all_bytecode_modules.h",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "arithmetic_ops",
-    src = "arithmetic_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "arithmetic_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "arithmetic_ops_f32",
-    src = "arithmetic_ops_f32.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f32=true",
-    ],
+    src = "arithmetic_ops_f32.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "arithmetic_ops_f64",
-    src = "arithmetic_ops_f64.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f64=true",
-    ],
+    src = "arithmetic_ops_f64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "arithmetic_ops_i64",
-    src = "arithmetic_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "arithmetic_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "assignment_ops",
-    src = "assignment_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "assignment_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "assignment_ops_f32",
-    src = "assignment_ops_f32.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f32=true",
-    ],
+    src = "assignment_ops_f32.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "assignment_ops_f64",
-    src = "assignment_ops_f64.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f64=true",
-    ],
+    src = "assignment_ops_f64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "assignment_ops_i64",
-    src = "assignment_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "assignment_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "async_ops",
-    src = "async_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "async_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "buffer_ops",
-    src = "buffer_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "buffer_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "call_ops",
-    src = "call_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "call_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "comparison_ops",
-    src = "comparison_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "comparison_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "comparison_ops_f32",
-    src = "comparison_ops_f32.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f32=true",
-    ],
+    src = "comparison_ops_f32.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "comparison_ops_f64",
-    src = "comparison_ops_f64.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f64=true",
-    ],
+    src = "comparison_ops_f64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "comparison_ops_i64",
-    src = "comparison_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "comparison_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "control_flow_ops",
-    src = "control_flow_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "control_flow_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "conversion_ops",
-    src = "conversion_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "conversion_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "conversion_ops_f32",
-    src = "conversion_ops_f32.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f32=true",
-    ],
+    src = "conversion_ops_f32.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "conversion_ops_f64",
-    src = "conversion_ops_f64.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f64=true",
-    ],
+    src = "conversion_ops_f64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "conversion_ops_i64",
-    src = "conversion_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "conversion_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "global_ops",
-    src = "global_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "global_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "global_ops_f32",
-    src = "global_ops_f32.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f32=true",
-    ],
+    src = "global_ops_f32.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "global_ops_f64",
-    src = "global_ops_f64.mlir",
-    flags = [
-        "--compile-mode=vm",
-        "--iree-vm-target-extension-f64=true",
-    ],
+    src = "global_ops_f64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "global_ops_i64",
-    src = "global_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "global_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "list_ops",
-    src = "list_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "list_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "list_ops_i64",
-    src = "list_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "list_ops_i64.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "list_variant_ops",
-    src = "list_variant_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "list_variant_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "ref_ops",
-    src = "ref_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "ref_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "shift_ops",
-    src = "shift_ops.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "shift_ops.vmasm",
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "shift_ops_i64",
-    src = "shift_ops_i64.mlir",
-    flags = [
-        "--compile-mode=vm",
-    ],
+    src = "shift_ops_i64.vmasm",
 )

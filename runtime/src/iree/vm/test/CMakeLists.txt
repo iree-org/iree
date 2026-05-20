@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
+if(NOT IREE_BUILD_TESTS)
   return()
 endif()
 
@@ -56,313 +56,243 @@ iree_c_embed_data(
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     arithmetic_ops
   SRC
-    "arithmetic_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "arithmetic_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     arithmetic_ops_f32
   SRC
-    "arithmetic_ops_f32.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f32=true"
+    "arithmetic_ops_f32.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     arithmetic_ops_f64
   SRC
-    "arithmetic_ops_f64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f64=true"
+    "arithmetic_ops_f64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     arithmetic_ops_i64
   SRC
-    "arithmetic_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "arithmetic_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     assignment_ops
   SRC
-    "assignment_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "assignment_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     assignment_ops_f32
   SRC
-    "assignment_ops_f32.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f32=true"
+    "assignment_ops_f32.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     assignment_ops_f64
   SRC
-    "assignment_ops_f64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f64=true"
+    "assignment_ops_f64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     assignment_ops_i64
   SRC
-    "assignment_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "assignment_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     async_ops
   SRC
-    "async_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "async_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     buffer_ops
   SRC
-    "buffer_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "buffer_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     call_ops
   SRC
-    "call_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "call_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     comparison_ops
   SRC
-    "comparison_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "comparison_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     comparison_ops_f32
   SRC
-    "comparison_ops_f32.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f32=true"
+    "comparison_ops_f32.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     comparison_ops_f64
   SRC
-    "comparison_ops_f64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f64=true"
+    "comparison_ops_f64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     comparison_ops_i64
   SRC
-    "comparison_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "comparison_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     control_flow_ops
   SRC
-    "control_flow_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "control_flow_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     conversion_ops
   SRC
-    "conversion_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "conversion_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     conversion_ops_f32
   SRC
-    "conversion_ops_f32.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f32=true"
+    "conversion_ops_f32.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     conversion_ops_f64
   SRC
-    "conversion_ops_f64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f64=true"
+    "conversion_ops_f64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     conversion_ops_i64
   SRC
-    "conversion_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "conversion_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     global_ops
   SRC
-    "global_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "global_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     global_ops_f32
   SRC
-    "global_ops_f32.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f32=true"
+    "global_ops_f32.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     global_ops_f64
   SRC
-    "global_ops_f64.mlir"
-  FLAGS
-    "--compile-mode=vm"
-    "--iree-vm-target-extension-f64=true"
+    "global_ops_f64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     global_ops_i64
   SRC
-    "global_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "global_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     list_ops
   SRC
-    "list_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "list_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     list_ops_i64
   SRC
-    "list_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "list_ops_i64.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     list_variant_ops
   SRC
-    "list_variant_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "list_variant_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     ref_ops
   SRC
-    "ref_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "ref_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     shift_ops
   SRC
-    "shift_ops.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "shift_ops.vmasm"
   PUBLIC
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
   NAME
     shift_ops_i64
   SRC
-    "shift_ops_i64.mlir"
-  FLAGS
-    "--compile-mode=vm"
+    "shift_ops_i64.vmasm"
   PUBLIC
 )
 

@@ -1,0 +1,57 @@
+vm.module @assignment_ops_i64 version 0
+vm.type i32
+vm.type i64
+
+vm.export @test_select_i64
+vm.func @test_select_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.const.i64.zero
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i6 = vm.const.i32.zero
+  %i8:9 = vm.select.i64 %i6 ? %i4:5 : %i2:3
+  %i6 = vm.cmp.ne.i64 %i8:9, %i2:3
+  vm.cond_br %i6, ^bb4(), ^bb1()
+^bb1:
+  %i2:3 = vm.select.i64 %i1 ? %i4:5 : %i2:3
+  %i1 = vm.cmp.nz.i64 %i2:3
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "1 ? 0 : 1 = 0"
+^bb4:
+  vm.fail %i0, "0 ? 0 : 1 = 1"
+}
+
+vm.export @test_switch_i64
+vm.func @test_switch_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.i64 100  // 0x0000000000000064
+  %i6:7 = vm.const.i64 200  // 0x00000000000000C8
+  %i8:9 = vm.const.i64 300  // 0x000000000000012C
+  %i3 = vm.const.i32.zero
+  %i10:11 = vm.switch.i64 %i3[%i4, %i6] else %i8:9
+  %i3 = vm.cmp.ne.i64 %i10:11, %i4:5
+  vm.cond_br %i3, ^bb6(), ^bb1()
+^bb1:
+  %i10:11 = vm.switch.i64 %i2[%i4, %i6] else %i8:9
+  %i2 = vm.cmp.ne.i64 %i10:11, %i6:7
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i6:7 = vm.switch.i64 %i1[%i4, %i6] else %i8:9
+  %i1 = vm.cmp.ne.i64 %i6:7, %i8:9
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "index 2 (out of bounds) is default 300"
+^bb5:
+  vm.fail %i0, "index 1 is 200"
+^bb6:
+  vm.fail %i0, "index 0 is 100"
+}

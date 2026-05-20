@@ -39,6 +39,7 @@ iree_lit_test_suite(
             "iree-compile-help.txt",
             "iree-benchmark-module.mlir",
             "iree-convert-parameters.txt",
+            "iree-dump-module-control-flow.mlir",
             "iree-dump-module.mlir",
             "iree-dump-parameters.txt",
             "iree-link-bundle.mlir",

@@ -1,0 +1,155 @@
+vm.module @bytecode_module_benchmark version 0
+vm.type i32
+vm.type i64
+vm.type !vm.buffer
+vm.import @native_import_module.add_1 cconv "0i_i"
+
+vm.export @empty_func
+vm.func @empty_func() -> () {
+^bb0:
+  vm.return
+}
+
+vm.func @fn1(%i0: i32) -> (i32) {
+^bb0:
+  vm.return %i0
+}
+
+vm.export @call_internal_func
+vm.func @call_internal_func(%i0: i32) -> (i32) {
+^bb0:
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  %i0 = vm.call @bytecode_module_benchmark:1(%i0)
+  vm.return %i0
+}
+
+vm.export @call_imported_func
+vm.func @call_imported_func(%i0: i32) -> (i32) {
+^bb0:
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  %i0 = vm.call @native_import_module.add_1(%i0)
+  vm.return %i0
+}
+
+vm.export @loop_sum
+vm.func @loop_sum(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32.zero
+  vm.br ^bb1()
+^bb1:
+  %i2 = vm.add.i32 %i2, %i1
+  %i3 = vm.cmp.lt.i32.s %i2, %i0
+  vm.cond_br %i3, ^bb1(), ^bb2()
+^bb2:
+  vm.return %i2
+}
+
+vm.export @buffer_reduce
+vm.func @buffer_reduce(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32 16  // 0x00000010
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32.zero
+  %i5 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64 1  // 0x0000000000000001
+  %i8:9 = vm.const.i64 4  // 0x0000000000000004
+  %i10:11 = vm.ext.i32.i64.u %i0
+  %i8:9 = vm.mul.i64 %i10:11, %i8:9
+  %r0 = vm.buffer.alloc %i8:9, %i1
+  vm.buffer.fill.i32 %r0, %i2:3, %i10:11, %i5
+  vm.br ^bb1(%i4->%i2, %i2->%i0, %i3->%i1)
+^bb1:
+  %i3 = vm.buffer.load.i32 %r0, %i0:1
+  %i3 = vm.add.i32 %i2, %i3
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i2 = vm.cmp.lt.i64.s %i0:1, %i10:11
+  vm.cond_br %i2, ^bb1(%i3->%i2), ^bb2()
+^bb2:
+  vm.discard.refs %r0
+  vm.return %i3
+}
+
+vm.export @buffer_reduce_unrolled
+vm.func @buffer_reduce_unrolled(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 16  // 0x00000010
+  %i4:5 = vm.const.i64.zero
+  %i3 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64 1  // 0x0000000000000001
+  %i8:9 = vm.const.i64 4  // 0x0000000000000004
+  %i10:11 = vm.ext.i32.i64.u %i0
+  %i8:9 = vm.mul.i64 %i10:11, %i8:9
+  %r0 = vm.buffer.alloc %i8:9, %i2
+  vm.buffer.fill.i32 %r0, %i4:5, %i10:11, %i3
+  vm.br ^bb1(%i1->%i2, %i4->%i0, %i5->%i1)
+^bb1:
+  %i3 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i4 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i5 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i8 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i9 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i12 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i13 = vm.buffer.load.i32 %r0, %i0:1
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i14 = vm.buffer.load.i32 %r0, %i0:1
+  %i3 = vm.add.i32 %i2, %i3
+  %i4 = vm.add.i32 %i3, %i4
+  %i5 = vm.add.i32 %i4, %i5
+  %i8 = vm.add.i32 %i5, %i8
+  %i9 = vm.add.i32 %i8, %i9
+  %i12 = vm.add.i32 %i9, %i12
+  %i13 = vm.add.i32 %i12, %i13
+  %i14 = vm.add.i32 %i13, %i14
+  %i0:1 = vm.add.i64 %i0:1, %i6:7
+  %i2 = vm.cmp.lt.i64.s %i0:1, %i10:11
+  vm.cond_br %i2, ^bb1(%i14->%i2), ^bb2()
+^bb2:
+  vm.discard.refs %r0
+  vm.return %i14
+}

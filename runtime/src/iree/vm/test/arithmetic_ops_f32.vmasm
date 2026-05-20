@@ -1,0 +1,444 @@
+vm.module @arithmetic_ops_f32 version 0
+vm.type f32
+vm.type i32
+
+vm.export @test_add_f32
+vm.func @test_add_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 3
+  %i2 = vm.const.f32 1.5
+  %i2 = vm.add.f32 %i2, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "1.5+1.5=3"
+}
+
+vm.export @test_sub_f32
+vm.func @test_sub_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.5
+  %i2 = vm.const.f32 2.5
+  %i3 = vm.const.f32 3
+  %i2 = vm.sub.f32 %i3, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3.0-2.5=0.5"
+}
+
+vm.export @test_mul_f32
+vm.func @test_mul_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 6.25
+  %i2 = vm.const.f32 2.5
+  %i2 = vm.mul.f32 %i2, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2.5*2.5=6.25"
+}
+
+vm.export @test_div_f32
+vm.func @test_div_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 -2
+  %i2 = vm.const.f32 4
+  %i2 = vm.div.f32 %i2, %i1
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4.0/-2.0=-2.0"
+}
+
+vm.export @test_rem_f32
+vm.func @test_rem_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32 -2
+  %i3 = vm.const.f32 -3
+  %i2 = vm.rem.f32 %i3, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-3.0%-2.0=1.0"
+}
+
+vm.export @test_fma_f32
+vm.func @test_fma_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 11
+  %i2 = vm.const.f32 5
+  %i3 = vm.const.f32 3
+  %i4 = vm.const.f32 2
+  %i2 = vm.fma.f32 %i4, %i3, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2.0*3.0+5.0=11.0"
+}
+
+vm.export @test_abs_f32
+vm.func @test_abs_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32 -1
+  %i2 = vm.abs.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "abs(-1.0)=1.0"
+}
+
+vm.export @test_neg_f32
+vm.func @test_neg_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32 -1
+  %i2 = vm.neg.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "neg(-1.0)=1.0"
+}
+
+vm.export @test_ceil_f32
+vm.func @test_ceil_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.f32 1.5
+  %i2 = vm.ceil.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ceil(1.5)=2.0"
+}
+
+vm.export @test_floor_f32
+vm.func @test_floor_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32 1.5
+  %i2 = vm.floor.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "floor(1.5)=1.0"
+}
+
+vm.export @test_round_f32
+vm.func @test_round_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.f32 1.5
+  %i2 = vm.round.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "round(1.5)=2.0"
+}
+
+vm.export @test_round_f32_even
+vm.func @test_round_f32_even() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.f32 1.5
+  %i2 = vm.round.f32.even %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "roundeven(1.5)=2.0"
+}
+
+vm.export @test_min_f32
+vm.func @test_min_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 -2
+  %i2 = vm.const.f32 -3
+  %i1 = vm.min.f32 %i2, %i1
+  %i3 = vm.cmp.ne.f32.o %i1, %i2
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "min(-3.0,-2.0)=-3.0"
+}
+
+vm.export @test_max_f32
+vm.func @test_max_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 -2
+  %i2 = vm.const.f32 -3
+  %i2 = vm.max.f32 %i2, %i1
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "max(-3.0,-2.0)=-2.0"
+}
+
+vm.export @test_atan_f32
+vm.func @test_atan_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.785398185
+  %i2 = vm.const.f32 1
+  %i2 = vm.atan.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "atan(1.0)=0.7853981633974483"
+}
+
+vm.export @test_atan2_f32
+vm.func @test_atan2_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1.57079637
+  %i2 = vm.const.f32.zero
+  %i3 = vm.const.f32 1
+  %i2 = vm.atan2.f32 %i3, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "atan2(1.0,0.0)=1.5707963267948966"
+}
+
+vm.export @test_cos_f32
+vm.func @test_cos_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.87758255
+  %i2 = vm.const.f32 0.5
+  %i2 = vm.cos.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cos(0.5)=0.8775825618903728"
+}
+
+vm.export @test_sin_f32
+vm.func @test_sin_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.47942555
+  %i2 = vm.const.f32 0.5
+  %i2 = vm.sin.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "sin(0.5)=0.479425538604203"
+}
+
+vm.export @test_exp_f32
+vm.func @test_exp_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2.71828175
+  %i2 = vm.const.f32 1
+  %i2 = vm.exp.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "exp(1.0)=2.718281828459045"
+}
+
+vm.export @test_exp2_f32
+vm.func @test_exp2_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 4
+  %i2 = vm.const.f32 2
+  %i2 = vm.exp2.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "exp(2.0)=4.0"
+}
+
+vm.export @test_expm1_f32
+vm.func @test_expm1_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 6.38905621
+  %i2 = vm.const.f32 2
+  %i2 = vm.expm1.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "expm1(2.0)=6.38905609893065"
+}
+
+vm.export @test_log_f32
+vm.func @test_log_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2.30258512
+  %i2 = vm.const.f32 10
+  %i2 = vm.log.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log(10.0)=2.302585092994046"
+}
+
+vm.export @test_log10_f32
+vm.func @test_log10_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32 10
+  %i2 = vm.log10.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log10(10.0)=1.0"
+}
+
+vm.export @test_log1p_f32
+vm.func @test_log1p_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2.39789534
+  %i2 = vm.const.f32 10
+  %i2 = vm.log1p.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log1p(10.0)=2.3978952727983707"
+}
+
+vm.export @test_log2_f32
+vm.func @test_log2_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 3.32192802
+  %i2 = vm.const.f32 10
+  %i2 = vm.log2.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log2(10.0)=3.321928094887362"
+}
+
+vm.export @test_pow_f32
+vm.func @test_pow_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 9
+  %i2 = vm.const.f32 2
+  %i3 = vm.const.f32 3
+  %i2 = vm.pow.f32 %i3, %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "pow(3.0,2.0)=9.0"
+}
+
+vm.export @test_rsqrt_f32
+vm.func @test_rsqrt_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.5
+  %i2 = vm.const.f32 4
+  %i2 = vm.rsqrt.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "rsqrt(4.0)=0.5"
+}
+
+vm.export @test_sqrt_f32
+vm.func @test_sqrt_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 2
+  %i2 = vm.const.f32 4
+  %i2 = vm.sqrt.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "sqrt(4.0)=2.0"
+}
+
+vm.export @test_tanh_f32
+vm.func @test_tanh_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 0.462117165
+  %i2 = vm.const.f32 0.5
+  %i2 = vm.tanh.f32 %i2
+  %i3 = vm.cmp.ne.f32.o %i2, %i1
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "tanh(0.5)=0.46211715726000974"
+}

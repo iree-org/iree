@@ -565,6 +565,8 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-inner-tiled"
   LABELS
 
+  TIMEOUT
+    300
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"

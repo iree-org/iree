@@ -1,0 +1,310 @@
+vm.module @arithmetic_ops_i64 version 0
+vm.type i32
+vm.type i64
+
+vm.export @test_add_i64
+vm.func @test_add_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.add.i64 %i4:5, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "1+1=2"
+}
+
+vm.export @test_sub_i64
+vm.func @test_sub_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.const.i64 2  // 0x0000000000000002
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i4:5 = vm.sub.i64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3-2=1"
+}
+
+vm.export @test_mul_i64
+vm.func @test_mul_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 4  // 0x0000000000000004
+  %i4:5 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.mul.i64 %i4:5, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2*2=4"
+}
+
+vm.export @test_div_i64s
+vm.func @test_div_i64s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i4:5 = vm.const.i64 4  // 0x0000000000000004
+  %i4:5 = vm.div.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4/-2=-2"
+}
+
+vm.export @test_div_i64u
+vm.func @test_div_i64u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 4  // 0x0000000000000004
+  %i4:5 = vm.div.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4/2=2"
+}
+
+vm.export @test_rem_i64s
+vm.func @test_rem_i64s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i4:5 = vm.const.i64 -2  // 0xFFFFFFFFFFFFFFFE
+  %i6:7 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i4:5 = vm.rem.i64.s %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-3%-2=-1"
+}
+
+vm.export @test_rem_i64u
+vm.func @test_rem_i64u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.const.i64 2  // 0x0000000000000002
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i4:5 = vm.rem.i64.u %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3%2=1"
+}
+
+vm.export @test_fma_i64
+vm.func @test_fma_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 11  // 0x000000000000000B
+  %i4:5 = vm.const.i64 5  // 0x0000000000000005
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i8:9 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.fma.i64 %i8:9, %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2*3+5=11"
+}
+
+vm.export @test_abs_i64
+vm.func @test_abs_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i4:5 = vm.abs.i64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "abs(-1)=1"
+}
+
+vm.export @test_min_i64s
+vm.func @test_min_i64s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i2:3 = vm.min.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i2:3, %i4:5
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "smin(-3,2)=-3"
+}
+
+vm.export @test_min_i64u
+vm.func @test_min_i64u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i4:5 = vm.min.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "umin(-3,2)=2"
+}
+
+vm.export @test_max_i64s
+vm.func @test_max_i64s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i4:5 = vm.max.i64.s %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "smax(-3,2)=2"
+}
+
+vm.export @test_max_i64u
+vm.func @test_max_i64u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64 -3  // 0xFFFFFFFFFFFFFFFD
+  %i2:3 = vm.max.i64.u %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i64 %i2:3, %i4:5
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "umax(-3,2)=-3"
+}
+
+vm.export @test_not_i64
+vm.func @test_not_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i4:5 = vm.const.i64.zero
+  %i4:5 = vm.not.i64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "~0=-1"
+}
+
+vm.export @test_and_i64
+vm.func @test_and_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.const.i64 3  // 0x0000000000000003
+  %i6:7 = vm.const.i64 5  // 0x0000000000000005
+  %i4:5 = vm.and.i64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5&3=1"
+}
+
+vm.export @test_or_i64
+vm.func @test_or_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 7  // 0x0000000000000007
+  %i4:5 = vm.const.i64 3  // 0x0000000000000003
+  %i6:7 = vm.const.i64 5  // 0x0000000000000005
+  %i4:5 = vm.or.i64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5|3=7"
+}
+
+vm.export @test_xor_i64
+vm.func @test_xor_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 6  // 0x0000000000000006
+  %i4:5 = vm.const.i64 3  // 0x0000000000000003
+  %i6:7 = vm.const.i64 5  // 0x0000000000000005
+  %i4:5 = vm.xor.i64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "5^3=6"
+}
+
+vm.export @test_ctlz_i64_const_zero
+vm.func @test_ctlz_i64_const_zero() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 64  // 0x0000000000000040
+  %i4:5 = vm.const.i64.zero
+  %i4:5 = vm.ctlz.i64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(0)=64"
+}
+
+vm.export @test_ctlz_i64_const_1
+vm.func @test_ctlz_i64_const_1() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 63  // 0x000000000000003F
+  %i4:5 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.ctlz.i64 %i4:5
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(1)=63"
+}
+
+vm.export @test_ctlz_i64_const_ffffffffffffffff
+vm.func @test_ctlz_i64_const_ffffffffffffffff() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i2:3 = vm.ctlz.i64 %i2:3
+  %i1 = vm.cmp.nz.i64 %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ctlz(0xFFFFFFFFFFFFFFFF)=0"
+}
