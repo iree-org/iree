@@ -168,7 +168,7 @@ struct ROCDLPrepareForSPIRVPass final
         funcOp.setCConv(LLVM::CConv::SPIR_FUNC);
       }
 
-      // Remove AMDGPU attributes from the function's attribute dictionary.
+      // Remove ROCDLGPU attributes from the function's attribute dictionary.
       for (auto attrName : kROCDLGPUAttrsToRemove) {
         funcOp->removeAttr(attrName);
       }
@@ -195,6 +195,7 @@ struct ROCDLPrepareForSPIRVPass final
 
       // Remove inreg attributes from all parameters. AMDGPU uses inreg for
       // argument preloading which is incompatible with SPIR-V.
+      // TODO: Clean this up once the SPIR-V backend can handle this.
       for (unsigned i = 0; i < funcOp.getNumArguments(); ++i) {
         funcOp.removeArgAttr(i, "llvm.inreg");
       }

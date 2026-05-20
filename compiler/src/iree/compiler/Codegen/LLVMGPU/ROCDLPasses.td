@@ -80,9 +80,8 @@ def ROCDLPrepareForSPIRVPass :
     Transforms AMDGPU-flavored LLVM dialect IR into SPIR-V-compatible form:
     - Remaps address spaces (AMDGPU -> SPIR-V conventions)
     - Changes calling conventions (amdgpu_kernel -> spir_kernel, etc.)
-    - Removes AMDGPU-specific function attributes
+    - Removes ROCDL-specific function attributes
     - Removes inreg parameter attributes (AMDGPU argument preloading)
-    - Strips llvm.intr.assume calls (SPIR-V backend crash workaround)
     - Sets module triple and data layout for spirv64-amd-amdhsa
   }];
   let dependentDialects = [

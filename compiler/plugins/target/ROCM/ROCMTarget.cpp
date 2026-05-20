@@ -295,11 +295,6 @@ struct ROCMOptions {
                      cl::desc("Generate and embed debug information (DWARF)."));
 
     binder.opt<bool>(
-        "iree-hip-emit-debug-info", debugSymbols, cl::cat(category),
-        cl::desc("Deprecated; use --iree-rocm-emit-debug-info instead."),
-        Deprecated("use --iree-rocm-emit-debug-info instead"));
-
-    binder.opt<bool>(
         "iree-rocm-use-spirv", useAmdgcnSpirv, cl::cat(category),
         cl::desc("Produce SPIR-V binary (amdgcnspirv) instead of native ISA. "
                  "The HIP runtime JIT-compiles the SPIR-V to native ISA."));
