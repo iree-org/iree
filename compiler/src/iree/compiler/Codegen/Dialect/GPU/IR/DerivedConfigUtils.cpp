@@ -159,6 +159,13 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
                                           vectorizableDim);
 }
 
+SmallVector<int64_t> deriveThreadTileSizes(ArrayRef<int64_t> loopRanges,
+                                           int64_t numThreads,
+                                           int64_t elementBitWidth) {
+  int64_t vectorSize = kPreferredCopyNumBits / elementBitWidth;
+  return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
+}
+
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {
   std::optional<SmallVector<int64_t>> workgroupSize =
       getWorkgroupSize(op->getParentOfType<FunctionOpInterface>());

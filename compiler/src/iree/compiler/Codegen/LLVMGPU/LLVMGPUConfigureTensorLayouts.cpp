@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -372,65 +373,14 @@ static LogicalResult setDerivedThreadConfigLayout(
     ArrayRef<int64_t> workgroupSize, RewriterBase &rewriter) {
 
   SmallVector<int64_t> opShape = getIterationSpaceBounds(candidate);
-  int64_t opRank = opShape.size();
-
   SmallVector<int64_t> elementTile = config.getStaticTilingLevelSizes(
       static_cast<unsigned>(IREE::GPU::TilingLevel::Thread),
       candidate.getOperation());
-
-  for (auto [index, size, element] : llvm::enumerate(opShape, elementTile)) {
-    if (ShapedType::isDynamic(size)) {
-      candidate->emitError() << "opShape could not be inferred";
-      return failure();
-    }
-
-    if (size % element != 0) {
-      candidate->emitError()
-          << "Operation with unsupported number of elements. "
-             "Chosen vector tile sizes for operation are not "
-             "divisible by operation loop ranges at dim: "
-          << index << ", size=" << size << ", vector size = " << element;
-      return failure();
-    }
-
-    size /= element;
+  FailureOr<NestedLayoutAttr> layout = getDerivedThreadLayout(
+      rewriter.getContext(), workgroupSize, opShape, elementTile);
+  if (failed(layout)) {
+    return candidate->emitError("cannot build derived thread layout");
   }
-
-  SmallVector<int64_t> threadTile(opRank, 1);
-  SmallVector<int64_t> threadStrides(opRank, 0);
-
-  int64_t residualThreads = ShapedType::getNumElements(workgroupSize);
-  int64_t currStride = 1;
-
-  for (auto [tile, stride, size] :
-       llvm::reverse(llvm::zip(threadTile, threadStrides, opShape))) {
-    int64_t threadBlock;
-    if (residualThreads % size == 0) {
-      threadBlock = size;
-    } else if (size % residualThreads == 0) {
-      threadBlock = residualThreads;
-    } else {
-      candidate->emitError()
-          << "Operation with unsupported number of elements.";
-      return failure();
-    }
-
-    tile = threadBlock;
-    stride = currStride;
-    size /= threadBlock;
-
-    currStride *= threadBlock;
-    residualThreads /= threadBlock;
-  }
-
-  SmallVector<int64_t> subgroupTile(opRank, 1);
-  SmallVector<int64_t> subgroupStrides(opRank, 0);
-  SmallVector<int64_t> outerTile(opRank, 1);
-
-  MLIRContext *context = rewriter.getContext();
-  auto layout = IREE::VectorExt::NestedLayoutAttr::get(
-      context, subgroupTile, opShape, outerTile, threadTile, elementTile,
-      subgroupStrides, threadStrides);
 
   Location loc = candidate->getLoc();
   auto dpsOp = cast<DestinationStyleOpInterface>(candidate.getOperation());
@@ -440,7 +390,7 @@ static LogicalResult setDerivedThreadConfigLayout(
     AffineMap resultMap = candidate.getMatchingIndexingMap(
         dpsOp.getDpsInitOperand(result.getResultNumber()));
     auto toLayout =
-        ToLayoutOp::create(rewriter, loc, result, layout.apply(resultMap));
+        ToLayoutOp::create(rewriter, loc, result, layout->apply(resultMap));
     rewriter.replaceAllUsesExcept(result, toLayout, toLayout);
   }
 

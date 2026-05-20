@@ -4,9 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPromotionAnalysis.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
@@ -14,6 +17,7 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Repeated.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -33,11 +37,15 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Allocates a tensor to copy the vector into a la bufferization.alloc_tensor.
-// This allocation is always static as vectors are currently always static
-// where this is used.
-static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
-                                                Value vector) {
+using LayoutMap =
+    llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface>;
+
+// Allocates a tensor to copy the vector into a la bufferization.alloc_tensor
+// and then writes the vector into the allocated tensor. This allocation is
+// always static as vectors are currently always static where this is used.
+static FailureOr<Value> allocateTensorAndWriteVector(OpBuilder &b, Location loc,
+                                                     Value vector,
+                                                     ArrayRef<int64_t> shape) {
   VectorType vectorType = cast<VectorType>(vector.getType());
   if (vectorType.isScalable()) {
     return failure();
@@ -46,9 +54,8 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
   Attribute sharedMemoryAddrSpace = gpu::AddressSpaceAttr::get(
       b.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
 
-  RankedTensorType tensorType =
-      RankedTensorType::get(vectorType.getShape(), vectorType.getElementType(),
-                            sharedMemoryAddrSpace);
+  RankedTensorType tensorType = RankedTensorType::get(
+      shape, vectorType.getElementType(), sharedMemoryAddrSpace);
   // Vectors are always statically shaped.
   auto allocTensorOp = bufferization::AllocTensorOp::create(
       b, loc, tensorType, ValueRange{}, Value());
@@ -63,6 +70,12 @@ static FailureOr<Value> allocateTensorForVector(OpBuilder &b, Location loc,
   return copied;
 }
 
+static FailureOr<Value> allocateTensorAndWriteVector(OpBuilder &b, Location loc,
+                                                     Value vector) {
+  VectorType vectorType = cast<VectorType>(vector.getType());
+  return allocateTensorAndWriteVector(b, loc, vector, vectorType.getShape());
+}
+
 static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
                                   Value tensor) {
   Value c0 = arith::ConstantIndexOp::create(b, tensor.getLoc(), 0);
@@ -74,8 +87,32 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
       .getResult();
 }
 
-/// Materialize shared memory for all to_layout ops marked with
-/// shared_memory_conversion. Clears the attribute after materialization.
+static void insertWorkgroupBarrierAtBlockStart(OpBuilder &builder,
+                                               Operation *op) {
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(op->getBlock());
+  gpu::BarrierOp::create(builder, op->getLoc(), gpu::AddressSpace::Workgroup);
+}
+
+static LogicalResult
+validateSharedMemoryConversionAttrs(FunctionOpInterface funcOp) {
+  WalkResult result = funcOp.walk([&](IREE::VectorExt::ToLayoutOp op) {
+    Attribute attr = op->getAttr("shared_memory_conversion");
+    if (!attr) {
+      return WalkResult::advance();
+    }
+    if (llvm::isa<IREE::GPU::PromotionAttr>(attr)) {
+      return WalkResult::advance();
+    }
+    op.emitOpError("shared_memory_conversion attribute must implement "
+                   "IREE::GPU::PromotionAttr");
+    return WalkResult::interrupt();
+  });
+  return failure(result.wasInterrupted());
+}
+
+/// Materialize shared memory roundtrip to resolve layout differences. Clears
+/// the shared_memory_conversion attribute after materialization.
 static LogicalResult
 materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
   SmallVector<IREE::VectorExt::ToLayoutOp> opsToPromote;
@@ -100,15 +137,14 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
     // Synchronize before the write to shared memory to avoid stepping over
     // reads in the previous iteration of a loop. We set this barrier
     // at the start of this block.
-    builder.setInsertionPointToStart(op->getBlock());
-    gpu::BarrierOp::create(builder, op->getLoc(), gpu::AddressSpace::Workgroup);
+    insertWorkgroupBarrierAtBlockStart(builder, op);
 
     builder.setInsertionPoint(op);
     OpOperand &operand = op.getInputMutable();
     // TODO: Since we know the read/write layout for this memory, we can get
     // optimal swizzling here. Figure out how to do that.
     FailureOr<Value> ret =
-        allocateTensorForVector(builder, op->getLoc(), operand.get());
+        allocateTensorAndWriteVector(builder, op->getLoc(), operand.get());
     if (failed(ret)) {
       return failure();
     }
@@ -128,6 +164,126 @@ materializeSharedMemoryConversions(FunctionOpInterface funcOp) {
   return success();
 }
 
+struct PromotionCandidate {
+  Operation *op = nullptr;
+  Value vector;
+};
+
+/// Find promotion candidates, i.e., operations that load data from memory and
+/// were reached by a promotion type during analysis propagation.
+static std::optional<PromotionCandidate>
+getPromotionCandidate(Operation *op, const PromotionTypeMap &promotionTypes) {
+  auto shouldPromoteCandidate =
+      [&](Operation *op, Value vector) -> std::optional<PromotionCandidate> {
+    auto promotionType = promotionTypes.find(vector);
+    if (promotionType == promotionTypes.end()) {
+      return std::nullopt;
+    }
+
+    // TODO: Currently only handles derived_thread_config promotion types,
+    // extend to other promotion types.
+    if (!isa<IREE::GPU::DerivedThreadConfigAttr>(promotionType->second)) {
+      return std::nullopt;
+    }
+    return PromotionCandidate{op, vector};
+  };
+  return TypeSwitch<Operation *, std::optional<PromotionCandidate>>(op)
+      .Case([&](vector::TransferReadOp read) {
+        return shouldPromoteCandidate(read.getOperation(), read.getVector());
+      })
+      .Case([&](vector::GatherOp gather) {
+        return shouldPromoteCandidate(gather.getOperation(),
+                                      gather.getResult());
+      })
+      .Default(std::nullopt);
+}
+
+/// Materialize promotion of operands to LDS.
+static LogicalResult
+materializeSharedMemoryPromotions(FunctionOpInterface funcOp,
+                                  const PromotionTypeMap &promotionTypes,
+                                  const LayoutMap &layouts) {
+  SmallVector<PromotionCandidate> readsToPromote;
+  funcOp.walk([&](Operation *op) {
+    std::optional<PromotionCandidate> candidate =
+        getPromotionCandidate(op, promotionTypes);
+    if (candidate) {
+      readsToPromote.push_back(*candidate);
+    }
+  });
+
+  if (readsToPromote.empty()) {
+    return success();
+  }
+
+  OpBuilder builder(funcOp);
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  if (!workgroupSize) {
+    return funcOp.emitOpError("unable to query workgroup_size information");
+  }
+  // Assume this candidate operation:
+  //
+  // %read = vector.transfer_read %global_memref ...
+  //
+  // This gets promoted by transforming the IR as follows:
+  //
+  // %read = vector.transfer_read %global_memref ...
+  // %global_layout = vector_ext.to_layout %read, #derived_thread_layout
+  // %alloc = bufferization.alloc_tensor <workgroup_memory>
+  // %lds_write = vector.transfer_write %global_layout, %alloc ...
+  // %barrier = iree_gpu.value_barrier %lds_write
+  // %lds_read = transfer_read %barrier
+  //
+  // All uses of %read except %global_layout will be replaced by %lds_read.
+  for (PromotionCandidate candidate : readsToPromote) {
+    Value vector = candidate.vector;
+    IREE::VectorExt::VectorLayoutInterface allocationLayout =
+        layouts.lookup(vector);
+    if (!allocationLayout) {
+      return candidate.op->emitOpError(
+          "missing layout for promoted read-like op");
+    }
+
+    VectorType readType = cast<VectorType>(vector.getType());
+    SmallVector<int64_t> elementTile = IREE::GPU::deriveThreadTileSizes(
+        readType.getShape(), ShapedType::getNumElements(*workgroupSize),
+        readType.getElementTypeBitWidth());
+    FailureOr<IREE::VectorExt::NestedLayoutAttr> readLayout =
+        getDerivedThreadLayout(candidate.op->getContext(), *workgroupSize,
+                               readType.getShape(), elementTile);
+    if (failed(readLayout)) {
+      return candidate.op->emitOpError(
+          "failed to derive layout for promoted read-like op");
+    }
+    Operation *op = candidate.op;
+    builder.setInsertionPointAfter(op);
+
+    // Synchronize before the write to shared memory to avoid stepping over
+    // reads in the previous iteration of a loop. We set this barrier at the
+    // start of this block.
+    insertWorkgroupBarrierAtBlockStart(builder, op);
+
+    auto toLayout = IREE::VectorExt::ToLayoutOp::create(builder, op->getLoc(),
+                                                        vector, *readLayout);
+
+    FailureOr<Value> copied = allocateTensorAndWriteVector(
+        builder, op->getLoc(), toLayout.getResult(),
+        allocationLayout.getUndistributedShape());
+    if (failed(copied)) {
+      return failure();
+    }
+
+    auto synced =
+        IREE::GPU::ValueBarrierOp::create(builder, op->getLoc(), *copied);
+    Value newRead =
+        readVectorFromTensor(builder, readType, synced.getResult(0));
+
+    vector.replaceUsesWithIf(
+        newRead, [&](OpOperand &use) { return use.getOwner() != toLayout; });
+  }
+  return success();
+}
+
 struct GPUVectorAllocPass final
     : impl::GPUVectorAllocPassBase<GPUVectorAllocPass> {
   void runOnOperation() override {
@@ -141,10 +297,22 @@ struct GPUVectorAllocPass final
       walkAndApplyPatterns(funcOp, std::move(patterns));
     }
 
+    // Run the promotion propagation to propagate promotion information from
+    // compute ops up to the ops accessing memory.
+    if (failed(validateSharedMemoryConversionAttrs(funcOp))) {
+      return signalPassFailure();
+    }
+    PromotionTypeMap promotionTypes = analyzePromotionTypes(funcOp);
+
+    // Remove the existing promotion information. The direct operand promotion
+    // path uses the analysis result above; newly detected layout conflicts
+    // below will get fresh markers.
+    funcOp.walk([](IREE::VectorExt::ToLayoutOp op) {
+      op.removeSharedMemoryConversionAttr();
+    });
+
     // Run layout analysis to find additional conflict points.
-    // The analysis sees the materialized shared memory roundtrips and
-    // only detects genuinely new conflicts.
-    llvm::MapVector<Value, IREE::VectorExt::VectorLayoutInterface> layouts;
+    LayoutMap layouts;
     propagateVectorLayoutInfo(funcOp, layouts);
 
     // Mark newly-inserted to_layout ops where input/output layouts don't
@@ -159,7 +327,13 @@ struct GPUVectorAllocPass final
       }
     });
 
-    // Phase 3: Materialize any newly-found conflicts.
+    // Materialize operand promotions based on the analysis.
+    if (failed(materializeSharedMemoryPromotions(funcOp, promotionTypes,
+                                                 layouts))) {
+      return signalPassFailure();
+    }
+
+    // Materialize LDS roundtrips for layout conflicts.
     if (failed(materializeSharedMemoryConversions(funcOp))) {
       return signalPassFailure();
     }
