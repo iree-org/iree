@@ -540,8 +540,6 @@ VER_0 {
     mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel;
     mlirGreedyRewriteDriverConfigSetStrictness;
     mlirGreedyRewriteDriverConfigSetUseTopDownTraversal;
-    mlirIREELinalgTransformRegisterPasses;
-    mlirIREETransformRegisterPasses;
     mlirIRRewriterCreate;
     mlirIRRewriterCreateFromOp;
     mlirIRRewriterDestroy;

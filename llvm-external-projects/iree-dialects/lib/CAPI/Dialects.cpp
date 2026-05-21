@@ -20,16 +20,6 @@
 using namespace mlir;
 
 //===--------------------------------------------------------------------===//
-// IREELinalgTransform
-//===--------------------------------------------------------------------===//
-
-void mlirIREELinalgTransformRegisterPasses() {
-  // DropSchedulePass moved into the IREE codegen common pass library and is
-  // registered via `registerCodegenCommonPasses`. This entry point is kept for
-  // ABI compatibility with existing CAPI / Python consumers.
-}
-
-//===--------------------------------------------------------------------===//
 // TransformDialect
 //===--------------------------------------------------------------------===//
 
@@ -39,10 +29,4 @@ void ireeRegisterTransformExtensions(MlirContext context) {
   registry
       .addExtensions<mlir::transform_ext::StructuredTransformOpsExtension>();
   ctx->appendDialectRegistry(registry);
-}
-
-void mlirIREETransformRegisterPasses() {
-  // DropSchedulePass moved into the IREE codegen common pass library and is
-  // registered via `registerCodegenCommonPasses`. This entry point is kept for
-  // ABI compatibility with existing CAPI / Python consumers.
 }

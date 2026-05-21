@@ -24,7 +24,6 @@ NB_MODULE(_ireeDialects, m) {
   // TransformDialect
   //===--------------------------------------------------------------------===//
   auto transform_m = m.def_submodule("transform");
-  mlirIREETransformRegisterPasses();
 
   transform_m.def(
       "register_dialect",
