@@ -780,6 +780,9 @@ static LogicalResult emitTileAndFuseConstraints(
   // total_threads = sg_m_cnt * sg_n_cnt * sg_size
   Value totalThreads =
       smt::IntMulOp::create(builder, loc, ValueRange{subgroups, sgSize});
+  // packed_k = red_k * mma_k
+  Value packedK =
+      smt::IntMulOp::create(builder, loc, ValueRange{redK, mmaKLookup});
 
   // Constraint 0: Set concrete values for knobs.
   // sg_size == preferred_subgroup_size.
@@ -881,24 +884,24 @@ static LogicalResult emitTileAndFuseConstraints(
   }
 
   // Constraint 2: Reduction Tile.
-  // aligned_dim_k % red_k == 0, aligned_dim_k = ceil(dim_k / mma_k) * mma_k
-  // problemInnerKAligned = ceil(dim_k / mma_k) * mma_k.
+  // red_k >= 1
+  assertCmp(builder, loc, smt::IntPredicate::ge, redK,
+            mkIntConst(builder, loc, 1),
+            llvm::join_items("", redKInnerName, " >= 1"));
+  // aligned_dim_k % (red_k * mma_k) == 0, aligned_dim_k = ceil(dim_k / mma_k) *
+  // mma_k problemInnerKAligned = ceil(dim_k / mma_k) * mma_k.
   Value problemInnerKAligned =
       emitAlignUpToMultiple(builder, loc, smtDimArgs[kInnerDim], mmaKLookup);
-  assertDivisible(builder, loc, problemInnerKAligned, redK,
+  assertDivisible(builder, loc, problemInnerKAligned, packedK,
                   llvm::join_items("", "aligned inner k dim ", kInnerDimName,
-                                   " must be divisible by ", redKInnerName));
-  // red_k <= max_vgprs
-  assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
-            llvm::join_items("", redKInnerName, " <= 512 (max_vgprs)"));
-  // red_k <= aligned_dim_k
-  assertCmp(builder, loc, smt::IntPredicate::le, redK, problemInnerKAligned,
-            llvm::join_items("", redKInnerName, " <= aligned k dim"));
-  // unpacked_k >= 1, unpacked_k = red_k / mma_k
-  Value unpackedK = smt::IntDivOp::create(builder, loc, redK, mmaKLookup);
-  assertCmp(builder, loc, smt::IntPredicate::ge, unpackedK,
-            mkIntConst(builder, loc, 1),
-            llvm::join_items("", "1 <= ", redKInnerName, " / mma_k"));
+                                   " must be divisible by ", redKInnerName,
+                                   " * mma_k"));
+  // red_k * mma_k <= max_vgprs
+  assertCmp(builder, loc, smt::IntPredicate::le, packedK, maxVGPRsVal,
+            llvm::join_items("", redKInnerName, " * mma_k <= 512 (max_vgprs)"));
+  // red_k * mma_k <= aligned_dim_k
+  assertCmp(builder, loc, smt::IntPredicate::le, packedK, problemInnerKAligned,
+            llvm::join_items("", redKInnerName, " * mma_k <= aligned k dim"));
 
   // Constraint 3: Subgroup tile size.
   // sg >= 1 for M and N tiles.
@@ -924,13 +927,13 @@ static LogicalResult emitTileAndFuseConstraints(
             "total_threads <= max_threads");
 
   // Constraint 5: Shared memory limit.
-  // (lhs_bytes * wg_m * red_k) + (rhs_bytes * wg_n * red_k)
+  // (lhs_bytes * wg_m * red_k * mma_k) + (rhs_bytes * wg_n * red_k * mma_k)
   auto [lhsBytesVal, rhsBytesVal] =
       getLhsRhsOperandBytes(builder, loc, linalgOp);
-  Value lhsMem = smt::IntMulOp::create(builder, loc,
-                                       ValueRange{lhsBytesVal, wgMInner, redK});
-  Value rhsMem = smt::IntMulOp::create(builder, loc,
-                                       ValueRange{rhsBytesVal, wgNInner, redK});
+  Value lhsMem = smt::IntMulOp::create(
+      builder, loc, ValueRange{lhsBytesVal, wgMInner, packedK});
+  Value rhsMem = smt::IntMulOp::create(
+      builder, loc, ValueRange{rhsBytesVal, wgNInner, packedK});
   Value totalSharedMem =
       smt::IntAddOp::create(builder, loc, ValueRange{lhsMem, rhsMem});
   assertCmp(builder, loc, smt::IntPredicate::le, totalSharedMem,
