@@ -531,16 +531,25 @@ class IREEBenchmark {
     instance_.reset();
 
     // Tear down device last in order to get accurate statistics.
-    if (device_allocator_ && FLAG_print_statistics) {
-      status = iree_status_join(status, iree_hal_allocator_statistics_fprint(
-                                            stderr, device_allocator_.get()));
+    if (FLAG_print_statistics && device_list_) {
+      for (iree_host_size_t i = 0; i < device_list_->count; ++i) {
+        iree_hal_device_t* dev = iree_hal_device_list_at(device_list_, i);
+        iree_string_view_t device_id = iree_hal_device_id(dev);
+        fprintf(stderr, "Device: %.*s\n", (int)device_id.size, device_id.data);
+        iree_hal_allocator_t* allocator = iree_hal_device_allocator(dev);
+        status = iree_status_join(
+            status, iree_hal_allocator_statistics_fprint(stderr, allocator));
+        fprintf(stderr, "\n");
+      }
     }
     device_allocator_.reset();
-    device_.reset();
+    device_ = nullptr;
+    iree_hal_device_list_free(device_list_);
+    device_list_ = nullptr;
     return status;
   }
 
-  iree_hal_device_t* device() const { return device_.get(); }
+  iree_hal_device_t* device() const { return device_; }
 
   iree_status_t CloseReplayCapture() {
     if (!replay_recorder_) return iree_ok_status();
@@ -581,7 +590,8 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(iree_tooling_create_context_from_flags(
         instance_.get(), module_list_.count, module_list_.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context_, &device_, &device_allocator_, &replay_recorder_));
+        &context_, &device_list_, &device_allocator_, &replay_recorder_));
+    device_ = device_list_ ? iree_hal_device_list_at(device_list_, 0) : nullptr;
 
     IREE_TRACE_FRAME_MARK_END_NAMED("init");
     return iree_ok_status();
@@ -605,22 +615,19 @@ class IREEBenchmark {
         &signature, &arguments_cconv, &results_cconv));
 
     IREE_CHECK_OK(iree_tooling_parse_variants(
-        arguments_cconv, FLAG_input_list(), device_.get(),
-        device_allocator_.get(), iree_vm_instance_allocator(instance_.get()),
-        &inputs_));
+        arguments_cconv, FLAG_input_list(), device_, device_allocator_.get(),
+        iree_vm_instance_allocator(instance_.get()), &inputs_));
 
     iree_string_view_t invocation_model = iree_vm_function_lookup_attr_by_name(
         &function, IREE_SV("iree.abi.model"));
     if (iree_string_view_equal(invocation_model, IREE_SV("coarse-fences"))) {
       // Asynchronous invocation.
-      iree::RegisterAsyncBenchmark(function_name, replay_recorder_,
-                                   device_.get(), context_.get(), function,
-                                   inputs_.get());
+      iree::RegisterAsyncBenchmark(function_name, replay_recorder_, device_,
+                                   context_.get(), function, inputs_.get());
     } else {
       // Synchronous invocation.
-      iree::RegisterGenericBenchmark(function_name, replay_recorder_,
-                                     device_.get(), context_.get(), function,
-                                     inputs_.get());
+      iree::RegisterGenericBenchmark(function_name, replay_recorder_, device_,
+                                     context_.get(), function, inputs_.get());
     }
     return iree_ok_status();
   }
@@ -648,7 +655,7 @@ class IREEBenchmark {
       } else if (iree_string_view_equal(benchmark_type, IREE_SV("entry"))) {
         iree::RegisterGenericBenchmark(
             std::string(function_name.data, function_name.size),
-            replay_recorder_, device_.get(), context_.get(), function,
+            replay_recorder_, device_, context_.get(), function,
             /*inputs=*/nullptr);
       } else {
         // Pick up generic () -> () functions.
@@ -677,7 +684,7 @@ class IREEBenchmark {
             // Only functions taking a (wait, signal) fence pair are run.
             iree::RegisterAsyncBenchmark(
                 std::string(function_name.data, function_name.size),
-                replay_recorder_, device_.get(), context_.get(), function,
+                replay_recorder_, device_, context_.get(), function,
                 /*inputs=*/nullptr);
           }
         } else {
@@ -687,7 +694,7 @@ class IREEBenchmark {
             // anything).
             iree::RegisterGenericBenchmark(
                 std::string(function_name.data, function_name.size),
-                replay_recorder_, device_.get(), context_.get(), function,
+                replay_recorder_, device_, context_.get(), function,
                 /*inputs=*/nullptr);
           }
         }
@@ -698,7 +705,8 @@ class IREEBenchmark {
 
   iree::vm::ref<iree_vm_instance_t> instance_;
   iree::vm::ref<iree_vm_context_t> context_;
-  iree::vm::ref<iree_hal_device_t> device_;
+  iree_hal_device_list_t* device_list_ = NULL;
+  iree_hal_device_t* device_ = NULL;
   iree::vm::ref<iree_hal_allocator_t> device_allocator_;
   iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
   iree_tooling_module_list_t module_list_;
