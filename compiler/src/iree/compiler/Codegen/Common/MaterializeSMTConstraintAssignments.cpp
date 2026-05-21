@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Materializes a concrete tuning assignment for an
-// `iree_codegen.smt.constraints` op. The common code only substitutes SMT knob
-// leaves with assigned values; each pipeline owns the mechanical repackaging of
-// that materialized knob dictionary into its concrete compilation_info attr.
+// `iree_codegen.smt.constraints` op. The pipeline merges existing dispatch
+// config with explicit knob assignments before substitution. Each pipeline
+// repackages the materialized knob dictionary into its concrete
+// compilation_info attr.
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -27,6 +29,33 @@ using IREE::Codegen::ConstraintsOp;
 using IREE::Codegen::IntKnobAttr;
 using IREE::Codegen::OneOfKnobAttr;
 using IREE::Codegen::PipelineAttrInterface;
+
+static DictionaryAttr
+knobAssignmentsToDict(MLIRContext *ctx,
+                      const DenseMap<StringRef, int64_t> &assignments) {
+  Builder b(ctx);
+  SmallVector<NamedAttribute> entries;
+  entries.reserve(assignments.size());
+  for (const auto &entry : assignments) {
+    entries.emplace_back(b.getStringAttr(entry.first),
+                         b.getI64IntegerAttr(entry.second));
+  }
+  return DictionaryAttr::get(ctx, entries);
+}
+
+static DenseMap<StringRef, int64_t>
+knobAssignmentsFromDict(DictionaryAttr assignments) {
+  DenseMap<StringRef, int64_t> result;
+  result.reserve(assignments.size());
+  for (NamedAttribute entry : assignments) {
+    auto value = dyn_cast<IntegerAttr>(entry.getValue());
+    if (!value) {
+      continue;
+    }
+    result[entry.getName().getValue()] = value.getInt();
+  }
+  return result;
+}
 
 static InFlightDiagnostic emitMaterializationError(ConstraintsOp op) {
   return op.emitError(
@@ -182,9 +211,21 @@ struct TestMaterializeSMTConstraintAssignmentsPass final
 
 FailureOr<CompilationInfoAttr> materializeCompilationInfoFromConstraints(
     ConstraintsOp op, const DenseMap<StringRef, int64_t> &assignments) {
+  PipelineAttrInterface pipeline = op.getPipeline();
+  DictionaryAttr assignmentsDict =
+      knobAssignmentsToDict(op.getContext(), assignments);
+  DictionaryAttr effectiveDict =
+      pipeline.mergeKnobAssignmentsForMaterialization(op.getOperation(),
+                                                      assignmentsDict);
+  DenseMap<StringRef, int64_t> effectiveAssignments =
+      knobAssignmentsFromDict(effectiveDict);
+
   if (DictionaryAttr materializedKnobs =
-          materializeKnobsDictionary(op, assignments)) {
-    return materializeCompilationInfo(op, materializedKnobs);
+          materializeKnobsDictionary(op, effectiveAssignments)) {
+    DictionaryAttr mergedKnobs =
+        pipeline.mergeMaterializedKnobsForMaterialization(op.getOperation(),
+                                                          materializedKnobs);
+    return materializeCompilationInfo(op, mergedKnobs);
   }
   return failure();
 }

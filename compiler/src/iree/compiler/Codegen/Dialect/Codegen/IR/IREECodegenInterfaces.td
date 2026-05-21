@@ -794,6 +794,40 @@ def IREECodegen_PipelineAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Merge partial knob assignments with existing dispatch configuration.
+        Returns a dictionary of knob name to integer assignment. The default
+        returns the input assignments unchanged. Implementations may overlay
+        explicit assignments on values taken from the current lowering config.
+      }],
+      /*retTy=*/"::mlir::DictionaryAttr",
+      /*methodName=*/"mergeKnobAssignmentsForMaterialization",
+      /*args=*/(ins "::mlir::Operation *":$op,
+                    "::mlir::DictionaryAttr":$partialAssignments),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        (void)op;
+        return partialAssignments;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Merge a materialized knobs dictionary with existing dispatch
+        configuration. Returns a knobs dictionary that includes fields from the
+        current lowering config and translation info when they are absent from
+        the materialized template. Materialized entries override existing ones.
+      }],
+      /*retTy=*/"::mlir::DictionaryAttr",
+      /*methodName=*/"mergeMaterializedKnobsForMaterialization",
+      /*args=*/(ins "::mlir::Operation *":$op,
+                    "::mlir::DictionaryAttr":$materializedKnobs),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        (void)op;
+        return materializedKnobs;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Materialize the pipeline-specific compilation_info attribute from a
         knobs dictionary whose knob leaves have already been substituted with
         concrete values. Implementations should only mechanically repackage the

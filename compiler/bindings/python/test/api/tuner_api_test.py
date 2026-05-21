@@ -804,3 +804,61 @@ def test_materialize_compilation_info_error_diagnostic():
         assert False, "expected missing wg_0 assignment to fail"
     except RuntimeError as e:
         assert "missing assignment for knob 'wg_0'" in str(e)
+
+
+_MATERIALIZE_PARTIAL_SUBGROUP_MODULE = """
+    module {
+      func.func @matmul_partial_subgroup(
+          %lhs: tensor<4x8xf32>, %rhs: tensor<8x4xf32>) -> tensor<4x4xf32>
+          attributes {translation_info = #iree_codegen.translation_info<
+            pipeline = #iree_gpu.pipeline<VectorDistribute>
+            workgroup_size = [64, 1, 1]
+            subgroup_size = 32>} {
+        %init = tensor.empty() : tensor<4x4xf32>
+        %result = linalg.matmul {
+          lowering_config = #iree_gpu.lowering_config<{
+            subgroup = [2, 4, 0],
+            workgroup = [64, 128, 0]
+          }>,
+          root_op = #iree_codegen.root_op<set = 0>
+        } ins(%lhs, %rhs : tensor<4x8xf32>, tensor<8x4xf32>)
+          outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
+        return %result : tensor<4x4xf32>
+      }
+
+      iree_codegen.smt.constraints
+          target = <set = 0>,
+          pipeline = #iree_gpu.pipeline<VectorDistribute>,
+          knobs = {
+            subgroup = [
+              #iree_codegen.smt.int_knob<"sg_0">,
+              #iree_codegen.smt.int_knob<"sg_1">,
+              0
+            ]
+          }
+          dims() {
+          }
+    }
+"""
+
+
+@run
+def test_materialize_compilation_info_partial_subgroup_overlay():
+    # Config has workgroup and subgroup. Assign only subgroup knobs.
+    input_module = ir.Module.parse(_MATERIALIZE_PARTIAL_SUBGROUP_MODULE)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert len(constraints_ops) == 1
+    constraints_op = constraints_ops[0]
+
+    compilation_info = iree_codegen.materialize_compilation_info(
+        constraints_op,
+        {
+            "sg_0": 8,
+            "sg_1": 16,
+        },
+    )
+    assert isinstance(compilation_info, iree_codegen.CompilationInfoAttr)
+    assert str(compilation_info.lowering_config) == (
+        "#iree_gpu.lowering_config<{subgroup = [8, 16, 0], "
+        "workgroup = [64, 128, 0]}>"
+    )

@@ -22,6 +22,7 @@ iree_cc_library(
     "IREEGPUEnums.h"
     "IREEGPUInterfaces.h"
     "IREEGPUOps.h"
+    "IREEGPUSMTKnobResolution.h"
   TEXTUAL_HDRS
     "IREEGPUAttrs.cpp.inc"
     "IREEGPUAttrs.h.inc"
@@ -41,6 +42,7 @@ iree_cc_library(
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
     "IREEGPUOps.cpp"
+    "IREEGPUSMTKnobResolution.cpp"
     "PromotionImpls.cpp"
   DEPS
     ::IREEGPUAttrs

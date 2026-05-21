@@ -823,7 +823,8 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
 def IREEGPU_PipelineAttr : AttrDef<IREEGPU_Dialect, "Pipeline", [
     DeclareAttrInterfaceMethods<IREECodegen_PipelineAttrInterface,
-      ["emitConstraints", "materializeCompilationInfo"]>
+      ["emitConstraints", "mergeKnobAssignmentsForMaterialization",
+       "mergeMaterializedKnobsForMaterialization", "materializeCompilationInfo"]>
   ]> {
   let mnemonic = "pipeline";
   let summary = "LLVMGPU lowering pipeline identifier.";

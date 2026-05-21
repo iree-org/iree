@@ -195,7 +195,10 @@ mlir::OwningOpRef<mlir::ModuleOp>
 convertConstraintsToSMTModule(IREE::Codegen::ConstraintsOp op);
 
 /// Materializes a CompilationInfoAttr from a ConstraintsOp knobs dictionary and
-/// a flat mapping from knob name to concrete integer assignment.
+/// a flat mapping from knob name to concrete integer assignment. The
+/// constraints pipeline may overlay assignments on existing dispatch config via
+/// PipelineAttrInterface::mergeKnobAssignmentsForMaterialization and preserve
+/// non-template fields via mergeMaterializedKnobsForMaterialization.
 FailureOr<IREE::Codegen::CompilationInfoAttr>
 materializeCompilationInfoFromConstraints(
     IREE::Codegen::ConstraintsOp op,

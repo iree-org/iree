@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUSMTKnobResolution.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/EncodingUtils.h"
@@ -3425,6 +3426,41 @@ PipelineAttr::buildPipeline(OpPassManager &pm,
   assert(builder && "no GPU pipeline builder registered; ensure "
                     "registerCodegenLLVMGPUPasses() was called");
   return builder(*this, pm, options);
+}
+
+DictionaryAttr PipelineAttr::mergeKnobAssignmentsForMaterialization(
+    Operation *constraintsOperation, DictionaryAttr assignments) const {
+  auto constraintsOp = cast<IREE::Codegen::ConstraintsOp>(constraintsOperation);
+  KnobAssignmentMap assignmentMap;
+  assignmentMap.reserve(assignments.size());
+  for (NamedAttribute entry : assignments) {
+    auto value = dyn_cast<IntegerAttr>(entry.getValue());
+    if (!value) {
+      return assignments;
+    }
+    assignmentMap[entry.getName().getValue()] = value.getInt();
+  }
+  if (std::optional<KnobAssignmentMap> merged =
+          mergeKnobAssignmentsWithExistingGPUConfig(constraintsOp,
+                                                    assignmentMap)) {
+    MLIRContext *ctx = constraintsOp.getContext();
+    Builder b(ctx);
+    SmallVector<NamedAttribute> entries;
+    entries.reserve(merged->size());
+    for (const auto &entry : *merged) {
+      entries.emplace_back(StringAttr::get(ctx, entry.first),
+                           b.getI64IntegerAttr(entry.second));
+    }
+    return DictionaryAttr::get(ctx, entries);
+  }
+  return assignments;
+}
+
+DictionaryAttr PipelineAttr::mergeMaterializedKnobsForMaterialization(
+    Operation *constraintsOperation, DictionaryAttr materializedKnobs) const {
+  auto constraintsOp = cast<IREE::Codegen::ConstraintsOp>(constraintsOperation);
+  return mergeMaterializedKnobsWithExistingDispatchConfig(constraintsOp,
+                                                          materializedKnobs);
 }
 
 LogicalResult
