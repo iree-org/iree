@@ -171,7 +171,7 @@ func.func @conv_e2e_generated_violation_tf(
           workgroup = [1, 1, 48, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
-          subgroup = [0, 1, 1, 1, 0, 0, 0]}>,
+          subgroup = [1, 1, 1, 1, 0, 0, 0]}>,
       root_op = #iree_codegen.root_op<set = 1>,
       strides = dense<1> : tensor<2xi64>}
       ins(%input, %filter : tensor<1x18x130x64xf32>,

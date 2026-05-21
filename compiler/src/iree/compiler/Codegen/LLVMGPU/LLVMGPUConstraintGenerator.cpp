@@ -49,16 +49,16 @@ struct RootOpLoopInfo {
 // These names are aligned with lowering config and translation info fields.
 
 // Lowering config knob list for VectorDistribute (VD):
-//   workgroup = [wg_#, wg_#, ...]
-//   reduction = [..., ..., red_#]
+//   workgroup = [wg_#, wg_#, ...], only innermost M and N dims are knobbed.
+//   reduction = [..., ..., red_#], only innermost K dim is knobbed.
 //   mma_kind = mma_idx
 //   subgroup_basis = [[..., sg_m_cnt, sg_n_cnt, ...], [0, 1, 2, ...]]
 
 // Lowering config knob list for TileAndFuse (TF):
-//   workgroup = [wg_#, wg_#, ...]
-//   reduction = [..., ..., red_#]
+//   workgroup = [wg_#, wg_#, ...], B, M, N dims are knobbed.
+//   reduction = [..., ..., red_#], only innermost K dim is knobbed.
 //   mma_kind = mma_idx
-//   subgroup = [sg_#, sg_#, ...]
+//   subgroup = [sg_#, sg_#, ...], M and N dims are knobbed.
 
 // Translation info knob list (shared by both pipelines):
 //   workgroup_size = [wg_size_x, wg_size_y, wg_size_z]
@@ -125,26 +125,6 @@ static void assertBounds(OpBuilder &builder, Location loc, Value val,
             llvm::join_items("", name, " <= ", hiName));
 }
 
-/// Helper to build a knob variable name from a prefix.
-/// e.g. ("wg_", 2) -> "wg_2".
-static std::string makeVarName(StringRef prefix, unsigned idx) {
-  return (prefix + Twine(idx)).str();
-}
-
-/// Helper to create an i64 IntegerAttr with a fixed value.
-static IntegerAttr makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
-  return IntegerAttr::get(IntegerType::get(ctx, 64), value);
-}
-
-/// Emit product(values), returning 1 for an empty range.
-static Value emitProduct(OpBuilder &builder, Location loc,
-                         ArrayRef<Value> values) {
-  if (values.empty()) {
-    return mkIntConst(builder, loc, 1);
-  }
-  return smt::IntMulOp::create(builder, loc, values);
-}
-
 /// Emit ceil(lhs / rhs) * rhs.
 static Value emitAlignUpToMultiple(OpBuilder &builder, Location loc, Value lhs,
                                    Value rhs) {
@@ -154,6 +134,43 @@ static Value emitAlignUpToMultiple(OpBuilder &builder, Location loc, Value lhs,
       smt::IntAddOp::create(builder, loc, ValueRange{lhs, rhsMinusOne});
   Value div = smt::IntDivOp::create(builder, loc, lhsPlus, rhs);
   return smt::IntMulOp::create(builder, loc, ValueRange{div, rhs});
+}
+
+/// Emit product(values[0], values[1], ..., values[n-1]).
+static Value emitProduct(OpBuilder &builder, Location loc,
+                         ArrayRef<Value> values) {
+  Value prod = mkIntConst(builder, loc, 1);
+  for (Value value : values) {
+    prod = smt::IntMulOp::create(builder, loc, ValueRange{prod, value});
+  }
+  return prod;
+}
+
+/// Get the LHS and RHS operand element-type byte sizes of a linalg op as SMT
+/// int constants.
+static std::pair<Value, Value>
+getLhsRhsOperandBytes(OpBuilder &builder, Location loc,
+                      linalg::LinalgOp linalgOp) {
+  auto lhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
+  auto rhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType());
+  Value lhsBytes =
+      mkIntConst(builder, loc, lhsType.getElementTypeBitWidth() / 8);
+  Value rhsBytes =
+      mkIntConst(builder, loc, rhsType.getElementTypeBitWidth() / 8);
+  return {lhsBytes, rhsBytes};
+}
+
+/// Helper to build a knob variable name from a prefix.
+/// e.g. ("wg_", 2) -> "wg_2".
+static std::string makeVarName(StringRef prefix, unsigned idx) {
+  return (prefix + Twine(idx)).str();
+}
+
+/// Helper to create an i64 IntegerAttr with a fixed value.
+static IntegerAttr makeIntAttr(MLIRContext *ctx, int64_t value = 0) {
+  return IntegerAttr::get(IntegerType::get(ctx, 64), value);
 }
 
 /// Get unique compatible MMA attrs for matmul and conv ops.
@@ -703,48 +720,64 @@ static LogicalResult emitTileAndFuseConstraints(
   Value maxSharedMemVal =
       mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
   Value maxVGPRsVal = mkIntConst(builder, loc, 512);
-  Value one = mkIntConst(builder, loc, 1);
-  Value thirtyTwo = mkIntConst(builder, loc, 32);
-  Value ten = mkIntConst(builder, loc, 10);
 
-  // Only innermost M and N dims are constrained, same as VectorDistribute.
-  unsigned mDim = dims.m.back();
-  unsigned nDim = dims.n.back();
-  unsigned kDim = dims.k.back();
-  std::string wgMName = makeVarName(kKnobWgPrefix, mDim);
-  std::string wgNName = makeVarName(kKnobWgPrefix, nDim);
-  std::string mDimName = makeVarName(kLoopRangePrefix, mDim);
-  std::string nDimName = makeVarName(kLoopRangePrefix, nDim);
+  // Innermost M, N, K dims.
+  unsigned mInnerDim = dims.m.back();
+  unsigned nInnerDim = dims.n.back();
+  unsigned kInnerDim = dims.k.back();
+  std::string wgMInnerName = makeVarName(kKnobWgPrefix, mInnerDim);
+  std::string wgNInnerName = makeVarName(kKnobWgPrefix, nInnerDim);
+  std::string redKInnerName = makeVarName(kKnobRedPrefix, kInnerDim);
+  std::string kInnerDimName = makeVarName(kLoopRangePrefix, kInnerDim);
+  std::string sgMInnerName = makeVarName(kKnobSgPrefix, mInnerDim);
+  std::string sgNInnerName = makeVarName(kKnobSgPrefix, nInnerDim);
 
   // Create top-level knobs from lowering and translation configs.
-  Value wgM = mkKnob(builder, loc, wgMName);
-  Value wgN = mkKnob(builder, loc, wgNName);
-  Value sgMInner = mkKnob(builder, loc, makeVarName(kKnobSgPrefix, mDim));
-  Value sgNInner = mkKnob(builder, loc, makeVarName(kKnobSgPrefix, nDim));
+  SmallVector<unsigned> wgMNBDims;
+  llvm::append_range(wgMNBDims, dims.m);
+  llvm::append_range(wgMNBDims, dims.n);
+  llvm::append_range(wgMNBDims, dims.b);
+  SmallVector<unsigned> sgMNDims;
+  llvm::append_range(sgMNDims, dims.m);
+  llvm::append_range(sgMNDims, dims.n);
+  auto createKnobsByDim = [&](ArrayRef<unsigned> dimList,
+                              StringRef knobPrefix) -> SmallVector<Value> {
+    SmallVector<Value> knobsByDim(smtDimArgs.size());
+    for (unsigned dim : dimList) {
+      knobsByDim[dim] = mkKnob(builder, loc, makeVarName(knobPrefix, dim));
+    }
+    return knobsByDim;
+  };
+  SmallVector<Value> wgKnobsByDim = createKnobsByDim(wgMNBDims, kKnobWgPrefix);
+  SmallVector<Value> sgKnobsByDim = createKnobsByDim(sgMNDims, kKnobSgPrefix);
+  Value wgMInner = wgKnobsByDim[mInnerDim];
+  Value wgNInner = wgKnobsByDim[nInnerDim];
+  Value sgM = sgKnobsByDim[mInnerDim];
+  Value sgN = sgKnobsByDim[nInnerDim];
+  Value redK = mkKnob(builder, loc, redKInnerName);
   Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
   Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
 
-  // Create MMA shape lookup values from `mma_idx`.
-  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
-      emitMMALookup(builder, loc, compatibleMMAs);
-
-  // Create reduction tile knob for innermost K only.
-  Value redK = mkKnob(builder, loc, makeVarName(kKnobRedPrefix, kDim));
-
   // Create intermediate variables.
   // Do not create these as knobs because they are not in the knob dict
   // and would fail constraint verification.
-  Value prodKTiles = redK;
+  // mma_m, mma_n, mma_k
+  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
+      emitMMALookup(builder, loc, compatibleMMAs);
   Value sgMDenom =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgMInner, mmaMLookup});
+      smt::IntMulOp::create(builder, loc, ValueRange{sgM, mmaMLookup});
   Value sgNDenom =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgNInner, mmaNLookup});
-  Value sgMCnt = smt::IntDivOp::create(builder, loc, wgM, sgMDenom);
-  Value sgNCnt = smt::IntDivOp::create(builder, loc, wgN, sgNDenom);
+      smt::IntMulOp::create(builder, loc, ValueRange{sgN, mmaNLookup});
+  // sg_m_cnt = wg_m / (sg_m * mma_m)
+  Value sgMCnt = smt::IntDivOp::create(builder, loc, wgMInner, sgMDenom);
+  // sg_n_cnt = wg_n / (sg_n * mma_n)
+  Value sgNCnt = smt::IntDivOp::create(builder, loc, wgNInner, sgNDenom);
+  // sg_num = sg_m_cnt * sg_n_cnt
   Value subgroups =
       smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
+  // total_threads = sg_m_cnt * sg_n_cnt * sg_size
   Value totalThreads =
       smt::IntMulOp::create(builder, loc, ValueRange{subgroups, sgSize});
 
@@ -753,124 +786,165 @@ static LogicalResult emitTileAndFuseConstraints(
   Value sgSizeEq = smt::EqOp::create(builder, loc, sgSize, subgroupSizeVal);
   AssertOp::create(builder, loc, sgSizeEq,
                    "sg_size == preferred_subgroup_size");
-  // Constraint 1: Tile size must divide problem size.
-  // dim % wg_tile == 0 for innermost M/N loops and packed inner K alignment.
+
+  // Constraint 1: Workgroup Tiles.
+  // Basic constraints for both outer and innermost M and N tiles.
+  for (unsigned dim : wgMNBDims) {
+    std::string wgName = makeVarName(kKnobWgPrefix, dim);
+    std::string problemName = makeVarName(kLoopRangePrefix, dim);
+    std::string sgName = makeVarName(kKnobSgPrefix, dim);
+    Value wg = wgKnobsByDim[dim];
+    Value sg = sgKnobsByDim[dim];
+    // dim % wg == 0.
+    assertDivisible(
+        builder, loc, smtDimArgs[dim], wg,
+        llvm::join_items("", problemName, " must be divisible by ", wgName));
+    // 1 <= wg <= dim
+    assertBounds(builder, loc, wg, wgName, mkIntConst(builder, loc, 1), "1",
+                 smtDimArgs[dim], problemName);
+    // wg % sg == 0.
+    assertDivisible(
+        builder, loc, wg, sg,
+        llvm::join_items("", wgName, " must be divisible by ", sgName));
+  }
+  // Extra constraints for innermost M and N tiles.
+  // wg >= mma
+  assertCmp(builder, loc, smt::IntPredicate::ge, wgMInner, mmaMLookup,
+            llvm::join_items("", wgMInnerName, " >= mma_m"));
+  assertCmp(builder, loc, smt::IntPredicate::ge, wgNInner, mmaNLookup,
+            llvm::join_items("", wgNInnerName, " >= mma_n"));
+  // wg % mma == 0.
   assertDivisible(
-      builder, loc, smtDimArgs[mDim], wgM,
-      llvm::join_items("", mDimName, " must be divisible by ", wgMName));
+      builder, loc, wgMInner, mmaMLookup,
+      llvm::join_items("", wgMInnerName, " must be divisible by mma_m"));
   assertDivisible(
-      builder, loc, smtDimArgs[nDim], wgN,
-      llvm::join_items("", nDimName, " must be divisible by ", wgNName));
-
-  // Align the innermost K problem size to the chosen intrinsic K.
-  Value kInnerAligned =
-      emitAlignUpToMultiple(builder, loc, smtDimArgs[kDim], mmaKLookup);
-
-  // Constraint 4: Reduction tile structure.
-  // Only innermost K is a knob. Outer K dims are fixed to unit tile in knobs.
-  Value packedK =
-      smt::IntMulOp::create(builder, loc, ValueRange{redK, mmaKLookup});
-  assertCmp(builder, loc, smt::IntPredicate::le, packedK, kInnerAligned,
-            "inner packed k tile <= aligned k dim");
-  assertDivisible(builder, loc, kInnerAligned, packedK,
-                  "aligned inner k dim must be divisible by packed k tile");
-
-  // Constraint 2: Tile size bounds.
-  // 1 <= tile <= dim and inner M/N are intrinsic-aligned.
-  assertBounds(builder, loc, wgM, wgMName, one, "1", smtDimArgs[mDim],
-               mDimName);
-  assertBounds(builder, loc, wgN, wgNName, one, "1", smtDimArgs[nDim],
-               nDimName);
-  assertCmp(builder, loc, smt::IntPredicate::ge, wgM, mmaMLookup,
-            "inner m tile >= mma_m");
-  assertCmp(builder, loc, smt::IntPredicate::ge, wgN, mmaNLookup,
-            "inner n tile >= mma_n");
-  assertDivisible(builder, loc, wgM, mmaMLookup,
-                  llvm::join_items("", wgMName, " must be divisible by mma_m"));
-  assertDivisible(builder, loc, wgN, mmaNLookup,
-                  llvm::join_items("", wgNName, " must be divisible by mma_n"));
-
-  // Constraint 3: Tile size decomposition.
-  // Inner subgroup tiles and full M/N tile products must decompose into
-  // subgroup tiles, subgroup counts, and intrinsic shape.
-  assertCmp(builder, loc, smt::IntPredicate::ge, sgMInner, one,
-            "sg_m_inner >= 1");
-  assertCmp(builder, loc, smt::IntPredicate::ge, sgNInner, one,
-            "sg_n_inner >= 1");
+      builder, loc, wgNInner, mmaNLookup,
+      llvm::join_items("", wgNInnerName, " must be divisible by mma_n"));
+  // wg % (sg * mma) == 0
   Value mInnerDiv =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgMInner, mmaMLookup});
+      smt::IntMulOp::create(builder, loc, ValueRange{sgM, mmaMLookup});
   Value nInnerDiv =
-      smt::IntMulOp::create(builder, loc, ValueRange{sgNInner, mmaNLookup});
-  assertDivisible(builder, loc, wgM, mInnerDiv,
-                  "inner m tile must be divisible by subgroup_m_inner * mma_m");
-  assertDivisible(builder, loc, wgN, nInnerDiv,
-                  "inner n tile must be divisible by subgroup_n_inner * mma_n");
-  Value mDecompRhs = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgMInner, sgMCnt, mmaMLookup});
-  Value nDecompRhs = smt::IntMulOp::create(
-      builder, loc, ValueRange{sgNInner, sgNCnt, mmaNLookup});
-  Value mDecompEq = smt::EqOp::create(builder, loc, wgM, mDecompRhs);
-  Value nDecompEq = smt::EqOp::create(builder, loc, wgN, nDecompRhs);
-  AssertOp::create(builder, loc, mDecompEq,
-                   "prod_m_tiles == prod_subgroup_m_tiles * sg_m_cnt * mma_m");
-  AssertOp::create(builder, loc, nDecompEq,
-                   "prod_n_tiles == prod_subgroup_n_tiles * sg_n_cnt * mma_n");
+      smt::IntMulOp::create(builder, loc, ValueRange{sgN, mmaNLookup});
+  assertDivisible(builder, loc, wgMInner, mInnerDiv,
+                  llvm::join_items("", wgMInnerName, " must be divisible by ",
+                                   sgMInnerName, " * mma_m"));
+  assertDivisible(builder, loc, wgNInner, nInnerDiv,
+                  llvm::join_items("", wgNInnerName, " must be divisible by ",
+                                   sgNInnerName, " * mma_n"));
+  // Product constraints for all M and N tiles.
+  // prod(wg) <= max_vgprs
+  auto buildWgProd = [&](ArrayRef<unsigned> axisDims) -> Value {
+    SmallVector<Value> values;
+    for (unsigned dim : axisDims) {
+      values.push_back(wgKnobsByDim[dim]);
+    }
+    return emitProduct(builder, loc, values);
+  };
+  Value wgMProd = buildWgProd(dims.m);
+  Value wgNProd = buildWgProd(dims.n);
+  assertCmp(builder, loc, smt::IntPredicate::le, wgMProd, maxVGPRsVal,
+            "prod(wg_m) <= 512 (max_vgprs)");
+  assertCmp(builder, loc, smt::IntPredicate::le, wgNProd, maxVGPRsVal,
+            "prod(wg_n) <= 512 (max_vgprs)");
 
-  // Constraint 4: Subgroup count bounds.
-  assertBounds(builder, loc, sgMCnt, "sg_m_cnt", one, "1", thirtyTwo, "32");
-  assertBounds(builder, loc, sgNCnt, "sg_n_cnt", one, "1", thirtyTwo, "32");
-  // Keep current tuner-compatible subgroup range.
-  assertBounds(builder, loc, subgroups, "sg_num", one, "1", ten, "10");
+  // prod(wg) == prod(sg * sg_cnt * mma)
+  auto buildSgProd = [&](ArrayRef<unsigned> axisDims) -> Value {
+    SmallVector<Value> values;
+    for (unsigned dim : axisDims) {
+      values.push_back(sgKnobsByDim[dim]);
+    }
+    return emitProduct(builder, loc, values);
+  };
+  Value allSgMProd = buildSgProd(dims.m);
+  Value allSgNProd = buildSgProd(dims.n);
+  Value mRhsProd = smt::IntMulOp::create(
+      builder, loc, ValueRange{allSgMProd, sgMCnt, mmaMLookup});
+  Value nRhsProd = smt::IntMulOp::create(
+      builder, loc, ValueRange{allSgNProd, sgNCnt, mmaNLookup});
+  Value mProdEq = smt::EqOp::create(builder, loc, wgMProd, mRhsProd);
+  Value nProdEq = smt::EqOp::create(builder, loc, wgNProd, nRhsProd);
+  AssertOp::create(builder, loc, mProdEq,
+                   "prod(wg_m) == prod(sg_m) * sg_m_cnt * mma_m");
+  AssertOp::create(builder, loc, nProdEq,
+                   "prod(wg_n) == prod(sg_n) * sg_n_cnt * mma_n");
+  // Batch dim tile constraints.
+  // TODO: This constraint can be expanded to allow wg_b values other than 1.
+  // wg_b == 1
+  for (auto dim : dims.b) {
+    std::string wgBatchName = makeVarName(kKnobWgPrefix, dim);
+    Value wgBatch = wgKnobsByDim[dim];
+    Value batchEqOne =
+        smt::EqOp::create(builder, loc, wgBatch, mkIntConst(builder, loc, 1));
+    AssertOp::create(builder, loc, batchEqOne,
+                     llvm::join_items("", wgBatchName, " == 1"));
+  }
 
-  // Constraint 5: Thread count limit.
+  // Constraint 2: Reduction Tile.
+  // aligned_dim_k % red_k == 0, aligned_dim_k = ceil(dim_k / mma_k) * mma_k
+  // problemInnerKAligned = ceil(dim_k / mma_k) * mma_k.
+  Value problemInnerKAligned =
+      emitAlignUpToMultiple(builder, loc, smtDimArgs[kInnerDim], mmaKLookup);
+  assertDivisible(builder, loc, problemInnerKAligned, redK,
+                  llvm::join_items("", "aligned inner k dim ", kInnerDimName,
+                                   " must be divisible by ", redKInnerName));
+  // red_k <= max_vgprs
+  assertCmp(builder, loc, smt::IntPredicate::le, redK, maxVGPRsVal,
+            llvm::join_items("", redKInnerName, " <= 512 (max_vgprs)"));
+  // red_k <= aligned_dim_k
+  assertCmp(builder, loc, smt::IntPredicate::le, redK, problemInnerKAligned,
+            llvm::join_items("", redKInnerName, " <= aligned k dim"));
+  // unpacked_k >= 1, unpacked_k = red_k / mma_k
+  Value unpackedK = smt::IntDivOp::create(builder, loc, redK, mmaKLookup);
+  assertCmp(builder, loc, smt::IntPredicate::ge, unpackedK,
+            mkIntConst(builder, loc, 1),
+            llvm::join_items("", "1 <= ", redKInnerName, " / mma_k"));
+
+  // Constraint 3: Subgroup tile size.
+  // sg >= 1 for M and N tiles.
+  for (unsigned dim : sgMNDims) {
+    std::string sgName = makeVarName(kKnobSgPrefix, dim);
+    Value sg = sgKnobsByDim[dim];
+    assertCmp(builder, loc, smt::IntPredicate::ge, sg,
+              mkIntConst(builder, loc, 1),
+              llvm::join_items("", sgName, " >= 1"));
+  }
+  // 1 <= sg_cnt <= 32
+  assertBounds(builder, loc, sgMCnt, "sg_m_cnt", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 32), "32");
+  assertBounds(builder, loc, sgNCnt, "sg_n_cnt", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 32), "32");
+  // 1 <= sg_num <= 10
+  assertBounds(builder, loc, subgroups, "sg_num", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 10), "10");
+
+  // Constraint 4: Thread count limit.
   // sg_m_cnt * sg_n_cnt * sg_size <= max_threads.
   assertCmp(builder, loc, smt::IntPredicate::le, totalThreads, maxThreadsVal,
             "total_threads <= max_threads");
 
-  // Constraint 6: Shared memory limit.
-  // Use promoted operand memory (LHS + RHS) with packed-K scaling.
-  auto lhsType =
-      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
-  auto rhsType =
-      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType());
-  Value lhsBytes =
-      mkIntConst(builder, loc, lhsType.getElementTypeBitWidth() / 8);
-  Value rhsBytes =
-      mkIntConst(builder, loc, rhsType.getElementTypeBitWidth() / 8);
-  Value lhsElems =
-      smt::IntMulOp::create(builder, loc, ValueRange{wgM, prodKTiles});
-  Value rhsElems =
-      smt::IntMulOp::create(builder, loc, ValueRange{wgN, prodKTiles});
-  Value lhsMem =
-      smt::IntMulOp::create(builder, loc, ValueRange{lhsBytes, lhsElems});
-  Value rhsMem =
-      smt::IntMulOp::create(builder, loc, ValueRange{rhsBytes, rhsElems});
+  // Constraint 5: Shared memory limit.
+  // (lhs_bytes * wg_m * red_k) + (rhs_bytes * wg_n * red_k)
+  auto [lhsBytesVal, rhsBytesVal] =
+      getLhsRhsOperandBytes(builder, loc, linalgOp);
+  Value lhsMem = smt::IntMulOp::create(builder, loc,
+                                       ValueRange{lhsBytesVal, wgMInner, redK});
+  Value rhsMem = smt::IntMulOp::create(builder, loc,
+                                       ValueRange{rhsBytesVal, wgNInner, redK});
   Value totalSharedMem =
       smt::IntAddOp::create(builder, loc, ValueRange{lhsMem, rhsMem});
-  Value packedSharedMem = smt::IntMulOp::create(
-      builder, loc, ValueRange{totalSharedMem, mmaKLookup});
-  assertCmp(builder, loc, smt::IntPredicate::le, packedSharedMem,
+  assertCmp(builder, loc, smt::IntPredicate::le, totalSharedMem,
             maxSharedMemVal, "shared memory must fit in workgroup memory");
 
-  // Constraint 7: TranslationInfo workgroup structure.
+  // Constraint 6: TranslationInfo workgroup structure.
   // For TileAndFuse, workgroup_size = [total_threads, 1, 1].
   Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, totalThreads);
   AssertOp::create(builder, loc, wgXEq, "wg_size_x == total_threads");
-  Value wgYEq = smt::EqOp::create(builder, loc, wgSizeY, one);
+  Value wgYEq =
+      smt::EqOp::create(builder, loc, wgSizeY, mkIntConst(builder, loc, 1));
   AssertOp::create(builder, loc, wgYEq, "wg_size_y == 1");
-  Value wgZEq = smt::EqOp::create(builder, loc, wgSizeZ, one);
+  Value wgZEq =
+      smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
   AssertOp::create(builder, loc, wgZEq, "wg_size_z == 1");
-
-  // Constraint 8: Additional heuristic filters to narrow the search space.
-  // Keep product bounds from the tuner reference.
-  assertCmp(builder, loc, smt::IntPredicate::le, wgM, maxVGPRsVal,
-            "prod_m_tiles <= 512");
-  assertCmp(builder, loc, smt::IntPredicate::le, wgN, maxVGPRsVal,
-            "prod_n_tiles <= 512");
-  Value kProdLimit =
-      smt::IntMulOp::create(builder, loc, ValueRange{prodKTiles, mmaKLookup});
-  assertCmp(builder, loc, smt::IntPredicate::le, kProdLimit, maxVGPRsVal,
-            "prod_k_tiles * mma_k <= 512");
 
   return success();
 }
