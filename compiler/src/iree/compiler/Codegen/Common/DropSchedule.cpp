@@ -7,23 +7,15 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_DROPSCHEDULEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
+
 namespace {
 
-struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DropSchedulePass)
-
-  StringRef getArgument() const final {
-    return "transform-dialect-drop-schedule";
-  }
-
-  StringRef getDescription() const final {
-    return "Drop the schedule from the operation";
-  }
-
+struct DropSchedulePass : public impl::DropSchedulePassBase<DropSchedulePass> {
   bool canScheduleOn(RegisteredOperationName opName) const override {
     return true;
   }
@@ -54,12 +46,6 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
     }
   }
 };
+
 } // namespace
-
-std::unique_ptr<Pass> createDropSchedulePass() {
-  return std::make_unique<DropSchedulePass>();
-}
-
-void registerDropSchedulePass() { PassRegistration<DropSchedulePass>(); }
-
 } // namespace mlir::iree_compiler
