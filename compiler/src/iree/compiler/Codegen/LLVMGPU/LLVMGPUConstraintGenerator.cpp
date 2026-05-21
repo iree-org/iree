@@ -47,10 +47,28 @@ struct RootOpLoopInfo {
 
 // Keys for entries in the SMT constraints `knobs` dictionary.
 // These names are aligned with lowering config and translation info fields.
+
+// Lowering config knob list for VectorDistribute (VD):
+//   workgroup = [wg_#, wg_#, ...], only innermost M and N dims are knobbed.
+//   reduction = [..., ..., red_#], only innermost K dim is knobbed.
+//   mma_kind = mma_idx
+//   subgroup_basis = [[..., sg_m_cnt, sg_n_cnt, ...], [0, 1, 2, ...]]
+
+// Lowering config knob list for TileAndFuse (TF):
+//   workgroup = [wg_#, wg_#, ...], B, M, N dims are knobbed.
+//   reduction = [..., ..., red_#], only innermost K dim is knobbed.
+//   mma_kind = mma_idx
+//   subgroup = [sg_#, sg_#, ...], M and N dims are knobbed.
+
+// Translation info knob list (shared by both pipelines):
+//   workgroup_size = [wg_size_x, wg_size_y, wg_size_z]
+//   subgroup_size = sg_size
+
 constexpr StringLiteral kKnobWorkgroupKey = "workgroup";
 constexpr StringLiteral kKnobReductionKey = "reduction";
 constexpr StringLiteral kKnobMmaKindKey = "mma_kind";
 constexpr StringLiteral kKnobSubgroupBasisKey = "subgroup_basis";
+constexpr StringLiteral kKnobSubgroupKey = "subgroup";
 constexpr StringLiteral kKnobWorkgroupSizeKey = "workgroup_size";
 constexpr StringLiteral kKnobSubgroupSizeKey = "subgroup_size";
 
@@ -63,10 +81,12 @@ constexpr StringLiteral kKnobWgSizeXName = "wg_size_x";
 constexpr StringLiteral kKnobWgSizeYName = "wg_size_y";
 constexpr StringLiteral kKnobWgSizeZName = "wg_size_z";
 
-// SMT variable name prefixes. The loop dim count varies
-// per problem, so names are built at runtime as prefix + dim idx.
+// SMT variable name prefixes.
+// The loop dim count varies per problem, so names are built at runtime
+// as prefix + dim idx, for example: wg_0, red_1, sg_0, etc.
 constexpr StringLiteral kKnobWgPrefix = "wg_";
 constexpr StringLiteral kKnobRedPrefix = "red_";
+constexpr StringLiteral kKnobSgPrefix = "sg_";
 
 // Default value for dims that are not knobbed.
 constexpr int64_t kNoTileDimVal = 0;
@@ -103,6 +123,43 @@ static void assertBounds(OpBuilder &builder, Location loc, Value val,
             llvm::join_items("", name, " >= ", loName));
   assertCmp(builder, loc, smt::IntPredicate::le, val, hi,
             llvm::join_items("", name, " <= ", hiName));
+}
+
+/// Emit ceil(lhs / rhs) * rhs.
+static Value emitAlignUpToMultiple(OpBuilder &builder, Location loc, Value lhs,
+                                   Value rhs) {
+  Value one = mkIntConst(builder, loc, 1);
+  Value rhsMinusOne = smt::IntSubOp::create(builder, loc, rhs, one);
+  Value lhsPlus =
+      smt::IntAddOp::create(builder, loc, ValueRange{lhs, rhsMinusOne});
+  Value div = smt::IntDivOp::create(builder, loc, lhsPlus, rhs);
+  return smt::IntMulOp::create(builder, loc, ValueRange{div, rhs});
+}
+
+/// Emit product(values[0], values[1], ..., values[n-1]).
+static Value emitProduct(OpBuilder &builder, Location loc,
+                         ArrayRef<Value> values) {
+  Value prod = mkIntConst(builder, loc, 1);
+  for (Value value : values) {
+    prod = smt::IntMulOp::create(builder, loc, ValueRange{prod, value});
+  }
+  return prod;
+}
+
+/// Get the LHS and RHS operand element-type byte sizes of a linalg op as SMT
+/// int constants.
+static std::pair<Value, Value>
+getLhsRhsOperandBytes(OpBuilder &builder, Location loc,
+                      linalg::LinalgOp linalgOp) {
+  auto lhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(0)->get().getType());
+  auto rhsType =
+      cast<ShapedType>(linalgOp.getDpsInputOperand(1)->get().getType());
+  Value lhsBytes =
+      mkIntConst(builder, loc, lhsType.getElementTypeBitWidth() / 8);
+  Value rhsBytes =
+      mkIntConst(builder, loc, rhsType.getElementTypeBitWidth() / 8);
+  return {lhsBytes, rhsBytes};
 }
 
 /// Helper to build a knob variable name from a prefix.
@@ -177,7 +234,8 @@ getCompatibleMMAAttrs(linalg::LinalgOp op, IREE::GPU::TargetAttr gpuTarget,
 /// Get contraction-like (m,n,k) dims for a linalg op.
 /// Only supports contraction and convolution today.
 static FailureOr<ContractionLikeDims>
-inferContractionLikeDims(linalg::LinalgOp linalgOp) {
+inferContractionLikeDims(linalg::LinalgOp linalgOp,
+                         IREE::GPU::LoweringPipeline pipeline) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
     FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
         mlir::linalg::inferContractionDims(linalgOp);
@@ -192,19 +250,44 @@ inferContractionLikeDims(linalg::LinalgOp linalgOp) {
   if (linalg::isaConvolutionOpInterface(linalgOp)) {
     FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
         mlir::linalg::inferConvolutionDims(linalgOp);
-    if (failed(convolutionDims) || convolutionDims->outputImage.empty() ||
-        convolutionDims->outputChannel.empty() ||
-        convolutionDims->inputChannel.empty()) {
+    if (failed(convolutionDims)) {
       return failure();
     }
-    // TODO(Amily): This mapping aligns with how VectorDistribute
-    // sets the dims for convs. It may be too coarse for conv
-    // semantics; revisit when plumbing through conv constraint
-    // generation.
-    return ContractionLikeDims{llvm::to_vector(convolutionDims->batch),
-                               llvm::to_vector(convolutionDims->outputImage),
-                               llvm::to_vector(convolutionDims->outputChannel),
-                               llvm::to_vector(convolutionDims->inputChannel)};
+    if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+      if (convolutionDims->outputImage.empty() ||
+          convolutionDims->outputChannel.empty() ||
+          convolutionDims->inputChannel.empty()) {
+        return failure();
+      }
+      // TODO(Amily): This mapping aligns with how VectorDistribute sets conv
+      // dims. It may be too coarse for conv semantics and should be revisited
+      // when conv constraint generation is fully plumbed.
+      return ContractionLikeDims{
+          llvm::to_vector(convolutionDims->batch),
+          llvm::to_vector(convolutionDims->outputImage),
+          llvm::to_vector(convolutionDims->outputChannel),
+          llvm::to_vector(convolutionDims->inputChannel)};
+    }
+    if (pipeline == IREE::GPU::LoweringPipeline::TileAndFuse) {
+      if (convolutionDims->outputChannel.empty() ||
+          convolutionDims->inputChannel.empty() ||
+          convolutionDims->filterLoop.empty() ||
+          convolutionDims->outputImage.empty()) {
+        return failure();
+      }
+      // Match TileAndFuse conv mapping.
+      SmallVector<unsigned> mDims;
+      llvm::append_range(mDims, convolutionDims->batch);
+      llvm::append_range(mDims, convolutionDims->outputImage);
+      llvm::sort(mDims);
+      SmallVector<unsigned> kDims;
+      llvm::append_range(kDims, convolutionDims->filterLoop);
+      llvm::append_range(kDims, convolutionDims->inputChannel);
+      return ContractionLikeDims{
+          llvm::to_vector(convolutionDims->depth), mDims,
+          llvm::to_vector(convolutionDims->outputChannel), kDims};
+    }
+    return failure();
   }
   return failure();
 }
@@ -282,6 +365,74 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
       ArrayAttr::get(ctx, {ArrayAttr::get(ctx, subgroupCounts),
                            ArrayAttr::get(ctx, subgroupMapping)});
   knobsEntries.emplace_back(kKnobSubgroupBasisKey, subgroupBasis);
+
+  // Add workgroup size and subgroup size at the top level.
+  SmallVector<Attribute> wgSizeKnobs = {
+      IntKnobAttr::get(ctx, kKnobWgSizeXName),
+      IntKnobAttr::get(ctx, kKnobWgSizeYName),
+      IntKnobAttr::get(ctx, kKnobWgSizeZName)};
+  knobsEntries.emplace_back(kKnobWorkgroupSizeKey,
+                            ArrayAttr::get(ctx, wgSizeKnobs));
+  knobsEntries.emplace_back(kKnobSubgroupSizeKey,
+                            IntKnobAttr::get(ctx, kKnobSgSizeName));
+
+  return DictionaryAttr::get(ctx, knobsEntries);
+}
+
+/// Build the TileAndFuse knobs dict for contraction-like dims.
+static DictionaryAttr
+buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                          const ContractionLikeDims &dims,
+                          ArrayRef<Attribute> compatibleMMAs) {
+  SmallVector<NamedAttribute> knobsEntries;
+
+  // Build workgroup entries.
+  // Batch, M, N dims are knobbed, K dims are not tiled and get 0.
+  SmallVector<Attribute> workgroupEntries(loopInfo.numLoops,
+                                          makeIntAttr(ctx, kNoTileDimVal));
+  SmallVector<unsigned> knobbedWorkgroupDims;
+  llvm::append_range(knobbedWorkgroupDims, dims.b);
+  llvm::append_range(knobbedWorkgroupDims, dims.m);
+  llvm::append_range(knobbedWorkgroupDims, dims.n);
+  for (unsigned i : knobbedWorkgroupDims) {
+    workgroupEntries[i] = IntKnobAttr::get(ctx, makeVarName(kKnobWgPrefix, i));
+  }
+  knobsEntries.emplace_back(kKnobWorkgroupKey,
+                            ArrayAttr::get(ctx, workgroupEntries));
+
+  // Build reduction entries.
+  // Only innermost K dim is knobbed, other K dims are unit tiled as 1.
+  // Other untiled dims get 0.
+  SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
+                                          makeIntAttr(ctx, kNoTileDimVal));
+  for (unsigned i = 0; i < loopInfo.numLoops; ++i) {
+    reductionEntries[i] = makeIntAttr(ctx, kNoTileDimVal);
+  }
+  for (unsigned i : dims.k) {
+    reductionEntries[i] = makeIntAttr(ctx, kUnitTileDimVal);
+  }
+  reductionEntries[dims.k.back()] =
+      IntKnobAttr::get(ctx, makeVarName(kKnobRedPrefix, dims.k.back()));
+  knobsEntries.emplace_back(kKnobReductionKey,
+                            ArrayAttr::get(ctx, reductionEntries));
+
+  // Build subgroup entries.
+  // M and N dims are knobbed, other untiled dims get 0.
+  SmallVector<Attribute> subgroupEntries(loopInfo.numLoops,
+                                         makeIntAttr(ctx, kNoTileDimVal));
+  SmallVector<unsigned> knobbedSubgroupDims;
+  llvm::append_range(knobbedSubgroupDims, dims.m);
+  llvm::append_range(knobbedSubgroupDims, dims.n);
+  for (unsigned i : knobbedSubgroupDims) {
+    subgroupEntries[i] = IntKnobAttr::get(ctx, makeVarName(kKnobSgPrefix, i));
+  }
+  knobsEntries.emplace_back(kKnobSubgroupKey,
+                            ArrayAttr::get(ctx, subgroupEntries));
+
+  // Add mma_kind knob.
+  knobsEntries.emplace_back(
+      kKnobMmaKindKey,
+      OneOfKnobAttr::get(ctx, kKnobMmaIdxName, compatibleMMAs));
 
   // Add workgroup size and subgroup size at the top level.
   SmallVector<Attribute> wgSizeKnobs = {
@@ -554,10 +705,276 @@ static LogicalResult emitVectorDistributeConstraints(
   return success();
 }
 
-/// Emit constraints for a single root op under the VectorDistribute pipeline.
+/// Emit TileAndFuse constraints for contraction-like dims (matmul/conv).
+static LogicalResult emitTileAndFuseConstraints(
+    OpBuilder &builder, linalg::LinalgOp linalgOp,
+    const ContractionLikeDims &dims, IREE::GPU::TargetAttr gpuTarget,
+    ArrayRef<Value> smtDimArgs, ArrayRef<Attribute> compatibleMMAs) {
+  Location loc = linalgOp.getLoc();
+
+  // Hardware constants.
+  Value subgroupSizeVal =
+      mkIntConst(builder, loc, gpuTarget.getPreferredSubgroupSize());
+  Value maxThreadsVal = mkIntConst(
+      builder, loc, gpuTarget.getWgp().getMaxThreadCountPerWorkgroup());
+  Value maxSharedMemVal =
+      mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
+  Value maxVGPRsVal = mkIntConst(builder, loc, 512);
+
+  // Innermost M, N, K dims.
+  unsigned mInnerDim = dims.m.back();
+  unsigned nInnerDim = dims.n.back();
+  unsigned kInnerDim = dims.k.back();
+  std::string wgMInnerName = makeVarName(kKnobWgPrefix, mInnerDim);
+  std::string wgNInnerName = makeVarName(kKnobWgPrefix, nInnerDim);
+  std::string redKInnerName = makeVarName(kKnobRedPrefix, kInnerDim);
+  std::string kInnerDimName = makeVarName(kLoopRangePrefix, kInnerDim);
+  std::string sgMInnerName = makeVarName(kKnobSgPrefix, mInnerDim);
+  std::string sgNInnerName = makeVarName(kKnobSgPrefix, nInnerDim);
+
+  // Create top-level knobs from lowering and translation configs.
+  SmallVector<unsigned> wgMNBDims;
+  llvm::append_range(wgMNBDims, dims.m);
+  llvm::append_range(wgMNBDims, dims.n);
+  llvm::append_range(wgMNBDims, dims.b);
+  SmallVector<unsigned> sgMNDims;
+  llvm::append_range(sgMNDims, dims.m);
+  llvm::append_range(sgMNDims, dims.n);
+  auto createKnobsByDim = [&](ArrayRef<unsigned> dimList,
+                              StringRef knobPrefix) -> SmallVector<Value> {
+    SmallVector<Value> knobsByDim(smtDimArgs.size());
+    for (unsigned dim : dimList) {
+      knobsByDim[dim] = mkKnob(builder, loc, makeVarName(knobPrefix, dim));
+    }
+    return knobsByDim;
+  };
+  SmallVector<Value> wgKnobsByDim = createKnobsByDim(wgMNBDims, kKnobWgPrefix);
+  SmallVector<Value> sgKnobsByDim = createKnobsByDim(sgMNDims, kKnobSgPrefix);
+  Value wgMInner = wgKnobsByDim[mInnerDim];
+  Value wgNInner = wgKnobsByDim[nInnerDim];
+  Value sgM = sgKnobsByDim[mInnerDim];
+  Value sgN = sgKnobsByDim[nInnerDim];
+  Value redK = mkKnob(builder, loc, redKInnerName);
+  Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
+  Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
+  Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
+  Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
+
+  // Create intermediate variables.
+  // Do not create these as knobs because they are not in the knob dict
+  // and would fail constraint verification.
+  // mma_m, mma_n, mma_k
+  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
+      emitMMALookup(builder, loc, compatibleMMAs);
+  auto buildWgProd = [&](ArrayRef<unsigned> axisDims) -> Value {
+    SmallVector<Value> values;
+    for (unsigned dim : axisDims) {
+      values.push_back(wgKnobsByDim[dim]);
+    }
+    return emitProduct(builder, loc, values);
+  };
+  auto buildSgProd = [&](ArrayRef<unsigned> axisDims) -> Value {
+    SmallVector<Value> values;
+    for (unsigned dim : axisDims) {
+      values.push_back(sgKnobsByDim[dim]);
+    }
+    return emitProduct(builder, loc, values);
+  };
+  Value wgMProd = buildWgProd(dims.m);
+  Value wgNProd = buildWgProd(dims.n);
+  Value allSgMProd = buildSgProd(dims.m);
+  Value allSgNProd = buildSgProd(dims.n);
+  Value sgMDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{allSgMProd, mmaMLookup});
+  Value sgNDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{allSgNProd, mmaNLookup});
+  smt::IntType smtIntTy = smt::IntType::get(builder.getContext());
+  auto sgMCntDecl = smt::DeclareFunOp::create(
+      builder, loc, smtIntTy, builder.getStringAttr(kKnobSgMCntName));
+  auto sgNCntDecl = smt::DeclareFunOp::create(
+      builder, loc, smtIntTy, builder.getStringAttr(kKnobSgNCntName));
+  Value sgMCnt = sgMCntDecl.getResult();
+  Value sgNCnt = sgNCntDecl.getResult();
+  // sg_num = sg_m_cnt * sg_n_cnt
+  Value subgroups =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
+  // total_threads = sg_m_cnt * sg_n_cnt * sg_size
+  Value totalThreads =
+      smt::IntMulOp::create(builder, loc, ValueRange{subgroups, sgSize});
+  // packed_k = red_k * mma_k
+  Value packedK =
+      smt::IntMulOp::create(builder, loc, ValueRange{redK, mmaKLookup});
+  // problemInnerAligned = ceil(dim / mma) * mma.
+  Value problemInnerMAligned =
+      emitAlignUpToMultiple(builder, loc, smtDimArgs[mInnerDim], mmaMLookup);
+  Value problemInnerNAligned =
+      emitAlignUpToMultiple(builder, loc, smtDimArgs[nInnerDim], mmaNLookup);
+  // problemInnerKAligned = ceil(dim_k / mma_k) * mma_k.
+  Value problemInnerKAligned =
+      emitAlignUpToMultiple(builder, loc, smtDimArgs[kInnerDim], mmaKLookup);
+
+  // Constraint 0: Set concrete values for knobs.
+  // sg_size == preferred_subgroup_size.
+  Value sgSizeEq = smt::EqOp::create(builder, loc, sgSize, subgroupSizeVal);
+  AssertOp::create(builder, loc, sgSizeEq,
+                   "sg_size == preferred_subgroup_size");
+
+  // Constraint 1: Workgroup Tiles.
+  // Basic constraints for both outer and innermost M and N tiles.
+  for (unsigned dim : wgMNBDims) {
+    std::string wgName = makeVarName(kKnobWgPrefix, dim);
+    std::string problemName = makeVarName(kLoopRangePrefix, dim);
+    std::string sgName = makeVarName(kKnobSgPrefix, dim);
+    Value wg = wgKnobsByDim[dim];
+    Value sg = sgKnobsByDim[dim];
+    Value problemDim = smtDimArgs[dim];
+    if (dim == mInnerDim) {
+      problemDim = problemInnerMAligned;
+    } else if (dim == nInnerDim) {
+      problemDim = problemInnerNAligned;
+    }
+    // dim % wg == 0.
+    assertDivisible(
+        builder, loc, problemDim, wg,
+        llvm::join_items("", problemName, " must be divisible by ", wgName));
+    // 1 <= wg <= dim
+    assertBounds(builder, loc, wg, wgName, mkIntConst(builder, loc, 1), "1",
+                 problemDim, problemName);
+    // wg % sg == 0.
+    assertDivisible(
+        builder, loc, wg, sg,
+        llvm::join_items("", wgName, " must be divisible by ", sgName));
+  }
+  // Extra constraints for innermost M and N tiles.
+  // wg >= mma
+  assertCmp(builder, loc, smt::IntPredicate::ge, wgMInner, mmaMLookup,
+            llvm::join_items("", wgMInnerName, " >= mma_m"));
+  assertCmp(builder, loc, smt::IntPredicate::ge, wgNInner, mmaNLookup,
+            llvm::join_items("", wgNInnerName, " >= mma_n"));
+  // wg % mma == 0.
+  assertDivisible(
+      builder, loc, wgMInner, mmaMLookup,
+      llvm::join_items("", wgMInnerName, " must be divisible by mma_m"));
+  assertDivisible(
+      builder, loc, wgNInner, mmaNLookup,
+      llvm::join_items("", wgNInnerName, " must be divisible by mma_n"));
+  // wg % (sg * mma) == 0
+  Value mInnerDiv =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgM, mmaMLookup});
+  Value nInnerDiv =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgN, mmaNLookup});
+  assertDivisible(builder, loc, wgMInner, mInnerDiv,
+                  llvm::join_items("", wgMInnerName, " must be divisible by ",
+                                   sgMInnerName, " * mma_m"));
+  assertDivisible(builder, loc, wgNInner, nInnerDiv,
+                  llvm::join_items("", wgNInnerName, " must be divisible by ",
+                                   sgNInnerName, " * mma_n"));
+  // Product constraints for all M and N tiles.
+  // prod(wg) <= max_vgprs
+  assertCmp(builder, loc, smt::IntPredicate::le, wgMProd, maxVGPRsVal,
+            "prod(wg_m) <= 512 (max_vgprs)");
+  assertCmp(builder, loc, smt::IntPredicate::le, wgNProd, maxVGPRsVal,
+            "prod(wg_n) <= 512 (max_vgprs)");
+
+  // prod(wg) == prod(sg) * sg_cnt * mma
+  assertDivisible(builder, loc, wgMProd, sgMDenom,
+                  "prod(wg_m) must be divisible by prod(sg_m) * mma_m");
+  assertDivisible(builder, loc, wgNProd, sgNDenom,
+                  "prod(wg_n) must be divisible by prod(sg_n) * mma_n");
+  Value mRhsProd = smt::IntMulOp::create(
+      builder, loc, ValueRange{allSgMProd, sgMCnt, mmaMLookup});
+  Value nRhsProd = smt::IntMulOp::create(
+      builder, loc, ValueRange{allSgNProd, sgNCnt, mmaNLookup});
+  Value mProdEq = smt::EqOp::create(builder, loc, wgMProd, mRhsProd);
+  Value nProdEq = smt::EqOp::create(builder, loc, wgNProd, nRhsProd);
+  AssertOp::create(builder, loc, mProdEq,
+                   "prod(wg_m) == prod(sg_m) * sg_m_cnt * mma_m");
+  AssertOp::create(builder, loc, nProdEq,
+                   "prod(wg_n) == prod(sg_n) * sg_n_cnt * mma_n");
+  // Batch dim tile constraints.
+  // TODO: This constraint can be expanded to allow wg_b values other than 1.
+  // wg_b == 1
+  for (auto dim : dims.b) {
+    std::string wgBatchName = makeVarName(kKnobWgPrefix, dim);
+    Value wgBatch = wgKnobsByDim[dim];
+    Value batchEqOne =
+        smt::EqOp::create(builder, loc, wgBatch, mkIntConst(builder, loc, 1));
+    AssertOp::create(builder, loc, batchEqOne,
+                     llvm::join_items("", wgBatchName, " == 1"));
+  }
+
+  // Constraint 2: Reduction Tile.
+  // red_k >= 1
+  assertCmp(builder, loc, smt::IntPredicate::ge, redK,
+            mkIntConst(builder, loc, 1),
+            llvm::join_items("", redKInnerName, " >= 1"));
+  // problemInnerKAligned % (packed_k) == 0
+  assertDivisible(builder, loc, problemInnerKAligned, packedK,
+                  llvm::join_items("", "aligned inner k dim ", kInnerDimName,
+                                   " must be divisible by ", redKInnerName,
+                                   " * mma_k"));
+  // packed_k <= max_vgprs
+  assertCmp(builder, loc, smt::IntPredicate::le, packedK, maxVGPRsVal,
+            llvm::join_items("", redKInnerName, " * mma_k <= 512 (max_vgprs)"));
+  // packed_k <= aligned_dim_k
+  assertCmp(builder, loc, smt::IntPredicate::le, packedK, problemInnerKAligned,
+            llvm::join_items("", redKInnerName, " * mma_k <= aligned k dim"));
+
+  // Constraint 3: Subgroup tile size.
+  // sg >= 1 for M and N tiles.
+  for (unsigned dim : sgMNDims) {
+    std::string sgName = makeVarName(kKnobSgPrefix, dim);
+    Value sg = sgKnobsByDim[dim];
+    assertCmp(builder, loc, smt::IntPredicate::ge, sg,
+              mkIntConst(builder, loc, 1),
+              llvm::join_items("", sgName, " >= 1"));
+  }
+  // 1 <= sg_cnt <= 32
+  assertBounds(builder, loc, sgMCnt, "sg_m_cnt", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 32), "32");
+  assertBounds(builder, loc, sgNCnt, "sg_n_cnt", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 32), "32");
+  // 1 <= sg_num <= 10
+  assertBounds(builder, loc, subgroups, "sg_num", mkIntConst(builder, loc, 1),
+               "1", mkIntConst(builder, loc, 10), "10");
+
+  // Constraint 4: Thread count limit.
+  // sg_m_cnt * sg_n_cnt * sg_size <= max_threads.
+  assertCmp(builder, loc, smt::IntPredicate::le, totalThreads, maxThreadsVal,
+            "total_threads <= max_threads");
+
+  // Constraint 5: Shared memory limit.
+  // (lhs_bytes * wg_m * packed_k) + (rhs_bytes * wg_n * packed_k)
+  auto [lhsBytesVal, rhsBytesVal] =
+      getLhsRhsOperandBytes(builder, loc, linalgOp);
+  Value lhsMem = smt::IntMulOp::create(
+      builder, loc, ValueRange{lhsBytesVal, wgMProd, packedK});
+  Value rhsMem = smt::IntMulOp::create(
+      builder, loc, ValueRange{rhsBytesVal, wgNProd, packedK});
+  Value totalSharedMem =
+      smt::IntAddOp::create(builder, loc, ValueRange{lhsMem, rhsMem});
+  assertCmp(builder, loc, smt::IntPredicate::le, totalSharedMem,
+            maxSharedMemVal, "shared memory must fit in workgroup memory");
+
+  // Constraint 6: TranslationInfo workgroup structure.
+  // For TileAndFuse, workgroup_size = [total_threads, 1, 1].
+  Value wgXEq = smt::EqOp::create(builder, loc, wgSizeX, totalThreads);
+  AssertOp::create(builder, loc, wgXEq, "wg_size_x == total_threads");
+  Value wgYEq =
+      smt::EqOp::create(builder, loc, wgSizeY, mkIntConst(builder, loc, 1));
+  AssertOp::create(builder, loc, wgYEq, "wg_size_y == 1");
+  Value wgZEq =
+      smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
+  AssertOp::create(builder, loc, wgZEq, "wg_size_z == 1");
+
+  return success();
+}
+
+/// Emit constraints for a single root op under a supported LLVMGPU pipeline.
 /// Only supports linalg contraction and convolution today.
 static LogicalResult
-emitVectorDistributeConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr) {
+emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
+                     IREE::GPU::LoweringPipeline pipeline) {
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -575,7 +992,8 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr) {
     return success();
   }
 
-  FailureOr<ContractionLikeDims> dims = inferContractionLikeDims(linalgOp);
+  FailureOr<ContractionLikeDims> dims =
+      inferContractionLikeDims(linalgOp, pipeline);
   if (failed(dims)) {
     return success();
   }
@@ -588,16 +1006,29 @@ emitVectorDistributeConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr) {
 
   MLIRContext *ctx = rootOp->getContext();
   OpBuilder builder(ctx);
-  DictionaryAttr knobs =
-      buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
-  auto pipelineAttr = IREE::GPU::PipelineAttr::get(
-      ctx, IREE::GPU::LoweringPipeline::VectorDistribute);
+  DictionaryAttr knobs;
+  if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+    knobs =
+        buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
+  } else if (pipeline == IREE::GPU::LoweringPipeline::TileAndFuse) {
+    knobs = buildTileAndFuseKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
+  } else {
+    return success();
+  }
+  auto pipelineAttr = IREE::GPU::PipelineAttr::get(ctx, pipeline);
   ConstraintsOpShell shell =
       createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
                                loopInfo->numLoops, loopInfo->indexingMaps);
 
-  return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
-                                         shell.smtDimArgs, compatibleMMAs);
+  if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+    return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
+                                           shell.smtDimArgs, compatibleMMAs);
+  }
+  if (pipeline == IREE::GPU::LoweringPipeline::TileAndFuse) {
+    return emitTileAndFuseConstraints(builder, linalgOp, *dims, gpuTarget,
+                                      shell.smtDimArgs, compatibleMMAs);
+  }
+  return success();
 }
 
 /// Multiple root ops may be present in a set, e.g. <set = 0>:
@@ -633,13 +1064,12 @@ LogicalResult emitLLVMGPUConstraints(Attribute attr,
 
   auto gpuPipelineAttr = cast<IREE::GPU::PipelineAttr>(attr);
 
-  // Only VectorDistribute has constraint generation today.
-  if (gpuPipelineAttr.getValue() !=
-      IREE::GPU::LoweringPipeline::VectorDistribute) {
+  IREE::GPU::LoweringPipeline pipeline = gpuPipelineAttr.getValue();
+  if (pipeline != IREE::GPU::LoweringPipeline::VectorDistribute &&
+      pipeline != IREE::GPU::LoweringPipeline::TileAndFuse) {
     return success();
   }
-
-  return emitVectorDistributeConstraintsForOp(tunableOp, opAttr);
+  return emitConstraintsForOp(tunableOp, opAttr, pipeline);
 }
 
 } // namespace mlir::iree_compiler
