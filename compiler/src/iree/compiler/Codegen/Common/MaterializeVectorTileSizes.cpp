@@ -10,7 +10,9 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/Im2colUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 #include "mlir/Analysis/DataFlow/Utils.h"
@@ -58,11 +60,11 @@ namespace mlir::iree_compiler {
 //   (backward) based on indexing maps and the mapped state is propagated.
 //
 // Duplicatable operations such as `tensor.empty`, constants, and generator
-// linalg ops (e.g. linalg.fill) are excluded from propagation entirely. CSE
-// connects otherwise unrelated compute ops by deduplicating their DPS init
-// operands to a single tensor.empty (or similar). To avoid cross-polluting the
-// vector tile size of unrelated operations, tile sizes from duplicatable
-// operations are never propagated.
+// linalg ops (e.g. linalg.fill) are split per use before analysis when they
+// feed multiple consumers. After splitting, the dataflow analysis can propagate
+// through them normally without cross-polluting unrelated uses. Equivalent
+// clones are deduplicated again after materialization if they ended up with the
+// same concrete vector tile sizes.
 //
 // For some other operations, no propagation rules are defined on purpose. For
 // example, `extract_slice` and `insert_slice` operations are natural boundaries
@@ -278,33 +280,6 @@ private:
   }
 };
 
-/// Returns true if the operation is trivially duplicatable and should not
-/// propagate tile sizes across independent consumers.
-static bool isDuplicatable(Value val) {
-  Operation *defOp = val.getDefiningOp();
-  if (!defOp) {
-    return false;
-  }
-  if (isa<tensor::EmptyOp>(defOp)) {
-    return true;
-  }
-  if (defOp->hasTrait<OpTrait::ConstantLike>()) {
-    return true;
-  }
-  // A linalg op that doesn't read any tensor data (e.g., linalg.fill or a
-  // fill-like linalg.generic broadcasting a scalar) is a generator and
-  // duplicatable.
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(defOp)) {
-    if (llvm::none_of(linalgOp->getOpOperands(), [&](OpOperand &operand) {
-          return isa<ShapedType>(operand.get().getType()) &&
-                 linalgOp.payloadUsesValueFromOperand(&operand);
-        })) {
-      return true;
-    }
-  }
-  return false;
-}
-
 //===----------------------------------------------------------------------===//
 // Lattice and analysis definitions
 //===----------------------------------------------------------------------===//
@@ -315,16 +290,13 @@ public:
 };
 
 /// Read the TileSizes from a lattice, returning empty tile sizes if the lattice
-/// value is from a duplicatable operation.
+/// value is not available.
 static TileSizes getTileSizesFor(Value val, const TileSizeLattice *lattice) {
   if (!lattice) {
     return {};
   }
   const TileSizes &tileSizes = lattice->getValue();
   if (tileSizes.empty()) {
-    return {};
-  }
-  if (isDuplicatable(val)) {
     return {};
   }
   return tileSizes;
@@ -337,6 +309,10 @@ class TileSizeForwardAnalysis
     : public dataflow::SparseForwardDataFlowAnalysis<TileSizeLattice> {
 public:
   using SparseForwardDataFlowAnalysis::SparseForwardDataFlowAnalysis;
+
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeForwardAnalysis>();
+  }
 
   void setToEntryState(TileSizeLattice *lattice) override {
     // Entry state is uninitialized (identity for join).
@@ -413,8 +389,25 @@ public:
     // so tile sizes go directly on the result lattice.
     if (auto im2colOp = dyn_cast<IREE::LinalgExt::Im2colOp>(op)) {
       OpBuilder builder(op);
+      // The dependent determines what reruns if the divisibility lattice for
+      // `val` changes below. Sparse forward analyses visit operations from the
+      // program point after the operation, so use `after(op)` to rerun this op.
+      // This dependency is not expected to affect convergence in practice:
+      // divisibility is solved to fixpoint before tile-size analysis starts.
+      ProgramPoint *dependent = getProgramPointAfter(op);
       std::optional<SmallVector<int64_t>> maybeTileSizes =
-          IREE::LinalgExt::computeIm2colVectorTileSizes(builder, im2colOp);
+          IREE::LinalgExt::computeIm2colVectorTileSizes(
+              builder, im2colOp, [this, dependent](Value val) {
+                const auto *lattice =
+                    getOrCreateFor<IREE::Util::IntegerDivisibilityLattice>(
+                        dependent, val);
+                if (!lattice || lattice->getValue().isUninitialized()) {
+                  return uint64_t{1};
+                }
+                const IREE::Util::ConstantIntDivisibility &div =
+                    lattice->getValue().getValue();
+                return div.sdiv();
+              });
       if (maybeTileSizes) {
         TileSizes tileSizes(*maybeTileSizes);
         propagateIfChanged(results[0], results[0]->join(tileSizes));
@@ -460,6 +453,10 @@ class TileSizeBackwardAnalysis
     : public dataflow::SparseBackwardDataFlowAnalysis<TileSizeLattice> {
 public:
   using SparseBackwardDataFlowAnalysis::SparseBackwardDataFlowAnalysis;
+
+  static bool classof(const DataFlowAnalysis *a) {
+    return a->getTypeID() == TypeID::get<TileSizeBackwardAnalysis>();
+  }
 
   void setToExitState(TileSizeLattice *lattice) override {
     // Exit state is uninitialized (identity for meet).
@@ -637,6 +634,27 @@ static TileSizes getIterationSpaceTileSizes(Operation *op, unsigned numLoops,
   return iterTileSizes;
 }
 
+/// Gather tile sizes into the iteration space of a linalg op by looking up
+/// both operand and result lattice states in the solver.
+static TileSizes
+getLinalgIterationSpaceTileSizes(linalg::LinalgOp linalgOp,
+                                 const DataFlowSolver &solver) {
+  TileSizes iterTileSizes =
+      getIterationSpaceTileSizes(linalgOp, linalgOp.getNumLoops(),
+                                 linalgOp.getIndexingMapsArray(), solver);
+
+  for (auto [idx, result] : llvm::enumerate(linalgOp->getResults())) {
+    const TileSizeLattice *lattice =
+        solver.lookupState<TileSizeLattice>(result);
+    TileSizes tileSizes = getTileSizesFor(result, lattice);
+    OpOperand *init = linalgOp.getDpsInitOperand(idx);
+    AffineMap map = linalgOp.getMatchingIndexingMap(init);
+    iterTileSizes.merge(tileSizes.mapToIterationSpace(map));
+  }
+
+  return iterTileSizes;
+}
+
 /// Get tile sizes for an im2col op from its result lattice. Im2col's output
 /// dimensions are the iteration domain, so the result lattice directly holds
 /// the iteration-space tile sizes.
@@ -645,6 +663,155 @@ static TileSizes getIm2colTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   Value result = im2colOp.getResult(0);
   const TileSizeLattice *lattice = solver.lookupState<TileSizeLattice>(result);
   return getTileSizesFor(result, lattice);
+}
+
+//===----------------------------------------------------------------------===//
+// Operand duplication and de-duplication.
+//===----------------------------------------------------------------------===//
+
+static constexpr StringLiteral kSplitGroupAttrName =
+    "__iree_vector_tile_size_split_group__";
+
+/// Returns true if the operation is trivially duplicatable and cheap enough to
+/// split per use before analysis.
+static bool isDuplicatable(Value val) {
+  Operation *defOp = val.getDefiningOp();
+  if (!defOp) {
+    return false;
+  }
+  if (isa<tensor::EmptyOp>(defOp)) {
+    return true;
+  }
+  if (defOp->hasTrait<OpTrait::ConstantLike>()) {
+    return true;
+  }
+  // A linalg op that doesn't read any tensor data (e.g., linalg.fill or a
+  // fill-like linalg.generic broadcasting a scalar) is a generator and
+  // duplicatable.
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(defOp)) {
+    if (llvm::none_of(linalgOp->getOpOperands(), [&](OpOperand &operand) {
+          return isa<ShapedType>(operand.get().getType()) &&
+                 linalgOp.payloadUsesValueFromOperand(&operand);
+        })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool isDuplicatableTensorProducer(Operation *op) {
+  if (!op || op->getNumResults() != 1) {
+    return false;
+  }
+  Value result = op->getResult(0);
+  return isa<TensorType>(result.getType()) && isDuplicatable(result);
+}
+
+static bool needsSplitting(Operation *op) {
+  if (!op->getBlock() || !isDuplicatableTensorProducer(op)) {
+    return false;
+  }
+  return op->getResult(0).getNumUses() > 1;
+}
+
+static void setSplitGroup(Operation *op, int64_t groupId) {
+  op->setAttr(
+      kSplitGroupAttrName,
+      IntegerAttr::get(IntegerType::get(op->getContext(), 64), groupId));
+}
+
+// Duplicate all duplicatable operations. If a duplicatable operation has more
+// than one user, it will be duplicated (via clone) and each user will receive
+// their own copy of the duplicatable operation. By attaching a split-group to
+// the clones of the same operation as (discardable) attribute, we can later
+// deduplicate clones of the same operation that received the same tile size
+// from the analysis.
+static void splitDuplicatableTensorProducers(FunctionOpInterface funcOp) {
+  int64_t nextGroupId = 0;
+  SmallVector<Operation *> worklist;
+
+  funcOp.walk([&](Operation *op) {
+    if (needsSplitting(op)) {
+      worklist.push_back(op);
+    }
+  });
+
+  llvm::SmallPtrSet<Operation *, 16> visited;
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (!visited.insert(op).second || !needsSplitting(op)) {
+      continue;
+    }
+
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (Operation *defOp = operand.get().getDefiningOp()) {
+        worklist.push_back(defOp);
+      }
+    }
+
+    Value result = op->getResult(0);
+    OpBuilder builder(op);
+    builder.setInsertionPointAfter(op);
+    int64_t groupId = nextGroupId++;
+
+    while (!result.use_empty()) {
+      OpOperand &use = *result.use_begin();
+      Operation *clone = builder.clone(*op);
+      setSplitGroup(clone, groupId);
+      use.set(clone->getResult(0));
+    }
+    op->erase();
+  }
+}
+
+static void dedupSplitGroup(ArrayRef<Operation *> group) {
+  SmallVector<std::pair<DenseI64ArrayAttr, Operation *>> representatives;
+  for (Operation *op : group) {
+    if (!op || !op->getBlock()) {
+      continue;
+    }
+    auto tileSizesAttr = dyn_cast_or_null<DenseI64ArrayAttr>(
+        op->getAttr(kVectorTileSizesAttrName));
+    if (!tileSizesAttr) {
+      // Deduplicate operations that were not assigned a tile size during
+      // analysis. It is safe to assume a single result with tensor type here,
+      // as all operations that end up here must match
+      // `isDuplicatableTensorProducer` earlier.
+      TensorType resTy = cast<TensorType>(op->getResult(0).getType());
+      SmallVector<int64_t> minusOne(resTy.getRank(), -1);
+      tileSizesAttr = DenseI64ArrayAttr::get(op->getContext(), minusOne);
+    }
+    auto it = llvm::find_if(representatives, [&](auto &entry) {
+      return entry.first == tileSizesAttr;
+    });
+    if (it == representatives.end()) {
+      representatives.emplace_back(tileSizesAttr, op);
+      continue;
+    }
+    op->getResult(0).replaceAllUsesWith(it->second->getResult(0));
+    op->erase();
+  }
+}
+
+// Deduplicate the duplicated operations as much as possible. From the split
+// group attribute attached to the operations, we can identify operations that
+// are clones of the same original operation. Clones of the same operation that
+// have the same tile size after analysis will be merged.
+static void dedupSplitGroups(FunctionOpInterface funcOp) {
+  DenseMap<int64_t, SmallVector<Operation *>> groups;
+  funcOp.walk([&](Operation *op) {
+    auto groupAttr =
+        dyn_cast_if_present<IntegerAttr>(op->getAttr(kSplitGroupAttrName));
+    if (!groupAttr) {
+      return;
+    }
+    groups[groupAttr.getInt()].push_back(op);
+    op->removeAttr(kSplitGroupAttrName);
+  });
+
+  for (auto &[_, group] : groups) {
+    dedupSplitGroup(group);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -660,18 +827,44 @@ public:
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
+    // Duplicate all duplicatable operations before running the analysis. This
+    // avoids cross-polluting the result of unrelated operations via CSE'd edges
+    // such as linalg.fill used as DPS init. Duplicating preemptively instead of
+    // on-demand after the analysis has two advantages: It makes the analysis
+    // code simpler, as we don't need special case handling for duplicatable
+    // operations. On-demand duplication is also difficult in the presence of
+    // conditional data-flow such as scf.if. After the analysis, we de-duplicate
+    // again based on the analysis result, to reduce IR size.
+    splitDuplicatableTensorProducers(funcOp);
+
+    // Stage 1: run baseline analyses and IntegerDivisibilityAnalysis to
+    // convergence. We need these results to be stable before the tile size
+    // analyses consult them, so we use the staged-solve pattern enabled by
+    // `DataFlowSolver::initializeAndRun`'s analysis filter.
     DataFlowSolver solver;
     dataflow::loadBaselineAnalyses(solver);
+    solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
+    if (failed(solver.initializeAndRun(funcOp))) {
+      return signalPassFailure();
+    }
+
+    // Stage 2: load the tile size analyses and initialize only those.
+    // The existing divisibility lattices are left initialized from stage 1 and
+    // can be queried by the vector size analyses when determining vector sizes.
     solver.load<TileSizeForwardAnalysis>();
     SymbolTableCollection symbolTable;
     solver.load<TileSizeBackwardAnalysis>(symbolTable);
-
-    if (failed(solver.initializeAndRun(funcOp))) {
+    if (failed(solver.initializeAndRun(
+            funcOp, llvm::IsaPred<TileSizeForwardAnalysis,
+                                  TileSizeBackwardAnalysis>))) {
       return signalPassFailure();
     }
 
     auto materialize = [](Operation *op, TileSizes tileSizes) -> LogicalResult {
       if (tileSizes.isOverdefined()) {
+        if (op->hasAttr(kVectorTileSizesAttrName)) {
+          return success();
+        }
         op->emitOpError()
             << "tile size analysis did not determine a valid tile size";
         return failure();
@@ -706,9 +899,8 @@ public:
         return WalkResult(materialize(op, tileSizes));
       }
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-        SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
-        TileSizes tileSizes = getIterationSpaceTileSizes(
-            op, linalgOp.getNumLoops(), indexingMaps, solver);
+        TileSizes tileSizes =
+            getLinalgIterationSpaceTileSizes(linalgOp, solver);
         assert(!tileSizes.isDefined() ||
                tileSizes.rank() == linalgOp.getNumLoops());
         return WalkResult(materialize(op, tileSizes));
@@ -729,8 +921,11 @@ public:
       return WalkResult::advance();
     });
     if (result.wasInterrupted()) {
-      signalPassFailure();
+      return signalPassFailure();
     }
+
+    // Deduplicate based on the analysis result, to reduce IR size again.
+    dedupSplitGroups(funcOp);
   }
 };
 

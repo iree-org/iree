@@ -62,13 +62,15 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
   iree_hal_buffer_t* input_buffer = nullptr;
   {
     std::vector<uint32_t> input_data = {1, 2, 3, 4};
-    CreateDeviceBufferWithData(
-        input_data.data(), input_data.size() * sizeof(uint32_t), &input_buffer);
+    IREE_ASSERT_OK(CreateDeviceBufferWithData(
+        input_data.data(), input_data.size() * sizeof(uint32_t),
+        &input_buffer));
   }
 
   // Create output buffer (zeroed).
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer);
+  IREE_ASSERT_OK(
+      CreateZeroedDeviceBuffer(4 * sizeof(uint32_t), &output_buffer));
 
   // Set up bindings: binding 0 = input, binding 1 = output.
   iree_hal_buffer_ref_t binding_refs[2];
@@ -81,14 +83,14 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       binding_refs[1] = {
           /*binding=*/1,
           /*buffer_slot=*/0,
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       break;
@@ -97,7 +99,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       binding_table.bindings = binding_table_values;
       binding_table_values[0] = {
           /*buffer=*/input_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(input_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(input_buffer),
       };
       binding_refs[0] = {
@@ -109,7 +111,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       };
       binding_table_values[1] = {
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       binding_refs[1] = {
@@ -139,7 +141,7 @@ TEST_P(DispatchConstantsBindingsTest, ScaleAndOffset) {
       constant_data.data(), constant_data.size() * sizeof(constant_data[0]));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1), constants, bindings,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(

@@ -253,19 +253,124 @@ static LogicalResult testGetEstimatedLoopRangeImpl(scf::ForallOp forallOp) {
   return success();
 }
 
+// Test the `resolveRange` method of the SparseCastOpInterface. Finds a
+// `"test.range"` marker op whose operands are grouped in triples
+// (offset, size, stride) — one triple per result dimension. Calls
+// `resolveRange` and replaces the marker with `"test.resolved_range"`.
+static LogicalResult testResolveRangeImpl(Operation *funcOp) {
+  SmallVector<IREE::TensorExt::SparseCastOpInterface> sparseOps;
+  SmallVector<Operation *> rangeOps;
+  funcOp->walk([&](Operation *op) {
+    if (auto sparseOp = dyn_cast<IREE::TensorExt::SparseCastOpInterface>(op)) {
+      sparseOps.push_back(sparseOp);
+    }
+    if (op->getName().getStringRef() == "test.range") {
+      rangeOps.push_back(op);
+    }
+  });
+  if (sparseOps.size() != 1) {
+    return funcOp->emitError("expected exactly one SparseCastOpInterface op");
+  }
+  if (rangeOps.size() != 1) {
+    return funcOp->emitError("expected exactly one test.range op");
+  }
+  IREE::TensorExt::SparseCastOpInterface sparseOp = sparseOps[0];
+  Operation *rangeOp = rangeOps[0];
+
+  // Operands are grouped as (offset0, size0, stride0, offset1, size1, ...).
+  unsigned numOperands = rangeOp->getNumOperands();
+  if (numOperands % 3 != 0) {
+    return rangeOp->emitError(
+        "test.range operands must be a multiple of 3 (offset, size, stride)");
+  }
+
+  SmallVector<Range> allRanges;
+  for (unsigned i = 0; i < numOperands; i += 3) {
+    allRanges.push_back(Range{rangeOp->getOperand(i),
+                              rangeOp->getOperand(i + 1),
+                              rangeOp->getOperand(i + 2)});
+  }
+
+  llvm::BitVector inBounds(allRanges.size(), true);
+
+  IRRewriter rewriter(funcOp->getContext());
+  rewriter.setInsertionPoint(rangeOp);
+  Location loc = rangeOp->getLoc();
+
+  FailureOr<SmallVector<Range>> resolvedRanges =
+      sparseOp.resolveRange(rewriter, allRanges, inBounds, std::nullopt);
+  if (failed(resolvedRanges)) {
+    return failure();
+  }
+
+  // Materialize the resolved ranges as values so FileCheck can verify them.
+  SmallVector<Value> allVals;
+  for (auto &range : resolvedRanges.value()) {
+    allVals.push_back(
+        getValueOrCreateConstantIndexOp(rewriter, loc, range.offset));
+    allVals.push_back(
+        getValueOrCreateConstantIndexOp(rewriter, loc, range.size));
+    allVals.push_back(
+        getValueOrCreateConstantIndexOp(rewriter, loc, range.stride));
+  }
+  OperationState state(loc, "test.resolved_range");
+  state.addOperands(allVals);
+  rewriter.create(state);
+
+  rewriter.eraseOp(rangeOp);
+  return success();
+}
+
+// Test the `getDistributionInfoForSparseDimensions` method. For each
+// SparseCastOpInterface op, emit a `test.distribution_info` marker with the
+// result BitVector encoded as a dense bool array attribute.
+static LogicalResult testGetDistributionInfoImpl(Operation *funcOp) {
+  SmallVector<IREE::TensorExt::SparseCastOpInterface> sparseOps;
+  funcOp->walk([&](IREE::TensorExt::SparseCastOpInterface op) {
+    sparseOps.push_back(op);
+  });
+  if (sparseOps.empty()) {
+    return funcOp->emitError("expected at least one SparseCastOpInterface op");
+  }
+
+  IRRewriter rewriter(funcOp->getContext());
+  for (auto sparseOp : sparseOps) {
+    llvm::BitVector distInfo =
+        sparseOp.getDistributionInfoForSparseDimensions();
+
+    SmallVector<bool> distributable;
+    for (unsigned i = 0; i < distInfo.size(); ++i) {
+      distributable.push_back(distInfo.test(i));
+    }
+
+    rewriter.setInsertionPointAfter(sparseOp);
+    OperationState state(sparseOp->getLoc(), "test.distribution_info");
+    state.addAttribute("distributable",
+                       rewriter.getDenseBoolArrayAttr(distributable));
+    rewriter.create(state);
+  }
+  return success();
+}
+
 void TestSparseOpInterfaceMethodsPass::runOnOperation() {
   Operation *op = getOperation();
 
+  // resolveRange and getDistributionInfo use their own marker ops, not forall.
+  if (testResolveRange) {
+    if (failed(testResolveRangeImpl(op))) {
+      return signalPassFailure();
+    }
+    return;
+  }
+  if (testGetDistributionInfo) {
+    if (failed(testGetDistributionInfoImpl(op))) {
+      return signalPassFailure();
+    }
+    return;
+  }
+
   SmallVector<scf::ForallOp> forallOps;
-  SmallVector<IREE::TensorExt::SparseCastOpInterface> sparseInterfaceOps;
-  op->walk([&](Operation *op) {
-    if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
-      forallOps.push_back(forallOp);
-    }
-    if (auto sparseOp = dyn_cast<IREE::TensorExt::SparseCastOpInterface>(op)) {
-      sparseInterfaceOps.push_back(sparseOp);
-    }
-  });
+  op->walk([&](scf::ForallOp forallOp) { forallOps.push_back(forallOp); });
 
   if (!llvm::hasSingleElement(forallOps)) {
     op->emitError("expected a single ForallOp");

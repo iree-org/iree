@@ -14,6 +14,16 @@ func.func @specify_inline_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 
 // -----
 
+func.func @specify_shared_memory_conversion(%lhs: vector<32x32xf16>) -> vector<32x32xf16> {
+  %0 = iree_vector_ext.to_layout %lhs to layout(#iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 4], outer_tile = [4, 1], thread_tile = [4, 2], element_tile = [1, 4], subgroup_strides = [0, 0], thread_strides = [1, 4]>) {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<32x32xf16>
+  return %0 : vector<32x32xf16>
+}
+
+// CHECK-LABEL: func.func @specify_shared_memory_conversion
+// CHECK:      iree_vector_ext.to_layout {{.*}} to layout({{.*}}) {shared_memory_conversion = #iree_gpu.derived_thread_config}
+
+// -----
+
 #nested_0 = #iree_vector_ext.nested_layout<
   subgroup_tile = [1, 1],
   batch_tile = [2, 4],

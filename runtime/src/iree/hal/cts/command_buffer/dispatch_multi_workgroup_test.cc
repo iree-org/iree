@@ -61,7 +61,8 @@ class DispatchMultiWorkgroupTest : public CtsTestBase<> {
 // Expected output: [0, 1, 2, ..., 31].
 TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateZeroedDeviceBuffer(kWorkgroupCount * sizeof(uint32_t), &output_buffer);
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kWorkgroupCount * sizeof(uint32_t),
+                                          &output_buffer));
 
   iree_hal_buffer_ref_t binding_refs[1];
   iree_hal_buffer_binding_t binding_table_values[1];
@@ -73,7 +74,7 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
           /*binding=*/0,
           /*buffer_slot=*/0,
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       break;
@@ -82,7 +83,7 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
       binding_table.bindings = binding_table_values;
       binding_table_values[0] = {
           /*buffer=*/output_buffer,
-          /*offset=*/iree_hal_buffer_byte_offset(output_buffer),
+          /*offset=*/0,
           /*length=*/iree_hal_buffer_byte_length(output_buffer),
       };
       binding_refs[0] = {
@@ -107,7 +108,7 @@ TEST_P(DispatchMultiWorkgroupTest, WriteWorkgroupIds) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(kWorkgroupCount, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(

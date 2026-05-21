@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -14,7 +14,7 @@ package(
 
 iree_runtime_cc_library(
     name = "registration",
-    srcs = ["driver_module.cc"],
+    srcs = ["driver_module.c"],
     hdrs = ["driver_module.h"],
     defines = [
         "IREE_HAVE_HAL_VULKAN_DRIVER_MODULE=1",
@@ -24,5 +24,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/vulkan",
+        "//runtime/src/iree/hal/drivers/vulkan:api",
     ],
 )

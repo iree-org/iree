@@ -16,12 +16,13 @@ iree_cc_library(
   HDRS
     "driver_module.h"
   SRCS
-    "driver_module.cc"
+    "driver_module.c"
   DEPS
     iree::base
     iree::base::tooling::flags
     iree::hal
     iree::hal::drivers::vulkan
+    iree::hal::drivers::vulkan::api
   DEFINES
     "IREE_HAVE_HAL_VULKAN_DRIVER_MODULE=1"
   PUBLIC

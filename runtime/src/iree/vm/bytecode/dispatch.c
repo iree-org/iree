@@ -1384,9 +1384,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DECODE_RODATA_ATTR(rodata_ordinal);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
       IREE_ASSERT(rodata_ordinal < module->rodata_ref_count);
-      IREE_RETURN_IF_ERROR(
-          iree_vm_ref_wrap_retain(&module->rodata_ref_table[rodata_ordinal],
-                                  iree_vm_buffer_type(), result));
+      IREE_RETURN_IF_ERROR(iree_vm_buffer_wrap_retain(
+          &module->rodata_ref_table[rodata_ordinal], result));
     });
 
     //===------------------------------------------------------------------===//

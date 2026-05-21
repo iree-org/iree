@@ -20,22 +20,19 @@ namespace mlir::iree_compiler::IREE::VMVX {
 // Helpers
 //===----------------------------------------------------------------------===//
 
-// Adds a set of passes to the given pass manager that configure the required
-// VMVX transforms and tiling parameters.
-void buildVMVXConfigurationPassPipeline(OpPassManager &variantPassManager);
-
 // Adds a set of passes to the given pass manager that run the required VMVX
-// transforms in the canonical order.
+// transforms in the canonical order. The `modulePassManager` should operate
+// on the module within the IREE::HAL::ExecutableOp.
 //
 // Most translation code should prefer to use this instead of manually adding
 // the passes themselves to ensure that expected pass ordering is observed.
 //
 // The expected usage is:
 //   <run conversion from TF/HLO/etc to flow>
-//   buildVMVXConfigurationPassPipeline & run
+//   buildVMVXCodegenConfigurationPassPipeline & run
 //   buildVMVXTransformPassPipeline & run
 //   <serialize VM module>
-void buildVMVXTransformPassPipeline(OpPassManager &variantPassManager);
+void buildVMVXTransformPassPipeline(OpPassManager &modulePassManager);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

@@ -483,14 +483,15 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: tensor.pad is fused - source is the extract_slice result, not the padded tensor.
-  // in_bounds = [false, true] because M dim has dynamic padding, K dim has no padding.
-  // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
-  // CHECK: scf.forall {{.*}} shared_outs(%[[OUTER_INIT:.+]] = %[[INIT]])
-  // CHECK:   scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[OUTER_INIT]])
+  // Key check: tensor.pad is fused. The DMA source is a clamped sub-slice of
+  // the pre-pad source. in_bounds = [false, true] because M dim has padding.
+  // CHECK-DAG: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
+  // CHECK: scf.forall
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     arith.minsi
+  // CHECK:     %[[WARP_SRC:.+]] = tensor.extract_slice %[[EXTRACTED]]
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
-  // CHECK-SAME:     : tensor<?x64xf32>, tensor<4x64xf32>, index
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[WARP_SRC]] into {{.*}} lane(%[[LANE]]) in_bounds [false, true]
   // CHECK:     }
   // CHECK-NOT: tensor.pad
 
@@ -499,10 +500,9 @@ func.func @copy_with_tensor_pad_fusion(%source: tensor<121x64xf32>, %init: tenso
 
 // -----
 
-// Test: tensor.pad fusion with multiple warps creates single-iteration wrapper forall.
-// When tensor.pad is fused, subgroup-level tiling is skipped to ensure the DMA
-// operates on the full padded buffer shape, not on smaller subviews.
-// This is critical for correct delinearization in the lowering pass.
+// Test: tensor.pad fusion with multiple warps distributes across warps.
+// With 4 warps and shape 4x64, the outer dimension is tiled with step=1 across
+// 4 warps. Each warp gets a clamped sub-slice of the pre-pad source.
 
 #gpu_target_pad_multi_warp = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
   compute = fp32, storage = b32, subgroup = shuffle,
@@ -536,31 +536,77 @@ func.func @copy_with_tensor_pad_fusion_multi_warp(%source: tensor<121x64xf32>, %
     ins(%padded : tensor<4x64xf32>)
     outs(%init : tensor<4x64xf32>) -> tensor<4x64xf32>
 
-  // Key check: With 4 warps available, normal tiling would create a warp-level
-  // forall with step (1, 64) producing 4 iterations with 1x64 subviews.
-  // For tensor.pad fusion, we instead create a single-iteration wrapper forall
-  // with step (4, 64) - the full shape - so the DMA operates on 4x64 directly.
-  // After canonicalization, identity extract_slices are eliminated.
+  // Key check: 4 warps distribute dimension 0 with step=1 (4 iterations).
+  // Each warp's DMA source is a clamped sub-slice of the pre-pad source.
   //
-  // CHECK: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
-  // CHECK: %[[WARP_RESULT:.+]] = scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 64) step (4, 64)
-  // CHECK-SAME: shared_outs(%[[INIT_TILE:.+]] = %[[INIT]]) -> (tensor<4x64xf32>) {
+  // CHECK-DAG: %[[EXTRACTED:.+]] = tensor.extract_slice %[[SRC]]
+  // CHECK: scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (4, 64) step (1, 64)
+  // CHECK-SAME: shared_outs({{.*}} = %[[INIT]]) -> (tensor<4x64xf32>) {
   //
-  // Thread-level forall with 64 lanes (uses outer forall's shared_out directly):
-  // CHECK:   %[[THREAD_RESULT:.+]] = scf.forall (%[[LANE:.+]]) in (64) shared_outs(%[[INNER_INIT:.+]] = %[[INIT_TILE]])
+  // Thread-level forall with clamped source and DMA:
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     %[[CLAMPED_OFF:.+]] = arith.minsi %[[IV0]]
+  // CHECK:     %[[WARP_SRC:.+]] = tensor.extract_slice %[[EXTRACTED]][%[[CLAMPED_OFF]], 0]
   // CHECK:     scf.forall.in_parallel {
-  // CHECK:       iree_gpu.coalesced_gather_dma %[[EXTRACTED]] into %[[INNER_INIT]] lane(%[[LANE]]) in_bounds [false, true]
-  // CHECK-SAME:     : tensor<?x64xf32>, tensor<4x64xf32>, index
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[WARP_SRC]] into {{.*}} lane(%[[LANE]]) in_bounds [false, true]
   // CHECK:     }
   // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
   //
-  // CHECK:   scf.forall.in_parallel {
-  // CHECK:     tensor.parallel_insert_slice %[[THREAD_RESULT]] into %[[INIT_TILE]][0, 0] [4, 64] [1, 1]
-  // CHECK:   }
   // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
   // CHECK-NOT: tensor.pad
 
   return %result : tensor<4x64xf32>
+}
+
+// -----
+
+// Test: tensor.pad fusion with padding on both dimensions (in_bounds [false, false]).
+// A larger tile (32x128) with 4 warps: dim 0 is tiled across warps.
+// Both dimensions have padding, so both get clamping and in_bounds=false.
+
+#gpu_target_pad_both_dims = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_pad_both_dims = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_both_dims}>
+#translation_pad_both_dims = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_with_tensor_pad_both_dims
+// The source's innermost dim is static (96) and DWORD-aligned (96*4=384 bytes)
+// so the dynamic-innermost rejection in `isValidPadForDMA` (PR #24132) does not
+// fire and DMA conversion can proceed.
+func.func @copy_with_tensor_pad_both_dims(%source: tensor<500x96xf32>, %init: tensor<32x128xf32>, %off0: index, %sz0: index, %high0: index) -> tensor<32x128xf32>
+  attributes {hal.executable.target = #exec_target_pad_both_dims, translation_info = #translation_pad_both_dims} {
+  %extracted = tensor.extract_slice %source[%off0, 0] [%sz0, 96] [1, 1]
+      : tensor<500x96xf32> to tensor<?x96xf32>
+
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %extracted low[0, 0] high[%high0, 32] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : f32
+  } : tensor<?x96xf32> to tensor<32x128xf32>
+
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<32x128xf32>)
+    outs(%init : tensor<32x128xf32>) -> tensor<32x128xf32>
+
+  // 4 warps, 32x128 tile. dim 0: tiled to step=8, dim 1: kept whole (128).
+  // Both dims have padding → in_bounds = [false, false].
+  // CHECK: scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (0, 0) to (32, 128) step (8, 128)
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     arith.minsi
+  // CHECK:     tensor.extract_slice
+  // CHECK:     scf.forall.in_parallel {
+  // CHECK:       iree_gpu.coalesced_gather_dma {{.*}} in_bounds [false, false]
+  // CHECK:     }
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: tensor.pad
+
+  return %result : tensor<32x128xf32>
 }
 
 // -----
@@ -605,12 +651,56 @@ func.func @copy_with_tensor_pad_unaligned_row(%source: tensor<65x121xf16>, %init
 
   // Source row size (121 * 2 = 242 bytes) is not DWORD-aligned.
   // Coalesced DMA bails out to avoid partial OOB in per-DWORD range checking.
-  // The linalg.copy should remain unchanged.
+  // The copy is downgraded from use_global_load_dma to derived_thread_config.
   // CHECK: tensor.pad
-  // CHECK: linalg.copy
+  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
   // CHECK-NOT: iree_gpu.coalesced_gather_dma
 
   return %result : tensor<4x124xf16>
+}
+
+// -----
+
+// Negative test: Dynamic innermost dimension fails DWORD alignment check.
+
+#gpu_target_pad_dynamic_inner = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_pad_dynamic_inner = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_pad_dynamic_inner}>
+#translation_pad_dynamic_inner = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_with_tensor_pad_dynamic_inner_dim
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<457x330xi8>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<4x256xi8>
+func.func @copy_with_tensor_pad_dynamic_inner_dim(%source: tensor<457x330xi8>, %init: tensor<4x256xi8>, %off: index, %sz_m: index, %sz_k: index, %high_m: index, %high_k: index) -> tensor<4x256xi8>
+  attributes {hal.executable.target = #exec_target_pad_dynamic_inner, translation_info = #translation_pad_dynamic_inner} {
+  // Extract a dynamic slice where both dimensions are dynamic.
+  %extracted = tensor.extract_slice %source[%off, 0] [%sz_m, %sz_k] [1, 1]
+      : tensor<457x330xi8> to tensor<?x?xi8>
+
+  // Pad to static size.
+  %cst = arith.constant 0 : i8
+  %padded = tensor.pad %extracted low[0, 0] high[%high_m, %high_k] {
+  ^bb0(%arg0: index, %arg1: index):
+    tensor.yield %cst : i8
+  } : tensor<?x?xi8> to tensor<4x256xi8>
+
+  // Copy from padded tensor.
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<4x256xi8>)
+    outs(%init : tensor<4x256xi8>) -> tensor<4x256xi8>
+
+  // The copy is downgraded from use_global_load_dma to derived_thread_config.
+  // CHECK: tensor.pad
+  // CHECK: linalg.copy {lowering_config = #iree_gpu.derived_thread_config}
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<4x256xi8>
 }
 
 // -----
@@ -825,4 +915,285 @@ func.func @copy_swizzle_hint_linearized(%source: tensor<128x16xf32>) -> tensor<1
   // CHECK-NOT: linalg.copy
 
   return %result : tensor<128x16xf32>
+}
+
+// -----
+
+// Test: incremental warp-distribution halving in tileAtSubgroupLevel.
+// 32x4xf32 tile = 128 elements. Workgroup has 4 warps.  The greedy 4-warp
+// distribution would give 8x4 = 32 elements per warp, less than the
+// minimum DMA transfer (subgroup_size=64 * 1 elt/lane = 64 elements with
+// dma_sizes=[32,128] / 32-bit f32).  Halving picks numWarps=2, which gives
+// 16x4 = 64 elements per warp (== min) — DMA emit succeeds and the warp
+// forall is well-formed (preserving wave-uniformity by construction).
+// Issue #24139.
+
+#gpu_target_warp_halve = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_warp_halve = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_warp_halve}>
+#translation_warp_halve = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_warp_distribution_halving
+func.func @copy_warp_distribution_halving(%source: tensor<32x4xf32>, %off: index, %sz: index, %high: index) -> tensor<32x4xf32>
+  attributes {hal.executable.target = #exec_target_warp_halve, translation_info = #translation_warp_halve} {
+  %extracted = tensor.extract_slice %source[%off, 0] [%sz, 4] [1, 1]
+      : tensor<32x4xf32> to tensor<?x4xf32>
+  %cst = arith.constant 0.0 : f32
+  %padded = tensor.pad %extracted low[0, 0] high[%high, 0] {
+  ^bb0(%a: index, %b: index):
+    tensor.yield %cst : f32
+  } : tensor<?x4xf32> to tensor<32x4xf32>
+  %init = tensor.empty() : tensor<32x4xf32>
+  %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%padded : tensor<32x4xf32>) outs(%init : tensor<32x4xf32>) -> tensor<32x4xf32>
+
+  // 2-warp distribution (step=16 on dim 0, dim 1 kept whole).
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (32, 4) step (16, 4)
+  // CHECK:   scf.forall (%{{.+}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: linalg.copy
+
+  return %r : tensor<32x4xf32>
+}
+
+// -----
+
+// Test: linearized-availability detection must not rely on
+// `availableElements != innermostDim`. With a 1D (or [1,...,N]) shape whose
+// output traces to tensor.empty(), linearization fires but the two values
+// are equal. The unmodified `numWarps` (4) on shape [128] yields a per-warp
+// tile of 32 elements (< min DMA transfer 64), so halving must still kick in
+// and pick numWarps=2 (per-warp tile = 64). Issue #24139.
+
+#gpu_target_warp_halve_1d = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_warp_halve_1d = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_warp_halve_1d}>
+#translation_warp_halve_1d = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_warp_distribution_halving_1d
+func.func @copy_warp_distribution_halving_1d(%source: tensor<128xf32>) -> tensor<128xf32>
+  attributes {hal.executable.target = #exec_target_warp_halve_1d, translation_info = #translation_warp_halve_1d} {
+  %init = tensor.empty() : tensor<128xf32>
+  %r = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128xf32>) outs(%init : tensor<128xf32>) -> tensor<128xf32>
+
+  // 2-warp distribution (step=64 on the only dim).
+  // CHECK: scf.forall (%{{.+}}) = (0) to (128) step (64)
+  // CHECK:   scf.forall (%{{.+}}) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_0>]}
+  // CHECK-NOT: linalg.copy
+
+  return %r : tensor<128xf32>
+}
+// -----
+
+// Test: workgroup-aligned but per-warp-sub-aligned scale copy caps the
+// participating warps instead of collapsing to a single identity-tiled warp.
+// Scale tile is 128x4 f8E8M0FNU = 512 elements. With dma_sizes=[32,128],
+// subgroup_size=64:
+//   min DMA granularity = 64 * (32/8) = 256 elements
+// Workgroup total: 512 % 256 == 0 → aligned.
+// Naive per-warp at 8 warps: 512 / 8 = 64 elements → 64 % 256 != 0 → sub-aligned.
+// Fix: cap usable warps at maxSegments = 512 / 256 = 2, so warp tile = 64x4
+// (= 256 elements). Two warps issue one DMA each in parallel instead of
+// one warp running two sequential DMAs.
+
+#gpu_target_scale_identity = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+
+#exec_target_scale_identity = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_scale_identity}>
+// 8 warps: workgroup_size[0] / subgroup_size = 512 / 64 = 8
+#translation_scale_identity = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [512, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}>
+
+// CHECK-LABEL: func.func @copy_scale_capped_warps
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]: tensor<128x4xf8E8M0FNU>
+func.func @copy_scale_capped_warps(%source: tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
+  attributes {hal.executable.target = #exec_target_scale_identity, translation_info = #translation_scale_identity} {
+  %empty = tensor.empty() : tensor<128x4xf8E8M0FNU>
+  %result = linalg.copy {lowering_config = #iree_gpu.use_global_load_dma}
+    ins(%source : tensor<128x4xf8E8M0FNU>)
+    outs(%empty : tensor<128x4xf8E8M0FNU>) -> tensor<128x4xf8E8M0FNU>
+
+  // Outer warp forall: 2 iterations, step=(64,4). Each iteration = 1 warp,
+  // DMA-aligned per-warp tile. The remaining warps idle behind the standard
+  // scf.if guard inserted by downstream distribution.
+  // CHECK: scf.forall (%{{.+}}, %{{.+}}) = (0, 0) to (128, 4) step (64, 4)
+
+  // Inner lane forall: 64 lanes per warp, each handles 4 elements (256/64=4).
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     iree_gpu.coalesced_gather_dma
+  // CHECK-SAME:  tensor<64x4xf8E8M0FNU>, tensor<64x4xf8E8M0FNU>
+  // CHECK: } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+
+  return %result : tensor<128x4xf8E8M0FNU>
+}
+
+// -----
+
+// Test: im2col → gather DMA conversion (happy path).
+// NHWC layout, 3×3 kernel, stride 1, dilation 1, C=512 on gfx950.
+// The im2col should be converted to: collapse_shape + linalg.generic (index
+// computation) + gather → then the gather gets converted to coalesced DMA.
+
+#gpu_target_im2col = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col}>
+#translation_im2col = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_to_gather_dma
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x16x16x512xf16>
+// CHECK-SAME:    %[[OUTPUT:[a-zA-Z0-9]+]]: tensor<1x196x512xf16>
+func.func @im2col_to_gather_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col, translation_info = #translation_im2col} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // Step 1: Collapse input [1,16,16,512] → [256,512] (flatten spatial dims).
+  // CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[INPUT]] {{\[}}[0, 1, 2], [3]{{\]}}
+  // CHECK-SAME: tensor<1x16x16x512xf16> into tensor<256x512xf16>
+
+  // Step 2: Compute linearized spatial indices via linalg.generic.
+  // Each of the 196 output positions (14×14) maps to a row in the 256-row
+  // collapsed source via: linearize(delinearize(i, [14,14]), [16,16]).
+  // CHECK: %[[INDICES:.+]] = linalg.generic
+  // CHECK:   %[[IDX:.+]] = linalg.index 0
+  // CHECK:   affine.delinearize_index %[[IDX]] into (14, 14)
+  // CHECK:   affine.linearize_index
+  // CHECK:   linalg.yield
+  // CHECK: } -> tensor<196xindex>
+
+  // Step 3: Collapse output [1,196,512] → [196,512].
+  // CHECK: %[[COLLAPSED_OUT:.+]] = tensor.collapse_shape %[[OUTPUT]] {{\[}}[0, 1], [2]{{\]}}
+
+  // Step 4: Warp-level forall distributes 196 batch positions across warps.
+  // 256 threads / 64 subgroup_size = 4 warps. 196 / 4 = 49 per warp.
+  // CHECK: scf.forall (%[[WIV0:.+]], %[[WIV1:.+]]) = (0, 0) to (196, 512) step (49, 512)
+  // CHECK-SAME: shared_outs(%[[WINIT:.+]] = %[[COLLAPSED_OUT]])
+
+  // Step 5: Slice indices for this warp's batch positions.
+  // CHECK:   %[[WARP_INDICES:.+]] = tensor.extract_slice %[[INDICES]][%[[WIV0]]] [49] [1]
+
+  // Step 6: Lane-level forall (64 lanes) + coalesced gather DMA.
+  // Each lane reads elementsPerLane contiguous f16 from the collapsed source.
+  // CHECK:   scf.forall (%[[LANE:.+]]) in (64)
+  // CHECK:     scf.forall.in_parallel {
+  // CHECK:       iree_gpu.coalesced_gather_dma %[[COLLAPSED]][%[[WARP_INDICES]]]
+  // CHECK-SAME:    into %{{.+}} lane(%[[LANE]])
+  // CHECK-SAME:    tensor<256x512xf16>, tensor<49xindex>, tensor<49x512xf16>, index
+  // CHECK:   } {mapping = [#iree_gpu.lane_id<0>]}
+
+  // CHECK:   } {mapping = [#gpu.warp<linear_dim_1>, #gpu.warp<linear_dim_0>]}
+
+  // Step 7: Expand result back to [1,196,512].
+  // CHECK: tensor.expand_shape %{{.+}} {{\[}}[0, 1], [2]{{\]}}
+
+  // No im2col or gather should remain.
+  // CHECK-NOT: iree_linalg_ext.im2col
+  // CHECK-NOT: iree_linalg_ext.gather
+
+  return %result : tensor<1x196x512xf16>
+}
+
+// -----
+
+// Negative test: im2col NOT converted when K_tile is too small for DMA
+// alignment. With f16, dma_sizes=[32,128], subgroup_size=64:
+// min_elements_per_transfer = 64 * (32/16) = 128. K_tile=4 is not aligned.
+// The im2col should be downgraded to derived_thread_config.
+
+#gpu_target_im2col_small_k = #iree_gpu.target<arch = "gfx950", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+  dma_sizes = [32, 128]
+>>
+#exec_target_im2col_small_k = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_small_k}>
+#translation_im2col_small_k = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_small_k_no_dma
+func.func @im2col_small_k_no_dma(%input: tensor<1x6x6x4xf16>, %output: tensor<1x16x4xf16>) -> tensor<1x16x4xf16>
+  attributes {hal.executable.target = #exec_target_im2col_small_k, translation_info = #translation_im2col_small_k} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [4, 4], [3, 3, 4]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x6x6x4xf16>)
+    outs(%output : tensor<1x16x4xf16>) -> tensor<1x16x4xf16>
+
+  // K_tile=4 is too small. Im2col remains with derived_thread_config.
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<1x16x4xf16>
+}
+
+// -----
+
+// Negative test: im2col NOT converted on non-gfx950 target (gfx942).
+// gfx942 does not support global load DMA (no dma_sizes field).
+
+#gpu_target_im2col_nogfx950 = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  max_load_instruction_bits = 128, subgroup_size_choices = [64],
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536, max_workgroup_counts = [2147483647, 2147483647, 2147483647]
+>>
+#exec_target_im2col_nogfx950 = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree_codegen.target_info = #gpu_target_im2col_nogfx950}>
+#translation_im2col_nogfx950 = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 0, no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution = true>}>
+
+// CHECK-LABEL: func.func @im2col_nogfx950_no_dma
+func.func @im2col_nogfx950_no_dma(%input: tensor<1x16x16x512xf16>, %output: tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+  attributes {hal.executable.target = #exec_target_im2col_nogfx950, translation_info = #translation_im2col_nogfx950} {
+  %result = iree_linalg_ext.im2col
+    {lowering_config = #iree_gpu.use_global_load_dma}
+    strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
+    offsets = [0, 0, 0]
+    output_sizes = [[1], [14, 14], [3, 3, 512]]
+    batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+    input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+    ins(%input : tensor<1x16x16x512xf16>)
+    outs(%output : tensor<1x196x512xf16>) -> tensor<1x196x512xf16>
+
+  // Non-gfx950 target. Im2col remains with derived_thread_config.
+  // CHECK: iree_linalg_ext.im2col
+  // CHECK-SAME: lowering_config = #iree_gpu.derived_thread_config
+  // CHECK-NOT: iree_gpu.coalesced_gather_dma
+
+  return %result : tensor<1x196x512xf16>
 }

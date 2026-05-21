@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan --pass-pipeline='builtin.module(iree-codegen-spirv-configuration-pipeline, func.func(iree-spirv-lower-executable-target-pass))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan \
+// RUN:   --iree-codegen-spirv-configuration-pipeline \
+// RUN:   --iree-codegen-linalg-to-spirv-pipeline='include-spirv-lowering=false' \
+// RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -76,9 +79,11 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:   %[[ZP_BINDING:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(2)
 //           CHECK:   %[[ZP_ALIGNED:.+]] = memref.assume_alignment %[[ZP_BINDING]]
 //           CHECK:   scf.for %arg0 = %c0 to %c86 step %c1 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
-//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_ALIGNED]]
-//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_ALIGNED]]
+//           CHECK:     %[[SCALE_SUB:.+]] = memref.subview %[[SCALE_ALIGNED]]
+//           CHECK:     %[[ZP_SUB:.+]] = memref.subview %[[ZP_ALIGNED]]
+//           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_SUB]]
+//           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_SUB]]
+//           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_SUB]]
 //           CHECK:     %[[SLICE0:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
 //           CHECK:     %[[ZP_EXT0:.+]] = arith.extsi %[[SLICE0]] : vector<4xi4> to vector<4xi32>
 //           CHECK:     %[[SLICE1:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>

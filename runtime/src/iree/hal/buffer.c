@@ -224,6 +224,7 @@ IREE_API_EXPORT void iree_hal_buffer_initialize(
   buffer->byte_offset = byte_offset;
   buffer->byte_length = byte_length;
   buffer->placement = placement;
+  buffer->pooling_allocator = NULL;
   buffer->preserve_count = IREE_ATOMIC_VAR_INIT(1);
   buffer->memory_type = memory_type;
   buffer->allowed_access = allowed_access;

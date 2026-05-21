@@ -16,7 +16,7 @@
 // For policy-substituted macros that build on these helpers, see
 // `isa_decoder.inl`.
 
-#include "iree/vm/bytecode/utils/isa.h"
+#include "iree/vm/bytecode/isa/isa.h"
 
 //===----------------------------------------------------------------------===//
 // Decoding utilities

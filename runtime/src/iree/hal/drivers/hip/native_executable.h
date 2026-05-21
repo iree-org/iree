@@ -31,13 +31,21 @@ typedef struct iree_hal_hip_kernel_debug_info_t {
 } iree_hal_hip_kernel_debug_info_t;
 
 typedef struct iree_hal_hip_kernel_params_t {
+  // Executable-local function name used for lookup and reflection.
+  iree_string_view_t name;
+
+  // HIP function handle.
   hipFunction_t function;
 
+  // Total number of 32-bit constants passed at dispatch time.
   uint32_t constant_count;
+  // Total number of buffers bound at dispatch time.
   uint32_t binding_count;
 
+  // Required HIP block dimensions.
   uint32_t block_dims[3];
 
+  // Optional tracing metadata.
   IREE_TRACE(iree_hal_hip_kernel_debug_info_t debug_info;)
 } iree_hal_hip_kernel_params_t;
 
@@ -52,7 +60,7 @@ iree_status_t iree_hal_hip_native_executable_infer_format(
 // Creates an IREE executable from a HSACO module. The module may contain
 // several kernels that can be extracted along with the associated block size.
 iree_status_t iree_hal_hip_native_executable_create(
-    const iree_hal_hip_dynamic_symbols_t* symbols,
+    iree_hal_device_t* device, const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_device_topology_t topology,
     const iree_hal_executable_params_t* executable_params,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable);
@@ -61,7 +69,7 @@ iree_status_t iree_hal_hip_native_executable_create(
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_lookup_kernel_params(
     iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_function_t export_ordinal,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_hip_kernel_params_t** out_params);
 

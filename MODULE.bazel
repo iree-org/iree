@@ -16,7 +16,7 @@ bazel_dep(name = "apple_support", version = "1.24.1", repo_name = "build_bazel_a
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.11")
-bazel_dep(name = "rules_python", version = "1.6.3")
+bazel_dep(name = "rules_python", version = "1.9.0")
 
 # Python pip dependencies
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
@@ -67,24 +67,33 @@ use_repo(
     "vulkan_sdk",
 )
 
-# IREE extension creates llvm-raw (when IREE is root) and other IREE-specific repos
+# IREE extension creates MLIR-adjacent source repos when IREE is root and other
+# IREE-specific repos unconditionally.
 iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
+    "abseil_cpp",
     "amdgpu_device_libs",
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
+    "dawn",
+    "dlmalloc",
     "hip_api_headers",
     "hsa_runtime_headers",
+    "iree_amdgpu_device_toolchain",
     "iree_cuda",
     "llvm-raw",
     "nccl",
     "rccl",
     "spirv_cross",
+    "spirv_headers",
+    "spirv_tools",
     "stablehlo",
+    "torch-mlir-raw",
     "tracy_client",
     "vulkan_headers",
+    "wasi_sdk",
     "webgpu_headers",
 )
 
@@ -99,7 +108,17 @@ llvm_configure(
         "ARM",
         "NVPTX",
         "RISCV",
+        "SPIRV",
         "WebAssembly",
         "X86",
     ],
+)
+
+# Configure torch-mlir using its upstream Bazel overlay. The configured
+# repository is only needed when the Torch input plugin is selected.
+torch_mlir_configure = use_repo_rule("@torch-mlir-raw//utils/bazel:configure.bzl", "torch_mlir_configure")
+
+torch_mlir_configure(
+    name = "torch-mlir",
+    src_workspace = "@torch-mlir-raw//:CMakeLists.txt",
 )

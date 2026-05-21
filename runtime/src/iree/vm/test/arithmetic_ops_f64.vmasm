@@ -1,0 +1,444 @@
+vm.module @arithmetic_ops_f64 version 0
+vm.type f64
+vm.type i32
+
+vm.export @test_add_f64
+vm.func @test_add_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 3
+  %i4:5 = vm.const.f64 1.5
+  %i4:5 = vm.add.f64 %i4:5, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "1.5+1.5=3"
+}
+
+vm.export @test_sub_f64
+vm.func @test_sub_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.5
+  %i4:5 = vm.const.f64 2.5
+  %i6:7 = vm.const.f64 3
+  %i4:5 = vm.sub.f64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "3.0-2.5=0.5"
+}
+
+vm.export @test_mul_f64
+vm.func @test_mul_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 6.25
+  %i4:5 = vm.const.f64 2.5
+  %i4:5 = vm.mul.f64 %i4:5, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2.5*2.5=6.25"
+}
+
+vm.export @test_div_f64
+vm.func @test_div_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 -2
+  %i4:5 = vm.const.f64 4
+  %i4:5 = vm.div.f64 %i4:5, %i2:3
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4.0/-2.0=-2.0"
+}
+
+vm.export @test_rem_f64
+vm.func @test_rem_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1
+  %i4:5 = vm.const.f64 -2
+  %i6:7 = vm.const.f64 -3
+  %i4:5 = vm.rem.f64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-3.0%-2.0=1.0"
+}
+
+vm.export @test_fma_f64
+vm.func @test_fma_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 11
+  %i4:5 = vm.const.f64 5
+  %i6:7 = vm.const.f64 3
+  %i8:9 = vm.const.f64 2
+  %i4:5 = vm.fma.f64 %i8:9, %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "2.0*3.0+5.0=11.0"
+}
+
+vm.export @test_abs_f64
+vm.func @test_abs_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1
+  %i4:5 = vm.const.f64 -1
+  %i4:5 = vm.abs.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "abs(-1.0)=1.0"
+}
+
+vm.export @test_neg_f64
+vm.func @test_neg_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1
+  %i4:5 = vm.const.f64 -1
+  %i4:5 = vm.neg.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "neg(-1.0)=1.0"
+}
+
+vm.export @test_ceil_f64
+vm.func @test_ceil_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i4:5 = vm.const.f64 1.5
+  %i4:5 = vm.ceil.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "ceil(1.5)=2.0"
+}
+
+vm.export @test_floor_f64
+vm.func @test_floor_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1
+  %i4:5 = vm.const.f64 1.5
+  %i4:5 = vm.floor.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "floor(1.5)=1.0"
+}
+
+vm.export @test_round_f64
+vm.func @test_round_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i4:5 = vm.const.f64 1.5
+  %i4:5 = vm.round.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "round(1.5)=2.0"
+}
+
+vm.export @test_round_f64_even
+vm.func @test_round_f64_even() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i4:5 = vm.const.f64 1.5
+  %i4:5 = vm.round.f64.even %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "roundeven(1.5)=2.0"
+}
+
+vm.export @test_min_f64
+vm.func @test_min_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 -2
+  %i4:5 = vm.const.f64 -3
+  %i2:3 = vm.min.f64 %i4:5, %i2:3
+  %i1 = vm.cmp.ne.f64.o %i2:3, %i4:5
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "min(-3.0,-2.0)=-3.0"
+}
+
+vm.export @test_max_f64
+vm.func @test_max_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 -2
+  %i4:5 = vm.const.f64 -3
+  %i4:5 = vm.max.f64 %i4:5, %i2:3
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "max(-3.0,-2.0)=-2.0"
+}
+
+vm.export @test_atan_f64
+vm.func @test_atan_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.78539816339744828
+  %i4:5 = vm.const.f64 1
+  %i4:5 = vm.atan.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "atan(1.0)=0.7853981633974483"
+}
+
+vm.export @test_atan2_f64
+vm.func @test_atan2_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1.5707963267948966
+  %i4:5 = vm.const.f64.zero
+  %i6:7 = vm.const.f64 1
+  %i4:5 = vm.atan2.f64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "atan2(1.0,0.0)=1.5707963267948966"
+}
+
+vm.export @test_cos_f64
+vm.func @test_cos_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.87758256189037276
+  %i4:5 = vm.const.f64 0.5
+  %i4:5 = vm.cos.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cos(0.5)=0.8775825618903728"
+}
+
+vm.export @test_sin_f64
+vm.func @test_sin_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.47942553860420301
+  %i4:5 = vm.const.f64 0.5
+  %i4:5 = vm.sin.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "sin(0.5)=0.479425538604203"
+}
+
+vm.export @test_exp_f64
+vm.func @test_exp_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2.7182818284590451
+  %i4:5 = vm.const.f64 1
+  %i4:5 = vm.exp.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "exp(1.0)=2.718281828459045"
+}
+
+vm.export @test_exp2_f64
+vm.func @test_exp2_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 4
+  %i4:5 = vm.const.f64 2
+  %i4:5 = vm.exp2.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "exp(2.0)=4.0"
+}
+
+vm.export @test_expm1_f64
+vm.func @test_expm1_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 6.3890560989306504
+  %i4:5 = vm.const.f64 2
+  %i4:5 = vm.expm1.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "expm1(2.0)=6.38905609893065"
+}
+
+vm.export @test_log_f64
+vm.func @test_log_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2.3025850929940459
+  %i4:5 = vm.const.f64 10
+  %i4:5 = vm.log.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log(10.0)=2.302585092994046"
+}
+
+vm.export @test_log10_f64
+vm.func @test_log10_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 1
+  %i4:5 = vm.const.f64 10
+  %i4:5 = vm.log10.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log10(10.0)=1.0"
+}
+
+vm.export @test_log1p_f64
+vm.func @test_log1p_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2.3978952727983707
+  %i4:5 = vm.const.f64 10
+  %i4:5 = vm.log1p.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log1p(10.0)=2.3978952727983707"
+}
+
+vm.export @test_log2_f64
+vm.func @test_log2_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 3.3219280948873622
+  %i4:5 = vm.const.f64 10
+  %i4:5 = vm.log2.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "log2(10.0)=3.321928094887362"
+}
+
+vm.export @test_pow_f64
+vm.func @test_pow_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 9
+  %i4:5 = vm.const.f64 2
+  %i6:7 = vm.const.f64 3
+  %i4:5 = vm.pow.f64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "pow(3.0,2.0)=9.0"
+}
+
+vm.export @test_rsqrt_f64
+vm.func @test_rsqrt_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.5
+  %i4:5 = vm.const.f64 4
+  %i4:5 = vm.rsqrt.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "rsqrt(4.0)=0.5"
+}
+
+vm.export @test_sqrt_f64
+vm.func @test_sqrt_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i4:5 = vm.const.f64 4
+  %i4:5 = vm.sqrt.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "sqrt(4.0)=2.0"
+}
+
+vm.export @test_tanh_f64
+vm.func @test_tanh_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 0.46211715726000974
+  %i4:5 = vm.const.f64 0.5
+  %i4:5 = vm.tanh.f64 %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "tanh(0.5)=0.46211715726000974"
+}

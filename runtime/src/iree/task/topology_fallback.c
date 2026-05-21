@@ -13,8 +13,8 @@
 // Only compiles when:
 // - cpuinfo is not available
 // - Not on a platform with a dedicated implementation
-#if !defined(IREE_TASK_USE_CPUINFO) && !defined(IREE_PLATFORM_APPLE) &&      \
-    !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
+#if !defined(IREE_TASK_USE_CPUINFO) && !defined(IREE_PLATFORM_APPLE) && \
+    !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM) &&  \
     !defined(IREE_PLATFORM_LINUX)
 
 #include <string.h>
@@ -57,11 +57,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_task_topology_t* out_topology) {
   // Today we have a fixed limit on the number of groups within a particular
   // topology.
-  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+  if (cpu_count > IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "too many CPUs specified (%" PRIhsz
-                            " provided for a max capacity of %zu)",
-                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+                            " provided for a max capacity of %d)",
+                            cpu_count, IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);

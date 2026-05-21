@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
+if(NOT IREE_BUILD_TESTS)
   return()
 endif()
 """,
@@ -30,6 +30,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
+        "//runtime/src/iree/vm/bytecode/utils",
         "//runtime/src/iree/vm/test:all_bytecode_modules_c",
         "//runtime/src/iree/vm/testing:test_runner",
         "//runtime/src/iree/vm/testing:yieldable_test_module",

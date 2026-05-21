@@ -1,0 +1,479 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// Block processor: cooperative multi-worker execution engine for the block ISA.
+//
+// Multiple workers call drain() concurrently, sharing .data (scheduling
+// atomics, resolved bindings) and cooperatively processing work via atomic
+// tile claiming. Each call to drain() attempts to claim and execute tiles
+// from the current active region, then returns control to the caller.
+//
+// The drain/return model enables user-mode cooperative scheduling: callers
+// maintain an active list of block processor contexts and scan across them,
+// calling drain() on each to claim work. When drain() returns with no work
+// (tiles_executed == 0 and not completed), the caller yields or moves to
+// other contexts. No hooks, no callbacks, no implicit blocking — all yield
+// and scheduling policy lives in the caller.
+//
+// The inner loop is tight: one amortized atomic CAS per tile reservation,
+// zero task system interaction between dispatches within a region. Region
+// transitions are handled by the completer (elected via remaining_tiles
+// countdown). Tile counters and remaining_tiles carry epoch tags so stale
+// workers from an earlier region fail their next claim without an arrival
+// barrier. Multi-worker contexts keep separate .data storage for each block so
+// block fixups are never rewritten under workers that may still be finishing
+// the previous block.
+//
+// Execution paths:
+//   - Single-worker (worker_count=1): drain() executes the entire recording
+//     synchronously with no atomics, returning completed=true on the first
+//     call.
+//   - Multi-worker (worker_count>1): callers invoke drain() repeatedly from
+//     N concurrent contexts. Each call processes one region pass and returns.
+
+#ifndef IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_PROCESSOR_H_
+#define IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_PROCESSOR_H_
+
+#include "iree/base/api.h"
+#include "iree/base/internal/cpu.h"
+#include "iree/hal/drivers/local_task/block_isa.h"
+#include "iree/hal/local/profile.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+typedef struct iree_task_executor_t iree_task_executor_t;
+
+//===----------------------------------------------------------------------===//
+// Execution context
+//===----------------------------------------------------------------------===//
+
+// Execution context shared across all workers processing a recording.
+// Contains the .data storage (mutable execution state) and synchronization
+// state for multi-worker coordination.
+//
+// For single-worker execution, declare on the stack and use
+// context_initialize. For multi-worker, use context_allocate (which
+// allocates the context + .data storage together with proper alignment).
+typedef struct iree_hal_cmd_block_processor_profile_dispatch_t {
+  // Earliest host timestamp observed for this dispatch in the active region.
+  iree_atomic_int64_t start_host_time_ns;
+
+  // Latest host timestamp observed for this dispatch in the active region.
+  iree_atomic_int64_t end_host_time_ns;
+
+  // Total tiles completed for this dispatch in the active region.
+  iree_atomic_int64_t tile_count;
+
+  // Sum of worker execution span durations for this dispatch.
+  iree_atomic_int64_t tile_duration_sum_ns;
+
+  // First non-OK worker status code observed, or OK when absent.
+  iree_atomic_int32_t status_code;
+} iree_hal_cmd_block_processor_profile_dispatch_t;
+
+typedef struct iree_hal_cmd_block_processor_context_t {
+  // The recording being executed (immutable .text).
+  const iree_hal_cmd_block_recording_t* recording;
+
+  // Binding entries used for indirect fixup resolution.
+  const iree_hal_cmd_binding_entry_t* binding_table;
+
+  // Number of entries in |binding_table|.
+  iree_host_size_t binding_table_length;
+
+  // First block-state storage slot. Single-worker contexts reuse this slot;
+  // multi-worker contexts allocate one slot per recorded block.
+  iree_hal_cmd_block_state_t* state_storage;
+
+  // Byte size of one block-state payload without trailing slot padding.
+  iree_host_size_t state_size;
+
+  // Byte stride between block-state slots.
+  iree_host_size_t state_stride;
+
+  // Number of block-state slots available in |state_storage|.
+  uint16_t state_count;
+
+  // Next block-state slot to initialize for a multi-worker block transition.
+  uint16_t next_block_state_index;
+
+  // Total workers cooperating on this recording.
+  uint32_t worker_count;
+
+  // Wake demand for the current active region, clamped to [1, worker_count].
+  // This seeds the task process wake_budget when a recording is published and
+  // is updated by region/block completers. It is not an admission limit.
+  iree_atomic_int32_t current_wake_budget;
+
+  // Set to 1 when RETURN is reached or an error occurs. Workers check this
+  // on each drain() entry and exit immediately when set.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_int32_t completed;
+
+  // Block sequence counter. Incremented after initializing each new block's
+  // .data. Workers compare their cached value against this to detect block
+  // transitions and reset per-block local state.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_int32_t block_sequence;
+
+  // First error encountered by any worker. Set via CAS; only the first error
+  // wins and subsequent errors are freed by the losing reporter. Stored as an
+  // intptr_t because iree_status_t is a pointer-tagged value.
+  iree_alignas(iree_hardware_destructive_interference_size)
+      iree_atomic_intptr_t error_status;
+
+  // The current block being processed. Updated by the completer at block
+  // transitions before publishing the next odd block_sequence value.
+  iree_atomic_intptr_t current_block;
+
+  // The current block-state slot. Updated with |current_block| at block
+  // transitions so workers sample a matching immutable block and mutable state.
+  iree_atomic_intptr_t current_state;
+
+  // Maximum active-region dispatch count in any recorded block. This is the
+  // number of tile_index slots in each block-state slot.
+  uint16_t max_region_dispatch_count;
+
+  // Maximum total binding count in any recorded block.
+  uint16_t max_total_binding_count;
+
+  // Global epoch counter for region publication. Monotonically increasing
+  // across region and block transitions. Only the completer writes this
+  // (single-writer, not atomic). Workers read the epoch from
+  // state->region_state instead.
+  int32_t next_epoch;
+
+  // Process wake budget updated by the completer at region transitions.
+  iree_atomic_int32_t* wake_budget_ptr;
+
+  // Executor to notify when a region transition increases wake demand.
+  iree_task_executor_t* wake_executor;
+
+  // Process-local retention epoch advanced after region, block, and terminal
+  // transitions. Warm task workers use this to wait near the compute process
+  // without repeatedly entering the block processor while no tiles are
+  // currently claimable.
+  iree_atomic_int32_t* retention_epoch_ptr;
+
+  // Warm task workers sleeping on retention_epoch_ptr.
+  iree_atomic_int32_t* retention_sleepers_ptr;
+
+  // Shared warm-retainer spin deadline in host nanoseconds.
+  iree_atomic_int64_t* retention_spin_deadline_ns_ptr;
+
+  // Duration to keep warm retainers spinning during region transitions.
+  iree_duration_t retention_transition_spin_ns;
+
+  struct {
+    // Optional recorder receiving command-buffer dispatch execution records.
+    iree_hal_local_profile_recorder_t* recorder;
+
+    // Queue identity attached to emitted dispatch records.
+    iree_hal_local_profile_queue_scope_t scope;
+
+    // Queue submission id shared by command-buffer dispatch records.
+    uint64_t submission_id;
+
+    // Session-local command-buffer identifier for replayed dispatch records.
+    uint64_t command_buffer_id;
+
+    // Aggregation state for dispatches in the active region, or NULL.
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatches;
+
+    // Number of entries in |dispatches|.
+    iree_host_size_t dispatch_capacity;
+
+    // Command-buffer region event capture state.
+    struct {
+      // True when command-buffer region events should be emitted.
+      bool events_enabled;
+
+      // Host timestamp when the active region became claimable.
+      iree_atomic_int64_t start_host_time_ns;
+
+      // Initial tile count observed when the active region became claimable.
+      iree_atomic_int32_t tile_count;
+
+      // Number of active-region drains that executed one or more tiles.
+      iree_atomic_int32_t useful_drain_count;
+
+      // Number of active-region drains that found no claimable tiles.
+      iree_atomic_int32_t no_work_drain_count;
+
+      // Tail no-work observations collected after tile claiming.
+      struct {
+        // Unfinished tile counts observed by tail no-work drains.
+        struct {
+          // Minimum unfinished tile count observed.
+          iree_atomic_int32_t min;
+
+          // Maximum unfinished tile count observed.
+          iree_atomic_int32_t max;
+
+          // Power-of-two unfinished tile count histogram.
+          iree_atomic_int32_t bucket_counts
+              [IREE_HAL_PROFILE_COMMAND_REGION_REMAINING_TILE_BUCKET_COUNT];
+        } remaining_tiles;
+
+        // Host timestamp when the first drain began.
+        iree_atomic_int64_t first_start_host_time_ns;
+
+        // Host timestamp when the last drain ended.
+        iree_atomic_int64_t last_end_host_time_ns;
+
+        // Accumulated region-relative time values for tail no-work drains.
+        struct {
+          // Sum of no-work drain start offsets from the region start.
+          iree_atomic_int64_t start_offset_ns;
+
+          // Sum of no-work drain durations.
+          iree_atomic_int64_t drain_duration_ns;
+        } time_sums;
+      } tail_no_work;
+
+      // Host timestamp when the first useful active-region drain began.
+      iree_atomic_int64_t first_useful_drain_start_host_time_ns;
+
+      // Host timestamp when the last useful active-region drain ended.
+      iree_atomic_int64_t last_useful_drain_end_host_time_ns;
+
+      // No-work drain retention behavior counts for the active region.
+      struct {
+        // No-work drains that kept the process active after advancement.
+        iree_atomic_int32_t keep_active_count;
+
+        // No-work drains that explicitly republished process activity.
+        iree_atomic_int32_t publish_keep_active_count;
+
+        // No-work drains that waited warm on the process retention epoch.
+        iree_atomic_int32_t keep_warm_count;
+      } retention;
+    } command_region;
+  } profile;
+} iree_hal_cmd_block_processor_context_t;
+
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, completed) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor completion flag must start on its own cache line");
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, block_sequence) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor block sequence must start on its own cache line");
+static_assert(offsetof(iree_hal_cmd_block_processor_context_t, error_status) %
+                      iree_hardware_destructive_interference_size ==
+                  0,
+              "processor error state must start on its own cache line");
+
+// Per-worker state maintained by the caller across drain() calls. Each worker
+// has its own instance — no sharing, no atomic access. Initialize with
+// memset(&state, 0, sizeof(state)) before the first drain() call.
+typedef struct iree_hal_cmd_block_processor_worker_state_t {
+  // Block sequence counter cached by this worker. Compared against the
+  // context's block_sequence to detect block transitions.
+  int32_t block_sequence;
+} iree_hal_cmd_block_processor_worker_state_t;
+
+// Calling worker context for one block processor drain.
+typedef struct iree_hal_cmd_block_processor_worker_context_t {
+  // Globally unique task worker index.
+  uint32_t worker_index;
+
+  // Cached logical processor identifier for the calling worker.
+  iree_cpu_processor_id_t processor_id;
+
+  // Reusable worker-local scratch memory.
+  iree_byte_span_t local_memory;
+} iree_hal_cmd_block_processor_worker_context_t;
+
+// Diagnostic reason used by trace-only drain metadata.
+typedef enum iree_hal_cmd_block_processor_drain_reason_e {
+  // No specific reason was assigned.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_UNKNOWN = 0,
+  // The caller provided a NULL processor context.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NULL_CONTEXT,
+  // The single-worker synchronous fast path ran.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_SINGLE_WORKER,
+  // The recording had already reached a terminal state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETED,
+  // A block transition was in progress.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_BLOCK_TRANSITION,
+  // The active block had no remaining runnable regions.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_REGION_COMPLETE,
+  // The block sequence changed while the worker was sampling state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_STALE_BLOCK_SEQUENCE,
+  // A worker-visible error had already been reported.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_ERROR,
+  // The worker claimed no tiles from the active region.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_NO_TILES,
+  // The worker claimed one or more tiles.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_WORK,
+  // The worker completed the region and advanced processor state.
+  IREE_HAL_CMD_BLOCK_PROCESSOR_DRAIN_REASON_COMPLETER,
+} iree_hal_cmd_block_processor_drain_reason_t;
+
+// Result of a single drain() call.
+typedef struct iree_hal_cmd_block_processor_drain_result_t {
+  // Number of tiles executed by this worker during this drain() call.
+  // Zero means no work was available (either the region was exhausted by
+  // other workers or the processor is between region transitions).
+  uint32_t tiles_executed;
+
+  // True when the entire recording has finished (all blocks processed and
+  // RETURN reached) or an error has been reported. Once true, all
+  // subsequent drain() calls also return completed=true.
+  bool completed;
+
+  // Block sequence observed by the drain, or 0 if no multi-worker block state
+  // was sampled. Callers use this on no-work drains to detect that a block
+  // transition raced the decision to retain a warm worker.
+  int32_t block_sequence;
+
+  // Region epoch observed by the drain, or 0 if no active region was sampled.
+  // Callers use this on no-work drains to detect that a region transition
+  // raced the decision to retain a warm worker.
+  int32_t region_epoch;
+
+  // Additional workers requested by a completed region transition. Published
+  // after the transition gate has reopened so woken workers enter ready state.
+  int32_t wake_delta;
+
+  // Maximum warm retainers requested by recorded region lookahead. Zero means
+  // the caller should use the process's current wake budget.
+  int32_t warm_retainer_limit;
+
+  // True when this no-work drain should keep the worker spinning near the
+  // processor because the next recorded candidate region is wide.
+  bool prefer_warm_spin;
+
+  // Trace-only diagnostic reason describing why this drain call returned.
+  IREE_TRACE(iree_hal_cmd_block_processor_drain_reason_t reason;)
+
+  // Trace-only active region index observed by this drain, or -1 if absent.
+  IREE_TRACE(int32_t active_region;)
+
+  // Trace-only remaining tile count observed after the drain decision.
+  IREE_TRACE(uint32_t remaining_tiles;)
+} iree_hal_cmd_block_processor_drain_result_t;
+
+// Initializes a caller-owned context for single-worker synchronous execution.
+//
+// |state| is the pre-allocated .data buffer, sized via
+// iree_hal_cmd_block_state_size(recording->max_region_dispatch_count,
+// recording->max_total_binding_count). The caller is responsible for
+// allocating this (e.g., from an arena).
+//
+// For multi-worker execution, use context_allocate instead.
+void iree_hal_cmd_block_processor_context_initialize(
+    iree_hal_cmd_block_processor_context_t* out_context,
+    const iree_hal_cmd_block_recording_t* recording,
+    const iree_hal_cmd_binding_entry_t* binding_table,
+    iree_host_size_t binding_table_length, iree_hal_cmd_block_state_t* state,
+    iree_host_size_t state_size);
+
+// Attaches an optional local profiling recorder to a processor context.
+//
+// Callers should only set this for command-buffer replay operations that need
+// per-dispatch host execution spans; direct queue dispatches already have a
+// queue-operation-level profiling record.
+void iree_hal_cmd_block_processor_context_set_profile_recorder(
+    iree_hal_cmd_block_processor_context_t* context,
+    iree_hal_local_profile_recorder_t* recorder,
+    iree_hal_local_profile_queue_scope_t scope, uint64_t submission_id,
+    uint64_t command_buffer_id,
+    iree_hal_cmd_block_processor_profile_dispatch_t* dispatches,
+    iree_host_size_t dispatch_capacity);
+
+// Returns the current wake demand hint for |context|. The value is always at
+// least 1 and at most the number of cooperating workers, and is intended to
+// seed the owning task process before scheduling a recording. NULL/no-block
+// contexts report 1.
+int32_t iree_hal_cmd_block_processor_context_wake_budget(
+    const iree_hal_cmd_block_processor_context_t* context);
+
+// Records task-process retention behavior observed after a no-work drain.
+void iree_hal_cmd_block_processor_context_profile_record_retention(
+    iree_hal_cmd_block_processor_context_t* context, bool keep_active,
+    bool publish_keep_active, bool keep_warm);
+
+// Allocates an execution context for processing a block recording.
+//
+// Allocates .data (block state) sized to the recording's highwater marks.
+// For worker_count > 1, initializes the first block's .data and sets
+// block_sequence so workers can begin immediately upon calling drain().
+//
+// If the recording is empty (no blocks), returns iree_ok_status() and
+// sets *out_context to NULL. drain() and context_free accept NULL.
+//
+// The binding_table is used for indirect fixups (span == NULL). It may be
+// NULL if all fixups are direct.
+iree_status_t iree_hal_cmd_block_processor_context_allocate(
+    const iree_hal_cmd_block_recording_t* recording,
+    const iree_hal_cmd_binding_entry_t* binding_table,
+    iree_host_size_t binding_table_length, uint32_t worker_count,
+    iree_allocator_t allocator,
+    iree_hal_cmd_block_processor_context_t** out_context);
+
+// Attempts to claim and execute tiles from the current active region.
+//
+// For worker_count == 1: executes the entire recording synchronously on the
+// first call and returns completed=true. No atomics, no coordination.
+//
+// For worker_count > 1: claims tiles from the current region via epoch-tagged
+// atomic CAS, executes them, and participates in completer election via
+// epoch-tagged remaining_tiles countdown. If elected as completer, advances the
+// region or handles block transitions before returning.
+// Returns control to the caller after one pass.
+//
+// The caller is responsible for yield/scheduling policy:
+//   do {
+//     iree_hal_cmd_block_processor_drain(context, &worker_context,
+//                                        &worker_state, &result);
+//     if (!result.completed && result.tiles_executed == 0) {
+//       // Scan other contexts, park, or otherwise apply caller policy.
+//     }
+//   } while (!result.completed);
+//
+// Errors are stored in the context (first error wins via CAS). The caller
+// retrieves the result from context_consume_result after all workers have
+// stopped calling drain().
+//
+// Accepts NULL context (returns completed=true immediately).
+void iree_hal_cmd_block_processor_drain(
+    iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_block_processor_worker_context_t* worker_context,
+    iree_hal_cmd_block_processor_worker_state_t* worker_state,
+    iree_hal_cmd_block_processor_drain_result_t* out_result);
+
+// Returns true if the context has advanced since |drain_result| observed it.
+// Used only on no-work drains before arming warm retention so workers do not
+// sleep through a region/block/terminal transition that already happened.
+bool iree_hal_cmd_block_processor_context_did_advance(
+    const iree_hal_cmd_block_processor_context_t* context,
+    const iree_hal_cmd_block_processor_drain_result_t* drain_result);
+
+// Consumes and returns the first error encountered by any worker during
+// execution. Returns iree_ok_status() if all workers completed
+// successfully. The caller takes ownership of the returned status.
+//
+// Must be called exactly once after all workers have stopped calling
+// drain(). Accepts NULL (returns iree_ok_status()).
+iree_status_t iree_hal_cmd_block_processor_context_consume_result(
+    iree_hal_cmd_block_processor_context_t* context);
+
+// Frees the execution context. Must be called after consume_result.
+// With arena allocators this is a no-op (the arena handles bulk cleanup).
+// Accepts NULL.
+void iree_hal_cmd_block_processor_context_free(
+    iree_hal_cmd_block_processor_context_t* context,
+    iree_allocator_t allocator);
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
+
+#endif  // IREE_HAL_DRIVERS_LOCAL_TASK_BLOCK_PROCESSOR_H_

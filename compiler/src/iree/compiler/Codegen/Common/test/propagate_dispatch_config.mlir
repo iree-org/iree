@@ -18,7 +18,8 @@ hal.executable private @basic_exe {
         return
       }
       iree_codegen.dispatch_config @matmul
-          workgroup_size = [64, 16, 1] subgroup_size = 64 {
+          workgroup_size = [64, 16, 1] subgroup_size = 64
+          workgroup_local_memory = 4096 {
         ^bb0(%device: !hal.device, %w0: index, %w1: index):
           %c1 = arith.constant 1 : index
           %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 128)>()[%w0]
@@ -33,7 +34,10 @@ hal.executable private @basic_exe {
 //       CHECK:       %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:       %[[X:.+]] = affine.apply
 //       CHECK:       hal.return %[[X]], %[[W1]], %[[C1]]
-//       CHECK:     } attributes {subgroup_size = 64 : index, workgroup_size = [64 : index, 16 : index, 1 : index]}
+//       CHECK:     } attributes {
+//  CHECK-SAME:       subgroup_size = 64 : index
+//  CHECK-SAME:       workgroup_local_memory = 4096 : index
+//  CHECK-SAME:       workgroup_size = [64 : index, 16 : index, 1 : index]
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul()
 //   CHECK-NOT:     iree_codegen.dispatch_config

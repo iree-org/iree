@@ -128,6 +128,35 @@ def HALLoader_ExecutableExportOrdinalOp : HALLoader_PureOp<"executable.export.or
   }];
 }
 
+def HALLoader_ExecutableLookupFunctionOp : HALLoader_PureOp<"executable.lookup.function", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Executable function lookup pseudo-op.}];
+  let description = [{
+    Resolves an executable export name to a runtime function id. The result is
+    only meaningful for the executable operand and must be treated as opaque by
+    compiler IR. The function reference is retained as a SymbolRefAttr so
+    executable linking passes can rewrite it, but it may intentionally stop
+    resolving after executable serialization strips the original export
+    declarations.
+  }];
+
+  let arguments = (ins
+    HAL_Executable:$executable,
+    SymbolRefAttr:$entry_point
+  );
+  let results = (outs
+    HAL_FunctionId:$result
+  );
+
+  let assemblyFormat = [{
+    `target` `(` $executable `:` type($executable) `)`
+    `function` `(` $entry_point `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
 def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
   AttrSizedOperandSegments,
 ]> {
@@ -138,7 +167,7 @@ def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
 
   let arguments = (ins
     HAL_Executable:$executable,
-    HAL_Ordinal:$entry_point,
+    HAL_FunctionId:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z,

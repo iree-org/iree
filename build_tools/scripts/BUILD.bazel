@@ -1,0 +1,23 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_python//python:defs.bzl", "py_binary")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],
+)
+
+exports_files([
+    "amdgpu_device_binaries.py",
+    "amdgpu_target_map.py",
+    "generate_vm_isa.py",
+])
+
+py_binary(
+    name = "generate_vm_isa",
+    srcs = ["generate_vm_isa.py"],
+)

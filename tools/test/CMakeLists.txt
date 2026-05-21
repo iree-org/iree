@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "compile_pipelines.mlir"
     "compile_to_continuation.mlir"
     "compile_to_phase.mlir"
+    "compile_to_resources.mlir"
     "executable_benchmarks.mlir"
     "executable_configurations.mlir"
     "executable_sources.mlir"
@@ -26,11 +27,13 @@ iree_lit_test_suite(
     "iree-benchmark-module.mlir"
     "iree-compile-help.txt"
     "iree-convert-parameters.txt"
+    "iree-dump-module-control-flow.mlir"
     "iree-dump-module.mlir"
     "iree-dump-parameters.txt"
     "iree-link-bundle.mlir"
     "iree-link-executable-source.mlir"
     "iree-link.mlir"
+    "iree-replay-tools.txt"
     "iree-run-mlir.mlir"
     "iree-run-module-expected.mlir"
     "iree-run-module-in-place.mlir"
@@ -54,14 +57,17 @@ iree_lit_test_suite(
     FileCheck
     iree-benchmark-executable
     iree-benchmark-module
+    iree-benchmark-replay
     iree-compile
     iree-convert-parameters
     iree-dump-module
     iree-dump-parameters
+    iree-dump-replay
     iree-link
     iree-opt
     iree-run-mlir
     iree-run-module
+    iree-run-replay
     iree-tblgen
     iree-tokenize
     not

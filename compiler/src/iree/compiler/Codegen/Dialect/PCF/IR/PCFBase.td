@@ -200,12 +200,16 @@ def PCF_TestScopeAttr
 
   let extraClassDeclaration = [{
     SmallVector<Value> getWorkerCounts(OpBuilder&, Location, int64_t) {
-      assert(false && "why are you here?");
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
       return {};
     }
     SmallVector<Value> getWorkerIDs(OpBuilder&, Location, int64_t) {
-      assert(false && "why are you here?");
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
       return {};
+    }
+    int64_t getNativeNumProcessorIds() {
+      assert(false && "TestScopeAttr is for structural tests only; querying hardware properties is not expected.");
+      return 1;
     }
   }];
 }
@@ -233,6 +237,9 @@ def PCF_SequentialAttr
       Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
       SmallVector<Value> ids(numIds, zero);
       return ids;
+    }
+    int64_t getNativeNumProcessorIds() {
+      return 1;
     }
   }];
 }

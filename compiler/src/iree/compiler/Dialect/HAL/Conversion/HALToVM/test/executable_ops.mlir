@@ -107,3 +107,25 @@ util.func public @executableConstants(
   // CHECK: vm.return %[[EXE]]
   util.return %0 : !hal.executable
 }
+
+// -----
+
+hal.executable @exe {
+  hal.executable.variant @variant target(<"backend", "format">) {
+    hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<bindings = [
+      #hal.pipeline.binding<storage_buffer>
+    ]>)
+  }
+}
+
+// CHECK-LABEL: @executableLookupFunction
+// CHECK-SAME: (%[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>)
+util.func public @executableLookupFunction(%executable: !hal.executable) -> i64 {
+  // CHECK-DAG: %[[FUNCTION_NAME:.+]] = vm.rodata.inline {{.+}} : !vm.buffer = "dispatch"
+  // CHECK: %[[FUNCTION_ID:.+]] = vm.call @hal.executable.lookup.function(%[[EXECUTABLE]], %[[FUNCTION_NAME]])
+  %function_id = hal.executable.lookup.function
+      target(%executable : !hal.executable)
+      function(@exe::@variant::@dispatch) : i64
+  // CHECK: vm.return %[[FUNCTION_ID]]
+  util.return %function_id : i64
+}

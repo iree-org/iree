@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "iree/async/frontier_tracker.h"
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/threading/numa.h"
@@ -187,24 +188,23 @@ IREE_FLAG_CALLBACK(
 typedef struct iree_benchmark_executable_args_t {
   iree_hal_device_t* device;
   iree_hal_executable_t* executable;
+  iree_hal_executable_function_t function;
   const iree_hal_buffer_ref_t* bindings;
   uint32_t workgroup_count[3];
 } iree_benchmark_executable_args_t;
 
-// NOTE: error handling is here just for better diagnostics: it is not tracking
-// allocations correctly and will leak. Don't use this as an example for how to
-// write robust code.
 static iree_status_t iree_benchmark_executable_run(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   iree_benchmark_executable_args_t* args =
       (iree_benchmark_executable_args_t*)benchmark_def->user_data;
 
+  iree_status_t status = iree_ok_status();
   iree_hal_semaphore_t* fence_semaphore = NULL;
   uint64_t fence_value = 0ull;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
+  status = iree_hal_semaphore_create(
       args->device, IREE_HAL_QUEUE_AFFINITY_ANY, fence_value,
-      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore));
+      IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &fence_semaphore);
   iree_hal_semaphore_list_t wait_semaphore_list =
       iree_hal_semaphore_list_empty();
   iree_hal_semaphore_list_t signal_semaphore_list = {
@@ -216,11 +216,15 @@ static iree_status_t iree_benchmark_executable_run(
   // Record a command buffer with the dispatches.
   // The same command buffer recording is reused on each benchmark step.
   iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_create(
-      args->device, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_begin(command_buffer));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_create(
+        args->device, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+        IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+        /*binding_capacity=*/0, &command_buffer);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_begin(command_buffer);
+  }
   iree_const_byte_span_t constants = iree_make_const_byte_span(
       &parsed_params.constants[0].ui32,
       parsed_params.constant_count * sizeof(parsed_params.constants[0]));
@@ -231,20 +235,28 @@ static iree_status_t iree_benchmark_executable_run(
   iree_hal_dispatch_config_t config = iree_hal_make_static_dispatch_config(
       args->workgroup_count[0], args->workgroup_count[1],
       args->workgroup_count[2]);
-  for (int32_t i = 0; i < FLAG_batch_size; ++i) {
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_dispatch(
-        command_buffer, args->executable, FLAG_entry_point, config, constants,
-        bindings, IREE_HAL_DISPATCH_FLAG_NONE));
-    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_execution_barrier(
-        command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
-        IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, NULL, 0, NULL));
+  for (int32_t i = 0; i < FLAG_batch_size && iree_status_is_ok(status); ++i) {
+    status = iree_hal_command_buffer_dispatch(
+        command_buffer, args->executable, args->function, config, constants,
+        bindings, IREE_HAL_DISPATCH_FLAG_NONE);
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_command_buffer_execution_barrier(
+          command_buffer, IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+          IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE,
+          IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, NULL, 0, NULL);
+    }
   }
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_end(command_buffer));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_end(command_buffer);
+  }
 
   // Start profiling now - all subsequent device operations will be what the
   // user wants to measure.
-  IREE_RETURN_IF_ERROR(iree_hal_begin_profiling_from_flags(args->device));
+  iree_hal_profiling_from_flags_t* profiling = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_begin_profiling_from_flags(
+        args->device, iree_allocator_system(), &profiling);
+  }
 
   // Submit the command buffer and wait for it to complete.
   // Note that each iteration runs through the whole grid as it's important that
@@ -253,49 +265,58 @@ static iree_status_t iree_benchmark_executable_run(
   // not testing cache effects. This means we need to account for the total
   // number of workgroups executed.
   int64_t dispatch_count = 0;
-  while (iree_benchmark_keep_running(benchmark_state, FLAG_batch_size)) {
+  while (iree_status_is_ok(status) &&
+         iree_benchmark_keep_running(benchmark_state, FLAG_batch_size)) {
     // Submit the command buffer; if the device could not start executing while
     // we were recording then this will kick off the execution.
     ++fence_value;
-    IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
+    status = iree_hal_device_queue_execute(
         args->device, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphore_list,
         signal_semaphore_list, command_buffer,
-        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
+        iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE);
 
     // Block and wait for the submission to complete.
     // Note that this will include round-trip overhead and if the dispatch or
     // batch size is small then the final time may end up being mostly overhead.
-    IREE_RETURN_IF_ERROR(iree_hal_semaphore_wait(fence_semaphore, fence_value,
-                                                 iree_infinite_timeout(),
-                                                 IREE_ASYNC_WAIT_FLAG_NONE));
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_semaphore_wait(fence_semaphore, fence_value,
+                                       iree_infinite_timeout(),
+                                       IREE_ASYNC_WAIT_FLAG_NONE);
+    }
+    if (iree_status_is_ok(status)) {
+      iree_benchmark_pause_timing(benchmark_state);
 
-    iree_benchmark_pause_timing(benchmark_state);
+      // Accumulate the total number of dispatches executed.
+      dispatch_count += FLAG_batch_size;
 
-    // Accumulate the total number of dispatches executed.
-    dispatch_count += FLAG_batch_size;
+      // Flush profiling if recording. Note that we don't want to include the
+      // profiling time in the benchmark result.
+      status = iree_hal_flush_profiling_from_flags(profiling);
 
-    // Flush profiling if recording. Note that we don't want to include the
-    // profiling time in the benchmark result.
-    IREE_RETURN_IF_ERROR(iree_hal_device_profiling_flush(args->device));
-
-    iree_benchmark_resume_timing(benchmark_state);
+      iree_benchmark_resume_timing(benchmark_state);
+    }
   }
 
   // End profiling before cleaning up so tooling doesn't capture it.
-  IREE_RETURN_IF_ERROR(iree_hal_end_profiling_from_flags(args->device));
+  if (profiling) {
+    status =
+        iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  }
 
   // To get a total time per invocation we set the item count to the total
   // invocations dispatched. That gives us both total dispatch and single
   // invocation times in the reporter output.
-  int64_t total_invocations = dispatch_count * args->workgroup_count[0] *
-                              args->workgroup_count[1] *
-                              args->workgroup_count[2];
-  iree_benchmark_set_items_processed(benchmark_state, total_invocations);
+  if (iree_status_is_ok(status)) {
+    int64_t total_invocations = dispatch_count * args->workgroup_count[0] *
+                                args->workgroup_count[1] *
+                                args->workgroup_count[2];
+    iree_benchmark_set_items_processed(benchmark_state, total_invocations);
+  }
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(fence_semaphore);
 
-  return iree_ok_status();
+  return status;
 }
 
 // Parses an `x,y,z` workgroup count.
@@ -322,6 +343,11 @@ static iree_status_t iree_parse_workgroup_count(
 // and input/output buffers.
 static iree_status_t iree_benchmark_executable_from_flags(
     iree_allocator_t host_allocator) {
+  if (FLAG_entry_point < 0) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "--entry_point must be non-negative");
+  }
+
   iree_vm_instance_t* instance = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                                                host_allocator, &instance));
@@ -346,6 +372,21 @@ static iree_status_t iree_benchmark_executable_from_flags(
       &create_params, host_allocator, &device);
   iree_async_proactor_pool_release(proactor_pool);
   IREE_RETURN_IF_ERROR(device_status);
+
+  // Queue operations require devices to be assigned to a causal frontier. Keep
+  // the single-device group alive for the benchmark so direct queue execution
+  // has the same ordering contract as VM HAL module execution.
+  iree_async_frontier_tracker_t* frontier_tracker = NULL;
+  iree_status_t topology_status = iree_async_frontier_tracker_create(
+      iree_async_frontier_tracker_options_default(), host_allocator,
+      &frontier_tracker);
+  iree_hal_device_group_t* device_group = NULL;
+  if (iree_status_is_ok(topology_status)) {
+    topology_status = iree_hal_device_group_create_from_device(
+        device, frontier_tracker, host_allocator, &device_group);
+  }
+  iree_async_frontier_tracker_release(frontier_tracker);
+  IREE_RETURN_IF_ERROR(topology_status);
 
   // We'll reuse the same executable cache so that once we load the executable
   // we'll be able to reuse any driver-side optimizations.
@@ -421,6 +462,8 @@ static iree_status_t iree_benchmark_executable_from_flags(
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_executable_cache_prepare_executable(
       executable_cache, &executable_params, &executable));
+  iree_hal_executable_function_t function =
+      iree_hal_executable_function_from_index((uint32_t)FLAG_entry_point);
 
   // Register one benchmark per workgroup count specified.
   iree_benchmark_executable_args_t* args = NULL;
@@ -431,6 +474,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
     args[i] = (iree_benchmark_executable_args_t){
         .device = device,
         .executable = executable,
+        .function = function,
         .bindings = bindings,
         .workgroup_count = {1, 1, 1},
     };
@@ -459,6 +503,7 @@ static iree_status_t iree_benchmark_executable_from_flags(
   iree_hal_executable_release(executable);
   iree_io_file_contents_free(file_contents);
   iree_hal_executable_cache_release(executable_cache);
+  iree_hal_device_group_release(device_group);
   iree_hal_device_release(device);
   iree_vm_instance_release(instance);
 

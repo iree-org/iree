@@ -28,16 +28,81 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
+constexpr unsigned kBdaDispatchRootDwordCount = 8;
+constexpr uint32_t kBdaDispatchRootLength =
+    kBdaDispatchRootDwordCount * sizeof(uint32_t);
+constexpr uint32_t kBdaDispatchRootOffset = 0;
+constexpr uint32_t kBdaDispatchConstantOffset = kBdaDispatchRootLength;
+
+constexpr char kVulkanSpirvFlatbufferFormat[] = "vulkan-spirv-fb";
+constexpr char kVulkanSpirvBdaFormat[] = "vulkan-spirv-bda-v1";
+
+enum class VulkanDispatchAbi {
+  Descriptors,
+  Bda,
+  All,
+};
+
+class PropagateExecutableTargetPass final
+    : public PassWrapper<PropagateExecutableTargetPass,
+                         OperationPass<ModuleOp>> {
+public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PropagateExecutableTargetPass)
+
+  explicit PropagateExecutableTargetPass(
+      IREE::HAL::ExecutableTargetAttr targetAttr)
+      : targetAttr(targetAttr) {}
+
+  StringRef getArgument() const final {
+    return "iree-vulkan-spirv-propagate-executable-target";
+  }
+
+  StringRef getDescription() const final {
+    return "Propagates the selected Vulkan executable target into the inner "
+           "module.";
+  }
+
+  void runOnOperation() final {
+    ModuleOp moduleOp = getOperation();
+    if (failed(setOrVerifyTarget(moduleOp))) {
+      return signalPassFailure();
+    }
+    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+      if (failed(setOrVerifyTarget(funcOp))) {
+        return signalPassFailure();
+      }
+    }
+  }
+
+private:
+  LogicalResult setOrVerifyTarget(Operation *op) {
+    Attribute existingAttr = op->getAttr(IREE::HAL::ExecutableTargetAttr::name);
+    if (!existingAttr) {
+      op->setAttr(IREE::HAL::ExecutableTargetAttr::name, targetAttr);
+      return success();
+    }
+    if (existingAttr == targetAttr) {
+      return success();
+    }
+    return op->emitError() << "conflicting Vulkan executable target attribute";
+  }
+
+  // Target selected by the HAL target backend for this translation pipeline.
+  IREE::HAL::ExecutableTargetAttr targetAttr;
+};
+
 struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
   // lowest common denominator to guarantee the generated SPIR-V is widely
   // accepted for now. Eventually we want to use a list for multi-targeting.
   std::string target = "vp_android_baseline_2022";
-  bool indirectBindings = false;
+  VulkanDispatchAbi dispatchAbi = VulkanDispatchAbi::Descriptors;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
@@ -53,20 +118,73 @@ struct VulkanSPIRVTargetOptions {
             "GPUs. See "
             "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
             "more details."));
-    binder.opt<bool>(
-        "iree-vulkan-experimental-indirect-bindings", indirectBindings,
-        llvm::cl::desc(
-            "Force indirect bindings for all generated dispatches."));
+    binder.opt<VulkanDispatchAbi>(
+        "iree-vulkan-dispatch-abi", dispatchAbi,
+        llvm::cl::desc("Selects the Vulkan dispatch ABI emitted for generated "
+                       "executables."),
+        llvm::cl::values(
+            clEnumValN(VulkanDispatchAbi::Descriptors, "descriptors",
+                       "Emit descriptor-set executables."),
+            clEnumValN(VulkanDispatchAbi::Bda, "bda",
+                       "Emit BDA root binding table executables."),
+            clEnumValN(VulkanDispatchAbi::All, "all",
+                       "Emit all supported executable ABI variants ordered by "
+                       "runtime preference.")));
   }
 };
 
 using DescriptorSetLayout = std::pair<unsigned, ArrayRef<PipelineBindingAttr>>;
 
+static IREE::GPU::TargetAttr
+getTargetAttrWithBdaRootAbiFeatures(IREE::GPU::TargetAttr target) {
+  StringRef features = target.getFeatures();
+  std::string bdaFeatures = features.str();
+  auto appendFeatureIfMissing = [&](StringRef feature) {
+    if (features.contains(feature)) {
+      return;
+    }
+    if (!bdaFeatures.empty()) {
+      bdaFeatures += ",";
+    }
+    bdaFeatures += feature;
+  };
+  appendFeatureIfMissing("cap:Int64");
+  appendFeatureIfMissing("cap:PhysicalStorageBufferAddresses");
+  appendFeatureIfMissing("ext:SPV_KHR_physical_storage_buffer");
+
+  if (features == StringRef(bdaFeatures)) {
+    return target;
+  }
+  return IREE::GPU::TargetAttr::get(target.getContext(), target.getArch(),
+                                    bdaFeatures, target.getWgp(),
+                                    target.getChip());
+}
+
+static iree_hal_vulkan_BdaDispatchLayoutDef_ref_t
+createBdaDispatchLayoutDef(IREE::HAL::ExecutableExportOp exportOp,
+                           FlatbufferBuilder &fbb) {
+  iree_hal_vulkan_BdaDispatchLayoutDef_start(fbb);
+  iree_hal_vulkan_BdaDispatchLayoutDef_abi_version_add(fbb, 1);
+  iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_offset_add(
+      fbb, kBdaDispatchRootOffset);
+  iree_hal_vulkan_BdaDispatchLayoutDef_root_push_constant_length_add(
+      fbb, kBdaDispatchRootLength);
+  iree_hal_vulkan_BdaDispatchLayoutDef_constant_push_constant_offset_add(
+      fbb, kBdaDispatchConstantOffset);
+  iree_hal_vulkan_BdaDispatchLayoutDef_constant_count_add(
+      fbb, static_cast<uint32_t>(exportOp.getLayout().getConstants()));
+  iree_hal_vulkan_BdaDispatchLayoutDef_binding_table_entry_type_add(
+      fbb, iree_hal_vulkan_BdaBindingTableEntryType_ADDRESS64);
+  iree_hal_vulkan_BdaDispatchLayoutDef_binding_count_add(
+      fbb, static_cast<uint32_t>(exportOp.getLayout().getBindings().size()));
+  return iree_hal_vulkan_BdaDispatchLayoutDef_end(fbb);
+}
+
 static std::tuple<iree_hal_vulkan_DescriptorSetLayoutDef_vec_ref_t,
                   iree_hal_vulkan_PipelineLayoutDef_vec_ref_t,
                   DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t>>
 createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
-                         FlatbufferBuilder &fbb) {
+                         bool useBdaRootAbi, FlatbufferBuilder &fbb) {
   DenseMap<DescriptorSetLayout, size_t> descriptorSetLayoutMap;
   DenseMap<IREE::HAL::PipelineLayoutAttr, uint32_t> pipelineLayoutMap;
   SmallVector<iree_hal_vulkan_DescriptorSetLayoutDef_ref_t>
@@ -78,48 +196,54 @@ createPipelineLayoutDefs(ArrayRef<IREE::HAL::ExecutableExportOp> exportOps,
       continue; // already present
     }
 
-    // Currently only one descriptor set on the compiler side. We could
-    // partition it by binding type (direct vs indirect, etc).
     SmallVector<uint32_t> descriptorSetLayoutOrdinals;
-    auto descriptorSetLayout =
-        DescriptorSetLayout(0, pipelineLayoutAttr.getBindings());
-    auto it = descriptorSetLayoutMap.find(descriptorSetLayout);
-    if (it != descriptorSetLayoutMap.end()) {
-      descriptorSetLayoutOrdinals.push_back(it->second);
-    } else {
-      SmallVector<iree_hal_vulkan_DescriptorSetLayoutBindingDef_ref_t>
-          bindingRefs;
-      for (auto [i, bindingAttr] :
-           llvm::enumerate(pipelineLayoutAttr.getBindings())) {
-        uint32_t ordinal = static_cast<uint32_t>(i);
-        iree_hal_vulkan_VkDescriptorType_enum_t descriptorType = 0;
-        switch (bindingAttr.getType()) {
-        case IREE::HAL::DescriptorType::UniformBuffer:
-          descriptorType = iree_hal_vulkan_VkDescriptorType_UNIFORM_BUFFER;
-          break;
-        case IREE::HAL::DescriptorType::StorageBuffer:
-          descriptorType = iree_hal_vulkan_VkDescriptorType_STORAGE_BUFFER;
-          break;
+    if (!useBdaRootAbi) {
+      // Currently only one descriptor set on the compiler side. We could
+      // partition it by binding type (direct vs indirect, etc).
+      auto descriptorSetLayout =
+          DescriptorSetLayout(0, pipelineLayoutAttr.getBindings());
+      auto it = descriptorSetLayoutMap.find(descriptorSetLayout);
+      if (it != descriptorSetLayoutMap.end()) {
+        descriptorSetLayoutOrdinals.push_back(it->second);
+      } else {
+        SmallVector<iree_hal_vulkan_DescriptorSetLayoutBindingDef_ref_t>
+            bindingRefs;
+        for (auto [i, bindingAttr] :
+             llvm::enumerate(pipelineLayoutAttr.getBindings())) {
+          uint32_t ordinal = static_cast<uint32_t>(i);
+          iree_hal_vulkan_VkDescriptorType_enum_t descriptorType = 0;
+          switch (bindingAttr.getType()) {
+          case IREE::HAL::DescriptorType::UniformBuffer:
+            descriptorType = iree_hal_vulkan_VkDescriptorType_UNIFORM_BUFFER;
+            break;
+          case IREE::HAL::DescriptorType::StorageBuffer:
+            descriptorType = iree_hal_vulkan_VkDescriptorType_STORAGE_BUFFER;
+            break;
+          }
+          uint32_t descriptorCount = 1;
+          uint32_t stageFlags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT
+          bindingRefs.push_back(
+              iree_hal_vulkan_DescriptorSetLayoutBindingDef_create(
+                  fbb, ordinal, descriptorType, descriptorCount, stageFlags));
         }
-        uint32_t descriptorCount = 1;
-        uint32_t stageFlags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT
-        bindingRefs.push_back(
-            iree_hal_vulkan_DescriptorSetLayoutBindingDef_create(
-                fbb, ordinal, descriptorType, descriptorCount, stageFlags));
-      }
-      auto bindingsRef = fbb.createOffsetVecDestructive(bindingRefs);
+        auto bindingsRef = fbb.createOffsetVecDestructive(bindingRefs);
 
-      descriptorSetLayoutOrdinals.push_back(descriptorSetLayoutRefs.size());
-      descriptorSetLayoutMap[descriptorSetLayout] =
-          descriptorSetLayoutRefs.size();
-      descriptorSetLayoutRefs.push_back(
-          iree_hal_vulkan_DescriptorSetLayoutDef_create(fbb, bindingsRef));
+        descriptorSetLayoutOrdinals.push_back(descriptorSetLayoutRefs.size());
+        descriptorSetLayoutMap[descriptorSetLayout] =
+            descriptorSetLayoutRefs.size();
+        descriptorSetLayoutRefs.push_back(
+            iree_hal_vulkan_DescriptorSetLayoutDef_create(fbb, bindingsRef));
+      }
     }
     auto descriptorSetLayoutOrdinalsRef =
         fbb.createInt32Vec(descriptorSetLayoutOrdinals);
 
     iree_hal_vulkan_PushConstantRange_vec_ref_t pushConstantRangesRef = 0;
-    if (int64_t pushConstantCount = pipelineLayoutAttr.getConstants()) {
+    int64_t pushConstantCount = pipelineLayoutAttr.getConstants();
+    if (useBdaRootAbi) {
+      pushConstantCount += kBdaDispatchRootDwordCount;
+    }
+    if (pushConstantCount) {
       SmallVector<iree_hal_vulkan_PushConstantRange> pushConstantRanges;
       iree_hal_vulkan_PushConstantRange range0;
       range0.stage_flags = 0x00000020u; // VK_SHADER_STAGE_COMPUTE_BIT
@@ -183,15 +307,28 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const final {
-    executableTargetAttrs.push_back(
-        getExecutableTarget(context, options_.indirectBindings));
+    switch (options_.dispatchAbi) {
+    case VulkanDispatchAbi::Descriptors:
+      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      break;
+    case VulkanDispatchAbi::Bda:
+      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      break;
+    case VulkanDispatchAbi::All:
+      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      break;
+    }
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context, bool indirectBindings) const {
+  getExecutableTarget(MLIRContext *context, bool useBdaRootAbi) const {
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
+      if (useBdaRootAbi) {
+        target = getTargetAttrWithBdaRootAbiFeatures(target);
+      }
       addConfigGPUTarget(context, target, configItems);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
@@ -201,8 +338,8 @@ public:
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("vulkan-spirv"),
-        indirectBindings ? b.getStringAttr("vulkan-spirv-fb-ptr")
-                         : b.getStringAttr("vulkan-spirv-fb"),
+        useBdaRootAbi ? b.getStringAttr(kVulkanSpirvBdaFormat)
+                      : b.getStringAttr(kVulkanSpirvFlatbufferFormat),
         b.getDictionaryAttr(configItems));
   }
 
@@ -221,7 +358,10 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
-    buildSPIRVCodegenPassPipeline(passManager.nest<ModuleOp>());
+    OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
+    modulePassManager.addPass(
+        std::make_unique<PropagateExecutableTargetPass>(targetAttr));
+    buildSPIRVCodegenPassPipeline(modulePassManager);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 
@@ -333,9 +473,12 @@ public:
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
 
+    const bool useBdaRootAbi =
+        variantOp.getTarget().getFormat() == kVulkanSpirvBdaFormat;
+
     // Create unique descriptor and pipeline layouts for each entry point.
     auto [descriptorSetLayoutsRef, pipelineLayoutsRef, pipelineLayoutMap] =
-        createPipelineLayoutDefs(sortedExportOps, builder);
+        createPipelineLayoutDefs(sortedExportOps, useBdaRootAbi, builder);
 
     // Create pipelines representing entry points.
     // Note that the element at index #i is for entry point with ordinal #i.
@@ -356,6 +499,9 @@ public:
       uint32_t subgroupSize =
           abiAttr ? abiAttr.getSubgroupSize().value_or(0) : 0;
 
+      iree_hal_vulkan_BdaDispatchLayoutDef_ref_t bdaDispatchLayoutRef =
+          useBdaRootAbi ? createBdaDispatchLayoutDef(exportOp, builder) : 0;
+
       auto entryPointRef = builder.createString(spirvEntryPointOp.getFn());
       iree_hal_vulkan_PipelineDef_start(builder);
       iree_hal_vulkan_PipelineDef_shader_module_ordinal_add(
@@ -366,6 +512,12 @@ public:
       iree_hal_vulkan_PipelineDef_subgroup_size_add(builder, subgroupSize);
       iree_hal_vulkan_PipelineDef_debug_info_add(builder,
                                                  exportDebugInfos[ordinal]);
+      if (useBdaRootAbi) {
+        iree_hal_vulkan_PipelineDef_dispatch_abi_add(
+            builder, iree_hal_vulkan_DispatchAbi_BDA_V1);
+        iree_hal_vulkan_PipelineDef_bda_dispatch_layout_add(
+            builder, bdaDispatchLayoutRef);
+      }
       pipelineRefs.push_back(iree_hal_vulkan_PipelineDef_end(builder));
     }
     auto pipelinesRef = builder.createOffsetVecDestructive(pipelineRefs);
@@ -438,10 +590,13 @@ public:
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
 
+    const bool useBdaRootAbi =
+        variantOp.getTarget().getFormat() == kVulkanSpirvBdaFormat;
+
     // Generate descriptor set and pipeline layouts from export ops.
     auto exportOps = llvm::to_vector(variantOp.getExportOps());
     auto [descriptorSetLayoutsRef, pipelineLayoutsRef, pipelineLayoutMap] =
-        createPipelineLayoutDefs(exportOps, builder);
+        createPipelineLayoutDefs(exportOps, useBdaRootAbi, builder);
 
     // Create a pipeline for each export.
     SmallVector<iree_hal_vulkan_PipelineDef_ref_t> pipelineRefs;
@@ -454,6 +609,9 @@ public:
       // TODO: support annotation on an attribute to allow users to specify.
       uint32_t subgroupSize = 0;
 
+      iree_hal_vulkan_BdaDispatchLayoutDef_ref_t bdaDispatchLayoutRef =
+          useBdaRootAbi ? createBdaDispatchLayoutDef(exportOp, builder) : 0;
+
       auto entryPointRef = builder.createString(exportOp.getName());
       iree_hal_vulkan_PipelineDef_start(builder);
       iree_hal_vulkan_PipelineDef_shader_module_ordinal_add(
@@ -462,6 +620,12 @@ public:
       iree_hal_vulkan_PipelineDef_pipeline_layout_ordinal_add(
           builder, pipelineLayoutOrdinal);
       iree_hal_vulkan_PipelineDef_subgroup_size_add(builder, subgroupSize);
+      if (useBdaRootAbi) {
+        iree_hal_vulkan_PipelineDef_dispatch_abi_add(
+            builder, iree_hal_vulkan_DispatchAbi_BDA_V1);
+        iree_hal_vulkan_PipelineDef_bda_dispatch_layout_add(
+            builder, bdaDispatchLayoutRef);
+      }
       pipelineRefs.push_back(iree_hal_vulkan_PipelineDef_end(builder));
     }
     auto pipelinesRef = builder.createOffsetVecDestructive(pipelineRefs);

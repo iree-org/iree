@@ -6,6 +6,7 @@
 
 # End-to-end convolution 2d tests.
 
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//build_tools/bazel:iree_e2e_generated_runner_test.bzl", "iree_generated_e2e_runner_test")
 
 package(

@@ -606,4 +606,35 @@ def IREETensorExt_CastToRaggedShapeOp :
   let hasVerifier = 1;
 }
 
+def IREETensorExt_LinearizeRaggedDimsOp :
+    IREETensorExt_PureOp<"linearize_ragged_dims", [
+      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface,
+        ["reifyResultShapes"]>
+    ]> {
+  let summary = [{Linearizes the sparse dimensions of a ragged shaped value.}];
+  let description = [{
+    Linearizes the contiguous sparse dimensions of a tensor or memref with a
+    `#iree_tensor_ext.ragged_shape` encoding/layout into a single dense
+    dimension. The result has the same element type, preserves all non-sparse
+    dimensions, removes the ragged encoding/layout, and has rank:
+
+    ```
+    rank(source) - num_sparse_dimensions + 1
+    ```
+
+    Dynamic result dimensions are provided by `resultDynamicDims`.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$source,
+    Variadic<Index>:$resultDynamicDims
+  );
+  let results = (outs AnyTypeOf<[AnyRankedTensor, AnyMemRef]>:$result);
+
+  let assemblyFormat = [{
+    $source attr-dict `:` type($source) `->` type($result)(`{` $resultDynamicDims^ `}`)?
+  }];
+
+  let hasVerifier = 1;
+}
 #endif  // IREE_DIALECT_TENSOR_EXT_OPS

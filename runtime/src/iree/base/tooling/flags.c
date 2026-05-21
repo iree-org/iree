@@ -138,9 +138,17 @@ static int iree_flag_cmp(const void* lhs_ptr, const void* rhs_ptr) {
 }
 
 // Sorts the flags in the flag registry by file > line.
+// Insertion sort — the flag array is small and bounded by IREE_FLAGS_CAPACITY.
 static void iree_flag_registry_sort(iree_flag_registry_t* registry) {
-  qsort(registry->flags, registry->flag_count, sizeof(iree_flag_t),
-        iree_flag_cmp);
+  for (int i = 1; i < registry->flag_count; i++) {
+    iree_flag_t temp = registry->flags[i];
+    int j = i - 1;
+    while (j >= 0 && iree_flag_cmp(&registry->flags[j], &temp) > 0) {
+      registry->flags[j + 1] = registry->flags[j];
+      --j;
+    }
+    registry->flags[j + 1] = temp;
+  }
 }
 
 //===----------------------------------------------------------------------===//

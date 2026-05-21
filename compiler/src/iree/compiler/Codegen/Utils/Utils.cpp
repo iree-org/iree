@@ -342,6 +342,12 @@ LogicalResult duplicateTensorEmptyOps(OpBuilder &b, tensor::EmptyOp emptyOp) {
   b.setInsertionPoint(emptyOp);
   SmallVector<OpOperand *> uses = llvm::map_to_vector(
       emptyOp->getUses(), [](OpOperand &use) { return &use; });
+  // Keep the original op for the first use; clone for the rest. If the empty
+  // op has zero or one uses there's nothing to duplicate, and `std::next` on
+  // an empty vector's begin is past-end UB.
+  if (uses.size() < 2) {
+    return success();
+  }
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp = cast<tensor::EmptyOp>(b.clone(*emptyOp.getOperation()));
     Operation *user = use->getOwner();
@@ -1163,7 +1169,7 @@ FailureOr<int64_t> getDynamicUpperBound(Value value,
   // Fallback to ValueBoundsConstraintSet for complex cases.
   auto ub = ValueBoundsConstraintSet::computeConstantBound(
       presburger::BoundType::UB, {value, std::nullopt},
-      /*stopCondition=*/nullptr, /*closedUB=*/true);
+      /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
   if (succeeded(ub)) {
     return ub.value();
   }
@@ -1791,7 +1797,7 @@ computeDimUpperBound(Value shapedValue, unsigned dimNum,
     FailureOr<int64_t> maybeDimBoundSize =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {shapedValue, dimNum},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (succeeded(maybeDimBoundSize)) {
       return DimBoundSize{/*baseSize=*/*maybeDimBoundSize,
                           /*scalable=*/false};
@@ -2124,7 +2130,7 @@ inferSizesFromIR(IREE::Codegen::UKernelGenericOp ukernelOp, OpResult opResult) {
       FailureOr<int64_t> maybeDimBound =
           ValueBoundsConstraintSet::computeConstantBound(
               presburger::BoundType::UB, {opResult, static_cast<unsigned>(idx)},
-              /*stopCondition=*/nullptr, /*closedUB=*/true);
+              /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
       if (failed(maybeDimBound)) {
         LDBG() << "failed to infer bounds for dynamic dim";
         return std::nullopt;
@@ -2153,7 +2159,7 @@ std::optional<VectorizationTileSizes> static inferSizesFromMixedSizes(
     FailureOr<int64_t> maybeDimBound =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, dim,
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(maybeDimBound)) {
       LDBG() << "failed to infer bounds for dim #" << dim;
       return std::nullopt;
@@ -2406,6 +2412,22 @@ bool isValidInPlaceAccumulatingOp(DestinationStyleOpInterface dpsOp) {
     }
   }
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Utility functions to collect root ops.
+//===----------------------------------------------------------------------===//
+
+SmallVector<Operation *> getTunerRootOps(Operation *scopeOp) {
+  SmallVector<Operation *> rootOps;
+
+  scopeOp->walk([&](Operation *op) {
+    if (hasRootOpInfo(op)) {
+      rootOps.push_back(op);
+    }
+  });
+
+  return rootOps;
 }
 
 } // namespace mlir::iree_compiler

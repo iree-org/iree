@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_COMBINELAYOUTTRANSFORMATION_H_
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -89,6 +90,17 @@ FailureOr<IREE::LinalgExt::MapStoreOp>
 foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
                     IREE::LinalgExt::MapStoreOp mapStoreOp,
                     PadDistributionConfigFn padDistributionConfigFn);
+
+/// Fold a linalg.pack op into a iree_linalg_ext.map_store op by decomposing
+/// the pack into [pad] → expand_shape → transpose and folding each piece.
+/// If a `padDistributionConfigFn` is provided, packs with padding semantics
+/// are supported (the pad is folded via `foldPadIntoMapStore`). Without it,
+/// only packs without padding semantics are folded; packs that require padding
+/// return failure.
+FailureOr<IREE::LinalgExt::MapStoreOp>
+foldPackIntoMapStore(RewriterBase &rewriter, linalg::PackOp packOp,
+                     IREE::LinalgExt::MapStoreOp mapStoreOp,
+                     PadDistributionConfigFn padDistributionConfigFn);
 
 /// Combines any layout/indexing transformation ops at the ends of a dispatch.
 /// Finds `iree_codegen.store_to_buffer` ops in the `funcOp`, and combines any

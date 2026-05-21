@@ -112,9 +112,17 @@ struct WorkgroupScopeAttrModel final
     // Allocating workgroup memory unsupported.
     return failure();
   }
+
+  int64_t getNativeNumProcessorIds(Attribute attr) const {
+    auto workgroupScopeAttr = cast<Codegen::WorkgroupScopeAttr>(attr);
+    // When linearize is true, all IDs are combined into one.
+    // When false, we have 3 native IDs (x, y, z).
+    return workgroupScopeAttr.getLinearize() ? 1 : 3;
+  }
 };
 
-class CodegenPCFConversionInterface : public PCFConversionDialectInterface {
+class CodegenPCFConversionInterface final
+    : public PCFConversionDialectInterface {
 public:
   using PCFConversionDialectInterface::PCFConversionDialectInterface;
   void

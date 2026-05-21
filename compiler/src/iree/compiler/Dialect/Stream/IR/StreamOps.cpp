@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -1843,7 +1844,7 @@ ResourceAllocaOp::createSuballocations(Type timepointType, Type resourceType,
   // Compute total size and the offsets of all suballocated resources via the
   // pack op.
   auto indexType = builder.getIndexType();
-  SmallVector<Type> packedOffsetTypes(sliceCount, indexType);
+  llvm::Repeated<Type> packedOffsetTypes(sliceCount, indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
       builder, fusedLoc, indexType, packedOffsetTypes, /*offset=*/nullptr,
       builder.getIndexArrayAttr(lifetimeIntervals), storageSizes, affinityAttr);
@@ -1949,7 +1950,7 @@ void ResourcePackOp::build(OpBuilder &builder, OperationState &state,
   size_t sliceCount = valueSizes.size();
   SmallVector<int64_t> lifetimeIntervals(sliceCount * 2, 0);
   auto indexType = builder.getIndexType();
-  SmallVector<Type> indexTypes(sliceCount, indexType);
+  llvm::Repeated<Type> indexTypes(sliceCount, indexType);
   build(builder, state, indexType, indexTypes, offset,
         builder.getIndexArrayAttr(lifetimeIntervals), valueSizes, affinity);
 }
@@ -3033,6 +3034,35 @@ void AsyncTransferOp::getAsyncAccessRanges(
 }
 
 //===----------------------------------------------------------------------===//
+// stream.async.cast
+//===----------------------------------------------------------------------===//
+
+Value AsyncCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+AsyncCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> AsyncCastOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+LogicalResult AsyncCastOp::verify() {
+  AsyncCastOp op = *this;
+  if (failed(verifyOpValueSizes(op, op.getSource(), op.getSourceSize())) ||
+      failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
+    return failure();
+  }
+  if (getSourceSize() != getResultSize()) {
+    return emitOpError("source and result sizes must be equal (tied storage)");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.async.load
 //===----------------------------------------------------------------------===//
 
@@ -3834,7 +3864,7 @@ void AsyncParameterWriteOp::getAsyncAccessRanges(
 
 LogicalResult AsyncParameterGatherOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    DictionaryAttr attributes, PropertyRef properties, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   // The result type matches the target operand type.
   AsyncParameterGatherOpAdaptor adaptor(operands, attributes, properties,
@@ -3900,7 +3930,7 @@ void AsyncParameterGatherOp::getAsyncAccessRanges(
 
 LogicalResult AsyncParameterScatterOp::inferReturnTypes(
     MLIRContext *context, std::optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, OpaqueProperties properties, RegionRange regions,
+    DictionaryAttr attributes, PropertyRef properties, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   // The result type matches the source operand type.
   AsyncParameterScatterOpAdaptor adaptor(operands, attributes, properties,

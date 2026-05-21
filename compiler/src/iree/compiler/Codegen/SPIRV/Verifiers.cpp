@@ -259,6 +259,9 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   // sizes.
   bool isNativeVectorSizeAccepted = false;
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
 

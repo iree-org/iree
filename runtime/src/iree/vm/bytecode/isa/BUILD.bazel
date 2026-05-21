@@ -1,0 +1,85 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:iree_genrule.bzl", "iree_genrule")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "isa.json",
+])
+
+iree_genrule(
+    name = "op_table_gen",
+    srcs = [
+        "isa.json",
+        "//build_tools/scripts:generate_vm_isa.py",
+    ],
+    outs = ["op_table.h"],
+    cmd = " ".join([
+        "python3",
+        "$(rootpath //build_tools/scripts:generate_vm_isa.py)",
+        "--schema",
+        "$(rootpath isa.json)",
+        "--op-table",
+        "$(execpath op_table.h)",
+    ]),
+)
+
+iree_genrule(
+    name = "encoding_table_gen",
+    srcs = [
+        "isa.json",
+        "//build_tools/scripts:generate_vm_isa.py",
+    ],
+    outs = [
+        "encoding_table.c",
+        "encoding_table.h",
+    ],
+    cmd = " ".join([
+        "python3",
+        "$(rootpath //build_tools/scripts:generate_vm_isa.py)",
+        "--schema",
+        "$(rootpath isa.json)",
+        "--encoding-table-header",
+        "$(execpath encoding_table.h)",
+        "--encoding-table-source",
+        "$(execpath encoding_table.c)",
+    ]),
+)
+
+iree_runtime_cc_library(
+    name = "isa",
+    srcs = [
+        "encoding_table.c",
+    ],
+    hdrs = [
+        "encoding_table.h",
+        "isa.h",
+        "op_table.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal/flatcc:parsing",
+        "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "isa_test",
+    srcs = ["isa_test.cc"],
+    deps = [
+        ":isa",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)

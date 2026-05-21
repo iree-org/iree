@@ -36,12 +36,6 @@
 
 #define DEBUG_TYPE "iree-gpu-config-utils"
 
-static llvm::cl::opt<bool> clGPUTestCpromotion(
-    "iree-codegen-test-c-promotion",
-    llvm::cl::desc("C promote in specific case of elemetwise operations that "
-                   "codegen cant yet support without it if also doing padding"),
-    llvm::cl::init(true));
-
 namespace mlir::iree_compiler::IREE::GPU {
 
 constexpr int64_t kCacheLineSizeBits = 128 * 8;
@@ -326,6 +320,7 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
           elementTypes[kScaledMMAOperandAcc], smma));
     }
   } else {
+    MLIRContext *ctx = target.getContext();
     for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
       // Intrinsics that do not specify a distribution kind cannot be
       // distributed.
@@ -336,9 +331,46 @@ static std::optional<GPUMMASchedule> getMmaScheduleFromProblemAndTarget(
         continue;
       }
 
-      auto [mSize, nSize, kSize] = mma.getMNKShape();
       auto [aType, bType, cType] = mma.getABCElementTypes();
-      intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+      // Only group convolutions show a clear gain from block intrinsics.
+      if (mma.isBlockIntrinsic() && isGemm) {
+        continue;
+      }
+      if (mma.isBlockIntrinsic()) {
+        auto [bSize, mSize, nSize, kSize] = mma.getBMNKShape();
+        intrinsics.emplace_back(GPUIntrinsicType(mSize, nSize, kSize, bSize,
+                                                 aType, bType, cType, mma));
+      } else {
+        auto [mSize, nSize, kSize] = mma.getMNKShape();
+        intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);
+
+        // Derive VDMFMA virtual intrinsics from this concrete MMA. VDMFMAs
+        // use the sparse trick (smfmac) and are only efficient when the
+        // problem's total M size fits within the VDMFMA's M tile size (8)
+        // and the problem's K size is at least the size of the VDMFMA
+        // intrinsic.
+        //
+        // Note: VMFMA intrinsics are intentionally excluded here. Adding
+        // them would change MMA selection for all problems.
+        for (VirtualMMAIntrinsic vi : mma.getVirtualIntrinsics()) {
+          if (!isVDMFMAIntrinsic(vi)) {
+            continue;
+          }
+          auto vmma = VirtualMMAAttr::get(ctx, vi);
+          auto [vm, vn, vk] = vmma.getMNKShape();
+          if (llvm::product_of(problem.mSizes) > vm) {
+            continue;
+          }
+
+          const int64_t vdmfmaKTileSize = vmma.getIntrinsicsK() * vk;
+          const int64_t problemKSize = llvm::product_of(problem.kSizes);
+          if (problemKSize % vdmfmaKTileSize != 0) {
+            continue;
+          }
+          auto [va, vb, vc] = vmma.getABCElementTypes();
+          intrinsics.emplace_back(vm, vn, vk, va, vb, vc, vmma);
+        }
+      }
     }
   }
   if (intrinsics.empty()) {
@@ -553,49 +585,130 @@ getSplitReductionTripCount(mlir::FunctionOpInterface entryPoint) {
   return splitReductionTripCnt;
 }
 
-/// Helper to check if a linalg operation has elementwise users that have
-/// additional operands beyond the result of the linalg operation.
-/// This function a workaround until we have map_load op that
-/// can allow us to codegen without c promotion for such elementwise ops
-/// we will track progress of this in
-/// https://github.com/iree-org/iree/issues/23038
-static bool checkForElementwiseUsersWithNewOperands(linalg::LinalgOp linalgOp) {
-  // Iterate through all users of the linalg operation's results
-  for (OpResult result : linalgOp->getResults()) {
-    for (Operation *user : result.getUsers()) {
-      // All elementwise operations are expected to be linalg at this stage.
-      auto linalgUser = dyn_cast<linalg::LinalgOp>(user);
-      if (!linalgUser) {
-        continue;
-      }
-      // Check if the linalg user has operands other than the result from
-      // linalgOp.
-      for (Value operand : linalgUser.getDpsInputs()) {
-        // If the operand is not from this linalg operation, return true.
-        if (operand.getDefiningOp() != linalgOp.getOperation()) {
-          return true;
-        }
+constexpr int64_t kMinWorkgroupsPerCU = 2;
+
+/// Rejects DMA when its extra LDS usage would drop occupancy (WGs/CU) below
+/// `kMinWorkgroupsPerCU` while non-DMA would still meet it. When chip info
+/// is available, the LDS-limited occupancy is capped by actual work
+/// (totalWorkgroups / numCUs) so that under-subscribed shapes are not
+/// penalized.
+/// TODO(#24375): Remove this guard once the tile-size heuristic stops
+/// over-allocating LDS or 1-warp/SIMD codegen can recover the perf without
+/// requiring inter-SIMD latency hiding via WGs/CU >= 2.
+static bool shouldRejectDMAForOccupancy(
+    const GPUMMASchedule &schedule, const GPUMatmulShapeType &problem,
+    IREE::GPU::TargetAttr target, int64_t prefetchNumStages, bool doCPromotion,
+    ArrayRef<int64_t> bounds, ArrayRef<int64_t> workgroupTileSizes) {
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
+
+  int64_t dmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/true, prefetchNumStages,
+      doCPromotion);
+  int64_t nonDmaLdsBytes = calculateTotalSharedMemoryUsedInBytes(
+      schedule, problem, /*useDirectLoad=*/false, /*prefetchNumStages=*/0,
+      doCPromotion);
+
+  assert(dmaLdsBytes > 0 && nonDmaLdsBytes > 0 && "LDS usage must be positive");
+
+  int64_t dmaMaxWgsPerCU = maxSharedMemoryBytes / dmaLdsBytes;
+  int64_t nonDmaMaxWgsPerCU = maxSharedMemoryBytes / nonDmaLdsBytes;
+
+  // When chip info is available, cap effective WGs/CU by how many workgroups
+  // actually exist per CU. This avoids over-rejecting DMA for small shapes
+  // where the GPU is under-subscribed.
+  IREE::GPU::TargetChipAttr chip = target.getChip();
+  if (chip) {
+    int64_t numCUs = chip.getWgpCount();
+    int64_t totalWorkgroups = 1;
+    for (auto [dim, tileSize] : llvm::zip_equal(bounds, workgroupTileSizes)) {
+      if (tileSize > 0) {
+        totalWorkgroups *= llvm::divideCeil(dim, tileSize);
       }
     }
+    int64_t maxWgsPerCU = llvm::divideCeil(totalWorkgroups, numCUs);
+    dmaMaxWgsPerCU = std::min(maxWgsPerCU, dmaMaxWgsPerCU);
+    nonDmaMaxWgsPerCU = std::min(maxWgsPerCU, nonDmaMaxWgsPerCU);
   }
+
+  return dmaMaxWgsPerCU < kMinWorkgroupsPerCU &&
+         nonDmaMaxWgsPerCU >= kMinWorkgroupsPerCU;
+}
+
+/// Returns true if direct load DMA should be rejected, and fall back to stream
+/// copies.
+///
+/// Problem-size + target-arch rejection (Stage 1). Called before the schedule
+/// is computed.
+///
+/// Rejection cases:
+///   1. Target does not support DMA (requires gfx950+ / CDNA4+).
+///   2. Not a GEMM. TODO(#23907): support convolution.
+///   3. LHS transposed, RHS not transposed shows regressions. TODO (#24117).
+///   4. Non-scaled only: data types are not f16 or bf16. TODO(#22119).
+///      For scaled, the data-type filter is replaced by the post-schedule
+///      `isScaledDMAAligned` check (the per-workgroup scale tile must be
+///      DMA-aligned).
+static bool shouldRejectDirectLoadDMA(IREE::GPU::TargetAttr target, bool isGemm,
+                                      Type lhsElemType, Type rhsElemType,
+                                      bool transposedLhs, bool transposedRhs,
+                                      bool scaled) {
+  // Case 1: DMA requires hardware support (gfx950+ / CDNA4+).
+  if (!targetSupportsGlobalLoadDMA(target)) {
+    return true;
+  }
+
+  // Case 2: Only GEMM are supported currently.
+  if (!isGemm) {
+    return true;
+  }
+
+  // Case 3: LHS transposed, RHS not transposed show regressions with DMA.
+  if (transposedLhs && !transposedRhs) {
+    return true;
+  }
+
+  // Case 4: non-scaled supports f16/bf16 only. Scaled is checked separately
+  // post-schedule via isScaledDMAAligned.
+  if (!scaled) {
+    auto isF16OrBF16 = [](Type t) { return t.isF16() || t.isBF16(); };
+    if (!isF16OrBF16(lhsElemType) || !isF16OrBF16(rhsElemType)) {
+      return true;
+    }
+  }
+
+  // Case 5: For scaled matmul, sub-byte LHS/RHS (e.g. f4E2M1FN) is rejected.
+  // Pipelining a sub-byte LDS allocation produces a multi-buffered
+  // `memref.reinterpret_cast` with a dynamic offset and routes the resulting
+  // sub-byte LDS slices through `cf.br` block arguments, neither of which the
+  // current narrow-type emulation pass can legalize. Lift this restriction
+  // once the follow-up narrow-type-emulation PR lands.
+  if (scaled) {
+    auto isSubByte = [](Type t) {
+      return t.isIntOrFloat() && t.getIntOrFloatBitWidth() < 8;
+    };
+    if (isSubByte(lhsElemType) || isSubByte(rhsElemType)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
-/// Returns true if any of the DPS init operands of the `dpsOp` are produced by
-/// a LinalgOp or LinalgExtOp. This is a workaround constraint for C promotion
-/// in cases that will require map_load to codegen without C promotion.
-/// Progress is being tracked in https://github.com/iree-org/iree/issues/23038.
-static bool
-checkForDPSOperandComputeOpProducers(DestinationStyleOpInterface dpsOp) {
-  for (Value dpsOperand : dpsOp.getDpsInits()) {
-    auto producer = dpsOperand.getDefiningOp();
-    // Fill ops are okay because they can become splat constants.
-    if (llvm::isa_and_nonnull<linalg::FillOp>(producer)) {
+/// Post-schedule check for scaled matmul: returns true if the per-workgroup
+/// scale tile (`scaleElements` of `scaleBits`-wide elements) is DMA-aligned
+/// for at least one of the target's supported DMA widths. Misaligned scales
+/// would force a mixed DMA-LHS/RHS + stream-scale strategy, which we no
+/// longer support — so callers treat misalignment as another reason to drop
+/// the DMA path entirely.
+static bool isScaledDMAAligned(int64_t scaleElements, int64_t scaleBits,
+                               int64_t targetSubgroupSize,
+                               ArrayRef<int64_t> dmaSizes) {
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % scaleBits != 0) {
       continue;
     }
-    // Compute ops are expected to be linalg ops or linalg_ext ops.
-    if (llvm::isa_and_nonnull<IREE::LinalgExt::LinalgExtOp, linalg::LinalgOp>(
-            producer)) {
+    int64_t elementsPerTransfer = targetSubgroupSize * (dmaSize / scaleBits);
+    if (scaleElements % elementsPerTransfer == 0) {
       return true;
     }
   }
@@ -617,9 +730,8 @@ static FailureOr<std::pair<LoweringConfigAttr, int64_t>>
 getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     ArrayRef<int64_t> bounds, ArrayRef<AffineMap> maps,
     ArrayRef<Value> operands, IREE::GPU::TargetAttr target, bool isGemm,
-    bool scaled, bool useDirectLoad, int64_t prefetchNumStages,
-    int64_t splitReductionTripCnt, bool cPromoteIfPadding,
-    bool hasExistingAccumulator = false,
+    bool scaled, bool &useDirectLoad, int64_t prefetchNumStages,
+    int64_t splitReductionTripCnt, bool hasExistingAccumulator = false,
     std::optional<ConvToIgemmInfo> convToIgemmInfo = std::nullopt) {
   if (target.getWgp().getMma().empty()) {
     return failure();
@@ -796,37 +908,29 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
                              lhsScaleType,
                              rhsScaleType};
 
-  // TODO(#22119): We don't use global load DMA for scaled matmuls, because
-  // compilation doesn't support it. Once this is fixed, we should use global
-  // load DMA here when possible.
   Location loc = operands[0].getLoc();
-  if (scaled && useDirectLoad) {
-    mlir::emitWarning(loc) << "direct load (global load DMA) is not yet "
-                              "supported for scaled matmuls, ignoring";
+  // Stage 1 (problem-size + target-arch) DMA rejection. Stage 2 (tile-size
+  // + scaled-tile alignment + occupancy) happens below after the schedule
+  // and workgroup tiles are computed.
+  if (useDirectLoad &&
+      shouldRejectDirectLoadDMA(target, isGemm, lhsElemType, rhsElemType,
+                                transposedLhs, transposedRhs, scaled)) {
+    LDBG() << "overriding direct load DMA, falling back to stream copies";
     useDirectLoad = false;
   }
-
-  // Accumulator needs shared memory if:
-  // - Padding requires C promotion, OR
-  // - The operation has an existing accumulator (matmul_accumulate)
-  bool doCPromotion =
-      (couldNeedPadding && cPromoteIfPadding) || hasExistingAccumulator;
 
   bool mustBeAligned = true;
   std::optional<GPUMMASchedule> schedule = getMmaScheduleFromProblemAndTarget(
       target, problem, loc, transposedLhs, transposedRhs, isGemm, scaled,
-      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/true, doCPromotion,
-      splitReductionTripCnt);
+      useDirectLoad, prefetchNumStages, /*mustBeAligned=*/true,
+      hasExistingAccumulator, splitReductionTripCnt);
 
   if (!schedule && canSupportUnaligned) {
     LDBG() << "Attempting to deduce unaligned TileAndFuse MMA schedule";
     mustBeAligned = false;
-    // For unaligned schedules, C promotion is needed for padding OR existing
-    // accumulator.
-    bool doCPromotionUnaligned = cPromoteIfPadding || hasExistingAccumulator;
     schedule = getMmaScheduleFromProblemAndTarget(
         target, problem, loc, transposedLhs, transposedRhs, isGemm, scaled,
-        useDirectLoad, prefetchNumStages, mustBeAligned, doCPromotionUnaligned,
+        useDirectLoad, prefetchNumStages, mustBeAligned, hasExistingAccumulator,
         splitReductionTripCnt);
   }
 
@@ -846,7 +950,8 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Use the batch tile sizes computed by the heuristic. When both M and
   // N sizes are smaller than the intrinsic sizes and must be padded up to
   // them, tiling batch elements per workgroup may help amortize the
-  // padding overhead.
+  // padding overhead. Additionally, if block intrinsics are available,
+  // the subgroup is tiled to match the intrinsic's batch dimension.
   int64_t staticBatchIdx = 0;
   for (unsigned batch : contractionB) {
     if (ShapedType::isDynamic(bounds[batch])) {
@@ -854,6 +959,12 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     } else {
       workgroupTileSizes[batch] =
           schedule->workgroupBatchSizes[staticBatchIdx++];
+    }
+    // If we are using block intrinsics, then we set the subgroup tile to 1
+    // in that dimension as we always use one tile in heuristic.
+    if (batch == contractionB[contractionB.size() - 1] &&
+        !schedule->batchSizes.empty()) {
+      subgroupTileSizes[batch] = 1;
     }
   }
 
@@ -899,6 +1010,18 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
   // Similarly the reduction tile size is just the post-packing tile count.
   for (auto [i, kDim] : llvm::enumerate(kDims)) {
     reductionTileSizes[kDim] = schedule->kTileSizes[i];
+
+    // VDMFMA (smfmac sparse trick) compresses the compute phase to roughly half
+    // the cycles of an equivalent MFMA sequence. In a software-pipelined loop
+    // this can cause the compute to finish before the next tile's loads arrive,
+    // turning latency-hiding overlap into vmcnt stalls. Scale the K tile count
+    // by the virtual intrinsic K unroll factor to restore the compute-to-memory
+    // ratio.
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(schedule->mmaKind)) {
+      if (isVDMFMAIntrinsic(vmma.getIntrinsic())) {
+        reductionTileSizes[kDim] *= vmma.getIntrinsicsK();
+      }
+    }
   }
 
   IREE::Codegen::InnerTileDescAttrInterface kind = schedule->mmaKind;
@@ -921,41 +1044,92 @@ getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
     }
   }
 
+  // Stage 2 (post-schedule). For scaled, reject DMA if the per-workgroup
+  // scale tile is not DMA-aligned (mixed DMA-LHS/RHS + stream-scale is
+  // unsupported). Then the existing occupancy check.
+  if (useDirectLoad && scaled) {
+    // Scale operands have shape [M/N, Ko] where Ko = K-reduction-tile *
+    // koBlocksPerIntrinsic. reductionTileSizes[contractionK] counts MFMA
+    // invocations, not Ko elements; multiply by koBlocksPerIntrinsic.
+    int64_t scaleMDim = workgroupTileSizes[contractionM.back()];
+    auto smmaKind = cast<IREE::GPU::ScaledMMAAttr>(kind);
+    int64_t koBlocksPerIntrinsic = std::get<2>(smmaKind.getScaledMNKShape());
+    int64_t scaleKoDim =
+        reductionTileSizes[contractionK.back()] * koBlocksPerIntrinsic;
+    int64_t scaleElements = scaleMDim * scaleKoDim;
+    constexpr int64_t kScaleBits = 8; // f8E8M0FNU is 8-bit
+    ArrayRef<int64_t> dmaSizes;
+    if (DenseI64ArrayAttr dmaSizesAttr = target.getWgp().getDmaSizes()) {
+      dmaSizes = dmaSizesAttr.asArrayRef();
+    }
+    if (!isScaledDMAAligned(scaleElements, kScaleBits, targetSubgroupSize,
+                            dmaSizes)) {
+      LDBG() << "rejecting direct load DMA: scale tile not DMA-aligned";
+      useDirectLoad = false;
+    }
+  }
+
+  if (useDirectLoad &&
+      shouldRejectDMAForOccupancy(*schedule, problem, target, prefetchNumStages,
+                                  hasExistingAccumulator, bounds,
+                                  workgroupTileSizes)) {
+    LDBG() << "rejecting direct load DMA: LDS limits occupancy (WGs/CU)";
+    useDirectLoad = false;
+  }
+
   // Use global load DMA attribute (subgroup sizes will be derived from
   // translation_info).
   SmallVector<Attribute> promotionArray;
   if (useDirectLoad) {
-    Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
-    promotionArray = {useGlobalDma, useGlobalDma};
+    Attribute lhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    Attribute rhsAttr = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+    // Apply XOR swizzle for BF16 DMA operands whose reduction dim is
+    // innermost (contiguous reads) to avoid LDS bank conflicts.
+    // TODO(#24255): Fix untuned swizzle logic for DMA.
+    if (!transposedLhs) {
+      FailureOr<Attribute> lhsSwizzleAttr = getXorShuffleAttr(
+          context, lhsAttr, target, kind, schedule->kTileSizes, kMMAOperandLhs,
+          /*skipUntunedFallback=*/true);
+      if (succeeded(lhsSwizzleAttr)) {
+        lhsAttr = *lhsSwizzleAttr;
+      }
+    }
+    if (transposedRhs) {
+      FailureOr<Attribute> rhsSwizzleAttr = getXorShuffleAttr(
+          context, rhsAttr, target, kind, schedule->kTileSizes, kMMAOperandRhs,
+          /*skipUntunedFallback=*/true);
+      if (succeeded(rhsSwizzleAttr)) {
+        rhsAttr = *rhsSwizzleAttr;
+      }
+    }
+    promotionArray = {lhsAttr, rhsAttr};
   }
   SmallVector<int64_t> promotionList = {0, 1};
   if (scaled) {
     promotionList.append({2, 3});
     auto defaultConfigAttr = IREE::GPU::DerivedThreadConfigAttr::get(context);
-    // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
-    FailureOr<Attribute> lhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandLhs);
-    FailureOr<Attribute> rhsSwizzleAttr =
-        getXorShuffleAttr(context, defaultConfigAttr, target, kind,
-                          schedule->kTileSizes, kMMAOperandRhs);
-    if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
-      promotionArray = {};
+    if (useDirectLoad) {
+      // Scale alignment was already vetted by shouldRejectDirectLoadDMA, so
+      // here we DMA all four operands (LHS, RHS, and both scales).
+      Attribute useGlobalDma = IREE::GPU::UseGlobalLoadDMAAttr::get(context);
+      promotionArray = {useGlobalDma, useGlobalDma, useGlobalDma, useGlobalDma};
     } else {
-      promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
-                        defaultConfigAttr};
+      // TODO(#23329): Do not swizzle shapes that have no bank conflicts.
+      FailureOr<Attribute> lhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandLhs);
+      FailureOr<Attribute> rhsSwizzleAttr =
+          getXorShuffleAttr(context, defaultConfigAttr, target, kind,
+                            schedule->kTileSizes, kMMAOperandRhs);
+      if (failed(lhsSwizzleAttr) || failed(rhsSwizzleAttr)) {
+        promotionArray = {};
+      } else {
+        promotionArray = {*lhsSwizzleAttr, *rhsSwizzleAttr, defaultConfigAttr,
+                          defaultConfigAttr};
+      }
     }
   }
-  if ((!mustBeAligned || couldNeedPadding) && cPromoteIfPadding) {
-    // If needed then add C operand which would be operand 2 or 4 for unscaled
-    // and scaled GEMM respectively.
-    promotionList.push_back(promotionList.size());
-    // Use default config attribute for the C promotion.
-    if (!promotionArray.empty()) {
-      promotionArray.push_back(
-          IREE::GPU::DerivedThreadConfigAttr::get(context));
-    }
-  }
+
   GPU::appendPromotedOperandsList(context, attrs, promotionList,
                                   promotionArray);
   if (!mustBeAligned || couldNeedPadding) {
@@ -1062,11 +1236,6 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
   SmallVector<int64_t> igemmLoopBounds =
       igemmGenericConvDetails->igemmLoopBounds;
   SmallVector<Value> igemmOperands = igemmGenericConvDetails->igemmOperands;
-  bool cPromoteIfPadding = false;
-  if (clGPUTestCpromotion) {
-    cPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
-                        checkForDPSOperandComputeOpProducers(linalgOp);
-  }
   // Detect if the convolution is accumulating (reads existing accumulator).
   bool hasExistingAccumulator = isValidInPlaceAccumulatingOp(
       cast<DestinationStyleOpInterface>(linalgOp.getOperation()));
@@ -1076,9 +1245,7 @@ LogicalResult setIGEMMConvolutionLoweringConfig(
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           igemmLoopBounds, igemmContractionMaps, igemmOperands, target,
           /*isGemm=*/false, /*scaled=*/false, useDirectLoad, prefetchStages,
-          splitReductionTripCnt,
-          /*cPromoteIfPadding=*/cPromoteIfPadding, hasExistingAccumulator,
-          convToIgemmInfo);
+          splitReductionTripCnt, hasExistingAccumulator, convToIgemmInfo);
   if (failed(configAndWgSize)) {
     return failure();
   }
@@ -1131,11 +1298,6 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
   const int64_t splitReductionTripCnt = getSplitReductionTripCount(entryPoint);
 
   LDBG() << "Matmul TileAndFuse Config";
-  bool cPromoteIfPadding = false;
-  if (clGPUTestCpromotion) {
-    cPromoteIfPadding = checkForElementwiseUsersWithNewOperands(linalgOp) ||
-                        checkForDPSOperandComputeOpProducers(linalgOp);
-  }
 
   // Detect if the matmul is accumulating (reads existing accumulator from
   // global memory). This affects shared memory usage for scaled MMA operations.
@@ -1150,7 +1312,7 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
       getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
           bounds, maps, operands, target, /*isGemm=*/true, isScaled,
           useDirectLoad, prefetchStages, splitReductionTripCnt,
-          cPromoteIfPadding, hasExistingAccumulator);
+          hasExistingAccumulator);
 
   // TODO (muzasyed) : add generalization for scaled and nonscaled versions of
   // matmul lowering.
@@ -1160,7 +1322,7 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
     isScaled = true;
     configAndWgSize = getMatmulOrIGEMMLoweringConfigAndWorkgroupSize(
         bounds, maps, operands, target, /*isGemm=*/true, isScaled,
-        useDirectLoad, prefetchStages, splitReductionTripCnt, cPromoteIfPadding,
+        useDirectLoad, prefetchStages, splitReductionTripCnt,
         hasExistingAccumulator);
   }
 
@@ -1189,10 +1351,10 @@ setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                             workgroupSize, targetSubgroupSize, pipelineConfig));
 }
 
-/// Helper to identify contraction like operations for operand promotiong.
+/// Helper to identify contraction-like operations for operand promotion.
 static bool isNonMatvecContraction(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp) {
+  if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
     return false;
   }
   SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
@@ -2114,6 +2276,111 @@ LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
       workgroupTileSizes[depth] = residualWorkgroupSize;
       break;
     }
+  }
+
+  IREE::GPU::LoweringConfigAttr loweringConfig =
+      createLoweringConfig(workgroupTileSizes, threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, loweringConfig,
+      getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                            workgroupSize, subgroupSize));
+}
+
+//====---------------------------------------------------------------------===//
+// ArgCompare Pipeline Configuration
+//====---------------------------------------------------------------------===//
+
+LogicalResult setArgCompareConfig(IREE::GPU::TargetAttr target,
+                                  mlir::FunctionOpInterface entryPoint,
+                                  Operation *op) {
+  auto argCompareOp = cast<IREE::LinalgExt::ArgCompareOp>(op);
+  MLIRContext *context = op->getContext();
+  Builder b(context);
+
+  const int64_t subgroupSize = target.getPreferredSubgroupSize();
+  auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
+  SmallVector<unsigned> partitionedLoops =
+      interfaceOp.getPartitionableLoops(std::nullopt);
+
+  auto createLoweringConfig = [&](ArrayRef<int64_t> workgroupSizes,
+                                  ArrayRef<int64_t> threadSizes) {
+    NamedAttribute attrs[2] = {{"workgroup", b.getI64ArrayAttr(workgroupSizes)},
+                               {"thread", b.getI64ArrayAttr(threadSizes)}};
+    return IREE::GPU::LoweringConfigAttr::get(context,
+                                              b.getDictionaryAttr(attrs));
+  };
+
+  // No parallel dims (e.g. rank-1 input reducing to a scalar) means there is
+  // nothing to distribute across threads. Emit a degenerate single-thread
+  // TileAndFuse config instead of bailing: the per-loop tile size is 0 for
+  // every reduction loop, so a single thread walks the full reduction once
+  // without racing.
+  if (partitionedLoops.empty()) {
+    int64_t numLoops = argCompareOp.getInputRank();
+    SmallVector<int64_t> zeroTileSizes(numLoops, 0);
+    IREE::GPU::LoweringConfigAttr loweringConfig =
+        createLoweringConfig(zeroTileSizes, zeroTileSizes);
+    std::array<int64_t, 3> singleThread = {1, 1, 1};
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, loweringConfig,
+        getGPUTranslationInfo(op->getContext(), LoweringPipeline::TileAndFuse,
+                              singleThread, subgroupSize));
+  }
+
+  // arg_compare's iteration domain has one loop per input dim; the single
+  // reduction dim is `getDimension()` and the rest are parallel.
+  int64_t numLoops = argCompareOp.getInputRank();
+
+  // Starting point pending tuning data: two warps per workgroup mirrors
+  // setSortConfig and gives reasonable occupancy without over-subscribing
+  // for the small parallel iteration spaces typical of arg_compare fallbacks.
+  std::array<int64_t, 3> workgroupSize = {2 * subgroupSize, 1, 1};
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+  SmallVector<int64_t> threadTileSizes(numLoops, 1);
+
+  // Set non-parallel loops (the single reduction dim) to zero tile size so
+  // each thread runs the full reduction on its parallel slice.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(llvm::from_range,
+                                               partitionedLoops);
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      workgroupTileSizes[depth] = 0;
+      threadTileSizes[depth] = 0;
+    }
+  }
+
+  // Pack as many parallel-dim iterations as possible into the workgroup tile
+  // (innermost dim first), matching the setSortConfig packing strategy.
+  ArrayRef<int64_t> loopBounds = argCompareOp.getInputType().getShape();
+  int64_t residualWorkgroupSize = workgroupSize[0];
+  for (int64_t depth = numLoops - 1; depth >= 0; --depth) {
+    if (!partitionedLoopsSet.contains(depth)) {
+      continue;
+    }
+    if (ShapedType::isDynamic(loopBounds[depth])) {
+      continue;
+    }
+    if (residualWorkgroupSize % loopBounds[depth] == 0) {
+      workgroupTileSizes[depth] = loopBounds[depth];
+      residualWorkgroupSize /= loopBounds[depth];
+      continue;
+    }
+    if (loopBounds[depth] % residualWorkgroupSize == 0) {
+      workgroupTileSizes[depth] = residualWorkgroupSize;
+      break;
+    }
+  }
+
+  // If the parallel iterations actually packed into the workgroup tile fit in
+  // a single subgroup, drop to one warp so we don't launch idle threads.
+  int64_t cumulativeWorkgroupTile = 1;
+  for (int64_t depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (partitionedLoopsSet.contains(depth) && workgroupTileSizes[depth] > 0) {
+      cumulativeWorkgroupTile *= workgroupTileSizes[depth];
+    }
+  }
+  if (cumulativeWorkgroupTile <= subgroupSize) {
+    workgroupSize[0] = subgroupSize;
   }
 
   IREE::GPU::LoweringConfigAttr loweringConfig =

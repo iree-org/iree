@@ -1,0 +1,86 @@
+vm.module @conversion_ops version 0
+vm.type i32
+vm.type i64
+vm.type !vm.buffer
+vm.type !vm.list<?>
+vm.type !vm.opaque
+
+vm.export @test_trunc_i32_i8
+vm.func @test_trunc_i32_i8() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 255  // 0x000000FF
+  %i2 = vm.const.i32 2147483647  // 0x7FFFFFFF
+  %i2 = vm.trunc.i32.i8 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "truncate unsigned i32 to unsigned i8"
+}
+
+vm.export @test_trunc_i32_i16
+vm.func @test_trunc_i32_i16() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 65535  // 0x0000FFFF
+  %i2 = vm.const.i32 2147483647  // 0x7FFFFFFF
+  %i2 = vm.trunc.i32.i16 %i2
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "truncate unsigned i32 to unsigned i16"
+}
+
+vm.export @test_cast_any_ref
+vm.func @test_cast_any_ref() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 128  // 0x0000000000000080
+  %i4 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i2:3, %i4
+  %r1 = vm.assign.ref %r0
+  %r2 = vm.cast.any.ref %R1 : !vm.ref<?> -> !vm.buffer
+  %i2 = vm.cmp.eq.ref %r0, %r2
+  vm.discard.refs %r0, %r2
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast should succeed"
+}
+
+vm.export @test_cast_any_ref_null
+vm.func @test_cast_any_ref_null() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.zero
+  %r1 = vm.cast.any.ref %R0 : !vm.ref<?> -> !vm.buffer
+  %i2 = vm.cmp.nz.ref %r1
+  vm.discard.refs %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "cast should succeed on nulls"
+}
+
+vm.export @fail_cast_any_ref
+vm.func @fail_cast_any_ref() -> () {
+^bb0:
+  %i0:1 = vm.const.i64 128  // 0x0000000000000080
+  %i2 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i0:1, %i2
+  %r1 = vm.assign.ref %R0
+  %r0 = vm.cast.any.ref %R1 : !vm.ref<?> -> !vm.list<?>
+  vm.discard.refs %r0
+  vm.return
+}

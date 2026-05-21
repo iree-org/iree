@@ -90,14 +90,18 @@ iree_status_code_from_errno(int error_number) {
     case EFAULT:        // Bad address
     case EILSEQ:        // Illegal byte sequence
     case ENOPROTOOPT:   // Protocol not available
-    case ENOSTR:        // Not a STREAM
-    case ENOTSOCK:      // Not a socket
-    case ENOTTY:        // Inappropriate I/O control operation
-    case EPROTOTYPE:    // Protocol wrong type for socket
-    case ESPIPE:        // Invalid seek
+#ifdef ENOSTR
+    case ENOSTR:      // Not a STREAM
+#endif                // ENOSTR
+    case ENOTSOCK:    // Not a socket
+    case ENOTTY:      // Inappropriate I/O control operation
+    case EPROTOTYPE:  // Protocol wrong type for socket
+    case ESPIPE:      // Invalid seek
       return IREE_STATUS_INVALID_ARGUMENT;
     case ETIMEDOUT:  // Connection timed out
-    case ETIME:      // Timer expired
+#ifdef ETIME
+    case ETIME:  // Timer expired
+#endif           // ETIME
       return IREE_STATUS_DEADLINE_EXCEEDED;
     case ENODEV:  // No such device
     case ENOENT:  // No such file or directory
@@ -156,9 +160,13 @@ iree_status_code_from_errno(int error_number) {
     case EMLINK:   // Too many links
     case ENFILE:   // Too many open files in system
     case ENOBUFS:  // No buffer space available
+#ifdef ENODATA
     case ENODATA:  // No message is available on the STREAM read queue
+#endif             // ENODATA
     case ENOMEM:   // Not enough space
-    case ENOSR:    // No STREAM resources
+#ifdef ENOSR
+    case ENOSR:  // No STREAM resources
+#endif           // ENOSR
 #ifdef EUSERS
     case EUSERS:  // Too many users
 #endif
@@ -686,11 +694,26 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
 
 IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
                                                iree_status_t new_status) {
-  // TODO(benvanik): annotate |base_status| with |new_status| so we see it?
-  // This is intended for failure handling and usually the first failure is the
-  // root cause and most important to see.
   if (!iree_status_is_ok(base_status)) {
-    iree_status_ignore(new_status);
+    if (!iree_status_is_ok(new_status)) {
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
+      iree_allocator_t allocator = iree_allocator_system();
+      char* message = NULL;
+      iree_host_size_t message_length = 0;
+      if (iree_status_to_string(new_status, &allocator, &message,
+                                &message_length)) {
+        base_status =
+            iree_status_annotate_f(base_status, "additional failure: %.*s",
+                                   (int)message_length, message);
+        iree_allocator_free(allocator, message);
+      } else {
+        base_status = iree_status_annotate_f(
+            base_status, "additional failure: %s",
+            iree_status_code_string(iree_status_code(new_status)));
+      }
+#endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+      iree_status_free(new_status);
+    }
     return base_status;
   }
   return new_status;

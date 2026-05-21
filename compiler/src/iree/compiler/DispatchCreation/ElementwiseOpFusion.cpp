@@ -12,7 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
@@ -45,6 +47,59 @@ static SmallVector<T> applyProjectedPermutation(const SmallVectorImpl<T> &input,
     result.push_back(input[idx]);
   }
   return result;
+}
+
+static bool wouldBroadcastAwayAttentionDimGroup(OpOperand *fusedOperand) {
+  Operation *consumer = fusedOperand->getOwner();
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      TypeSwitch<Operation *, FailureOr<IREE::LinalgExt::AttentionOpDetail>>(
+          consumer)
+          .Case<IREE::LinalgExt::AttentionOp,
+                IREE::LinalgExt::OnlineAttentionOp>([](auto attentionOp) {
+            return IREE::LinalgExt::AttentionOpDetail::get(
+                attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+                attentionOp.getValueMap(), attentionOp.getOutputMap());
+          })
+          .Default({});
+  if (failed(maybeOpInfo)) {
+    return false;
+  }
+  IREE::LinalgExt::AttentionOpDetail opInfo = std::move(*maybeOpInfo);
+
+  auto producer = dyn_cast_if_present<linalg::LinalgOp>(
+      fusedOperand->get().getDefiningOp());
+  if (!producer || !IREE::LinalgExt::isBroadcastingOp(producer)) {
+    return false;
+  }
+
+  AffineMap producerInputMap =
+      producer.getMatchingIndexingMap(producer.getDpsInputOperand(0));
+  AffineMap producerResultMap =
+      producer.getMatchingIndexingMap(producer.getDpsInitOperand(0));
+  AffineMap consumerInputMap =
+      cast<IREE::LinalgExt::LinalgFusionOpInterface>(consumer)
+          .getMatchingIndexingMap(fusedOperand);
+  AffineMap fusedInputMap =
+      producerInputMap.compose(inversePermutation(producerResultMap))
+          .compose(consumerInputMap);
+
+  auto broadcastsAwayDimGroup = [&](ArrayRef<int64_t> dims) {
+    auto usesAnyDim = [](AffineMap map, ArrayRef<int64_t> dims) {
+      return llvm::any_of(map.getResults(), [&](AffineExpr expr) {
+        auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+        return dimExpr && llvm::any_of(dims, [&](int64_t dim) {
+                 return dimExpr.getPosition() == dim;
+               });
+      });
+    };
+    return !dims.empty() && usesAnyDim(consumerInputMap, dims) &&
+           !usesAnyDim(fusedInputMap, dims);
+  };
+
+  SmallVector<ArrayRef<int64_t>> importantDimGroups = {
+      opInfo.getBatchDims(), opInfo.getMDims(), opInfo.getK1Dims(),
+      opInfo.getK2Dims(), opInfo.getNDims()};
+  return llvm::any_of(importantDimGroups, broadcastsAwayDimGroup);
 }
 
 //===----------------------------------------------------------------------===//
@@ -192,7 +247,13 @@ void ElementwiseOpFusionPass::runOnOperation() {
     Operation *producer = fusedOperand->get().getDefiningOp();
     Operation *consumer = fusedOperand->getOwner();
 
-    return IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer});
+    if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+      return false;
+    }
+    if (wouldBroadcastAwayAttentionDimGroup(fusedOperand)) {
+      return false;
+    }
+    return true;
   };
   RewritePatternSet linalgExtFusionPatterns(context);
   IREE::LinalgExt::populateFuseLinalgExtOpsWithTransposes(

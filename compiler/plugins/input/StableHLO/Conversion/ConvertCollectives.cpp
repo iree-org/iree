@@ -486,10 +486,17 @@ struct AllGatherOpConversion final
     int32_t numReplicas = getNumReplicas(moduleOp);
     int32_t numPartitions = getNumPartitions(moduleOp);
 
+    DenseIntElementsAttr replicateGroups =
+        dyn_cast<DenseIntElementsAttr>(op.getReplicaGroups());
+    if (!replicateGroups) {
+      return rewriter.notifyMatchFailure(op,
+                                         "replica_groups must be a constant");
+    }
+
     // Create a channel.
     Value channel = createChannelWithGroupInfo(
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
-        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
+        replicateGroups, op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult(0).getType());
@@ -577,10 +584,17 @@ struct AllReduceOpConversion final
     int32_t numReplicas = getNumReplicas(moduleOp);
     int32_t numPartitions = getNumPartitions(moduleOp);
 
+    DenseIntElementsAttr replicateGroups =
+        dyn_cast<DenseIntElementsAttr>(op.getReplicaGroups());
+    if (!replicateGroups) {
+      return rewriter.notifyMatchFailure(op,
+                                         "replica_groups must be a constant");
+    }
+
     // Create a channel.
     Value channel = createChannelWithGroupInfo(
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
-        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
+        replicateGroups, op.getUseGlobalDeviceIds(), rewriter);
 
     // Convert stablehlo reduction op into flow reduction op.
     auto reductionOpAttr =
@@ -673,10 +687,17 @@ struct AllToAllOpConversion final
     int32_t numReplicas = getNumReplicas(moduleOp);
     int32_t numPartitions = getNumPartitions(moduleOp);
 
+    DenseIntElementsAttr replicateGroups =
+        dyn_cast<DenseIntElementsAttr>(op.getReplicaGroups());
+    if (!replicateGroups) {
+      return rewriter.notifyMatchFailure(op,
+                                         "replica_groups must be a constant");
+    }
+
     // Create a channel.
     Value channel = createChannelWithGroupInfo(
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
-        op.getReplicaGroups(), /*useGlobalDeviceIds=*/std::nullopt, rewriter);
+        replicateGroups, /*useGlobalDeviceIds=*/std::nullopt, rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getType(0));
@@ -778,10 +799,17 @@ struct ReduceScatterOpConversion final
     int32_t numReplicas = getNumReplicas(moduleOp);
     int32_t numPartitions = getNumPartitions(moduleOp);
 
+    DenseIntElementsAttr replicateGroups =
+        dyn_cast<DenseIntElementsAttr>(op.getReplicaGroups());
+    if (!replicateGroups) {
+      return rewriter.notifyMatchFailure(op,
+                                         "replica_groups must be a constant");
+    }
+
     // Create a channel.
     Value channel = createChannelWithGroupInfo(
         loc, op.getChannelHandleAttr(), numReplicas, numPartitions,
-        op.getReplicaGroups(), op.getUseGlobalDeviceIds(), rewriter);
+        replicateGroups, op.getUseGlobalDeviceIds(), rewriter);
 
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());

@@ -44,7 +44,8 @@ iree_hal_module_device_policy_default(void) {
 //===----------------------------------------------------------------------===//
 
 #define IREE_HAL_MODULE_VERSION_0_6 0x00000006u
-#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_6
+#define IREE_HAL_MODULE_VERSION_0_7 0x00000007u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_7
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
@@ -836,6 +837,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_create,  //
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_hal_command_buffer_mode_t modes =
       (iree_hal_command_buffer_mode_t)args->i1;
+  if (iree_all_bits_set(
+          state->flags,
+          IREE_HAL_MODULE_FLAG_RETAIN_COMMAND_BUFFER_PROFILE_METADATA)) {
+    modes |= IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA;
+  }
   iree_hal_command_category_t command_categories =
       (iree_hal_command_category_t)args->i2;
   iree_hal_queue_affinity_t queue_affinity =
@@ -1031,17 +1037,17 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_collective,  //
                                             send_ref, recv_ref, element_count);
 }
 
-// Argument signature: rriiiiICiDCiirIID
+// Argument signature: rrIiiiICiDCiirIID
 typedef struct {
   union {
     struct {
       iree_vm_ref_t command_buffer;
       iree_vm_ref_t executable;
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      int64_t function_id;
       uint32_t workgroup_count[3];
       iree_hal_dispatch_flags_t flags;
     };
-    iree_vm_abi_rriiiiI_t params;
+    iree_vm_abi_rrIiiiI_t params;
   };
   iree_vm_size_t constant_count;
   const uint32_t* constants;
@@ -1086,8 +1092,10 @@ static iree_status_t iree_hal_module_command_buffer_dispatch(
   iree_hal_dispatch_config_t config = iree_hal_make_static_dispatch_config(
       args->workgroup_count[0], args->workgroup_count[1],
       args->workgroup_count[2]);
+  const iree_hal_executable_function_t function =
+      iree_hal_executable_function_from_value((uint64_t)args->function_id);
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, args->export_ordinal, config,
+      command_buffer, executable, function, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
@@ -1101,13 +1109,13 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_shim(
   // For now we inline what it would do in a very painful way.
   bool args_ok = true;
   if (args_storage.data_length <
-      (sizeof(iree_vm_abi_rriiiiI_t) + sizeof(iree_vm_size_t) +
+      (sizeof(iree_vm_abi_rrIiiiI_t) + sizeof(iree_vm_size_t) +
        sizeof(iree_vm_size_t))) {
     // Can't fit even with zero lengths.
     args_ok = false;
   }
   iree_hal_module_command_buffer_dispatch_args_t args = {
-      .params = *(const iree_vm_abi_rriiiiI_t*)args_storage.data,
+      .params = *(const iree_vm_abi_rrIiiiI_t*)args_storage.data,
   };
   if (args_ok) {
     const uint8_t* constants_ptr = args_storage.data + sizeof(args.params);
@@ -1137,19 +1145,19 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_shim(
                                                  &args);
 }
 
-// Argument signature: rriirIICiDCiirIID
+// Argument signature: rrIirIICiDCiirIID
 typedef struct {
   union {
     struct {
       iree_vm_ref_t command_buffer;
       iree_vm_ref_t executable;
-      iree_hal_executable_export_ordinal_t export_ordinal;
+      int64_t function_id;
       int32_t workgroups_buffer_slot;
       iree_vm_ref_t workgroups_buffer;
       int64_t workgroups_offset;
       iree_hal_dispatch_flags_t flags;
     };
-    iree_vm_abi_rriirII_t params;
+    iree_vm_abi_rrIirII_t params;
   };
   iree_vm_size_t constant_count;
   const uint32_t* constants;
@@ -1206,8 +1214,10 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
     flags |= IREE_HAL_DISPATCH_FLAG_DYNAMIC_INDIRECT_PARAMETERS;
   }
 
+  const iree_hal_executable_function_t function =
+      iree_hal_executable_function_from_value((uint64_t)args->function_id);
   return iree_hal_command_buffer_dispatch(
-      command_buffer, executable, args->export_ordinal, config,
+      command_buffer, executable, function, config,
       iree_make_const_byte_span(args->constants,
                                 args->constant_count * sizeof(uint32_t)),
       bindings, flags);
@@ -1221,13 +1231,13 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect_shim(
   // For now we inline what it would do in a very painful way.
   bool args_ok = true;
   if (args_storage.data_length <
-      (sizeof(iree_vm_abi_rriirII_t) + sizeof(iree_vm_size_t) +
+      (sizeof(iree_vm_abi_rrIirII_t) + sizeof(iree_vm_size_t) +
        sizeof(iree_vm_size_t))) {
     // Can't fit even with zero lengths.
     args_ok = false;
   }
   iree_hal_module_command_buffer_dispatch_indirect_args_t args = {
-      .params = *(const iree_vm_abi_rriirII_t*)args_storage.data,
+      .params = *(const iree_vm_abi_rrIirII_t*)args_storage.data,
   };
   if (args_ok) {
     const uint8_t* constants_ptr = args_storage.data + sizeof(args.params);
@@ -1300,7 +1310,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_alloca,  //
       (iree_hal_queue_affinity_t)args->i1;
   iree_hal_fence_t* wait_fence = iree_hal_fence_deref(args->r2);
   iree_hal_fence_t* signal_fence = iree_hal_fence_deref(args->r3);
-  iree_hal_allocator_pool_t pool = (iree_hal_allocator_pool_t)args->i4;
+  if (IREE_UNLIKELY(args->i4 != 0)) {
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "VM queue allocation pools are not supported");
+  }
+  iree_hal_pool_t* pool = NULL;
   iree_hal_memory_type_t memory_types = (iree_hal_memory_type_t)args->i5;
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i6;
   iree_device_size_t allocation_size = iree_hal_cast_device_size(args->i7);
@@ -1640,6 +1654,26 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
       executable_cache, &executable_params, &executable));
 
   rets->r0 = iree_hal_executable_move_ref(executable);
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_executable_lookup_function,  //
+                   iree_hal_module_state_t,                     //
+                   rr, I) {
+  iree_hal_executable_t* executable = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_executable_check_deref(args->r0, &executable));
+  iree_vm_buffer_t* function_name = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r1, &function_name));
+
+  iree_hal_executable_function_t function =
+      iree_hal_executable_function_invalid();
+  IREE_RETURN_IF_ERROR(iree_hal_executable_lookup_function_by_name(
+      executable, iree_vm_buffer_as_string(function_name), &function));
+  if (IREE_UNLIKELY(!iree_hal_executable_function_is_valid(function))) {
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "executable returned an invalid function handle");
+  }
+  rets->i0 = (int64_t)function.value;
   return iree_ok_status();
 }
 

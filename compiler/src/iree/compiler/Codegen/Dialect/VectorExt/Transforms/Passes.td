@@ -18,4 +18,27 @@ def VectorExtFoldUnitExtentDimsPass :
   ];
 }
 
+def LowerTransferGatherScatterToVectorPass :
+    Pass<"iree-vector-ext-lower-transfer-gather-scatter-to-vector", "func::FuncOp"> {
+  let summary = "Lower transfer_gather/transfer_scatter to vector.gather/vector.scatter";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
+// TODO(Bangtian): Consolidate per-op lowering passes into a single generic
+// pass once we have more such lowerings.
+def LowerArgCompareToVectorPass :
+    Pass<"iree-vector-ext-lower-arg-compare-to-vector", "func::FuncOp"> {
+  let summary = "Lower iree_vector_ext.arg_compare to vector/SCF ops";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::vector::VectorDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 #endif // IREE_CODEGEN_DIALECT_VECTOR_EXT_TRANSFORMS_PASSES

@@ -45,8 +45,10 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
   __asm__ volatile(".inst 0xd4200000");
 #elif defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_X86_64)
   __asm__ volatile("int $0x03");
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
-  EM_ASM({ debugger; });
+#elif defined(IREE_PLATFORM_WASM)
+  // Wasm has no debug break instruction. __builtin_trap() is unrecoverable
+  // but is the best we can do without a JS bridge.
+  __builtin_trap();
 #else
   // NOTE: this is unrecoverable and debugging cannot continue.
   __builtin_trap();
@@ -82,13 +84,14 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
 #include <sanitizer/lsan_interface.h>
 #endif  // IREE_SANITIZER_ADDRESS
 
+#if defined(IREE_SANITIZER_THREAD)
+#include <sanitizer/tsan_interface.h>
+#endif  // IREE_SANITIZER_THREAD
+
 // For whenever we want to provide specialized msan/tsan hooks:
 //   #if defined(IREE_SANITIZER_MEMORY)
 //   #include <sanitizer/msan_interface.h>
 //   #endif  // IREE_SANITIZER_MEMORY
-//   #if defined(IREE_SANITIZER_THREAD)
-//   #include <sanitizer/tsan_interface.h>
-//   #endif  // IREE_SANITIZER_THREAD
 
 // Suppresses leak detection false-positives in a region. May be nested.
 // Do not use this for any IREE-owned code: fix your leaks! This is useful when
@@ -129,6 +132,16 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
 #define IREE_ASAN_UNPOISON_MEMORY_REGION(addr, size) \
   ((void)(addr), (void)(size))
 #endif  // IREE_SANITIZER_ADDRESS
+
+// Annotates synchronization edges that TSAN cannot infer from platform calls or
+// custom ownership transfers.
+#if defined(IREE_SANITIZER_THREAD)
+#define IREE_TSAN_ACQUIRE(addr) __tsan_acquire((addr))
+#define IREE_TSAN_RELEASE(addr) __tsan_release((addr))
+#else
+#define IREE_TSAN_ACQUIRE(addr) ((void)(addr))
+#define IREE_TSAN_RELEASE(addr) ((void)(addr))
+#endif  // IREE_SANITIZER_THREAD
 
 #if defined(IREE_COMPILER_GCC_COMPAT) && defined(IREE_SANITIZER_THREAD)
 

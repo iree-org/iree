@@ -139,6 +139,11 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index,
   op->setOperand(index, replacement);
 }
 
+bool isDpsInputOperand(Operation *op, unsigned index) {
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
+  return dpsOp && index < dpsOp.getNumDpsInputs();
+}
+
 struct GPUPromoteMatmulOperandsPass final
     : impl::GPUPromoteMatmulOperandsPassBase<GPUPromoteMatmulOperandsPass> {
   using GPUPromoteMatmulOperandsPassBase::GPUPromoteMatmulOperandsPassBase;
@@ -162,12 +167,6 @@ struct GPUPromoteMatmulOperandsPass final
 
       std::optional<ArrayRef<Attribute>> maybePromotionTypes =
           getPromotionTypesList(loweringConfig);
-      if (maybePromotionTypes &&
-          maybePromotionTypes->size() != promotedOperands->size()) {
-        op->emitOpError(
-            "promoted operand and promotion types lists size mismatch");
-        return WalkResult::interrupt();
-      }
 
       Attribute derived =
           IREE::GPU::DerivedThreadConfigAttr::get(op->getContext());
@@ -177,6 +176,10 @@ struct GPUPromoteMatmulOperandsPass final
       builder.setInsertionPoint(op);
       for (auto [operand, maybePromotionType] :
            llvm::zip_longest(promotedOperands.value(), promotionTypes)) {
+        unsigned operandIndex = operand.value();
+        if (skipOperandPromotion && isDpsInputOperand(op, operandIndex)) {
+          continue;
+        }
         auto promotionType = dyn_cast<IREE::GPU::PromotionAttr>(
             maybePromotionType.value_or(derived));
         if (!promotionType) {
@@ -184,7 +187,7 @@ struct GPUPromoteMatmulOperandsPass final
               "promotion types does not implement promotion attr interface");
           return WalkResult::interrupt();
         }
-        promoteOperand(builder, op, operand.value(), promotionType);
+        promoteOperand(builder, op, operandIndex, promotionType);
       }
       return WalkResult::advance();
     });

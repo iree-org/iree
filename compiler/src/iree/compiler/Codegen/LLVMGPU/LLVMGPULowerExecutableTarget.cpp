@@ -88,6 +88,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   OpPassManager &pipeline = maybePipeline.value();
 
   Attribute pipelineAttr = translationInfo.getPassPipeline();
+  // No pipeline specified, nothing to do.
+  if (isa<IREE::Codegen::NoPipelineAttr>(pipelineAttr)) {
+    return;
+  }
 
   // Check for PipelineAttrInterface first (covers GPU::PipelineAttr via
   // external model and any custom pipeline attrs).
@@ -95,11 +99,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
       dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr);
 
   if (!pipelineIface) {
-    // Not an interface implementor -- check for the legacy None pipeline.
-    if (translationInfo.getDispatchLoweringPassPipeline() ==
-        IREE::Codegen::DispatchLoweringPassPipeline::None) {
-      return;
-    }
+    // Not an interface implementor -- reject any remaining legacy pipeline.
     funcOp.emitOpError("unsupported pipeline on GPU target");
     return signalPassFailure();
   }

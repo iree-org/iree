@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
-// RUN:     --pass-pipeline="builtin.module(func.func(iree-llvmgpu-lower-executable-target))" %s | \
+// RUN:     --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' %s | \
 // RUN: FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer, Indirect>], flags = Indirect>
@@ -45,9 +45,8 @@ module {
 
 //   CHECK-LABEL:  func.func @sort2D_static_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      scf.forall
-//         CHECK:        memref.subview
-//         CHECK:        scf.for
+//         CHECK:      memref.subview
+//         CHECK:      scf.for
 
 // -----
 
@@ -76,6 +75,5 @@ module {
 
 //   CHECK-LABEL:  func.func @sort3D_dynamic_shape
 //         CHECK:      amdgpu.fat_raw_buffer_cast
-//         CHECK:      scf.forall
-//         CHECK:       scf.for
-//         CHECK:         memref.subview
+//         CHECK:      scf.for
+//         CHECK:        memref.subview

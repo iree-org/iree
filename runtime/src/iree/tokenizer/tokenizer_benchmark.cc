@@ -218,9 +218,9 @@ static iree_tokenizer_t* BuildBenchmarkTokenizer(size_t vocab_size) {
   return tokenizer;
 }
 
-// Builds a tokenizer with a ByteLevel decoder, enabling pre-decoded fast path.
-// The ByteLevel decoder has STATELESS capability, so all vocab tokens get
-// pre-decoded at build time — decode becomes a memcpy from a flat table.
+// Builds a tokenizer with a ByteLevel decoder, enabling the hybrid pre-decoded
+// path. Most tokens (99.3% of GPT-2 vocab) are pre-decoded at build time
+// (memcpy fast path). Tokens producing partial UTF-8 use a byte accumulator.
 static iree_tokenizer_t* BuildBenchmarkTokenizerWithDecoder(size_t vocab_size) {
   iree_tokenizer_vocab_builder_t* vocab_builder = nullptr;
   IREE_CHECK_OK(iree_tokenizer_vocab_builder_allocate(
@@ -293,7 +293,7 @@ static iree_tokenizer_t* BuildBenchmarkTokenizerWithDecoder(size_t vocab_size) {
   IREE_CHECK_OK(iree_tokenizer_segmenter_whitespace_allocate(
       iree_allocator_system(), &segmenter));
 
-  // Create ByteLevel decoder (STATELESS — enables pre-decode fast path).
+  // Create ByteLevel decoder (hybrid pre-decode with byte accumulator).
   iree_tokenizer_decoder_t* decoder = nullptr;
   IREE_CHECK_OK(iree_tokenizer_decoder_byte_level_allocate(
       iree_allocator_system(), &decoder));

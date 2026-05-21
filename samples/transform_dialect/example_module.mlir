@@ -148,7 +148,7 @@ hal.executable private @example_module_dispatch_2 {
 // RUN: FileCheck %s --check-prefixes=CODEGEN-PRINTER
 
 // CODEGEN-PRINTER:     IR printer: Setting matmul strategy to custom_transform_strategy
-// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = TransformDialectCodegen codegen_spec = @custom_transform_strategy>
+// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.transform_dialect_codegen codegen_spec = @custom_transform_strategy>
 // CODEGEN-PRINTER:     IR printer: Setting reduce strategy to base vectorize top-level
 // CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseVectorize> workgroup_size = [16, 1, 1]>
 

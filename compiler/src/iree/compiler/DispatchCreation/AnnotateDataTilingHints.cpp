@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
@@ -20,6 +21,7 @@
 #define DEBUG_TYPE "iree-dispatch-creation-annotate-data-tiling-hints"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
 #define GEN_PASS_DEF_ANNOTATEDATATILINGHINTSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
@@ -27,6 +29,7 @@ namespace {
 struct AnnotateDataTilingHintsPass final
     : impl::AnnotateDataTilingHintsPassBase<AnnotateDataTilingHintsPass> {
   using Base::Base;
+
   void runOnOperation() override;
 };
 } // namespace
@@ -137,6 +140,23 @@ static bool isSupportedContractionOp(linalg::LinalgOp linalgOp) {
   return true;
 }
 
+static bool isSupportedConvolutionOp(linalg::LinalgOp linalgOp) {
+  if (!dataTilablePreCondition(linalgOp)) {
+    return false;
+  }
+
+  if (!linalg::isaConvolutionOpInterface(linalgOp)) {
+    return false;
+  }
+
+  auto cDims = linalg::inferConvolutionDims(linalgOp);
+  if (failed(cDims)) {
+    return false;
+  }
+
+  return true;
+}
+
 /// Not all scaled contractions are supported by data tiling, so return true if:
 ///   1) `linalgOp` meets the pre-conditions for data tiling defined in
 ///      `dataTilablePreCondition`.
@@ -167,16 +187,39 @@ static bool isSupportedScaledContractionOp(linalg::LinalgOp linalgOp) {
 
 void AnnotateDataTilingHintsPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
+
+  using OpType = IREE::Encoding::EncodingOpType;
+
+  bool enableMatmul = false;
+  bool enableScaledMatmul = false;
+  bool enableConvolution = false;
+  for (OpType t : opTypes) {
+    switch (t) {
+    case OpType::matmul:
+      enableMatmul = true;
+      break;
+    case OpType::scaled_matmul:
+      enableScaledMatmul = true;
+      break;
+    case OpType::conv:
+      enableConvolution = true;
+      break;
+    }
+  }
+
   SmallVector<Operation *> candidates;
   WalkResult result = funcOp.walk([&](Operation *op) -> WalkResult {
     if (IREE::Encoding::hasDataTilingHint(op)) {
       return WalkResult::interrupt();
     }
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (linalgOp && (isSupportedContractionOp(linalgOp) ||
-                     isSupportedScaledContractionOp(linalgOp))) {
-      candidates.push_back(op);
+    if (!linalgOp) {
       return WalkResult::advance();
+    }
+    if ((enableMatmul && isSupportedContractionOp(linalgOp)) ||
+        (enableScaledMatmul && isSupportedScaledContractionOp(linalgOp)) ||
+        (enableConvolution && isSupportedConvolutionOp(linalgOp))) {
+      candidates.push_back(op);
     }
     return WalkResult::advance();
   });

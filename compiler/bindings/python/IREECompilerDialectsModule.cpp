@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <vector>
 #include "iree/compiler/dialects/iree_codegen.h"
 #include "iree/compiler/dialects/iree_gpu.h"
@@ -17,7 +18,7 @@
 #include "mlir-c/Target/LLVMIR.h"
 #include "mlir/Bindings/Python/Nanobind.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
-#include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Support.h"
 
 static const char *kCodegenModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
@@ -74,29 +75,57 @@ NB_MODULE(_ireeCompilerDialects, m) {
       m.def_submodule("iree_codegen", "iree_codegen dialect bindings");
 
   //===-------------------------------------------------------------------===//
-  // CodegenDispatchLoweringPassPipelineAttr
+  // Codegen pipeline attrs
   //===-------------------------------------------------------------------===//
 
-  mlir_attribute_subclass(
-      iree_codegen_module, "DispatchLoweringPassPipelineAttr",
-      ireeAttributeIsACodegenDispatchLoweringPassPipelineAttr,
-      ireeCodegenDispatchLoweringPassPipelineAttrGetTypeID)
+  mlir_attribute_subclass(iree_codegen_module, "VMVXPipelineAttr",
+                          ireeAttributeIsACodegenVMVXPipelineAttr,
+                          ireeCodegenVMVXPipelineAttrGetTypeID)
       .def_classmethod(
           "get",
-          [](const py::object &, uint32_t value, MlirContext ctx) {
-            return ireeCodegenDispatchLoweringPassPipelineAttrGet(ctx, value);
+          [](const py::object &, MlirContext ctx) {
+            return ireeCodegenVMVXPipelineAttrGet(ctx);
           },
-          "cls"_a, "value"_a, "ctx"_a = py::none(),
-          "Gets an #iree_codegen.dispatch_lowering_pass_pipeline from "
-          "parameters.")
-      .def_property_readonly(
-          "raw_value", ireeCodegenDispatchLoweringPassPipelineAttrGetValue)
-      .def_property_readonly("value", [](MlirAttribute self) -> py::object {
-        uint32_t rawValue =
-            ireeCodegenDispatchLoweringPassPipelineAttrGetValue(self);
-        return py::module_::import_(kCodegenModuleImportPath)
-            .attr("DispatchLoweringPassPipeline")(rawValue);
-      });
+          "cls"_a, "ctx"_a = py::none(),
+          "Gets an #iree_codegen.vmvx_pipeline attribute.");
+
+  mlir_attribute_subclass(
+      iree_codegen_module, "TransformDialectCodegenPipelineAttr",
+      ireeAttributeIsACodegenTransformDialectCodegenPipelineAttr,
+      ireeCodegenTransformDialectCodegenPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirContext ctx) {
+            return ireeCodegenTransformDialectCodegenPipelineAttrGet(ctx);
+          },
+          "cls"_a, "ctx"_a = py::none(),
+          "Gets an #iree_codegen.transform_dialect_codegen attribute.");
+
+  mlir_attribute_subclass(iree_codegen_module, "NoPipelineAttr",
+                          ireeAttributeIsACodegenNoPipelineAttr,
+                          ireeCodegenNoPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, MlirContext ctx) {
+            return ireeCodegenNoPipelineAttrGet(ctx);
+          },
+          "cls"_a, "ctx"_a = py::none(),
+          "Gets an #iree_codegen.no_pipeline attribute.");
+
+  mlir_attribute_subclass(iree_codegen_module, "PassPipelineAttr",
+                          ireeAttributeIsACodegenPassPipelineAttr,
+                          ireeCodegenPassPipelineAttrGetTypeID)
+      .def_classmethod(
+          "get",
+          [](const py::object &, std::string pipeline, MlirContext ctx) {
+            MlirStringRef pipelineRef =
+                mlirStringRefCreate(pipeline.data(), pipeline.size());
+            return ireeCodegenPassPipelineAttrGet(ctx, pipelineRef);
+          },
+          "cls"_a, "pipeline"_a, "ctx"_a = py::none(),
+          "Gets an #iree_codegen.pass_pipeline attribute.")
+      .def_property_readonly("pipeline",
+                             ireeCodegenPassPipelineAttrGetPipeline);
 
   //===-------------------------------------------------------------------===//
   // CodegenTranslationInfoAttr
@@ -766,6 +795,43 @@ NB_MODULE(_ireeCompilerDialects, m) {
       },
       "Convert an iree_codegen.smt.constraints op to an SMT-LIB string.",
       py::arg("constraints_op"), py::arg("emit_reset") = false);
+
+  iree_codegen_module.def(
+      "materialize_compilation_info",
+      [](MlirOperation op, py::dict assignments) -> MlirAttribute {
+        std::vector<MlirStringRef> nameRefs;
+        std::vector<int64_t> values;
+        nameRefs.reserve(assignments.size());
+        values.reserve(assignments.size());
+        for (auto [key, value] : assignments) {
+          Py_ssize_t nameSize = 0;
+          const char *nameData = PyUnicode_AsUTF8AndSize(key.ptr(), &nameSize);
+          if (!nameData) {
+            throw py::python_error();
+          }
+          nameRefs.push_back(
+              mlirStringRefCreate(nameData, static_cast<size_t>(nameSize)));
+          values.push_back(py::cast<int64_t>(value));
+        }
+
+        MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirAttribute attr =
+            ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
+                op, nameRefs.size(), nameRefs.data(), values.data(),
+                &diagnosticMessage);
+        if (mlirAttributeIsNull(attr)) {
+          if (!mlirAttributeIsNull(diagnosticMessage)) {
+            throw std::runtime_error(
+                unwrap(mlirStringAttrGetValue(diagnosticMessage)).str());
+          }
+          throw std::runtime_error(
+              "compilation_info materialization from constraints failed");
+        }
+        return attr;
+      },
+      "Materialize a compilation_info attr from a constraints op and flat knob "
+      "assignment dictionary.",
+      py::arg("constraints_op"), py::arg("assignments"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps

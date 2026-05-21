@@ -76,14 +76,24 @@ static std::optional<Value> promotionImpl(OpBuilder &builder,
     }
 
     if (isa<linalg::LinalgOp>(producer.getOperation())) {
-      setLoweringConfig(producer, attr);
-      return operand.get();
+      // Don't skip promotion for transpose producers — they need to go through
+      // the swizzle path so XOR swizzle hints are applied.
+      auto generic = dyn_cast<linalg::GenericOp>(producer.getOperation());
+      if (!generic || !linalg::isaTransposeOpInterface(generic)) {
+        setLoweringConfig(producer, attr);
+        return operand.get();
+      }
     }
-    // Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
-    // always use derived_thread_config regardless of the requested attr.
+    // If the promotion attr requests DMA, pass it through to im2col.
+    // GPUConvertToCoalescedDMA will convert im2col → gather → DMA.
+    // Otherwise, fall back to derived_thread_config.
     if (isa<IREE::LinalgExt::Im2colOp>(producer.getOperation())) {
-      setLoweringConfig(producer,
-                        DerivedThreadConfigAttr::get(producer->getContext()));
+      if (isa<UseGlobalLoadDMAAttr>(attr)) {
+        setLoweringConfig(producer, attr);
+      } else {
+        setLoweringConfig(producer,
+                          DerivedThreadConfigAttr::get(producer->getContext()));
+      }
       return operand.get();
     }
   }

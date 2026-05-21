@@ -56,7 +56,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @custom_matmul(%matmul: !transform.any_op {transform.readonly}) {
     %variant_op = transform.get_parent_op %matmul {op_name = "hal.executable.variant"} : (!transform.any_op) -> !transform.any_op
     %funcs = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<pipeline = TransformDialectCodegen
+    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<pipeline = #iree_codegen.transform_dialect_codegen
                                                                                codegen_spec = @custom_transform_strategy> -> !transform.any_param
     transform.annotate %funcs "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
     transform.print {name = "Setting matmul strategy to custom_transform_strategy"}
@@ -133,8 +133,9 @@ module attributes { transform.with_named_sequence } {
   //
   // To couple this with a transform dialect based codegen strategy, the target
   // codegen strategy can be included inline with this library and relevant ops
-  // can be annotated with `TransformDialectCodegen` as the lowering pipeline,
-  // with a reference to the strategy to use (see an example above).
+  // can be annotated with `#iree_codegen.transform_dialect_codegen` as the
+  // lowering pipeline, with a reference to the strategy to use (see an example
+  // above).
   transform.named_sequence @kernel_config(%variant_op: !transform.any_op {transform.consumed}) {
     transform.foreach_match in %variant_op
         @match_matmul -> @custom_matmul,

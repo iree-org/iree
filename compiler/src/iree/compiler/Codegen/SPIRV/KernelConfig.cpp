@@ -959,6 +959,9 @@ setCooperativeMatrixConfig(IREE::GPU::TargetAttr target, linalg::LinalgOp op,
   SmallVector<GPUIntrinsicType> intrinsics;
   intrinsics.reserve(target.getWgp().getMma().size());
   for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType, mma);

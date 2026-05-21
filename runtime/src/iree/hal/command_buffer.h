@@ -72,6 +72,21 @@ enum iree_hal_command_buffer_mode_bits_t {
   // about lifetime this flag disables the internal resource tracking to reduce
   // overhead.
   IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED = 1u << 6,
+
+  // Retains producer metadata required for command-buffer profiling.
+  // This makes profiling possible for the command buffer but does not enable
+  // profiling by itself. Implementations may spend additional recording-time
+  // CPU and memory to retain command operation metadata and compact sidecars
+  // used by profiling sessions. This is intended for rich host profiling that
+  // needs source/correlation records, not minimal production timestamp capture.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA = 1u << 7,
+
+  // Retains compact dispatch metadata required for command-buffer timestamping.
+  // This makes dispatch timestamp capture possible for the command buffer but
+  // does not enable timestamp capture by itself. Implementations may spend
+  // additional recording-time CPU and memory to retain compact per-dispatch
+  // packet/correlation sidecars without requiring full profile metadata.
+  IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA = 1u << 8,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -448,7 +463,7 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
 // Configuration defining how a dispatch is performed.
 typedef struct iree_hal_dispatch_config_t {
   // Optional workgroup size for targets that have workgroup sizes specified by
-  // their exports. If all zeros the default workgroup size of the export is
+  // their functions. If all zeros the default workgroup size of the function is
   // used and otherwise must be at least 1x1x1.
   uint32_t workgroup_size[3];
   // Static workgroup count, used when one of the _INDIRECT_PARAMETERS flags is
@@ -472,7 +487,7 @@ typedef struct iree_hal_dispatch_config_t {
   iree_hal_buffer_ref_t workgroup_count_ref;
   // Size, in bytes, of any dynamically-sized workgroup local memory required.
   // This is added on top of the static workgroup local memory declared by the
-  // export metadata.
+  // function metadata.
   uint32_t dynamic_workgroup_local_memory;
 } iree_hal_dispatch_config_t;
 
@@ -564,6 +579,17 @@ enum iree_hal_dispatch_flag_bits_t {
   // knows the workload is small enough that worker wake-up latency would
   // dominate the total cost.
   IREE_HAL_DISPATCH_FLAG_ALLOW_INLINE_EXECUTION = 1ull << 5,
+
+  // Allows queue_dispatch implementations to borrow resource lifetimes instead
+  // of retaining them until the submitted work completes. Callers using this
+  // flag must keep the executable and all directly referenced buffers live and
+  // backed by stable storage until the submission's signal semaphores indicate
+  // completion. Implementations may ignore this hint and retain resources.
+  //
+  // Command buffer dispatches ignore this flag. Command buffer lifetime
+  // control is expressed by command buffer modes such as
+  // IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED.
+  IREE_HAL_DISPATCH_FLAG_BORROW_RESOURCE_LIFETIMES = 1ull << 6,
 };
 
 // Returns true if the given dispatch uses indirect workgroup parameters.
@@ -792,6 +818,15 @@ IREE_API_EXPORT iree_hal_command_category_t
 iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer);
 
+// Returns the queue affinity selected for the command buffer.
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer);
+
+// Returns the process-local nonzero profiling identifier for |command_buffer|.
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
+    const iree_hal_command_buffer_t* command_buffer);
+
 // Begins recording into the command buffer.
 // The command buffer must not have been recorded already; this is only valid to
 // call once after creation and must be paired with iree_hal_command_buffer_end.
@@ -954,13 +989,12 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 // IREE_HAL_COMMAND_CATEGORY_DISPATCH was not set.
 //
 // May fail during recording if validation is enabled and the dispatch
-// configuration is not supported by the device or exported entry point. Some
+// configuration is not supported by the device or function. Some
 // implementations cannot verify statically and may fail asynchronously during
 // execution.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 
@@ -1112,7 +1146,7 @@ typedef struct iree_hal_command_buffer_vtable_t {
   iree_status_t(IREE_API_PTR* dispatch)(
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_executable_t* executable,
-      iree_hal_executable_export_ordinal_t export_ordinal,
+      iree_hal_executable_function_t function,
       const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
       iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags);
 } iree_hal_command_buffer_vtable_t;
@@ -1123,6 +1157,10 @@ struct iree_hal_command_buffer_t {
   iree_hal_command_buffer_mode_t mode;
   iree_hal_command_category_t allowed_categories;
   iree_hal_queue_affinity_t queue_affinity;
+
+  // Process-local nonzero command-buffer identifier used by profiling sessions.
+  uint64_t profile_id;
+
   uint32_t binding_capacity;
   uint32_t binding_count;
   void* validation_state;

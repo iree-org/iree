@@ -1,0 +1,136 @@
+vm.module @list_ops version 0
+vm.type i16
+vm.type i32
+vm.type i8
+vm.type !vm.list<i16>
+vm.type !vm.list<i32>
+vm.type !vm.list<i8>
+
+vm.export @test_i8
+vm.func @test_i8() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 42  // 0x0000002A
+  %i2 = vm.const.i32 100  // 0x00000064
+  %r0 = vm.list.alloc %i1 : !vm.list<i8>
+  vm.list.reserve %r0, %i2
+  %i1 = vm.list.size %r0
+  vm.discard.refs %r0
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "list<i8>.empty.size()=0"
+}
+
+vm.export @test_i16
+vm.func @test_i16() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 27  // 0x0000001B
+  %r0 = vm.list.alloc %i2 : !vm.list<i16>
+  vm.list.resize %r0, %i2
+  vm.list.set.i32 %r0, %i1, %i3
+  %i1 = vm.list.get.i32 %r0, %i1
+  vm.discard.refs %r0
+  %i3 = vm.cmp.ne.i32 %i1, %i3
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "list<i16>.empty.set(0, 27).get(0)=27"
+}
+
+vm.export @test_i32
+vm.func @test_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 101  // 0x00000065
+  %i2 = vm.const.i32 100  // 0x00000064
+  %i3 = vm.const.i32 42  // 0x0000002A
+  %r0 = vm.list.alloc %i3 : !vm.list<i32>
+  vm.list.resize %r0, %i1
+  vm.list.set.i32 %r0, %i2, %i3
+  %i2 = vm.list.get.i32 %r0, %i2
+  vm.discard.refs %r0
+  %i3 = vm.cmp.ne.i32 %i2, %i3
+  vm.cond_br %i3, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "list<i32>.empty.set(100, 42).get(100)=42"
+}
+
+vm.export @test_ref
+vm.func @test_ref() -> () {
+^bb0:
+  vm.return
+}
+
+vm.export @test_multiple_lists
+vm.func @test_multiple_lists() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 27  // 0x0000001B
+  %i4 = vm.const.i32 42  // 0x0000002A
+  %r0 = vm.list.alloc %i2 : !vm.list<i8>
+  %r1 = vm.list.alloc %i2 : !vm.list<i8>
+  vm.list.resize %r0, %i2
+  vm.list.resize %r1, %i2
+  vm.list.set.i32 %r0, %i1, %i3
+  vm.list.set.i32 %r1, %i1, %i4
+  %i2 = vm.list.get.i32 %r0, %i1
+  vm.discard.refs %r0
+  %i1 = vm.list.get.i32 %r1, %i1
+  vm.discard.refs %r1
+  %i3 = vm.cmp.ne.i32 %i2, %i3
+  vm.cond_br %i3, ^bb4(), ^bb1()
+^bb1:
+  %i4 = vm.cmp.ne.i32 %i1, %i4
+  vm.cond_br %i4, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "list1.get(0)=42"
+^bb4:
+  vm.fail %i0, "list0.get(0)=27"
+}
+
+vm.export @fail_uninitialized_access
+vm.func @fail_uninitialized_access() -> () {
+^bb0:
+  %i0 = vm.const.i32.zero
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.list.alloc %i1 : !vm.list<i32>
+  vm.list.set.i32 %r0, %i0, %i1
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @fail_out_of_bounds_read
+vm.func @fail_out_of_bounds_read() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.list.alloc %i0 : !vm.list<i32>
+  vm.list.resize %r0, %i0
+  %i1 = vm.list.get.i32 %r0, %i0
+  vm.list.set.i32 %r0, %i0, %i1
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @fail_out_of_bounds_write
+vm.func @fail_out_of_bounds_write() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.list.alloc %i0 : !vm.list<i32>
+  vm.list.resize %r0, %i0
+  vm.list.set.i32 %r0, %i0, %i0
+  vm.discard.refs %r0
+  vm.return
+}

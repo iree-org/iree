@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -61,16 +62,15 @@ static void emitCommonConstraints(OpBuilder &builder, Location loc,
     Value eq = smt::EqOp::create(builder, loc, dimArg, constVal);
     IREE::Codegen::AssertOp::create(
         builder, loc, eq,
-        ("dim_" + Twine(d) + " ({}) == " + Twine(staticSize)).str(),
+        (kLoopRangePrefix + Twine(d) + " ({}) == " + Twine(staticSize)).str(),
         ValueRange{dimArg});
   }
 }
 
-ConstraintsOpShell
-createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
-                         IREE::Codegen::RootOpAttr rootOpAttr,
-                         Attribute pipelineAttr, DictionaryAttr knobs,
-                         unsigned numLoops, ArrayRef<AffineMap> indexingMaps) {
+ConstraintsOpShell createConstraintsOpShell(
+    OpBuilder &builder, Operation *rootOp, IREE::Codegen::RootOpAttr rootOpAttr,
+    IREE::Codegen::PipelineAttrInterface pipelineAttr, DictionaryAttr knobs,
+    unsigned numLoops, ArrayRef<AffineMap> indexingMaps) {
   MLIRContext *ctx = rootOp->getContext();
   Location loc = rootOp->getLoc();
   builder.setInsertionPointAfter(rootOp);
@@ -87,7 +87,7 @@ createConstraintsOpShell(OpBuilder &builder, Operation *rootOp,
 
   // Create the constraints op.
   smt::IntType smtIntTy = smt::IntType::get(ctx);
-  SmallVector<Type> blockArgTypes(numLoops, smtIntTy);
+  llvm::Repeated<Type> blockArgTypes(numLoops, smtIntTy);
 
   auto constraintsOp = IREE::Codegen::ConstraintsOp::create(
       builder, loc, rootOpAttr, pipelineAttr, knobs, dimValues);

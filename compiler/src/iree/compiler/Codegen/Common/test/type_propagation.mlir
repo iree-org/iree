@@ -451,6 +451,83 @@ func.func @scatter() {
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @scatter_mask_only_illegal() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1xi32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi8>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<3xi32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi32>> -> tensor<8xi32>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1xi32>> -> tensor<8x1xi32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0], sizes = [8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi8>> -> tensor<8xi8>
+  %7 = arith.trunci %6 : tensor<8xi8> to tensor<8xi1>
+  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0], sizes = [3], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<3xi32>> -> tensor<3xi32>
+  %9 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%4, %5, %7 : tensor<8xi32>, tensor<8x1xi32>, tensor<8xi1>)
+    outs(%8 : tensor<3xi32>) {
+    ^bb0(%arg0: i32, %arg1: i32):
+      iree_linalg_ext.yield %arg0 : i32
+    } -> tensor<3xi32>
+  iree_tensor_ext.dispatch.tensor.store %9, %3, offsets = [0], sizes = [3], strides = [1] : tensor<3xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<3xi32>>
+  return
+}
+// CHECK-LABEL: func.func @scatter_mask_only_illegal()
+//   CHECK-DAG:   %[[UPDATES:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8xi32>
+//   CHECK-DAG:   %[[INDICES:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8x1xi32>
+//   CHECK-DAG:   %[[MASK:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8xi8>
+//   CHECK-DAG:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<3xi32>
+//       CHECK:   %[[SCATTER:.+]] = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+//  CHECK-SAME:       ins(%[[UPDATES]], %[[INDICES]], %[[MASK]] : tensor<8xi32>, tensor<8x1xi32>, tensor<8xi8>)
+//  CHECK-SAME:       outs(%[[OUT]] : tensor<3xi32>)
+//  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i32, %[[ARG1:[a-zA-Z0-9]+]]: i32)
+//       CHECK:       iree_linalg_ext.yield %[[ARG0]] : i32
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[SCATTER]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @gather_mask_only_illegal() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1xi32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi8>>
+  %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<8x4xi32>>
+  %4 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4xi32>> -> tensor<16x4xi32>
+  %5 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [8, 1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8x1xi32>> -> tensor<8x1xi32>
+  %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0], sizes = [8], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<8xi8>> -> tensor<8xi8>
+  %7 = arith.trunci %6 : tensor<8xi8> to tensor<8xi1>
+  %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0], sizes = [8, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<8x4xi32>> -> tensor<8x4xi32>
+  %9 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%4, %5, %7 : tensor<16x4xi32>, tensor<8x1xi32>, tensor<8xi1>)
+    outs(%8 : tensor<8x4xi32>) -> tensor<8x4xi32>
+  iree_tensor_ext.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [8, 4], strides = [1, 1] : tensor<8x4xi32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<8x4xi32>>
+  return
+}
+// CHECK-LABEL: func.func @gather_mask_only_illegal()
+//   CHECK-DAG:   %[[SOURCE:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<16x4xi32>
+//   CHECK-DAG:   %[[INDICES:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8x1xi32>
+//   CHECK-DAG:   %[[MASK:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8xi8>
+//   CHECK-DAG:   %[[OUT:.+]] = iree_tensor_ext.dispatch.tensor.load %{{.+}} : {{.+}} -> tensor<8x4xi32>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather
+//  CHECK-SAME:       dimension_map = [0]
+//  CHECK-SAME:       ins(%[[SOURCE]], %[[INDICES]], %[[MASK]] : tensor<16x4xi32>, tensor<8x1xi32>, tensor<8xi8>)
+//  CHECK-SAME:       outs(%[[OUT]] : tensor<8x4xi32>) -> tensor<8x4xi32>
+//       CHECK:   iree_tensor_ext.dispatch.tensor.store %[[GATHER]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 func.func @sort() {

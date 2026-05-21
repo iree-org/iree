@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/PassUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
 
 namespace mlir::iree_compiler {
 
@@ -29,7 +31,8 @@ void addCommonTargetExecutablePreprocessingPasses(
       .addPass(createBufferizeCopyOnlyDispatchesPass)
       .addPass([&]() {
         return createDecomposeSoftmaxPass(useDecomposeSoftmaxFusion);
-      });
+      })
+      .addPass(IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass);
 }
 
 //===---------------------------------------------------------------------===//
@@ -44,5 +47,21 @@ namespace {
 void registerCodegenCommonPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> CodegenConfigurationPreProcessingPipeline(
+      "iree-codegen-configuration-preprocessing-pipeline",
+      "Runs the variant-scope pre-processing pipeline that precedes the "
+      "codegen configuration pipeline",
+      [](OpPassManager &variantPassManager) {
+        buildCodegenConfigurationPreProcessingPassPipeline(variantPassManager);
+      });
+
+  static PassPipelineRegistration<> CodegenTranslationPostProcessingPipeline(
+      "iree-codegen-translation-postprocessing-pipeline",
+      "Runs the variant-scope post-processing pipeline that follows the "
+      "codegen translation pipeline",
+      [](OpPassManager &variantPassManager) {
+        buildCodegenTranslationPostProcessingPassPipeline(variantPassManager);
+      });
 }
 } // namespace mlir::iree_compiler

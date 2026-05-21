@@ -162,6 +162,9 @@ function(iree_check_test)
   endif()
   if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
     list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-target=${IREE_ROCM_TEST_TARGET_CHIP}")
+    if(IREE_ROCM_TEST_AMDGCNSPIRV)
+      list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-use-spirv")
+    endif()
   endif()
 
   if(_BYTECODE_MODULE_BUILD_ENABLED)
@@ -194,7 +197,7 @@ function(iree_check_test)
   endif()
   add_dependencies(iree-test-deps "${_NAME}")
 
-  if(_TEST_DEFINED)
+  if(_TEST_DEFINED AND TARGET "${_RUNNER_TARGET}")
     iree_native_test(
       NAME
         "${_RULE_NAME}"

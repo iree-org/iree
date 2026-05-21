@@ -71,7 +71,6 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
-    MLIRArithDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces

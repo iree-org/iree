@@ -1,0 +1,245 @@
+vm.module @control_flow_ops version 0
+vm.type i32
+vm.type !vm.buffer
+vm.import optional @reserved.optional cconv "0i_i"
+vm.rodata[0] = 01
+vm.rodata[1] = 02
+vm.rodata[2] = 03
+
+vm.export @test_return_empty
+vm.func @test_return_empty() -> () {
+^bb0:
+  vm.return
+}
+
+vm.export @fail_always
+vm.func @fail_always() -> () {
+^bb0:
+  %i0 = vm.const.i32 4  // 0x00000004
+  vm.fail %i0, "error!"
+}
+
+vm.export @test_check_eq_always
+vm.func @test_check_eq_always() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.cmp.ne.i32 %i1, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "error!"
+}
+
+vm.export @fail_check_eq_never
+vm.func @fail_check_eq_never() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.cmp.ne.i32 %i1, %i2
+  vm.cond_br %i2, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "error!"
+}
+
+vm.export @test_optional_import_resolved
+vm.func @test_optional_import_resolved() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.import.resolved @reserved.optional
+  %i1 = vm.cmp.eq.i32 %i2, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "missing optional import found"
+}
+
+vm.export @fail_optional_import_call
+vm.func @fail_optional_import_call() -> () {
+^bb0:
+  %i0 = vm.const.i32 4  // 0x00000004
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.call @reserved.optional(%i1)
+  vm.fail %i0, "unreachable!"
+}
+
+vm.export @test_cond_br
+vm.func @test_cond_br() -> () {
+^bb0:
+  %i0 = vm.const.i32 4  // 0x00000004
+  %i1 = vm.const.i32 1  // 0x00000001
+  vm.cond_br %i1, ^bb1(), ^bb2()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "unreachable!"
+}
+
+vm.export @test_cond_br_int_arg
+vm.func @test_cond_br_int_arg() -> () {
+^bb0:
+  %i0 = vm.const.i32 4  // 0x00000004
+  %i1 = vm.const.i32 1  // 0x00000001
+  vm.cond_br %i1, ^bb1(), ^bb2()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "unreachable!"
+}
+
+vm.export @test_cond_br_ref_arg
+vm.func @test_cond_br_ref_arg() -> () {
+^bb0:
+  %i0 = vm.const.i32 4  // 0x00000004
+  %i1 = vm.const.i32 1  // 0x00000001
+  vm.cond_br %i1, ^bb1(), ^bb2()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "unreachable!"
+}
+
+vm.export @test_cond_br_same_successor
+vm.func @test_cond_br_same_successor() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  vm.cond_br %i2, ^bb1(), ^bb1(%i1->%i2)
+^bb1:
+  %i2 = vm.cmp.ne.i32 %i2, %i2
+  vm.cond_br %i2, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "error!"
+}
+
+vm.export @test_br_table_inbounds
+vm.func @test_br_table_inbounds() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32.zero
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 2  // 0x00000002
+  vm.br_table %i2 { default: ^bb1(), 0: ^bb2(%i1->%i2), 1: ^bb2() }
+^bb1:
+  vm.fail %i3, "unreachable"
+^bb2:
+  %i2 = vm.cmp.ne.i32 %i2, %i2
+  vm.cond_br %i2, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "expected table[1] branch"
+}
+
+vm.export @test_br_table_outofbounds
+vm.func @test_br_table_outofbounds() -> () {
+^bb0:
+  %i0 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 -1  // 0xFFFFFFFF
+  vm.br_table %i2 { default: ^bb1(), 0: ^bb2(), 1: ^bb2(%i1->%i0) }
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "unreachable"
+}
+
+vm.export @test_return_arg_cycling
+vm.func @test_return_arg_cycling() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %r0 = vm.const.ref.rodata 0  // 1b
+  %r1 = vm.const.ref.rodata 1  // 1b
+  %r2 = vm.const.ref.rodata 2  // 1b
+  %r3, %r4, %r5 = vm.call @control_flow_ops:13(%r0, %r1, %r2)
+  %i2 = vm.cmp.eq.ref %r3, %r1
+  vm.discard.refs %r3, %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.eq.ref %r4, %r2
+  vm.discard.refs %r4, %r2
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i2 = vm.cmp.eq.ref %r5, %r0
+  vm.discard.refs %r5, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.discard.refs %r0, %r2, %r4, %r5
+  vm.br ^bb6()
+^bb5:
+  vm.discard.refs %r0, %r5
+  vm.br ^bb6()
+^bb6:
+  vm.fail %i0, ""
+}
+
+vm.func @fn13(%r0: !vm.ref<?>, %r1: !vm.ref<?>, %r2: !vm.ref<?>) -> (!vm.ref<?>, !vm.ref<?>, !vm.ref<?>) {
+^bb0:
+  vm.return %R1, %R2, %R0
+}
+
+vm.export @test_branch_arg_cycling
+vm.func @test_branch_arg_cycling() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32.zero
+  %r0 = vm.const.ref.rodata 0  // 1b
+  %r1 = vm.const.ref.rodata 1  // 1b
+  %r2 = vm.const.ref.rodata 2  // 1b
+  %r3, %r4, %r5 = vm.call @control_flow_ops:15(%r0, %r1, %r2, %i2)
+  %i2 = vm.cmp.eq.ref %r3, %r1
+  vm.discard.refs %r3, %r1
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb4(), ^bb1()
+^bb1:
+  %i2 = vm.cmp.eq.ref %r4, %r2
+  vm.discard.refs %r4, %r2
+  %i2 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i2 = vm.cmp.eq.ref %r5, %r0
+  vm.discard.refs %r5, %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.discard.refs %r0, %r2, %r4, %r5
+  vm.br ^bb6()
+^bb5:
+  vm.discard.refs %r0, %r5
+  vm.br ^bb6()
+^bb6:
+  vm.fail %i0, ""
+}
+
+vm.func @fn15(%r0: !vm.ref<?>, %r1: !vm.ref<?>, %r2: !vm.ref<?>, %i0: i32) -> (!vm.ref<?>, !vm.ref<?>, !vm.ref<?>) {
+^bb0:
+  vm.cond_br %i0, ^bb1(), ^bb2()
+^bb1:
+  vm.return %R0, %R1, %R2
+^bb2:
+  vm.call @control_flow_ops:16(%i0)
+  vm.return %R1, %R2, %R0
+}
+
+vm.func @fn16(%i0: i32) -> () {
+^bb0:
+  vm.return
+}

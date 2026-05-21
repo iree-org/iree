@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-if(NOT IREE_BUILD_COMPILER OR NOT IREE_BUILD_TESTS)
+if(NOT IREE_BUILD_TESTS)
   return()
 endif()
 
@@ -25,6 +25,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode::module
+    iree::vm::bytecode::utils
     iree::vm::test::all_bytecode_modules_c
     iree::vm::testing::test_runner
     iree::vm::testing::yieldable_test_module

@@ -158,6 +158,23 @@ LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp,
                                      CloneableIntoDispatchOptions options = {});
 
+/// Returns true if an external user blocks fusing `producerOp` into the
+/// dispatch rooted at `rootOp`.
+///
+/// `rootOp` and `producerOp` are expected to be in the same block. Users are
+/// normalized to their nearest ancestor operation in that block, so nested
+/// "uses from above" are checked at block scope.
+///
+/// Producer fusion is blocked when an external user appears before `rootOp`
+/// and either:
+///   1) it is a `flow.dispatch.region`, or
+///   2) it is in the backward slice of `fusionGroupOps`, truncated at
+///      `producerOp`.
+///
+bool hasExternalUserBlockingProducerFusion(
+    Operation *rootOp, Operation *producerOp,
+    ArrayRef<Operation *> fusionGroupOps);
+
 } // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_

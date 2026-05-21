@@ -21,10 +21,7 @@ struct LinalgFusionOpInterfaceAdapter
           LinalgFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
-    auto maps = cast<ConcreteType>(op)
-                    .getIndexingMaps()
-                    .template getAsValueRange<AffineMapAttr>();
-    return {maps.begin(), maps.end() - cast<ConcreteType>(op).getNumResults()};
+    return cast<ConcreteType>(op).getIndexingMapsArray();
   }
 
   SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
@@ -54,7 +51,7 @@ public:
 
   AffineMap getMatchingIndexingMap(mlir::Operation *op,
                                    OpOperand *operand) const {
-    return (cast<ConcreteType>(op).getMatchingIndexingMap(operand));
+    return getIndexingMapsForOperands(op)[operand->getOperandNumber()];
   }
 
   SmallVector<AffineMap> getIndexingMapsArray(mlir::Operation *op) const {
@@ -70,12 +67,10 @@ struct SoftmaxFusionOpInterfaceAdapter
 public:
   SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
     Builder b(op->getContext());
-    return llvm::map_to_vector(
-        cast<linalg::SoftmaxOp>(op).getDpsInputs(),
-        [&b](Value operand) -> AffineMap {
-          auto rank = cast<ShapedType>(operand.getType()).getRank();
-          return b.getMultiDimIdentityMap(rank);
-        });
+    return llvm::map_to_vector(op->getOperands(), [&b](Value operand) {
+      auto rank = cast<ShapedType>(operand.getType()).getRank();
+      return b.getMultiDimIdentityMap(rank);
+    });
   }
 
   SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {

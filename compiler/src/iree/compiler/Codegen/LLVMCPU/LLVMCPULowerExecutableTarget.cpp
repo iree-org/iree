@@ -151,7 +151,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   // functionality, though the performance may be suboptimal.
   auto hasAttentionOp = [](FunctionOpInterface funcOp) {
     bool hasAttention = false;
-    funcOp.walk([&](IREE::LinalgExt::AttentionOp) {
+    funcOp.walk([&](IREE::LinalgExt::OnlineAttentionOp) {
       hasAttention = true;
       return WalkResult::interrupt();
     });
@@ -171,13 +171,15 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   OpPassManager passManager(func::FuncOp::getOperationName());
 
   Attribute pipelineAttr = translationInfo.getPassPipeline();
+  // No pipeline specified, nothing to do.
+  if (isa<IREE::Codegen::NoPipelineAttr>(pipelineAttr)) {
+    return;
+  }
+
   auto pipelineIface =
       dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr);
   if (!pipelineIface) {
-    if (translationInfo.getDispatchLoweringPassPipeline() ==
-        IREE::Codegen::DispatchLoweringPassPipeline::None) {
-      return;
-    }
+    // Not an interface implementor -- reject any remaining legacy pipeline.
     funcOp.emitOpError("Unsupported pipeline on CPU target.");
     return signalPassFailure();
   }

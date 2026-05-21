@@ -50,11 +50,13 @@ class DispatchTest : public CtsTestBase<> {
 TEST_P(DispatchTest, DispatchAbs) {
   // Create input buffer.
   iree_hal_buffer_t* input_buffer = nullptr;
-  CreateFilledDeviceBuffer<float>(4 * sizeof(float), -2.5f, &input_buffer);
+  IREE_ASSERT_OK(
+      CreateFilledDeviceBuffer<float>(4 * sizeof(float), -2.5f, &input_buffer));
 
   // Create output buffer.
   iree_hal_buffer_t* output_buffer = nullptr;
-  CreateFilledDeviceBuffer<float>(4 * sizeof(float), -9.0f, &output_buffer);
+  IREE_ASSERT_OK(CreateFilledDeviceBuffer<float>(4 * sizeof(float), -9.0f,
+                                                 &output_buffer));
 
   iree_hal_buffer_ref_t binding_refs[2];
   iree_hal_buffer_binding_t binding_table_values[2];
@@ -119,7 +121,7 @@ TEST_P(DispatchTest, DispatchAbs) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
 
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, /*entry_point=*/0,
+      command_buffer, executable_, iree_hal_executable_function_from_index(0),
       iree_hal_make_static_dispatch_config(1, 1, 1),
       iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
 

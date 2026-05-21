@@ -160,35 +160,14 @@ struct PropagateDispatchSizeBoundsPass final
     // Check if a specific subgroup size has been explicitly chosen via the
     // codegen pipeline configuration.
     std::optional<int64_t> staticSubgroupSize = getSubgroupSize(funcOp);
-
-    IREE::Codegen::DispatchConfigOp configOp;
-    if (useDispatchConfig) {
-      configOp = getDispatchConfigOp(funcOp);
-      if (configOp) {
-        if (std::optional<ArrayRef<int64_t>> wgSize =
-                configOp.getWorkgroupSize()) {
-          staticWorkgroupSize = llvm::to_vector(wgSize.value());
-        }
-        if (std::optional<uint64_t> sgSize = configOp.getSubgroupSize()) {
-          staticSubgroupSize = static_cast<int64_t>(*sgSize);
-        }
+    IREE::Codegen::DispatchConfigOp configOp = getDispatchConfigOp(funcOp);
+    if (configOp) {
+      if (std::optional<ArrayRef<int64_t>> wgSize =
+              configOp.getWorkgroupSize()) {
+        staticWorkgroupSize = llvm::to_vector(wgSize.value());
       }
-    } else {
-      // Late in codegen, we've reconciled the workgroup size onto the export
-      // op.
-      if (std::optional<IREE::HAL::ExecutableExportOp> exportOp =
-              getEntryPoint(funcOp)) {
-        if (std::optional<ArrayAttr> exportWorkgroupSize =
-                exportOp->getWorkgroupSize()) {
-          staticWorkgroupSize = llvm::map_to_vector(
-              exportWorkgroupSize->getAsRange<IntegerAttr>(),
-              [](IntegerAttr a) { return a.getInt(); });
-        }
-
-        if (std::optional<uint64_t> exportSubgroupSize =
-                exportOp->getSubgroupSizeAsUInt()) {
-          staticSubgroupSize = static_cast<int64_t>(*exportSubgroupSize);
-        }
+      if (std::optional<uint64_t> sgSize = configOp.getSubgroupSize()) {
+        staticSubgroupSize = static_cast<int64_t>(*sgSize);
       }
     }
 
@@ -219,10 +198,8 @@ struct PropagateDispatchSizeBoundsPass final
       }
     }
     SmallVector<int64_t> staticWorkgroupCounts;
-    if (useDispatchConfig && configOp) {
+    if (configOp) {
       staticWorkgroupCounts = configOp.getStaticNumWorkgroups();
-    } else {
-      staticWorkgroupCounts = getStaticNumWorkgroups(funcOp);
     }
     assert(staticWorkgroupCounts.size() <= 3 &&
            "workgroup counts are 3D at most");

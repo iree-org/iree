@@ -10,10 +10,12 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
+#include "mlir/Interfaces/LoopLikeInterface.h"
 
 namespace mlir::iree_compiler {
 
@@ -138,32 +140,12 @@ static void swizzleStore(RewriterBase &rewriter, vector::StoreOp store,
   rewriter.eraseOp(store);
 }
 
-/// Swizzles:
-///  amdgpu.gather_to_lds
-///    (iree_codegen.swizzle_hint, srcIndices, dst, dstIndices, transferType)
-///
-/// For now, only support gather_to_lds width == accessWidth.
-static void swizzleGatherToLDS(RewriterBase &rewriter,
-                               amdgpu::GatherToLDSOp gatherOp,
-                               IREE::Codegen::SwizzleHintOp hintOp) {
-  Location hintLoc = hintOp.getLoc();
-  Value memrefOffset = gatherOp.getSrcIndices()[0];
-  Value newOffset = getValueOrCreateConstantIndexOp(
-      rewriter, hintLoc,
-      hintOp.getSwizzle().swizzleOffset(rewriter, hintOp.getLoc(), memrefOffset,
-                                        hintOp.getOperand()));
-  rewriter.modifyOpInPlace(gatherOp, [&]() {
-    gatherOp.getSrcMutable().assign(hintOp.getOperand());
-    gatherOp.getSrcIndicesMutable().assign(newOffset);
-  });
-}
-
 static LogicalResult
 verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
   auto memrefType = cast<MemRefType>(hintOp.getOperand().getType());
   // Swizzle hints require flat (rank 1) memrefs.
   // For rank 1, allow dynamic memrefs or static contiguous row-major memrefs.
-  if ((memrefType.getRank() != 1 || !memrefType.getLayout().isIdentity()) ||
+  if (memrefType.getRank() != 1 ||
       (memrefType.hasStaticShape() &&
        !memref::isStaticShapeAndContiguousRowMajor(memrefType))) {
     hintOp.emitError()
@@ -174,14 +156,51 @@ verifyFlatContiguousSwizzleHintOp(IREE::Codegen::SwizzleHintOp hintOp) {
   return success();
 }
 
-/// Resolves all hints. Walks all direct users and splits them into loads and
-/// stores. If any user is not a swizzle-able load or store, bail out and
-/// silently drop the optimization hint.
-static void resolveHintOp(RewriterBase &rewriter,
-                          IREE::Codegen::SwizzleHintOp hintOp) {
-  SmallVector<vector::LoadOp> loads;
-  SmallVector<vector::StoreOp> stores;
-  SmallVector<amdgpu::GatherToLDSOp> gatherToLDSOps;
+/// Traces a memref value backward through defining ops and loop
+/// iter_args/results to find the root memref.alloc.
+static memref::AllocOp traceToAllocation(Value val) {
+  DenseSet<Value> visited;
+  SmallVector<Value> worklist = {val};
+  while (!worklist.empty()) {
+    Value current = worklist.pop_back_val();
+    if (!visited.insert(current).second) {
+      continue;
+    }
+    if (auto blockArg = dyn_cast<BlockArgument>(current)) {
+      auto loopOp =
+          dyn_cast<LoopLikeOpInterface>(blockArg.getOwner()->getParentOp());
+      if (!loopOp) {
+        continue;
+      }
+      if (OpOperand *init = loopOp.getTiedLoopInit(blockArg)) {
+        worklist.push_back(init->get());
+      }
+    } else if (auto allocOp = current.getDefiningOp<memref::AllocOp>()) {
+      return allocOp;
+    } else if (auto loopOp = current.getDefiningOp<LoopLikeOpInterface>()) {
+      if (OpOperand *init = loopOp.getTiedLoopInit(cast<OpResult>(current))) {
+        worklist.push_back(init->get());
+      }
+    } else {
+      for (Value operand : current.getDefiningOp()->getOperands()) {
+        if (isa<MemRefType>(operand.getType())) {
+          worklist.push_back(operand);
+        }
+      }
+    }
+  }
+  return nullptr;
+}
+
+struct SwizzleState {
+  bool resolvable = true;
+  bool hasGatherToLds = false;
+};
+
+/// Verifies the users of a swizzle hint and returns its swizzle state.
+/// Emits a diagnostic for any unsupported user.
+static SwizzleState verifyHintUsers(IREE::Codegen::SwizzleHintOp hintOp) {
+  SwizzleState state;
   int64_t accessWidth = hintOp.getSwizzle().getAccessElementCount();
   for (Operation *user : hintOp->getUsers()) {
     if (auto load = dyn_cast<vector::LoadOp>(user)) {
@@ -189,9 +208,8 @@ static void resolveHintOp(RewriterBase &rewriter,
       // Guard on zero rank loads and loads not divisible by the access width.
       if (loadType.getRank() != 1 ||
           loadType.getShape()[0] % accessWidth != 0) {
-        return;
+        state.resolvable = false;
       }
-      loads.push_back(load);
       continue;
     }
     if (auto store = dyn_cast<vector::StoreOp>(user)) {
@@ -199,50 +217,32 @@ static void resolveHintOp(RewriterBase &rewriter,
       // Guard on zero rank stores and stores not divisible by the access width.
       if (storeType.getRank() != 1 ||
           storeType.getShape()[0] % accessWidth != 0) {
-        return;
+        state.resolvable = false;
       }
-      stores.push_back(store);
       continue;
     }
-    if (auto gatherToLDSOp = dyn_cast<amdgpu::GatherToLDSOp>(user)) {
-      // Ignore swizzleHint on Dst Operand. Gather_to_lds writes elements of a
-      // subgroup contiguously in order of lane ID.
-      if (gatherToLDSOp.getDst() == hintOp) {
-        continue;
-      }
-      int64_t accessBitWidth = cast<MemRefType>(hintOp.getOperand().getType())
-                                   .getElementTypeBitWidth() *
-                               accessWidth;
-      auto transferBitWidth = [&]() -> int64_t {
-        if (auto vectorType =
-                dyn_cast<VectorType>(gatherToLDSOp.getTransferType())) {
-          return vectorType.getElementTypeBitWidth() *
-                 vectorType.getNumElements();
-        }
-        return gatherToLDSOp.getTransferType().getIntOrFloatBitWidth();
-      }();
-      if (accessBitWidth != transferBitWidth) {
-        return;
-      }
-      gatherToLDSOps.push_back(gatherToLDSOp);
+    if (isa<amdgpu::GatherToLDSOp>(user)) {
+      state.hasGatherToLds = true;
       continue;
     }
-    // Throw if we can't rewrite all users.
-    hintOp.emitError() << "unsupported SwizzleHintOp user: " << user;
-    return;
+    hintOp.emitError() << "unsupported SwizzleHintOp user: " << *user;
+    state.resolvable = false;
   }
+  return state;
+}
 
-  for (vector::LoadOp load : loads) {
-    rewriter.setInsertionPoint(load);
-    swizzleLoad(rewriter, load, hintOp);
-  }
-  for (vector::StoreOp store : stores) {
-    rewriter.setInsertionPoint(store);
-    swizzleStore(rewriter, store, hintOp);
-  }
-  for (amdgpu::GatherToLDSOp gatherToLDSOp : gatherToLDSOps) {
-    rewriter.setInsertionPoint(gatherToLDSOp);
-    swizzleGatherToLDS(rewriter, gatherToLDSOp, hintOp);
+/// Rewrites all load/store users of a resolved swizzle hint with swizzled
+/// offsets. Only call after verifyHintUsers returned a resolvable state.
+static void resolveHintOp(RewriterBase &rewriter,
+                          IREE::Codegen::SwizzleHintOp hintOp) {
+  for (Operation *user : llvm::make_early_inc_range(hintOp->getUsers())) {
+    if (auto load = dyn_cast<vector::LoadOp>(user)) {
+      rewriter.setInsertionPoint(load);
+      swizzleLoad(rewriter, load, hintOp);
+    } else if (auto store = dyn_cast<vector::StoreOp>(user)) {
+      rewriter.setInsertionPoint(store);
+      swizzleStore(rewriter, store, hintOp);
+    }
   }
 }
 
@@ -254,15 +254,54 @@ void ResolveSwizzleHintsPass::runOnOperation() {
   funcOp.walk(
       [&](IREE::Codegen::SwizzleHintOp hint) { hintOps.push_back(hint); });
 
-  // Swizzle all load/store uses of the hint ops if possible. If we can't
-  // guarantee all accesses of a particular hint are swizzled, this will
-  // silently pass through for that hint.
-  IRRewriter rewriter(funcOp->getContext());
+  // Verify resolvability of each hint and group results by alloc, since hints
+  // sharing an alloc must be resolved or dropped together.
+  DenseMap<Value, SwizzleState> allocToSwizzleState;
+  DenseMap<Operation *, Value> swizzleOpToAlloc;
+
   for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
     if (failed(verifyFlatContiguousSwizzleHintOp(hintOp))) {
       return signalPassFailure();
     }
-    resolveHintOp(rewriter, hintOp);
+    // Hints normally trace to a memref.alloc. BlockArgument only occurs in lit
+    // tests.
+    Value alloc;
+    if (memref::AllocOp allocOp = traceToAllocation(hintOp.getOperand())) {
+      alloc = allocOp.getResult();
+    } else {
+      assert(isa<BlockArgument>(hintOp.getOperand()) &&
+             "hint operand without alloc should be a function argument");
+      alloc = hintOp.getOperand();
+    }
+    swizzleOpToAlloc[hintOp] = alloc;
+
+    SwizzleState hintState = verifyHintUsers(hintOp);
+    SwizzleState &state = allocToSwizzleState[alloc];
+    state.resolvable &= hintState.resolvable;
+    state.hasGatherToLds |= hintState.hasGatherToLds;
+  }
+
+  // gather_to_lds is a special case: its swizzle is already resolved before
+  // this pass runs, so we cannot silently drop it here.
+  for (auto &[alloc, state] : allocToSwizzleState) {
+    memref::AllocOp allocOp = alloc.getDefiningOp<memref::AllocOp>();
+    if (!allocOp) {
+      continue;
+    }
+    if (!state.resolvable && state.hasGatherToLds) {
+      allocOp.emitError()
+          << "alloc has gather_to_lds users; all swizzle hints must resolve";
+      return signalPassFailure();
+    }
+  }
+
+  // Resolve hints.
+  IRRewriter rewriter(funcOp->getContext());
+  for (IREE::Codegen::SwizzleHintOp hintOp : hintOps) {
+    Value alloc = swizzleOpToAlloc[hintOp];
+    if (allocToSwizzleState[alloc].resolvable) {
+      resolveHintOp(rewriter, hintOp);
+    }
   }
 
   // Drop all hints.

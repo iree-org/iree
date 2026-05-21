@@ -43,5 +43,6 @@ iree_runtime_cc_test(
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/testing:temp_file",
     ],
 )

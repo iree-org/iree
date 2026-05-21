@@ -35,7 +35,8 @@ Usage in a driver's cts/BUILD.bazel:
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_binary", "iree_runtime_cc_library")
+load("//build_tools/bazel:iree_cc_test.bzl", "iree_cc_test")
 load("//build_tools/bazel:iree_hal_executable.bzl", "iree_hal_executables")
 
 # Non-executable test categories. Each entry maps a test binary name suffix
@@ -53,6 +54,7 @@ _NON_EXECUTABLE_SUITES = [
 _EXECUTABLE_SUITES = [
     ("dispatch_tests", "//runtime/src/iree/hal/cts/command_buffer:all_dispatch_tests"),
     ("executable_tests", "//runtime/src/iree/hal/cts/core:all_executable_tests"),
+    ("queue_dispatch_tests", "//runtime/src/iree/hal/cts/queue:queue_dispatch_test"),
 ]
 
 def _camel_case(snake_str):
@@ -87,6 +89,40 @@ def _cts_testdata_gen_impl(ctx):
         substitutions = substitutions,
     )
     return [DefaultInfo(files = depset([ctx.outputs.out]))]
+
+def _iree_hal_cts_test(
+        name,
+        srcs,
+        deps,
+        args = [],
+        resource_group = None,
+        tags = [],
+        test_kwargs = {},
+        target_kwargs = {}):
+    binary_name = "%s_bin" % name
+    iree_runtime_cc_binary(
+        name = binary_name,
+        testonly = True,
+        srcs = srcs,
+        deps = deps,
+        **target_kwargs
+    )
+
+    test_tags = list(tags)
+    if resource_group:
+        test_tags = test_tags + [
+            "exclusive-if-local",
+            "resource_group:" + resource_group,
+        ]
+
+    iree_cc_test(
+        name = name,
+        binary = ":%s" % binary_name,
+        cc_deps = deps,
+        args = args,
+        tags = test_tags,
+        **dict(target_kwargs, **test_kwargs)
+    )
 
 _cts_testdata_gen = rule(
     implementation = _cts_testdata_gen_impl,
@@ -202,6 +238,7 @@ def iree_hal_cts_test_suite(
         flag_values = {},
         name = "",
         args = [],
+        resource_group = None,
         tags = [],
         testonly = True,
         **kwargs):
@@ -241,6 +278,8 @@ def iree_hal_cts_test_suite(
             targets are prefixed (stream_core_tests, graph_buffer_tests, etc.).
             Use a prefix for multi-variant drivers (e.g., CUDA graph/stream).
         args: Runtime arguments passed to all test binaries.
+        resource_group: Optional shared resource group for generated tests.
+            Tests sharing the same resource group will not run concurrently.
         tags: Additional tags for test targets.
         testonly: Defaults to True.
         **kwargs: Forwarded to underlying rules (e.g., target_compatible_with).
@@ -248,7 +287,7 @@ def iree_hal_cts_test_suite(
 
     # Separate test-specific kwargs (env, data, size, etc.) from kwargs that
     # apply to all targets (target_compatible_with, etc.). Test kwargs go only
-    # to iree_runtime_cc_test; the rest go to all generated targets.
+    # to the adaptive test wrapper; the rest go to all generated targets.
     test_kwargs = {}
     for key in ("env", "env_inherit", "data", "size", "timeout", "flaky", "shard_count", "local"):
         if key in kwargs:
@@ -280,34 +319,35 @@ def iree_hal_cts_test_suite(
     # Common deps for all test binaries.
     common_deps = [
         backends_lib,
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal/cts/util:registry",
         "//runtime/src/iree/hal/cts/util:test_base",
         "//runtime/src/iree/testing:gtest",
     ]
 
-    # Merge test-specific and general kwargs for test targets.
-    all_test_kwargs = dict(kwargs)
-    all_test_kwargs.update(test_kwargs)
-
     # Non-executable test binaries.
     for suffix, test_lib in _NON_EXECUTABLE_SUITES:
-        iree_runtime_cc_test(
+        _iree_hal_cts_test(
             name = "%s%s" % (prefix, suffix),
             srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
             args = args,
             deps = common_deps + [test_lib],
+            resource_group = resource_group,
             tags = tags,
-            **all_test_kwargs
+            test_kwargs = test_kwargs,
+            target_kwargs = kwargs,
         )
 
     # Executable-dependent test binaries (only if formats are configured).
     if _testdata_libs:
         for suffix, test_lib in _EXECUTABLE_SUITES:
-            iree_runtime_cc_test(
+            _iree_hal_cts_test(
                 name = "%s%s" % (prefix, suffix),
                 srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
                 args = args,
                 deps = common_deps + _testdata_libs + [test_lib],
+                resource_group = resource_group,
                 tags = tags,
-                **all_test_kwargs
+                test_kwargs = test_kwargs,
+                target_kwargs = kwargs,
             )

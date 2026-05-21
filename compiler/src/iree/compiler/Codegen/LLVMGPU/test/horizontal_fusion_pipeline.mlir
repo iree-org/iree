@@ -1,5 +1,5 @@
-// RUN: iree-opt --iree-gpu-test-target=gfx942 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK,CDNA3
-// RUN: iree-opt --iree-gpu-test-target=gfx950 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s --split-input-file | FileCheck %s --check-prefixes=CHECK,CDNA4
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s --check-prefixes=CHECK,CDNA3
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx950 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s --check-prefixes=CHECK,CDNA4
 
 func.func @fused_contraction_1(%arg0: tensor<2x4096x640xf16>,
     %arg1 : tensor<10x64x640xf16>, %arg2 : tensor<10x64x640xf16>,

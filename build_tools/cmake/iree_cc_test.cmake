@@ -143,6 +143,20 @@ function(iree_cc_test)
   set(_NAME_PATH "${_PACKAGE_PATH}/${_RULE_NAME}")
 
   set(_ENVIRONMENT_VARS)
+  if(IREE_ENABLE_ASAN)
+    if("driver=hip" IN_LIST _RULE_LABELS)
+      set(_LSAN_SUPP_FILE
+          "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_rocm.txt")
+      list(APPEND _ENVIRONMENT_VARS
+          "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
+    if("driver=vulkan" IN_LIST _RULE_LABELS)
+      set(_LSAN_SUPP_FILE
+          "${CMAKE_SOURCE_DIR}/build_tools/sanitizer/lsan_suppressions_vulkan.txt")
+      list(APPEND _ENVIRONMENT_VARS
+          "LSAN_OPTIONS=suppressions=${_LSAN_SUPP_FILE}")
+    endif()
+  endif()
 
   # Case for cross-compiling towards Android.
   if(ANDROID)
@@ -181,7 +195,29 @@ function(iree_cc_test)
     )
     iree_configure_test(${_NAME_PATH})
     list(APPEND _ENVIRONMENT_VARS "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
-  else(ANDROID)
+  elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "wasm32")
+    # WASI: bundle the .wasm binary with JS companions and run via Node.js.
+    # Uses _iree_wasm_setup_bundler for order-independent collection of JS
+    # companion metadata and entry point discovery via genex chains.
+    set(_OUTPUT_MJS "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.mjs")
+    _iree_wasm_setup_bundler(
+      WASM_TARGET ${_NAME}
+      OUTPUT "${_OUTPUT_MJS}"
+      DEPS ${_RULE_DEPS}
+    )
+
+    # Custom target to drive the bundling.
+    add_custom_target(${_NAME}_bundle ALL DEPENDS "${_OUTPUT_MJS}")
+
+    add_test(
+      NAME
+        ${_NAME_PATH}
+      COMMAND
+        "${NODE_EXECUTABLE}" "${_OUTPUT_MJS}"
+        ${_RULE_ARGS}
+    )
+    iree_configure_test(${_NAME_PATH})
+  else()
     add_test(
       NAME
         ${_NAME_PATH}
@@ -191,7 +227,7 @@ function(iree_cc_test)
       )
 
     iree_configure_test(${_NAME_PATH})
-  endif(ANDROID)
+  endif()
 
   # TODO(benvanik): add an iree_runtime_cc_test that wraps this and adds the
   # runtime-specific options. Today all tests use iree_cc_test, but since this

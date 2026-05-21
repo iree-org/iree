@@ -15,8 +15,10 @@ iree_lit_test_suite(
     lit
   SRCS
     "sparse_interface_methods.mlir"
+    "sparse_interface_methods_distribution_info.mlir"
     "sparse_interface_methods_estimated_loop_range_fail.mlir"
     "sparse_interface_methods_lower_loop_range_fail.mlir"
+    "sparse_interface_methods_resolve_range.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -223,14 +223,26 @@ const WgpDetails *getCDNA4WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FN_F8E5M2,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
-      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
-      // https://github.com/iree-org/iree/issues/23941.
       // Introduced in CDNA2, still present in CDNA4
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA4
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const ScaledMMAIntrinsic cdna4ScaledMMAOps[] = {
       // Introduced in CDNA4
@@ -277,14 +289,26 @@ const WgpDetails *getCDNA3WgpDetails() {
       MMAIntrinsic::MFMA_F32_32x32x16_F8E4M3FNUZ_F8E5M2FNUZ,
       MMAIntrinsic::MFMA_I32_16x16x32_I8,
       MMAIntrinsic::MFMA_I32_32x32x16_I8,
-      // TODO (nirvedhmeshram) : Add block intrinsics, progress tracked in
-      // https://github.com/iree-org/iree/issues/23941.
       // Introduced in CDNA2, still present in CDNA3
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
       // Introduced in CDNA1, still present in CDNA3
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      // Block intrinsics
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const int64_t cdna3DMASizes[] = {32};
   static const WgpDetails cdna3Wgp = {
@@ -315,12 +339,29 @@ const WgpDetails *getCDNA2WgpDetails() {
       MMAIntrinsic::MFMA_F32_16x16x8_BF16,
       MMAIntrinsic::MFMA_F32_32x32x4_BF16,
       MMAIntrinsic::MFMA_F64_16x16x4_F64,
+      // Block intrinsics introduced in CDNA2 (we use the finalized name from
+      // CDNA3 for uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_BF16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_BF16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_BF16,
+      MMAIntrinsic::MFMA_F64_4x4x4x4B_F64,
       // Introduced in CDNA1
       MMAIntrinsic::MFMA_F32_16x16x4_F32,
       MMAIntrinsic::MFMA_F32_16x16x16_F16,
       MMAIntrinsic::MFMA_F32_32x32x8_F16,
       MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
+      // Block intrinsics introduced in CDNA1 (we use the finalized name from
+      // CDNA3 for uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const WgpDetails cdna2Wgp = {allComputeBits,
                                       allStorageBits,
@@ -345,9 +386,22 @@ const WgpDetails *getCDNA2WgpDetails() {
 
 const WgpDetails *getCDNA1WgpDetails() {
   static const MMAIntrinsic cdna1MMAOps[] = {
-      MMAIntrinsic::MFMA_F32_16x16x4_F32, MMAIntrinsic::MFMA_F32_16x16x16_F16,
-      MMAIntrinsic::MFMA_F32_32x32x8_F16, MMAIntrinsic::MFMA_I32_16x16x16_I8,
+      MMAIntrinsic::MFMA_F32_16x16x4_F32,
+      MMAIntrinsic::MFMA_F32_16x16x16_F16,
+      MMAIntrinsic::MFMA_F32_32x32x8_F16,
+      MMAIntrinsic::MFMA_I32_16x16x16_I8,
       MMAIntrinsic::MFMA_I32_32x32x8_I8,
+      // Block intrinsics: (we use the finalized name from CDNA3 for
+      // uniformity.)
+      MMAIntrinsic::MFMA_F32_4x4x4x16B_F16,
+      MMAIntrinsic::MFMA_F32_16x16x4x4B_F16,
+      MMAIntrinsic::MFMA_F32_32x32x4x2B_F16,
+      MMAIntrinsic::MFMA_F32_4x4x1x16B_F32,
+      MMAIntrinsic::MFMA_F32_16x16x1x4B_F32,
+      MMAIntrinsic::MFMA_F32_32x32x1x2B_F32,
+      MMAIntrinsic::MFMA_I32_4x4x4x16B_I8,
+      MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
+      MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
   static const WgpDetails cdna1Wgp = {allComputeBits,
                                       allStorageBits,
@@ -859,10 +913,14 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 // cooperative matrix layouts are opaque. We need to create NVIDIA specific WMMA
 // intrinsics if we need to have explicit layout analysis and register mapping.
 
+// Reports Ampere-class NVIDIA tensor core capabilities for GPU target
+// selection.
 const WgpDetails *getAmpereWgpDetails() {
+  // Expose BF16 mma.sync where Ampere-class hardware supports the instruction.
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
@@ -940,6 +998,7 @@ const WgpDetails *getPascalWgpDetails() {
   return &pascalWgp;
 }
 
+// Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
@@ -957,7 +1016,14 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
   // https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/
   // lists mappings from microarchitectures to compute capabilities.
 
-  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+  std::string lowerTarget = target.lower();
+  // Treat RTX 40 family aliases as Ada-class devices when no exact chip is
+  // named.
+  if (StringRef(lowerTarget).starts_with("rtx40")) {
+    return TargetDetails{ampereWgp, nullptr};
+  }
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(lowerTarget)
       // https://www.techpowerup.com/gpu-specs/a100-sxm4-80-gb.c3746
       .Case("a100", TargetDetails{ampereWgp, &a100Chip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3090-ti.c3829
@@ -972,6 +1038,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
+      .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
       .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
@@ -981,6 +1048,8 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Default(std::nullopt);
 }
 
+// Normalizes NVIDIA marketing and architecture names to canonical compute
+// capabilities.
 StringRef normalizeNVIDIAGPUTarget(StringRef target) {
   if (target.starts_with("sm_")) {
     return target;
@@ -998,6 +1067,7 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
+      .Case("ada", "sm_89")
       .Case("ampere", "sm_80") // Or sm_86/87; use smaller version.
       .Case("turing", "sm_75")
       .Case("volta", "sm_70")  // Or sm_72; use smaller version.

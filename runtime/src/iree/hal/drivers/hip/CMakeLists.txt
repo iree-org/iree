@@ -121,6 +121,27 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    graph_command_buffer_test
+  SRCS
+    "graph_command_buffer_test.cc"
+  DEPS
+    ::hip
+    iree::async
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=hip"
+    "requires-gpu-amd"
+  RESOURCE_GROUP
+    hip_driver
+)
+
+iree_cc_test(
+  NAME
     hip_allocator_test
   SRCS
     "hip_allocator_test.cc"
@@ -136,6 +157,8 @@ iree_cc_test(
   LABELS
     "driver=hip"
     "requires-gpu-amd"
+  RESOURCE_GROUP
+    hip_driver
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

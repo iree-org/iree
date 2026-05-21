@@ -6,7 +6,7 @@
 
 #include "iree/vm/bytecode/archive.h"
 
-#include "iree/vm/bytecode/utils/isa.h"
+#include "iree/vm/bytecode/isa/isa.h"
 
 // ZIP local file header (comes immediately before each file in the archive).
 // In order to find the starting offset of the FlatBuffer in a polyglot archive

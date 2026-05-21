@@ -405,10 +405,17 @@ if(ANDROID)
   )
 endif()
 
+if(NOT IREE_ARCH STREQUAL "wasm_32")
+  iree_select_compiler_opts(_IREE_MATH_LINKOPTS
+    CLANG_OR_GCC
+      # Required by all modern software, effectively:
+      "-lm"
+  )
+endif()
+
 iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
   CLANG_OR_GCC
-    # Required by all modern software, effectively:
-    "-lm"
+    ${_IREE_MATH_LINKOPTS}
     ${_IREE_LOGGING_LINKOPTS}
   MSVC
     "-natvis:${IREE_ROOT_DIR}/runtime/iree.natvis"

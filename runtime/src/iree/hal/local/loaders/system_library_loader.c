@@ -201,6 +201,8 @@ static iree_status_t iree_hal_system_executable_query_library(
   executable->identifier = iree_make_cstring_view(header->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
   executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
+  executable->base.export_count = executable->library.v0->exports.count;
+  executable->base.export_names = executable->library.v0->exports.names;
   return iree_ok_status();
 }
 
@@ -343,8 +345,8 @@ static iree_host_size_t iree_hal_system_executable_export_count(
 
 static iree_status_t iree_hal_system_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t export_ordinal,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   return iree_hal_executable_library_export_info(executable->library.v0,
@@ -353,9 +355,8 @@ static iree_status_t iree_hal_system_executable_export_info(
 
 static iree_status_t iree_hal_system_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   return iree_hal_executable_library_export_parameters(
@@ -364,11 +365,22 @@ static iree_status_t iree_hal_system_executable_export_parameters(
 
 static iree_status_t iree_hal_system_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   return iree_hal_executable_library_lookup_export_by_name(
       executable->library.v0, name, out_export_ordinal);
+}
+
+static iree_status_t iree_hal_system_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  (void)base_executable;
+  (void)name;
+  (void)queue_affinity;
+  *out_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "local executable global lookup not implemented");
 }
 
 static const iree_hal_local_executable_vtable_t
@@ -376,12 +388,14 @@ static const iree_hal_local_executable_vtable_t
         .base =
             {
                 .destroy = iree_hal_system_executable_destroy,
-                .export_count = iree_hal_system_executable_export_count,
-                .export_info = iree_hal_system_executable_export_info,
-                .export_parameters =
+                .function_count = iree_hal_system_executable_export_count,
+                .function_info = iree_hal_system_executable_export_info,
+                .function_parameters =
                     iree_hal_system_executable_export_parameters,
-                .lookup_export_by_name =
+                .lookup_function_by_name =
                     iree_hal_system_executable_lookup_export_by_name,
+                .lookup_global_by_name =
+                    iree_hal_system_executable_lookup_global_by_name,
             },
         .issue_call = iree_hal_system_executable_issue_call,
 };
@@ -443,7 +457,7 @@ static void iree_hal_system_library_loader_destroy(
 #define IREE_PLATFORM_DYLIB_TYPE "dylib"
 #elif defined(IREE_PLATFORM_WINDOWS)
 #define IREE_PLATFORM_DYLIB_TYPE "dll"
-#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#elif defined(IREE_PLATFORM_WASM)
 #define IREE_PLATFORM_DYLIB_TYPE "wasm"
 #else
 #define IREE_PLATFORM_DYLIB_TYPE "elf"

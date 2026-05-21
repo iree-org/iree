@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
+#include "iree/vm/bytecode/utils/features.h"
 #include "iree/vm/test/all_bytecode_modules.h"
 #include "iree/vm/testing/test_runner.h"
 #include "iree/vm/testing/yieldable_test_module.h"
@@ -34,16 +35,25 @@ std::vector<VMTestParams> GetBytecodeTestParams() {
 
   const struct iree_file_toc_t* module_file_toc =
       all_bytecode_modules_c_create();
+  const iree_vm_FeatureBits_enum_t available_features =
+      iree_vm_bytecode_available_features();
   for (size_t i = 0; i < all_bytecode_modules_c_size(); ++i) {
     const auto& module_file = module_file_toc[i];
     std::string module_name(module_file.name);
+    iree_const_byte_span_t module_data = iree_const_byte_span_t{
+        reinterpret_cast<const uint8_t*>(module_file.data),
+        static_cast<iree_host_size_t>(module_file.size)};
+
+    iree_vm_FeatureBits_enum_t required_features = 0;
+    IREE_CHECK_OK(iree_vm_bytecode_module_query_required_features(
+        module_data, &required_features));
+    if (!iree_all_bits_set(available_features, required_features)) {
+      continue;
+    }
 
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
-        instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
-        iree_const_byte_span_t{
-            reinterpret_cast<const uint8_t*>(module_file.data),
-            static_cast<iree_host_size_t>(module_file.size)},
+        instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE, module_data,
         iree_allocator_null(), iree_allocator_system(), &module));
 
     iree_vm_module_signature_t signature = iree_vm_module_signature(module);

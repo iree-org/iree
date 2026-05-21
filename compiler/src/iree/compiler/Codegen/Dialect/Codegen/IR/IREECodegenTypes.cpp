@@ -77,4 +77,26 @@ sliceSwizzledShape(const TileSwizzle &swizzle,
   return shape;
 }
 
+VectorType
+getTileVectorType(const TileSwizzle &swizzle, Type elemType,
+                  llvm::function_ref<bool(TileSwizzle::Dim)> keepSize) {
+  using Dim = TileSwizzle::Dim;
+  SmallVector<int64_t> shape = sliceSwizzledShape(swizzle, keepSize);
+  SmallVector<bool> scalable;
+  for (const auto &group : swizzle.expandShape()) {
+    for (const Dim &d : group) {
+      scalable.push_back(d.kind() == Dim::Kind::Internal &&
+                         d.symbolicMultiplier() !=
+                             Dim::SymbolicMultiplier::One);
+    }
+  }
+  applyPermutationToVector(scalable, swizzle.permutation());
+  return VectorType::get(shape, elemType, scalable);
+}
+
+VectorType getTileVectorType(const TileSwizzle &swizzle, Type elemType) {
+  return getTileVectorType(swizzle, elemType,
+                           [](TileSwizzle::Dim) { return true; });
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen

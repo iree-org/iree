@@ -11,38 +11,41 @@ util.func public @duplicate_dispatches(%cmd1: !hal.command_buffer, %cmd2: !hal.c
   %exe = util.global.load @executable : !hal.executable
 
   %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
   %c1 = arith.constant 1 : index
+  %c1_i64 = arith.constant 1 : i64
   %c2 = arith.constant 2 : index
-  %c3 = arith.constant 3 : index
-  hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c0] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
+  %c2_i64 = arith.constant 2 : i64
+  %c3_i64 = arith.constant 3 : i64
+  hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
   hal.command_buffer.execution_barrier<%cmd1 : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-  hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c1] workgroups([%c2, %c2, %c2]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
+  hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c1_i64] workgroups([%c2, %c2, %c2]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
 
-  hal.command_buffer.dispatch<%cmd2 : !hal.command_buffer> target(%exe : !hal.executable)[%c2] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
-  hal.command_buffer.dispatch<%cmd2 : !hal.command_buffer> target(%exe : !hal.executable)[%c3] workgroups([%c2, %c2, %c2]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
+  hal.command_buffer.dispatch<%cmd2 : !hal.command_buffer> target(%exe : !hal.executable)[%c2_i64] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
+  hal.command_buffer.dispatch<%cmd2 : !hal.command_buffer> target(%exe : !hal.executable)[%c3_i64] workgroups([%c2, %c2, %c2]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
   hal.command_buffer.execution_barrier<%cmd2 : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
 
   util.return
 }
 
-// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0] workgroups([%c1, %c1, %c1])
+// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD1]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0] workgroups([%c1, %c1, %c1])
+// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD1]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
 
-// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c1] workgroups([%c2, %c2, %c2])
+// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c1_i64] workgroups([%c2, %c2, %c2])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD1]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c1] workgroups([%c2, %c2, %c2])
+// CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c1_i64] workgroups([%c2, %c2, %c2])
 // CHECK-NOT: hal.command_buffer.execution_barrier
 
-// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c2] workgroups([%c1, %c1, %c1])
+// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c2_i64] workgroups([%c1, %c1, %c1])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD2]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c2] workgroups([%c1, %c1, %c1])
+// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c2_i64] workgroups([%c1, %c1, %c1])
 // CHECK-NOT: hal.command_buffer.execution_barrier
 
-// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c3] workgroups([%c2, %c2, %c2])
+// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c3_i64] workgroups([%c2, %c2, %c2])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD2]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c3] workgroups([%c2, %c2, %c2])
+// CHECK: hal.command_buffer.dispatch<%[[CMD2]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c3_i64] workgroups([%c2, %c2, %c2])
 // CHECK: hal.command_buffer.execution_barrier<%[[CMD2]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
 
 // -----
@@ -58,10 +61,11 @@ util.func public @nested_dispatch(%cmd1: !hal.command_buffer, %buffer: !hal.buff
   %exe = util.global.load @executable : !hal.executable
 
   %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
   %c1 = arith.constant 1 : index
   scf.index_switch %idx
   case 0 {
-    hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c0] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
+    hal.command_buffer.dispatch<%cmd1 : !hal.command_buffer> target(%exe : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1]) bindings([(%buffer : !hal.buffer)[%c0, %c1]]) flags(None)
     scf.yield
   }
   default {
@@ -72,6 +76,6 @@ util.func public @nested_dispatch(%cmd1: !hal.command_buffer, %buffer: !hal.buff
 
 // CHECK: scf.index_switch
 // CHECK: case 0 {
-// CHECK:   hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0] workgroups([%c1, %c1, %c1])
+// CHECK:   hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1])
 // CHECK:   hal.command_buffer.execution_barrier<%[[CMD1]] : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
-// CHECK:   hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0] workgroups([%c1, %c1, %c1])
+// CHECK:   hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[%c0_i64] workgroups([%c1, %c1, %c1])

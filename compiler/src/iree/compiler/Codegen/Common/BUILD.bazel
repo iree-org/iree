@@ -73,6 +73,7 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Common",
     srcs = [
+        "AbsorbSwizzleHintToAlloc.cpp",
         "AddFastMathFlags.cpp",
         "BlockDynamicDimensions.cpp",
         "BubbleUpOrdinalOps.cpp",
@@ -134,6 +135,7 @@ iree_compiler_cc_library(
         "MaterializeEncoding.cpp",
         "MaterializeEncodingIntoNop.cpp",
         "MaterializeEncodingPatterns.cpp",
+        "MaterializeSMTConstraintAssignments.cpp",
         "MaterializeTuningSpecs.cpp",
         "MaterializeVectorMasking.cpp",
         "MaterializeVectorTileSizes.cpp",
@@ -151,6 +153,7 @@ iree_compiler_cc_library(
         "PropagateDispatchSizeBounds.cpp",
         "PropagateReshapesByExpansion.cpp",
         "ReconcileTranslationInfo.cpp",
+        "ReinsertSwizzleHints.cpp",
         "RematerializeParallelOps.cpp",
         "RemoveIndexHints.cpp",
         "RemoveSingleIterationLoop.cpp",

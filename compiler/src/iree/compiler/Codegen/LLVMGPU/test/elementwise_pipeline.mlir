@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --iree-codegen-llvmgpu-configuration-pipeline --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -22,6 +22,5 @@ func.func @forward_dispatch_0_generic_320x320x3x3() {
   iree_tensor_ext.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [320, 320, 3, 3], strides = [1, 1, 1, 1] : tensor<320x320x3x3xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<320x320x3x3xf32>>
   return
 }
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 1, 1] subgroup_size = 32>
 //      CHECK: func.func @forward_dispatch_0_generic_320x320x3x3()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK-SAME:     gpu.known_block_size = array<i32: 32, 1, 1>

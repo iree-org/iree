@@ -1,0 +1,57 @@
+vm.module @assignment_ops_f32 version 0
+vm.type f32
+vm.type i32
+
+vm.export @test_select_f32
+vm.func @test_select_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.f32 1
+  %i2 = vm.const.f32.zero
+  %i3 = vm.const.i32 1  // 0x00000001
+  %i4 = vm.const.i32.zero
+  %i5 = vm.select.f32 %i4 ? %i2 : %i1
+  %i4 = vm.cmp.ne.f32.o %i5, %i1
+  vm.cond_br %i4, ^bb4(), ^bb1()
+^bb1:
+  %i1 = vm.select.f32 %i3 ? %i2 : %i1
+  %i3 = vm.cmp.ne.f32.o %i1, %i2
+  vm.cond_br %i3, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "1 ? 0.0 : 1.0 = 0.0"
+^bb4:
+  vm.fail %i0, "0 ? 0.0 : 1.0 = 1.0"
+}
+
+vm.export @test_switch_f32
+vm.func @test_switch_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.f32 100
+  %i4 = vm.const.f32 200
+  %i5 = vm.const.f32 300
+  %i6 = vm.const.i32.zero
+  %i7 = vm.switch.f32 %i6[%i3, %i4] else %i5
+  %i6 = vm.cmp.ne.f32.o %i7, %i3
+  vm.cond_br %i6, ^bb6(), ^bb1()
+^bb1:
+  %i6 = vm.switch.f32 %i2[%i3, %i4] else %i5
+  %i2 = vm.cmp.ne.f32.o %i6, %i4
+  vm.cond_br %i2, ^bb5(), ^bb2()
+^bb2:
+  %i4 = vm.switch.f32 %i1[%i3, %i4] else %i5
+  %i1 = vm.cmp.ne.f32.o %i4, %i5
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "index 2 (out of bounds) is default 300"
+^bb5:
+  vm.fail %i0, "index 1 is 200"
+^bb6:
+  vm.fail %i0, "index 0 is 100"
+}

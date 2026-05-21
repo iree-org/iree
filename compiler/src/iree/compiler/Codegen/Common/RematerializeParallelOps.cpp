@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -25,11 +24,6 @@ static bool isScalarOrTensorOfSizeOne(Type t) {
     return tensorType.hasStaticShape() && tensorType.getNumElements() == 1;
   }
   return t.isIntOrIndexOrFloat();
-}
-
-static bool hasDirectWriteResult(Operation *op) {
-  return llvm::any_of(op->getUsers(),
-                      llvm::IsaPred<IREE::TensorExt::DispatchTensorStoreOp>);
 }
 
 /// Rematerialize all parallel elementwise operations into its users within a
@@ -57,7 +51,14 @@ struct RematerializeParallelOpsPattern : OpRewritePattern<linalg::GenericOp> {
       if (producer && hasExternalCapture(producer)) {
         continue;
       }
-      if (producer && hasDirectWriteResult(producer)) {
+      // Only rematerialize when every user of `producer` is a `LinalgOp`:
+      // such users speak the shared indexing-map / iterator-type structure
+      // and can eliminate the producer through elementwise fusion or
+      // tile-level producer fusion. Any other user (e.g. `linalg.pack`,
+      // `tensor.insert_slice`, `dispatch.tensor.store`) would pin the
+      // producer alive, turning rematerialization into pure duplication.
+      if (producer && !llvm::all_of(producer->getUsers(),
+                                    llvm::IsaPred<linalg::LinalgOp>)) {
         continue;
       }
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =

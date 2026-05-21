@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -30,6 +31,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/WalkPatternRewriteDriver.h"
 
@@ -92,19 +94,24 @@ struct TransferSegment {
                                // (subgroupSize * elementsPerLane).
 };
 
-/// Computes transfer segments for a given number of elements.
+/// Computes transfer segments for a subgroup-level DMA transfer.
+/// |subgroupTotalElements| is the total element count the subgroup must
+/// collectively copy (determined by the destination's contiguous region).
+/// |maxElementsPerLane| caps the per-lane element count to avoid reading
+/// or writing past contiguous stride boundaries in source or destination.
 /// Prioritizes larger DMA sizes to minimize the number of transfers.
 /// Returns failure if the elements cannot be fully covered by the available
 /// DMA sizes.
 static FailureOr<SmallVector<TransferSegment>>
-computeTransferSegments(int64_t totalElements, int64_t elementBits,
-                        int64_t subgroupSize, ArrayRef<int64_t> dmaSizes) {
+computeTransferSegments(int64_t subgroupTotalElements, int64_t elementBits,
+                        int64_t subgroupSize, ArrayRef<int64_t> dmaSizes,
+                        int64_t maxElementsPerLane) {
   // Sort DMA sizes in descending order to prioritize larger transfers.
   SmallVector<int64_t> sortedDmaSizes(dmaSizes);
   llvm::sort(sortedDmaSizes, std::greater<>());
 
   SmallVector<TransferSegment> segments;
-  int64_t remainingElements = totalElements;
+  int64_t remainingElements = subgroupTotalElements;
   int64_t currentOffset = 0;
 
   for (int64_t dmaSize : sortedDmaSizes) {
@@ -113,6 +120,10 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
       continue;
     }
     int64_t elementsPerLane = dmaSize / elementBits;
+
+    if (elementsPerLane > maxElementsPerLane) {
+      continue;
+    }
 
     // Calculate total elements per transfer (all lanes combined).
     int64_t elementsPerTransfer = subgroupSize * elementsPerLane;
@@ -142,6 +153,145 @@ computeTransferSegments(int64_t totalElements, int64_t elementBits,
   }
 
   return segments;
+}
+
+/// Walk a memref value through ViewLikeOpInterface ops to find the root
+/// buffer that backs it.
+static Value traceThroughViewLikeOps(Value val) {
+  while (auto viewOp = val.getDefiningOp<ViewLikeOpInterface>()) {
+    val = viewOp.getViewSource();
+  }
+  return val;
+}
+
+/// Applies OOB clamping to source indices for fat_raw_buffer sources.
+///
+/// Raw buffer OOB clamping is 1D (linear): it returns 0 only when the byte
+/// offset >= total buffer size. For non-outermost dims, an OOB index wraps
+/// into the next row instead of returning 0. When the source is a view of a
+/// larger buffer, the outermost dim also needs checking because an OOB dim-0
+/// index may still land in valid parent memory.
+///
+/// Fix: when any checked source index exceeds its dimension, replace
+/// srcIndices[0] with the root buffer's dim-0 size to force the linearized
+/// offset past the buffer end.
+static void applyOOBClamping(OpBuilder &builder, Location loc, Value source,
+                             SmallVector<Value> &srcIndices,
+                             ArrayAttr inBoundsAttr) {
+  auto sourceType = cast<MemRefType>(source.getType());
+  if (!hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
+    return;
+  }
+
+  Value rootSource = traceThroughViewLikeOps(source);
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  Value anyOOB =
+      arith::ConstantOp::create(builder, loc, builder.getBoolAttr(false));
+
+  // For view-like sources (subview, etc.), dim 0 must also be checked because
+  // an OOB dim-0 index may still land in valid parent memory.
+  int64_t startDim =
+      source.getDefiningOp<ViewLikeOpInterface>() != nullptr ? 0 : 1;
+  for (int64_t dim = startDim; dim < sourceType.getRank(); ++dim) {
+    if (dim >= static_cast<int64_t>(inBoundsAttr.size())) {
+      break;
+    }
+    if (cast<BoolAttr>(inBoundsAttr[dim]).getValue()) {
+      continue;
+    }
+
+    Value dimSize;
+    if (ShapedType::isDynamic(sourceShape[dim])) {
+      dimSize = memref::DimOp::create(builder, loc, source, dim);
+    } else {
+      dimSize = arith::ConstantIndexOp::create(builder, loc, sourceShape[dim]);
+    }
+
+    Value isOOB = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::uge,
+                                        srcIndices[dim], dimSize);
+    anyOOB = arith::OrIOp::create(builder, loc, anyOOB, isOOB);
+  }
+
+  auto rootType = cast<MemRefType>(rootSource.getType());
+  Value oobOuterIdx;
+  if (ShapedType::isDynamic(rootType.getShape()[0])) {
+    oobOuterIdx = memref::DimOp::create(builder, loc, rootSource, 0);
+  } else {
+    oobOuterIdx =
+        arith::ConstantIndexOp::create(builder, loc, rootType.getShape()[0]);
+  }
+  srcIndices[0] =
+      arith::SelectOp::create(builder, loc, anyOOB, oobOuterIdx, srcIndices[0]);
+}
+
+/// Trace a memref value through view-like ops to find a SwizzleHintOp.
+/// Returns the swizzle attribute if it is an XOR swizzle (which is
+/// self-inverse), std::nullopt otherwise.
+static std::optional<IREE::Codegen::XORShuffleAttr>
+getDestSwizzleAttr(Value dest) {
+  dest = traceThroughViewLikeOps(dest);
+  if (auto hintOp = dest.getDefiningOp<IREE::Codegen::SwizzleHintOp>()) {
+    // Only XOR swizzle is self-inverse (swizzle(swizzle(x)) = x), so it can
+    // be applied to source addresses as the inverse transformation. Other
+    // swizzle types (e.g. rotate_rows) are not self-inverse.
+    if (auto xorSwizzle =
+            dyn_cast<IREE::Codegen::XORShuffleAttr>(hintOp.getSwizzle())) {
+      return xorSwizzle;
+    }
+  }
+  return std::nullopt;
+}
+
+/// Verifies that every transfer segment is compatible with the destination
+/// XOR swizzle's |accessWidth|.
+///
+/// `gather_to_lds` writes |elementsPerLane| contiguous elements per lane at
+/// `dstBase + laneId * elementsPerLane`, while the inverse XOR swizzle is
+/// applied only to each lane's base offset. The lane therefore reads
+/// `src[swizzle(perLaneBase) + k]` for k in [0, elementsPerLane). For this
+/// to match the swizzled LDS layout we need
+///   swizzle(perLaneBase) + k == swizzle(perLaneBase + k)   for all k.
+/// XOR-shuffle is identity within an access_width-sized chunk and permutes
+/// between chunks, so the equation holds iff every per-lane write stays
+/// inside one chunk:
+///   elementsPerLane <= accessWidth  AND
+///   accessWidth % elementsPerLane == 0.
+///
+/// Returns the offending segment's elementsPerLane on failure, std::nullopt
+/// on success.
+static std::optional<int64_t>
+findSwizzleIncompatibleSegment(ArrayRef<TransferSegment> segments,
+                               int64_t accessWidth) {
+  for (const TransferSegment &seg : segments) {
+    // When elementsPerLane > accessWidth, accessWidth % elementsPerLane
+    // equals accessWidth (!= 0), so this single check covers both the
+    // "fits in one chunk" and "evenly divides" requirements.
+    if (accessWidth % seg.elementsPerLane != 0) {
+      return seg.elementsPerLane;
+    }
+  }
+  return std::nullopt;
+}
+
+/// Returns {numStaticContiguous, linearSize} for the trailing contiguous
+/// portion of a memref type. At least 1 trailing dimension is always
+/// considered. Stops accumulating if a dynamic dimension is encountered.
+static std::pair<int64_t, int64_t>
+getContiguousTrailingLinearSize(MemRefType type) {
+  int64_t rank = type.getRank();
+  int64_t numContiguous = type.getNumContiguousTrailingDims();
+  numContiguous = std::max<int64_t>(numContiguous, 1);
+  ArrayRef<int64_t> shape = type.getShape();
+  int64_t linearSize = 1;
+  int64_t numStaticContiguous = 0;
+  for (int64_t i = rank - 1; i >= rank - numContiguous; --i) {
+    if (ShapedType::isDynamic(shape[i])) {
+      break;
+    }
+    linearSize *= shape[i];
+    ++numStaticContiguous;
+  }
+  return {numStaticContiguous, linearSize};
 }
 
 /// Generates source and destination indices for a GatherToLDS operation.
@@ -222,6 +372,8 @@ struct LowerCoalescedGatherDMAPattern final
 
     Value source = dmaOp.getSource();
     Value dest = dmaOp.getInit();
+    std::optional<IREE::Codegen::XORShuffleAttr> destSwizzle =
+        getDestSwizzleAttr(dest);
 
     auto sourceType = cast<MemRefType>(source.getType());
     auto destType = cast<MemRefType>(dest.getType());
@@ -253,41 +405,43 @@ struct LowerCoalescedGatherDMAPattern final
     // linearize.
     //
     // Example: For dest <2x4x128> fully contiguous:
-    //   - numLinearDims = 3 -> linearize all dims (1024 elements)
+    //   - destNumLinear = 3 -> linearize all dims (1024 elements)
     // Example: For dest <2x4x128> with only dims 1-2 contiguous:
-    //   - numLinearDims = 2 -> linearize dims 1-2 (512 elements)
-    int64_t destRank = destShape.size();
-    int64_t numLinearDims = destType.getNumContiguousTrailingDims();
-    // Always linearize at least the innermost dimension.
-    numLinearDims = std::max<int64_t>(numLinearDims, 1);
-    LDBG() << "  Number of linear dims: " << numLinearDims;
+    //   - destNumLinear = 2 -> linearize dims 1-2 (512 elements)
+    auto [destNumLinear, destLinearSize] =
+        getContiguousTrailingLinearSize(destType);
+    LDBG() << "  Dest contiguous trailing dims: " << destNumLinear
+           << ", linear size: " << destLinearSize;
 
-    // Verify all linearized dimensions are static.
-    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
-      if (ShapedType::isDynamic(destShape[i])) {
-        return rewriter.notifyMatchFailure(
-            dmaOp, "dynamic dimension in linearized portion");
-      }
-    }
-
-    // Compute total elements in the linearized portion (last numLinearDims
-    // dims).
-    int64_t linearSize = 1;
-    for (int64_t i = destRank - numLinearDims; i < destRank; ++i) {
-      linearSize *= destShape[i];
-    }
-    LDBG() << "  Linear size for segmentation: " << linearSize;
+    // Cap per-lane width to the minimum contiguous trailing size of source
+    // and destination, so gather_to_lds does not read/write past stride
+    // boundaries.
+    int64_t srcLinearSize = getContiguousTrailingLinearSize(sourceType).second;
+    int64_t maxElementsPerLane = std::min(srcLinearSize, destLinearSize);
+    LDBG() << "  Max elements per lane: " << maxElementsPerLane;
 
     // Compute transfer segments using the helper function.
     FailureOr<SmallVector<TransferSegment>> segmentsOrFailure =
-        computeTransferSegments(linearSize, elementBits, *subgroupSize,
-                                targetDmaSizes);
+        computeTransferSegments(destLinearSize, elementBits, *subgroupSize,
+                                targetDmaSizes, maxElementsPerLane);
     if (failed(segmentsOrFailure)) {
       return rewriter.notifyMatchFailure(
           dmaOp, "cannot cover elements with any combination "
                  "of supported DMA transfer sizes");
     }
     SmallVector<TransferSegment> segments = std::move(*segmentsOrFailure);
+
+    if (destSwizzle) {
+      int64_t accessWidth = destSwizzle->getAccessElementCount();
+      if (std::optional<int64_t> badEpl =
+              findSwizzleIncompatibleSegment(segments, accessWidth)) {
+        return dmaOp.emitOpError()
+               << "DMA segment elementsPerLane=" << *badEpl
+               << " incompatible with swizzle access_width=" << accessWidth
+               << " (need elementsPerLane <= access_width and "
+                  "access_width % elementsPerLane == 0)";
+      }
+    }
 
     // OOB padding requires fat_raw_buffer for hardware OOB clamping.
     if (std::optional<ArrayAttr> inBounds = dmaOp.getInBounds()) {
@@ -318,9 +472,9 @@ struct LowerCoalescedGatherDMAPattern final
       segmentLaneOffsets.push_back(laneOffset);
     }
 
-    emitTransfers(rewriter, loc, source, dest, destShape, numLinearDims,
+    emitTransfers(rewriter, loc, source, dest, destShape, destNumLinear,
                   elementType, indices, segments, segmentLaneOffsets,
-                  dmaOp.getInBounds());
+                  dmaOp.getInBounds(), destSwizzle);
 
     rewriter.eraseOp(dmaOp);
     return success();
@@ -341,20 +495,25 @@ private:
   ///   - Source indices: per-lane divergent (include lane offset)
   ///   - Destination indices: subgroup-uniform (exclude lane offset)
   ///
+  /// When a destination swizzle is present (e.g., XOR swizzle for LDS bank
+  /// conflict avoidance), an inverse swizzle is applied to the source indices.
+  /// The destination writes linearly into LDS, and the swizzled source read
+  /// pattern ensures data arrives in the correct swizzled layout.
+  ///
   /// We generate two delinearizations:
-  ///   1. With lane offset: for source index computation (divergent)
+  ///   1. With lane offset (and optional inverse swizzle): for source indices
   ///   2. Without lane offset: for destination index computation (uniform)
   ///
   /// Example: shape [16, 64] with 32 lanes, 4 elements/lane:
   ///   - Lane 16: srcLinearOffset = 0 + 16*4 = 64
   ///   - delinearize(64, [16, 64]) → [1, 0] (for source)
   ///   - delinearize(0, [16, 64])  → [0, 0] (for destination, uniform)
-  void emitTransfers(PatternRewriter &rewriter, Location loc, Value source,
-                     Value dest, ArrayRef<int64_t> destShape,
-                     int64_t numLinearDims, Type elementType,
-                     OperandRange indices, ArrayRef<TransferSegment> segments,
-                     ArrayRef<Value> segmentLaneOffsets,
-                     std::optional<ArrayAttr> inBoundsAttr) const {
+  void emitTransfers(
+      PatternRewriter &rewriter, Location loc, Value source, Value dest,
+      ArrayRef<int64_t> destShape, int64_t numLinearDims, Type elementType,
+      OperandRange indices, ArrayRef<TransferSegment> segments,
+      ArrayRef<Value> segmentLaneOffsets, std::optional<ArrayAttr> inBoundsAttr,
+      std::optional<IREE::Codegen::XORShuffleAttr> destSwizzle) const {
     int64_t destRank = destShape.size();
     int64_t numOuterDims = destRank - numLinearDims;
     LDBG() << "Emitting transfers: " << numOuterDims << " outer dims, "
@@ -401,6 +560,12 @@ private:
           // Source indices: add lane offset before delinearization (divergent).
           Value srcLinearOffset =
               arith::AddIOp::create(rewriter, loc, linearOffsetVal, laneOffset);
+          // Apply inverse source swizzle when destination has XOR swizzle.
+          // XOR swizzle is self-inverse, so swizzle(swizzle(x)) = x.
+          if (destSwizzle) {
+            srcLinearOffset = applyInverseXorSwizzleToDMASourceOffset(
+                rewriter, loc, srcLinearOffset, *destSwizzle, dest);
+          }
           auto srcDelinearize = affine::AffineDelinearizeIndexOp::create(
               rewriter, loc, srcLinearOffset, basis, /*hasOuterBound=*/true);
 
@@ -417,53 +582,8 @@ private:
           auto [srcIndices, dstIndices] = generateGatherIndices(
               rewriter, loc, srcDimOffsets, dstDimOffsets, indices);
 
-          // Raw buffer OOB clamping is 1D (linear): it returns 0 only when the
-          // byte offset >= total buffer size. For non-outermost dimensions,
-          // an OOB index wraps into the next row instead of returning 0.
-          // Fix: when any non-outermost source index exceeds its dimension,
-          // replace the outermost index with sourceShape[0] to force the
-          // linearized offset past the buffer end → hardware returns 0.
-          auto sourceType = cast<MemRefType>(source.getType());
-          if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-            ArrayRef<int64_t> sourceShape = sourceType.getShape();
-            Value anyNonOutermostOOB = arith::ConstantOp::create(
-                rewriter, loc, rewriter.getBoolAttr(false));
-
-            for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
-              if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
-                break;
-              }
-              bool dimInBounds =
-                  cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
-              if (dimInBounds) {
-                continue;
-              }
-
-              Value dimSize;
-              if (ShapedType::isDynamic(sourceShape[dim])) {
-                dimSize = memref::DimOp::create(rewriter, loc, source, dim);
-              } else {
-                dimSize = arith::ConstantIndexOp::create(rewriter, loc,
-                                                         sourceShape[dim]);
-              }
-
-              Value isOOB = arith::CmpIOp::create(rewriter, loc,
-                                                  arith::CmpIPredicate::uge,
-                                                  srcIndices[dim], dimSize);
-
-              anyNonOutermostOOB = arith::OrIOp::create(
-                  rewriter, loc, anyNonOutermostOOB, isOOB);
-            }
-
-            Value oobOuterIdx;
-            if (ShapedType::isDynamic(sourceShape[0])) {
-              oobOuterIdx = memref::DimOp::create(rewriter, loc, source, 0);
-            } else {
-              oobOuterIdx =
-                  arith::ConstantIndexOp::create(rewriter, loc, sourceShape[0]);
-            }
-            srcIndices[0] = arith::SelectOp::create(
-                rewriter, loc, anyNonOutermostOOB, oobOuterIdx, srcIndices[0]);
+          if (inBoundsAttr) {
+            applyOOBClamping(rewriter, loc, source, srcIndices, *inBoundsAttr);
           }
 
           amdgpu::GatherToLDSOp::create(rewriter, loc, source, srcIndices, dest,
@@ -625,44 +745,8 @@ void LowerCoalescedGatherDMAFallbackPattern::emitFallbackTransfers(
     auto [srcIndices, dstIndices] =
         generateGatherIndices(b, loc, srcDimOffsets, dstDimOffsets, indices);
 
-    // OOB handling: replicate the fast path's outermost-index-replacement
-    // trick for non-outermost dimensions.
-    auto sourceType = cast<MemRefType>(source.getType());
-    if (inBoundsAttr && hasAMDGPUFatRawBufferAddressSpace(sourceType)) {
-      ArrayRef<int64_t> sourceShape = sourceType.getShape();
-      Value anyNonOutermostOOB =
-          arith::ConstantOp::create(b, loc, b.getBoolAttr(false));
-
-      for (int64_t dim = 1; dim < sourceType.getRank(); ++dim) {
-        if (dim >= static_cast<int64_t>(inBoundsAttr->size())) {
-          break;
-        }
-        bool dimInBounds = cast<BoolAttr>((*inBoundsAttr)[dim]).getValue();
-        if (dimInBounds) {
-          continue;
-        }
-
-        Value dimSize;
-        if (ShapedType::isDynamic(sourceShape[dim])) {
-          dimSize = memref::DimOp::create(b, loc, source, dim);
-        } else {
-          dimSize = arith::ConstantIndexOp::create(b, loc, sourceShape[dim]);
-        }
-
-        Value isOOB = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::uge,
-                                            srcIndices[dim], dimSize);
-        anyNonOutermostOOB =
-            arith::OrIOp::create(b, loc, anyNonOutermostOOB, isOOB);
-      }
-
-      Value oobOuterIdx;
-      if (ShapedType::isDynamic(sourceShape[0])) {
-        oobOuterIdx = memref::DimOp::create(b, loc, source, 0);
-      } else {
-        oobOuterIdx = arith::ConstantIndexOp::create(b, loc, sourceShape[0]);
-      }
-      srcIndices[0] = arith::SelectOp::create(b, loc, anyNonOutermostOOB,
-                                              oobOuterIdx, srcIndices[0]);
+    if (inBoundsAttr) {
+      applyOOBClamping(b, loc, source, srcIndices, *inBoundsAttr);
     }
 
     // Determine in_bounds for vector.transfer_read.

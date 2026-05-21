@@ -257,6 +257,38 @@ util.func private @loop_iter_args_resource(%input_tp: !stream.timepoint, %initia
 
 // -----
 
+// Tests that an alloca used as a resource iter_arg is not deallocated before
+// the loop. The loop result may alias the initial resource when the loop has
+// zero iterations, so ownership transfers to the loop result.
+
+// CHECK-LABEL: @loop_iter_arg_initial_alloca_lifetime
+// CHECK-SAME: (%[[INPUT_TP:.+]]: !stream.timepoint, %[[SIZE:.+]]: index)
+util.func private @loop_iter_arg_initial_alloca_lifetime(%input_tp: !stream.timepoint, %size: index) -> (!stream.resource<transient>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+
+  // CHECK: %[[INIT_RESOURCE:.+]], %[[INIT_ALLOCA_TP:.+]] = stream.resource.alloca uninitialized await(%[[INPUT_TP]]) => !stream.resource<transient>{%[[SIZE]]}
+  %init_resource, %init_alloca_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+
+  // CHECK: %[[INIT_USE_TP:.+]] = stream.test.timeline_op await(%[[INIT_ALLOCA_TP]])
+  %init_use_tp = stream.test.timeline_op await(%init_alloca_tp) =>
+    with(%init_resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+
+  // CHECK-NEXT: %[[LOOP_RESULT:.+]]:2 = scf.for
+  %loop_resource, %loop_tp = scf.for %i = %c0 to %c10 step %c1 iter_args(%iter_resource = %init_resource, %iter_tp = %init_use_tp) -> (!stream.resource<transient>, !stream.timepoint) {
+    %next_resource, %next_alloca_tp = stream.resource.alloca uninitialized await(%iter_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %cmd_tp = stream.test.timeline_op await(%iter_tp, %next_alloca_tp) =>
+      with(%iter_resource, %next_resource) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %next_resource, %cmd_tp : !stream.resource<transient>, !stream.timepoint
+  }
+
+  // CHECK: util.return %[[LOOP_RESULT]]#0, %[[LOOP_RESULT]]#1
+  util.return %loop_resource, %loop_tp : !stream.resource<transient>, !stream.timepoint
+}
+
+// -----
+
 // Tests deeply nested control flow (3 levels).
 
 // CHECK-LABEL: @deeply_nested
@@ -710,6 +742,37 @@ util.func private @if_no_timepoint_result_conservative(%cond: i1, %input_tp: !st
   // CHECK-NOT: stream.resource.dealloca
   // CHECK: util.return %[[IF_RESULT]]
   util.return %if_result : index
+}
+
+// -----
+
+// Tests that duplicate yielded resources are not deallocated through an unused
+// sibling result. A single allocation may be yielded into multiple loop result
+// positions and one result can escape while another is dropped.
+
+// CHECK-LABEL: @loop_duplicate_yielded_resource
+// CHECK-SAME: (%[[INPUT_TP:.+]]: !stream.timepoint, %[[SIZE:.+]]: index, {{.+}}: !stream.resource<transient>, {{.+}}: !stream.resource<transient>)
+util.func private @loop_duplicate_yielded_resource(%input_tp: !stream.timepoint, %size: index, %init_a: !stream.resource<transient>, %init_b: !stream.resource<transient>) -> (!stream.resource<transient>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+
+  // CHECK: %[[LOOP_RESULT:.+]]:3 = scf.for
+  %result_a, %result_b, %result_tp = scf.for %i = %c0 to %c10 step %c1 iter_args(%arg_a = %init_a, %arg_b = %init_b, %arg_tp = %input_tp) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    // CHECK: %[[LOCAL_RESOURCE:.+]], %[[LOCAL_ALLOCA_TP:.+]] = stream.resource.alloca
+    %local_resource, %local_alloca_tp = stream.resource.alloca uninitialized await(%arg_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+
+    // CHECK: %[[CMD_TP:.+]] = stream.test.timeline_op await(%[[LOCAL_ALLOCA_TP]])
+    %cmd_tp = stream.test.timeline_op await(%local_alloca_tp) =>
+      with(%local_resource) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+
+    // CHECK: scf.yield %[[LOCAL_RESOURCE]], %[[LOCAL_RESOURCE]], %[[CMD_TP]]
+    scf.yield %local_resource, %local_resource, %cmd_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[LOOP_RESULT]]#1
+  // CHECK: util.return %[[LOOP_RESULT]]#0, %[[LOOP_RESULT]]#2
+  util.return %result_a, %result_tp : !stream.resource<transient>, !stream.timepoint
 }
 
 // -----

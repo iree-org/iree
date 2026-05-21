@@ -913,7 +913,7 @@ func.func @masked_tensor_multi_mma(%lhs: tensor<?x?x4xf16>, %rhs: tensor<?x?x4xf
 //       CHECK:   %[[MMA:.+]] = iree_codegen.inner_tiled ins(%[[LHS]], %[[RHS]]) outs(%[[ACC]])
 //  CHECK-SAME:     : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
 //       CHECK:   %[[WRITE_MASK:.+]] = vector.create_mask {{.*}} : vector<2x5x4xi1>
-//       CHECK:   vector.transfer_write %[[MMA]], %arg2{{.*}}, %[[WRITE_MASK]] {in_bounds = [false, false, true]}
+//       CHECK:   vector.transfer_write %[[MMA]], %arg2{{.*}}, %[[WRITE_MASK]] {in_bounds = [true, true, true]}
 //  CHECK-SAME:     : vector<2x5x4xf32>, tensor<?x?x4xf32>
 
 // -----
@@ -951,6 +951,32 @@ func.func @im2col_vectorize_nhwc(
 //       CHECK:   %[[R3:.+]] = vector.transfer_read %[[INPUT]]{{.*}}, %[[POISON]] {in_bounds = [true]} : tensor<2x34x34x640xf32>, vector<4xf32>
 //       CHECK:   %[[FINAL:.+]] = vector.transfer_write %[[R3]], {{.*}} : vector<4xf32>, tensor<2x2x4xf32>
 //       CHECK:   return %[[FINAL]] : tensor<2x2x4xf32>
+
+// -----
+
+// Unit-window M dim. This is the shape produced when a convolution batch dim is
+// reclassified as an im2col M dim: the synthetic window metadata is all ones, so
+// the M dim is a contiguous pass-through dim.
+func.func @im2col_vectorize_unit_m_dim(
+    %input: tensor<1x16xf32>
+) -> tensor<1x16x1xf32> {
+  %0 = tensor.empty() : tensor<1x16x1xf32>
+  %1 = iree_linalg_ext.im2col strides = [1] dilations = [1] kernel_size = [1]
+                          offsets = [0, 0, 0] output_sizes = [[1], [16], [1]]
+                          batch_pos = [0] m_pos = [1] k_pos = []
+                          input_k_perm = [0] output_perm = [0, 1, 2]
+                          ins(%input : tensor<1x16xf32>)
+                          outs(%0 : tensor<1x16x1xf32>) -> tensor<1x16x1xf32>
+  return %1 : tensor<1x16x1xf32>
+}
+// CHECK-LABEL: func.func @im2col_vectorize_unit_m_dim
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<1x16xf32>
+//   CHECK-DAG:   %[[POISON:.+]] = ub.poison : f32
+//   CHECK-NOT:   iree_linalg_ext.im2col
+//       CHECK:   %[[READ:.+]] = vector.transfer_read %[[INPUT]]{{.*}}, %[[POISON]] {in_bounds = [true]} : tensor<1x16xf32>, vector<16xf32>
+//       CHECK:   %[[WRITE_VEC:.+]] = vector.transpose {{.*}} : vector<1x16xf32> to vector<16x1xf32>
+//       CHECK:   %[[FINAL:.+]] = vector.transfer_write %[[WRITE_VEC]], {{.*}} : vector<16x1xf32>, tensor<1x16x1xf32>
+//       CHECK:   return %[[FINAL]] : tensor<1x16x1xf32>
 
 // -----
 

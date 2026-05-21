@@ -17,8 +17,11 @@
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
-// Get the attribute that specifies sparse iteration dimensions on operations.
+// Get/Set the attribute that specifies sparse iteration dimensions on
+// operations.
 SparseIterationDimsAttr getSparseIterationDimsAttr(Operation *op);
+void setSparseIterationDimsAttr(Operation *op,
+                                ArrayRef<int64_t> sparseIterationDims);
 
 } // namespace mlir::iree_compiler::IREE::TensorExt
 

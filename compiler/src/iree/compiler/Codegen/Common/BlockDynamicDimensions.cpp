@@ -279,11 +279,11 @@ blockDynamicDimensions(RewriterBase &rewriter,
   return success();
 }
 
-/// Block dynamic dimensions in operands of `AttentionOp`.
+/// Block dynamic dimensions in operands of `OnlineAttentionOp`.
 static LogicalResult
 blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
-                       IREE::LinalgExt::AttentionOp attentionOp) {
+                       IREE::LinalgExt::OnlineAttentionOp attentionOp) {
   // Only block the q and k values.
   llvm::SmallDenseSet<int64_t> prunedOperandsList, prunedResultsList;
   prunedOperandsList.insert(attentionOp.getQueryMutable().getOperandNumber());
@@ -298,7 +298,7 @@ blockDynamicDimensions(RewriterBase &rewriter,
                        const TensorDynamicDimAnalysis &dynamicDimAnalysis,
                        Operation *operation) {
   return TypeSwitch<Operation *, LogicalResult>(operation)
-      .Case([&](IREE::LinalgExt::AttentionOp attentionOp) {
+      .Case([&](IREE::LinalgExt::OnlineAttentionOp attentionOp) {
         return blockDynamicDimensions(rewriter, dynamicDimAnalysis,
                                       attentionOp);
       })

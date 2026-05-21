@@ -175,7 +175,7 @@ module @td_module attributes { transform.with_named_sequence } {
         }
 
         transform.named_sequence @match_attention_f16(%attention: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param, !transform.any_param) {
-            transform.match.operation_name %attention ["iree_linalg_ext.attention"] : !transform.any_op
+            transform.match.operation_name %attention ["iree_linalg_ext.online_attention"] : !transform.any_op
             %config = transform.param.constant {key = "attn_config"} -> !transform.any_param
             %decomposition_config = transform.param.constant {key = "decomp_config"} -> !transform.any_param
             transform.yield %attention, %config, %decomposition_config : !transform.any_op, !transform.any_param, !transform.any_param

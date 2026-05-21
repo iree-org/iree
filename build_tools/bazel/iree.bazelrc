@@ -12,13 +12,15 @@
 # Enable bzlmod (required for LLVM integration as of Nov 2025)
 common --enable_bzlmod
 
+# Bazel 8 disallows empty globs by default; IREE has test directories that
+# may legitimately contain no files yet.
+common --noincompatible_disallow_empty_glob
+
 # Prevent invalid caching if input files are modified during a build.
-build --experimental_guard_against_concurrent_changes
+build --guard_against_concurrent_changes
 # Default to optimized builds
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
-# Legacy from when we depended on TensorFlow, might not be needed in IREE.
-common --experimental_repo_remote_exec
 # Actually printing output on errors is... a useful default
 test --test_output=errors
 
@@ -46,6 +48,8 @@ build --force_pic
 # Build settings flag aliases. See https://bazel.build/rules/config
 ###############################################################################
 build --flag_alias=iree_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_runtime_drivers=//runtime/src/iree/hal/drivers:enabled_drivers
+build --flag_alias=iree_compiler_plugins=//compiler/plugins:enabled_plugins
 build --flag_alias=iree_link_compiler_shared=//compiler/src/iree/compiler/API:link_shared
 # Equivalent to CMake flag IREE_ENABLE_RUNTIME_TRACING + IREE_TRACING_PROVIDER.
 # Builds the runtime with tracing support enabled.
@@ -211,12 +215,49 @@ build:generic_gcc_release --linkopt=-Wl,--strip-all
 build:msvc_release --compilation_mode=opt
 
 ###############################################################################
+# Options for performance-oriented local runs and captures.
+###############################################################################
+
+# Uses an optimized local CPU-oriented build shape. This intentionally does not
+# enable tracing so it can be used with `perf` and other profiling tools;
+# compose it with --config=tracy when a profiled build is needed.
+build:perf --compilation_mode=opt
+build:perf --copt=-DNDEBUG
+build:perf --features=thin_lto
+build:perf --copt=-O3
+build:perf --cxxopt=-O3
+build:perf --host_copt=-O3
+build:perf --host_cxxopt=-O3
+build:perf --copt=-march=native
+build:perf --cxxopt=-march=native
+build:perf --host_copt=-march=native
+build:perf --host_cxxopt=-march=native
+
+build:tracy --iree_enable_runtime_tracing=tracy
+
+###############################################################################
+# AMDGPU builtin device binary source builds.
+###############################################################################
+
+# Default AMDGPU runtime builds embed checked-in builtin device code objects.
+# Use these configs when editing runtime/src/iree/hal/drivers/amdgpu/device/*.c
+# and wanting Bazel to rebuild the code objects from source.
+build:amdgpu_device_binaries_source --//runtime/src/iree/hal/drivers/amdgpu/device/binaries:build_mode=source
+build:amdgpu_device_binaries_source_rocm --config=amdgpu_device_binaries_source
+build:amdgpu_device_binaries_source_rocm --repo_env=IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN=rocm
+build:amdgpu_device_binaries_source_llvm_project --config=amdgpu_device_binaries_source
+build:amdgpu_device_binaries_source_llvm_project --repo_env=IREE_HAL_AMDGPU_DEVICE_TOOLCHAIN=llvm-project
+
+###############################################################################
 # Options for building with address sanitizer.
 # https://github.com/google/sanitizers/wiki/AddressSanitizer
 ###############################################################################
 
 # Don't strip debug info
 build:sanitizer --strip=never
+# Emit line tables in sanitizer builds. The default opt configuration passes
+# -g0, so this trailing -g restores file:line symbolization for TSAN/ASAN/etc.
+build:sanitizer --copt=-g
 # Ignore settings of `linkopts = ["-static"]` which can screw up the sanitizer.
 # We don't use this in IREE (that's what linkstatic is for), but it could show
 # up in dependencies.
@@ -262,6 +303,10 @@ build:ubsan --features=ubsan
 build:ubsan --copt=-fsanitize=undefined
 build:ubsan --linkopt=-fsanitize=undefined
 build:ubsan --linkopt=-lubsan
+# Match the CMake UBSAN configuration: the runtime uses type-erased function
+# pointers for dynamic dispatch, which UBSAN's function check cannot model.
+build:ubsan --copt=-fno-sanitize=function
+build:ubsan --cxxopt=-fno-sanitize=function
 # The vptr sanitizer check uses typeid() to verify vtable pointers, which
 # requires RTTI. IREE compiles all C++ with -fno-rtti for LLVM/MLIR
 # compatibility, so the vptr check produces false positives on every
@@ -279,6 +324,68 @@ build:fuzzer --cc_output_directory_tag=asan-fuzzer
 build:fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 
 ###############################################################################
+# Allocator selection.
+###############################################################################
+
+# User-provided default iree_allocator_system(). Embedders must provide
+# IREE_ALLOCATOR_SYSTEM_CTL, and optionally IREE_ALLOCATOR_SYSTEM_SELF, through
+# their own copts/defines and link the implementation into final binaries.
+build:custom_allocator --define=iree_allocator_system=custom
+
+###############################################################################
+# WebAssembly cross-compilation.
+###############################################################################
+
+# Common WebAssembly runtime settings. Architecture-specific configs inherit
+# this and select a concrete target platform.
+build:wasm --iree_drivers=local-sync
+
+# Wasm32 freestanding cross-compilation.
+# Use with: bazel build --config=wasm32 //some:target
+#
+# Uses wasi-sdk (downloaded automatically on first build) with IREE's
+# freestanding libc headers. Only local-sync is enabled by default; other
+# drivers must opt in explicitly and provide their own host integration.
+build:wasm32 --config=wasm
+build:wasm32 --platforms=//build_tools/bazel/wasm:wasm32
+build:wasm32 --extra_toolchains=//build_tools/bazel/wasm:wasm32_toolchain_linux_x86_64
+build:wasm32 --extra_toolchains=//build_tools/bazel/wasm:wasm32_toolchain_linux_aarch64
+build:wasm32 --extra_toolchains=//build_tools/bazel/wasm:wasm32_toolchain_macos_x86_64
+build:wasm32 --extra_toolchains=//build_tools/bazel/wasm:wasm32_toolchain_macos_aarch64
+
+# Freestanding WebAssembly with user-provided libc headers/objects. This
+# preserves IREE's WebAssembly target model while disabling the implicit
+# -isystem path to build_tools/wasm/libc/include. Embedders must provide
+# declared header deps and include paths, plus allocator/libc implementations
+# through their own deps/linkopts.
+build:wasm_custom_libc --define=iree_wasm_libc=custom
+
+# Wasm32-wasi compilation configuration.
+# Compiles with wasi-libc + libc++ (for gtest/gbenchmark).
+# Use with: bazel build --config=wasm32_wasi //some:target
+build:wasm32_wasi --config=wasm
+build:wasm32_wasi --platforms=//build_tools/bazel/wasm:wasm32_wasi
+build:wasm32_wasi --extra_toolchains=//build_tools/bazel/wasm:wasm32_wasi_toolchain_linux_x86_64
+build:wasm32_wasi --extra_toolchains=//build_tools/bazel/wasm:wasm32_wasi_toolchain_linux_aarch64
+build:wasm32_wasi --extra_toolchains=//build_tools/bazel/wasm:wasm32_wasi_toolchain_macos_x86_64
+build:wasm32_wasi --extra_toolchains=//build_tools/bazel/wasm:wasm32_wasi_toolchain_macos_aarch64
+# Sanitizers have no wasm runtime — disable any that may be enabled by
+# --config=asan or --config=tsan. These --copt flags come after earlier
+# config expansions, so -fno-sanitize=all overrides -fsanitize=address.
+build:wasm32_wasi --copt=-fno-sanitize=all
+build:wasm32_wasi --linkopt=-fno-sanitize=all
+
+###############################################################################
+# Dawn/Tint (WebGPU SPIR-V → WGSL translation).
+# Use with: bazel build --config=webgpu_spirv //some:target
+###############################################################################
+
+build:webgpu_spirv --@dawn//src/tint:tint_build_spv_reader=true
+build:webgpu_spirv --@dawn//src/tint:tint_build_wgsl_writer=true
+# Dawn requires C++20 - scope it to Dawn sources only so IREE tracks LLVM's
+# C++17 baseline.
+build:webgpu_spirv --per_file_copt=external/.*dawn.*@-std=c++20
+
 # Architecture specific options
 ###############################################################################
 

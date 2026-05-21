@@ -106,6 +106,13 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createDropVectorUnitDimsPass());
+  // Wrap reshape ops around `inner_tiled` in `HoistableConversionOp` pairs
+  // so they can hoist/cancel out of K-reduction loops; otherwise they
+  // remain bridges between the loop's iter args and the inner_tiled's
+  // accumulator, and the per-intrinsic conversion pairs that
+  // `LLVMCPUVirtualVectorLoweringPass` emits below fail to hoist (no
+  // direct iter_arg match) and fall back to inlining-in-place.
+  funcPassManager.addPass(createHoistInnerTiledAccReshapesPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
       LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
                                               options.enableArmI8mm}));
@@ -246,6 +253,8 @@ void addMultiTilingExpertPassPipeline(
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizeToTransferGather =
+        pipelineOpt.cpuOpts.enableTransferGather;
     funcPassManager.addPass(createGenericVectorizationPass(options));
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
@@ -298,6 +307,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizeToTransferGather =
+        pipelineOpt.cpuOpts.enableTransferGather;
     funcPassManager.addPass(createGenericVectorizationPass(options));
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
@@ -353,6 +364,8 @@ void addMmt4dTilingExpertPassPipeline(
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizeToTransferGather =
+        pipelineOpt.cpuOpts.enableTransferGather;
     funcPassManager.addPass(createGenericVectorizationPass(options));
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
@@ -401,6 +414,8 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizeToTransferGather =
+        pipelineOpt.cpuOpts.enableTransferGather;
     funcPassManager.addPass(createGenericVectorizationPass(options));
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
@@ -427,8 +442,6 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
@@ -440,6 +453,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizeToTransferGather =
+        pipelineOpt.cpuOpts.enableTransferGather;
     funcPassManager.addPass(createGenericVectorizationPass(options));
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
@@ -571,6 +586,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
+      .addPass(createLLVMCPUAssignWorkgroupLocalMemoryPass)
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(
@@ -638,7 +654,6 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
-
   modulePassManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen configuration pass pipeline:\n";
@@ -706,6 +721,16 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &modulePassManager,
 // Register LLVMCPU Passes
 //===---------------------------------------------------------------------===//
 
+template <typename PipelineOptionsT>
+static CPUCodegenOptions
+getCPUCodegenOptionsForTextualPipeline(const PipelineOptionsT &options) {
+  CPUCodegenOptions cpuOpts = CPUCodegenOptions::FromFlags::get();
+  if (options.optLevel.hasValue()) {
+    cpuOpts.setWithOptLevel(mapCodegenPipelineOptLevel(options.optLevel));
+  }
+  return cpuOpts;
+}
+
 /// CPU pipeline builder callback. Dispatches CPU::PipelineAttr to the
 /// appropriate pass pipeline construction function.
 static LogicalResult buildCPUPipeline(Attribute attr, OpPassManager &pm,
@@ -760,14 +785,32 @@ void registerCodegenLLVMCPUPasses() {
   // Generated.
   registerPasses();
 
-  static PassPipelineRegistration<> LLVMCPUConfigPipeline(
-      "iree-codegen-llvmcpu-configuration-pipeline",
-      "Runs the translation strategy configuration pipeline on Linalg for CPU",
-      [](OpPassManager &modulePassManager) {
-        const CPUCodegenOptions &cpuOpts = CPUCodegenOptions::FromFlags::get();
-        buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager,
-                                                         cpuOpts);
-      });
+  struct LLVMCPUConfigurationPipelineOptions final
+      : PassPipelineOptions<LLVMCPUConfigurationPipelineOptions> {
+    Option<CodegenPipelineOptLevel> optLevel{
+        *this, "opt-level",
+        llvm::cl::desc(
+            "Optimization level used to derive CPU codegen defaults."),
+        llvm::cl::values(
+            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
+        llvm::cl::init(CodegenPipelineOptLevel::O0)};
+  };
+
+  static PassPipelineRegistration<LLVMCPUConfigurationPipelineOptions>
+      LLVMCPUConfigPipeline(
+          "iree-codegen-llvmcpu-configuration-pipeline",
+          "Runs the translation strategy configuration pipeline on Linalg for "
+          "CPU",
+          [](OpPassManager &modulePassManager,
+             const LLVMCPUConfigurationPipelineOptions &options) {
+            CPUCodegenOptions cpuOpts =
+                getCPUCodegenOptionsForTextualPipeline(options);
+            buildLLVMCPUCodegenConfigurationPassPipelineImpl(modulePassManager,
+                                                             cpuOpts);
+          });
 
   static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
       "iree-codegen-llvmcpu-bufferization-pipeline",
@@ -787,6 +830,16 @@ void registerCodegenLLVMCPUPasses() {
 
   struct LLVMCPULoweringPipelineOptions
       : PassPipelineOptions<LLVMCPULoweringPipelineOptions> {
+    Option<CodegenPipelineOptLevel> optLevel{
+        *this, "opt-level",
+        llvm::cl::desc(
+            "Optimization level used to derive CPU codegen defaults."),
+        llvm::cl::values(
+            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
+            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
+        llvm::cl::init(CodegenPipelineOptLevel::O0)};
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
@@ -802,9 +855,8 @@ void registerCodegenLLVMCPUPasses() {
           "Runs the LLVMCPU lowering pipeline",
           [](OpPassManager &modulePassManager,
              LLVMCPULoweringPipelineOptions const &options) {
-            // Use global codegen options for pipeline registration.
-            const CPUCodegenOptions &cpuOpts =
-                CPUCodegenOptions::FromFlags::get();
+            CPUCodegenOptions cpuOpts =
+                getCPUCodegenOptionsForTextualPipeline(options);
             buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
                                             options.enableArmSME,
                                             options.includeLLVMLowering);

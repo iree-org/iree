@@ -146,11 +146,27 @@ SerializableAttr::getEncodingProperties(Operation *op) {
     return props;
   }
 
+  // Return encoding properties for convolutions operations.
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
+    Type inputElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInputOperand(0)->get().getType());
+    Type filterElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInputOperand(1)->get().getType());
+    Type outputElemType =
+        getElementTypeOrSelf(linalgOp.getDpsInitOperand(0)->get().getType());
+    elemTypes = {inputElemType, filterElemType, outputElemType};
+    opType = EncodingOpType::conv;
+    props.operands.push_back(addEncoding(CONV_IN));
+    props.operands.push_back(addEncoding(CONV_FILTER));
+    props.inits.push_back(addEncoding(CONV_OUT));
+    return props;
+  }
+
   // Return failure for unsupported operations.
   return failure();
 }
 
-std::string stringifyOperandIndex(IntegerAttr valueAttr) {
+static std::string stringifyMatmulOperandIndex(IntegerAttr valueAttr) {
   uint64_t value = valueAttr.getValue().getZExtValue();
   switch (value) {
   case MATMUL_LHS:
@@ -161,6 +177,55 @@ std::string stringifyOperandIndex(IntegerAttr valueAttr) {
     return "RESULT";
   default:
     assert(false && "invalid index");
+    return "";
+  }
+}
+
+static std::string stringifyScaledMatmulOperandIndex(IntegerAttr valueAttr) {
+  uint64_t value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case SCALED_MATMUL_LHS:
+    return "LHS";
+  case SCALED_MATMUL_LHS_SCALES:
+    return "LHS_SCALES";
+  case SCALED_MATMUL_RHS:
+    return "RHS";
+  case SCALED_MATMUL_RHS_SCALES:
+    return "RHS_SCALES";
+  case SCALED_MATMUL_RESULT:
+    return "RESULT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
+}
+
+static std::string stringifyConvOperandIndex(IntegerAttr valueAttr) {
+  uint64_t value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case CONV_IN:
+    return "CONV_IN";
+  case CONV_FILTER:
+    return "CONV_FILTER";
+  case CONV_OUT:
+    return "CONV_OUT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
+}
+
+std::string stringifyOperandIndex(EncodingOpType opType,
+                                  IntegerAttr valueAttr) {
+  switch (opType) {
+  case EncodingOpType::matmul:
+    return stringifyMatmulOperandIndex(valueAttr);
+  case EncodingOpType::scaled_matmul:
+    return stringifyScaledMatmulOperandIndex(valueAttr);
+  case EncodingOpType::conv:
+    return stringifyConvOperandIndex(valueAttr);
+  default:
+    assert(false && "invalid opType");
     return "";
   }
 }

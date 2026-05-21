@@ -171,7 +171,7 @@ static LogicalResult dimIsBound(RewriterBase &rewriter, Value value,
     FailureOr<int64_t> constantLb =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::LB, {value, /*dim=*/dimInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedLB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantLb)) {
       return failure();
     }
@@ -183,7 +183,7 @@ static LogicalResult dimIsBound(RewriterBase &rewriter, Value value,
     FailureOr<int64_t> constantUb =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {value, /*dim=*/dimInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantUb)) {
       return failure();
     }
@@ -219,11 +219,11 @@ static LogicalResult dimsMultipliedIsBound(RewriterBase &rewriter, Value value,
     FailureOr<int64_t> constantLbA =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::LB, {value, /*dim=*/dimAInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedLB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     FailureOr<int64_t> constantLbB =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::LB, {value, /*dim=*/dimBInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedLB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantLbA) || failed(constantLbB)) {
       return failure();
     }
@@ -235,11 +235,11 @@ static LogicalResult dimsMultipliedIsBound(RewriterBase &rewriter, Value value,
     FailureOr<int64_t> constantUbA =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {value, /*dim=*/dimAInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     FailureOr<int64_t> constantUbB =
         ValueBoundsConstraintSet::computeConstantBound(
             presburger::BoundType::UB, {value, /*dim=*/dimBInt.getInt()},
-            /*stopCondition=*/nullptr, /*closedUB=*/true);
+            /*stopCondition=*/nullptr, ValueBoundsOptions{/*closedUB=*/true});
     if (failed(constantUbA) || failed(constantUbB)) {
       return failure();
     }

@@ -60,6 +60,13 @@ function(iree_e2e_runner_test)
   set(_BASE_COMPILER_FLAGS
     "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
   )
+  string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
+  string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
+  if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM")
+    if(IREE_ROCM_TEST_AMDGCNSPIRV)
+      list(APPEND _BASE_COMPILER_FLAGS "--iree-rocm-use-spirv")
+    endif()
+  endif()
 
   if(NOT TARGET "${_NAME}_${_RULE_TEST_TYPE}_module")
     iree_bytecode_module(

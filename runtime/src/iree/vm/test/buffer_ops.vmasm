@@ -1,0 +1,947 @@
+vm.module @buffer_ops version 0
+vm.type f32
+vm.type i32
+vm.type i64
+vm.type !vm.buffer
+vm.rodata[0] = 010000000200000003000000
+vm.rodata[1] = 64000000C80000002C010000
+vm.rodata[2] = 64000000C90000002C010000
+vm.rodata[3] = 02000000
+vm.rodata[4] = 00000000000028420000284200000000
+vm.rodata[5] = 00666600
+vm.rodata[6] = 0000FECAFECA0000
+vm.rodata[7] = 000000000000FFFF0000FFFF00000000
+vm.rodata[8] = 0000000000000000000000000100000000000000010000000000000000000000
+vm.rodata[9] = 00017F80FF
+vm.rodata[10] = 00000100FF7F0080FFFF
+vm.rodata[11] = 0000000001000000FFFFFF7F00000080FFFFFFFF
+vm.rodata[12] = 000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F
+
+vm.export @test_compare
+vm.func @test_compare() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %r0 = vm.const.ref.rodata 1  // 12b
+  %r1 = vm.const.ref.rodata 2  // 12b
+  %i4:5 = vm.buffer.length %r0
+  %i6 = vm.buffer.compare %r0, %i2:3, %r0, %i2:3, %i4:5
+  %i6 = vm.cmp.nz.i32 %i6
+  %i1 = vm.xor.i32 %i6, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  %i1 = vm.buffer.compare %r0, %i2:3, %r1, %i2:3, %i4:5
+  vm.discard.refs %r0, %r1
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer a != b"
+^bb4:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "buffer a == a"
+}
+
+vm.export @test_compare_empty
+vm.func @test_compare_empty() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64.zero
+  %r0 = vm.const.ref.rodata 1  // 12b
+  %r1 = vm.const.ref.rodata 2  // 12b
+  vm.discard.refs %r1
+  %i6 = vm.buffer.compare %r0, %i2:3, %r0, %i2:3, %i4:5
+  vm.discard.refs %r0
+  %i6 = vm.cmp.nz.i32 %i6
+  %i1 = vm.xor.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "empty buffer ranges are always equal"
+}
+
+vm.export @test_alloc
+vm.func @test_alloc() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 128  // 0x0000000000000080
+  %i4 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i2:3, %i4
+  %i4 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  %i4:5 = vm.buffer.length %r0
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer length == 128"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_alloc_empty
+vm.func @test_alloc_empty() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i2:3, %i4
+  %i2 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  %i2:3 = vm.buffer.length %r0
+  vm.discard.refs %r0
+  %i1 = vm.cmp.nz.i64 %i2:3
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer length == 0"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_clone
+vm.func @test_clone() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %i6:7 = vm.const.i64 8  // 0x0000000000000008
+  %i8:9 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.buffer.clone %r0, %i8:9, %i6:7, %i4
+  %i4 = vm.cmp.nz.ref %r1
+  %i4 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i4, ^bb4(), ^bb1()
+^bb1:
+  %i4 = vm.buffer.compare %r0, %i8:9, %r1, %i2:3, %i6:7
+  vm.discard.refs %r0, %r1
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer subspans are equal"
+^bb4:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_clone_empty
+vm.func @test_clone_empty() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i2:3, %i4
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb7(), ^bb1()
+^bb1:
+  %i6:7 = vm.buffer.length %r0
+  %i5 = vm.cmp.nz.i64 %i6:7
+  vm.cond_br %i5, ^bb5(), ^bb2()
+^bb2:
+  %r1 = vm.buffer.clone %r0, %i2:3, %i2:3, %i4
+  vm.discard.refs %r0
+  %i2 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i2, %i1
+  vm.cond_br %i1, ^bb8(), ^bb3()
+^bb3:
+  %i2:3 = vm.buffer.length %r1
+  vm.discard.refs %r1
+  %i1 = vm.cmp.nz.i64 %i2:3
+  vm.cond_br %i1, ^bb6(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.discard.refs %r0
+  vm.br ^bb6()
+^bb6:
+  vm.fail %i0, "buffer length == 0"
+^bb7:
+  vm.discard.refs %r0
+  vm.br ^bb9()
+^bb8:
+  vm.discard.refs %r1
+  vm.br ^bb9()
+^bb9:
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_clone_out_of_range
+vm.func @fail_clone_out_of_range() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 16  // 0x00000010
+  %i4:5 = vm.const.i64 8  // 0x0000000000000008
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %i3 = vm.cmp.nz.ref %r0
+  %i1 = vm.xor.i32 %i3, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  %r1 = vm.buffer.clone %r0, %i4:5, %i4:5, %i2
+  vm.discard.refs %r1
+  vm.discard.refs %r0
+  vm.return
+^bb2:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_copy_full
+vm.func @test_copy_full() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %i6:7 = vm.buffer.length %r0
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb5(), ^bb1()
+^bb1:
+  %r1 = vm.buffer.alloc %i6:7, %i4
+  %i4 = vm.cmp.nz.ref %r1
+  %i4 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i4, ^bb6(), ^bb2()
+^bb2:
+  vm.buffer.copy %r0, %i2:3, %r1, %i2:3, %i6:7
+  %i4 = vm.buffer.compare %r0, %i2:3, %r1, %i2:3, %i6:7
+  vm.discard.refs %r0, %r1
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "source and target match"
+^bb5:
+  vm.discard.refs %r0
+  vm.br ^bb7()
+^bb6:
+  vm.discard.refs %r0, %r1
+  vm.br ^bb7()
+^bb7:
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_copy_partial
+vm.func @test_copy_partial() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4:5 = vm.const.i64 4  // 0x0000000000000004
+  %i6 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.buffer.alloc %i4:5, %i6
+  %i6 = vm.cmp.nz.ref %r0
+  %i6 = vm.xor.i32 %i6, %i1
+  vm.cond_br %i6, ^bb4(), ^bb1()
+^bb1:
+  %r1 = vm.const.ref.rodata 0  // 12b
+  vm.buffer.copy %r1, %i4:5, %r0, %i2:3, %i4:5
+  vm.discard.refs %r1
+  %r1 = vm.const.ref.rodata 3  // 4b
+  %i6 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i4:5
+  vm.discard.refs %r1, %r0
+  %i6 = vm.cmp.nz.i32 %i6
+  %i1 = vm.xor.i32 %i6, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "source and target match"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_copy_out_of_range_source_offset
+vm.func @fail_copy_out_of_range_source_offset() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %i6:7 = vm.const.i64 128  // 0x0000000000000080
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.buffer.alloc %i6:7, %i4
+  %i4 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.buffer.copy %r0, %i2:3, %r1, %i2:3, %i6:7
+  vm.discard.refs %r0, %r1
+  vm.return
+^bb2:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_copy_out_of_range_source_length
+vm.func @fail_copy_out_of_range_source_length() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64 8  // 0x0000000000000008
+  %i4:5 = vm.const.i64.zero
+  %i6 = vm.const.i32 16  // 0x00000010
+  %i8:9 = vm.const.i64 128  // 0x0000000000000080
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.buffer.alloc %i8:9, %i6
+  %i6 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.buffer.copy %r0, %i2:3, %r1, %i4:5, %i2:3
+  vm.discard.refs %r0, %r1
+  vm.return
+^bb2:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_copy_out_of_range_target_offset
+vm.func @fail_copy_out_of_range_target_offset() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %i6:7 = vm.const.i64 8  // 0x0000000000000008
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %i8:9 = vm.buffer.length %r0
+  %r1 = vm.buffer.alloc %i6:7, %i4
+  %i4 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.buffer.copy %r0, %i2:3, %r1, %i2:3, %i8:9
+  vm.discard.refs %r0, %r1
+  vm.return
+^bb2:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_copy_out_of_range_target_length
+vm.func @fail_copy_out_of_range_target_length() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 16  // 0x00000010
+  %i6:7 = vm.const.i64 8  // 0x0000000000000008
+  %r0 = vm.const.ref.rodata 0  // 12b
+  %r1 = vm.buffer.alloc %i6:7, %i4
+  %i4 = vm.cmp.nz.ref %r1
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.buffer.copy %r0, %i2:3, %r1, %i6:7, %i6:7
+  vm.discard.refs %r0, %r1
+  vm.return
+^bb2:
+  vm.discard.refs %r0, %r1
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_fill_f32
+vm.func @test_fill_f32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.f32 42
+  %i6:7 = vm.const.i64 2  // 0x0000000000000002
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i5 = vm.const.i32 16  // 0x00000010
+  %i10:11 = vm.const.i64 16  // 0x0000000000000010
+  %r0 = vm.buffer.alloc %i10:11, %i5
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb4(), ^bb1()
+^bb1:
+  vm.buffer.fill.f32 %r0, %i8:9, %i6:7, %i4
+  %r1 = vm.const.ref.rodata 4  // 16b
+  %i4 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i10:11
+  vm.discard.refs %r1, %r0
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer should match reference"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_fill_i8
+vm.func @test_fill_i8() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 102  // 0x00000066
+  %i6:7 = vm.const.i64 2  // 0x0000000000000002
+  %i5 = vm.const.i32 16  // 0x00000010
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.buffer.alloc %i10:11, %i5
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb4(), ^bb1()
+^bb1:
+  vm.buffer.fill.i8 %r0, %i8:9, %i6:7, %i4
+  %r1 = vm.const.ref.rodata 5  // 4b
+  %i4 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i10:11
+  vm.discard.refs %r1, %r0
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer should match reference"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_fill_i16
+vm.func @test_fill_i16() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 51966  // 0x0000CAFE
+  %i6:7 = vm.const.i64 1  // 0x0000000000000001
+  %i5 = vm.const.i32 16  // 0x00000010
+  %i8:9 = vm.const.i64 2  // 0x0000000000000002
+  %i10:11 = vm.const.i64 8  // 0x0000000000000008
+  %r0 = vm.buffer.alloc %i10:11, %i5
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb4(), ^bb1()
+^bb1:
+  vm.buffer.fill.i16 %r0, %i6:7, %i8:9, %i4
+  %r1 = vm.const.ref.rodata 6  // 8b
+  %i4 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i10:11
+  vm.discard.refs %r1, %r0
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer should match reference"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_fill_i32
+vm.func @test_fill_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4 = vm.const.i32 -65536  // 0xFFFF0000
+  %i6:7 = vm.const.i64 2  // 0x0000000000000002
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i5 = vm.const.i32 16  // 0x00000010
+  %i10:11 = vm.const.i64 16  // 0x0000000000000010
+  %r0 = vm.buffer.alloc %i10:11, %i5
+  %i5 = vm.cmp.nz.ref %r0
+  %i5 = vm.xor.i32 %i5, %i1
+  vm.cond_br %i5, ^bb4(), ^bb1()
+^bb1:
+  vm.buffer.fill.i32 %r0, %i8:9, %i6:7, %i4
+  %r1 = vm.const.ref.rodata 7  // 16b
+  %i4 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i10:11
+  vm.discard.refs %r1, %r0
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer should match reference"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @test_fill_i64
+vm.func @test_fill_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.i64.zero
+  %i4:5 = vm.const.i64 4294967296  // 0x0000000100000000
+  %i6:7 = vm.const.i64 2  // 0x0000000000000002
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10 = vm.const.i32 16  // 0x00000010
+  %i12:13 = vm.const.i64 32  // 0x0000000000000020
+  %r0 = vm.buffer.alloc %i12:13, %i10
+  %i10 = vm.cmp.nz.ref %r0
+  %i10 = vm.xor.i32 %i10, %i1
+  vm.cond_br %i10, ^bb4(), ^bb1()
+^bb1:
+  vm.buffer.fill.i64 %r0, %i8:9, %i6:7, %i4:5
+  %r1 = vm.const.ref.rodata 8  // 32b
+  %i4 = vm.buffer.compare %r1, %i2:3, %r0, %i2:3, %i12:13
+  vm.discard.refs %r1, %r0
+  %i4 = vm.cmp.nz.i32 %i4
+  %i1 = vm.xor.i32 %i4, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "buffer should match reference"
+^bb4:
+  vm.discard.refs %r0
+  vm.fail %i0, "!null"
+}
+
+vm.export @fail_fill_i16_rodata
+vm.func @fail_fill_i16_rodata() -> () {
+^bb0:
+  %i0 = vm.const.i32 51966  // 0x0000CAFE
+  %i2:3 = vm.const.i64 2  // 0x0000000000000002
+  %i4:5 = vm.const.i64.zero
+  %r0 = vm.const.ref.rodata 0  // 12b
+  vm.buffer.fill.i16 %r0, %i4:5, %i2:3, %i0
+  vm.discard.refs %r0
+  vm.return
+}
+
+vm.export @test_load_i8u
+vm.func @test_load_i8u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 255  // 0x000000FF
+  %i2 = vm.const.i32 128  // 0x00000080
+  %i3 = vm.const.i32 127  // 0x0000007F
+  %i4 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64.zero
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 2  // 0x0000000000000002
+  %i12:13 = vm.const.i64 3  // 0x0000000000000003
+  %i14:15 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 9  // 5b
+  %i5 = vm.buffer.load.i8.u %r0, %i6:7
+  %i5 = vm.cmp.nz.i32 %i5
+  vm.cond_br %i5, ^bb10(), ^bb1()
+^bb1:
+  %i5 = vm.buffer.load.i8.u %r0, %i8:9
+  %i4 = vm.cmp.ne.i32 %i5, %i4
+  vm.cond_br %i4, ^bb9(), ^bb2()
+^bb2:
+  %i4 = vm.buffer.load.i8.u %r0, %i10:11
+  %i3 = vm.cmp.ne.i32 %i4, %i3
+  vm.cond_br %i3, ^bb8(), ^bb3()
+^bb3:
+  %i3 = vm.buffer.load.i8.u %r0, %i12:13
+  %i2 = vm.cmp.ne.i32 %i3, %i2
+  vm.cond_br %i2, ^bb7(), ^bb4()
+^bb4:
+  %i2 = vm.buffer.load.i8.u %r0, %i14:15
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb5()
+^bb5:
+  vm.return
+^bb6:
+  vm.fail %i0, "0xFF"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x80"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x7F"
+^bb9:
+  vm.discard.refs %r0
+  vm.fail %i0, "1"
+^bb10:
+  vm.discard.refs %r0
+  vm.fail %i0, "0"
+}
+
+vm.export @test_load_i8s
+vm.func @test_load_i8s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.const.i32 -128  // 0xFFFFFF80
+  %i3 = vm.const.i32 127  // 0x0000007F
+  %i4 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64.zero
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 2  // 0x0000000000000002
+  %i12:13 = vm.const.i64 3  // 0x0000000000000003
+  %i14:15 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 9  // 5b
+  %i5 = vm.buffer.load.i8.s %r0, %i6:7
+  %i5 = vm.cmp.nz.i32 %i5
+  vm.cond_br %i5, ^bb10(), ^bb1()
+^bb1:
+  %i5 = vm.buffer.load.i8.s %r0, %i8:9
+  %i4 = vm.cmp.ne.i32 %i5, %i4
+  vm.cond_br %i4, ^bb9(), ^bb2()
+^bb2:
+  %i4 = vm.buffer.load.i8.s %r0, %i10:11
+  %i3 = vm.cmp.ne.i32 %i4, %i3
+  vm.cond_br %i3, ^bb8(), ^bb3()
+^bb3:
+  %i3 = vm.buffer.load.i8.s %r0, %i12:13
+  %i2 = vm.cmp.ne.i32 %i3, %i2
+  vm.cond_br %i2, ^bb7(), ^bb4()
+^bb4:
+  %i2 = vm.buffer.load.i8.s %r0, %i14:15
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb5()
+^bb5:
+  vm.return
+^bb6:
+  vm.fail %i0, "-1"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "-128"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x7F"
+^bb9:
+  vm.discard.refs %r0
+  vm.fail %i0, "1"
+^bb10:
+  vm.discard.refs %r0
+  vm.fail %i0, "0"
+}
+
+vm.export @test_load_i16u
+vm.func @test_load_i16u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 65535  // 0x0000FFFF
+  %i2 = vm.const.i32 32768  // 0x00008000
+  %i3 = vm.const.i32 32767  // 0x00007FFF
+  %i4 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64.zero
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 2  // 0x0000000000000002
+  %i12:13 = vm.const.i64 3  // 0x0000000000000003
+  %i14:15 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 10  // 10b
+  %i5 = vm.buffer.load.i16.u %r0, %i6:7
+  %i5 = vm.cmp.nz.i32 %i5
+  vm.cond_br %i5, ^bb10(), ^bb1()
+^bb1:
+  %i5 = vm.buffer.load.i16.u %r0, %i8:9
+  %i4 = vm.cmp.ne.i32 %i5, %i4
+  vm.cond_br %i4, ^bb9(), ^bb2()
+^bb2:
+  %i4 = vm.buffer.load.i16.u %r0, %i10:11
+  %i3 = vm.cmp.ne.i32 %i4, %i3
+  vm.cond_br %i3, ^bb8(), ^bb3()
+^bb3:
+  %i3 = vm.buffer.load.i16.u %r0, %i12:13
+  %i2 = vm.cmp.ne.i32 %i3, %i2
+  vm.cond_br %i2, ^bb7(), ^bb4()
+^bb4:
+  %i2 = vm.buffer.load.i16.u %r0, %i14:15
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb5()
+^bb5:
+  vm.return
+^bb6:
+  vm.fail %i0, "0xFFFF"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x8000"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x7FFF"
+^bb9:
+  vm.discard.refs %r0
+  vm.fail %i0, "1"
+^bb10:
+  vm.discard.refs %r0
+  vm.fail %i0, "0"
+}
+
+vm.export @test_load_i16s
+vm.func @test_load_i16s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.const.i32 -32768  // 0xFFFF8000
+  %i3 = vm.const.i32 32767  // 0x00007FFF
+  %i4 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64.zero
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 2  // 0x0000000000000002
+  %i12:13 = vm.const.i64 3  // 0x0000000000000003
+  %i14:15 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 10  // 10b
+  %i5 = vm.buffer.load.i16.s %r0, %i6:7
+  %i5 = vm.cmp.nz.i32 %i5
+  vm.cond_br %i5, ^bb10(), ^bb1()
+^bb1:
+  %i5 = vm.buffer.load.i16.s %r0, %i8:9
+  %i4 = vm.cmp.ne.i32 %i5, %i4
+  vm.cond_br %i4, ^bb9(), ^bb2()
+^bb2:
+  %i4 = vm.buffer.load.i16.s %r0, %i10:11
+  %i3 = vm.cmp.ne.i32 %i4, %i3
+  vm.cond_br %i3, ^bb8(), ^bb3()
+^bb3:
+  %i3 = vm.buffer.load.i16.s %r0, %i12:13
+  %i2 = vm.cmp.ne.i32 %i3, %i2
+  vm.cond_br %i2, ^bb7(), ^bb4()
+^bb4:
+  %i2 = vm.buffer.load.i16.s %r0, %i14:15
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb5()
+^bb5:
+  vm.return
+^bb6:
+  vm.fail %i0, "-1"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "-32768"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x7FFF"
+^bb9:
+  vm.discard.refs %r0
+  vm.fail %i0, "1"
+^bb10:
+  vm.discard.refs %r0
+  vm.fail %i0, "0"
+}
+
+vm.export @test_load_i32
+vm.func @test_load_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2 = vm.const.i32 -2147483648  // 0x80000000
+  %i3 = vm.const.i32 2147483647  // 0x7FFFFFFF
+  %i4 = vm.const.i32 1  // 0x00000001
+  %i6:7 = vm.const.i64.zero
+  %i8:9 = vm.const.i64 1  // 0x0000000000000001
+  %i10:11 = vm.const.i64 2  // 0x0000000000000002
+  %i12:13 = vm.const.i64 3  // 0x0000000000000003
+  %i14:15 = vm.const.i64 4  // 0x0000000000000004
+  %r0 = vm.const.ref.rodata 11  // 20b
+  %i5 = vm.buffer.load.i32 %r0, %i6:7
+  %i5 = vm.cmp.nz.i32 %i5
+  vm.cond_br %i5, ^bb10(), ^bb1()
+^bb1:
+  %i5 = vm.buffer.load.i32 %r0, %i8:9
+  %i4 = vm.cmp.ne.i32 %i5, %i4
+  vm.cond_br %i4, ^bb9(), ^bb2()
+^bb2:
+  %i4 = vm.buffer.load.i32 %r0, %i10:11
+  %i3 = vm.cmp.ne.i32 %i4, %i3
+  vm.cond_br %i3, ^bb8(), ^bb3()
+^bb3:
+  %i3 = vm.buffer.load.i32 %r0, %i12:13
+  %i2 = vm.cmp.ne.i32 %i3, %i2
+  vm.cond_br %i2, ^bb7(), ^bb4()
+^bb4:
+  %i2 = vm.buffer.load.i32 %r0, %i14:15
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb6(), ^bb5()
+^bb5:
+  vm.return
+^bb6:
+  vm.fail %i0, "0xFFFFFFFF"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x80000000"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0x7FFFFFFF"
+^bb9:
+  vm.discard.refs %r0
+  vm.fail %i0, "1"
+^bb10:
+  vm.discard.refs %r0
+  vm.fail %i0, "0"
+}
+
+vm.export @test_store_i8
+vm.func @test_store_i8() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 255  // 0x000000FF
+  %i2:3 = vm.const.i64 4  // 0x0000000000000004
+  %i4 = vm.const.i32 128  // 0x00000080
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i5 = vm.const.i32 127  // 0x0000007F
+  %i8:9 = vm.const.i64 2  // 0x0000000000000002
+  %i10 = vm.const.i32 1  // 0x00000001
+  %i12:13 = vm.const.i64 1  // 0x0000000000000001
+  %i11 = vm.const.i32.zero
+  %i14:15 = vm.const.i64.zero
+  %i16 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.const.ref.rodata 9  // 5b
+  %i18:19 = vm.buffer.length %r0
+  %r1 = vm.buffer.alloc %i18:19, %i16
+  vm.buffer.store.i8 %i11, %r1, %i14:15
+  vm.buffer.store.i8 %i10, %r1, %i12:13
+  vm.buffer.store.i8 %i5, %r1, %i8:9
+  vm.buffer.store.i8 %i4, %r1, %i6:7
+  vm.buffer.store.i8 %i1, %r1, %i2:3
+  %i1 = vm.buffer.compare %r0, %i14:15, %r1, %i14:15, %i18:19
+  vm.discard.refs %r0, %r1
+  %i1 = vm.cmp.nz.i32 %i1
+  %i10 = vm.xor.i32 %i1, %i10
+  vm.cond_br %i10, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "source and target match"
+}
+
+vm.export @test_store_i16
+vm.func @test_store_i16() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 65535  // 0x0000FFFF
+  %i2:3 = vm.const.i64 4  // 0x0000000000000004
+  %i4 = vm.const.i32 32768  // 0x00008000
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i5 = vm.const.i32 32767  // 0x00007FFF
+  %i8:9 = vm.const.i64 2  // 0x0000000000000002
+  %i10 = vm.const.i32 1  // 0x00000001
+  %i12:13 = vm.const.i64 1  // 0x0000000000000001
+  %i11 = vm.const.i32.zero
+  %i14:15 = vm.const.i64.zero
+  %i16 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.const.ref.rodata 10  // 10b
+  %i18:19 = vm.buffer.length %r0
+  %r1 = vm.buffer.alloc %i18:19, %i16
+  vm.buffer.store.i16 %i11, %r1, %i14:15
+  vm.buffer.store.i16 %i10, %r1, %i12:13
+  vm.buffer.store.i16 %i5, %r1, %i8:9
+  vm.buffer.store.i16 %i4, %r1, %i6:7
+  vm.buffer.store.i16 %i1, %r1, %i2:3
+  %i1 = vm.buffer.compare %r0, %i14:15, %r1, %i14:15, %i18:19
+  vm.discard.refs %r0, %r1
+  %i1 = vm.cmp.nz.i32 %i1
+  %i10 = vm.xor.i32 %i1, %i10
+  vm.cond_br %i10, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "source and target match"
+}
+
+vm.export @test_store_i32
+vm.func @test_store_i32() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 -1  // 0xFFFFFFFF
+  %i2:3 = vm.const.i64 4  // 0x0000000000000004
+  %i4 = vm.const.i32 -2147483648  // 0x80000000
+  %i6:7 = vm.const.i64 3  // 0x0000000000000003
+  %i5 = vm.const.i32 2147483647  // 0x7FFFFFFF
+  %i8:9 = vm.const.i64 2  // 0x0000000000000002
+  %i10 = vm.const.i32 1  // 0x00000001
+  %i12:13 = vm.const.i64 1  // 0x0000000000000001
+  %i11 = vm.const.i32.zero
+  %i14:15 = vm.const.i64.zero
+  %i16 = vm.const.i32 16  // 0x00000010
+  %r0 = vm.const.ref.rodata 11  // 20b
+  %i18:19 = vm.buffer.length %r0
+  %r1 = vm.buffer.alloc %i18:19, %i16
+  vm.buffer.store.i32 %i11, %r1, %i14:15
+  vm.buffer.store.i32 %i10, %r1, %i12:13
+  vm.buffer.store.i32 %i5, %r1, %i8:9
+  vm.buffer.store.i32 %i4, %r1, %i6:7
+  vm.buffer.store.i32 %i1, %r1, %i2:3
+  %i1 = vm.buffer.compare %r0, %i14:15, %r1, %i14:15, %i18:19
+  vm.discard.refs %r0, %r1
+  %i1 = vm.cmp.nz.i32 %i1
+  %i10 = vm.xor.i32 %i1, %i10
+  vm.cond_br %i10, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "source and target match"
+}
+
+vm.export @test_hash
+vm.func @test_hash() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 8153574914611379406  // 0x7127512F72F27CCE
+  %i4:5 = vm.const.i64 -4836423040314787606  // 0xBCE192DE8A85B8EA
+  %i6:7 = vm.const.i64 4551675220716592091  // 0x3F2ACC7F57C29BDB
+  %i8:9 = vm.const.i64 1762690195596617357  // 0x18765564CD99A68D
+  %i10:11 = vm.const.i64.zero
+  %i12:13 = vm.const.i64 5  // 0x0000000000000005
+  %i14:15 = vm.const.i64 16  // 0x0000000000000010
+  %i16:17 = vm.const.i64 25  // 0x0000000000000019
+  %i18:19 = vm.const.i64 32  // 0x0000000000000020
+  %r0 = vm.const.ref.rodata 12  // 32b
+  %i12:13 = vm.buffer.hash %r0, %i10:11, %i12:13
+  %i1 = vm.cmp.ne.i64 %i12:13, %i8:9
+  vm.cond_br %i1, ^bb8(), ^bb1()
+^bb1:
+  %i14:15 = vm.buffer.hash %r0, %i10:11, %i14:15
+  %i1 = vm.cmp.ne.i64 %i14:15, %i6:7
+  vm.cond_br %i1, ^bb7(), ^bb2()
+^bb2:
+  %i16:17 = vm.buffer.hash %r0, %i10:11, %i16:17
+  %i1 = vm.cmp.ne.i64 %i16:17, %i4:5
+  vm.cond_br %i1, ^bb6(), ^bb3()
+^bb3:
+  %i18:19 = vm.buffer.hash %r0, %i10:11, %i18:19
+  vm.discard.refs %r0
+  %i1 = vm.cmp.ne.i64 %i18:19, %i2:3
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "0-31: 0x7127512f72f27cce"
+^bb6:
+  vm.discard.refs %r0
+  vm.fail %i0, "0-24: 0xbce192de8a85b8ea"
+^bb7:
+  vm.discard.refs %r0
+  vm.fail %i0, "0-15: 0x3f2acc7f57c29bdb"
+^bb8:
+  vm.discard.refs %r0
+  vm.fail %i0, "0-4: 0x18765564cd99a68d"
+}

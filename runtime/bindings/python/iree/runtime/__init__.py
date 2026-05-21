@@ -60,6 +60,13 @@ from ._binding import (
     VmRef,
 )
 
+# Tokenizer imports
+from ._binding import (
+    Tokenizer,
+    TokenizerEncodeStream,
+    TokenizerDecodeStream,
+)
+
 # Debug imports
 from ._binding import HalModuleDebugSink
 from .typing import HalModuleBufferViewTraceCallback

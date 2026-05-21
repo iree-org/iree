@@ -1,0 +1,50 @@
+vm.module @shift_ops_i64 version 0
+vm.type i32
+vm.type i64
+
+vm.export @test_shl_i64
+vm.func @test_shl_i64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 4  // 0x0000000000000004
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i4:5 = vm.const.i64 1  // 0x0000000000000001
+  %i4:5 = vm.shl.i64 %i4:5, %i1
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "1<<2=4"
+}
+
+vm.export @test_shr_i64s
+vm.func @test_shr_i64s() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i2:3 = vm.const.i64 -1  // 0xFFFFFFFFFFFFFFFF
+  %i4:5 = vm.shr.i64.s %i2:3, %i1
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-1>>2=-1"
+}
+
+vm.export @test_shr_i64u
+vm.func @test_shr_i64u() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 1  // 0x0000000000000001
+  %i1 = vm.const.i32 2  // 0x00000002
+  %i4:5 = vm.const.i64 4  // 0x0000000000000004
+  %i4:5 = vm.shr.i64.u %i4:5, %i1
+  %i1 = vm.cmp.ne.i64 %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4>>2=1"
+}

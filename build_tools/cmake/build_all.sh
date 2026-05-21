@@ -76,6 +76,12 @@ declare -a CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
 )
 
+# sccache doesn't work with MSVC's /Zi (shared PDB files). Use /Z7 to embed
+# debug info in each .obj instead, avoiding PDB contention across parallel jobs.
+if [[ "${OSTYPE}" =~ ^msys ]] && (( ${IREE_USE_SCCACHE:-0} == 1 )); then
+  CMAKE_ARGS+=("-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded")
+fi
+
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"
 
 if (( IREE_CONFIGURE_ONLY == 1 )); then

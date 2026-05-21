@@ -36,24 +36,30 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 typedef enum {
-  // a == b
+  // Byte-exact comparison: memcmp(a, b) == 0.
   IREE_HAL_BUFFER_EQUALITY_EXACT = 0,
-  // abs(a - b) <= threshold
-  IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_ABSOLUTE,
-  // abs((a - b)/a) <= threshold
-  IREE_HAL_BUFFER_EQUALITY_APPROXIMATE_RELATIVE,
+  // Per-element approximate comparison for float buffers:
+  //   |actual - expected| <= atol + rtol * |expected|
+  // The rtol term scales with the *expected* (reference) operand, so the
+  // comparison is asymmetric. NaN compares equal to NaN.
+  // Non-float element types fall back to byte-exact comparison.
+  IREE_HAL_BUFFER_EQUALITY_APPROXIMATE,
 } iree_hal_buffer_equality_mode_t;
 
 // TODO(benvanik): initializers/configuration for equality comparisons.
 typedef struct {
   iree_hal_buffer_equality_mode_t mode;
-  // TODO(benvanik): allow override in approximate modes (ULP, abs/rel diff).
-  // For now we just have some hardcoded types that are used in place of
-  // compile-time constants. Consider these provisional.
-  float f16_threshold;
-  float f32_threshold;
-  double f64_threshold;
-  float bf16_threshold;
+  // TODO(benvanik, hanchung): allow override in approximate modes (ULP, abs/rel
+  // diff). For now we just have some hardcoded types that are used in place of
+  // compile-time constants. Consider these provisional. We may have a single
+  // atol for all float types.
+  // Used by APPROXIMATE: per-element-type absolute tolerance.
+  float f16_atol;
+  float f32_atol;
+  double f64_atol;
+  float bf16_atol;
+  // Used by APPROXIMATE: relative tolerance shared across all float types.
+  double rtol;
 } iree_hal_buffer_equality_t;
 
 // Variant type storing known HAL buffer elements.

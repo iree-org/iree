@@ -28,6 +28,44 @@ enum iree_io_file_access_bits_t {
   IREE_IO_FILE_ACCESS_WRITE = 1u << 1,
 };
 
+// Bits indicating how a file is opened.
+typedef uint64_t iree_io_file_mode_t;
+enum iree_io_file_mode_bits_t {
+  IREE_IO_FILE_MODE_NONE = 0ull,
+  // Allow reads of both existing and new content.
+  IREE_IO_FILE_MODE_READ = 1ull << 0,
+  // Allow writes.
+  IREE_IO_FILE_MODE_WRITE = 1ull << 1,
+  // Hints that the file will be accessed at random (more-so than not).
+  // Mutually exclusive with IREE_IO_FILE_MODE_SEQUENTIAL_SCAN. If no access
+  // hint is specified the platform will use its default behavior.
+  IREE_IO_FILE_MODE_RANDOM_ACCESS = 1ull << 2,
+  // Hints that the file will be accessed sequentially (contiguous reads/writes
+  // or small skips forward only).
+  // Mutually exclusive with IREE_IO_FILE_MODE_RANDOM_ACCESS. If no access
+  // hint is specified the platform will use its default behavior.
+  IREE_IO_FILE_MODE_SEQUENTIAL_SCAN = 1ull << 3,
+  // Hints that the library and system caching are not required. May hurt
+  // performance more than it helps unless the file is very large and
+  // exclusively accessed as part of bulk transfer operations that are
+  // page-aligned.
+  IREE_IO_FILE_MODE_DIRECT = 1ull << 4,
+  // Ensures the file is deleted when it is closed. Platforms may use this as a
+  // hint to avoid writing the file contents when cache is available.
+  IREE_IO_FILE_MODE_TEMPORARY = 1ull << 5,
+  // Allows subsequent operations to open the file for read access while the
+  // file is open by the creator.
+  IREE_IO_FILE_MODE_SHARE_READ = 1ull << 6,
+  // Allows subsequent operations to open the file for write access while the
+  // file is open by the creator.
+  IREE_IO_FILE_MODE_SHARE_WRITE = 1ull << 7,
+  // If the file exists during an open operation it is truncated for overwrite.
+  IREE_IO_FILE_MODE_OVERWRITE = 1ull << 8,
+  // Opens the file for platform asynchronous I/O.
+  // On Windows this maps to FILE_FLAG_OVERLAPPED.
+  IREE_IO_FILE_MODE_ASYNC = 1ull << 9,
+};
+
 //===----------------------------------------------------------------------===//
 // iree_io_file_handle_primitive_t
 //===----------------------------------------------------------------------===//
@@ -98,10 +136,14 @@ typedef struct iree_io_file_handle_t iree_io_file_handle_t;
 // Wraps a platform file primitive |handle_primitive| in a reference-counted
 // file handle. |allowed_access| declares which operations are allowed on the
 // handle and may be more restrictive than the underlying platform primitive.
+// |mode| declares platform file properties the caller knows are true for the
+// primitive. Wrapping a Windows HANDLE or CRT fd opened with
+// FILE_FLAG_OVERLAPPED requires IREE_IO_FILE_MODE_ASYNC; pass
+// IREE_IO_FILE_MODE_NONE when no platform file mode bits apply.
 // The optional provided |release_callback| will be issued when the last
 // reference to the handle is released.
 IREE_API_EXPORT iree_status_t iree_io_file_handle_wrap(
-    iree_io_file_access_t allowed_access,
+    iree_io_file_access_t allowed_access, iree_io_file_mode_t mode,
     iree_io_file_handle_primitive_t handle_primitive,
     iree_io_file_handle_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_io_file_handle_t** out_handle);
@@ -159,39 +201,13 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle);
 // iree_io_file_handle_t platform files
 //===----------------------------------------------------------------------===//
 
-// Bits indicating how a file is opened.
-typedef uint64_t iree_io_file_mode_t;
-enum iree_io_file_mode_bits_t {
-  // Allow reads of both existing and new content.
-  IREE_IO_FILE_MODE_READ = 1ull << 0,
-  // Allow writes.
-  IREE_IO_FILE_MODE_WRITE = 1ull << 1,
-  // Hints that the file will be accessed at random (more-so than not).
-  // Mutually exclusive with IREE_IO_FILE_MODE_SEQUENTIAL_SCAN. If no access
-  // hint is specified the platform will use its default behavior.
-  IREE_IO_FILE_MODE_RANDOM_ACCESS = 1ull << 2,
-  // Hints that the file will be accessed sequentially (contiguous reads/writes
-  // or small skips forward only).
-  // Mutually exclusive with IREE_IO_FILE_MODE_RANDOM_ACCESS. If no access
-  // hint is specified the platform will use its default behavior.
-  IREE_IO_FILE_MODE_SEQUENTIAL_SCAN = 1ull << 3,
-  // Hints that the library and system caching are not required. May hurt
-  // performance more than it helps unless the file is very large and
-  // exclusively accessed as part of bulk transfer operations that are
-  // page-aligned.
-  IREE_IO_FILE_MODE_DIRECT = 1ull << 4,
-  // Ensures the file is deleted when it is closed. Platforms may use this as a
-  // hint to avoid writing the file contents when cache is available.
-  IREE_IO_FILE_MODE_TEMPORARY = 1ull << 5,
-  // Allows subsequent operations to open the file for read access while the
-  // file is open by the creator.
-  IREE_IO_FILE_MODE_SHARE_READ = 1ull << 6,
-  // Allows subsequent operations to open the file for write access while the
-  // file is open by the creator.
-  IREE_IO_FILE_MODE_SHARE_WRITE = 1ull << 7,
-  // If the file exists during an open operation it is truncated for overwrite.
-  IREE_IO_FILE_MODE_OVERWRITE = 1ull << 8,
-};
+// Returns true if the file was explicitly opened for platform asynchronous I/O.
+//
+// This describes the platform handle, not whether a particular HAL has imported
+// it for async use. On Windows this corresponds to FILE_FLAG_OVERLAPPED and is
+// required before a HANDLE can be associated with an IOCP port.
+IREE_API_EXPORT bool iree_io_file_handle_uses_async_io(
+    const iree_io_file_handle_t* handle);
 
 // Creates a new platform file at |path| for usage as defined by |mode|.
 // The file will be extended to |initial_size| upon creation.

@@ -7,9 +7,12 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -43,8 +46,6 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
-  funcPassManager.addPass(
-      IREE::LinalgExt::createConvertAttentionToOnlineAttentionPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
@@ -80,6 +81,45 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   }
 }
 
+static LogicalResult buildVMVXPipeline(Attribute pipelineAttr,
+                                       OpPassManager &pm,
+                                       const CodegenPipelineOptions *options) {
+  assert(isa<IREE::Codegen::VMVXPipelineAttr>(pipelineAttr) &&
+         "unexpected VMVX pipeline attr");
+  if (!options) {
+    return emitError(UnknownLoc::get(pipelineAttr.getContext()))
+           << "VMVX pipeline expects VMVXCodegenPipelineOptions";
+  }
+  auto vmvxOptions = dyn_cast<VMVXCodegenPipelineOptions>(options);
+  if (!vmvxOptions) {
+    return emitError(UnknownLoc::get(pipelineAttr.getContext()))
+           << "VMVX pipeline expects VMVXCodegenPipelineOptions";
+  }
+  addVMVXDefaultPassPipeline(pm, vmvxOptions->enableUKernels);
+  return success();
+}
+
+void buildVMVXConfigurationPassPipeline(OpPassManager &modulePassManager) {
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
+  FunctionLikeNest(modulePassManager)
+      .addPass(createMaterializeDeviceEncodingPass)
+      // TODO: Remove the following pass the plumb support for
+      // #hal.descriptor_type memory space through the stack.
+      .addPass(createEraseHALDescriptorTypeFromMemRefPass);
+  modulePassManager.addPass(createVMVXSelectLoweringStrategyPass());
+}
+
+void buildVMVXLoweringPassPipeline(OpPassManager &modulePassManager) {
+  FunctionLikeNest(modulePassManager)
+      .addPass(createVMVXLowerExecutableTargetPass);
+  modulePassManager.addPass(createReconcileTranslationInfoPass());
+  modulePassManager.addPass(createResolveWorkgroupCountHintsPass());
+}
+
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
 void buildVMVXLinkingPassPipeline(OpPassManager &modulePassManager) {
@@ -108,6 +148,21 @@ namespace {
 void registerCodegenVMVXPasses() {
   // Generated.
   registerPasses();
+  IREE::Codegen::registerVMVXPipelineBuilder(buildVMVXPipeline);
+
+  static PassPipelineRegistration<> VMVXConfigPipeline(
+      "iree-codegen-vmvx-configuration-pipeline",
+      "Runs the VMVX codegen configuration pipeline",
+      [](OpPassManager &modulePassManager) {
+        buildVMVXConfigurationPassPipeline(modulePassManager);
+      });
+
+  static PassPipelineRegistration<> VMVXLoweringPipeline(
+      "iree-codegen-vmvx-lowering-pipeline",
+      "Runs the VMVX codegen lowering pipeline",
+      [](OpPassManager &modulePassManager) {
+        buildVMVXLoweringPassPipeline(modulePassManager);
+      });
 
   static PassPipelineRegistration<> VMVXLinkingPipeline(
       "iree-codegen-vmvx-linking-pipeline",

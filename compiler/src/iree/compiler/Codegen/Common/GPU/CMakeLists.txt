@@ -44,10 +44,13 @@ iree_cc_library(
   NAME
     CommonGPUPasses
   HDRS
+    "GPUNestedLayoutUtils.h"
     "GPUPatterns.h"
+    "GPUPromotionAnalysis.h"
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPULowerAsyncDMA.cpp"
     "AMDGPULowerCoalescedDMAToGatherLDS.cpp"
     "DecomposeHorizontallyFusedGemms.cpp"
     "ExpandGPUOps.cpp"
@@ -73,6 +76,7 @@ iree_cc_library(
     "GPUInferMemorySpace.cpp"
     "GPUMultiBuffering.cpp"
     "GPUNestedLayoutDistributionPatterns.cpp"
+    "GPUNestedLayoutUtils.cpp"
     "GPUPackPartialReductions.cpp"
     "GPUPackToIntrinsics.cpp"
     "GPUPadConvs.cpp"
@@ -80,6 +84,7 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
+    "GPUPromotionAnalysis.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUReuseSharedMemoryAllocs.cpp"
     "GPUTensorAlloc.cpp"
@@ -122,6 +127,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRLoopLikeInterface
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRMemRefUtils
@@ -144,6 +150,7 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRVectorUtils
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::Codegen::Utils

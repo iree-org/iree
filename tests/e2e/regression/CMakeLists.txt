@@ -86,6 +86,21 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_regression_xla_reverse_after_slice_llvm-cpu
+  SRCS
+    "xla_reverse_after_slice.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "noriscv"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_tosa_llvm-cpu
   SRCS
     "linalg_quantized_matmul_vs_linalg_matmul.mlir"
@@ -161,6 +176,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_hip
   SRCS
+    "dynamic_batch_matmul_gfx1100.mlir"
     "dynamic_gather_attention.mlir"
     "linalg_ops_dynamic.mlir"
     "split_reduction_using_tiling.mlir"
@@ -170,6 +186,28 @@ iree_check_single_backend_test_suite(
     "hip"
   COMPILER_FLAGS
     "--iree-opt-level=O3"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-amd"
+  TIMEOUT
+    300
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_vector_distribute_64bit_hip
+  SRCS
+    "vector_distribute_64bit_amdgpu.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+  COMPILER_FLAGS
+    "--iree-opt-level=O3"
+    "--iree-input-demote-f64-to-f32=false"
   LABELS
     "noasan"
     "nomsan"

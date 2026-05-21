@@ -156,8 +156,28 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // On platforms without file systems or in applications where no file I/O
 // utilities are used, all file I/O operations can be stripped out. Functions
 // relying on file I/O will still be defined, but they will return errors.
+#if defined(IREE_PLATFORM_WASM)
+#define IREE_FILE_IO_ENABLE 0
+#else
 #define IREE_FILE_IO_ENABLE 1
+#endif  // IREE_PLATFORM_WASM
 #endif  // !IREE_FILE_IO_ENABLE
+
+//===----------------------------------------------------------------------===//
+// Sockets
+//===----------------------------------------------------------------------===//
+
+#if !defined(IREE_SOCKETS_ENABLE)
+// On platforms without BSD socket APIs (wasm, bare-metal), socket operations
+// can be stripped out. Socket functions will still be defined but return
+// IREE_STATUS_UNIMPLEMENTED. Override with -DIREE_SOCKETS_ENABLE=1 for custom
+// platforms that provide a POSIX-compatible socket layer.
+#if defined(IREE_PLATFORM_WASM)
+#define IREE_SOCKETS_ENABLE 0
+#else
+#define IREE_SOCKETS_ENABLE 1
+#endif  // IREE_PLATFORM_WASM
+#endif  // !IREE_SOCKETS_ENABLE
 
 #if !defined(IREE_MAX_PATH)
 // Maximum path C string length in characters excluding the NUL terminator.

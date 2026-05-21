@@ -12,13 +12,24 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/base/threading/thread_impl.h"
 
+#ifdef __NEWLIB__
+// newlib does not provide strnlen; provide a fallback implementation.
+static size_t iree_strnlen(const char* s, size_t maxlen) {
+  size_t n = 0;
+  while (n < maxlen && s[n] != '\0') ++n;
+  return n;
+}
+#else
+#define iree_strnlen strnlen
+#endif
+
 int iree_strncpy_s(char* IREE_RESTRICT dest, size_t destsz,
                    const char* IREE_RESTRICT src, size_t count) {
 #if defined(IREE_COMPILER_MSVC) || defined(__STDC_LIB_EXT1__)
   return strncpy_s(dest, destsz, src, count);
 #else
   if (!src || !dest || !destsz) return EINVAL;
-  size_t src_len = strnlen(src, destsz);
+  size_t src_len = iree_strnlen(src, destsz);
   if (count >= destsz && destsz <= src_len) return ERANGE;
   if (src_len > count) src_len = count;
   while (*src != 0 && src_len > 0) {

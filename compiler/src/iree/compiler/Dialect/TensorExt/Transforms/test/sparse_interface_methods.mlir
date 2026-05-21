@@ -31,12 +31,12 @@ func.func public @simpleTest(%source : memref<?x?xf32>, %column_lengths: memref<
 // LOWER-LOOP-RANGE:   %[[C1:.*]] = arith.constant 1 : index
 // LOWER-LOOP-RANGE:   scf.for %[[IV0:.+]] = %[[LB0]] to %[[NUM_ROWS]] step %[[STEP0]] {
 // LOWER-LOOP-RANGE:     %[[PLUSONE:.+]] = arith.addi %[[IV0]], %[[C1]]
-// LOWER-LOOP-RANGE:     %[[ROW_UB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
-// LOWER-LOOP-RANGE:     %[[ROW_UB:.+]] = arith.index_cast %[[ROW_UB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:     %[[ROW_LB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV0]]]
-// LOWER-LOOP-RANGE:     %[[ROW_LB:.+]] = arith.index_cast %[[ROW_LB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:     %[[LB:.+]] = affine.max affine_map<()[s0, s1] -> (s0, s1)>()[%[[LB1]], %[[ROW_LB]]]
-// LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB]] to %[[ROW_UB]] step %[[STEP1]] {
+// LOWER-LOOP-RANGE:     %[[COL_END_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
+// LOWER-LOOP-RANGE:     %[[COL_START_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV0]]]
+// LOWER-LOOP-RANGE:     %[[COL_END:.+]] = arith.index_cast %[[COL_END_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_START:.+]] = arith.index_cast %[[COL_START_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_RANGE:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>()[%[[COL_END]], %[[COL_START]]]
+// LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB1]] to %[[COL_RANGE]] step %[[STEP1]] {
 // LOWER-LOOP-RANGE:       "some_op"(%[[IV0]], %[[IV1]])
 
 // GET-ESTIMATED-LOOP-RANGE: %[[C0:.+]] = arith.constant 0 : index
@@ -78,12 +78,12 @@ func.func public @testEstimatedColumnLength(%source : memref<?x?xf32>, %column_l
 // LOWER-LOOP-RANGE:   %[[C1:.*]] = arith.constant 1 : index
 // LOWER-LOOP-RANGE:   scf.for %[[IV0:.+]] = %[[LB0]] to %[[NUM_ROWS]] step %[[STEP0]] {
 // LOWER-LOOP-RANGE:     %[[PLUSONE:.+]] = arith.addi %[[IV0]], %[[C1]]
-// LOWER-LOOP-RANGE:     %[[ROW_UB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
-// LOWER-LOOP-RANGE:     %[[ROW_UB:.+]] = arith.index_cast %[[ROW_UB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:     %[[ROW_LB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV0]]]
-// LOWER-LOOP-RANGE:     %[[ROW_LB:.+]] = arith.index_cast %[[ROW_LB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:     %[[LB:.+]] = affine.max affine_map<()[s0, s1] -> (s0, s1)>()[%[[LB1]], %[[ROW_LB]]]
-// LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB]] to %[[ROW_UB]] step %[[STEP1]] {
+// LOWER-LOOP-RANGE:     %[[COL_END_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
+// LOWER-LOOP-RANGE:     %[[COL_START_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV0]]]
+// LOWER-LOOP-RANGE:     %[[COL_END:.+]] = arith.index_cast %[[COL_END_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_START:.+]] = arith.index_cast %[[COL_START_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_RANGE:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>()[%[[COL_END]], %[[COL_START]]]
+// LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB1]] to %[[COL_RANGE]] step %[[STEP1]] {
 // LOWER-LOOP-RANGE:       "some_op"(%[[IV0]], %[[IV1]])
 
 //      GET-ESTIMATED-LOOP-RANGE: %[[EST_COLS:.+]] = affine.apply
@@ -136,12 +136,12 @@ func.func public @nonOuterMostSparseLoops(%source : memref<?x?x?xf32>, %column_l
 // LOWER-LOOP-RANGE:   scf.for %[[IV0:.+]] =
 // LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB1]] to %[[NUM_ROWS]] step %[[STEP1]] {
 // LOWER-LOOP-RANGE:       %[[PLUSONE:.+]] = arith.addi %[[IV1]], %[[C1]]
-// LOWER-LOOP-RANGE:       %[[ROW_UB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
-// LOWER-LOOP-RANGE:       %[[ROW_UB:.+]] = arith.index_cast %[[ROW_UB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:       %[[ROW_LB_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV1]]]
-// LOWER-LOOP-RANGE:       %[[ROW_LB:.+]] = arith.index_cast %[[ROW_LB_I32]] : i32 to index
-// LOWER-LOOP-RANGE:       %[[LB:.+]] = affine.max affine_map<()[s0, s1] -> (s0, s1)>()[%[[LB2]], %[[ROW_LB]]]
-// LOWER-LOOP-RANGE:       scf.for %[[IV2:.+]] = %[[LB]] to %[[ROW_UB]] step %[[STEP2]] {
+// LOWER-LOOP-RANGE:       %[[COL_END_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
+// LOWER-LOOP-RANGE:       %[[COL_START_I32:.+]] = memref.load %[[COLUMN_LENGTHS]][%[[IV1]]]
+// LOWER-LOOP-RANGE:       %[[COL_END:.+]] = arith.index_cast %[[COL_END_I32]] : i32 to index
+// LOWER-LOOP-RANGE:       %[[COL_START:.+]] = arith.index_cast %[[COL_START_I32]] : i32 to index
+// LOWER-LOOP-RANGE:       %[[COL_RANGE:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 - s1)>()[%[[COL_END]], %[[COL_START]]]
+// LOWER-LOOP-RANGE:       scf.for %[[IV2:.+]] = %[[LB2]] to %[[COL_RANGE]] step %[[STEP2]] {
 // LOWER-LOOP-RANGE:         scf.for %[[IV3:.+]] =
 // LOWER-LOOP-RANGE:           "some_op"(%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]])
 
@@ -152,3 +152,53 @@ func.func public @nonOuterMostSparseLoops(%source : memref<?x?x?xf32>, %column_l
 // GET-ESTIMATED-LOOP-RANGE-SAME:     = (%[[LB0]], %[[LB1]], %[[LB2]], %[[LB3]]) to (%{{[a-zA-Z0-9_]+}}, %[[NUM_ROWS]], %[[UB2]], %{{[a-zA-Z0-9_]+}})
 // GET-ESTIMATED-LOOP-RANGE-SAME:     step (%[[STEP0]], %[[STEP1]], %[[STEP2]], %[[STEP3]]) {
 //      GET-ESTIMATED-LOOP-RANGE:   "some_op"(%[[IV0]], %[[IV1]], %[[IV2]], %[[IV3]])
+
+// -----
+
+// Check interface methods for tensor types (instead of memref).
+func.func public @tensorTest(%source : tensor<?x?xf32>, %column_lengths: tensor<?xi32>,
+    %num_rows: index, %lb0 : index, %lb1 : index, %step0 : index, %step1 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %source_d0 = tensor.dim %source, %c0 : tensor<?x?xf32>
+  %source_d1 = tensor.dim %source, %c1 : tensor<?x?xf32>
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source
+      ragged_dim(0) column_lengths(%column_lengths) num_ragged_rows(%num_rows)
+      : (tensor<?x?xf32>{%source_d0, %source_d1}, tensor<?xi32>)
+      -> tensor<?x?x?xf32, #iree_tensor_ext.ragged_shape<0>>
+  %d0 = tensor.dim %0, %c0 : tensor<?x?x?xf32, #iree_tensor_ext.ragged_shape<0>>
+  %d1 = tensor.dim %0, %c1 : tensor<?x?x?xf32, #iree_tensor_ext.ragged_shape<0>>
+  scf.forall (%i, %j) = (%lb0, %lb1) to (%d0, %d1) step (%step0, %step1) {
+    "some_op"(%i, %j) : (index, index) -> ()
+  } {iree_tensor_ext.sparse_iteration_dims = #iree_tensor_ext.sparse_iteration_dims<[0, 1]>}
+  return
+}
+// CHECK-ALL-LABEL: func public @tensorTest(
+//  CHECK-ALL-SAME:     %[[SOURCE:.+]]: tensor<?x?xf32>,
+//  CHECK-ALL-SAME:     %[[COLUMN_LENGTHS:.+]]: tensor<?xi32>,
+//  CHECK-ALL-SAME:     %[[NUM_ROWS:[a-zA-Z0-9]+]]: index,
+//  CHECK-ALL-SAME:     %[[LB0:[a-zA-Z0-9]+]]: index
+//  CHECK-ALL-SAME:     %[[LB1:[a-zA-Z0-9]+]]: index
+//  CHECK-ALL-SAME:     %[[STEP0:[a-zA-Z0-9]+]]: index,
+//  CHECK-ALL-SAME:     %[[STEP1:[a-zA-Z0-9]+]]: index) {
+
+// LOWER-LOOP-RANGE:   %[[C1:.*]] = arith.constant 1 : index
+// LOWER-LOOP-RANGE:   scf.for %[[IV0:.+]] = %[[LB0]] to %[[NUM_ROWS]] step %[[STEP0]] {
+// LOWER-LOOP-RANGE:     %[[PLUSONE:.+]] = arith.addi %[[IV0]], %[[C1]]
+// LOWER-LOOP-RANGE:     %[[COL_END_I32:.+]] = tensor.extract %[[COLUMN_LENGTHS]][%[[PLUSONE]]]
+// LOWER-LOOP-RANGE:     %[[COL_START_I32:.+]] = tensor.extract %[[COLUMN_LENGTHS]][%[[IV0]]]
+// LOWER-LOOP-RANGE:     %[[COL_END:.+]] = arith.index_cast %[[COL_END_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_START:.+]] = arith.index_cast %[[COL_START_I32]] : i32 to index
+// LOWER-LOOP-RANGE:     %[[COL_RANGE:.+]] = affine.apply
+// LOWER-LOOP-RANGE-SAME:    affine_map<()[s0, s1] -> (s0 - s1)>()[%[[COL_END]], %[[COL_START]]]
+// LOWER-LOOP-RANGE:     scf.for %[[IV1:.+]] = %[[LB1]] to %[[COL_RANGE]] step %[[STEP1]] {
+// LOWER-LOOP-RANGE:       "some_op"(%[[IV0]], %[[IV1]])
+
+//      GET-ESTIMATED-LOOP-RANGE: %[[C0:.+]] = arith.constant 0 : index
+//      GET-ESTIMATED-LOOP-RANGE: %[[D0:.+]] = tensor.dim %[[SOURCE]], %[[C0]]
+//      GET-ESTIMATED-LOOP-RANGE: %[[UB1:.+]] = affine.apply
+// GET-ESTIMATED-LOOP-RANGE-SAME:     affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%[[D0]], %[[NUM_ROWS]]]
+//      GET-ESTIMATED-LOOP-RANGE: scf.forall (%[[IV0:[a-zA-Z0-9]+]], %[[IV1:[a-zA-Z0-9]+]])
+// GET-ESTIMATED-LOOP-RANGE-SAME:     = (%[[LB0]], %[[LB1]]) to (%[[NUM_ROWS]], %[[UB1]])
+// GET-ESTIMATED-LOOP-RANGE-SAME:     step (%[[STEP0]], %[[STEP1]]) {
+//      GET-ESTIMATED-LOOP-RANGE:   "some_op"(%[[IV0]], %[[IV1]])

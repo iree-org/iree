@@ -4,11 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 # load(//build_tools/bazel:build_defs.oss.bzl, "iree_gentbl_cc_library")
 
-load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_vmasm_module.bzl", "iree_vmasm_module")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -40,17 +40,12 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/schemas:bytecode_module_def_c_fbs",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm:ops",
+        "//runtime/src/iree/vm/bytecode/isa",
         "//runtime/src/iree/vm/bytecode/utils",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-if(IREE_BUILD_COMPILER)
-""",
-    inline = True,
 )
 
 iree_runtime_cc_test(
@@ -66,12 +61,11 @@ iree_runtime_cc_test(
     ],
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "module_test_module",
     testonly = True,
-    src = "module_test.mlir",
+    src = "module_test.vmasm",
     c_identifier = "iree_vm_bytecode_module_test_module",
-    flags = ["--compile-mode=vm"],
 )
 
 cc_binary_benchmark(
@@ -88,12 +82,11 @@ cc_binary_benchmark(
     ],
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "module_benchmark_module",
     testonly = True,
-    src = "module_benchmark.mlir",
+    src = "module_benchmark.vmasm",
     c_identifier = "iree_vm_bytecode_module_benchmark_module",
-    flags = ["--compile-mode=vm"],
 )
 
 cc_binary_benchmark(
@@ -107,17 +100,9 @@ cc_binary_benchmark(
     ],
 )
 
-iree_bytecode_module(
+iree_vmasm_module(
     name = "module_size_benchmark_module",
     testonly = True,
-    src = "module_size_benchmark.mlir",
+    src = "module_size_benchmark.vmasm",
     c_identifier = "iree_vm_bytecode_module_size_benchmark_module",
-    flags = ["--compile-mode=vm"],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

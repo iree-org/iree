@@ -354,7 +354,7 @@ static_assert(
     sizeof(iree_hal_executable_workgroup_state_v0_t) <= 64,
     "try keeping workgroup state small enough to fit in a cache line");
 
-// Function signature of exported executable entry points.
+// Function signature of exported executable dispatch functions.
 // The same |environment| is passed to all dispatches.
 // The same |dispatch_state| is passed to all workgroups within a dispatch.
 // A unique |workgroup_state| is passed to every workgroup within a dispatch.
@@ -387,7 +387,7 @@ enum iree_hal_executable_dispatch_flag_v0_bits_e {
   // workgroups on execution units that share caches.
   IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL = 1ull << 0,
   // Workgroup size is dynamic at dispatch time.
-  // The workgroup size specified on the export info is the minimum size and
+  // The workgroup size specified on the dispatch info is the minimum size and
   // granularity and any dynamic workgroup size chosen must be a multiple.
   IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC = 1ull << 1,
 };
@@ -412,7 +412,7 @@ typedef struct iree_hal_executable_dispatch_attrs_v0_t {
   uint32_t workgroup_size_y;
   uint16_t workgroup_size_z;
   // Total number of logical parameters.
-  // Indicates the size of the parameter array for this export in the export
+  // Indicates the size of the parameter array for this function in the export
   // table.
   uint16_t parameter_count;
   // Unused. Must be 0.
@@ -500,15 +500,15 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // Total number of exports in the table.
   uint32_t count;
 
-  // Function pointers for each exported entry point.
+  // Function pointers for each exported dispatch function.
   const iree_hal_executable_dispatch_v0_t* ptrs;
 
   // Table of attributes 1:1 with ptrs.
   const iree_hal_executable_dispatch_attrs_v0_t* attrs;
 
-  // Optional parameter declarations per entry point in original logical order.
-  // The offset of each parameter for a particular entry point may jump around
-  // as alignment and padding are accounted for. Each entry point has as many
+  // Optional parameter declarations per function in original logical order.
+  // The offset of each parameter for a particular function may jump around
+  // as alignment and padding are accounted for. Each function has as many
   // parameters as the attributes constant_count + binding_count indicate.
   // When omitted the function is assumed to follow the IREE HAL ABI.
   //
@@ -533,7 +533,7 @@ typedef struct iree_hal_executable_export_table_v0_t {
   //
   // The packing logic for producing constants and bindings from a list of raw
   // parameters roughly follows:
-  //   for (param, value) in zip(params[entry_point], param_values):
+  //   for (param, value) in zip(params[function_index], param_values):
   //     if param.type == constant || buffer_ptr:
   //       memcpy(constants[param.offset / 4], &value, param.size)
   //     elif param.type == binding:
@@ -546,15 +546,15 @@ typedef struct iree_hal_executable_export_table_v0_t {
   // If unavailable then workgroup sizes must be specified on each export.
   const iree_hal_executable_dispatch_occupancy_v0_t* occupancy;
 
-  // Optional table of export function entry point names 1:1 with ptrs.
-  // These names are only used for tracing/debugging and can be omitted to save
-  // binary size.
+  // Table of export function names 1:1 with ptrs.
+  // Required when count is non-zero. These names are used for function lookup
+  // and diagnostics.
   const char* const* names;
 
-  // Optional table of entry point tags 1:1 with ptrs.
-  // Used to describe the entry point in a human-readable format useful for
+  // Optional table of function tags 1:1 with ptrs.
+  // Used to describe the function in a human-readable format useful for
   // verbose logging. The string values, when present, may be attached to
-  // tracing/debugging events related to the entry point.
+  // tracing/debugging events related to the function.
   const char* const* tags;
 
   // Optional string table of parameter names.

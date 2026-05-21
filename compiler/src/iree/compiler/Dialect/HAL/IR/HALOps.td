@@ -183,6 +183,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   let hasVerifier = 1;
 
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
@@ -1804,7 +1805,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch", [
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_Ordinal:$entry_point,
+    HAL_FunctionId:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z,
@@ -1875,7 +1876,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_Ordinal:$entry_point,
+    HAL_FunctionId:$entry_point,
     AnyTypeOf<[Index, HAL_BufferType]>:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset,
     Variadic<I32>:$constants,
@@ -3229,6 +3230,35 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
     `executable` `(` $executable `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_ExecutableLookupFunctionOp : HAL_PureOp<"executable.lookup.function", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{Executable function lookup pseudo-op.}];
+  let description = [{
+    Resolves an executable export name to a runtime function id. The result is
+    only meaningful for the executable operand and must be treated as opaque by
+    compiler IR. The function reference is retained as a SymbolRefAttr so
+    executable linking passes can rewrite it, but it may intentionally stop
+    resolving after executable serialization strips the original export
+    declarations.
+  }];
+
+  let arguments = (ins
+    HAL_Executable:$executable,
+    SymbolRefAttr:$entry_point
+  );
+  let results = (outs
+    HAL_FunctionId:$result
+  );
+
+  let assemblyFormat = [{
+    `target` `(` $executable `:` type($executable) `)`
+    `function` `(` $entry_point `)`
     `:` type($result)
     attr-dict-with-keyword
   }];

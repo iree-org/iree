@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmgpu-lower-executable-target))' %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
 
 // Verify that a custom pass pipeline specified via #iree_codegen.pass_pipeline
 // attribute is executed by the LLVMGPU lower executable target pass.

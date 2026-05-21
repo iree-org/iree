@@ -114,6 +114,47 @@ func.func private @workgroup_scope_attr_linearize() attributes {
 
 // -----
 
+// Test no pipeline attr inside translation_info.
+func.func private @translation_info_no_pipeline() attributes {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline>
+}
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline>
+// CHECK-LABEL: func.func private @translation_info_no_pipeline()
+// CHECK-SAME:    translation_info = #translation
+
+// -----
+
+// Test transform dialect codegen pipeline attr inside translation_info.
+func.func private @translation_info_transform_dialect_codegen() attributes {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.transform_dialect_codegen codegen_spec = @__kernel_config workgroup_size = [64, 1, 1] subgroup_size = 32>
+}
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_codegen.transform_dialect_codegen codegen_spec = @__kernel_config workgroup_size = [64, 1, 1] subgroup_size = 32>
+// CHECK-LABEL: func.func private @translation_info_transform_dialect_codegen()
+// CHECK-SAME:    translation_info = #translation
+
+// -----
+
+// Test VMVX pipeline attr inside translation_info.
+func.func private @translation_info_vmvx_pipeline() attributes {
+    translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
+}
+// CHECK: #translation = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
+// CHECK-LABEL: func.func private @translation_info_vmvx_pipeline()
+// CHECK-SAME:    translation_info = #translation
+
+// -----
+
+func.func @workgroup_local_memory_space(
+    %arg0: memref<64x64xf32, #iree_codegen.workgroup_local>)
+    -> memref<64x64xf32, #iree_codegen.workgroup_local> {
+  return %arg0 : memref<64x64xf32, #iree_codegen.workgroup_local>
+}
+// CHECK-LABEL: func.func @workgroup_local_memory_space(
+// CHECK-SAME:    memref<64x64xf32, #iree_codegen.workgroup_local>
+// CHECK-SAME:    -> memref<64x64xf32, #iree_codegen.workgroup_local>
+
+// -----
+
 // Test constraints op with knobs and dims.
 func.func @constraints_op(%arg0: index, %arg1: index) {
   iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
@@ -170,7 +211,7 @@ func.func @constraints_op_with_smt_body(%arg0: index, %arg1: index) {
 
 // Test assert op with static message (no format args).
 func.func @assert_static_message(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.no_pipeline,
    knobs = {x = #iree_codegen.smt.int_knob<"x">}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -210,7 +251,7 @@ func.func @assert_with_format_args(%arg0: index) {
 
 // Test constraints op with empty dims.
 func.func @constraints_op_empty_dims() {
-  iree_codegen.smt.constraints target = <set = 1>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_codegen.no_pipeline,
    knobs = {}
    dims() {
   ^bb0:
@@ -218,7 +259,7 @@ func.func @constraints_op_empty_dims() {
   return
 }
 // CHECK-LABEL: func.func @constraints_op_empty_dims(
-// CHECK:    iree_codegen.smt.constraints target = <set = 1>, pipeline = None,
+// CHECK:    iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_codegen.no_pipeline,
 // CHECK:     knobs = {}
 // CHECK:     dims()
 
@@ -257,7 +298,7 @@ func.func @constraints_op_with_pass_pipeline(%arg0: index) {
 
 // Test OneOfKnobAttr in constraints op knobs dict.
 func.func @one_of_knob_attr(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.no_pipeline,
    knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["option_a", "option_b", "option_c"]>}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -272,7 +313,7 @@ func.func @one_of_knob_attr(%arg0: index) {
 
 // Test OneOfKnobAttr with heterogeneous options (integer attrs).
 func.func @one_of_knob_int_options(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.no_pipeline,
    knobs = {size = #iree_codegen.smt.one_of_knob<"size_idx", [16 : i64, 32 : i64, 64 : i64]>}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -287,7 +328,7 @@ func.func @one_of_knob_int_options(%arg0: index) {
 
 // Test smt.lookup op roundtrip.
 func.func @smt_lookup(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.no_pipeline,
    knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -304,7 +345,7 @@ func.func @smt_lookup(%arg0: index) {
 
 // Test smt.lookup with non-contiguous keys not starting at 0.
 func.func @smt_lookup_sparse(%arg0: index) {
-  iree_codegen.smt.constraints target = <set = 0>, pipeline = None,
+  iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_codegen.no_pipeline,
    knobs = {mma = #iree_codegen.smt.one_of_knob<"mma_idx", ["a", "b", "c"]>}
    dims(%arg0) {
   ^bb0(%m: !smt.int):
@@ -320,7 +361,8 @@ func.func @smt_lookup_sparse(%arg0: index) {
 // -----
 
 iree_codegen.dispatch_config @matmul
-    workgroup_size = [64, 16, 1] subgroup_size = 64 {
+    workgroup_size = [64, 16, 1] subgroup_size = 64
+    workgroup_local_memory = 4096 {
   ^bb0(%w0: index, %w1: index):
     %c1 = arith.constant 1 : index
     iree_codegen.yield %w0, %w1, %c1 : index, index, index
@@ -328,6 +370,7 @@ iree_codegen.dispatch_config @matmul
 // CHECK-LABEL: iree_codegen.dispatch_config @matmul
 // CHECK-SAME:    workgroup_size = [64, 16, 1]
 // CHECK-SAME:    subgroup_size = 64
+// CHECK-SAME:    workgroup_local_memory = 4096
 // CHECK:       ^bb0(%[[W0:.+]]: index, %[[W1:.+]]: index):
 // CHECK:         %[[C1:.+]] = arith.constant 1 : index
 // CHECK:         iree_codegen.yield %[[W0]], %[[W1]], %[[C1]] : index, index, index

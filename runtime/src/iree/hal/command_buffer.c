@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/device.h"
@@ -33,6 +34,9 @@
 
 #define _VTABLE_DISPATCH(command_buffer, method_name) \
   IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)
+
+static iree_atomic_int64_t iree_hal_command_buffer_next_profile_id =
+    IREE_ATOMIC_VAR_INIT(1);
 
 //===----------------------------------------------------------------------===//
 // String utils
@@ -117,6 +121,10 @@ iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
        IREE_SVL("ALLOW_INLINE_EXECUTION")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED, IREE_SVL("UNVALIDATED")},
       {IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED, IREE_SVL("UNRETAINED")},
+      {IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_PROFILE_METADATA,
+       IREE_SVL("RETAIN_PROFILE_METADATA")},
+      {IREE_HAL_COMMAND_BUFFER_MODE_RETAIN_DISPATCH_METADATA,
+       IREE_SVL("RETAIN_DISPATCH_METADATA")},
   };
   return iree_bitfield_format_inline(value, IREE_ARRAYSIZE(mappings), mappings,
                                      out_temp);
@@ -206,6 +214,8 @@ IREE_API_EXPORT void iree_hal_command_buffer_initialize(
   command_buffer->mode = mode;
   command_buffer->allowed_categories = command_categories;
   command_buffer->queue_affinity = queue_affinity;
+  command_buffer->profile_id = (uint64_t)iree_atomic_fetch_add(
+      &iree_hal_command_buffer_next_profile_id, 1, iree_memory_order_relaxed);
   command_buffer->binding_capacity = binding_capacity;
   command_buffer->binding_count = 0;
   command_buffer->validation_state = validation_state;
@@ -259,6 +269,19 @@ iree_hal_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   return command_buffer->allowed_categories;
+}
+
+IREE_API_EXPORT iree_hal_queue_affinity_t
+iree_hal_command_buffer_queue_affinity(
+    const iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  return command_buffer->queue_affinity;
+}
+
+IREE_API_EXPORT uint64_t iree_hal_command_buffer_profile_id(
+    const iree_hal_command_buffer_t* command_buffer) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  return command_buffer->profile_id;
 }
 
 IREE_API_EXPORT iree_status_t
@@ -519,8 +542,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
+    iree_hal_executable_t* executable, iree_hal_executable_function_t function,
     const iree_hal_dispatch_config_t config, iree_const_byte_span_t constants,
     const iree_hal_buffer_ref_list_t bindings,
     iree_hal_dispatch_flags_t flags) {
@@ -567,12 +589,11 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                export_ordinal, config, constants, bindings, flags));
+                function, config, constants, bindings, flags));
   });
 
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch)(
-      command_buffer, executable, export_ordinal, config, constants, bindings,
-      flags);
+      command_buffer, executable, function, config, constants, bindings, flags);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

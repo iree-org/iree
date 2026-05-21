@@ -1,4 +1,5 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands),canonicalize)" | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands),canonicalize)" | FileCheck %s --check-prefixes=CHECK,RESULT
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-promote-matmul-operands{skip-operand-promotion=true}),canonicalize)" | FileCheck %s --check-prefixes=RESULT,SKIP-OPERAND
 
 #lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
 
@@ -119,17 +120,17 @@ func.func @promote_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %mdim : in
   return %mm : tensor<?x?xf32>
 }
 
-// CHECK-LABEL: func @promote_result(
-//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
-//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
-//       CHECK:   %[[COPY1:.+]] = linalg.copy
-//  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
-//  CHECK-SAME:       -> tensor<?x?xf32>
-//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
-//       CHECK:   %[[COPY2:.+]] = linalg.copy
-//  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
-//  CHECK-SAME:       ins(%[[BARRIER]] : tensor<?x?xf32>)
-//       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
+// RESULT-LABEL: func @promote_result(
+// RESULT:       %[[MATMUL:.+]] = linalg.matmul
+// RESULT:       %[[ALLOC:.+]] = bufferization.alloc_tensor
+// RESULT:       %[[COPY1:.+]] = linalg.copy
+// RESULT-SAME:      ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+// RESULT-SAME:      -> tensor<?x?xf32>
+// RESULT:       %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+// RESULT:       %[[COPY2:.+]] = linalg.copy
+// RESULT-SAME:      {lowering_config = #iree_gpu.derived_thread_config}
+// RESULT-SAME:      ins(%[[BARRIER]] : tensor<?x?xf32>)
+// RESULT:       return %[[COPY2]] : tensor<?x?xf32>
 
 // -----
 
@@ -148,17 +149,45 @@ func.func @promote_padded_result(%a : tensor<?x?xf32>, %b : tensor<?x?xf32>, %md
   return %mm_slice : tensor<?x?xf32>
 }
 
-// CHECK-LABEL: func @promote_padded_result(
-//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
-//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor
-//       CHECK:   %[[COPY1:.+]] = linalg.copy
-//  CHECK-SAME:       ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
-//       CHECK:   %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
-//       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[BARRIER]]
-//       CHECK:   %[[COPY2:.+]] = linalg.copy
-//  CHECK-SAME:       {lowering_config = #iree_gpu.derived_thread_config}
-//  CHECK-SAME:       ins(%[[EXTRACT]] : tensor<?x?xf32>)
-//       CHECK:   return %[[COPY2]] : tensor<?x?xf32>
+// RESULT-LABEL: func @promote_padded_result(
+// RESULT:       %[[MATMUL:.+]] = linalg.matmul
+// RESULT:       %[[ALLOC:.+]] = bufferization.alloc_tensor
+// RESULT:       %[[COPY1:.+]] = linalg.copy
+// RESULT-SAME:      ins(%[[MATMUL]] : tensor<?x?xf32>) outs(%[[ALLOC]] : tensor<?x?xf32>)
+// RESULT:       %[[BARRIER:.+]] = iree_codegen.fusion_barrier %[[COPY1]]
+// RESULT:       %[[EXTRACT:.+]] = tensor.extract_slice %[[BARRIER]]
+// RESULT:       %[[COPY2:.+]] = linalg.copy
+// RESULT-SAME:      {lowering_config = #iree_gpu.derived_thread_config}
+// RESULT-SAME:      ins(%[[EXTRACT]] : tensor<?x?xf32>)
+// RESULT:       return %[[COPY2]] : tensor<?x?xf32>
+
+// -----
+
+#lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2]}>
+
+func.func @promote_results_only(%a: tensor<32x1024xf32>, %b: tensor<1024x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config}
+    ins(%a, %b : tensor<32x1024xf32>, tensor<1024x128xf32>) outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// CHECK-LABEL: func.func @promote_results_only
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
+//       CHECK:   %[[PA:.+]] = linalg.copy {{.*}} ins(%[[A]] : tensor<32x1024xf32>)
+//       CHECK:   %[[PB:.+]] = linalg.copy {{.*}} ins(%[[B]] : tensor<1024x128xf32>)
+//       CHECK:   %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[PA]], %[[PB]] : tensor<32x1024xf32>, tensor<1024x128xf32>)
+//       CHECK:   linalg.copy{{.*}}ins(%[[MM]] : tensor<32x128xf32>)
+// SKIP-OPERAND-LABEL: func.func @promote_results_only
+//  SKIP-OPERAND-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<32x1024xf32>
+//  SKIP-OPERAND-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<1024x128xf32>
+//   SKIP-OPERAND-NOT:   linalg.copy {{.*}} ins(%[[A]] : tensor<32x1024xf32>)
+//   SKIP-OPERAND-NOT:   linalg.copy {{.*}} ins(%[[B]] : tensor<1024x128xf32>)
+//       SKIP-OPERAND:   %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[A]], %[[B]] : tensor<32x1024xf32>, tensor<1024x128xf32>)
+//       SKIP-OPERAND:   linalg.copy{{.*}}ins(%[[MM]] : tensor<32x128xf32>)
 
 // -----
 
@@ -394,6 +423,104 @@ func.func @swizzle_operand_no_promote_fill(%b: tensor<128x128xf32>) -> tensor<4x
 
 // -----
 
+#lowering_config_swizzle_transpose = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
+
+#transpose_map = affine_map<(d0, d1) -> (d1, d0)>
+#identity_map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @swizzle_operand_transpose_producer(
+    %a_transposed: tensor<64x32xf32>, %b: tensor<64x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty_a = tensor.empty() : tensor<32x64xf32>
+  %transpose_a = linalg.generic {
+    indexing_maps = [#transpose_map, #identity_map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%a_transposed : tensor<64x32xf32>) outs(%empty_a : tensor<32x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config_swizzle_transpose}
+    ins(%transpose_a, %b : tensor<32x64xf32>, tensor<64x128xf32>)
+    outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// Transpose linalg.generic producers are not given a lowering_config early
+// return — they fall through to the swizzle promotion path so XOR swizzle
+// hints are applied to their output buffer.
+// CHECK-LABEL: func.func @swizzle_operand_transpose_producer
+//  CHECK-SAME:   %[[A_T:[A-Za-z0-9]+]]: tensor<64x32xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf32>
+//       CHECK:   %[[TRANSPOSE:.+]] = linalg.generic {{.*}} ins(%[[A_T]] : tensor<64x32xf32>)
+//       CHECK:   %[[EMPTY_A:.+]] = tensor.empty() : tensor<2048xf32>
+//       CHECK:   %[[SWIZZLE_A:.+]] = iree_codegen.swizzle_hint %[[EMPTY_A]][#iree_codegen.xor_shuffle<256, 32>] : tensor<2048xf32>
+//       CHECK:   %[[EXPAND_A:.+]] = tensor.expand_shape %[[SWIZZLE_A]] {{\[\[}}0, 1{{\]\]}} output_shape [32, 64] : tensor<2048xf32> into tensor<32x64xf32>
+//       CHECK:   %[[COPY_A:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[TRANSPOSE]] : tensor<32x64xf32>) outs(%[[EXPAND_A]] : tensor<32x64xf32>)
+//       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32>
+//       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf32> into tensor<64x128xf32>
+//       CHECK:   %[[COPY_B:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[B]] : tensor<64x128xf32>) outs(%[[EXPAND_B]] : tensor<64x128xf32>)
+//       CHECK:   linalg.matmul {{.*}} ins(%[[COPY_A]], %[[COPY_B]] : tensor<32x64xf32>, tensor<64x128xf32>)
+
+// -----
+
+#lowering_config_swizzle_non_transpose = #iree_gpu.lowering_config<{
+  promote_operands = [0, 1],
+  promotion_types = [
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>,
+    #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>]}>
+
+#elementwise_map = affine_map<(d0, d1) -> (d0, d1)>
+
+func.func @swizzle_operand_non_transpose_generic_producer(
+    %a_raw: tensor<32x64xf32>, %b: tensor<64x128xf32>) -> tensor<32x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty_a = tensor.empty() : tensor<32x64xf32>
+  %negated_a = linalg.generic {
+    indexing_maps = [#elementwise_map, #elementwise_map],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%a_raw : tensor<32x64xf32>) outs(%empty_a : tensor<32x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %neg = arith.negf %in : f32
+    linalg.yield %neg : f32
+  } -> tensor<32x64xf32>
+  %empty = tensor.empty() : tensor<32x128xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<32x128xf32>) -> tensor<32x128xf32>
+  %mm = linalg.matmul {lowering_config = #lowering_config_swizzle_non_transpose}
+    ins(%negated_a, %b : tensor<32x64xf32>, tensor<64x128xf32>)
+    outs(%fill : tensor<32x128xf32>) -> tensor<32x128xf32>
+  return %mm : tensor<32x128xf32>
+}
+
+// Non-transpose linalg.generic producers get a lowering_config stamped on them
+// directly and skip swizzle promotion — no swizzle_hint is created for them.
+// CHECK-LABEL: func.func @swizzle_operand_non_transpose_generic_producer
+//  CHECK-SAME:   %[[A_RAW:[A-Za-z0-9]+]]: tensor<32x64xf32>
+//  CHECK-SAME:   %[[B:[A-Za-z0-9]+]]: tensor<64x128xf32>
+//       CHECK:   %[[NEGATED:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[A_RAW]] : tensor<32x64xf32>)
+//       CHECK:     lowering_config = #iree_gpu.derived_thread_config
+//   CHECK-NOT:   iree_codegen.swizzle_hint {{.*}} tensor<2048xf32>
+//       CHECK:   %[[EMPTY_B:.+]] = tensor.empty() : tensor<8192xf32>
+//       CHECK:   %[[SWIZZLE_B:.+]] = iree_codegen.swizzle_hint %[[EMPTY_B]][#iree_codegen.xor_shuffle<256, 32>] : tensor<8192xf32>
+//       CHECK:   %[[EXPAND_B:.+]] = tensor.expand_shape %[[SWIZZLE_B]] {{\[\[}}0, 1{{\]\]}} output_shape [64, 128] : tensor<8192xf32> into tensor<64x128xf32>
+//       CHECK:   %[[COPY_B:.+]] = linalg.copy
+//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     ins(%[[B]] : tensor<64x128xf32>) outs(%[[EXPAND_B]] : tensor<64x128xf32>)
+//       CHECK:   linalg.matmul {{.*}} ins(%[[NEGATED]], %[[COPY_B]] : tensor<32x64xf32>, tensor<64x128xf32>)
+
+// -----
+
 // Im2colOp has no DMA conversion path in GPUConvertToCoalescedDMA, so
 // promotionImpl must never stamp use_global_load_dma on it — it always falls
 // back to derived_thread_config regardless of the requested promotion type.
@@ -419,11 +546,10 @@ func.func @im2col_producer_dma_downgraded_to_derived(
   return %mm : tensor<2x32x256xf32>
 }
 
-// Im2col gets derived_thread_config (not use_global_load_dma) because Im2col
-// has no DMA lowering path. The non-Im2col operand still gets use_global_load_dma.
+// Im2col now gets use_global_load_dma because Im2col has a DMA lowering path.
 // CHECK-LABEL: func.func @im2col_producer_dma_downgraded_to_derived
 //       CHECK:   %[[PA:.+]] = iree_linalg_ext.im2col
-//  CHECK-SAME:     lowering_config = #iree_gpu.derived_thread_config
+//  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //       CHECK:   %[[PB:.+]] = linalg.copy
 //  CHECK-SAME:     lowering_config = #iree_gpu.use_global_load_dma
 //       CHECK:   linalg.batch_matmul {{.*}} ins(%[[PA]], %[[PB]]

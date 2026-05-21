@@ -37,6 +37,10 @@ struct SparseRangeResolver {
   int64_t resultDim;
 };
 
+/// Match a `memref.dim` or `tensor.dim` operation and return its source value
+/// and constant dimension index.
+bool matchDimOp(Operation *op, Value &source, IntegerAttr &dimIndex);
+
 /// For a given Range retrieve the SparseRangeResolver if it is defined by a
 /// sparse operation.
 std::optional<SparseRangeResolver> getSparseRangeResolver(Range range);

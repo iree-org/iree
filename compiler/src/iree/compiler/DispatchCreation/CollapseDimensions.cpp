@@ -211,8 +211,8 @@ static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
 
 /// Returns true if the given op is collapsible.
 static bool isEligibleForCollapse(Operation *op) {
-  if (isa<IREE::LinalgExt::AttentionOp, linalg::FillOp, tensor::EmptyOp,
-          tensor::ExtractSliceOp>(op)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp,
+          linalg::FillOp, tensor::EmptyOp, tensor::ExtractSliceOp>(op)) {
     return true;
   }
 
@@ -221,23 +221,36 @@ static bool isEligibleForCollapse(Operation *op) {
     return false;
   }
 
-  // Skip collapse for scatter-like generics that use tensor.extract with
-  // linalg.index-based addressing. These are strided scatter patterns where
-  // 1D collapse introduces expensive delinearization (div/mod chains) that
-  // dominates execution. Keeping the multi-dimensional iteration space
-  // allows direct workgroup tiling without delinearization.
-  {
-    bool hasTensorExtract = false;
+  // Skip collapse for strided-scatter-like generics that use tensor.extract
+  // with linalg.index-based addressing. These generics have a very specific
+  // shape that makes 1D collapse pessimal:
+  //   1. No DPS input operands — the source is captured by a `tensor.extract`
+  //      inside the body rather than passed as an `ins` operand. The op is a
+  //      pure scatter into a fresh destination.
+  //   2. `linalg.index` ops feed arithmetic that computes a multi-dimensional
+  //      strided index into the captured source tensor.
+  //   3. An `arith.select` (driven by bounds-check `arith.cmpi`/`arith.andi`)
+  //      picks between the extracted value and a constant zero default.
+  // For these ops, 1D collapse introduces expensive delinearization (div/mod
+  // chains) on the extract indices that dominates execution; keeping the
+  // multi-dimensional iteration space allows direct workgroup tiling without
+  // delinearization.
+  if (genericOp.getNumDpsInputs() == 0) {
     bool hasLinalgIndex = false;
+    bool extractFeedsSelect = false;
     genericOp.getBlock()->walk([&](Operation *inner) {
-      if (isa<tensor::ExtractOp>(inner)) {
-        hasTensorExtract = true;
-      }
       if (isa<linalg::IndexOp>(inner)) {
         hasLinalgIndex = true;
+      } else if (auto extractOp = dyn_cast<tensor::ExtractOp>(inner)) {
+        for (Operation *user : extractOp.getResult().getUsers()) {
+          if (isa<arith::SelectOp>(user)) {
+            extractFeedsSelect = true;
+            break;
+          }
+        }
       }
     });
-    if (hasTensorExtract && hasLinalgIndex) {
+    if (hasLinalgIndex && extractFeedsSelect) {
       return false;
     }
   }
@@ -290,6 +303,10 @@ static void populateReassocAndMaps(
       llvm::to_vector(llvm::seq<int64_t>(0, emptyOp.getType().getRank())))};
   resultMaps = {AffineMap::getMultiDimIdentityMap(emptyOp.getType().getRank(),
                                                   emptyOp.getContext())};
+  operandMaps.assign(emptyOp.getNumOperands(),
+                     AffineMap::get(emptyOp.getType().getRank(), 0,
+                                    ArrayRef<AffineExpr>{},
+                                    emptyOp.getContext()));
 }
 
 static void
@@ -1143,16 +1160,17 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
               }
               return maybeReplacements->results;
             })
-            .Case([&, &info = info](
-                      IREE::LinalgExt::AttentionOp attentionOp) -> ResultsType {
-              FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
-                  IREE::LinalgExt::collapseOpIterationDims(
-                      attentionOp, info.getReassociation(), rewriter);
-              if (failed(maybeReplacements)) {
-                return failure();
-              }
-              return maybeReplacements->results;
-            })
+            .Case<IREE::LinalgExt::AttentionOp,
+                  IREE::LinalgExt::OnlineAttentionOp>(
+                [&, &info = info](auto attnLikeOp) -> ResultsType {
+                  FailureOr<IREE::LinalgExt::CollapseResult> maybeReplacements =
+                      IREE::LinalgExt::collapseOpIterationDims(
+                          attnLikeOp, info.getReassociation(), rewriter);
+                  if (failed(maybeReplacements)) {
+                    return failure();
+                  }
+                  return maybeReplacements->results;
+                })
             .Case([](tensor::EmptyOp) {
               // No need to do anything. It will be folded with reshapes.
               return failure();

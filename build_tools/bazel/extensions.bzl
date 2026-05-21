@@ -8,18 +8,32 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
+load("//build_tools/bazel:amdgpu_device_toolchain_repo.bzl", "amdgpu_device_toolchain_repo")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
+load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
 
-    # Create llvm-raw only when IREE is the root module.
-    # This allows downstream consumers to provide their own LLVM.
-    if any([m.is_root and m.name == "iree_core" for m in module_ctx.modules]):
+    iree_is_root = any([m.is_root and m.name == "iree_core" for m in module_ctx.modules])
+
+    # Create MLIR-adjacent source repositories only when IREE is the root
+    # module. Downstream consumers can provide their own LLVM, StableHLO, and
+    # torch-mlir repositories when IREE is part of a larger project.
+    if iree_is_root:
         new_local_repository(
             name = "llvm-raw",
             build_file_content = "# empty",
             path = "third_party/llvm-project",
+        )
+        local_repository(
+            name = "stablehlo",
+            path = "third_party/stablehlo",
+        )
+        new_local_repository(
+            name = "torch-mlir-raw",
+            build_file_content = "# empty - BUILD files overlaid by torch_mlir_configure",
+            path = "third_party/torch-mlir",
         )
 
     # Googletest
@@ -40,12 +54,6 @@ def _iree_extension_impl(module_ctx):
         name = "vulkan_headers",
         build_file = "@iree_core//:build_tools/third_party/vulkan_headers/BUILD.overlay",
         path = "third_party/vulkan_headers",
-    )
-
-    # StableHLO
-    local_repository(
-        name = "stablehlo",
-        path = "third_party/stablehlo",
     )
 
     # Benchmark
@@ -96,11 +104,47 @@ def _iree_extension_impl(module_ctx):
         path = "third_party/rccl",
     )
 
+    # Doug Lea's malloc (dlmalloc v2.8.6, MIT-0 license)
+    new_local_repository(
+        name = "dlmalloc",
+        build_file = "@iree_core//:build_tools/third_party/dlmalloc/BUILD.overlay",
+        path = "third_party/dlmalloc",
+    )
+
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",
         build_file = "@iree_core//:build_tools/third_party/webgpu-headers/BUILD.overlay",
         path = "third_party/webgpu-headers",
+    )
+
+    # Dawn (Tint SPIR-V → WGSL translation for the WebGPU compiler target).
+    # Only fetched when //compiler/plugins/target/WebGPUSPIRV is built.
+    # Dawn's Tint targets have native Bazel support (auto-generated BUILD.bazel
+    # files under src/tint/). Dawn's submodule deps (abseil, spirv-tools,
+    # spirv-headers) are fetched separately since GitHub tarballs exclude them.
+    # Keep these pins synchronized with the CMake pins in
+    # compiler/plugins/target/WebGPUSPIRV/CMakeLists.txt.
+    _DAWN_COMMIT = "851ba3e50c354ef66d16c518d4341c01ed6828cc"
+    http_archive(
+        name = "dawn",
+        urls = ["https://github.com/ArthurSonzogni/dawn/archive/%s.tar.gz" % _DAWN_COMMIT],
+        strip_prefix = "dawn-%s" % _DAWN_COMMIT,
+    )
+    http_archive(
+        name = "abseil_cpp",
+        urls = ["https://github.com/abseil/abseil-cpp/archive/04f3bc01d12cf58c90a1bb68990f087fa3c3ed19.tar.gz"],
+        strip_prefix = "abseil-cpp-04f3bc01d12cf58c90a1bb68990f087fa3c3ed19",
+    )
+    http_archive(
+        name = "spirv_headers",
+        urls = ["https://github.com/KhronosGroup/SPIRV-Headers/archive/465055f6c9128772e20082e893d974146acf7a02.tar.gz"],
+        strip_prefix = "SPIRV-Headers-465055f6c9128772e20082e893d974146acf7a02",
+    )
+    http_archive(
+        name = "spirv_tools",
+        urls = ["https://github.com/KhronosGroup/SPIRV-Tools/archive/5a1eea1546c372a945a27d9b10e0a059db6cc651.tar.gz"],
+        strip_prefix = "SPIRV-Tools-5a1eea1546c372a945a27d9b10e0a059db6cc651",
     )
 
     # AMDGPU device library bitcode (ocml, ockl) for ROCM compilation.
@@ -116,6 +160,18 @@ def _iree_extension_impl(module_ctx):
     cuda_auto_configure(
         name = "iree_cuda",
         iree_repo_alias = "@iree_core",
+    )
+
+    # Optional AMDGPU builtin device compiler tools. This repository is only
+    # evaluated by source-mode AMDGPU device binary builds.
+    amdgpu_device_toolchain_repo(
+        name = "iree_amdgpu_device_toolchain",
+    )
+
+    # wasi-sdk: clang + lld + wasi-libc + libc++ + compiler-rt for wasm targets.
+    # Downloads the host-appropriate release from GitHub on first build.
+    wasi_sdk_repo(
+        name = "wasi_sdk",
     )
 
 iree_extension = module_extension(

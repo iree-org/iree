@@ -69,6 +69,10 @@ void iree_async_operation_retain_resources(iree_async_operation_t* operation) {
       iree_async_notification_wait_operation_t* notification_wait =
           (iree_async_notification_wait_operation_t*)operation;
       iree_async_notification_retain(notification_wait->notification);
+      if (iree_all_bits_set(notification_wait->wait_flags,
+                            IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+        iree_async_notification_begin_observe(notification_wait->notification);
+      }
       break;
     }
     case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL: {
@@ -155,6 +159,10 @@ void iree_async_operation_release_resources(iree_async_operation_t* operation) {
     case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT: {
       iree_async_notification_wait_operation_t* notification_wait =
           (iree_async_notification_wait_operation_t*)operation;
+      if (iree_all_bits_set(notification_wait->wait_flags,
+                            IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+        iree_async_notification_end_observe(notification_wait->notification);
+      }
       iree_async_notification_release(notification_wait->notification);
       break;
     }

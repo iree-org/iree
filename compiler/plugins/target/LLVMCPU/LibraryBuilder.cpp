@@ -603,7 +603,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
 
   // iree_hal_executable_export_table_v0_t::names
   llvm::Constant *exportNames = llvm::Constant::getNullValue(ptrType);
-  if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
+  if (!exports.empty()) {
     SmallVector<llvm::Constant *> exportNameValues;
     for (const Dispatch &dispatch : exports) {
       exportNameValues.push_back(createStringConstant(dispatch.name, module));

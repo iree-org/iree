@@ -13,6 +13,9 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 
+static constexpr char kSparseIterationDimsAttrName[] =
+    "iree_tensor_ext.sparse_iteration_dims";
+
 // clang-format off
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtAttrs.cpp.inc" // IWYU pragma: keep
@@ -28,12 +31,17 @@ void IREETensorExtDialect::initializeAttrs() {
 }
 
 SparseIterationDimsAttr getSparseIterationDimsAttr(Operation *op) {
-  static constexpr StringLiteral kAttrName =
-      "iree_tensor_ext.sparse_iteration_dims";
-  if (auto attr = op->getAttrOfType<SparseIterationDimsAttr>(kAttrName)) {
+  if (auto attr = op->getAttrOfType<SparseIterationDimsAttr>(
+          kSparseIterationDimsAttrName)) {
     return attr;
   }
   return SparseIterationDimsAttr();
+}
+void setSparseIterationDimsAttr(Operation *op,
+                                ArrayRef<int64_t> sparseIterationDims) {
+  auto sparseIterDimsAttr = IREE::TensorExt::SparseIterationDimsAttr::get(
+      op->getContext(), sparseIterationDims);
+  op->setAttr(kSparseIterationDimsAttrName, sparseIterDimsAttr);
 }
 
 //===---------------------------------------------------------------------===//

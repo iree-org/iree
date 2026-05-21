@@ -7,7 +7,6 @@
 #include "iree/modules/check/module.h"
 
 #include <cassert>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <iomanip>
@@ -65,27 +64,6 @@ Status ExpectAllTrue(iree_byte_span_t bytes) {
 bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
   return lhs_bytes.data_length == rhs_bytes.data_length &&
          memcmp(lhs_bytes.data, rhs_bytes.data, lhs_bytes.data_length) == 0;
-}
-
-// Numpy-compatible fuzzy comparison of floating-point values lhs, rhs with
-// respect to tolerance parameters atol, rtol.
-//
-// The meaning of the tolerance parameters atol and rtol is exactly as in NumPy
-// isclose():
-// https://github.com/numpy/numpy/blob/7297f3117d84745bfade1e2f9aec3531e5917500/numpy/_core/numeric.py#L2447-L2449
-// The condition being verified on each lhs and rhs value is:
-//   lhs == rhs || (isfinite(rhs) && abs(lhs - rhs) <= atol + rtol * abs(rhs)).
-// Note that the `lhs == rhs` part is needed for the case (lhs=+inf, rhs+inf)
-// to return true. Indeed, in that case, lhs-rhs is NaN.
-// Finally, unlike the above NumPy code, we also tolerate the case where both
-// lhs and rhs are NaN. That avoids nonsensical test failures whenever a NaN
-// is the legitimate result.
-template <typename T>
-bool NumpyFuzzyCompare(T lhs, T rhs, float atol, float rtol) {
-  return lhs == rhs ||
-         (std::isfinite(rhs) &&
-          std::abs(lhs - rhs) <= atol + rtol * std::abs(rhs)) ||
-         (std::isnan(lhs) && std::isnan(rhs));
 }
 
 // Records information about some LHS/RHS scalars that failed a fuzzy comparison
@@ -180,7 +158,6 @@ struct FloatTypeInfo<IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU> {
 };
 
 // Fuzzy comparison of spans.
-// The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
 // On failure, false is returned, and information about a specific failed
 // comparison is written to *diagnostic.
 template <iree_hal_element_type_t type>
@@ -196,7 +173,7 @@ bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
   for (int i = 0; i < lhs_span.size(); ++i) {
     ArithmeticType lhs_value = Info::load(lhs_span[i]);
     ArithmeticType rhs_value = Info::load(rhs_span[i]);
-    if (!NumpyFuzzyCompare(lhs_value, rhs_value, atol, rtol)) {
+    if (!iree_math_fuzzy_compare_f64(lhs_value, rhs_value, atol, rtol)) {
       diagnostic->index = i;
       diagnostic->lhs_value = lhs_value;
       diagnostic->rhs_value = rhs_value;
@@ -206,7 +183,6 @@ bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes,
   return true;
 }
 
-// The meaning of atol, rtol is explained in the comment on NumpyFuzzyCompare.
 StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
                                 iree_byte_span_t rhs_bytes,
                                 iree_hal_element_type_t element_type,

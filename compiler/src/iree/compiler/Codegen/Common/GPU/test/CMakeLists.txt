@@ -14,8 +14,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_lower_async_dma.mlir"
     "amdgpu_lower_coalesced_dma_to_gather_lds.mlir"
     "decompose_horizontally_fused_gemms.mlir"
+    "expand_gpu_ops_scan.mlir"
     "flatten_swizzle_hint_allocs.mlir"
     "gpu_alloc_private_memory_for_dps_ops.mlir"
     "gpu_apply_derived_thread_config.mlir"
@@ -41,9 +43,11 @@ iree_lit_test_suite(
     "gpu_infer_memory_space.mlir"
     "gpu_lower_coalesced_dma_to_global_loads.mlir"
     "gpu_nested_layout_vector_distribution.mlir"
+    "gpu_nested_layout_vector_distribution_argcompare.mlir"
     "gpu_nested_layout_vector_distribution_inner_tiled.mlir"
     "gpu_nested_layout_vector_distribution_mask.mlir"
     "gpu_nested_layout_vector_distribution_multi_reduce.mlir"
+    "gpu_nested_layout_vector_distribution_scan.mlir"
     "gpu_nested_layout_vector_distribution_step.mlir"
     "gpu_pack_partial_reductions.mlir"
     "gpu_pack_to_intrinsics.mlir"
@@ -51,6 +55,7 @@ iree_lit_test_suite(
     "gpu_pad_operands.mlir"
     "gpu_pipeline.mlir"
     "gpu_promote_matmul_operands.mlir"
+    "gpu_promotion_analysis.mlir"
     "gpu_reorder_workgroups.mlir"
     "gpu_reorder_workgroups_static.mlir"
     "gpu_reuse_shared_memory_allocs.mlir"

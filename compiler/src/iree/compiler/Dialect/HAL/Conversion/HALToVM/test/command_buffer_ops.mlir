@@ -1,5 +1,9 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-vm-conversion{index-bits=32},canonicalize)' %s | FileCheck %s
 
+// CHECK-DAG: vm.import private @hal.command_buffer.dispatch{{\(.+}}attributes {minimum_version = 7 : i32}
+// CHECK-DAG: vm.import private @hal.command_buffer.dispatch.indirect{{\(.+}}attributes {minimum_version = 7 : i32}
+// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {minimum_version = 7 : i32, nosideeffects}
+
 // CHECK-LABEL: @command_buffer_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)
 util.func public @command_buffer_create(%device: !hal.device, %affinity: i64) {
@@ -324,9 +328,9 @@ util.func public @command_buffer_dispatch(
   %buffer: !hal.buffer,
   %slot: index
 ) {
-  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[FUNCTION_ID:.+]] = vm.const.i64 123
   // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
-  %ordinal = arith.constant 123 : index
+  %function_id = arith.constant 123 : i64
   // CHECK-DAG: %[[X:.+]] = vm.const.i32 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[Y:.+]] = vm.const.i32 200
@@ -344,14 +348,14 @@ util.func public @command_buffer_dispatch(
   // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: vm.call.variadic @hal.command_buffer.dispatch
   // CHECK-SAME: %[[CMD]],
-  // CHECK-SAME: %[[EXECUTABLE]], %[[ORDINAL]],
+  // CHECK-SAME: %[[EXECUTABLE]], %[[FUNCTION_ID]],
   // CHECK-SAME: %[[X]], %[[Y]], %[[Z]],
   // CHECK-SAME: %[[FLAGS]],
   // CHECK-SAME: [%[[CONSTANT0]], %[[CONSTANT1]]],
   // CHECK-SAME: [(%[[C0]], %[[C0]], %[[BUFFER]], %c4096, %c8000),
   // CHECK-SAME:  (%[[C0]], %[[SLOT]], %[[NULL_BUFFER]], %c4, %c4096)]
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
-      target(%executable : !hal.executable)[%ordinal]
+      target(%executable : !hal.executable)[%function_id]
       workgroups([%x, %y, %z])
       constants([%constant0, %constant1])
       bindings([
@@ -377,9 +381,9 @@ util.func public @command_buffer_dispatch(
   %buffer: !hal.buffer,
   %slot: index
 ) {
-  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 123
+  // CHECK-DAG: %[[FUNCTION_ID:.+]] = vm.const.i64 123
   // CHECK-DAG: %[[C0:.+]] = vm.const.i32.zero
-  %ordinal = arith.constant 123 : index
+  %function_id = arith.constant 123 : i64
   // CHECK-DAG: %[[WORKGROUPS_OFFSET:.+]] = vm.const.i64 100
   %workgroups_offset = arith.constant 100 : index
   // CHECK-DAG: %[[CONSTANT0:.+]] = vm.const.i32 31
@@ -393,14 +397,14 @@ util.func public @command_buffer_dispatch(
   // CHECK-DAG: %[[FLAGS:.+]] = vm.const.i64.zero
   // CHECK: vm.call.variadic @hal.command_buffer.dispatch.indirect
   // CHECK-SAME: %[[CMD]],
-  // CHECK-SAME: %[[EXECUTABLE]], %[[ORDINAL]],
+  // CHECK-SAME: %[[EXECUTABLE]], %[[FUNCTION_ID]],
   // CHECK-SAME: %[[WORKGROUPS_SLOT]], %[[NULL_BUFFER]], %[[WORKGROUPS_OFFSET]],
   // CHECK-SAME: %[[FLAGS]],
   // CHECK-SAME: [%[[CONSTANT0]], %[[CONSTANT1]]],
   // CHECK-SAME: [(%[[C0]], %[[C0]], %[[BUFFER]], %c4096, %c8000),
   // CHECK-SAME:  (%[[C0]], %[[SLOT]], %[[NULL_BUFFER]], %c4, %c4096)]
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
-      target(%executable : !hal.executable)[%ordinal]
+      target(%executable : !hal.executable)[%function_id]
       workgroups(%workgroups_slot : index)[%workgroups_offset]
       constants([%constant0, %constant1])
       bindings([

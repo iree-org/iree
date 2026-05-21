@@ -8,12 +8,12 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-iree_add_all_subdirs()
-
 # Task-based executor requires threading support.
 if(NOT IREE_ENABLE_THREADING)
   return()
 endif()
+
+iree_add_all_subdirs()
 
 # cpuinfo can be conditionally disabled when it is not supported.
 # If disabled then by default the task system will use 1 thread.
@@ -32,6 +32,7 @@ iree_cc_library(
   DEPS
     ::task
     iree::base
+    iree::base::internal
     iree::base::tooling::flags
   PUBLIC
 )
@@ -42,32 +43,21 @@ iree_cc_library(
   HDRS
     "affinity_set.h"
     "executor.h"
-    "list.h"
-    "pool.h"
-    "queue.h"
+    "process.h"
     "scope.h"
-    "submission.h"
-    "task.h"
     "topology.h"
     "tuning.h"
   SRCS
     "executor.c"
     "executor_impl.h"
-    "list.c"
-    "pool.c"
-    "post_batch.c"
-    "post_batch.h"
-    "queue.c"
+    "process.c"
     "scope.c"
-    "submission.c"
-    "task.c"
-    "task_impl.h"
     "topology.c"
     "topology_cpuinfo.c"
     "topology_darwin.c"
-    "topology_emscripten.c"
     "topology_fallback.c"
     "topology_sysfs.c"
+    "topology_wasm.c"
     "topology_win32.c"
     "worker.c"
     "worker.h"
@@ -86,14 +76,14 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    executor_demo
+    process_test
   SRCS
-    "executor_demo.cc"
+    "process_test.cc"
   DEPS
     ::task
     iree::base
-    iree::base::internal::prng
-    iree::task::testing::test_util
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -104,78 +94,6 @@ iree_cc_test(
   DEPS
     ::task
     iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    list_test
-  SRCS
-    "list_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    pool_test
-  SRCS
-    "pool_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    queue_test
-  SRCS
-    "queue_test.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::base::threading::thread
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    scope_test
-  SRCS
-    "scope_test.cc"
-    "task_impl.h"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::test_util
-    iree::testing::gtest
-    iree::testing::gtest_main
-)
-
-iree_cc_test(
-  NAME
-    task_tests
-  SRCS
-    "task_test_barrier.cc"
-    "task_test_call.cc"
-    "task_test_dispatch.cc"
-    "task_test_fence.cc"
-    "task_test_nop.cc"
-  DEPS
-    ::task
-    iree::base
-    iree::task::testing::task_test
     iree::testing::gtest
     iree::testing::gtest_main
 )
@@ -192,6 +110,19 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_binary_benchmark(
+  NAME
+    executor_benchmark
+  SRCS
+    "executor_benchmark.cc"
+  DEPS
+    ::task
+    benchmark
+    iree::base
+    iree::testing::benchmark_main
+  TESTONLY
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Topology implementation selection.
@@ -200,21 +131,21 @@ iree_cc_test(
 #
 # Priority (first match wins):
 # 1. cpuinfo (if IREE_ENABLE_CPUINFO=ON)
-# 2. sysfs (Linux/Android, excluding Emscripten)
-# 3. Platform-specific (Darwin, Windows, Emscripten)
+# 2. sysfs (Linux/Android, excluding Emscripten/Wasm)
+# 3. Platform-specific (Darwin, Windows, Wasm)
 # 4. Fallback (single-threaded conservative topology)
 
 if(IREE_ENABLE_CPUINFO)
   target_compile_definitions(iree_task_task PRIVATE IREE_TASK_USE_CPUINFO=1)
   message(STATUS "IREE task topology: using cpuinfo")
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH STREQUAL "wasm_32")
   message(STATUS "IREE task topology: using sysfs (Linux)")
 elseif(APPLE)
   message(STATUS "IREE task topology: using platform-specific (Darwin)")
 elseif(WIN32)
   message(STATUS "IREE task topology: using platform-specific (Windows)")
-elseif(EMSCRIPTEN)
-  message(STATUS "IREE task topology: using platform-specific (Emscripten)")
+elseif(EMSCRIPTEN OR IREE_ARCH STREQUAL "wasm_32")
+  message(STATUS "IREE task topology: using platform-specific (Wasm)")
 else()
   message(STATUS "IREE task topology: using fallback (single-threaded)")
 endif()

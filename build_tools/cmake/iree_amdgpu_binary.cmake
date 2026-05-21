@@ -14,18 +14,15 @@ include(CMakeParseArguments)
 # TARGET: LLVM `-target` flag.
 # ARCH: LLVM `-march` flag.
 # SRCS: source files to pass to clang.
-# INTERNAL_HDRS: all headers transitively included by the source files.
-#                Unlike typical Bazel `hdrs`, these are not exposed as
-#                interface headers. This would normally be part of `srcs`,
-#                but separating it was easier for `bazel_to_cmake`, as
-#                CMake does not need this, and making this explicitly
-#                Bazel-only allows using `filegroup` on the Bazel side.
+# INTERNAL_HDRS: headers that should invalidate device compilation but are not
+#                compiled as translation units or exposed as interface headers.
 # COPTS: additional flags to pass to clang.
 # LINKOPTS: additional flags to pass to lld.
+# MINIMIZE: hide non-HSA ABI symbols after linking.
 function(iree_amdgpu_binary)
   cmake_parse_arguments(
     _RULE
-    ""
+    "MINIMIZE"
     "NAME;OUT;TARGET;ARCH"
     "SRCS;INTERNAL_HDRS;COPTS;LINKOPTS"
     ${ARGN}
@@ -74,7 +71,12 @@ function(iree_amdgpu_binary)
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
     get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
-    string(REGEX REPLACE "[.]c$" "--${_RULE_ARCH}.bc" _BITCODE_FILE ${_SRC})
+    set(_BITCODE_SRC_FRAGMENT "${_SRC}")
+    string(REPLACE "\\" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE "/" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE ":" "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    string(REPLACE "." "_" _BITCODE_SRC_FRAGMENT "${_BITCODE_SRC_FRAGMENT}")
+    set(_BITCODE_FILE "${_RULE_NAME}_${_BITCODE_SRC_FRAGMENT}.bc")
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT
@@ -89,8 +91,6 @@ function(iree_amdgpu_binary)
         "${IREE_CLANG_BINARY}"
         "${_BITCODE_SRC_PATH}"
         "${_RULE_INTERNAL_HDRS}"
-      MAIN_DEPENDENCY
-        "${_BITCODE_SRC_PATH}"
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
@@ -132,9 +132,22 @@ function(iree_amdgpu_binary)
     VERBATIM
   )
 
+  set(_LINK_OUT "${_OUT}")
+  set(_LINKOPTS ${_RULE_LINKOPTS})
+  if(_RULE_MINIMIZE)
+    if(NOT IREE_LLVM_OBJCOPY_BINARY)
+      message(FATAL_ERROR
+        "iree_amdgpu_binary(MINIMIZE) requires IREE_LLVM_OBJCOPY_BINARY")
+    endif()
+    set(_LINK_OUT "${_RULE_NAME}.linked.so")
+    set(_VERSION_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.local.version")
+    file(WRITE "${_VERSION_SCRIPT}" "{\n  local:\n    *;\n};\n")
+    list(APPEND _LINKOPTS "--version-script=${_VERSION_SCRIPT}")
+  endif()
+
   add_custom_command(
     OUTPUT
-      "${_OUT}"
+      "${_LINK_OUT}"
     COMMAND
       ${IREE_LLD_BINARY}
       "-flavor" "gnu"
@@ -150,15 +163,37 @@ function(iree_amdgpu_binary)
       "--strip-debug"
       "--discard-all"
       "--discard-locals"
+      ${_LINKOPTS}
       "${_LINKED_FILE}"
-      "-o" "${_OUT}"
+      "-o" "${_LINK_OUT}"
     DEPENDS
       "${_LINKED_FILE}"
+      "${IREE_LLD_BINARY}"
       "${IREE_LLD_TARGET}"
     COMMENT
-      "Compiling binary to ${_OUT}"
+      "Compiling binary to ${_LINK_OUT}"
     VERBATIM
   )
+  if(_RULE_MINIMIZE)
+    add_custom_command(
+      OUTPUT
+        "${_OUT}"
+      COMMAND
+        ${IREE_LLVM_OBJCOPY_BINARY}
+        "-R" ".comment"
+        "-R" ".AMDGPU.gpr_maximums"
+        "--discard-all"
+        "-N" "_DYNAMIC"
+        "${_LINK_OUT}"
+        "${_OUT}"
+      DEPENDS
+        "${_LINK_OUT}"
+        "${IREE_LLVM_OBJCOPY_BINARY}"
+      COMMENT
+        "Minimizing AMDGPU binary to ${_OUT}"
+      VERBATIM
+    )
+  endif()
 
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.

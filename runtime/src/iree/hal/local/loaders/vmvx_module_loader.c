@@ -260,6 +260,7 @@ static iree_status_t iree_hal_vmvx_executable_create(
     iree_hal_local_executable_initialize(&iree_hal_vmvx_executable_vtable,
                                          host_allocator, &executable->base);
     executable->base.dispatch_attrs = dispatch_attrs;
+    executable->base.export_count = entry_count;
 
     executable->worker_capacity = worker_capacity;
     executable->worker_states =
@@ -559,16 +560,18 @@ static iree_host_size_t iree_hal_vmvx_executable_export_count(
 
 static iree_status_t iree_hal_vmvx_executable_export_info(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_hal_executable_export_info_t* out_info) {
+    iree_hal_executable_function_t function,
+    iree_hal_executable_function_info_t* out_info) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
-  if (export_ordinal >= executable->entry_fn_count) {
+  if (!iree_hal_executable_function_is_index_in_range(
+          function, executable->entry_fn_count)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "export ordinal %" PRId32 " out of bounds (%" PRIhsz
+                            "function id %" PRIu64 " out of bounds (%" PRIhsz
                             " exports available)",
-                            export_ordinal, executable->entry_fn_count);
+                            function.value, executable->entry_fn_count);
   }
+  const uint32_t export_ordinal = iree_hal_executable_function_index(function);
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs =
       &executable->base.dispatch_attrs[export_ordinal];
 
@@ -578,15 +581,15 @@ static iree_status_t iree_hal_vmvx_executable_export_info(
       executable->entry_fn_ordinals[export_ordinal], &fn));
   out_info->name = iree_vm_function_name(&fn);
 
-  out_info->flags = IREE_HAL_EXECUTABLE_EXPORT_FLAG_NONE;
+  out_info->flags = IREE_HAL_EXECUTABLE_FUNCTION_FLAG_NONE;
   if (iree_all_bits_set(dispatch_attrs->flags,
                         IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_SEQUENTIAL)) {
-    out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_SEQUENTIAL;
+    out_info->flags |= IREE_HAL_EXECUTABLE_FUNCTION_FLAG_SEQUENTIAL;
   }
   if (iree_all_bits_set(
           dispatch_attrs->flags,
           IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC)) {
-    out_info->flags |= IREE_HAL_EXECUTABLE_EXPORT_FLAG_WORKGROUP_SIZE_DYNAMIC;
+    out_info->flags |= IREE_HAL_EXECUTABLE_FUNCTION_FLAG_WORKGROUP_SIZE_DYNAMIC;
   }
   out_info->constant_count = dispatch_attrs->constant_count;
   out_info->binding_count = dispatch_attrs->binding_count;
@@ -603,9 +606,8 @@ static iree_status_t iree_hal_vmvx_executable_export_info(
 
 static iree_status_t iree_hal_vmvx_executable_export_parameters(
     iree_hal_executable_t* base_executable,
-    iree_hal_executable_export_ordinal_t export_ordinal,
-    iree_host_size_t capacity,
-    iree_hal_executable_export_parameter_t* out_parameters) {
+    iree_hal_executable_function_t export_ordinal, iree_host_size_t capacity,
+    iree_hal_executable_function_parameter_t* out_parameters) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
   (void)executable;
@@ -616,10 +618,10 @@ static iree_status_t iree_hal_vmvx_executable_export_parameters(
 
 static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
-    iree_hal_executable_export_ordinal_t* out_export_ordinal) {
+    iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
-  *out_export_ordinal = 0;
+  *out_export_ordinal = iree_hal_executable_function_invalid();
 
   iree_vm_function_t fn;
   IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
@@ -630,7 +632,8 @@ static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
   // dispatch export table built during initialization.
   for (iree_host_size_t i = 0; i < executable->entry_fn_count; ++i) {
     if (executable->entry_fn_ordinals[i] == fn.ordinal) {
-      *out_export_ordinal = i;
+      *out_export_ordinal =
+          iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
     }
   }
@@ -641,16 +644,30 @@ static iree_status_t iree_hal_vmvx_executable_lookup_export_by_name(
       (int)name.size, name.data);
 }
 
+static iree_status_t iree_hal_vmvx_executable_lookup_global_by_name(
+    iree_hal_executable_t* base_executable, iree_string_view_t name,
+    iree_hal_queue_affinity_t queue_affinity, iree_hal_buffer_t** out_buffer) {
+  (void)base_executable;
+  (void)name;
+  (void)queue_affinity;
+  *out_buffer = NULL;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "VMVX executable global lookup not implemented");
+}
+
 static const iree_hal_local_executable_vtable_t
     iree_hal_vmvx_executable_vtable = {
         .base =
             {
                 .destroy = iree_hal_vmvx_executable_destroy,
-                .export_count = iree_hal_vmvx_executable_export_count,
-                .export_info = iree_hal_vmvx_executable_export_info,
-                .export_parameters = iree_hal_vmvx_executable_export_parameters,
-                .lookup_export_by_name =
+                .function_count = iree_hal_vmvx_executable_export_count,
+                .function_info = iree_hal_vmvx_executable_export_info,
+                .function_parameters =
+                    iree_hal_vmvx_executable_export_parameters,
+                .lookup_function_by_name =
                     iree_hal_vmvx_executable_lookup_export_by_name,
+                .lookup_global_by_name =
+                    iree_hal_vmvx_executable_lookup_global_by_name,
             },
         .issue_call = iree_hal_vmvx_executable_issue_call,
 };
@@ -796,33 +813,27 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
       (iree_hal_vmvx_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // The VM bytecode module stores pointers into its archive contents and may be
+  // destroyed after queue completion has already been signaled. Own a private
+  // copy so executable teardown never depends on the caller's module rodata.
   iree_const_byte_span_t bytecode_module_data =
       executable_params->executable_data;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_clone(executable_loader->host_allocator,
+                               executable_params->executable_data,
+                               (void**)&bytecode_module_data.data));
 
-  // If the caching mode allows for aliasing the existing FlatBuffer data then
-  // we avoid allocations and just pass the pointer on through. The caller
-  // ensures that the data remains valid for the duration the executable is
-  // loaded. Otherwise, we clone it and let the bytecode module take ownership.
-  iree_allocator_t bytecode_module_allocator;
-  if (iree_all_bits_set(executable_params->caching_mode,
-                        IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA)) {
-    // Zero-copy route.
-    bytecode_module_allocator = iree_allocator_null();
-  } else {
-    bytecode_module_allocator = executable_loader->host_allocator;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_allocator_clone(executable_loader->host_allocator,
-                                 executable_params->executable_data,
-                                 (void**)&bytecode_module_data.data));
-  }
-
-  // Load the user-provided bytecode module. We pass ownership of the data (if
-  // we have it) to the module to manage.
+  // Load the user-provided bytecode module and pass ownership of the cloned
+  // data to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
       executable_loader->instance, IREE_VM_BYTECODE_MODULE_FLAG_NONE,
-      executable_params->executable_data, bytecode_module_allocator,
+      bytecode_module_data, executable_loader->host_allocator,
       executable_loader->host_allocator, &bytecode_module);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(executable_loader->host_allocator,
+                        (void*)bytecode_module_data.data);
+  }
 
   // Executable takes ownership of the entire context (including the bytecode
   // module, which itself may own the underlying allocation).

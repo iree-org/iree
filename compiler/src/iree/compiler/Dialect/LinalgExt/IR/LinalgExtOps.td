@@ -59,7 +59,8 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
          "getTiledImplementationFromOperandTiles"]>]> {
   let summary = [{Scatters an input in slices based on a tensor of indices.}];
   let description = [{
-    Takes two `inputs` (`update` and `indices`) and `outputs` value (`original`).
+    Takes two or three `inputs` (`update`, `indices`, and optional `mask`) and
+    one `outputs` value (`original`).
     The operation updates the value at the slices specified by `indices` by
     combining the current value with the value in `updates` using the computation
     specified in `region`. The `region` specifies a binary operation
@@ -88,6 +89,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     `update` gets scattered to.
     Where `rank(original) = rank(update_slice) + index_depth`
 
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding scatter
+    update, leaving `original` unchanged for that batch element.
+
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
     scatter to the same location in `original` the final value in `original` is
@@ -100,6 +106,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let arguments = (ins
       AnyRankedTensorOrMemRef:$updates,
       AnyRankedTensorOrMemRef:$indices,
+      Optional<AnyRankedTensorOrMemRef>:$mask,
       AnyRankedTensorOrMemRef:$original,
       DenseI64ArrayAttr:$dimension_map,
       DefaultValuedAttr<BoolAttr, "true">:$unique_indices
@@ -109,7 +116,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
-    `ins` `(` $updates `,` $indices `:` type($updates) `,` type($indices) `)`
+    `ins` `(` $updates `,` $indices (`,` $mask^)? `:` type($updates) `,` type($indices) (`,` type($mask)^)? `)`
     `outs` `(` $original `:` type($original) `)`
     $region (`->` type($results)^)?
   }];
@@ -124,6 +131,13 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
 
     ShapedType getIndicesType() {
       return cast<ShapedType>(getIndices().getType());
+    }
+
+    std::optional<ShapedType> getMaskType() {
+      if (Value mask = getMask()) {
+        return cast<ShapedType>(mask.getType());
+      }
+      return std::nullopt;
     }
 
     ShapedType getOriginalType() {
@@ -174,8 +188,9 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
          "generateResultTileValue"]>]> {
   let summary = [{Gathers slices from a source based on a tensor of indices.}];
   let description = [{
-    Takes two inputs (`source` and `indices`) and outputs value (`output`).
-    The operation returns the value at the slices specified by `indices`.
+    Takes two or three inputs (`source`, `indices`, and optional `mask`) and
+    one output value (`output`). The operation returns the value at the slices
+    specified by `indices`.
 
     The size of the `dimension_map` attribute is used to determine how many
     indices are used to index into `source`, i.e. `index_depth`. The
@@ -187,17 +202,23 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
     `source` into `output` using the indices in `indices`. See the documentation
     on `iree_linalg_ext.scatter` for more details regarding the indexing/shape
     semantics.
+
+    If the optional operand `mask` is present, it must have batch shape and a
+    boolean element type (`i1`, or storage-legalized `i8` in backend
+    pipelines). A `false` mask value suppresses the corresponding gather
+    update, leaving `output` unchanged for that batch element.
   }];
   let arguments = (ins
       AnyRankedTensorOrMemRef:$source,
       AnyRankedTensorOrMemRef:$indices,
+      Optional<AnyRankedTensorOrMemRef>:$mask,
       AnyRankedTensorOrMemRef:$output,
       DenseI64ArrayAttr:$dimension_map
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
-    `ins` `(` $source `,` $indices `:` type($source) `,` type($indices) `)`
+    `ins` `(` $source `,` $indices (`,` $mask^)? `:` type($source) `,` type($indices) (`,` type($mask)^)? `)`
     `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
   }];
@@ -225,6 +246,13 @@ def IREELinalgExt_GatherOp : IREELinalgExt_Op<"gather",
 
     ShapedType getIndicesType(){
       return cast<ShapedType>(getIndices().getType());
+    }
+
+    std::optional<ShapedType> getMaskType() {
+      if (Value mask = getMask()) {
+        return cast<ShapedType>(mask.getType());
+      }
+      return std::nullopt;
     }
 
     ShapedType getOutputType(){
@@ -574,7 +602,8 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
 }
 
 def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+    [DeclareOpInterfaceMethods<IndexingMapOpInterface>,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["generateScalarImplementation",
        "getIterationDomain",
@@ -680,12 +709,90 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 }
 
+def IREELinalgExt_TopkV2Op : IREELinalgExt_Op<"topk_v2",[
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+  DeclareOpInterfaceMethods<LinalgExtInterface>,
+  DeclareOpInterfaceMethods<TilingInterface,
+    ["generateScalarImplementation",
+     "getIterationDomain",
+     "getLoopIteratorTypes",
+     "getResultTilePosition",
+     "getTiledImplementation"]>
+]>{
+  let summary = [{Top-K v2 operator.}];
+  let description = [{
+    Selects the top-K elements along the given `dimension` using the given
+    `comparator`. K is determined by the output shape. The output sort
+    dimension must be less than or equal to the input sort dimension.
+
+    This op replaces the legacy `topk` op with several improvements:
+    output indices are optional instead of mandatory, input indices of any
+    integer type are supported for pre-permuted inputs, and the comparator
+    region uses a pure ordering predicate decoupled from the swap semantics
+    of the legacy op.
+
+    Accepts a single N-D input tensor of values and an optional N-D tensor of
+    input indices (any integer type). If input indices aren't provided, the
+    index mapping defaults to [0, N) along the sort dimension, where N is
+    the input size. Input indices may only be provided when output indices
+    are also present, since the comparator operates solely on values and
+    input indices only carry positional provenance to the output. Produces
+    output values and optionally output indices (integer type) tracking
+    original positions.
+
+    When `is_sorted` is present, the output top-K elements are guaranteed to
+    be in sorted order along the sort dimension. When absent (default), the
+    top-K elements are returned but their relative order is unspecified.
+
+    Comparator region accepts two scalar arguments of the input value element
+    type and yields an i1 indicating whether the first argument should be
+    ordered before the second.
+  }];
+
+  let arguments = (ins I64Attr:$dimension,
+                       UnitAttr:$is_sorted,
+                       AnyShaped:$values,
+                       Optional<AnyShaped>:$input_indices,
+                       AnyShaped:$output_values,
+                       Optional<AnyShaped>:$output_indices
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `dimension` `(` $dimension `)`
+    (`is_sorted` $is_sorted^)?
+    `ins` `(` $values (`,` $input_indices^)? `:` type($values) (`,` type($input_indices)^)? `)`
+    `outs` `(` $output_values (`,` $output_indices^)? `:`
+               type($output_values) (`,` type($output_indices)^)? `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    ShapedType getInputType() {
+      return cast<ShapedType>(getValues().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    bool hasOutputIndices() {
+      return static_cast<bool>(getOutputIndices());
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable();
+  }];
+}
+
 def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<LinalgFusionInterface,
    ["getIndexingMapsForResults", "getIndexingMapsForOperands",
     "getStaticLoopRanges"]>,
+  DeclareOpInterfaceMethods<IndexingMapOpInterface, ["getMatchingIndexingMap"]>,
   DeclareOpInterfaceMethods<LinalgExtInterface>,
   DeclareOpInterfaceMethods<TilingInterface,
   ["generateScalarImplementation",
@@ -693,6 +800,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
    "getResultTilePosition",
    "getTiledImplementation",
    "generateResultTileValue",
+   "getIterationDomainTileFromResultTile",
    "getIterationDomain"]
   >,
   DeclareOpInterfaceMethods<PartialReductionOpInterface,
@@ -790,6 +898,7 @@ def IREELinalgExt_ArgCompareOp : IREELinalgExt_Op<"arg_compare", [
     Variadic<AnyRankedTensor>:$results
   );
   let regions = (region SizedRegion<1>:$region);
+  let hasRegionVerifier = 1;
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
@@ -966,7 +1075,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [IndexingMapOpInterface,
+    [DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     IndexingMapOpInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
      DeclareOpInterfaceMethods<TilingInterface,
@@ -1051,7 +1163,11 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     "Value":$max,
     "Value":$sum,
     "ArrayAttr":$indexing_maps,
-    CArg<"std::optional<Value>", "std::nullopt">:$mask)>
+    CArg<"std::optional<Value>", "std::nullopt">:$mask)>,
+    OpBuilder<(ins "TypeRange":$results,
+      "ValueRange":$inputOperands,
+      "ValueRange":$initOperands,
+      "ArrayAttr":$indexing_maps)>
   ];
 
 
@@ -1093,6 +1209,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
     }
+    int64_t getNumLoops() { return getIterationDomainRank(); }
 
     /* Decomposition control attributes */
 
@@ -1295,15 +1412,24 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     #### Attributes
 
     **Convolution metadata** — derived from the original convolution:
-    - `strides`: spatial stride per m_pos dimension.
-    - `dilations`: dilation factor per m_pos dimension.
-    - `kernel_size`: filter kernel extent per m_pos dimension.
+    - `strides`: source-coordinate stride per `m_pos` dimension.
+    - `dilations`: source-coordinate dilation per `m_pos` dimension.
+    - `kernel_size`: filter/window extent per `m_pos` dimension.
 
-    **Dimension mapping** — describes which input dimensions are batch, spatial
-    (M), or reduction (K):
-    - `batch_pos`: input dimensions that are batch (pass-through to output).
-    - `m_pos`: input dimensions that are spatial (indexed by stride/dilation).
-    - `k_pos`: input dimensions that are channels (direct index).
+    Spatial `m_pos` dimensions use the original convolution window metadata.
+    `m_pos` dimensions without a real filter window, such as convolution batch
+    dimensions, use synthetic unit metadata (`stride = dilation = kernel = 1`).
+
+    **Dimension mapping** — describes which input dimensions are GEMM batch,
+    M, or K dimensions:
+    - `batch_pos`: input dimensions that are GEMM batch/pass-through dims.
+      For convolution lowering, this is used for depth/group-like dimensions,
+      not convolution batch dimensions that only index the image/output.
+    - `m_pos`: input dimensions that form GEMM M coordinates. For convolution
+      lowering, this includes convolution batch dimensions and output image
+      dimensions.
+    - `k_pos`: input dimensions that form direct GEMM K coordinates, such as
+      input channel dimensions.
 
     **Indexing**:
     - `offsets`: one offset per output dimension in canonical
@@ -1312,14 +1438,15 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     - `output_sizes`: nested list of delinearization sizes per output dimension.
       Each entry describes how to delinearize that output dimension back to
       spatial/channel coordinates. For example:
-      `output_sizes = [[2], [32, 32], [3, 3, 640]]` means batch=[2],
-      M delinearizes into [OH=32, OW=32], K delinearizes into [KH=3, KW=3, C=640].
+      `output_sizes = [[2], [32], [32], [1, 3, 3, 640]]` with empty
+      `batch_pos` means M dims delinearize into [N=2], [OH=32], [OW=32], and K
+      delinearizes into [unit N window=1, KH=3, KW=3, C=640].
 
     **Layout permutations**:
     - `input_k_perm`: permutation that maps the delinearized K output dimension
-      coordinates (window offsets from spatial dims and channel indices) to their
-      corresponding input dimension positions. Used when
-      the filter layout differs from the input layout (e.g., input=HWC,
+      coordinates (window offsets from M dims, synthetic unit coordinates, and
+      channel indices) to their corresponding input dimension positions. Used
+      when the filter layout differs from the input layout (e.g., input=HWC,
       filter=CHW requires `input_k_perm = [2, 0, 1]`). The identity permutation
       means the layouts are already aligned.
     - `output_perm`: permutation of the canonical `[Batch, M, K]` order to the
@@ -1343,58 +1470,59 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
 
     #### Semantics
 
-    For each output position `(b, m, k)`, the op computes input coordinates,
-    where `i` indexes over `m_pos` dimensions (spatial) and `j` indexes over
-    `k_pos` dimensions (channel):
+    For each output position, the op computes input coordinates, where `i`
+    indexes over `m_pos` dimensions and `j` indexes over `k_pos` dimensions:
     ```
-      spatial_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
+      m_input_coord[i] = m_coord[i] * stride[i] + window_offset[i] * dilation[i]
       channel_coord[j] = k_coord[j]
     ```
     where `m_coord` and `window_offset`/`k_coord` come from delinearizing the
-    M and K output indices using `output_sizes`.
+    M and K output indices using `output_sizes`. For a convolution batch M dim,
+    the synthetic unit metadata makes `window_offset = 0`, so the input
+    coordinate is the M coordinate directly.
 
     #### Examples
 
     Basic im2col (NHWC conv, 3x3 kernel):
     ```mlir
       %im2col = iree_linalg_ext.im2col
-          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-          offsets = [0, 0, 0]
-          output_sizes = [[2], [32, 32], [3, 3, 640]]
-          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+          offsets = [0, 0, 0, 0]
+          output_sizes = [[2], [32], [32], [1, 3, 3, 640]]
+          batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
           ins(%in : tensor<2x34x34x640xf32>)
-          outs(%out : tensor<2x1024x5760xf32>) -> tensor<2x1024x5760xf32>
+          outs(%out : tensor<2x32x32x5760xf32>) -> tensor<2x32x32x5760xf32>
     ```
 
     With input padding (same padding absorbed from tensor.pad):
     ```mlir
       %im2col = iree_linalg_ext.im2col
-          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-          offsets = [0, 0, 0]
-          output_sizes = [[2], [34, 34], [3, 3, 640]]
-          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
+          strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+          offsets = [0, 0, 0, 0]
+          output_sizes = [[2], [34], [34], [1, 3, 3, 640]]
+          batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
           input_pad_low = [0, 1, 1, 0] input_pad_high = [0, 1, 1, 0]
           pad_value(%cst : f32)
           ins(%in : tensor<2x34x34x640xf32>)
-          outs(%out : tensor<2x1156x5760xf32>) -> tensor<2x1156x5760xf32>
+          outs(%out : tensor<2x34x34x5760xf32>) -> tensor<2x34x34x5760xf32>
     ```
 
     With output-only padding (GEMM alignment, no input padding):
     ```mlir
-      // M valid = 32*32 = 1024; output has 1040 (16 extra M positions filled
-      // with pad_value for GEMM alignment). K valid = 3*3*640 = 5760.
+      // K valid = 1*3*3*640 = 5760; output has 5768 (8 extra K positions
+      // filled with pad_value for GEMM alignment).
       %im2col = iree_linalg_ext.im2col
-          strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-          offsets = [0, 0, 0]
-          output_sizes = [[2], [32, 32], [3, 3, 640]]
-          batch_pos = [0] m_pos = [1, 2] k_pos = [3]
-          input_k_perm = [0, 1, 2] output_perm = [0, 1, 2]
-          output_pad_low = [0, 0, 0] output_pad_high = [0, 16, 0]
+          strides = [1, 1, 1] dilations = [1, 1, 1] kernel_size = [1, 3, 3]
+          offsets = [0, 0, 0, 0]
+          output_sizes = [[2], [32], [32], [1, 3, 3, 640]]
+          batch_pos = [] m_pos = [0, 1, 2] k_pos = [3]
+          input_k_perm = [0, 1, 2, 3] output_perm = [0, 1, 2, 3]
+          output_pad_low = [0, 0, 0, 0] output_pad_high = [0, 0, 0, 8]
           pad_value(%cst : f32)
           ins(%in : tensor<2x34x34x640xf32>)
-          outs(%out : tensor<2x1040x5760xf32>) -> tensor<2x1040x5760xf32>
+          outs(%out : tensor<2x32x32x5768xf32>) -> tensor<2x32x32x5768xf32>
     ```
   }];
 
@@ -1519,6 +1647,14 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
 
     // Returns true if the op has non-zero output padding.
     bool hasOutputPadding();
+
+    // Returns true iff *this can be lowered via decomposeOperationAsyncCopy.
+    bool canDecomposeAsyncCopy();
+
+    // Decomposes *this into the async-copy form (collapsed source +
+    // linalg.generic index tensor + iree_linalg_ext.gather + expand-shape).
+    // Precondition: canDecomposeAsyncCopy() returns true.
+    FailureOr<SmallVector<Value>> decomposeOperationAsyncCopy(OpBuilder &b);
 
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface

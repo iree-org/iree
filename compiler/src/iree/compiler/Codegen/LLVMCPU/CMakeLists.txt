@@ -56,6 +56,7 @@ iree_cc_library(
     "LLVMCPU2DScalableTo1DScalable.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"
+    "LLVMCPUAssignWorkgroupLocalMemory.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
@@ -127,6 +128,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRMemRefUtils
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRPass
@@ -157,6 +159,9 @@ iree_cc_library(
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Transforms::IREECodegenTransforms
+    iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
+    iree::compiler::Codegen::Dialect::VectorExt::Transforms::VectorExtTransforms
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
@@ -167,6 +172,7 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::TensorExt::IR
+    iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Transforms

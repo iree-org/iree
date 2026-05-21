@@ -50,6 +50,12 @@ static SmallVector<int64_t> getVectorTileSizesFromLoopRanges(
     ArrayRef<int64_t> loopRanges, int64_t numThreads, int64_t vectorSize,
     bool allowMultiDimCollapse = true,
     std::optional<int64_t> vectorizableDim = std::nullopt) {
+  // Rank-0 ops (e.g., a `linalg.fill` seeding a scalar tensor) have no loop
+  // dimension to vectorize across; return an empty tile-size list so callers
+  // can skip the op rather than indexing `loopRanges[-1]`.
+  if (loopRanges.empty()) {
+    return {};
+  }
   int64_t rank = loopRanges.size();
   int64_t targetDim = vectorizableDim.has_value() ? *vectorizableDim : rank - 1;
   int64_t targetRange = loopRanges[targetDim];
@@ -151,6 +157,13 @@ deriveIm2colOpThreadTileSizes(IREE::LinalgExt::Im2colOp im2colOp,
   return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize,
                                           /*allowMultiDimCollapse=*/false,
                                           vectorizableDim);
+}
+
+SmallVector<int64_t> deriveThreadTileSizes(ArrayRef<int64_t> loopRanges,
+                                           int64_t numThreads,
+                                           int64_t elementBitWidth) {
+  int64_t vectorSize = kPreferredCopyNumBits / elementBitWidth;
+  return getVectorTileSizesFromLoopRanges(loopRanges, numThreads, vectorSize);
 }
 
 SmallVector<int64_t> deriveThreadTileSizes(Operation *op) {

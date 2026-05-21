@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
-        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
+        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
@@ -85,6 +85,12 @@ jobs:
       - name: Run iree-flatcc-cli
         id: run_iree_flatcc_cli
         run: ./bin/iree-flatcc-cli --help
+      - name: Run iree-profile
+        id: run_iree_profile
+        run: ./bin/iree-profile --help
+      - name: Run iree-profile-render
+        id: run_iree_profile_render
+        run: ./bin/iree-profile-render --help
       - name: Run iree-opt
         id: run_iree_opt
         run: ./bin/iree-opt --help
@@ -119,6 +125,12 @@ jobs:
       - name: Py iree-cpuinfo
         id: py_iree_cpuinfo
         run: iree-cpuinfo
+      - name: Py iree-profile
+        id: py_iree_profile
+        run: iree-profile --help
+      - name: Py iree-profile-render
+        id: py_iree_profile_render
+        run: iree-profile-render --help
 
   publish_release:
     name: "Publish release"
@@ -155,7 +167,7 @@ jobs:
       - name: Updating latest-snapshot branch
         # Do not update the branch if the release is a patch release
         if: ${{ env.is_patch_release == 'false'}}
-        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
+        uses: ad-m/github-push-action@4cc74773234f74829a8c21bc4d69dd4be9cfa599 # v1.1.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot

@@ -1,0 +1,324 @@
+vm.module @async_ops version 0
+vm.type i32
+vm.import @yieldable_test.yield_n cconv "0ii_i"
+vm.import @yieldable_test.yield_variadic_sum cconv "0CiDi_i"
+
+vm.export @test_yield_sequence
+vm.func @test_yield_sequence() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 103  // 0x00000067
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 100  // 0x00000064
+  %i3 = vm.add.i32 %i3, %i2
+  vm.yield ^bb1()
+^bb1:
+  %i3 = vm.add.i32 %i3, %i2
+  vm.yield ^bb2()
+^bb2:
+  %i2 = vm.add.i32 %i3, %i2
+  vm.yield ^bb3()
+^bb3:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb5(), ^bb4()
+^bb4:
+  vm.return
+^bb5:
+  vm.fail %i0, "100+1+1+1=103"
+}
+
+vm.export @test_yield_divergent_true
+vm.func @test_yield_divergent_true() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 100  // 0x00000064
+  vm.yield ^bb1()
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i1, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "cond=1 selects true branch"
+}
+
+vm.export @test_yield_divergent_false
+vm.func @test_yield_divergent_false() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 200  // 0x000000C8
+  vm.yield ^bb1()
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i1, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "cond=0 selects false branch"
+}
+
+vm.func @fn3(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i0 = vm.add.i32 %i0, %i1
+  vm.yield ^bb1()
+^bb1:
+  %i0 = vm.add.i32 %i0, %i1
+  vm.yield ^bb2()
+^bb2:
+  %i0 = vm.add.i32 %i0, %i1
+  vm.yield ^bb3()
+^bb3:
+  %i1 = vm.add.i32 %i0, %i1
+  vm.return %i1
+}
+
+vm.export @test_call_yieldable_internal
+vm.func @test_call_yieldable_internal() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 4  // 0x00000004
+  %i2 = vm.const.i32.zero
+  vm.call.yieldable @async_ops:3(%i2) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "0+4=4"
+}
+
+vm.func @fn5(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i1 = vm.add.i32 %i0, %i1
+  vm.yield ^bb1()
+^bb1:
+  vm.return %i1
+}
+
+vm.export @test_call_yieldable_with_arg
+vm.func @test_call_yieldable_with_arg() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 43  // 0x0000002B
+  %i2 = vm.const.i32 42  // 0x0000002A
+  vm.call.yieldable @async_ops:5(%i2) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "42+1=43"
+}
+
+vm.export @test_call_yieldable_import_yields_3
+vm.func @test_call_yieldable_import_yields_3() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 103  // 0x00000067
+  %i2 = vm.const.i32 100  // 0x00000064
+  %i3 = vm.const.i32 3  // 0x00000003
+  vm.call.yieldable @yieldable_test.yield_n(%i2, %i3) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "100+3=103"
+}
+
+vm.export @test_call_yieldable_import_yields_0
+vm.func @test_call_yieldable_import_yields_0() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 42  // 0x0000002A
+  %i2 = vm.const.i32.zero
+  vm.call.yieldable @yieldable_test.yield_n(%i1, %i2) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "42+0=42"
+}
+
+vm.export @test_call_yieldable_after_internal
+vm.func @test_call_yieldable_after_internal() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 17  // 0x00000011
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i3 = vm.const.i32 15  // 0x0000000F
+  vm.call.yieldable @yieldable_test.yield_n(%i3, %i2) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "(5+10)+2=17"
+}
+
+vm.export @test_call_yieldable_import_sequential
+vm.func @test_call_yieldable_import_sequential() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 15  // 0x0000000F
+  %i2 = vm.const.i32 10  // 0x0000000A
+  %i3 = vm.const.i32 2  // 0x00000002
+  %i4 = vm.const.i32 3  // 0x00000003
+  vm.call.yieldable @yieldable_test.yield_n(%i2, %i3) -> ^bb1(%i2)
+^bb1:
+  vm.call.yieldable @yieldable_test.yield_n(%i2, %i4) -> ^bb2(%i2)
+^bb2:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "(10+2)+3=15"
+}
+
+vm.func @fn11(%i0: i32) -> (i32) {
+^bb0:
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2 = vm.const.i32 2  // 0x00000002
+  %i0 = vm.add.i32 %i0, %i1
+  vm.yield ^bb1()
+^bb1:
+  vm.call.yieldable @yieldable_test.yield_n(%i0, %i2) -> ^bb2(%i0)
+^bb2:
+  %i1 = vm.add.i32 %i0, %i1
+  vm.yield ^bb3()
+^bb3:
+  vm.return %i1
+}
+
+vm.export @test_call_nested_yieldable
+vm.func @test_call_nested_yieldable() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 54  // 0x00000036
+  %i2 = vm.const.i32 50  // 0x00000032
+  vm.call.yieldable @async_ops:11(%i2) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "((50+1)+2)+1=54"
+}
+
+vm.export @test_call_yieldable_import_stress
+vm.func @test_call_yieldable_import_stress() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1010  // 0x000003F2
+  %i2 = vm.const.i32 1000  // 0x000003E8
+  %i3 = vm.const.i32 10  // 0x0000000A
+  vm.call.yieldable @yieldable_test.yield_n(%i2, %i3) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "1000+10=1010"
+}
+
+vm.export @test_call_variadic_yieldable_2args
+vm.func @test_call_variadic_yieldable_2args() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 33  // 0x00000021
+  %i2 = vm.const.i32 10  // 0x0000000A
+  %i3 = vm.const.i32 20  // 0x00000014
+  %i4 = vm.const.i32 3  // 0x00000003
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[2, 1](%i2, %i3, %i4) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "(10+20)+3=33"
+}
+
+vm.export @test_call_variadic_yieldable_0yields
+vm.func @test_call_variadic_yieldable_0yields() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 30  // 0x0000001E
+  %i2 = vm.const.i32 5  // 0x00000005
+  %i3 = vm.const.i32 10  // 0x0000000A
+  %i4 = vm.const.i32 15  // 0x0000000F
+  %i5 = vm.const.i32.zero
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[3, 1](%i2, %i3, %i4, %i5) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "5+10+15+0=30"
+}
+
+vm.export @test_call_variadic_yieldable_1arg
+vm.func @test_call_variadic_yieldable_1arg() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 102  // 0x00000066
+  %i2 = vm.const.i32 100  // 0x00000064
+  %i3 = vm.const.i32 2  // 0x00000002
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[1, 1](%i2, %i3) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "100+2=102"
+}
+
+vm.export @test_call_variadic_yieldable_empty
+vm.func @test_call_variadic_yieldable_empty() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[0, 1](%i1) -> ^bb1(%i2)
+^bb1:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "0+1=1"
+}
+
+vm.export @test_call_variadic_yieldable_sequential
+vm.func @test_call_variadic_yieldable_sequential() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 38  // 0x00000026
+  %i2 = vm.const.i32 1  // 0x00000001
+  %i3 = vm.const.i32 2  // 0x00000002
+  %i4 = vm.const.i32 5  // 0x00000005
+  %i5 = vm.const.i32 10  // 0x0000000A
+  %i6 = vm.const.i32 20  // 0x00000014
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[2, 1](%i5, %i6, %i3) -> ^bb1(%i3)
+^bb1:
+  vm.call.variadic.yieldable @yieldable_test.yield_variadic_sum segments[2, 1](%i3, %i4, %i2) -> ^bb2(%i2)
+^bb2:
+  %i1 = vm.cmp.ne.i32 %i2, %i1
+  vm.cond_br %i1, ^bb4(), ^bb3()
+^bb3:
+  vm.return
+^bb4:
+  vm.fail %i0, "((10+20)+2)+((32+5)+1)=38"
+}

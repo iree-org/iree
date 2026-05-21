@@ -35,9 +35,9 @@ public:
   // Builder mode setting.
   enum class Mode : uint32_t {
     NONE = 0u,
-    // Include entry point names and tags.
-    // If not specified then the reflection strings will be excluded to reduce
-    // binary size.
+    // Include debug/reflection strings beyond required function names.
+    // If not specified then tags and source locations will be excluded to
+    // reduce binary size.
     INCLUDE_REFLECTION_ATTRS = 1 << 0u,
   };
 

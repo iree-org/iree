@@ -856,74 +856,78 @@ struct CmdDispatchOpPattern
                               });
   }
 
-  // Selects the ordinal for the given |baseExportOp| and calculates its
-  // workgroup count. The ordinal may be different than the ordinal of the
-  // export itself if any fallbacks are specified. Each export condition will be
-  // evaluated and the first that matches will be returned.
+  // Selects the function id for the given |baseExportOp| and calculates its
+  // workgroup count. The function may be different than the base export if any
+  // fallbacks are specified. Each export condition will be evaluated and the
+  // first that matches will be returned.
   //
   // As an example, a fallback chain of @0 -> @1 -> @2 (with @0 being the
   // highest priority) would result in a decision tree:
-  //   %ordinal, %workgroups = scf.if %cond0 {
-  //     %ordinal0 = hal.executable.export.ordinal @0
+  //   %function_id, %workgroups = scf.if %cond0 {
+  //     %function_id0 = hal.executable.lookup.function @0
   //     %workgroups0 = calculate for @0
-  //     scf.yield %ordinal0, %workgroups0
+  //     scf.yield %function_id0, %workgroups0
   //   } else {
-  //     %ordinal12, %workgroups12 = scf.if %cond1 {
-  //       %ordinal1 = hal.executable.export.ordinal @1
+  //     %function_id12, %workgroups12 = scf.if %cond1 {
+  //       %function_id1 = hal.executable.lookup.function @1
   //       %workgroups1 = calculate for @1
-  //       scf.yield %ordinal1, %workgroups1
+  //       scf.yield %function_id1, %workgroups1
   //     } else {
-  //       %ordinal2 = hal.executable.export.ordinal @2
+  //       %function_id2 = hal.executable.lookup.function @2
   //       %workgroups2 = calculate for @2
-  //       scf.yield %ordinal2, %workgroups2
+  //       scf.yield %function_id2, %workgroups2
   //     }
-  //     scf.yield %ordinal12, %workgroups12
+  //     scf.yield %function_id12, %workgroups12
   //   }
   std::tuple<Value, std::array<Value, 3>>
   selectExport(Location loc, IREE::HAL::ExecutableExportOp baseExportOp,
-               Value device, ValueRange workload, OpBuilder &builder) const {
+               Value executable, Value device, ValueRange workload,
+               OpBuilder &builder) const {
     if (!baseExportOp.getConditionBody()) {
       // No fallback - fast path to just the base export.
-      Value ordinal = IREE::HAL::ExecutableExportOrdinalOp::create(
-          builder, loc, builder.getIndexType(), getExportRef(baseExportOp));
+      Value functionId = IREE::HAL::ExecutableLookupFunctionOp::create(
+          builder, loc, builder.getI64Type(), executable,
+          getExportRef(baseExportOp));
       auto workgroupCount =
           baseExportOp.calculateWorkgroupCount(loc, device, workload, builder);
-      return {ordinal, workgroupCount};
+      return {functionId, workgroupCount};
     }
     // Recursively build the selection decision tree.
     auto fallbackExportOp =
         SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
             baseExportOp, baseExportOp.getConditionFallbackAttr());
-    return buildExportSelection(loc, baseExportOp, fallbackExportOp, device,
-                                workload, builder);
+    return buildExportSelection(loc, baseExportOp, fallbackExportOp, executable,
+                                device, workload, builder);
   }
   std::tuple<Value, std::array<Value, 3>>
   buildExportSelection(Location loc, IREE::HAL::ExecutableExportOp tryExportOp,
                        IREE::HAL::ExecutableExportOp fallbackExportOp,
-                       Value device, ValueRange workload,
+                       Value executable, Value device, ValueRange workload,
                        OpBuilder &builder) const {
     // Inline the condition logic.
     Value tryCondition =
         tryExportOp.calculateCondition(loc, device, workload, builder);
 
-    // Create an scf.if: the then region will simply return the
-    // ordinal (condition matches) and the else region will contain the rest of
-    // the decision tree.
+    // Create an scf.if: the then region will simply return the function id
+    // (condition matches) and the else region will contain the rest of the
+    // decision tree.
+    Type functionIdType = builder.getI64Type();
     Type indexType = builder.getIndexType();
     auto ifOp = scf::IfOp::create(
-        builder, loc, TypeRange{indexType, indexType, indexType, indexType},
+        builder, loc,
+        TypeRange{functionIdType, indexType, indexType, indexType},
         tryCondition,
         /*addThenBlock=*/true, /*addElseBlock=*/true);
     {
       auto thenBuilder = ifOp.getThenBodyBuilder();
-      Value tryOrdinal = IREE::HAL::ExecutableExportOrdinalOp::create(
-          thenBuilder, loc, thenBuilder.getIndexType(),
+      Value tryFunctionId = IREE::HAL::ExecutableLookupFunctionOp::create(
+          thenBuilder, loc, functionIdType, executable,
           getExportRef(tryExportOp));
       auto tryWorkgroupCount = tryExportOp.calculateWorkgroupCount(
           loc, device, workload, thenBuilder);
       scf::YieldOp::create(thenBuilder, loc,
                            ValueRange{
-                               tryOrdinal,
+                               tryFunctionId,
                                tryWorkgroupCount[0],
                                tryWorkgroupCount[1],
                                tryWorkgroupCount[2],
@@ -936,25 +940,27 @@ struct CmdDispatchOpPattern
         auto chainExportOp =
             SymbolTable::lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
                 fallbackExportOp, fallbackExportOp.getConditionFallbackAttr());
-        auto [chainOrdinal, chainWorkgroupCount] =
-            buildExportSelection(loc, fallbackExportOp, chainExportOp, device,
-                                 workload, elseBuilder);
+        auto [chainFunctionId, chainWorkgroupCount] =
+            buildExportSelection(loc, fallbackExportOp, chainExportOp,
+                                 executable, device, workload, elseBuilder);
         scf::YieldOp::create(elseBuilder, loc,
                              ValueRange{
-                                 chainOrdinal,
+                                 chainFunctionId,
                                  chainWorkgroupCount[0],
                                  chainWorkgroupCount[1],
                                  chainWorkgroupCount[2],
                              });
       } else {
         // Tail of recursion; fallback has no fallback.
-        Value fallbackOrdinal = IREE::HAL::ExecutableExportOrdinalOp::create(
-            elseBuilder, loc, indexType, getExportRef(fallbackExportOp));
+        Value fallbackFunctionId =
+            IREE::HAL::ExecutableLookupFunctionOp::create(
+                elseBuilder, loc, functionIdType, executable,
+                getExportRef(fallbackExportOp));
         auto fallbackWorkgroupCount = fallbackExportOp.calculateWorkgroupCount(
             loc, device, workload, elseBuilder);
         scf::YieldOp::create(elseBuilder, loc,
                              ValueRange{
-                                 fallbackOrdinal,
+                                 fallbackFunctionId,
                                  fallbackWorkgroupCount[0],
                                  fallbackWorkgroupCount[1],
                                  fallbackWorkgroupCount[2],
@@ -980,8 +986,8 @@ struct CmdDispatchOpPattern
         entryPointAttr.getRootReference().getValue());
 
     // Select the export and calculate its workgroup count.
-    auto [ordinal, workgroupCount] =
-        selectExport(loc, exportOp, device, adaptor.getWorkload(), builder);
+    auto [functionId, workgroupCount] = selectExport(
+        loc, exportOp, executable, device, adaptor.getWorkload(), builder);
 
     auto layoutAttr = exportOp.getLayout();
     SmallVector<IREE::HAL::BindingValue> bindings;
@@ -1013,7 +1019,7 @@ struct CmdDispatchOpPattern
     auto flags = IREE::HAL::DispatchFlags::None;
 
     return IREE::HAL::CommandBufferDispatchOp::create(
-        builder, loc, commandBufferMapping.getHandle(), executable, ordinal,
+        builder, loc, commandBufferMapping.getHandle(), executable, functionId,
         workgroupCount, adaptor.getUniformOperands(), bindings, flags);
   }
 };

@@ -25,7 +25,6 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Target/SPIRV/Serialization.h"
-#include "spirv-tools/libspirv.hpp"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
@@ -146,31 +145,29 @@ public:
     }
 
     // The schema expects each shader module to have entry points named "dN",
-    // where N is the entry point ordinal.
-    // For each executable entry point op, rename the entry point symbol using
-    // that convention and keep track of the mapping between entry point
-    // ordinals to which shader module they reference.
+    // where N is the entry point ordinal. For each executable entry point op,
+    // rename the entry point symbol using that convention.
     auto exportOps = llvm::to_vector(variantOp.getExportOps());
-    llvm::SmallVector<uint32_t> entryPointOrdinals(exportOps.size());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
     for (auto exportOp : exportOps) {
+      auto ordinalAttr = exportOp.getOrdinalAttr();
+      if (!ordinalAttr) {
+        return mlir::emitError(exportOp.getLoc())
+               << "could not compile WebGPU binary: export op is missing "
+                  "ordinal";
+      }
+      int64_t ordinal = ordinalAttr.getInt();
       auto entryPointFunc = dyn_cast<spirv::FuncOp>(
           SymbolTable::lookupSymbolIn(spvModuleOp, exportOp.getSymName()));
 
-      std::string symbolName = llvm::formatv("d{}", exportOp.getOrdinal());
+      std::string symbolName = llvm::formatv("d{}", ordinal);
       mlir::StringAttr nameAttr =
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
       symbolUsers.replaceAllUsesWith(entryPointFunc, nameAttr);
       exportOp.setName(symbolName); // Same symbol reference? Not in table?
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
-
-      // We only have one shader module right now, so all point to index 0.
-      // TODO(#7824): Support multiple shader modules per executable.
-      uint64_t ordinal =
-          exportOp.getOrdinal().value_or(APInt(64, 0)).getZExtValue();
-      entryPointOrdinals[ordinal] = 0;
     }
 
     // Serialize the spirv::ModuleOp into binary format.
@@ -187,34 +184,15 @@ public:
       dumpDataToPath<uint32_t>(serOptions.dumpIntermediatesPath,
                                serOptions.dumpBaseName, variantOp.getName(),
                                ".spv", spvBinary);
-
-      // Disassemble the shader and save that too.
-      // Note: this should match what getWebGPUTargetEnv used.
-      // TODO(scotttodd): Query spirv env from the executable variant?
-      spvtools::SpirvTools spirvTools(SPV_ENV_VULKAN_1_0);
-      std::string spvDisassembled;
-      if (spirvTools.Disassemble(
-              spvBinary.data(), spvBinary.size(), &spvDisassembled,
-              SPV_BINARY_TO_TEXT_OPTION_INDENT |
-                  SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES)) {
-        dumpDataToPath(serOptions.dumpIntermediatesPath,
-                       serOptions.dumpBaseName, variantOp.getName(), ".spvasm",
-                       spvDisassembled);
-      } else {
-        llvm::errs() << "Failed to disassemble SPIR-V binary\n";
-      }
     }
 
     // Compile SPIR-V to WGSL source code.
     auto wgsl = compileSPIRVToWGSL(spvBinary);
     if (!wgsl.has_value()) {
-      // TODO(scotttodd): restructure branching and write disassembled SPIR-V
-      //                  to stderr / an error diagnostic (don't want to
-      //                  disassemble if successful + option not set, also
-      //                  don't want to disassemble twice :P)
       return variantOp.emitError()
-             << "failed to compile SPIR-V to WGSL. Consider inspecting the "
-                "shader program using -iree-hal-dump-executable-intermediates.";
+             << "failed to compile SPIR-V to WGSL; see the preceding Tint "
+                "diagnostics. Use -iree-hal-dump-executable-intermediates to "
+                "capture the serialized SPIR-V module.";
     }
     if (!serOptions.dumpBinariesPath.empty()) {
       dumpDataToPath(serOptions.dumpBinariesPath, serOptions.dumpBaseName,
@@ -239,9 +217,65 @@ public:
         builder, &shaderModuleRef, /*len=*/1);
     iree_hal_webgpu_ExecutableDef_shader_modules_add(builder, shaderModulesVec);
 
-    auto entryPointsRef = flatbuffers_uint32_vec_create(
-        builder, entryPointOrdinals.data(), entryPointOrdinals.size());
-    iree_hal_webgpu_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    // Generate optional per-export debug information.
+    // May be empty if no debug information was requested.
+    auto exportDebugInfos =
+        createExportDefs(serOptions.debugLevel, exportOps, builder);
+
+    SmallVector<iree_hal_webgpu_ExportDef_ref_t> exportRefs;
+    exportRefs.resize(exportOps.size(), 0);
+    for (auto exportOp : exportOps) {
+      auto ordinalAttr = exportOp.getOrdinalAttr();
+      if (!ordinalAttr) {
+        return mlir::emitError(exportOp.getLoc())
+               << "could not compile WebGPU binary: export op is missing "
+                  "ordinal";
+      }
+      int64_t ordinal = ordinalAttr.getInt();
+
+      auto entryPointRef = builder.createString(exportOp.getName());
+
+      iree_hal_webgpu_WorkgroupSize_t workgroupSize = {0};
+      if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+        auto workgroupSizeDims = workgroupSizeAttr->getValue();
+        workgroupSize.x = cast<IntegerAttr>(workgroupSizeDims[0]).getInt();
+        workgroupSize.y = cast<IntegerAttr>(workgroupSizeDims[1]).getInt();
+        workgroupSize.z = cast<IntegerAttr>(workgroupSizeDims[2]).getInt();
+      }
+
+      auto layoutAttr = exportOp.getLayoutAttr();
+      uint32_t constantCount = static_cast<uint32_t>(layoutAttr.getConstants());
+      SmallVector<iree_hal_webgpu_BindingBits_enum_t> bindingFlags;
+      for (auto bindingAttr : layoutAttr.getBindings()) {
+        iree_hal_webgpu_BindingBits_enum_t flags = 0;
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::ReadOnly)) {
+          flags |= iree_hal_webgpu_BindingBits_READ_ONLY;
+        }
+        if (allEnumBitsSet(bindingAttr.getFlags(),
+                           IREE::HAL::DescriptorFlags::Indirect)) {
+          flags |= iree_hal_webgpu_BindingBits_INDIRECT;
+        }
+        bindingFlags.push_back(flags);
+      }
+      auto bindingFlagsRef = iree_hal_webgpu_BindingBits_vec_create(
+          builder, bindingFlags.data(), bindingFlags.size());
+
+      iree_hal_webgpu_ExportDef_start(builder);
+      // We only have one shader module right now, so all point to index 0.
+      // TODO(#7824): Support multiple shader modules per executable.
+      iree_hal_webgpu_ExportDef_shader_module_ordinal_add(builder, 0);
+      iree_hal_webgpu_ExportDef_entry_point_add(builder, entryPointRef);
+      iree_hal_webgpu_ExportDef_workgroup_size_add(builder, &workgroupSize);
+      iree_hal_webgpu_ExportDef_constant_count_add(builder, constantCount);
+      iree_hal_webgpu_ExportDef_binding_flags_add(builder, bindingFlagsRef);
+      iree_hal_webgpu_ExportDef_debug_info_add(builder,
+                                               exportDebugInfos[ordinal]);
+      exportRefs[ordinal] = iree_hal_webgpu_ExportDef_end(builder);
+    }
+    auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
+
+    iree_hal_webgpu_ExecutableDef_exports_add(builder, exportsRef);
     iree_hal_webgpu_ExecutableDef_source_files_add(builder, sourceFilesRef);
 
     iree_hal_webgpu_ExecutableDef_end_as_root(builder);
@@ -269,13 +303,13 @@ struct WebGPUSPIRVSession final
                     PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"webgpu", ...
-    targets.add("webgpu", [=]() {
+    targets.add("webgpu", [this]() {
       return std::make_shared<WebGPUTargetDevice>(options);
     });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"webgpu-spirv", ...
-    targets.add("webgpu-spirv", [=]() {
+    targets.add("webgpu-spirv", [this]() {
       return std::make_shared<WebGPUSPIRVTargetBackend>(options);
     });
   }

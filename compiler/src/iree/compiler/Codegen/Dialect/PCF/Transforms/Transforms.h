@@ -30,14 +30,31 @@ class ExtractSliceOp;
 
 namespace mlir::iree_compiler::IREE::PCF {
 
-// Helper to convert scf.forall ops to pcf.loop by linearizing/delinearizing
-// ids beyond |numIds| into the slowest varying id. Uses
-// DeviceMappingAttrInterface to infer the order of ids from slowest to fastest
-// varying. If |numIds| <= 0, then no linearization/delinearization is done.
-FailureOr<PCF::LoopOp> convertForallToPCF(RewriterBase &rewriter,
-                                          scf::ForallOp forallOp,
-                                          PCF::ScopeAttrInterface scope,
-                                          int64_t numIds = -1);
+/// Converts scf.forall ops to pcf.loop by linearizing/delinearizing ids beyond
+/// |numIds| into the slowest varying id. Uses DeviceMappingAttrInterface to
+/// infer the order of ids from slowest to fastest varying. If |numIds| <= 0,
+/// then no linearization/delinearization is done. Returns the newly created
+/// pcf.loop; callers are responsible for replacing or erasing the original
+/// scf.forall op as needed.
+FailureOr<PCF::LoopOp> convertForallToPCFLoop(RewriterBase &rewriter,
+                                              scf::ForallOp forallOp,
+                                              PCF::ScopeAttrInterface scope,
+                                              int64_t numIds = -1);
+
+/// Converts an scf.forall operation to a nest of pcf.generic operations with
+/// an inner scf.forall handling spillover iterations.
+///
+/// Each scope in |scopes| generates one pcf.generic op (outermost first).
+/// Worker IDs are linearized, chunk bounds computed for work distribution,
+/// and delinearized back to multi-dimensional forall bounds. Uneven chunks
+/// are distributed greedily, with only the last worker lexicographically
+/// getting fewer loop iterations. Returns the newly created outermost
+/// pcf.generic; callers are responsible for replacing or erasing the original
+/// scf.forall op as needed.
+///
+FailureOr<PCF::GenericOp>
+convertForallToGenericNest(RewriterBase &rewriter, scf::ForallOp forallOp,
+                           ArrayRef<PCF::ScopeAttrInterface> scopes);
 
 struct ConsumerFusionParams {
   // List of operands in the consumer that are fused along.
@@ -175,6 +192,26 @@ fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
                                      PCF::GenericOp genericOp,
                                      tensor::CollapseShapeOp collapseOp);
 
+// Composes two nested slice parameter sets so the resulting slice addresses the
+// outer base directly. The outer slice describes how an intermediate value is
+// embedded in the final destination, and the inner slice describes how a value
+// is embedded in that intermediate.
+//
+// For each dimension present in both slices:
+//   offsets = outerOffset + innerOffset * outerStride
+//   sizes = innerSizes
+//   strides = outerStride * innerStride
+//
+// Any remaining outer dimensions are forwarded unchanged.
+void composeNestedSliceParameters(
+    RewriterBase &rewriter, Location loc, ArrayRef<OpFoldResult> outerOffsets,
+    ArrayRef<OpFoldResult> outerSizes, ArrayRef<OpFoldResult> outerStrides,
+    ArrayRef<OpFoldResult> innerOffsets, ArrayRef<OpFoldResult> innerSizes,
+    ArrayRef<OpFoldResult> innerStrides,
+    SmallVectorImpl<OpFoldResult> &composedOffsets,
+    SmallVectorImpl<OpFoldResult> &composedSizes,
+    SmallVectorImpl<OpFoldResult> &composedStrides);
+
 // Composes a pcf.write_slice with a tensor.parallel_insert_slice from an
 // scf.forall terminator. The write_slice's destination must be produced by the
 // forall op, and the parallel_insert_slice must be inserting into that result.
@@ -182,6 +219,24 @@ fuseCollapseShapeIntoProducerGeneric(RewriterBase &rewriter,
 FailureOr<PCF::WriteSliceOp>
 composeWriteSliceWithParallelInsert(RewriterBase &rewriter,
                                     PCF::WriteSliceOp writeSliceOp);
+
+/// Folds an scf.forall containing a pcf.loop into a single pcf.generic.
+///
+/// Validates structural requirements:
+/// - All ops in scf.forall.in_parallel are tensor.parallel_insert_slice.
+/// - All insert sources come from the same pcf.loop result.
+/// - All insert destinations are scf.forall shared_outs.
+/// - The pcf.loop is the last op before terminator in forall body.
+/// - The pcf.loop has single count argument (linearized).
+/// - All pcf.loop region ref arg users are pcf.write_slice ops.
+/// - Ref args have SyncOnReturnAttr sync scope.
+///
+/// Does NOT validate mapping or scope attributes (caller's responsibility).
+/// Does NOT create workgroup_count_hint (caller's responsibility).
+///
+/// On success, the forall and inner loop are replaced with a pcf.generic.
+FailureOr<PCF::GenericOp> foldForallIntoPCFLoop(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp);
 
 } // namespace mlir::iree_compiler::IREE::PCF
 

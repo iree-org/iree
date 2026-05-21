@@ -70,29 +70,27 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
-  // Check for a custom pipeline via PipelineAttrInterface.
   Attribute pipelineAttr = translationInfo.getPassPipeline();
-  if (auto customPipeline =
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  VMVXCodegenPipelineOptions vmvxOptions(
+      /*enableUKernels=*/target && hasUkernel(target.getConfiguration()));
+
+  // No pipeline specified, nothing to do.
+  if (isa<IREE::Codegen::NoPipelineAttr>(pipelineAttr)) {
+    return;
+  }
+
+  // Check for a pipeline via PipelineAttrInterface.
+  if (auto pipelineIface =
           dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
-    if (failed(customPipeline.buildPipeline(pipeline,
-                                            /*options=*/nullptr))) {
-      funcOp.emitOpError("failed to build custom pass pipeline");
+    if (failed(pipelineIface.buildPipeline(pipeline, &vmvxOptions))) {
+      funcOp.emitOpError("failed to build pass pipeline");
       return signalPassFailure();
     }
   } else {
-    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    bool enableUKernels = target && hasUkernel(target.getConfiguration());
-    switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    // No pipeline specified, nothing to do.
-    case IREE::Codegen::DispatchLoweringPassPipeline::None:
-      return;
-    case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-      addVMVXDefaultPassPipeline(pipeline, enableUKernels);
-      break;
-    default:
-      funcOp.emitOpError("Unsupported pipeline on VMVX target.");
-      return signalPassFailure();
-    }
+    // Not an interface implementor -- reject any remaining legacy pipeline.
+    funcOp.emitOpError("Unsupported pipeline on VMVX target.");
+    return signalPassFailure();
   }
 
   LDBG() << "Using pass pipeline: ";

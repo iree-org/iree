@@ -35,6 +35,7 @@ iree_cc_library(
     LLVMLinker
     LLVMMC
     LLVMPasses
+    LLVMSPIRVCodeGen
     LLVMSupport
     LLVMTarget
     LLVMTransformUtils

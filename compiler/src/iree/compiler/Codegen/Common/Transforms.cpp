@@ -134,9 +134,9 @@ struct FoldRelayoutOpIntoMapStorePattern
     if (!op) {
       return failure();
     }
-    // Folding tensor.pad is handled by a separate pattern.
+    // Folding tensor.pad and linalg.pack are handled by separate patterns.
     if (!isSupportedSingleInputRelayoutOpForResult(op) ||
-        isa<tensor::PadOp>(op)) {
+        isa<tensor::PadOp, linalg::PackOp>(op)) {
       return failure();
     }
     if (failed(foldIntoMapStore(rewriter, op, mapStoreOp))) {
@@ -172,12 +172,39 @@ private:
   PadDistributionConfigFn padDistributionConfigFn;
 };
 
+struct FoldPackOpIntoMapStorePattern
+    : OpRewritePattern<IREE::LinalgExt::MapStoreOp> {
+  FoldPackOpIntoMapStorePattern(MLIRContext *context,
+                                PadDistributionConfigFn configFn = nullptr,
+                                PatternBenefit benefit = 1)
+      : OpRewritePattern<IREE::LinalgExt::MapStoreOp>(context, benefit),
+        padDistributionConfigFn(configFn) {}
+
+  LogicalResult matchAndRewrite(IREE::LinalgExt::MapStoreOp mapStoreOp,
+                                PatternRewriter &rewriter) const override {
+    auto packOp = mapStoreOp.getInput().getDefiningOp<linalg::PackOp>();
+    if (!packOp) {
+      return failure();
+    }
+    if (failed(foldPackIntoMapStore(rewriter, packOp, mapStoreOp,
+                                    padDistributionConfigFn))) {
+      return failure();
+    }
+    return success();
+  }
+
+private:
+  PadDistributionConfigFn padDistributionConfigFn;
+};
+
 } // namespace
 
 void populateCombineRelayoutOpPatterns(
     RewritePatternSet &patterns,
     PadDistributionConfigFn padDistributionConfigFn) {
   patterns.add<FoldRelayoutOpIntoMapStorePattern>(patterns.getContext());
+  patterns.add<FoldPackOpIntoMapStorePattern>(patterns.getContext(),
+                                              padDistributionConfigFn);
   if (padDistributionConfigFn) {
     patterns.add<FoldPadOpIntoMapStorePattern>(patterns.getContext(),
                                                padDistributionConfigFn);
@@ -1148,26 +1175,41 @@ struct ExpandDestinationForallOp final
       return failure();
     }
 
-    // We only want this pattern if the forall op result is being written to a
-    // full slice, or an expandable buffer. Otherwise the hoisted collapse op is
-    // not foldable.
+    // This pattern hoists a collapse_shape out of the forall body by
+    // expanding the forall destination and wrapping the result in a
+    // collapse_shape: expand -> new_forall -> collapse. The collapse
+    // result has the exact same type as the original forall result, so
+    // all users of the original result (stores, tensor.dim, etc.) see
+    // an unchanged type. The only requirement is that at least one store
+    // user can absorb the expansion, so the collapse is foldable. Even
+    // if the collapse survives (e.g., non-store users keep it alive),
+    // it is valid IR and strictly better than failing to hoist.
+    bool hasExpandableStore = false;
     for (Operation *foralluser : tiedResult.getUsers()) {
       auto storeOp =
           dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(foralluser);
-      if (storeOp && isFullSlice(storeOp, storeOp.getTargetType(),
-                                 storeOp.getTargetDims())) {
+      if (storeOp) {
+        if (!isFullSlice(storeOp, storeOp.getTargetType(),
+                         storeOp.getTargetDims())) {
+          return failure();
+        }
+        hasExpandableStore = true;
         continue;
       }
       auto storeToBufferOp =
           dyn_cast<IREE::Codegen::StoreToBufferOp>(foralluser);
-      if (!storeToBufferOp) {
-        return failure();
+      if (storeToBufferOp) {
+        MemRefType bufferType = storeToBufferOp.getBuffer().getType();
+        if (failed(memref::ExpandShapeOp::computeExpandedType(
+                bufferType, expandedDestShape, reIndices))) {
+          return failure();
+        }
+        hasExpandableStore = true;
+        continue;
       }
-      MemRefType bufferType = storeToBufferOp.getBuffer().getType();
-      if (failed(memref::ExpandShapeOp::computeExpandedType(
-              bufferType, expandedDestShape, reIndices))) {
-        return failure();
-      }
+    }
+    if (!hasExpandableStore) {
+      return failure();
     }
 
     // This allows us to assume that the extract/inserts in the loop are

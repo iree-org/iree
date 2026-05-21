@@ -16,7 +16,9 @@
 #include "iree/compiler/Utils/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -63,6 +65,7 @@ bool isNonNullAndOutsideDispatch(Operation *op) {
   }
   return true;
 }
+
 bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations) {
   return llvm::all_of(operations, [](Operation *op) {
     return isNonNullAndOutsideDispatch(op);
@@ -303,6 +306,55 @@ clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
   return newTargetOp;
 }
 
+bool hasExternalUserBlockingProducerFusion(
+    Operation *rootOp, Operation *producerOp,
+    ArrayRef<Operation *> fusionGroupOps) {
+  Block *block = rootOp->getBlock();
+  assert(block == producerOp->getBlock() &&
+         "root and producer expected to be in the same block");
+
+  BackwardSliceOptions sliceOptions;
+  sliceOptions.inclusive = true;
+  sliceOptions.omitUsesFromAbove = false;
+  sliceOptions.omitBlockArguments = true;
+  sliceOptions.filter = [&](Operation *op) {
+    Operation *ancestor = block->findAncestorOpInBlock(*op);
+    return !ancestor || !ancestor->isBeforeInBlock(producerOp);
+  };
+  llvm::SmallPtrSet<Operation *, 32> fusionGroupSet;
+  fusionGroupSet.insert(fusionGroupOps.begin(), fusionGroupOps.end());
+  llvm::SmallPtrSet<Operation *, 32> fusionGroupDeps;
+  for (Operation *seed : fusionGroupOps) {
+    llvm::SetVector<Operation *> slice;
+    LogicalResult status = getBackwardSlice(seed, &slice, sliceOptions);
+    assert(succeeded(status) && "expected backward slice");
+    (void)status;
+    for (Operation *op : slice) {
+      if (Operation *ancestor = block->findAncestorOpInBlock(*op)) {
+        fusionGroupDeps.insert(ancestor);
+      }
+    }
+  }
+  for (Value producerResult : producerOp->getResults()) {
+    for (OpOperand &use : producerResult.getUses()) {
+      Operation *user = block->findAncestorOpInBlock(*use.getOwner());
+      if (!user || fusionGroupSet.contains(user)) {
+        continue;
+      }
+      if (!user->isBeforeInBlock(rootOp)) {
+        continue;
+      }
+      if (isa<IREE::Flow::DispatchRegionOp>(user)) {
+        return true;
+      }
+      if (fusionGroupDeps.contains(user)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 // Move a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
 FailureOr<IREE::Flow::DispatchRegionOp>
@@ -318,10 +370,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
   // New values that are yielded from dispatch.
   SmallVector<Value> yieldedResults;
-
   llvm::SetVector<Operation *> targetSet;
   targetSet.insert(targets.begin(), targets.end());
-
   Block &body = regionOp.getBody().front();
   for (Operation *target : llvm::reverse(targets)) {
     // Clone op into dispatch region.
@@ -337,7 +387,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
             // The use is not in
             // 1. the current dispatch
             // 2. Not in one of the targets.
-            return !regionOp->isProperAncestor(user) && !targetSet.count(user);
+            return !regionOp->isProperAncestor(user) &&
+                   !targetSet.contains(user);
           });
       if (hasUsesOutsideOfRegion) {
         replacedValues.push_back(result);
@@ -358,20 +409,63 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                       &body);
   }
 
+  // Collect all ops that must be moved after the dispatch. Start from direct
+  // users of replaced values and transitively include ops that use their
+  // results, normalizing nested uses to ancestors in the dispatch block so that
+  // "uses from above" are handled correctly.
+  Block *dispatchBlock = regionOp->getBlock();
+  auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
+  llvm::SetVector<Operation *> opsToMove;
+  auto addUser = [&](Value val) {
+    for (OpOperand &use : val.getUses()) {
+      Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+      if (user && user->isBeforeInBlock(regionOp) && !isInTargetSet(user)) {
+        opsToMove.insert(user);
+      }
+    }
+  };
+  for (Value val : replacedValues) {
+    addUser(val);
+  }
+  // Transitively collect ops that use results of ops already in the set.
+  // Index-based loop: addUser may append to opsToMove.
+  for (unsigned i = 0; i < opsToMove.size(); ++i) {
+    for (Value result : opsToMove[i]->getResults()) {
+      addUser(result);
+    }
+  }
+
+  // Once legality is established, expose the moved values as dispatch results.
   FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =
       appendDispatchRegionResults(rewriter, regionOp, yieldedResults,
                                   dispatchOpNewResultsDynamicDims);
-
   if (failed(newRegionOp)) {
     return regionOp->emitOpError("failed to append results to op");
   }
 
+  // External users now consume the yielded dispatch values.
   ValueRange replacements =
       newRegionOp->getResults().take_back(replacedValues.size());
   for (auto [index, replacedVal] : llvm::enumerate(replacedValues)) {
     rewriter.replaceAllUsesWith(replacedVal, replacements[index]);
   }
-  for (auto target : llvm::reverse(targets)) {
+
+  // Keep rewritten users after the dispatch so the new values dominate them.
+  // Sort by original block order (which respects data dependencies including
+  // values captured from above in nested regions) rather than topological sort
+  // (which only sees direct operands).
+  if (!opsToMove.empty()) {
+    Operation *newDispatchOp = newRegionOp->getOperation();
+    SmallVector<Operation *> sorted(opsToMove.begin(), opsToMove.end());
+    llvm::sort(sorted, [](Operation *a, Operation *b) {
+      return a->isBeforeInBlock(b);
+    });
+    for (Operation *op : llvm::reverse(sorted)) {
+      rewriter.moveOpAfter(op, newDispatchOp);
+    }
+  }
+
+  for (auto *target : llvm::reverse(targets)) {
     rewriter.eraseOp(target);
   }
   return newRegionOp.value();
@@ -664,6 +758,12 @@ static bool isAttentionMaskGenerator(Operation *op) {
         return true;
       }
     }
+    if (auto attention =
+            dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(use.getOwner())) {
+      if (attention.getMask() == use.get()) {
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -752,8 +852,70 @@ bool isCloneableIntoDispatchOp(Operation *op,
   return false;
 }
 
+/// Returns true if `operand` is an init that producers cannot be fused
+/// through (scatter's `original`, insert_slice's `dest`, ...).
+static bool isUnfusableInit(OpOperand &operand) {
+  Operation *op = operand.getOwner();
+  if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(op)) {
+    return insertSlice.getDest() == operand.get();
+  }
+  auto dpsOp = dyn_cast<DestinationStyleOpInterface>(op);
+  if (!dpsOp || !dpsOp.isDpsInit(&operand)) {
+    return false;
+  }
+  // A null matching map means the init has no mapping into the affine
+  // iteration space, so producers cannot be fused through it.
+  // Scatter's `original` hits this branch — its writes are addressed by
+  // `indices`, not mapped from iteration variables.
+  auto fusionOp = dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(op);
+  return fusionOp && !fusionOp.getMatchingIndexingMap(&operand);
+}
+
+/// Collects values whose producers materialize a tensor write feeding an
+/// init that cannot be fused through (scatter's `original`,
+/// insert_slice's `dest`, ...). Such producers must stay out of the dispatch.
+static llvm::DenseSet<Value>
+collectUnfusableInitSources(IREE::Flow::DispatchRegionOp regionOp,
+                            CloneableIntoDispatchOptions options) {
+  BackwardSliceOptions sliceOpts;
+  sliceOpts.omitUsesFromAbove = false;
+  sliceOpts.omitBlockArguments = true;
+  sliceOpts.inclusive = true;
+  sliceOpts.filter = [&](Operation *op) {
+    return IREE::Flow::isCloneableIntoDispatchOp(op, options);
+  };
+
+  SetVector<Operation *> slice;
+  regionOp.getBody().walk([&](Operation *op) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (isUnfusableInit(operand)) {
+        (void)getBackwardSlice(operand.get(), &slice, sliceOpts);
+      }
+    }
+  });
+
+  llvm::DenseSet<Value> sources;
+  for (Operation *sliceOp : slice) {
+    if (isa<tensor::ExtractSliceOp, tensor::EmptyOp, tensor::ExpandShapeOp,
+            tensor::CollapseShapeOp>(sliceOp)) {
+      continue;
+    }
+    for (Value r : sliceOp->getResults()) {
+      if (isa<RankedTensorType>(r.getType())) {
+        sources.insert(r);
+      }
+    }
+  }
+  return sources;
+}
+
 /// Checks if the `Value` has a use within the dispatch that is unfusable.
-static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
+static bool
+hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
+                          const llvm::DenseSet<Value> &unfusableInitSources) {
+  if (unfusableInitSources.contains(v)) {
+    return true;
+  }
   for (OpOperand &use : v.getUses()) {
     Operation *user = use.getOwner();
 
@@ -771,16 +933,13 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
         user->getParentOfType<IREE::Flow::DispatchRegionOp>();
     Operation *owner = ownerWorkgroupsOp ? ownerWorkgroupsOp : ownerRegionOp;
 
-    // Ignore uses outside of dispatch workgroups op.
     if (owner != dispatchOp) {
       continue;
     }
 
-    // Cannot fuse producer of `dest` with `tensor.insert_slice`.
-    if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
-      if (insertSliceUser.getDest() == v) {
-        return true;
-      }
+    if (auto insertSlice = dyn_cast<tensor::InsertSliceOp>(user);
+        insertSlice && use.get() == insertSlice.getDest()) {
+      return true;
     }
   }
   return false;
@@ -795,6 +954,9 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
   if (valuesDefinedAbove.empty()) {
     return {};
   }
+
+  llvm::DenseSet<Value> unfusableInitSources =
+      collectUnfusableInitSources(regionOp, options);
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
@@ -813,7 +975,8 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
     Operation *definingOp = outsideValue.getDefiningOp();
     if (!definingOp ||
         !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp)) {
+        hasUnfusableUseInDispatch(outsideValue, regionOp,
+                                  unfusableInitSources)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }

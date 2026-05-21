@@ -1,13 +1,25 @@
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN: --remarks-filter=".*" %s 2>&1 | FileCheck %s --check-prefix=CHECK-REMARKS
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-DIRECT-LOAD
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true --iree-llvmgpu-prefetch-num-stages=2 \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-DIRECT-LOAD
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
@@ -23,12 +35,19 @@
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi355x@hip \
 // RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
-// RUN: --iree-codegen-llvmgpu-use-igemm=false \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=false \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=MI355X
+
+// RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=mi355x@hip \
+// RUN: --iree-codegen-llvmgpu-use-tile-and-fuse-matmul=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
+// RUN: --iree-codegen-llvmgpu-use-igemm=false --iree-llvmgpu-use-direct-load=true \
+// RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s \
+// RUN: | FileCheck %s --check-prefix=MI355X-DIRECT-LOAD
 
 // RUN: iree-opt --mlir-print-local-scope --split-input-file --iree-gpu-test-target=gfx950 \
 // RUN: --iree-codegen-llvmgpu-use-igemm=true --iree-codegen-llvmgpu-test-tile-and-fuse-vectorize=true \
 // RUN: --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=IGEMM
+
 
 #lhs_map = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
 #rhs_map = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
@@ -62,10 +81,20 @@ func.func @scaled_matmul(
 //  CHECK-SAME:     subgroup = [4, 8, 0, 0]
 //  CHECK-SAME:     workgroup = [256, 256, 0, 0]
 
+// Sub-byte (f4) scaled matmul DMA is rejected by `shouldRejectDirectLoadDMA`
+// until narrow-type emulation can handle multi-buffered sub-byte LDS slices,
+// so even with --iree-llvmgpu-use-direct-load the heuristic falls back to the
+// swizzled non-DMA promotion path.
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
+
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
+// Same shared-memory usage as the non-direct-load CHECK above — the heuristic
+// rejects DMA for sub-byte scaled matmul.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
@@ -73,6 +102,54 @@ func.func @scaled_matmul(
 // CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=34816
+
+// -----
+
+// Small scaled matmul: scale tile is 128M x 4Ko = 512 f8 elements per workgroup
+// step, which is divisible by 256 (minDMAAlignedElements for gfx950 f8), so
+// scales should use use_global_load_dma under --iree-llvmgpu-use-direct-load.
+// Bug: reductionTileSizes[contractionK] counts MFMA invocations (1), not Ko
+// elements (4), so scaleElements was computed as 128x1=128 < 256, causing
+// scales to fall back to derived_thread_config.
+#lhs_map_small = affine_map<(M, N, Ko, Kb) -> (M, Ko, Kb)>
+#rhs_map_small = affine_map<(M, N, Ko, Kb) -> (N, Ko, Kb)>
+#scale_m_small = affine_map<(M, N, Ko, Kb) -> (M, Ko)>
+#scale_n_small = affine_map<(M, N, Ko, Kb) -> (N, Ko)>
+#out_map_small = affine_map<(M, N, Ko, Kb) -> (M, N)>
+func.func @scaled_matmul_small(
+    %A: tensor<128x64x32xf4E2M1FN>, %B: tensor<128x64x32xf4E2M1FN>,
+    %A_scales: tensor<128x64xf8E8M0FNU>, %B_scales: tensor<128x64xf8E8M0FNU>,
+    %C: tensor<128x128xf32>) -> tensor<128x128xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [#lhs_map_small, #rhs_map_small, #scale_m_small, #scale_n_small, #out_map_small],
+    iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+  } ins(%A, %B, %A_scales, %B_scales : tensor<128x64x32xf4E2M1FN>, tensor<128x64x32xf4E2M1FN>, tensor<128x64xf8E8M0FNU>, tensor<128x64xf8E8M0FNU>) outs(%C : tensor<128x128xf32>) {
+  ^bb0(%a: f4E2M1FN, %b: f4E2M1FN, %a_scale: f8E8M0FNU, %b_scale: f8E8M0FNU, %out: f32):
+    %1 = arith.scaling_extf %a, %a_scale : f4E2M1FN, f8E8M0FNU to f32
+    %2 = arith.scaling_extf %b, %b_scale : f4E2M1FN, f8E8M0FNU to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<128x128xf32>
+  return %0 : tensor<128x128xf32>
+}
+
+// Sub-byte scaled matmul DMA is rejected — see scaled_matmul above.
+// CHECK-DIRECT-LOAD-LABEL: func.func @scaled_matmul_small
+// CHECK-DIRECT-LOAD:       linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.swizzle_operand<copy_config = #iree_gpu.derived_thread_config, swizzle = #iree_codegen.xor_shuffle<256, 32>>, #iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config]
+
+// CHECK-REMARKS: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-SAME: Remark=17408
+
+// CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=17408
+
+// CHECK-REMARKS-DIRECT-LOAD-3: [Analysis] SharedMemoryUsage
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Category:deduceMMASchedule
+// CHECK-REMARKS-DIRECT-LOAD-3-SAME: Remark=17408
 
 // -----
 
@@ -112,6 +189,7 @@ func.func @scaled_matmul_with_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=34816
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=34816
@@ -186,6 +264,7 @@ func.func @scaled_matmul_with_dynamic_batch(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=26112
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=26112
@@ -232,6 +311,7 @@ func.func @small_scaled_matmul(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=2176
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=2176
@@ -353,6 +433,7 @@ func.func @scaled_matmul_accumulate(
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=157184
 
+// Sub-byte scaled matmul DMA is rejected — same usage as the non-DMA path.
 // CHECK-REMARKS-DIRECT-LOAD-2: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-DIRECT-LOAD-2-SAME: Remark=157184
@@ -516,9 +597,8 @@ func.func @small_mn_matmul(%lhs: tensor<8x5000xf16>, %rhs: tensor<5000x8xf16>, %
 // -----
 
 // Small-channel grouped convolution (weight backward): 32 groups, 8 in/out channels per group.
-// With old heuristics, this picks MFMA_F32_32x32x8_F16 with workgroup = [1, 16, 1, 1, 16, 0].
-// Now it picks MFMA_F32_16x16x16_F16 (less wasted compute per instruction for 8x8 per-group channels),
-// distributes the N=3 filter dim, and increases batch tile from 1 to 4.
+// M product (8) <= 2*kVerySkinnyDimThreshold so block intrinsics are allowed and preferred.
+// Picks MFMA_F32_4x4x4x16B_F16 (block intrinsic) for small M/N channels.
 #map_gc = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d2 + d6, d3 + d7, d0, d4)>
 #map_gc1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d1)>
 #map_gc2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
@@ -535,9 +615,116 @@ func.func @group_conv_small_channels(%arg0: tensor<32x102x102x32x8xf16>, %arg1: 
 }
 // IGEMM-LABEL: func.func @group_conv_small_channels
 // IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
+// IGEMM-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_4x4x4x16B_F16>
+// IGEMM-SAME:      promote_operands = [0, 1]
+// IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 32]
+// IGEMM-SAME:      subgroup = [1, 1, 1, 1, 1, 0]
+// IGEMM-SAME:      workgroup = [16, 8, 1, 1, 8, 0]
+
+// -----
+
+// Grouped convolution with 10 channels per group: M product (10) > 2*kVerySkinnyDimThreshold
+// so block intrinsics are skipped. Falls back to MFMA_F32_16x16x16_F16 with a larger
+// batch tile (workgroup[0]=4) to distribute the batch=32 dimension across workgroups.
+#map_gc_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d2 + d6, d3 + d7, d0, d4)>
+#map_gc1_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d1)>
+#map_gc2_10ch = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+func.func @group_conv_10_channels(%arg0: tensor<32x102x102x32x10xf16>, %arg1: tensor<32x100x100x32x10xf16>, %arg2: tensor<32x10x3x3x10xf32>) -> tensor<32x10x3x3x10xf32> {
+  %0 = linalg.generic {indexing_maps = [#map_gc_10ch, #map_gc1_10ch, #map_gc2_10ch], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<32x102x102x32x10xf16>, tensor<32x100x100x32x10xf16>) outs(%arg2 : tensor<32x10x3x3x10xf32>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<32x10x3x3x10xf32>
+  return %0 : tensor<32x10x3x3x10xf32>
+}
+// IGEMM-LABEL: func.func @group_conv_10_channels
+// IGEMM:         linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config
 // IGEMM-SAME:      mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // IGEMM-SAME:      padding = [4, 16, 1, 3, 16, 128]
 // IGEMM-SAME:      promote_operands = [0, 1]
 // IGEMM-SAME:      reduction = [0, 0, 0, 0, 0, 8]
 // IGEMM-SAME:      subgroup = [0, 1, 1, 1, 1, 0]
 // IGEMM-SAME:      workgroup = [4, 16, 1, 3, 16, 0]
+
+// -----
+
+// BF16 matmul with DMA. Both LHS and RHS are not transposed, so only LHS gets XOR swizzle.
+func.func @matmul_bf16(
+    %arg0: tensor<4096x4096xbf16>,
+    %arg1: tensor<4096x4096xbf16>,
+    %arg2: tensor<4096x4096xf32>) -> tensor<4096x4096xf32> {
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<4096x4096xbf16>, tensor<4096x4096xbf16>)
+                      outs(%arg2 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
+  return %0 : tensor<4096x4096xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_bf16
+// CHECK-DIRECT-LOAD:       linalg.matmul {lowering_config = #iree_gpu.lowering_config
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<64, 8>>, #iree_gpu.use_global_load_dma]
+
+// -----
+
+// BF16 1x1 conv (preprocessed to fold unit spatial dims) with DMA. The MMA intrinsic
+// (MFMA_F32_32x32x8_BF16) is not in the tuned swizzle table, so no XOR
+// swizzle should be applied -- only plain use_global_load_dma.
+func.func @conv_1x1_bf16_no_untuned_swizzle(
+    %arg0: tensor<16x96x64x40xbf16>,
+    %arg1: tensor<40x40xbf16>) -> tensor<16x96x64x40xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x96x64x40xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x96x64x40xf32>) -> tensor<16x96x64x40xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+  } ins(%arg0, %arg1 : tensor<16x96x64x40xbf16>, tensor<40x40xbf16>)
+    outs(%fill : tensor<16x96x64x40xf32>) {
+  ^bb0(%in: bf16, %in_1: bf16, %out: f32):
+    %0 = arith.extf %in : bf16 to f32
+    %1 = arith.extf %in_1 : bf16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %out, %2 : f32
+    linalg.yield %3 : f32
+  } -> tensor<16x96x64x40xf32>
+  return %result : tensor<16x96x64x40xf32>
+}
+
+// CHECK-DIRECT-LOAD-LABEL: func.func @conv_1x1_bf16_no_untuned_swizzle
+// CHECK-DIRECT-LOAD:       linalg.generic
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.use_global_load_dma, #iree_gpu.use_global_load_dma]
+
+// -----
+
+// mi355x + direct load: prod 1x1 conv (n16 c2048 H8 W32 k576) after preprocessing to a
+// batched GEMM-like linalg.generic; occupancy guard rejects DMA (stream copies).
+func.func @conv_1x1_mi355x_dma_rejected_occ(
+    %arg0: tensor<16x8x32x2048xbf16>,
+    %arg1: tensor<576x2048xbf16>) -> tensor<16x8x32x576xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<16x8x32x576xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<16x8x32x576xf32>) -> tensor<16x8x32x576xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>,
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
+  } ins(%arg0, %arg1 : tensor<16x8x32x2048xbf16>, tensor<576x2048xbf16>)
+    outs(%fill : tensor<16x8x32x576xf32>) {
+  ^bb0(%in: bf16, %in_1: bf16, %out: f32):
+    %0 = arith.extf %in : bf16 to f32
+    %1 = arith.extf %in_1 : bf16 to f32
+    %2 = arith.mulf %0, %1 : f32
+    %3 = arith.addf %out, %2 : f32
+    linalg.yield %3 : f32
+  } -> tensor<16x8x32x576xf32>
+  return %result : tensor<16x8x32x576xf32>
+}
+
+// MI355X-DIRECT-LOAD-LABEL: func.func @conv_1x1_mi355x_dma_rejected_occ
+// MI355X-DIRECT-LOAD:       linalg.generic
+// MI355X-DIRECT-LOAD-SAME:   promote_operands = [0, 1]
+// MI355X-DIRECT-LOAD-NOT:   use_global_load_dma

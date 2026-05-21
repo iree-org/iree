@@ -328,12 +328,12 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       funcBuilder, loc, funcBuilder.getIndexType(), funcBuilder.getIndexType(),
       funcBuilder.getIndexType(), device, exportRefAttr, workload);
 
-  // Get the executable/entry point ordinal used to dispatch.
+  // Get the executable/function id used to dispatch.
   Value executable = IREE::HAL::ExecutableLookupOp::create(
       funcBuilder, loc, funcBuilder.getType<IREE::HAL::ExecutableType>(),
       device, exportRefAttr.getRootReference().getValue());
-  Value ordinal = IREE::HAL::ExecutableExportOrdinalOp::create(
-      funcBuilder, loc, funcBuilder.getIndexType(), exportRefAttr);
+  Value functionId = IREE::HAL::ExecutableLookupFunctionOp::create(
+      funcBuilder, loc, funcBuilder.getI64Type(), executable, exportRefAttr);
 
   // Loop around dispatches based on batch size.
   // Note that we insert a barrier between each dispatch - we could make this
@@ -344,7 +344,7 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
       [&](OpBuilder &forBuilder, Location loc, Value iv, ValueRange iters) {
         // Dispatch.
         IREE::HAL::CommandBufferDispatchOp::create(
-            forBuilder, loc, commandBuffer, executable, ordinal,
+            forBuilder, loc, commandBuffer, executable, functionId,
             workgroupCountOp.getResults(), constantValues, bindingValues,
             IREE::HAL::DispatchFlags::None);
 

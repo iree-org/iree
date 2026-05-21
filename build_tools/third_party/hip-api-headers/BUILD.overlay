@@ -8,6 +8,8 @@
 # hip/hip_runtime_api.h and related headers needed by the HIP HAL driver's
 # dynamic symbol loading layer.
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(

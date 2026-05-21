@@ -62,7 +62,7 @@ jobs:
           git tag "${tag_name}"
 
       - name: Pushing changes
-        uses: ad-m/github-push-action@77c5b412c50b723d2a4fbc6d71fb5723bcd439aa # v1.0.0
+        uses: ad-m/github-push-action@4cc74773234f74829a8c21bc4d69dd4be9cfa599 # v1.1.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: ${{ github.ref_name }}
@@ -81,7 +81,7 @@ jobs:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
 
       - name: "Invoke workflow :: Build Release Packages"
-        uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1.3.1
+        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26 # v1.3.2
         with:
           workflow: Build Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}

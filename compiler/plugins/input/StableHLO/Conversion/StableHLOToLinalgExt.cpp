@@ -24,6 +24,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -237,6 +238,11 @@ struct ScatterOpConversion final
     if (scatterDimsToOperandDims.size() != indexDepth) {
       return false;
     }
+    for (auto [idx, dim] : llvm::enumerate(scatterDimsToOperandDims)) {
+      if (idx != dim) {
+        return false;
+      }
+    }
 
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
     for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
@@ -283,8 +289,8 @@ struct ScatterOpConversion final
     }
 
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
-        rewriter, op.getLoc(), originalType, updates, indices, original,
-        scatterDimMap, op.getUniqueIndices());
+        rewriter, op.getLoc(), originalType, updates, indices,
+        /*mask=*/Value(), original, scatterDimMap, op.getUniqueIndices());
 
     rewriter.inlineRegionBefore(op.getUpdateComputation(),
                                 scatterOp.getRegion(),
@@ -683,7 +689,7 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
         /*output_values=*/negInfTensor, /*output_indices=*/posInfTensor, kDim);
 
     // Define the region of TopK with a GT comparison
-    SmallVector<Type> types(2, valueElementType);
+    llvm::Repeated<Type> types(2, valueElementType);
     SmallVector<Location> locations(2, loc);
     Block *block =
         rewriter.createBlock(&topkOp.getRegion(), {}, types, locations);

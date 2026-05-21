@@ -1,0 +1,196 @@
+vm.module @comparison_ops_f64 version 0
+vm.type f64
+vm.type i32
+vm.type i64
+
+vm.export @test_cmp_lt_0_f64
+vm.func @test_cmp_lt_0_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 -4
+  %i4:5 = vm.const.f64 4
+  %i1 = vm.cmp.lt.f64.o %i4:5, %i2:3
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "4.0 < -4.0"
+}
+
+vm.export @test_cmp_lt_1_f64
+vm.func @test_cmp_lt_1_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i2:3 = vm.const.f64 4
+  %i4:5 = vm.const.f64 -4
+  %i6 = vm.cmp.lt.f64.o %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "-4.0 < 4.0"
+}
+
+vm.export @test_cmp_eq_f64_near
+vm.func @test_cmp_eq_f64_near() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.i64 50000000000  // 0x0000000BA43B7400
+  %i4:5 = vm.const.f64.zero
+  %i6:7 = vm.const.f64 1.00003
+  %i8:9 = vm.const.f64 1.0000199999999999
+  %i10:11 = vm.const.f64 2
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i12:13 = vm.const.f64 -2
+  %i14 = vm.cmp.lt.f64.o %i12:13, %i4:5
+  %i14 = vm.xor.i32 %i14, %i1
+  %i15 = vm.cmp.lt.f64.o %i10:11, %i4:5
+  %i15 = vm.xor.i32 %i15, %i1
+  %i14 = vm.cmp.ne.i32 %i14, %i15
+  vm.cond_br %i14, ^bb1(), ^bb2()
+^bb1:
+  %i16 = vm.cmp.eq.f64.o %i12:13, %i10:11
+  vm.br ^bb3()
+^bb2:
+  %i16:17 = vm.bitcast.f64.i64 %i12:13
+  %i18:19 = vm.bitcast.f64.i64 %i10:11
+  %i18:19 = vm.sub.i64 %i16:17, %i18:19
+  %i18:19 = vm.abs.i64 %i18:19
+  %i16 = vm.cmp.lt.i64.s %i18:19, %i2:3
+  vm.br ^bb3()
+^bb3:
+  %i16 = vm.cmp.nz.i32 %i16
+  vm.cond_br %i16, ^bb20(), ^bb4()
+^bb4:
+  vm.cond_br %i14, ^bb5(), ^bb6()
+^bb5:
+  %i14 = vm.cmp.eq.f64.o %i10:11, %i12:13
+  vm.br ^bb7(%i14->%i12)
+^bb6:
+  %i16:17 = vm.bitcast.f64.i64 %i10:11
+  %i18:19 = vm.bitcast.f64.i64 %i12:13
+  %i18:19 = vm.sub.i64 %i16:17, %i18:19
+  %i18:19 = vm.abs.i64 %i18:19
+  %i12 = vm.cmp.lt.i64.s %i18:19, %i2:3
+  vm.br ^bb7()
+^bb7:
+  %i12 = vm.cmp.nz.i32 %i12
+  vm.cond_br %i12, ^bb19(), ^bb8()
+^bb8:
+  %i12 = vm.cmp.lt.f64.o %i8:9, %i4:5
+  %i12 = vm.xor.i32 %i12, %i1
+  %i13 = vm.cmp.lt.f64.o %i6:7, %i4:5
+  %i13 = vm.xor.i32 %i13, %i1
+  %i13 = vm.cmp.ne.i32 %i12, %i13
+  vm.cond_br %i13, ^bb9(), ^bb10()
+^bb9:
+  %i4 = vm.cmp.eq.f64.o %i8:9, %i6:7
+  vm.br ^bb11()
+^bb10:
+  %i4:5 = vm.bitcast.f64.i64 %i8:9
+  %i16:17 = vm.bitcast.f64.i64 %i6:7
+  %i16:17 = vm.sub.i64 %i4:5, %i16:17
+  %i16:17 = vm.abs.i64 %i16:17
+  %i4 = vm.cmp.lt.i64.s %i16:17, %i2:3
+  vm.br ^bb11()
+^bb11:
+  %i1 = vm.cmp.ne.i32 %i4, %i1
+  vm.cond_br %i1, ^bb18(), ^bb12()
+^bb12:
+  %i15 = vm.cmp.ne.i32 %i12, %i15
+  vm.cond_br %i15, ^bb13(), ^bb14()
+^bb13:
+  %i1 = vm.cmp.eq.f64.o %i8:9, %i10:11
+  vm.br ^bb15()
+^bb14:
+  %i4:5 = vm.bitcast.f64.i64 %i8:9
+  %i6:7 = vm.bitcast.f64.i64 %i10:11
+  %i6:7 = vm.sub.i64 %i4:5, %i6:7
+  %i6:7 = vm.abs.i64 %i6:7
+  %i1 = vm.cmp.lt.i64.s %i6:7, %i2:3
+  vm.br ^bb15()
+^bb15:
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb17(), ^bb16()
+^bb16:
+  vm.return
+^bb17:
+  vm.fail %i0, "1.00002 !~ 2"
+^bb18:
+  vm.fail %i0, "1.00002 ~ 1.00003"
+^bb19:
+  vm.fail %i0, "2 !~ -2"
+^bb20:
+  vm.fail %i0, "-2 !~ 2"
+}
+
+vm.export @test_cmp_lte_f64
+vm.func @test_cmp_lte_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.f64 -2
+  %i6 = vm.cmp.lte.f64.o %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb4(), ^bb1()
+^bb1:
+  %i1 = vm.cmp.lte.f64.o %i2:3, %i4:5
+  %i1 = vm.cmp.nz.i32 %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 <= -2"
+^bb4:
+  vm.fail %i0, "-2 <= 2"
+}
+
+vm.export @test_cmp_gt_f64
+vm.func @test_cmp_gt_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.f64 -2
+  %i6 = vm.cmp.lt.f64.o %i2:3, %i4:5
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb4(), ^bb1()
+^bb1:
+  %i6 = vm.cmp.lt.f64.o %i4:5, %i2:3
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 > -2"
+^bb4:
+  vm.fail %i0, "-2 > 2"
+}
+
+vm.export @test_cmp_gte_f64
+vm.func @test_cmp_gte_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 9  // 0x00000009
+  %i2:3 = vm.const.f64 2
+  %i1 = vm.const.i32 1  // 0x00000001
+  %i4:5 = vm.const.f64 -2
+  %i6 = vm.cmp.lt.f64.o %i4:5, %i2:3
+  %i6 = vm.xor.i32 %i6, %i1
+  %i6 = vm.cmp.nz.i32 %i6
+  vm.cond_br %i6, ^bb4(), ^bb1()
+^bb1:
+  %i6 = vm.cmp.lt.f64.o %i2:3, %i4:5
+  %i6 = vm.xor.i32 %i6, %i1
+  %i1 = vm.cmp.ne.i32 %i6, %i1
+  vm.cond_br %i1, ^bb3(), ^bb2()
+^bb2:
+  vm.return
+^bb3:
+  vm.fail %i0, "2 >= -2"
+^bb4:
+  vm.fail %i0, "-2 >= 2"
+}

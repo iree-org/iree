@@ -158,3 +158,36 @@ func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32
 //       CHECK:       tensor.parallel_insert_slice %[[T]]
 //       CHECK:   mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]
 //       CHECK:   return %[[ADD_DIST]], %[[T_DIST]]
+
+// -----
+
+// Regression: `getVectorTileSizesFromLoopRanges` previously underflowed on
+// rank-0 ops via `loopRanges[rank - 1]`; they should be left untiled instead.
+func.func @rank0_fill_no_crash(%input: tensor<5xf32>) -> (tensor<f32>, tensor<i32>)
+    attributes {
+      translation_info = #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [64, 1, 1] subgroup_size = 64>
+    } {
+  %cstf = arith.constant 0.0 : f32
+  %csti = arith.constant 0 : i32
+  %ev = tensor.empty() : tensor<f32>
+  %ei = tensor.empty() : tensor<i32>
+  %fv = linalg.fill ins(%cstf : f32) outs(%ev : tensor<f32>) -> tensor<f32>
+  %fi = linalg.fill ins(%csti : i32) outs(%ei : tensor<i32>) -> tensor<i32>
+  %0:2 = iree_linalg_ext.arg_compare
+    dimension(0)
+    ins(%input : tensor<5xf32>)
+    outs(%fv, %fi : tensor<f32>, tensor<i32>) {
+    ^bb0(%a: f32, %b: f32):
+      %cmp = arith.cmpf ogt, %a, %b : f32
+      iree_linalg_ext.yield %cmp : i1
+  } -> tensor<f32>, tensor<i32>
+  return %0#0, %0#1 : tensor<f32>, tensor<i32>
+}
+
+// CHECK-LABEL: func.func @rank0_fill_no_crash
+//   CHECK-NOT:   scf.forall
+//       CHECK:   linalg.fill {{.*}} -> tensor<f32>
+//       CHECK:   linalg.fill {{.*}} -> tensor<i32>
+//       CHECK:   iree_linalg_ext.arg_compare
+//  CHECK-SAME:     dimension(0)
+//  CHECK-SAME:     ins({{.*}}: tensor<5xf32>)

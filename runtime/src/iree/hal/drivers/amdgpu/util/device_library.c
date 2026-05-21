@@ -6,8 +6,10 @@
 
 #include "iree/hal/drivers/amdgpu/util/device_library.h"
 
-#include "iree/hal/drivers/amdgpu/device/binaries.h"
+#include "iree/base/internal/debugging.h"
+#include "iree/hal/drivers/amdgpu/device/binaries/toc.h"
 #include "iree/hal/drivers/amdgpu/device/kernels.h"
+#include "iree/hal/drivers/amdgpu/util/device_library_target.h"
 #include "iree/hal/drivers/amdgpu/util/topology.h"
 
 //===----------------------------------------------------------------------===//
@@ -31,6 +33,47 @@ typedef struct iree_hal_amdgpu_agent_available_isas_t {
   iree_host_size_t count;
   hsa_isa_t values[32];
 } iree_hal_amdgpu_agent_available_isas_t;
+
+static iree_status_t iree_hal_amdgpu_device_library_query_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa, hsa_agent_t device_agent,
+    hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  IREE_RETURN_IF_ERROR(iree_hsa_agent_get_info(
+      IREE_LIBHSA(libhsa), device_agent, HSA_AGENT_INFO_PROFILE, out_profile));
+  return iree_hsa_agent_get_info(IREE_LIBHSA(libhsa), device_agent,
+                                 HSA_AGENT_INFO_DEFAULT_FLOAT_ROUNDING_MODE,
+                                 out_rounding_mode);
+}
+
+static iree_status_t iree_hal_amdgpu_device_library_select_agent_profile(
+    const iree_hal_amdgpu_libhsa_t* libhsa,
+    const iree_hal_amdgpu_topology_t* topology, hsa_profile_t* out_profile,
+    hsa_default_float_rounding_mode_t* out_rounding_mode) {
+  if (topology->gpu_agent_count == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "no GPU agents available for device library load");
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_amdgpu_device_library_query_agent_profile(
+      libhsa, topology->gpu_agents[0], out_profile, out_rounding_mode));
+  for (iree_host_size_t i = 1; i < topology->gpu_agent_count; ++i) {
+    hsa_profile_t profile = HSA_PROFILE_BASE;
+    hsa_default_float_rounding_mode_t rounding_mode =
+        HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+    IREE_RETURN_IF_ERROR(iree_hal_amdgpu_device_library_query_agent_profile(
+        libhsa, topology->gpu_agents[i], &profile, &rounding_mode));
+    if (profile != *out_profile || rounding_mode != *out_rounding_mode) {
+      return iree_make_status(
+          IREE_STATUS_INCOMPATIBLE,
+          "GPU agents must have matching HSA executable profiles and default "
+          "rounding modes; agent[%" PRIhsz
+          "] has profile %d and rounding mode %d but the device library "
+          "requires profile %d and rounding mode %d",
+          i, (int)profile, (int)rounding_mode, (int)*out_profile,
+          (int)*out_rounding_mode);
+    }
+  }
+  return iree_ok_status();
+}
 
 static hsa_status_t iree_hal_amdgpu_iterate_agent_isa(hsa_isa_t isa,
                                                       void* user_data) {
@@ -61,6 +104,44 @@ static iree_status_t iree_hal_amdgpu_agent_available_isas_append_to_builder(
         builder, isa_name_length - 1, &isa_name));
     IREE_RETURN_IF_ERROR(iree_hsa_isa_get_info_alt(
         IREE_LIBHSA(libhsa), isas->values[i], HSA_ISA_INFO_NAME, isa_name));
+  }
+  return iree_ok_status();
+}
+
+static const iree_file_toc_t* iree_hal_amdgpu_device_library_find_file_for_arch(
+    iree_string_view_t arch) {
+  const iree_string_view_t isa_prefix = IREE_SVL("amdgcn-amd-amdhsa--");
+  for (iree_host_size_t i = 0; i < iree_hal_amdgpu_device_binaries_size();
+       ++i) {
+    const iree_file_toc_t* file_toc =
+        &iree_hal_amdgpu_device_binaries_create()[i];
+    iree_string_view_t file_name = iree_make_cstring_view(file_toc->name);
+    if (!iree_string_view_starts_with(file_name, isa_prefix)) continue;
+    iree_string_view_t file_arch = iree_string_view_substr(
+        file_name, isa_prefix.size, IREE_STRING_VIEW_NPOS);
+    if (iree_hal_amdgpu_device_library_target_matches_file_arch(file_arch,
+                                                                arch)) {
+      return file_toc;
+    }
+  }
+  return NULL;
+}
+
+static iree_status_t iree_hal_amdgpu_device_library_find_file_for_isa(
+    iree_string_view_t isa_name, const iree_file_toc_t** out_file_toc) {
+  *out_file_toc = NULL;
+  iree_hal_amdgpu_device_library_target_candidate_list_t candidates = {0};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_amdgpu_device_library_target_candidates_from_isa(isa_name,
+                                                                &candidates));
+  for (iree_host_size_t i = 0; i < candidates.count; ++i) {
+    const iree_file_toc_t* file_toc =
+        iree_hal_amdgpu_device_library_find_file_for_arch(
+            candidates.values[i].value);
+    if (file_toc) {
+      *out_file_toc = file_toc;
+      break;
+    }
   }
   return iree_ok_status();
 }
@@ -108,15 +189,12 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
                                       HSA_ISA_INFO_NAME, isa_name_buffer));
     iree_string_view_t isa_name =
         iree_make_string_view(isa_name_buffer, isa_name_length - /*NUL*/ 1);
-    for (iree_host_size_t j = 0; j < iree_hal_amdgpu_device_binaries_size();
-         ++j) {
-      const iree_file_toc_t* file_toc =
-          &iree_hal_amdgpu_device_binaries_create()[j];
-      if (iree_string_view_starts_with(IREE_SV(file_toc->name), isa_name)) {
-        best_isa = isa;
-        best_file_toc = file_toc;
-        break;
-      }
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_amdgpu_device_library_find_file_for_isa(isa_name,
+                                                             &best_file_toc));
+    if (best_file_toc) {
+      best_isa = isa;
+      break;
     }
   }
 
@@ -135,20 +213,33 @@ static iree_status_t iree_hal_amdgpu_device_library_select_file(
 #if IREE_STATUS_MODE >= 2
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator, &builder);
-    IREE_IGNORE_ERROR(iree_string_builder_append_string(
-        &builder, IREE_SV("available in runtime build: [")));
-    IREE_IGNORE_ERROR(iree_file_toc_append_names_to_builder(
-        iree_hal_amdgpu_device_binaries_create(),
-        iree_hal_amdgpu_device_binaries_size(), &builder));
-    IREE_IGNORE_ERROR(iree_string_builder_append_string(
-        &builder, IREE_SV("], supported by agent: [")));
-    IREE_IGNORE_ERROR(iree_hal_amdgpu_agent_available_isas_append_to_builder(
-        libhsa, &available_isas, &builder));
-    IREE_IGNORE_ERROR(
-        iree_string_builder_append_string(&builder, IREE_SV("]")));
-    status = iree_status_annotate_f(status, "%.*s",
-                                    (int)iree_string_builder_size(&builder),
-                                    iree_string_builder_buffer(&builder));
+    iree_status_t annotation_status = iree_string_builder_append_string(
+        &builder, IREE_SV("available in runtime build: ["));
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status = iree_file_toc_append_names_to_builder(
+          iree_hal_amdgpu_device_binaries_create(),
+          iree_hal_amdgpu_device_binaries_size(), &builder);
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status = iree_string_builder_append_string(
+          &builder, IREE_SV("], supported by agent: ["));
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status =
+          iree_hal_amdgpu_agent_available_isas_append_to_builder(
+              libhsa, &available_isas, &builder);
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      annotation_status =
+          iree_string_builder_append_string(&builder, IREE_SV("]"));
+    }
+    if (iree_status_is_ok(annotation_status)) {
+      status = iree_status_annotate_f(status, "%.*s",
+                                      (int)iree_string_builder_size(&builder),
+                                      iree_string_builder_buffer(&builder));
+    } else {
+      status = iree_status_join(status, annotation_status);
+    }
     iree_string_builder_deinitialize(&builder);
 #endif  // IREE_STATUS_MODE >= 2
   }
@@ -188,19 +279,31 @@ iree_status_t iree_hal_amdgpu_device_library_initialize(
   // lacking. These may have only been used for HSAIL anyway.
   const char* options = NULL;
 
+  // ROCR's executable loader retains some process-lifetime bookkeeping while
+  // building executable/code-object state. Keep LeakSanitizer focused on
+  // IREE-owned allocations by bracketing those HSA setup calls.
+
   // Bind a code object reader to the memory sourced from our rodata.
   hsa_code_object_reader_t code_object_reader;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hsa_code_object_reader_create_from_memory(
-              IREE_LIBHSA(libhsa), file_toc->data, file_toc->size,
-              &code_object_reader));
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  iree_status_t status = iree_hsa_code_object_reader_create_from_memory(
+      IREE_LIBHSA(libhsa), file_toc->data, file_toc->size, &code_object_reader);
+  IREE_LEAK_CHECK_DISABLE_POP();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status);
 
   // Create the executable that will hold all of the loaded code objects.
-  // TODO(benvanik): pass profile/rounding mode from queried info.
-  iree_status_t status =
-      iree_hsa_executable_create_alt(IREE_LIBHSA(libhsa), HSA_PROFILE_FULL,
-                                     HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT,
-                                     options, &out_library->executable);
+  hsa_profile_t executable_profile = HSA_PROFILE_BASE;
+  hsa_default_float_rounding_mode_t executable_rounding_mode =
+      HSA_DEFAULT_FLOAT_ROUNDING_MODE_DEFAULT;
+  status = iree_hal_amdgpu_device_library_select_agent_profile(
+      libhsa, topology, &executable_profile, &executable_rounding_mode);
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  if (iree_status_is_ok(status)) {
+    status = iree_hsa_executable_create_alt(
+        IREE_LIBHSA(libhsa), executable_profile, executable_rounding_mode,
+        options, &out_library->executable);
+  }
+  IREE_LEAK_CHECK_DISABLE_POP();
 
   // Load the code object for each agent.
   // Note that we could save off the loaded_code_object per-agent here but then
@@ -210,9 +313,11 @@ iree_status_t iree_hal_amdgpu_device_library_initialize(
   // loaded_code_objects caches the results.
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < topology->gpu_agent_count; ++i) {
+      IREE_LEAK_CHECK_DISABLE_PUSH();
       status = iree_hsa_executable_load_agent_code_object(
           IREE_LIBHSA(libhsa), out_library->executable, topology->gpu_agents[i],
           code_object_reader, options, NULL);
+      IREE_LEAK_CHECK_DISABLE_POP();
       if (!iree_status_is_ok(status)) break;
     }
   }
@@ -220,13 +325,16 @@ iree_status_t iree_hal_amdgpu_device_library_initialize(
   // Freeze the executable now that loading has completed. Most queries require
   // that the executable be frozen.
   if (iree_status_is_ok(status)) {
+    IREE_LEAK_CHECK_DISABLE_PUSH();
     status = iree_hsa_executable_freeze(IREE_LIBHSA(libhsa),
                                         out_library->executable, options);
+    IREE_LEAK_CHECK_DISABLE_POP();
   }
 
   // Release the reader now that the executable has been fully loaded.
-  IREE_IGNORE_ERROR(iree_hsa_code_object_reader_destroy(IREE_LIBHSA(libhsa),
-                                                        code_object_reader));
+  status =
+      iree_status_join(status, iree_hsa_code_object_reader_destroy(
+                                   IREE_LIBHSA(libhsa), code_object_reader));
 
   if (!iree_status_is_ok(status)) {
     iree_hal_amdgpu_device_library_deinitialize(out_library);
@@ -241,8 +349,8 @@ void iree_hal_amdgpu_device_library_deinitialize(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   if (library->executable.handle) {
-    IREE_IGNORE_ERROR(iree_hsa_executable_destroy(IREE_LIBHSA(library->libhsa),
-                                                  library->executable));
+    iree_hal_amdgpu_hsa_cleanup_assert_success(
+        iree_hsa_executable_destroy_raw(library->libhsa, library->executable));
   }
 
   memset(library, 0, sizeof(*library));
@@ -423,14 +531,6 @@ static iree_status_t iree_hal_amdgpu_device_library_populate_kernel_args(
               IREE_LIBHSA(libhsa), symbol,
               HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_KERNARG_SEGMENT_ALIGNMENT,
               &out_kernel_args->kernarg_alignment));
-
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
-  // TODO(benvanik): intern an export_loc? We don't have a Tracy API for this
-  // yet and our option is to leak the value unconditionally.
-  out_kernel_args->trace_src_loc = 0;
-#else
-  out_kernel_args->trace_src_loc = 0;
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

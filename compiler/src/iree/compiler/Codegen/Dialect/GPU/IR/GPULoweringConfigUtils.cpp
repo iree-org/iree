@@ -100,6 +100,43 @@ getPromotionTypesList(LoweringConfigAttr config) {
   return array.getValue();
 }
 
+LogicalResult
+verifyPromotedOperandsList(function_ref<InFlightDiagnostic()> emitError,
+                           DictionaryAttr attributes) {
+  Attribute promotionTypesAttr = attributes.get(kPromotionTypesName);
+  if (!promotionTypesAttr) {
+    return success();
+  }
+  auto promotionTypes = dyn_cast<ArrayAttr>(promotionTypesAttr);
+  if (!promotionTypes) {
+    return emitError() << "promotion_types must be an array";
+  }
+
+  auto promotedOperandsAttr = attributes.getAs<ArrayAttr>(kPromoteOperandsName);
+  if (!promotedOperandsAttr) {
+    return emitError()
+           << "promotion_types requires promote_operands to be specified";
+  }
+
+  std::optional<SmallVector<int64_t>> promotedOperands =
+      getIntegerVector(promotedOperandsAttr);
+  if (!promotedOperands) {
+    return emitError() << "promote_operands must be an array of integers";
+  }
+
+  if (promotionTypes.size() != promotedOperands->size()) {
+    return emitError()
+           << "promote_operands and promotion_types must have the same length";
+  }
+
+  if (!llvm::all_of(promotionTypes.getValue(), llvm::IsaPred<PromotionAttr>)) {
+    return emitError() << "promotion_types elements must implement "
+                          "IREE::GPU::PromotionAttr";
+  }
+
+  return success();
+}
+
 void appendPromotedOperandsList(MLIRContext *context,
                                 SmallVectorImpl<NamedAttribute> &attrs,
                                 ArrayRef<int64_t> operands,
@@ -112,6 +149,15 @@ void appendPromotedOperandsList(MLIRContext *context,
     attrs.emplace_back(kPromotionTypesName, b.getArrayAttr(promotionTypes));
   }
 }
+
+static bool arePromotionTypesEqual(std::optional<ArrayRef<Attribute>> lhs,
+                                   std::optional<ArrayRef<Attribute>> rhs) {
+  if (lhs.has_value() != rhs.has_value()) {
+    return false;
+  }
+  return !lhs || lhs->equals(*rhs);
+}
+
 IREE::GPU::LoweringConfigAttr
 setPromotedOperandsList(MLIRContext *context,
                         IREE::GPU::LoweringConfigAttr currAttr,
@@ -122,8 +168,11 @@ setPromotedOperandsList(MLIRContext *context,
   NamedAttrList attributes(currAttributes);
   std::optional<SmallVector<int64_t>> currPromotedOperandsList =
       getPromotedOperandList(currAttr);
+  std::optional<ArrayRef<Attribute>> currPromotionTypes =
+      getPromotionTypesList(currAttr);
   if (currPromotedOperandsList &&
-      currPromotedOperandsList.value() == operands) {
+      currPromotedOperandsList.value() == operands &&
+      arePromotionTypesEqual(currPromotionTypes, promotionTypes)) {
     return currAttr;
   }
 
@@ -133,6 +182,8 @@ setPromotedOperandsList(MLIRContext *context,
 
   if (promotionTypes) {
     attributes.set(kPromotionTypesName, b.getArrayAttr(promotionTypes.value()));
+  } else {
+    attributes.erase(kPromotionTypesName);
   }
   return IREE::GPU::LoweringConfigAttr::get(context,
                                             attributes.getDictionary(context));

@@ -1055,6 +1055,72 @@ module attributes {transform.with_named_sequence} {
 
 // -----
 
+// Verify exact matching for the unmasked online_attention op.
+
+#map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#map_key = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>
+#map_value = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>
+#map_scale = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#map_output = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#map_max = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+
+// CHECK-LABEL: func.func @online_attention_exact
+func.func @online_attention_exact(
+    %query: tensor<2x10x6x4xf16>,
+    %key: tensor<2x10x4x4xf16>,
+    %value: tensor<2x10x4x4xf16>,
+    %scale: f16,
+    %output: tensor<2x10x6x4xf32>,
+    %max: tensor<2x10x6xf32>,
+    %sum: tensor<2x10x6xf32>) -> tensor<2x10x6x4xf32> {
+
+  // CHECK: iree_linalg_ext.online_attention
+  // CHECK-SAME: match_status = "matched"
+  %res:3 = iree_linalg_ext.online_attention {
+      indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output, #map_max, #map_max],
+      match_status = "unmatched"}
+      ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
+      outs(%output, %max, %sum : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) {
+    ^bb0(%arg: f32):
+      iree_linalg_ext.yield %arg : f32
+    } -> tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>
+
+  return %res#0 : tensor<2x10x6x4xf32>
+}
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @match_online_attention(%op: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %batch, %m, %n, %k1, %k2 =
+      transform.iree.match.online_attention %op,
+        query_type = f16, key_type = f16, value_type = f16, scale_type = f16,
+        output_type = f32, max_type = f32, sum_type = f32,
+        indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output, #map_max, #map_max] :
+        !transform.any_op -> !transform.param<i64>
+
+    transform.iree.match.dims_equal %batch, [2, 10] : !transform.param<i64>
+    transform.iree.match.dims_equal %m, [6] : !transform.param<i64>
+    transform.iree.match.dims_equal %n, [4] : !transform.param<i64>
+    transform.iree.match.dims_equal %k1, [4] : !transform.param<i64>
+    transform.iree.match.dims_equal %k2, [4] : !transform.param<i64>
+    transform.yield %op : !transform.any_op
+  }
+
+  transform.named_sequence @annotate(%op: !transform.any_op {transform.readonly}) {
+    %0 = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %op "match_status" = %0 : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module
+        @match_online_attention -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
 // Verify indexing maps mismatching for the attention op.
 
 #map_query = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>

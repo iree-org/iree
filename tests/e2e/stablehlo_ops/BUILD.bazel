@@ -278,6 +278,27 @@ iree_check_single_backend_test_suite(
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv-bda_vulkan",
+    srcs = [
+        "add.mlir",
+    ],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32",
+        "--iree-vulkan-dispatch-abi=bda",
+    ],
+    driver = "vulkan",
+    runner_args = [
+        "--vulkan_dispatch_abi=bda",
+    ],
+    tags = [
+        "manual",
+        "notap",
+        "vulkan_uses_vk_khr_buffer_device_address",
+    ],
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_cuda_graph",
     srcs = ALL_SRCS,
     compiler_flags = [

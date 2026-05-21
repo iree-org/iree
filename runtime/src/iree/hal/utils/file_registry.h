@@ -21,9 +21,10 @@ extern "C" {
 // Supported file handle types are determined based on compile configuration.
 //
 // Some implementations - such as for IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION -
-// will try to import the backing storage directly into a usable staging buffer
-// using |device_allocator| and available |queue_affinity|. Otherwise the
-// file is allowed to be used with any device or queue as it is host-only.
+// may import the backing storage directly into a device-accessible storage
+// buffer using |device_allocator| and available |queue_affinity|. Passing an
+// allocator enables that optional import path, but import failure does not make
+// the host-backed file invalid.
 //
 // If |proactor| is non-NULL, file descriptor-based files will be bound to the
 // proactor for async I/O at construction time. The async handle is then

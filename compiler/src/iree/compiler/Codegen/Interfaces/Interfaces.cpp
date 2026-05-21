@@ -32,6 +32,7 @@
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/GPU/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
+#include "mlir/Dialect/GPU/Transforms/IndexedAccessOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
@@ -47,6 +48,7 @@
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
 #include "mlir/Dialect/Vector/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
+#include "mlir/Dialect/Vector/Transforms/IndexedAccessOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/SubsetOpInterfaceImpl.h"
 
 namespace mlir::iree_compiler {
@@ -107,6 +109,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   affine::registerValueBoundsOpInterfaceExternalModels(registry);
   arith::registerValueBoundsOpInterfaceExternalModels(registry);
   bufferization::registerTransformDialectExtension(registry);
+  gpu::registerIndexedAccessOpInterfaceExternalModels(registry);
   gpu::registerValueBoundsOpInterfaceExternalModels(registry);
   gpu::registerTransformDialectExtension(registry);
   gpu::registerValueBoundsOpInterfaceExternalModels(registry);
@@ -121,6 +124,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   tensor::registerTransformDialectExtension(registry);
   tensor::registerValueBoundsOpInterfaceExternalModels(registry);
   transform::registerLoopExtension(registry);
+  vector::registerIndexedAccessOpInterfaceExternalModels(registry);
   vector::registerSubsetOpInterfaceExternalModels(registry);
   vector::registerTransformDialectExtension(registry);
   vector::registerValueBoundsOpInterfaceExternalModels(registry);

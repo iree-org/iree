@@ -1,0 +1,27 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+_WEBGPU_SPIRV_COMPILER_PLUGIN = select({
+    "//compiler/plugins:hal_target_webgpu_spirv_enabled": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+iree_bytecode_module(
+    name = "hello_world_bytecode_module_webgpu",
+    src = "hello_world.mlir",
+    flags = [
+        "--iree-hal-target-device=webgpu",
+    ],
+    target_compatible_with = _WEBGPU_SPIRV_COMPILER_PLUGIN,
+)

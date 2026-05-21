@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_VMVX_PASSES_H_
 #define IREE_COMPILER_CODEGEN_VMVX_PASSES_H_
 
+#include "iree/compiler/Codegen/Utils/CodegenPipelineOptions.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -26,6 +27,29 @@ namespace mlir::iree_compiler {
 /// suitable for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
                                 bool enableUKernels);
+
+/// Wraps VMVX pipeline options for passing through
+/// PipelineAttrInterface::buildPipeline.
+struct VMVXCodegenPipelineOptions final
+    : CodegenPipelineOptionsBase<VMVXCodegenPipelineOptions> {
+  explicit VMVXCodegenPipelineOptions(bool enableUKernels)
+      : enableUKernels(enableUKernels) {}
+
+  bool enableUKernels = false;
+};
+
+//----------------------------------------------------------------------------//
+// VMVX Codegen Pipelines
+//----------------------------------------------------------------------------//
+
+/// Populates passes needed for preprocessing before codegen lowerings, as well
+/// as high level lowering strategy selection.
+void buildVMVXConfigurationPassPipeline(OpPassManager &modulePassManager);
+
+/// Populates passes needed to lower high level ops to VMVX-compatible ops via
+/// the structured ops path. The `modulePassManager` should operate on the
+/// module within the IREE::HAL::ExecutableOp.
+void buildVMVXLoweringPassPipeline(OpPassManager &modulePassManager);
 
 //----------------------------------------------------------------------------//
 // VMVX Linking Passes and Pipelines

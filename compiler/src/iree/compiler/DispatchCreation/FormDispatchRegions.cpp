@@ -393,10 +393,20 @@ static bool isUnpackLikeOp(Operation *op) {
 static SmallVector<OpOperand *>
 getFusableUses(MLIRContext *context, Operation *op,
                DominanceInfo const &dominanceInfo, bool aggressiveFusion) {
-  if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
-                             return !isa<tensor::DimOp>(use.getOwner());
-                           }) != 1) {
-    return {};
+  // In non-aggressive mode, restrict fusion to producers whose results flow
+  // to a single consumer. Count distinct consumers rather than operand uses
+  // so that a single consumer reading multiple results from a multi-result
+  // producer (e.g. OnlineAttentionOp) still qualifies.
+  if (!aggressiveFusion) {
+    llvm::SetVector<Operation *> consumers;
+    for (Operation *user : op->getUsers()) {
+      if (!isa<tensor::DimOp>(user)) {
+        consumers.insert(user);
+      }
+    }
+    if (consumers.size() != 1) {
+      return {};
+    }
   }
 
   // Collect all fusable user candidates.
@@ -657,24 +667,32 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         continue;
       }
 
-      // Analyse the use to see if it is fusable.
-      for (OpOperand *fusableUse : fusableUses) {
-        Operation *consumerOp = fusableUse->getOwner();
+      // Group operands by owning consumer so the per-operand checks inside
+      // `isFusableWithConsumer` are evaluated for every operand of a consumer.
+      llvm::MapVector<Operation *, SmallVector<OpOperand *>> usesByConsumer;
+      for (OpOperand *use : fusableUses) {
+        usesByConsumer[use->getOwner()].push_back(use);
+      }
+
+      for (auto &[consumerOp, operands] : usesByConsumer) {
         if (tracker.isRootOp(consumerOp) || tracker.isFusedOp(consumerOp)) {
           continue;
         }
 
         // Ensure that fusing the consumer would not cause use-def violations.
         if (tracker.getFusionGroup(currRoot)
-                .hasTransitiveDependencyOnFusionGroup(fusableUse->getOwner(),
+                .hasTransitiveDependencyOnFusionGroup(consumerOp,
                                                       dominanceInfo)) {
           continue;
         }
 
-        if (isFusableWithConsumer(*fusableUse, tracker, options)) {
-          tracker.appendToFusionGroup(consumerOp, fusionGroup);
-          workList.push_back(consumerOp);
+        if (!llvm::all_of(operands, [&](OpOperand *use) {
+              return isFusableWithConsumer(*use, tracker, options);
+            })) {
+          continue;
         }
+        tracker.appendToFusionGroup(consumerOp, fusionGroup);
+        workList.push_back(consumerOp);
       }
     }
   }
@@ -705,7 +723,8 @@ static bool isFusableWithProducer(OpOperand &operand,
     return true;
   }
 
-  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(consumer)) {
+  if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp>(
+          consumer)) {
     // Disable all other producer fusion. TODO: Enable some producer fusions.
     return false;
   }
@@ -754,30 +773,21 @@ static bool isFusableWithProducer(OpOperand &operand,
   return true;
 }
 
-/// Check if moving the producer into the dispatch at the root's position would
-/// break any existing uses. Returns true if there are uses between the producer
-/// and the root that are not in the fusion group, which would cause a dominance
-/// violation.
-static bool hasUsesBetweenProducerAndRoot(Operation *producer, Operation *root,
-                                          const FusionGroup &fusionGroup,
-                                          const DominanceInfo &dominanceInfo) {
-  for (OpOperand &use : producer->getUses()) {
-    Operation *user = use.getOwner();
-    // Walk up to the parent in the same block as the producer/root.
-    while (user && user->getBlock() != root->getBlock()) {
-      user = user->getParentOp();
-    }
-    // If the user is in the fusion group, it will be moved too.
-    if (!user || fusionGroup.contains(user)) {
-      continue;
-    }
-    // If the user does not come after the root, then moving the producer
-    // into the dispatch at root's position would break dominance.
-    if (!dominanceInfo.properlyDominates(root, user)) {
+static bool areAllFusionGroupUsesFusableWithProducer(
+    Operation *producer, const FusionGroup &fusionGroup,
+    const FusionTracker &tracker, FormDispatchRegionsPassOptions const &options,
+    bool fuseWithTruncate) {
+  return llvm::all_of(producer->getUses(), [&](OpOperand &use) {
+    Operation *useOwner = use.getOwner();
+    Operation *useOwnerAtProducerLevel =
+        producer->getBlock()->findAncestorOpInBlock(*useOwner);
+    if (!useOwnerAtProducerLevel ||
+        !fusionGroup.contains(useOwnerAtProducerLevel)) {
       return true;
     }
-  }
-  return false;
+    return useOwnerAtProducerLevel == useOwner &&
+           isFusableWithProducer(use, tracker, options, fuseWithTruncate);
+  });
 }
 
 /// Starting from the `root` op, traverse the operand use-def chain
@@ -785,7 +795,6 @@ static bool hasUsesBetweenProducerAndRoot(Operation *producer, Operation *root,
 static void
 fuseRootsWithProducers(MLIRContext *context, Operation *root,
                        FusionGroup &fusionGroup,
-                       DominanceInfo const &dominanceInfo,
                        FormDispatchRegionsPassOptions const &options,
                        FusionTracker &tracker, bool fuseWithTruncate) {
   SmallVector<Operation *> worklist;
@@ -799,24 +808,31 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root,
       if (!producer) {
         continue;
       }
+      // Only fuse producers in the same block as the root. Cross-block
+      // fusion (e.g., producer at function scope, root inside scf.if)
+      // would create dispatch results that don't dominate external uses.
+      if (producer->getBlock() != root->getBlock()) {
+        continue;
+      }
       if (IREE::Flow::isCloneableIntoDispatchOp(producer, cloneableOptions) ||
           tracker.isFusedOp(producer) || tracker.isRootOp(producer)) {
         continue;
       }
 
-      if (!isFusableWithProducer(operand, tracker, options, fuseWithTruncate)) {
+      if (!areAllFusionGroupUsesFusableWithProducer(
+              producer, fusionGroup, tracker, options, fuseWithTruncate)) {
         continue;
       }
 
-      if (hasUsesBetweenProducerAndRoot(producer, root, fusionGroup,
-                                        dominanceInfo)) {
+      if (!options.fuseMultiUseProducers &&
+          llvm::count_if(producer->getUses(), [](OpOperand &use) {
+            return !isa<tensor::DimOp>(use.getOwner());
+          }) != 1) {
         continue;
       }
 
-      SmallVector<OpOperand *> fusableUses =
-          getFusableUses(context, producer, dominanceInfo,
-                         /*aggressiveFusion=*/options.aggressiveFusion);
-      if (fusableUses.empty() || fusableUses.front()->getOwner() != candidate) {
+      if (IREE::Flow::hasExternalUserBlockingProducerFusion(
+              root, producer, fusionGroup.getFusedOperations())) {
         continue;
       }
 
@@ -857,8 +873,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       }
       FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
-                             tracker,
+      fuseRootsWithProducers(context, &op, newGroup, options, tracker,
                              /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
@@ -866,8 +881,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     fuseRootsWithConsumers(context, roots, dominanceInfo, options, tracker);
     for (Operation *root : roots) {
       FusionGroup &fusionGroup = tracker.getFusionGroup(root);
-      fuseRootsWithProducers(context, root, fusionGroup, dominanceInfo, options,
-                             tracker,
+      fuseRootsWithProducers(context, root, fusionGroup, options, tracker,
                              /*fuseWithTruncate=*/true);
     }
   }
@@ -897,14 +911,15 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // by the `isCloneableIntoDispatchOp` call above, but for now this is done
       // as a point fix.
       if (IREE::LinalgExt::isGatherlikeOp(&op) &&
-          llvm::all_of(op.getUsers(),
-                       llvm::IsaPred<IREE::LinalgExt::AttentionOp>)) {
+          llvm::all_of(op.getUsers(), [](Operation *user) {
+            return isa<IREE::LinalgExt::AttentionOp,
+                       IREE::LinalgExt::OnlineAttentionOp>(user);
+          })) {
         continue;
       }
 
       FusionGroup &newGroup = tracker.createFusionGroup(context, &op);
-      fuseRootsWithProducers(context, &op, newGroup, dominanceInfo, options,
-                             tracker,
+      fuseRootsWithProducers(context, &op, newGroup, options, tracker,
                              /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
@@ -912,8 +927,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     fuseRootsWithConsumers(context, roots, dominanceInfo, options, tracker);
     for (Operation *root : roots) {
       FusionGroup &fusionGroup = tracker.getFusionGroup(root);
-      fuseRootsWithProducers(context, root, fusionGroup, dominanceInfo, options,
-                             tracker,
+      fuseRootsWithProducers(context, root, fusionGroup, options, tracker,
                              /*fuseWithTruncate=*/true);
     }
   }
@@ -1055,8 +1069,9 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{aggressiveFusion, fusePadWithConsumers,
-                                         fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{
+      aggressiveFusion, fuseMultiUseProducers, fusePadWithConsumers,
+      fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();

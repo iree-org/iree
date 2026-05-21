@@ -63,7 +63,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
     return success();
   }
 
-  int cumSize = 0;
+  int64_t cumSize = 0;
   const unsigned assumedVscale = clAssumedVscaleValue;
   for (auto allocaOp : allocaOps) {
     if (allocaOp->getBlock() != &funcOp.getFunctionBody().front()) {
@@ -71,7 +71,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           "all stack allocations need to be hoisted to the entry block of the "
           "function");
     }
-    int allocaSize = 1;
+    int64_t allocaSize = 1;
     auto allocaType = cast<ShapedType>(allocaOp.getType());
     for (auto dimSize : allocaType.getShape()) {
       if (ShapedType::isDynamic(dimSize)) {

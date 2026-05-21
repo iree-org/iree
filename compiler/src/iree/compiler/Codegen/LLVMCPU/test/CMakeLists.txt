@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "apply_scale_lowering.mlir"
     "assign_constant_ordinals.mlir"
     "assign_import_ordinals.mlir"
+    "assign_workgroup_local_memory.mlir"
     "check_ir_before_llvm_conversion.mlir"
     "check_ir_before_llvm_conversion_not_fail_unbound.mlir"
     "convert_to_llvm.mlir"
@@ -35,6 +36,8 @@ iree_lit_test_suite(
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
     "pipeline_disable_distribution_tests.mlir"
+    "pipeline_full_smoketests.mlir"
+    "pipeline_gather_tests.mlir"
     "pipeline_pack_unpack_tests.mlir"
     "pipeline_pad_conv_tests.mlir"
     "pipeline_pad_tests.mlir"
@@ -66,6 +69,7 @@ iree_lit_test_suite(
     "vectorize_with_masking_and_hoist.mlir"
     "verify_linalg_transform_legality.mlir"
     "verify_vector_size_legality.mlir"
+    "virtual_vector_lowering.mlir"
   TOOLS
     FileCheck
     iree-compile

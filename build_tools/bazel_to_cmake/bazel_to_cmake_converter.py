@@ -27,12 +27,13 @@ _BUILD_SETTING_CMAKE_VARIABLES = {
 }
 
 # Maps Bazel platform labels (from both select() conditions and
-# target_compatible_with) to CMake CMAKE_SYSTEM_NAME values.
+# target_compatible_with) to CMake platform condition values.
 _PLATFORM_CMAKE_SYSTEM_NAME = {
     # select() condition labels (config_setting in build_tools/bazel/).
     "//build_tools/bazel:iree_is_android": "Android",
     "//build_tools/bazel:iree_is_linux": "Linux",
     "//build_tools/bazel:iree_is_macos": "Darwin",
+    "//build_tools/bazel:iree_is_wasm": "wasm_32",
     "//build_tools/bazel:iree_is_windows": "Windows",
     # target_compatible_with constraint labels.
     "@platforms//os:android": "Android",
@@ -43,12 +44,24 @@ _PLATFORM_CMAKE_SYSTEM_NAME = {
     "@platforms//cpu:wasm32": "wasm_32",
 }
 
+_COMPILER_PLUGIN_CMAKE_OPTIONS = {
+    "//compiler/plugins:input_stablehlo_enabled": "IREE_INPUT_STABLEHLO",
+    "//compiler/plugins:input_torch_enabled": "IREE_INPUT_TORCH",
+    "//compiler/plugins:input_tosa_enabled": "IREE_INPUT_TOSA",
+    "//compiler/plugins:hal_target_cuda_enabled": "IREE_TARGET_BACKEND_CUDA",
+    "//compiler/plugins:hal_target_llvm_cpu_enabled": "IREE_TARGET_BACKEND_LLVM_CPU",
+    "//compiler/plugins:hal_target_metal_spirv_enabled": "IREE_TARGET_BACKEND_METAL_SPIRV",
+    "//compiler/plugins:hal_target_rocm_enabled": "IREE_TARGET_BACKEND_ROCM",
+    "//compiler/plugins:hal_target_vmvx_enabled": "IREE_TARGET_BACKEND_VMVX",
+    "//compiler/plugins:hal_target_vulkan_spirv_enabled": "IREE_TARGET_BACKEND_VULKAN_SPIRV",
+}
 
-class PlatformSelect:
-    """Represents a platform-conditional value from a Bazel select().
+
+class ConditionSelect:
+    """Represents a supported conditional value from a Bazel select().
 
     Carries the full condition→value mapping so that the rule handler can emit
-    CMake if/elseif/else blocks for platform-specific deps.
+    CMake if/elseif/else blocks for platform- or option-specific values.
     """
 
     def __init__(self, conditions):
@@ -57,29 +70,29 @@ class PlatformSelect:
         self.conditions = conditions
 
     def __radd__(self, other):
-        """Support: unconditional_list + PlatformSelect(...)."""
+        """Support: unconditional_list + ConditionSelect(...)."""
         if isinstance(other, list):
             return MixedDeps(unconditional=list(other), selects=[self])
         return NotImplemented
 
     def __add__(self, other):
-        """Support: PlatformSelect(...) + unconditional_list."""
+        """Support: ConditionSelect(...) + unconditional_list."""
         if isinstance(other, list):
             return MixedDeps(unconditional=list(other), selects=[self])
         return NotImplemented
 
 
 class MixedDeps:
-    """A deps value containing both unconditional entries and PlatformSelects.
+    """A deps value containing both unconditional entries and ConditionSelects.
 
-    Created by list + PlatformSelect concatenation in BUILD file exec context.
+    Created by list + ConditionSelect concatenation in BUILD file exec context.
     The rule handler splits this into a normal DEPS block (unconditional) plus
     CMake variable(s) for the conditional portions.
     """
 
     def __init__(self, unconditional, selects):
         self.unconditional = unconditional  # List of dep labels.
-        self.selects = selects  # List of PlatformSelect objects.
+        self.selects = selects  # List of ConditionSelect objects.
 
     def __add__(self, other):
         """Support: MixedDeps + list (e.g., cfg.py injecting extra deps)."""
@@ -154,6 +167,8 @@ class BuildFileFunctions(object):
 
     def _convert_platform_condition(self, constraint_label):
         """Returns a CMake condition string for a platform constraint label."""
+        if constraint_label == "//build_tools/bazel:iree_is_wasm":
+            return 'IREE_ARCH STREQUAL "wasm_32"'
         cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
         if not cmake_name:
             return None
@@ -163,37 +178,42 @@ class BuildFileFunctions(object):
             return f'IREE_ARCH STREQUAL "{cmake_name}"'
         return f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
 
+    def _convert_select_condition(self, label):
+        """Returns a CMake condition string for a supported select condition."""
+        condition = self._convert_platform_condition(label)
+        if condition:
+            return condition
+        return _COMPILER_PLUGIN_CMAKE_OPTIONS.get(label)
+
     def _emit_platform_guard_begin(self, target_compatible_with):
-        """Emits if(CMAKE_SYSTEM_NAME ...) for target_compatible_with."""
+        """Emits platform guards for target_compatible_with."""
         if not target_compatible_with:
             return
 
-        # Handle PlatformSelect from select() in target_compatible_with.
+        # Handle ConditionSelect from select() in target_compatible_with.
         # Example: select({"@platforms//os:linux": [], "@platforms//os:macos": [],
         #                  "//conditions:default": ["@platforms//:incompatible"]})
-        # Platforms with empty list are compatible; default with incompatible means
-        # "only build on the explicitly listed platforms".
-        if isinstance(target_compatible_with, PlatformSelect):
-            compatible_platforms = []
+        # Conditions with empty list are compatible; default with incompatible
+        # means "only build when one of the explicitly listed conditions matches".
+        if isinstance(target_compatible_with, ConditionSelect):
+            compatible_conditions = []
             for label, value in target_compatible_with.conditions.items():
                 if label == "//conditions:default":
                     continue
-                # Empty list means compatible on this platform.
+                # Empty list means compatible for this condition.
                 if value == []:
-                    cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(label)
-                    if cmake_name:
-                        compatible_platforms.append(
-                            f'CMAKE_SYSTEM_NAME STREQUAL "{cmake_name}"'
-                        )
-            if compatible_platforms:
-                combined = " OR ".join(compatible_platforms)
+                    condition = self._convert_select_condition(label)
+                    if condition:
+                        compatible_conditions.append(condition)
+            if compatible_conditions:
+                combined = " OR ".join(compatible_conditions)
                 self._converter.body += f"if({combined})\n"
             return
 
         # target_compatible_with is a list of constraints (typically one).
         conditions = []
         for label in target_compatible_with:
-            cond = self._convert_platform_condition(label)
+            cond = self._convert_select_condition(label)
             if cond:
                 conditions.append(cond)
             else:
@@ -208,12 +228,12 @@ class BuildFileFunctions(object):
         if not target_compatible_with:
             return
 
-        # Handle PlatformSelect: check if any compatible platforms were found.
-        if isinstance(target_compatible_with, PlatformSelect):
+        # Handle ConditionSelect: check if any compatible conditions were found.
+        if isinstance(target_compatible_with, ConditionSelect):
             has_compatible = any(
                 label != "//conditions:default"
                 and value == []
-                and label in _PLATFORM_CMAKE_SYSTEM_NAME
+                and self._convert_select_condition(label)
                 for label, value in target_compatible_with.conditions.items()
             )
             if has_compatible:
@@ -223,7 +243,7 @@ class BuildFileFunctions(object):
 
         # Only emit if all labels are recognized (same check as begin).
         if all(
-            label in _PLATFORM_CMAKE_SYSTEM_NAME for label in target_compatible_with
+            self._convert_select_condition(label) for label in target_compatible_with
         ):
             # Strip trailing blank line from the target body so endif() is
             # adjacent to the closing paren.
@@ -231,16 +251,16 @@ class BuildFileFunctions(object):
             self._converter.body += f"endif()\n\n"
 
     def _convert_platform_select_deps(self, name, deps):
-        """Handles deps that may contain PlatformSelect entries.
+        """Handles deps that may contain ConditionSelect entries.
 
         If deps is a plain list, returns (converted_deps_block, "").
-        If deps is a MixedDeps or PlatformSelect, emits a CMake variable
+        If deps is a MixedDeps or ConditionSelect, emits a CMake variable
         with if/elseif/else blocks before the target and returns
         (converted_deps_block_with_variable, variable_block).
         """
         if deps is None:
             return self._convert_target_list_block("DEPS", None), ""
-        if isinstance(deps, PlatformSelect):
+        if isinstance(deps, ConditionSelect):
             deps = MixedDeps(unconditional=[], selects=[deps])
         if not isinstance(deps, MixedDeps):
             return self._convert_target_list_block("DEPS", deps), ""
@@ -254,7 +274,7 @@ class BuildFileFunctions(object):
             for label, values in ps.conditions.items():
                 if label == "//conditions:default":
                     continue
-                cond = self._convert_platform_condition(label)
+                cond = self._convert_select_condition(label)
                 if not cond:
                     self._convert_unimplemented_function("select condition", label)
                     continue
@@ -424,7 +444,7 @@ class BuildFileFunctions(object):
         mapped_target = self._convert_single_target(target)
         return self._convert_string_arg_block(name, mapped_target, quote=False)
 
-    def _convert_target_list_block(self, list_name, targets):
+    def _convert_target_list_block(self, list_name, targets, omit_empty=False):
         if targets is None:
             return ""
 
@@ -438,11 +458,54 @@ class BuildFileFunctions(object):
         # Remove duplicates
         targets = set(targets)
         # Remove Falsey (None and empty string) values
-        targets = filter(None, targets)
+        targets = list(filter(None, targets))
+        if omit_empty and not targets:
+            return ""
 
         return self._convert_string_list_block(
             list_name, targets, sort=True, quote=False
         )
+
+    def _local_cts_testdata_lib_deps(self, deps):
+        if isinstance(deps, MixedDeps):
+            deps = deps.unconditional
+        if not deps:
+            return []
+        return [
+            dep
+            for dep in deps
+            if isinstance(dep, str)
+            and dep.startswith(":testdata_")
+            and dep.endswith("_lib")
+        ]
+
+    def _emit_optional_local_cts_testdata_guard_begin(self, deps):
+        testdata_deps = self._local_cts_testdata_lib_deps(deps)
+        if not testdata_deps:
+            return False
+
+        optional_targets = []
+        for dep in testdata_deps:
+            for target in self._convert_target(dep):
+                if target.startswith("::"):
+                    target = "${_IREE_OPTIONAL_TESTDATA_PACKAGE_NS}" + target
+                optional_targets.append(target)
+
+        if not optional_targets:
+            return False
+
+        conditions = " AND ".join(
+            f"TARGET {target}" for target in sorted(set(optional_targets))
+        )
+        self._converter.body += (
+            f"iree_package_ns(_IREE_OPTIONAL_TESTDATA_PACKAGE_NS)\n"
+            f"if({conditions})\n"
+        )
+        return True
+
+    def _emit_optional_local_cts_testdata_guard_end(self, did_emit_guard):
+        if did_emit_guard:
+            self._converter.body += "endif()\n\n"
 
     def _convert_includes_block(self, includes):
         if not includes:
@@ -560,6 +623,9 @@ class BuildFileFunctions(object):
     def py_library(self, *args, **kwargs):
         pass
 
+    def py_test(self, *args, **kwargs):
+        pass
+
     def filegroup(self, name, srcs, **kwargs):
         if not srcs:
             return
@@ -601,6 +667,151 @@ class BuildFileFunctions(object):
         if self._should_skip_target(**kwargs):
             return
         self._convert_unimplemented_function("sh_binary", name)
+
+    def wasm_cc_library(
+        self,
+        name,
+        srcs=None,
+        module=None,
+        deps=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_string_list_block("SRCS", srcs, sort=True)
+        module_block = self._convert_string_arg_block("MODULE", module)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_library(\n"
+            f"{name_block}"
+            f"{srcs_block}"
+            f"{module_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_library(self, **kwargs):
+        """Direct handler for iree_wasm_cc_library (loaded from .bzl)."""
+        self.wasm_cc_library(**kwargs)
+
+    def wasm_entry(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        main_block = self._convert_string_arg_block("MAIN", main)
+        srcs_block = self._convert_string_list_block("SRCS", srcs, sort=True)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_entry(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_entry(self, **kwargs):
+        """Direct handler for iree_wasm_entry (loaded from .bzl)."""
+        self.wasm_entry(**kwargs)
+
+    def wasm_cc_binary(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        deps=None,
+        copts=None,
+        defines=None,
+        linkopts=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        # Emit as a standard iree_cc_binary for the C side, plus a
+        # wasm bundle step. For now, emit the cc_binary and add a comment
+        # noting the JS bundling is handled at build time.
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        defines_block = self._convert_string_list_block("DEFINES", defines)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+        main_block = self._convert_string_arg_block("MAIN", main)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_binary(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{defines_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f")\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_binary(self, **kwargs):
+        """Direct handler for iree_wasm_cc_binary (loaded from .bzl)."""
+        self.wasm_cc_binary(**kwargs)
+
+    def wasm_cc_test(
+        self,
+        name,
+        main=None,
+        srcs=None,
+        deps=None,
+        copts=None,
+        defines=None,
+        linkopts=None,
+        testonly=None,
+        target_compatible_with=None,
+        **kwargs,
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        defines_block = self._convert_string_list_block("DEFINES", defines)
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        main_block = self._convert_string_arg_block("MAIN", main)
+
+        self._emit_platform_guard_begin(target_compatible_with)
+        self._converter.body += (
+            f"iree_wasm_cc_test(\n"
+            f"{name_block}"
+            f"{main_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{defines_block}"
+            f"{deps_block}"
+            f")\n\n"
+        )
+        self._emit_platform_guard_end(target_compatible_with)
+
+    def iree_wasm_cc_test(self, **kwargs):
+        """Direct handler for iree_wasm_cc_test (loaded from .bzl)."""
+        self.wasm_cc_test(**kwargs)
 
     def enforce_glob(self, files, **kwargs):
         return files
@@ -646,13 +857,13 @@ class BuildFileFunctions(object):
 
     def select(self, d):
         # Check if all condition keys (except //conditions:default) are known
-        # platform conditions. If so, return a PlatformSelect that the rule
-        # handler can convert to CMake if/elseif/else blocks.
+        # conditions. If so, return a ConditionSelect that the rule handler can
+        # convert to CMake if/elseif/else blocks.
         non_default_keys = [k for k in d if k != "//conditions:default"]
         if non_default_keys and all(
-            k in _PLATFORM_CMAKE_SYSTEM_NAME for k in non_default_keys
+            self._convert_select_condition(k) for k in non_default_keys
         ):
-            return PlatformSelect(d)
+            return ConditionSelect(d)
         # Unrecognized conditions: fall back to default-only with a warning.
         self._convert_unimplemented_function("select", str(d))
         return d.get("//conditions:default", [])
@@ -768,7 +979,7 @@ class BuildFileFunctions(object):
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
         defines_block = self._convert_string_list_block("DEFINES", defines)
-        data_block = self._convert_target_list_block("DATA", data)
+        data_block = self._convert_target_list_block("DATA", data, omit_empty=True)
         deps_block, platform_deps_block = self._convert_platform_select_deps(name, deps)
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
@@ -780,6 +991,9 @@ class BuildFileFunctions(object):
         )
 
         self._emit_platform_guard_begin(target_compatible_with)
+        did_emit_testdata_guard = self._emit_optional_local_cts_testdata_guard_begin(
+            deps
+        )
         if platform_deps_block:
             self._converter.body += platform_deps_block
         self._converter.body += (
@@ -799,6 +1013,7 @@ class BuildFileFunctions(object):
             f"{resource_group_block}"
             f")\n\n"
         )
+        self._emit_optional_local_cts_testdata_guard_end(did_emit_testdata_guard)
         self._emit_platform_guard_end(target_compatible_with)
 
     def cc_binary(
@@ -977,6 +1192,12 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_hal_amdgpu_source_device_binaries(self):
+        self._converter.body += (
+            "# Source-built AMDGPU device binary targets are wired manually by\n"
+            "# runtime/src/iree/hal/drivers/amdgpu/device/binaries/CMakeLists.txt.\n\n"
+        )
+
     def iree_cuda_bitcode_library(
         self, name, cuda_arch, srcs, internal_hdrs=None, copts=None
     ):
@@ -1062,6 +1283,40 @@ class BuildFileFunctions(object):
             f"{compile_tool_block}"
             f"{static_lib_block}"
             f"{flags_block}"
+            f"{deps_block}"
+            f"{testonly_block}"
+            f"  PUBLIC\n)\n\n"
+        )
+
+    def iree_vmasm_module(
+        self,
+        name,
+        src,
+        module_name=None,
+        assemble_tool=None,
+        c_identifier=None,
+        deps=None,
+        testonly=None,
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        src_block = self._convert_string_arg_block("SRC", src)
+        module_name_block = self._convert_string_arg_block(
+            "MODULE_FILE_NAME", module_name
+        )
+        assemble_tool_block = self._convert_target_block("ASSEMBLE_TOOL", assemble_tool)
+        c_identifier_block = self._convert_string_arg_block(
+            "C_IDENTIFIER", c_identifier
+        )
+        deps_block = self._convert_target_list_block("DEPS", deps)
+        testonly_block = self._convert_option_block("TESTONLY", testonly)
+
+        self._converter.body += (
+            f"iree_vmasm_module(\n"
+            f"{name_block}"
+            f"{src_block}"
+            f"{module_name_block}"
+            f"{assemble_tool_block}"
+            f"{c_identifier_block}"
             f"{deps_block}"
             f"{testonly_block}"
             f"  PUBLIC\n)\n\n"
@@ -1187,9 +1442,18 @@ class BuildFileFunctions(object):
         backend_name_block = self._convert_string_arg_block(
             "BACKEND_NAME", backend_name
         )
-        # Bracket-quote the format string to preserve C expressions like
-        # "embedded-elf-" IREE_ARCH without CMake interpretation.
-        format_string_block = f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
+        # Bracket-quote C expressions like "embedded-elf-" IREE_ARCH so CMake
+        # leaves them alone. If placeholder substitution produced a CMake
+        # variable reference, use a normal quoted argument so the generated
+        # testdata registration contains the configured value instead of the
+        # literal ${...} token.
+        if "${" in format_string:
+            escaped_format_string = format_string.replace("\\", "\\\\").replace(
+                '"', '\\"'
+            )
+            format_string_block = f'  FORMAT_STRING\n    "{escaped_format_string}"\n'
+        else:
+            format_string_block = f"  FORMAT_STRING\n    [=[{format_string}]=]\n"
         flags_block = self._convert_string_list_block("FLAGS", flags)
 
         # Convert Bazel label to CMake directory path.
@@ -1221,10 +1485,17 @@ class BuildFileFunctions(object):
         flag_values=None,
         name="",
         args=None,
+        resource_group=None,
         tags=None,
         testonly=None,
         **kwargs,
     ):
+        if not resource_group and tags:
+            for tag in tags:
+                if tag.startswith("resource_group:"):
+                    resource_group = tag[len("resource_group:") :]
+                    break
+
         # Expand executable_formats into individual iree_hal_cts_testdata()
         # calls. The CMake function takes only flat TESTDATA_LIBS, avoiding
         # nested dict argument parsing.
@@ -1258,6 +1529,9 @@ class BuildFileFunctions(object):
         )
         args_block = self._convert_string_list_block("ARGS", args)
         labels_block = self._convert_string_list_block("LABELS", tags)
+        resource_group_block = self._convert_string_arg_block(
+            "RESOURCE_GROUP", resource_group, quote=False
+        )
         testonly_block = self._convert_option_block("TESTONLY", testonly)
 
         self._converter.body += (
@@ -1267,6 +1541,7 @@ class BuildFileFunctions(object):
             f"{name_block}"
             f"{args_block}"
             f"{labels_block}"
+            f"{resource_group_block}"
             f"{testonly_block}"
             f")\n\n"
         )
@@ -1348,7 +1623,15 @@ class BuildFileFunctions(object):
         )
 
     def iree_lit_test_suite(
-        self, name, srcs, tools=None, data=None, tags=None, timeout=None, **kwargs
+        self,
+        name,
+        srcs,
+        tools=None,
+        data=None,
+        tags=None,
+        timeout=None,
+        target_compatible_with=None,
+        **kwargs,
     ):
         if self._should_skip_target(tags=tags, **kwargs):
             return
@@ -1359,6 +1642,7 @@ class BuildFileFunctions(object):
         labels_block = self._convert_string_list_block("LABELS", tags)
         timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
 
+        self._emit_platform_guard_begin(target_compatible_with)
         self._converter.body += (
             f"iree_lit_test_suite(\n"
             f"{name_block}"
@@ -1369,6 +1653,7 @@ class BuildFileFunctions(object):
             f"{timeout_block}"
             f")\n\n"
         )
+        self._emit_platform_guard_end(target_compatible_with)
 
     def iree_check_single_backend_test_suite(
         self,
@@ -1484,6 +1769,7 @@ class BuildFileFunctions(object):
         compiler_flags=None,
         runner_args=None,
         tags=None,
+        timeout=None,
         target_cpu_features_variants=None,
         **kwargs,
     ):
@@ -1518,6 +1804,7 @@ class BuildFileFunctions(object):
         )
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
+        timeout_block = self._convert_timeout_arg_block("TIMEOUT", timeout)
         target_cpu_features_variants_block = self._convert_string_list_block(
             "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants
         )
@@ -1534,6 +1821,7 @@ class BuildFileFunctions(object):
             f"{compiler_flags_block}"
             f"{runner_args_block}"
             f"{labels_block}"
+            f"{timeout_block}"
             f"{target_cpu_features_variants_block}"
             f")\n\n"
         )

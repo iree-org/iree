@@ -18,9 +18,14 @@ typedef struct iree_hal_hip_nop_executable_cache_t {
   // must be at offset 0.
   iree_hal_resource_t resource;
 
+  // Host allocator used for executable cache lifetime.
   iree_allocator_t host_allocator;
 
+  // Borrowed HAL device used for buffer placement metadata.
+  iree_hal_device_t* device;
+  // Borrowed HIP dynamic symbols used for executable loading.
   const iree_hal_hip_dynamic_symbols_t* symbols;
+  // Borrowed HIP device topology used for per-device module loading.
   iree_hal_hip_device_topology_t topology;
 } iree_hal_hip_nop_executable_cache_t;
 
@@ -35,7 +40,7 @@ iree_hal_hip_nop_executable_cache_cast(
 }
 
 iree_status_t iree_hal_hip_nop_executable_cache_create(
-    iree_string_view_t identifier,
+    iree_hal_device_t* device, iree_string_view_t identifier,
     const iree_hal_hip_dynamic_symbols_t* symbols,
     iree_hal_hip_device_topology_t topology, iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
@@ -52,6 +57,7 @@ iree_status_t iree_hal_hip_nop_executable_cache_create(
   iree_hal_resource_initialize(&iree_hal_hip_nop_executable_cache_vtable,
                                &executable_cache->resource);
   executable_cache->host_allocator = host_allocator;
+  executable_cache->device = device;
   executable_cache->symbols = symbols;
 
   executable_cache->topology = topology;
@@ -103,7 +109,8 @@ static iree_status_t iree_hal_hip_nop_executable_cache_prepare_executable(
   iree_hal_hip_nop_executable_cache_t* executable_cache =
       iree_hal_hip_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_hip_native_executable_create(
-      executable_cache->symbols, executable_cache->topology, executable_params,
+      executable_cache->device, executable_cache->symbols,
+      executable_cache->topology, executable_params,
       executable_cache->host_allocator, out_executable);
 }
 

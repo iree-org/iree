@@ -80,14 +80,14 @@ static llvm::cl::opt<bool> clGPUEnableReductionVectorDistribution(
         "enable the usage of the reduction vector distribution pipeline"),
     llvm::cl::init(true));
 
-// TODO (nirvedhmeshram): Drop this whole path after we have support with
-// TileAndFuse pipeline from completion of
-// https://github.com/iree-org/iree/issues/18858
-static llvm::cl::opt<bool> clGPUUnalignedGEMMVectorDistribution(
-    "iree-codegen-llvmgpu-use-unaligned-gemm-vector-distribution",
-    llvm::cl::desc("enable the usage of the vector distribution pipeline for "
-                   "unaligned GEMMs when supported"),
-    llvm::cl::init(false));
+static void appendPromotedOperandsListWithDerivedThread(
+    MLIRContext *context, SmallVectorImpl<NamedAttribute> &attrs,
+    ArrayRef<int64_t> operands) {
+  SmallVector<Attribute> promotionTypes(
+      operands.size(), IREE::GPU::DerivedThreadConfigAttr::get(context));
+  IREE::GPU::appendPromotedOperandsList(context, attrs, operands,
+                                        promotionTypes);
+}
 
 static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     "iree-codegen-llvmgpu-use-tile-and-fuse-convolution",
@@ -115,7 +115,7 @@ static llvm::cl::opt<bool> clGPUPadConvolution(
 static llvm::cl::opt<bool>
     clUseDirectLoad("iree-llvmgpu-use-direct-load",
                     llvm::cl::desc("Use global load DMA for direct load ops."),
-                    llvm::cl::Hidden, llvm::cl::init(false));
+                    llvm::cl::Hidden, llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDirectConvolution(
     "iree-codegen-llvmgpu-use-direct-convolution",
@@ -338,6 +338,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
     // Intrinsics without distribution mapping cannot be distributed.
     if (!mma.getDistributionMappingKind()) {
+      continue;
+    }
+    // TODO: Add block intrinsic support for vector distribute convolutions.
+    if (mma.isBlockIntrinsic()) {
       continue;
     }
     storeMmaInfo(mma, intrinsics);
@@ -575,6 +579,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     if (mma.getSubgroupSize() != targetSubgroupSize) {
       continue;
     }
+    // We currently dont use block intrinsics for GEMMs.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     // Intrinsics without distribution mapping cannot be distributed.
     if (!mma.getDistributionMappingKind()) {
       continue;
@@ -656,6 +664,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+
   // Tile all batch dimensions with unit size.
   for (int64_t batch : contractionDims->batch) {
     workgroupTileSizes[batch] = 1;
@@ -692,7 +701,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
   auto promotedOperands =
       llvm::to_vector(llvm::seq<int64_t>(op.getNumDpsInputs()));
-  IREE::GPU::appendPromotedOperandsList(context, attrs, promotedOperands);
+  appendPromotedOperandsListWithDerivedThread(context, attrs, promotedOperands);
   IREE::GPU::setMmaKind(context, attrs, schedule->mmaKind);
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(op.getNumLoops(), 1),
@@ -742,7 +751,7 @@ setAttentionPipelineAttributes(IREE::GPU::TargetAttr target,
 
 static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     IREE::GPU::TargetAttr target, mlir::FunctionOpInterface entryPoint,
-    IREE::LinalgExt::AttentionOp op) {
+    IREE::LinalgExt::OnlineAttentionOp op) {
   if (target.getWgp().getMma().empty()) {
     return failure();
   }
@@ -833,6 +842,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
     if (!mma.getDistributionMappingKind()) {
       continue;
     }
+    // TODO: Enable block intrinsics for attention.
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
     storeMmaInfo(mma, intrinsics);
     // Store info on virtual intrinsics based on current mma if any
     for (IREE::GPU::VirtualMMAIntrinsic virtualIntrinsic :
@@ -856,7 +869,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   Type f32Type = b.getF32Type();
   GPUMatmulShapeType qkMatmul{
       /*m=*/getDimBounds(mDims),
-      /*n=*/getDimBounds(nDims),
+      /*n=*/getDimBounds(k2Dims),
       /*k=*/getDimBounds(k1Dims),
       /*batch=*/getDimBounds(batchDims),
       /*a=*/qElementType,
@@ -920,7 +933,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   std::array<int64_t, 3> workgroupSize{flatWorkgroupSize, 1, 1};
 
   SmallVector<int64_t> workgroupTileSizes(opInfo.getDomainRank(), 0);
-  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> reductionTileSizes(opInfo.getDomainRank(), 0);
   IREE::GPU::Basis subgroupBasis = {
       SmallVector<int64_t>(opInfo.getDomainRank(), 1),
       // Distribute subgroups from outer to inner. Mostly an arbitrary choice.
@@ -974,7 +987,7 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> attrs = {
       NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
       NamedAttribute("reduction", b.getI64ArrayAttr(reductionTileSizes))};
-  IREE::GPU::appendPromotedOperandsList(context, attrs, {0, 1, 2});
+  appendPromotedOperandsListWithDerivedThread(context, attrs, {0, 1, 2});
 
   // Check if transposing both intrinsics eliminates the layout conflict
   // between QK output and PV LHS input.
@@ -1011,14 +1024,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   SmallVector<NamedAttribute, 2> pvConfig;
 
   // Configuring for qk matmul.
-  IREE::GPU::appendPromotedOperandsList(context, qkConfig, {0, 1});
+  appendPromotedOperandsListWithDerivedThread(context, qkConfig, {0, 1});
   IREE::GPU::setMmaKind(context, qkConfig,
                         getIntrinsic(qkSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, qkConfig, IREE::GPU::TilingLevel::Subgroup,
                       projectBasis(subgroupBasis, opInfo.getNDims()));
 
   // Configuring for pv matmul.
-  IREE::GPU::appendPromotedOperandsList(context, pvConfig, {1});
+  appendPromotedOperandsListWithDerivedThread(context, pvConfig, {1});
   IREE::GPU::setMmaKind(context, pvConfig,
                         getIntrinsic(pvSchedule.mmaKind, useColMajor));
   IREE::GPU::setBasis(context, pvConfig, IREE::GPU::TilingLevel::Subgroup,
@@ -1042,10 +1055,10 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
-                                   qkAttrDict);
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
-                                   pvAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getQKAttrStr(), qkAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getPVAttrStr(), pvAttrDict);
 
   DictionaryAttr decompositionConfigDict =
       b.getDictionaryAttr(decompositionConfig);
@@ -1082,7 +1095,7 @@ struct AttentionReductionHeuristicSeeds {
 
 static LogicalResult setAttentionReductionConfig(
     AttentionReductionHeuristicSeeds &seeds, IREE::GPU::TargetAttr target,
-    FunctionOpInterface entryPoint, IREE::LinalgExt::AttentionOp op) {
+    FunctionOpInterface entryPoint, IREE::LinalgExt::OnlineAttentionOp op) {
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
 
@@ -1331,10 +1344,10 @@ static LogicalResult setAttentionReductionConfig(
   auto pvAttrDict = b.getDictionaryAttr(pvAttrs);
 
   SmallVector<NamedAttribute, 2> decompositionConfig;
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getQKAttrStr(),
-                                   qkAttrDict);
-  decompositionConfig.emplace_back(IREE::LinalgExt::AttentionOp::getPVAttrStr(),
-                                   pvAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getQKAttrStr(), qkAttrDict);
+  decompositionConfig.emplace_back(
+      IREE::LinalgExt::OnlineAttentionOp::getPVAttrStr(), pvAttrDict);
 
   SmallVector<NamedAttribute, 1> pipelineAttrs;
   setAttentionPipelineAttributes(target, pipelineAttrs);
@@ -1355,7 +1368,7 @@ static LogicalResult setAttentionReductionConfig(
 static LogicalResult
 setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                      FunctionOpInterface entryPoint,
-                                     IREE::LinalgExt::AttentionOp op) {
+                                     IREE::LinalgExt::OnlineAttentionOp op) {
 
   // This configuration is not really smart right now. It just makes sure that
   // attention always compiles and tries to distribute workload on threads,
@@ -1441,8 +1454,9 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  if (auto attnOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
-    LDBG() << "VectorDistribution: trying to find a suitable attention config";
+  if (auto attnOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(computeOp)) {
+    LDBG() << "VectorDistribution: trying to find a suitable online attention "
+              "config";
     if (succeeded(setAttentionIntrinsicBasedVectorDistributionConfig(
             target, entryPoint, attnOp))) {
       return success();
@@ -1458,6 +1472,7 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
 // Contraction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+// Selects an LLVMGPU lowering configuration for matmul-like contractions.
 static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                        mlir::FunctionOpInterface entryPoint,
                                        linalg::LinalgOp op) {
@@ -1655,9 +1670,19 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
     // SIMT matmul case. Query the best configuration.
     SmallVector<TileWorkgroupSizePair> tileSizeConfig = getMatmulConfig(target);
+    // Treat unit tiles on non-skinny dimensions as degenerate exact matches.
+    auto isDegenerateUnitTile = [&](const TileWorkgroupSizePair &config) {
+      return (config.tileSize[0] == 1 && sizeM > kVerySkinnyDimThreshold) ||
+             (config.tileSize[1] == 1 && sizeN > kVerySkinnyDimThreshold);
+    };
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
+      // Skip degenerate matches so later configs can use both parallel
+      // dimensions.
+      if (isDegenerateUnitTile(config)) {
+        continue;
+      }
       if (sizeN % config.tileSize[1] == 0 && sizeM % config.tileSize[0] == 0 &&
           sizeK % config.tileSize[2] == 0) {
         return setMatmulConfig(
@@ -2435,8 +2460,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     }
     if (clGPUEnableReductionVectorDistribution) {
       LDBG() << "ReductionVectorDistribution: finding a suitable config...";
-      if (succeeded(
-              IREE::GPU::setReductionConfig(target, entryPointFn, linalgOp))) {
+      if (succeeded(IREE::GPU::setReductionConfig(target, entryPointFn,
+                                                  linalgOp.getOperation()))) {
         LDBG() << "Vector Distribution Subgroup Reduction Config";
         return success();
       }
@@ -2474,6 +2499,18 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       .Case([&](IREE::LinalgExt::SortOp sortOp) {
         LDBG() << "Sort Config";
         return IREE::GPU::setSortConfig(target, entryPointFn, sortOp);
+      })
+      .Case([&](IREE::LinalgExt::ArgCompareOp argCompareOp) {
+        LDBG() << "ArgCompare Config";
+        if (succeeded(IREE::GPU::setReductionConfig(
+                target, entryPointFn, argCompareOp.getOperation()))) {
+          return success();
+        }
+        if (succeeded(IREE::GPU::setArgCompareConfig(
+                target, entryPointFn, argCompareOp.getOperation()))) {
+          return success();
+        }
+        return setRootDefaultConfig(target, entryPointFn, computeOp);
       })
       .Case<IREE::LinalgExt::WinogradInputTransformOp,
             IREE::LinalgExt::WinogradOutputTransformOp,
@@ -2649,9 +2686,12 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   }
 
   if (!rootOperation) {
-    // No root operation found, set it to none.
+    // No root operation found, set it to no_pipeline.
+    MLIRContext *context = funcOp.getContext();
     auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+        context, IREE::Codegen::NoPipelineAttr::get(context),
+        /*codegenSpec=*/SymbolRefAttr(), /*workgroupSize=*/ArrayRef<int64_t>(),
+        /*subgroupSize=*/int64_t(), /*configuration=*/DictionaryAttr());
     if (failed(setTranslationInfo(funcOp, translationInfo))) {
       return failure();
     }

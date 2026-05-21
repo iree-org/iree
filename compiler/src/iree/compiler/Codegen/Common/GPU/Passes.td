@@ -94,6 +94,18 @@ def AMDGPULowerCoalescedDMAToGatherLDSPass :
   ];
 }
 
+def AMDGPULowerAsyncDMAPass :
+    InterfacePass<"iree-codegen-amdgpu-lower-async-dma", "mlir::FunctionOpInterface"> {
+  let summary = "Lower async_dma operations to amdgpu.gather_to_lds.";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect",
+    "::mlir::amdgpu::AMDGPUDialect",
+    "::mlir::arith::ArithDialect",
+    "::mlir::gpu::GPUDialect",
+    "::mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect"
+  ];
+}
+
 def GPUDistributeForallPass :
     InterfacePass<"iree-codegen-gpu-distribute-forall", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";
@@ -274,6 +286,11 @@ def GPUPromoteMatmulOperandsPass :
     logic for "promoting" an operand is deferred to an attribute interface
     allowing for custom logic.
   }];
+  let options = [
+    Option<"skipOperandPromotion", "skip-operand-promotion", "bool",
+            /*default=*/"false",
+           "Skip promotion of DPS input operands, promoting only results.">,
+  ];
   let dependentDialects = [
     "::mlir::bufferization::BufferizationDialect",
     "::mlir::gpu::GPUDialect",
@@ -476,8 +493,15 @@ def ExpandGPUOpsPass :
     InterfacePass<"iree-codegen-expand-gpu-ops", "mlir::FunctionOpInterface"> {
   let summary = "Expands high-level GPU ops, such as clustered gpu.subgroup_reduce.";
   let dependentDialects = [
-    "::mlir::gpu::GPUDialect"
+    "::mlir::arith::ArithDialect",
+    "::mlir::gpu::GPUDialect",
   ];
+}
+
+def TestGPUPromotionAnalysisPass :
+    InterfacePass<"iree-codegen-test-gpu-promotion-analysis",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Test the GPU promotion type backward analysis.";
 }
 
 #endif // IREE_CODEGEN_COMMON_GPU_PASSES

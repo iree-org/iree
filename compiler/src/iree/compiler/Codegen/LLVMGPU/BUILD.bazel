@@ -85,6 +85,32 @@ iree_compiler_cc_library(
 )
 
 ################################################################################
+# Constraint generator
+################################################################################
+
+iree_compiler_cc_library(
+    name = "LLVMGPUConstraintGenerator",
+    srcs = [
+        "LLVMGPUConstraintGenerator.cpp",
+    ],
+    hdrs = [
+        "LLVMGPUConstraintGenerator.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:GPUHeuristics",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:SMTDialect",
+    ],
+)
+
+################################################################################
 # Common library
 ################################################################################
 
@@ -96,10 +122,12 @@ iree_compiler_cc_library(
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
+        "LLVMGPU1DVectorCanonicalizations.cpp",
         "LLVMGPUAssignConstantOrdinals.cpp",
         "LLVMGPUCastAddressSpaceFunction.cpp",
         "LLVMGPUConfigureTensorLayouts.cpp",
-        "LLVMGPUConstraintGenerator.cpp",
+        "LLVMGPUGroupGlobalLoads.cpp",
+        "LLVMGPULegalizeNDVectors.cpp",
         "LLVMGPULinkExecutables.cpp",
         "LLVMGPULowerExecutableTarget.cpp",
         "LLVMGPUPackSharedMemoryAlloc.cpp",
@@ -107,7 +135,9 @@ iree_compiler_cc_library(
         "LLVMGPUTensorCoreVectorization.cpp",
         "LLVMGPUTileAndDistribute.cpp",
         "LLVMGPUVectorDistribute.cpp",
+        "LLVMGPUVectorFlattening.cpp",
         "LLVMGPUVectorLowering.cpp",
+        "LLVMGPUVectorMultiReductionLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
         "Passes.cpp",
         "ROCDLAnnotateKernelForTranslation.cpp",
@@ -115,16 +145,17 @@ iree_compiler_cc_library(
         "ROCDLConfigureBufferInstructions.cpp",
         "ROCDLLoadToTransposeLoad.cpp",
         "ROCDLPrefetching.cpp",
+        "ROCDLPrepareForSPIRV.cpp",
         "Verifiers.cpp",
     ],
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
-        "LLVMGPUConstraintGenerator.h",
         "Passes.h",
         "ROCDLPasses.h",
     ],
     deps = [
+        ":LLVMGPUConstraintGenerator",
         ":PassHeaders",
         ":PassesIncGen",
         ":ROCDLPassHeaders",
@@ -191,6 +222,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:GPUTransformOps",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:IndexingMapOpInterface",
         "@llvm-project//mlir:LLVMCommonConversion",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgDialect",
@@ -233,6 +265,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:VectorToSCF",
         "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:VectorUtils",
     ],
 )
 

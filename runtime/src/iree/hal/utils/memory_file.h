@@ -21,13 +21,23 @@ extern "C" {
 
 // Creates a file backed by |handle| without copying the data.
 // Only supports file handles of IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION.
-// If the memory can be imported into a usable staging buffer |device_allocator|
-// will be used to do so.
+// If |device_allocator| is provided the memory will be imported as a
+// device-accessible storage buffer when possible. Import failure leaves the
+// file host-only: it still supports synchronous I/O and can be used by devices
+// with an explicit staging path.
 IREE_API_EXPORT iree_status_t iree_hal_memory_file_wrap(
     iree_hal_allocator_t* device_allocator,
     iree_hal_queue_affinity_t queue_affinity, iree_hal_memory_access_t access,
     iree_io_file_handle_t* handle, iree_allocator_t host_allocator,
     iree_hal_file_t** out_file);
+
+// Returns true if |file| is a memory file created by
+// iree_hal_memory_file_wrap.
+IREE_API_EXPORT bool iree_hal_memory_file_isa(iree_hal_file_t* file);
+
+// Returns the host byte span backing |file|.
+IREE_API_EXPORT iree_status_t iree_hal_memory_file_contents(
+    iree_hal_file_t* file, iree_byte_span_t* out_contents);
 
 #ifdef __cplusplus
 }  // extern "C"

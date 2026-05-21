@@ -50,7 +50,7 @@ jobs:
           git submodule update --init --depth=1
 
       - name: Download iree-clang-tidy artifact
-        uses: dawidd6/action-download-artifact@8305c0f1062bb0d184d09ef4493ecb9288447732 # v20
+        uses: dawidd6/action-download-artifact@b6e2e70617bc3265edd6dab6c906732b2f1ae151 # v21
         with:
           workflow: build_clang_tidy.yml
           name: iree-clang-tidy-linux-x86_64
@@ -77,8 +77,26 @@ jobs:
         run: |
           IREE_CONFIGURE_ONLY=1 ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
+      - name: Select clang-tidy diff mode
+        id: tidy-diff-mode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          status_code=$(curl -sS -o /tmp/pr.diff -w "%{http_code}" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3.diff" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+          if [[ "${status_code}" == "200" ]]; then
+            echo "use_cpp_linter=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "GitHub PR diff request returned ${status_code}; running clang-tidy locally on changed files."
+            echo "use_cpp_linter=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Run clang-tidy
-        uses: cpp-linter/cpp-linter-action@89288efe7a9b377406dcea651d756aa1ade3e4a3 # v1.11.4
+        if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
+        uses: cpp-linter/cpp-linter-action@77c390c5ba9c947ebc185a3e49cc754f1558abb5 # v1.11.4
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -92,3 +110,23 @@ jobs:
           ignore: 'third_party'
           thread-comments: false
           step-summary: true
+
+      - name: Skip clang-tidy on large diff
+        if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'false'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed_files="${RUNNER_TEMP}/clang-tidy-changed-files.txt"
+
+          git diff --name-only --diff-filter=ACMRT "${BASE_SHA}" "${HEAD_SHA}" \
+            | grep -E '\.(c|h|C|H|cpp|hpp|cc|hh|c\+\+|h\+\+|cxx|hxx)$' \
+            | grep -Ev '(^|/)third_party/' \
+            | sort -u > "${changed_files}" || true
+
+          if [[ ! -s "${changed_files}" ]]; then
+            echo "No changed C/C++ files found."
+            exit 0
+          fi
+
+          echo "::warning title=clang-tidy skipped::GitHub refused the PR diff because it exceeds the 20,000-line API limit, so cpp-linter cannot compute changed-line diagnostics for $(wc -l < "${changed_files}") changed C/C++ files."

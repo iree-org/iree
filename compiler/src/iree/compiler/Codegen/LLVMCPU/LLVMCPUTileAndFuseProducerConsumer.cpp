@@ -71,6 +71,52 @@ static Operation *getLastAnchorOpAfterRootOp(ArrayRef<Operation *> computeOps,
   return nullptr;
 }
 
+/// Returns the root op and all its transitive consumers in `computeOps`.
+static llvm::SmallDenseSet<Operation *>
+getRootAndTransitiveConsumers(ArrayRef<Operation *> computeOps,
+                              Operation *rootOp) {
+  llvm::SmallDenseSet<Operation *> result;
+  if (!rootOp) {
+    return result;
+  }
+  result.insert(rootOp);
+  for (Operation *op : computeOps) {
+    if (result.contains(op)) {
+      continue;
+    }
+    for (Value operand : op->getOperands()) {
+      if (auto *def = operand.getDefiningOp(); def && result.contains(def)) {
+        result.insert(op);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+/// Returns the root op and all its transitive producers in `computeOps`.
+static llvm::SmallDenseSet<Operation *>
+getRootAndTransitiveProducers(ArrayRef<Operation *> computeOps,
+                              Operation *rootOp) {
+  llvm::SmallDenseSet<Operation *> result;
+  if (!rootOp) {
+    return result;
+  }
+  result.insert(rootOp);
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (result.contains(op)) {
+      continue;
+    }
+    for (auto user : op->getUsers()) {
+      if (result.contains(user)) {
+        result.insert(op);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 /// Returns the last operation that has `level` tiling level in lowering config
 /// before the root op (or ukernel ops) in the compute sequence.
 static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
@@ -99,11 +145,13 @@ static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
 /// the root operation and fuse the producers of the root operation then
 /// consumers (finds any missing fusion opportunities, then apply producer
 /// fusion). If `onlyFuseProducerInputOperands` is set, only fuse producer input
-/// operands.
-static FailureOr<Operation *>
-tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
-                                IREE::CPU::TilingLevel tilingLevel,
-                                bool onlyFuseProducerInputOperands) {
+/// operands. `unfusableOps` contains operations that must not be fused as
+/// consumers (e.g., root ops from other anchor chains whose reduction
+/// dimensions would be incorrectly tiled as parallel).
+static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
+    IRRewriter &rewriter, TilingInterface rootOp,
+    IREE::CPU::TilingLevel tilingLevel, bool onlyFuseProducerInputOperands,
+    const llvm::SmallDenseSet<Operation *> &unfusableOps = {}) {
   auto *context = rewriter.getContext();
   mlir::DominanceInfo dominanceInfo(rootOp);
   llvm::SmallDenseSet<Operation *> tiledAndFusedOps;
@@ -209,10 +257,12 @@ tileRootAndFuseProducerConsumer(IRRewriter &rewriter, TilingInterface rootOp,
 
   if (!onlyFuseProducerInputOperands) {
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
-        fuseConsumersIntoForall(rewriter, *rootTiledOp, tilingLoops,
-                                [&tiledAndFusedOps](Operation *op) {
-                                  return tiledAndFusedOps.contains(op);
-                                });
+        fuseConsumersIntoForall(
+            rewriter, *rootTiledOp, tilingLoops,
+            [&tiledAndFusedOps, &unfusableOps](Operation *op) {
+              return tiledAndFusedOps.contains(op) &&
+                     !unfusableOps.contains(op);
+            });
 
     if (failed(newFusionOpportunities)) {
       LDBG() << "failed to fuse consumers, skip";
@@ -258,34 +308,48 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
   IRRewriter rewriter(funcOp);
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  SmallVector<Operation *> anchorOps;
-  if (anchorOnRootOp) {
-    Operation *anchorOp = getRootOp(computeOps, tilingLevel);
-    if (anchorOp) {
-      anchorOps.push_back(anchorOp);
-    }
 
+  Operation *rootOp =
+      getRootOp(computeOps, IREE::CPU::TilingLevel::DistributionTiles);
+
+  // Anchor op paired with the set of ops that must not be fused as consumers
+  // when tiling from that anchor. When anchoring before the root, the root
+  // and its transitive consumers are unfusable; when after, the root and its
+  // transitive producers are unfusable; when on the root itself, nothing is
+  // restricted.
+  struct AnchorInfo {
+    Operation *anchorOp;
+    llvm::SmallDenseSet<Operation *> unfusableOps;
+  };
+  SmallVector<AnchorInfo> anchors;
+
+  if (anchorOnRootOp) {
+    if (Operation *anchorOp = getRootOp(computeOps, tilingLevel)) {
+      anchors.push_back({anchorOp, {}});
+    }
   } else {
     if (Operation *anchorOp =
             getLastAnchorOpAfterRootOp(computeOps, tilingLevel)) {
-      anchorOps.push_back(anchorOp);
+      anchors.push_back(
+          {anchorOp, getRootAndTransitiveProducers(computeOps, rootOp)});
     }
     if (Operation *anchorOp =
             getLastAnchorOpBeforeRootOp(computeOps, tilingLevel)) {
-      anchorOps.push_back(anchorOp);
+      anchors.push_back(
+          {anchorOp, getRootAndTransitiveConsumers(computeOps, rootOp)});
     }
   }
-  if (anchorOps.empty()) {
+  if (anchors.empty()) {
     LDBG() << "unable to find an anchor operation that has "
            << IREE::CPU::getTilingLevelName(tilingLevel) << " config";
     return;
   }
 
-  for (auto anchorOp : anchorOps) {
+  for (auto &[anchorOp, unfusable] : anchors) {
     LDBG() << "anchorOp: " << *anchorOp;
     if (failed(tileRootAndFuseProducerConsumer(
             rewriter, cast<TilingInterface>(anchorOp), tilingLevel,
-            onlyFuseProducerInputOperands))) {
+            onlyFuseProducerInputOperands, unfusable))) {
       funcOp.emitError() << "tiling of level "
                          << IREE::CPU::getTilingLevelName(tilingLevel)
                          << " failed\n";

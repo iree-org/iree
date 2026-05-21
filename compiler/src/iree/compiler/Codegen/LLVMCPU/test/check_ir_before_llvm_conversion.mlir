@@ -65,3 +65,15 @@ func.func @complex_alloca() {
   return
 }
 // CHECK-LABEL: func @complex_alloca(
+
+// -----
+
+// Workgroup-local allocs are backed by HAL dispatch local memory, not stack
+// slots. Only the memref.alloca below contributes to the stack allocation
+// limit.
+func.func @workgroup_local_alloc_not_counted_as_stack() {
+  %0 = memref.alloc() : memref<16384xf32, #iree_codegen.workgroup_local>
+  %1 = memref.alloca() : memref<1024xf32>
+  return
+}
+// CHECK-LABEL: func @workgroup_local_alloc_not_counted_as_stack(

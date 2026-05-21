@@ -94,3 +94,20 @@ func.func @scatter_2d_batch() {
 
   return
 }
+
+func.func @scatter_operand_mask_preserves_original() {
+  %original = util.unfoldable_constant dense<[10, 20, 30, 40]> : tensor<4xi32>
+  %update = util.unfoldable_constant dense<[1, 2]> : tensor<2xi32>
+  %indices = util.unfoldable_constant dense<[[1], [3]]> : tensor<2x1xi32>
+  %mask = util.unfoldable_constant dense<[true, false]> : tensor<2xi1>
+  %result = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+                          ins(%update, %indices, %mask : tensor<2xi32>, tensor<2x1xi32>, tensor<2xi1>)
+                          outs(%original : tensor<4xi32>) {
+                    ^bb0(%arg0: i32, %arg1: i32):
+                      iree_linalg_ext.yield %arg0 : i32
+  } -> tensor<4xi32>
+
+  check.expect_eq_const(%result, dense<[10, 1, 30, 40]> : tensor<4xi32>) : tensor<4xi32>
+
+  return
+}

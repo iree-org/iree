@@ -107,7 +107,7 @@ func.func @topk_2d_dim1_max() {
   %0:2 = iree_linalg_ext.topk
         dimension(1)
         ins(%input_values, %input_indices : tensor<2x6xf32> , tensor<2x6xi32>)
-        outs(%out_values_empty, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
+        outs(%out_values, %out_indices : tensor<2x3xf32>, tensor<2x3xi32>) {
         ^bb0(%arg0 : f32, %arg1 : f32):
          %0 = arith.cmpf ogt, %arg0, %arg1 : f32
          iree_linalg_ext.yield %0 : i1

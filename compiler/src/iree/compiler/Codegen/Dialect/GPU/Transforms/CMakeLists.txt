@@ -48,6 +48,7 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "ConvertForallToGenericNestGPU.cpp"
     "DistributeInnerTiledToLanes.cpp"
     "ExpandUndistributedInnerTiles.cpp"
     "LowerIREEGPUOps.cpp"
@@ -82,7 +83,10 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::Transforms::IREECodegenTransforms
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Dialect::PCF::IR
+    iree::compiler::Codegen::Dialect::PCF::Transforms
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

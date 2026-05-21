@@ -192,7 +192,8 @@ merge_dict_entries() {
     } | sort -u > "${temp_file}"
 
     local old_count new_count added_count
-    old_count=$(grep -cE '^"' "${dict_file}" 2>/dev/null || echo 0)
+    old_count=$(grep -cE '^"' "${dict_file}" 2>/dev/null || true)
+    old_count=${old_count:-0}
     new_count=$(wc -l < "${temp_file}")
     added_count=$((new_count - old_count))
 
