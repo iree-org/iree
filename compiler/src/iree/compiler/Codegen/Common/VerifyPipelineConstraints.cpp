@@ -196,9 +196,8 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
       }
     }
   }
-  entries.emplace_back(
-      "use_igemm_convolution",
-      StringAttr::get(ctx, useIgemmConvolution ? "true" : "false"));
+  entries.emplace_back("use_igemm_convolution",
+                       BoolAttr::get(ctx, useIgemmConvolution));
   return DictionaryAttr::get(ctx, entries);
 }
 
