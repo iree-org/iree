@@ -103,15 +103,28 @@ buildKnobLookupDictFromGPUConfig(LoweringConfigAttr gpuConfig,
                                  Codegen::TranslationInfoAttr translationInfo) {
   MLIRContext *ctx = gpuConfig.getContext();
   Builder b(ctx);
-  SmallVector<NamedAttribute> entries(gpuConfig.getAttributes().getValue());
+  // Deduplicate by name. A pathological GPU lowering config could already
+  // contain `workgroup_size` or `subgroup_size`; in that case keep the
+  // existing config entry rather than emitting a duplicate.
+  llvm::StringMap<Attribute> entryMap;
+  for (NamedAttribute entry : gpuConfig.getAttributes()) {
+    entryMap[entry.getName().getValue()] = entry.getValue();
+  }
   ArrayRef<int64_t> wgSize = translationInfo.getWorkgroupSize();
-  if (!wgSize.empty()) {
+  if (!wgSize.empty() && !entryMap.contains("workgroup_size")) {
     auto wgSizeAttrs = llvm::map_to_vector(
         wgSize, [&](int64_t v) -> Attribute { return b.getI64IntegerAttr(v); });
-    entries.emplace_back("workgroup_size", b.getArrayAttr(wgSizeAttrs));
+    entryMap["workgroup_size"] = b.getArrayAttr(wgSizeAttrs);
   }
-  entries.emplace_back("subgroup_size",
-                       b.getI64IntegerAttr(translationInfo.getSubgroupSize()));
+  if (!entryMap.contains("subgroup_size")) {
+    entryMap["subgroup_size"] =
+        b.getI64IntegerAttr(translationInfo.getSubgroupSize());
+  }
+  SmallVector<NamedAttribute> entries;
+  entries.reserve(entryMap.size());
+  for (const auto &kv : entryMap) {
+    entries.emplace_back(StringAttr::get(ctx, kv.getKey()), kv.getValue());
+  }
   return DictionaryAttr::get(ctx, entries);
 }
 
@@ -195,6 +208,15 @@ std::optional<KnobAssignmentMap> mergeKnobAssignmentsWithExistingGPUConfig(
 
 DictionaryAttr mergeMaterializedKnobsWithExistingDispatchConfig(
     ConstraintsOp constraintsOp, DictionaryAttr materializedKnobs) {
+  // This merge is flat-only by design. It overlays at the top level and is
+  // intended for the flat knobs template shape, e.g.
+  // `knobs = { workgroup = [...], subgroup = [...], workgroup_size = [...],
+  // subgroup_size = ... }`. If the template uses the nested form
+  // (`knobs = { lowering_config = { ... }, translation_info = { ... } }`),
+  // the dispatch-config overlay does not apply: the nested template is
+  // treated as self-sufficient and `PipelineAttr::materializeCompilationInfo`
+  // uses that nested source as the single source of truth. Callers wanting
+  // overlay behavior should use the flat template form.
   std::optional<DictionaryAttr> lookupDict =
       getKnobLookupDictForConstraints(constraintsOp);
   if (!lookupDict) {

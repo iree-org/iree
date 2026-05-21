@@ -39,6 +39,13 @@ mergeKnobAssignmentsWithExistingGPUConfig(Codegen::ConstraintsOp constraintsOp,
 
 /// Overlay materialized knobs on the existing dispatch config lookup dict.
 /// Returns `materializedKnobs` when no matching GPU config is available.
+///
+/// The merge is flat-only by design: it overlays at the top level and is
+/// intended for the flat knobs template shape, e.g.
+/// `knobs = { workgroup = [...], workgroup_size = [...], ... }`. Nested
+/// templates of the form
+/// `knobs = { lowering_config = { ... }, translation_info = { ... } }` are
+/// treated as self-sufficient and pass through unchanged at this step.
 DictionaryAttr mergeMaterializedKnobsWithExistingDispatchConfig(
     Codegen::ConstraintsOp constraintsOp, DictionaryAttr materializedKnobs);
 

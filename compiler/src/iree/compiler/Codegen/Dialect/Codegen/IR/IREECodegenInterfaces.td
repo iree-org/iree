@@ -798,15 +798,17 @@ def IREECodegen_PipelineAttrInterface :
         Returns a dictionary of knob name to integer assignment. The default
         returns the input assignments unchanged. Implementations may overlay
         explicit assignments on values taken from the current lowering config.
+        Explicit `assignments` entries override values extracted from the
+        existing dispatch config.
       }],
       /*retTy=*/"::mlir::DictionaryAttr",
       /*methodName=*/"mergeKnobAssignmentsForMaterialization",
-      /*args=*/(ins "::mlir::Operation *":$op,
-                    "::mlir::DictionaryAttr":$partialAssignments),
+      /*args=*/(ins "::mlir::Operation *":$constraintsOperation,
+                    "::mlir::DictionaryAttr":$assignments),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        (void)op;
-        return partialAssignments;
+        (void)constraintsOperation;
+        return assignments;
       }]
     >,
     InterfaceMethod<
@@ -815,14 +817,17 @@ def IREECodegen_PipelineAttrInterface :
         configuration. Returns a knobs dictionary that includes fields from the
         current lowering config and translation info when they are absent from
         the materialized template. Materialized entries override existing ones.
+        Implementations may overlay only at the flat top level; nested
+        `lowering_config` / `translation_info` templates are treated as the
+        sole source of truth without overlay.
       }],
       /*retTy=*/"::mlir::DictionaryAttr",
       /*methodName=*/"mergeMaterializedKnobsForMaterialization",
-      /*args=*/(ins "::mlir::Operation *":$op,
+      /*args=*/(ins "::mlir::Operation *":$constraintsOperation,
                     "::mlir::DictionaryAttr":$materializedKnobs),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        (void)op;
+        (void)constraintsOperation;
         return materializedKnobs;
       }]
     >,

@@ -222,6 +222,9 @@ FailureOr<CompilationInfoAttr> materializeCompilationInfoFromConstraints(
 
   if (DictionaryAttr materializedKnobs =
           materializeKnobsDictionary(op, effectiveAssignments)) {
+    // The merge here only overlays at the flat top level; nested
+    // `lowering_config` / `translation_info` templates pass through as the
+    // sole source of truth.
     DictionaryAttr mergedKnobs =
         pipeline.mergeMaterializedKnobsForMaterialization(op.getOperation(),
                                                           materializedKnobs);

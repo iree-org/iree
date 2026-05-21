@@ -862,3 +862,78 @@ def test_materialize_compilation_info_partial_subgroup_overlay():
         "#iree_gpu.lowering_config<{subgroup = [8, 16, 0], "
         "workgroup = [64, 128, 0]}>"
     )
+    translation_info = iree_codegen.TranslationInfoAttr(
+        compilation_info.translation_info
+    )
+    assert list(translation_info.workgroup_size) == [64, 1, 1]
+    assert translation_info.subgroup_size == 32
+
+
+_MATERIALIZE_PARTIAL_WORKGROUP_BACKFILL_MODULE = """
+    module {
+      func.func @matmul_partial_workgroup_backfill(
+          %lhs: tensor<4x8xf32>, %rhs: tensor<8x4xf32>) -> tensor<4x4xf32>
+          attributes {translation_info = #iree_codegen.translation_info<
+            pipeline = #iree_gpu.pipeline<VectorDistribute>
+            workgroup_size = [64, 1, 1]
+            subgroup_size = 32>} {
+        %init = tensor.empty() : tensor<4x4xf32>
+        %result = linalg.matmul {
+          lowering_config = #iree_gpu.lowering_config<{
+            subgroup = [2, 4, 0],
+            workgroup = [64, 128, 0]
+          }>,
+          root_op = #iree_codegen.root_op<set = 0>
+        } ins(%lhs, %rhs : tensor<4x8xf32>, tensor<8x4xf32>)
+          outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
+        return %result : tensor<4x4xf32>
+      }
+
+      iree_codegen.smt.constraints
+          target = <set = 0>,
+          pipeline = #iree_gpu.pipeline<VectorDistribute>,
+          knobs = {
+            workgroup = [
+              #iree_codegen.smt.int_knob<"wg_0">,
+              #iree_codegen.smt.int_knob<"wg_1">,
+              0
+            ],
+            subgroup = [
+              #iree_codegen.smt.int_knob<"sg_0">,
+              #iree_codegen.smt.int_knob<"sg_1">,
+              0
+            ]
+          }
+          dims() {
+          }
+    }
+"""
+
+
+@run
+def test_materialize_compilation_info_partial_workgroup_backfill():
+    # The constraints template tunes both workgroup and subgroup, but the
+    # caller assigns only the workgroup knobs. The subgroup knob values are
+    # backfilled from the existing dispatch lowering_config's `subgroup`
+    # array, so materialization must succeed.
+    input_module = ir.Module.parse(_MATERIALIZE_PARTIAL_WORKGROUP_BACKFILL_MODULE)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert len(constraints_ops) == 1
+    constraints_op = constraints_ops[0]
+
+    compilation_info = iree_codegen.materialize_compilation_info(
+        constraints_op,
+        {
+            "wg_0": 16,
+            "wg_1": 32,
+        },
+    )
+    assert isinstance(compilation_info, iree_codegen.CompilationInfoAttr)
+    assert str(compilation_info.lowering_config) == (
+        "#iree_gpu.lowering_config<{subgroup = [2, 4, 0], " "workgroup = [16, 32, 0]}>"
+    )
+    translation_info = iree_codegen.TranslationInfoAttr(
+        compilation_info.translation_info
+    )
+    assert list(translation_info.workgroup_size) == [64, 1, 1]
+    assert translation_info.subgroup_size == 32

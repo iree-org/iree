@@ -144,9 +144,64 @@ iree_codegen.smt.constraints
     } {
     }
 
+// CHECK:       #translation = #iree_codegen.translation_info<
+// CHECK-SAME:  pipeline = #iree_gpu.pipeline<VectorDistribute>
+// CHECK-SAME:  workgroup_size = [64, 1, 1]
+// CHECK-SAME:  subgroup_size = 32>
 // CHECK:       #compilation = #iree_codegen.compilation_info<
 // CHECK-SAME:      lowering_config = #iree_gpu.lowering_config<{subgroup = [8, 16, 0], workgroup = [64, 128, 0]}>,
 // CHECK-SAME:      translation_info = #translation>
+// CHECK-LABEL: @matmul_partial_subgroup
+// CHECK:       iree_codegen.smt.constraints
+// CHECK:       dims() attributes {test.materialized_compilation_info = #compilation}
+
+// -----
+
+// Constraints tune both `workgroup` and `subgroup` knobs, but the caller
+// only assigns the `wg_*` values. The `sg_*` values must be backfilled
+// from the existing dispatch lowering_config's `subgroup = [...]` array.
+#translation_backfill = #iree_codegen.translation_info<
+    pipeline = #iree_gpu.pipeline<VectorDistribute>
+    workgroup_size = [64, 1, 1]
+    subgroup_size = 32>
+func.func @matmul_partial_workgroup_backfill(
+    %lhs: tensor<4x8xf32>, %rhs: tensor<8x4xf32>) -> tensor<4x4xf32>
+    attributes {translation_info = #translation_backfill} {
+  %init = tensor.empty() : tensor<4x4xf32>
+  %result = linalg.matmul {
+    lowering_config = #iree_gpu.lowering_config<{
+      subgroup = [2, 4, 0],
+      workgroup = [64, 128, 0]
+    }>,
+    root_op = #iree_codegen.root_op<set = 0>
+  } ins(%lhs, %rhs : tensor<4x8xf32>, tensor<8x4xf32>) outs(%init : tensor<4x4xf32>)
+    -> tensor<4x4xf32>
+  return %result : tensor<4x4xf32>
+}
+
+iree_codegen.smt.constraints
+    target = <set = 0>,
+    pipeline = #iree_gpu.pipeline<VectorDistribute>,
+    knobs = {
+      workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0],
+      subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, 0]
+    }
+    dims() attributes {
+      test.assignments = {
+        wg_0 = 16 : i64,
+        wg_1 = 32 : i64
+      }
+    } {
+    }
+
+// CHECK:       #translation = #iree_codegen.translation_info<
+// CHECK-SAME:  pipeline = #iree_gpu.pipeline<VectorDistribute>
+// CHECK-SAME:  workgroup_size = [64, 1, 1]
+// CHECK-SAME:  subgroup_size = 32>
+// CHECK:       #compilation = #iree_codegen.compilation_info<
+// CHECK-SAME:      lowering_config = #iree_gpu.lowering_config<{subgroup = [2, 4, 0], workgroup = [16, 32, 0]}>,
+// CHECK-SAME:      translation_info = #translation>
+// CHECK-LABEL: @matmul_partial_workgroup_backfill
 // CHECK:       iree_codegen.smt.constraints
 // CHECK:       dims() attributes {test.materialized_compilation_info = #compilation}
 
