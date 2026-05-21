@@ -10,7 +10,9 @@
 // that materialized knob dictionary into its concrete compilation_info attr.
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -94,6 +96,22 @@ materializeKnobAttribute(ConstraintsOp op, Attribute attr,
           materialized.emplace_back(entry.getName(), materializedValue);
         }
         return DictionaryAttr::get(ctx, materialized);
+      })
+      .Case([&](IREE::GPU::LoweringConfigAttr lcAttr) -> Attribute {
+        // `LoweringConfigAttr` wraps a DictionaryAttr; recurse into the
+        // inner attributes so any knobs nested under e.g. `mma_kind` /
+        // `subgroup_m_count` / `subgroup_n_count` get substituted, then
+        // re-wrap. Without this case the typed attribute would fall
+        // through to `Default` and the inner knobs would be left as
+        // template literals (which downstream codegen can't consume).
+        DictionaryAttr inner = lcAttr.getAttributes();
+        Attribute materialized =
+            materializeKnobAttribute(op, inner, assignments);
+        if (!materialized) {
+          return {};
+        }
+        return IREE::GPU::LoweringConfigAttr::get(
+            ctx, cast<DictionaryAttr>(materialized));
       })
       .Default([](Attribute attr) { return attr; });
 }
@@ -187,6 +205,35 @@ FailureOr<CompilationInfoAttr> materializeCompilationInfoFromConstraints(
     return materializeCompilationInfo(op, materializedKnobs);
   }
   return failure();
+}
+
+FailureOr<Attribute> materializeDecompositionConfigFromConstraints(
+    ConstraintsOp op, const DenseMap<StringRef, int64_t> &assignments) {
+  // Substitute knob leaves in the entire knob template, then extract
+  // the `decomposition_config` sub-dict. The substitution machinery is
+  // identical to materialize_compilation_info; only the repackaging at
+  // the end differs (we return a nested DictionaryAttr instead of a
+  // CompilationInfoAttr).
+  DictionaryAttr materializedKnobs =
+      materializeKnobsDictionary(op, assignments);
+  if (!materializedKnobs) {
+    return failure();
+  }
+  Attribute decompAttr = materializedKnobs.get(kDecompositionConfigKey);
+  if (!decompAttr) {
+    emitMaterializationError(op)
+        << "constraints op has no '" << kDecompositionConfigKey
+        << "' entry in its knobs dictionary (required for attention)";
+    return failure();
+  }
+  auto decompDict = dyn_cast<DictionaryAttr>(decompAttr);
+  if (!decompDict) {
+    emitMaterializationError(op)
+        << "'" << kDecompositionConfigKey
+        << "' entry must be a DictionaryAttr (got " << decompAttr << ")";
+    return failure();
+  }
+  return decompDict;
 }
 
 } // namespace mlir::iree_compiler

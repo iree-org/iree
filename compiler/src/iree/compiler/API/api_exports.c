@@ -40,6 +40,7 @@ extern void ireeCodegenInferScaledContractionDimensions();
 extern void ireeCodegenIntKnobAttrGetName();
 extern void ireeCodegenIntKnobAttrGetTypeID();
 extern void ireeCodegenMaterializeCompilationInfoFromConstraintsOp();
+extern void ireeCodegenMaterializeDecompositionConfigFromConstraintsOp();
 extern void ireeCodegenMlirOperationIsACodegenAttentionOp();
 extern void ireeCodegenMlirOperationIsAScaledContractionOp();
 extern void ireeCodegenNoPipelineAttrGet();
@@ -1218,6 +1219,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCodegenIntKnobAttrGetName;
   x += (uintptr_t)&ireeCodegenIntKnobAttrGetTypeID;
   x += (uintptr_t)&ireeCodegenMaterializeCompilationInfoFromConstraintsOp;
+  x += (uintptr_t)&ireeCodegenMaterializeDecompositionConfigFromConstraintsOp;
   x += (uintptr_t)&ireeCodegenMlirOperationIsACodegenAttentionOp;
   x += (uintptr_t)&ireeCodegenMlirOperationIsAScaledContractionOp;
   x += (uintptr_t)&ireeCodegenNoPipelineAttrGet;

@@ -833,6 +833,45 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "assignment dictionary.",
       py::arg("constraints_op"), py::arg("assignments"));
 
+  iree_codegen_module.def(
+      "materialize_decomposition_config",
+      [](MlirOperation op, py::dict assignments) -> MlirAttribute {
+        std::vector<MlirStringRef> nameRefs;
+        std::vector<int64_t> values;
+        nameRefs.reserve(assignments.size());
+        values.reserve(assignments.size());
+        for (auto [key, value] : assignments) {
+          Py_ssize_t nameSize = 0;
+          const char *nameData = PyUnicode_AsUTF8AndSize(key.ptr(), &nameSize);
+          if (!nameData) {
+            throw py::python_error();
+          }
+          nameRefs.push_back(
+              mlirStringRefCreate(nameData, static_cast<size_t>(nameSize)));
+          values.push_back(py::cast<int64_t>(value));
+        }
+
+        MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirAttribute attr =
+            ireeCodegenMaterializeDecompositionConfigFromConstraintsOp(
+                op, nameRefs.size(), nameRefs.data(), values.data(),
+                &diagnosticMessage);
+        if (mlirAttributeIsNull(attr)) {
+          if (!mlirAttributeIsNull(diagnosticMessage)) {
+            throw std::runtime_error(
+                unwrap(mlirStringAttrGetValue(diagnosticMessage)).str());
+          }
+          throw std::runtime_error(
+              "decomposition_config materialization from constraints failed");
+        }
+        return attr;
+      },
+      "Materialize a decomposition_config dictionary attr from a constraints "
+      "op and flat knob assignment dictionary. Used for attention dispatches "
+      "where the per-matmul (qk / pv) lowering_config sub-dicts are carried "
+      "separately from the top-level compilation_info.",
+      py::arg("constraints_op"), py::arg("assignments"));
+
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps
   //===-------------------------------------------------------------------===//

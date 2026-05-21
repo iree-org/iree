@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
+#include "mlir/IR/AttrTypeSubElements.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 
@@ -20,6 +22,28 @@ namespace mlir::iree_compiler {
 
 #define GEN_PASS_DEF_VERIFYSMTCONSTRAINTSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
+
+/// Returns true if `attr` (or anything reachable from it through MLIR's
+/// generic sub-element walker) is an IntKnobAttr or OneOfKnobAttr.
+/// Used by the `extractKnobValue` `Default` arm to refuse equality-only
+/// matching for typed wrapper attributes that hide knobs inside — without
+/// this guard a future typed wrapper containing knobs would silently
+/// bypass extraction and the inner knobs would resolve to std::nullopt,
+/// causing the evaluator to skip every constraint that touches them.
+static bool containsKnob(Attribute attr) {
+  bool found = false;
+  AttrTypeWalker walker;
+  walker.addWalk([&](IREE::Codegen::IntKnobAttr) -> WalkResult {
+    found = true;
+    return WalkResult::interrupt();
+  });
+  walker.addWalk([&](IREE::Codegen::OneOfKnobAttr) -> WalkResult {
+    found = true;
+    return WalkResult::interrupt();
+  });
+  walker.walk(attr);
+  return found;
+}
 
 /// Walk a knobs template dictionary and extract concrete values from the
 /// corresponding lowering config. Returns failure if any knob has no
@@ -82,15 +106,70 @@ static LogicalResult extractKnobValue(Attribute templateAttr,
         }
         return success();
       })
-      .Default(failure());
+      .Case([&](IREE::GPU::LoweringConfigAttr lcTemplate) -> LogicalResult {
+        // `LoweringConfigAttr` wraps a DictionaryAttr; recurse into the
+        // inner attrs and require the config side to also be a
+        // LoweringConfigAttr (otherwise the materialized form drifted).
+        auto lcConfig =
+            dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(configAttr);
+        if (!lcConfig) {
+          return failure();
+        }
+        return extractKnobValue(lcTemplate.getAttributes(),
+                                lcConfig.getAttributes(), result);
+      })
+      .Default([&](Attribute fixedTemplateAttr) -> LogicalResult {
+        // Fallback for fixed typed leaf attrs (e.g.
+        // `#iree_gpu.derived_thread_config` inside a per-matmul
+        // promotion_types list): no knob to extract, just require the
+        // config side to be identical. Without this case the typed
+        // leaf would silently fail extraction and the entire knob
+        // resolution would be skipped, so concrete violations would
+        // never be flagged.
+        //
+        // Guard: refuse to apply equality-only matching to any typed
+        // wrapper attribute that hides knobs inside. If a future typed
+        // attr wraps a dictionary carrying IntKnobAttr/OneOfKnobAttr
+        // references, equality with a structurally-equal config side
+        // would silently bypass extraction; those knobs would then
+        // resolve to std::nullopt at evaluation time, and every
+        // assertion touching them would be silently skipped. Force
+        // the caller to add an explicit case for any such wrapper.
+        if (containsKnob(fixedTemplateAttr)) {
+          return failure();
+        }
+        if (fixedTemplateAttr != configAttr) {
+          return failure();
+        }
+        return success();
+      });
 }
+
+// `kSMTAuxKnobKeys` (the whitelist of SMT-only auxiliary sub-dict names
+// the emitter declares but the materializer never propagates) lives in
+// SMTConstraintUtils.h so the producer (LLVMGPUConstraintGenerator's
+// attention emitter) and consumer (this verifier) reference the same
+// strings.
 
 static LogicalResult extractKnobValues(DictionaryAttr knobsTemplate,
                                        DictionaryAttr configAttrs,
                                        DenseMap<StringAttr, int64_t> &result) {
   for (NamedAttribute entry : knobsTemplate) {
-    if (failed(extractKnobValue(entry.getValue(),
-                                configAttrs.get(entry.getName()), result))) {
+    Attribute configAttr = configAttrs.get(entry.getName());
+    if (!configAttr) {
+      // The only legitimate "no config counterpart" case is the small
+      // whitelist of SMT-only auxiliary sub-dicts above. Anything else
+      // (a missing `workgroup`, `reduction`, etc.) means the materialized
+      // config is incomplete or has drifted from the template, and the
+      // evaluator would otherwise treat the resulting unresolved knobs as
+      // std::nullopt and silently skip every constraint that touches them
+      // — masking real violations. Fail verification instead.
+      if (!llvm::is_contained(kSMTAuxKnobKeys, entry.getName().getValue())) {
+        return failure();
+      }
+      continue;
+    }
+    if (failed(extractKnobValue(entry.getValue(), configAttr, result))) {
       return failure();
     }
   }

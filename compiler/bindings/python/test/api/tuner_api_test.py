@@ -804,3 +804,128 @@ def test_materialize_compilation_info_error_diagnostic():
         assert False, "expected missing wg_0 assignment to fail"
     except RuntimeError as e:
         assert "missing assignment for knob 'wg_0'" in str(e)
+
+
+# Attention knob template with a nested decomposition_config carrying
+# per-matmul (qk / pv) lowering_config sub-dicts. Mirrors the shape that
+# LLVMGPUConstraintGenerator emits for OnlineAttentionOp under
+# VectorDistribute. Used to exercise both `materialize_compilation_info`
+# (top-level lowering_config + translation_info) and
+# `materialize_decomposition_config` (the nested per-matmul sub-dict that
+# attention tuning attaches via setDecompositionConfigAttr).
+_MATERIALIZE_ATTENTION_CONSTRAINTS_MODULE = """
+    module {
+        iree_codegen.smt.constraints
+            target = <set = 0>,
+            pipeline = #iree_gpu.pipeline<VectorDistribute>,
+            knobs = {
+                workgroup = [0, #iree_codegen.smt.int_knob<"m_tile">, 0, 0, #iree_codegen.smt.int_knob<"n_tile">],
+                partial_reduction = [0, 0, 0, #iree_codegen.smt.int_knob<"red_k2">, 0],
+                promote_operands = [0, 1, 2],
+                decomposition_config = {
+                    qk_attrs = {lowering_config = {
+                        mma_kind = #iree_codegen.smt.one_of_knob<"qk_mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>]>}},
+                    pv_attrs = {lowering_config = {
+                        mma_kind = #iree_codegen.smt.one_of_knob<"pv_mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>]>}}
+                },
+                subgroup_m_count = #iree_codegen.smt.int_knob<"sg_m_cnt">,
+                subgroup_n_count = #iree_codegen.smt.int_knob<"sg_n_cnt">,
+                workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, 1, 1],
+                subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
+            }
+            dims() {
+            }
+    }
+"""
+
+
+def _get_materialize_attention_constraints_op():
+    input_module = ir.Module.parse(_MATERIALIZE_ATTENTION_CONSTRAINTS_MODULE)
+    constraints_ops = ir.get_ops_of_type(input_module, iree_codegen.ConstraintsOp)
+    assert len(constraints_ops) == 1
+    return input_module, constraints_ops[0]
+
+
+_ATTENTION_ASSIGNMENTS = {
+    "m_tile": 64,
+    "n_tile": 64,
+    "red_k2": 64,
+    "qk_mma_idx": 0,
+    "pv_mma_idx": 0,
+    "sg_m_cnt": 4,
+    "sg_n_cnt": 1,
+    "wg_size_x": 256,
+    "sg_size": 64,
+}
+
+
+@run
+def test_materialize_compilation_info_attention():
+    input_module, constraints_op = _get_materialize_attention_constraints_op()
+    compilation_info = iree_codegen.materialize_compilation_info(
+        constraints_op, _ATTENTION_ASSIGNMENTS
+    )
+    assert isinstance(compilation_info, iree_codegen.CompilationInfoAttr)
+    lowering_config_str = str(compilation_info.lowering_config)
+    # Top-level attention lowering_config entries.
+    assert "workgroup = [0, 64, 0, 0, 64]" in lowering_config_str
+    assert "partial_reduction = [0, 0, 0, 64, 0]" in lowering_config_str
+    assert "promote_operands = [0, 1, 2]" in lowering_config_str
+    assert "subgroup_m_count = 4" in lowering_config_str
+    assert "subgroup_n_count = 1" in lowering_config_str
+    # The nested per-matmul sub-dicts are present in the materialized
+    # top-level too — `materialize_decomposition_config` simply extracts
+    # the same sub-tree as a separate Attribute for tuner-side attach.
+    assert (
+        "mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>" in lowering_config_str
+    )
+    translation_info = iree_codegen.TranslationInfoAttr(
+        compilation_info.translation_info
+    )
+    assert list(translation_info.workgroup_size) == [256, 1, 1]
+    assert translation_info.subgroup_size == 64
+
+
+@run
+def test_materialize_decomposition_config_attention():
+    input_module, constraints_op = _get_materialize_attention_constraints_op()
+    decomp = iree_codegen.materialize_decomposition_config(
+        constraints_op, _ATTENTION_ASSIGNMENTS
+    )
+    decomp_str = str(decomp)
+    assert "qk_attrs" in decomp_str
+    assert "pv_attrs" in decomp_str
+    # Both per-matmul lowering_configs select the chosen MMA intrinsic.
+    assert (
+        decomp_str.count("mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>") == 2
+    )
+
+
+@run
+def test_materialize_decomposition_config_picks_indexed_mma():
+    input_module, constraints_op = _get_materialize_attention_constraints_op()
+    assignments = dict(_ATTENTION_ASSIGNMENTS)
+    assignments["pv_mma_idx"] = 1  # MFMA_F32_32x32x8_F16
+    decomp = iree_codegen.materialize_decomposition_config(constraints_op, assignments)
+    decomp_str = str(decomp)
+    # QK picks index 0; PV picks index 1.
+    assert (
+        "qk_attrs = {lowering_config = {mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>}}"
+        in decomp_str
+    )
+    assert (
+        "pv_attrs = {lowering_config = {mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>}}"
+        in decomp_str
+    )
+
+
+@run
+def test_materialize_decomposition_config_error_diagnostic():
+    input_module, constraints_op = _get_materialize_attention_constraints_op()
+    assignments = dict(_ATTENTION_ASSIGNMENTS)
+    del assignments["qk_mma_idx"]
+    try:
+        iree_codegen.materialize_decomposition_config(constraints_op, assignments)
+        assert False, "expected missing qk_mma_idx assignment to fail"
+    except RuntimeError as e:
+        assert "missing assignment for knob 'qk_mma_idx'" in str(e)

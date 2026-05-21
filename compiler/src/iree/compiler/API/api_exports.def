@@ -30,6 +30,7 @@ EXPORTS
   ireeCodegenIntKnobAttrGetName
   ireeCodegenIntKnobAttrGetTypeID
   ireeCodegenMaterializeCompilationInfoFromConstraintsOp
+  ireeCodegenMaterializeDecompositionConfigFromConstraintsOp
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenNoPipelineAttrGet

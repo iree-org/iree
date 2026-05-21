@@ -31,6 +31,7 @@ VER_0 {
     ireeCodegenIntKnobAttrGetName;
     ireeCodegenIntKnobAttrGetTypeID;
     ireeCodegenMaterializeCompilationInfoFromConstraintsOp;
+    ireeCodegenMaterializeDecompositionConfigFromConstraintsOp;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenNoPipelineAttrGet;

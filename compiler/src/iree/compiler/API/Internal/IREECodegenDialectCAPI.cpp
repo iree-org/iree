@@ -320,6 +320,51 @@ MlirAttribute ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
   return wrap(*compilationInfo);
 }
 
+MlirAttribute ireeCodegenMaterializeDecompositionConfigFromConstraintsOp(
+    MlirOperation op, size_t numAssignments,
+    const MlirStringRef *assignmentNames, const int64_t *assignmentValues,
+    MlirAttribute *diagnosticMessage) {
+  // Mirrors ireeCodegenMaterializeCompilationInfoFromConstraintsOp but
+  // returns the per-matmul `decomposition_config` DictionaryAttr instead
+  // of a top-level CompilationInfoAttr. Used by attention tuning: the
+  // tuner attaches the returned attribute to the attention op via
+  // setDecompositionConfigAttr after the matching compilation_info has
+  // been attached via setTranslationInfoAttr.
+  auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
+  if (diagnosticMessage) {
+    *diagnosticMessage = wrap(mlir::Attribute());
+  }
+
+  llvm::DenseMap<llvm::StringRef, int64_t> assignments;
+  assignments.reserve(numAssignments);
+  for (size_t i = 0; i < numAssignments; ++i) {
+    assignments[unwrap(assignmentNames[i])] = assignmentValues[i];
+  }
+
+  std::string diagnostics;
+  llvm::raw_string_ostream diagnosticStream(diagnostics);
+  mlir::ScopedDiagnosticHandler diagnosticHandler(
+      constraintsOp->getContext(), [&](mlir::Diagnostic &diagnostic) {
+        diagnostic.print(diagnosticStream);
+        diagnosticStream << '\n';
+        return mlir::success();
+      });
+
+  llvm::FailureOr<mlir::Attribute> decompositionConfig =
+      mlir::iree_compiler::materializeDecompositionConfigFromConstraints(
+          constraintsOp, assignments);
+  if (failed(decompositionConfig)) {
+    diagnosticStream.flush();
+    if (diagnosticMessage && !diagnostics.empty()) {
+      mlir::Attribute diagnosticAttr =
+          mlir::StringAttr::get(constraintsOp->getContext(), diagnostics);
+      *diagnosticMessage = wrap(diagnosticAttr);
+    }
+    return wrap(mlir::Attribute());
+  }
+  return wrap(*decompositionConfig);
+}
+
 ireeCodegenAttentionOpDetail
 ireeCodegenGetAttentionOpDetail(MlirAffineMap qMap, MlirAffineMap kMap,
                                 MlirAffineMap vMap, MlirAffineMap oMap) {

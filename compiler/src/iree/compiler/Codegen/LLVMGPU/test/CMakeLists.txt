@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "config_gather_like_ops.mlir"
     "config_horizontally_fused_ops.mlir"
     "config_llvm_gpu_constraints.mlir"
+    "config_llvm_gpu_vd_attention_constraints.mlir"
     "config_matmul.mlir"
     "config_matvec.mlir"
     "config_root_op_attribute.mlir"
