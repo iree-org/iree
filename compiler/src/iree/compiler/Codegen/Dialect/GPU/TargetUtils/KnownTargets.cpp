@@ -940,6 +940,32 @@ const WgpDetails *getAmpereWgpDetails() {
   return &ampereWgp;
 }
 
+const WgpDetails *getBlackwellWgpDetails() {
+  // TODO: Model Blackwell-specific capabilities once IREE has target details
+  // for the architecture. Reuse the existing NVIDIA capability model for now
+  // so canonical CUDA targets such as sm_120 can be represented.
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
+  };
+  static const WgpDetails blackwellWgp = {allComputeBits,
+                                          allStorageBits,
+                                          allSubgroupOps,
+                                          allDotProductOps,
+                                          std::size(mmaOps),
+                                          mmaOps,
+                                          0,
+                                          nullptr,
+                                          {32, 32},
+                                          {1024, 1024, 1024},
+                                          1024,
+                                          163 * 1024,
+                                          {0x7fffffff, 0xffff, 0xffff}};
+  return &blackwellWgp;
+}
+
 const WgpDetails *getTuringWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
@@ -1001,6 +1027,7 @@ const WgpDetails *getPascalWgpDetails() {
 // Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
+  const WgpDetails *blackwellWgp = getBlackwellWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
   const WgpDetails *voltaWgp = getVoltaWgpDetails();
   const WgpDetails *pascalWgp = getPascalWgpDetails();
@@ -1039,6 +1066,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
       .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
+      .Cases({"blackwell", "sm_120"}, TargetDetails{blackwellWgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
       .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
@@ -1068,6 +1096,7 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("a100", "sm_80")
       .Case("ada", "sm_89")
+      .Case("blackwell", "sm_120")
       .Case("ampere", "sm_80") // Or sm_86/87; use smaller version.
       .Case("turing", "sm_75")
       .Case("volta", "sm_70")  // Or sm_72; use smaller version.
