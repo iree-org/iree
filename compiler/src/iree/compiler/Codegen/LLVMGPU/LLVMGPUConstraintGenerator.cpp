@@ -789,6 +789,7 @@ static LogicalResult emitTileAndFuseConstraints(
 
   // Constraint 1: Workgroup Tiles.
   // Basic constraints for both outer and innermost M and N tiles.
+  // TODO: Add overpadding to problem M and N dims to get better tile sizes.
   for (unsigned dim : wgMNBDims) {
     std::string wgName = makeVarName(kKnobWgPrefix, dim);
     std::string problemName = makeVarName(kLoopRangePrefix, dim);
