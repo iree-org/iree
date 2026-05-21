@@ -182,6 +182,23 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
   }
   entries.emplace_back("subgroup_size",
                        b.getI64IntegerAttr(translationInfo.getSubgroupSize()));
+
+  // TODO(#23535): This is a temporary hack to add the use_igemm_convolution
+  // knob from translation info config to support IGEMM convolution. It should
+  // be automatically handled by each backend in the future.
+  bool useIgemmConvolution = false;
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    if (auto pipelineOptions =
+            dyn_cast_or_null<IREE::GPU::GPUPipelineOptionsAttr>(config.get(
+                IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()))) {
+      if (BoolAttr useIgemmAttr = pipelineOptions.getUseIgemmConvolution()) {
+        useIgemmConvolution = useIgemmAttr.getValue();
+      }
+    }
+  }
+  entries.emplace_back(
+      "use_igemm_convolution",
+      StringAttr::get(ctx, useIgemmConvolution ? "true" : "false"));
   return DictionaryAttr::get(ctx, entries);
 }
 

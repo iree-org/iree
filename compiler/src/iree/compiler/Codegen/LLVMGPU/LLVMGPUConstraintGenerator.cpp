@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/DebugLog.h"
@@ -50,6 +51,12 @@ struct RootOpLoopInfo {
   SmallVector<AffineMap> indexingMaps;
 };
 
+/// Optional TileAndFuse constraint inputs for IGEMM convolution.
+struct TileAndFuseConstraintOptions {
+  bool useIgemm = false;
+  ArrayRef<unsigned> fusedIgemmKDims = {};
+};
+
 // Keys for entries in the SMT constraints `knobs` dictionary.
 // These names are aligned with lowering config and translation info fields.
 
@@ -69,6 +76,9 @@ struct RootOpLoopInfo {
 //   workgroup_size = [wg_size_x, wg_size_y, wg_size_z]
 //   subgroup_size = sg_size
 
+// Translation info knob list (TileAndFuse only):
+//   use_igemm_convolution = use_igemm_convolution ("true" or "false")
+
 constexpr StringLiteral kKnobWorkgroupKey = "workgroup";
 constexpr StringLiteral kKnobReductionKey = "reduction";
 constexpr StringLiteral kKnobMmaKindKey = "mma_kind";
@@ -76,6 +86,7 @@ constexpr StringLiteral kKnobSubgroupBasisKey = "subgroup_basis";
 constexpr StringLiteral kKnobSubgroupKey = "subgroup";
 constexpr StringLiteral kKnobWorkgroupSizeKey = "workgroup_size";
 constexpr StringLiteral kKnobSubgroupSizeKey = "subgroup_size";
+constexpr StringLiteral kKnobUseIgemmConvolutionKey = "use_igemm_convolution";
 
 // SMT variable names for knob values used in constraints.
 constexpr StringLiteral kKnobMmaIdxName = "mma_idx";
@@ -85,6 +96,7 @@ constexpr StringLiteral kKnobSgSizeName = "sg_size";
 constexpr StringLiteral kKnobWgSizeXName = "wg_size_x";
 constexpr StringLiteral kKnobWgSizeYName = "wg_size_y";
 constexpr StringLiteral kKnobWgSizeZName = "wg_size_z";
+constexpr StringLiteral kKnobUseIgemmConvolutionName = "use_igemm_convolution";
 
 // SMT variable name prefixes.
 // The loop dim count varies per problem, so names are built at runtime
@@ -168,6 +180,24 @@ static Value emitAlignUpToMultiple(OpBuilder &builder, Location loc, Value lhs,
       smt::IntAddOp::create(builder, loc, ValueRange{lhs, rhsMinusOne});
   Value div = smt::IntDivOp::create(builder, loc, lhsPlus, rhs);
   return smt::IntMulOp::create(builder, loc, ValueRange{div, rhs});
+}
+
+/// Emit tuner-style overpadded bound for a dimension.
+/// If dim > 128: align up to 128. Else if dim > 32: align up to 32.
+/// Otherwise keep dim unchanged.
+static Value emitOverpaddedBound(OpBuilder &builder, Location loc, Value dim) {
+  Value c32 = mkIntConst(builder, loc, 32);
+  Value c33 = mkIntConst(builder, loc, 33);
+  Value c128 = mkIntConst(builder, loc, 128);
+  Value c129 = mkIntConst(builder, loc, 129);
+  Value align32 = emitAlignUpToMultiple(builder, loc, dim, c32);
+  Value align128 = emitAlignUpToMultiple(builder, loc, dim, c128);
+  Value gt32 =
+      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, dim, c33);
+  Value gt128 =
+      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, dim, c129);
+  Value padded32 = smt::IteOp::create(builder, loc, gt32, align32, dim);
+  return smt::IteOp::create(builder, loc, gt128, align128, padded32);
 }
 
 /// Emit product(values[0], values[1], ..., values[n-1]).
@@ -343,6 +373,45 @@ static std::optional<RootOpLoopInfo> getRootOpLoopInfo(Operation *rootOp) {
   return std::nullopt;
 }
 
+/// Returns original conv K indices that fuse in IGEMM, excluding innermost.
+/// For conv K [3, 4, 5] mapping to [3, 3, 3], returns [3, 4]. For conv K
+/// [1, 4, 5] mapping to [1, 4, 4], returns [4].
+static SmallVector<unsigned>
+getFusedIgemmKDimIndices(linalg::LinalgOp linalgOp,
+                         ArrayRef<unsigned> convKDims) {
+  if (convKDims.empty()) {
+    return {};
+  }
+
+  FailureOr<IREE::LinalgExt::IGEMMGenericConvDetails> igemmDetails =
+      IREE::LinalgExt::getIGEMMGenericConvDetails(linalgOp);
+  if (failed(igemmDetails)) {
+    return {};
+  }
+
+  auto mapConvDimToIgemm = [&](unsigned convDim) -> unsigned {
+    return cast<AffineDimExpr>(igemmDetails->convToIgemmDimMap.lookup(convDim))
+        .getPosition();
+  };
+
+  DenseMap<unsigned, unsigned> igemmDimToConvKCount;
+  for (unsigned convKDim : convKDims) {
+    ++igemmDimToConvKCount[mapConvDimToIgemm(convKDim)];
+  }
+
+  unsigned innermostConvK = convKDims.back();
+  SmallVector<unsigned> fusedConvKDims;
+  for (unsigned convKDim : convKDims) {
+    if (convKDim == innermostConvK) {
+      continue;
+    }
+    if (igemmDimToConvKCount[mapConvDimToIgemm(convKDim)] > 1) {
+      fusedConvKDims.push_back(convKDim);
+    }
+  }
+  return fusedConvKDims;
+}
+
 /// Build the VectorDistribute knobs dict for contraction-like dims.
 static DictionaryAttr
 buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
@@ -421,15 +490,22 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
 }
 
 /// Build the TileAndFuse knobs dict for contraction-like dims.
-static DictionaryAttr
-buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
-                          const ContractionLikeDims &dims,
-                          ArrayRef<Attribute> compatibleMMAs) {
+/// When `useIgemm` is true, also adds the `use_igemm_convolution` one-of
+/// knob entry with string options "false"/"true".
+static DictionaryAttr buildTileAndFuseKnobsDict(
+    MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+    const ContractionLikeDims &dims, ArrayRef<Attribute> compatibleMMAs,
+    bool isConv = false, ArrayRef<unsigned> fusedIgemmKDims = {}) {
   SmallVector<NamedAttribute> knobsEntries;
+
+  unsigned layoutNumLoops = loopInfo.numLoops;
+  if (!fusedIgemmKDims.empty()) {
+    layoutNumLoops = loopInfo.numLoops - fusedIgemmKDims.size();
+  }
 
   // Build workgroup entries.
   // Batch, M, N dims are knobbed, K dims are not tiled and get 0.
-  SmallVector<Attribute> workgroupEntries(loopInfo.numLoops,
+  SmallVector<Attribute> workgroupEntries(layoutNumLoops,
                                           makeIntAttr(ctx, kNoTileDimVal));
   SmallVector<unsigned> knobbedWorkgroupDims;
   llvm::append_range(knobbedWorkgroupDims, dims.b);
@@ -444,22 +520,25 @@ buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   // Build reduction entries.
   // Only innermost K dim is knobbed, other K dims are unit tiled as 1.
   // Other untiled dims get 0.
-  SmallVector<Attribute> reductionEntries(loopInfo.numLoops,
+  SmallVector<Attribute> reductionEntries(layoutNumLoops,
                                           makeIntAttr(ctx, kNoTileDimVal));
-  for (unsigned i = 0; i < loopInfo.numLoops; ++i) {
+  for (auto i : knobbedWorkgroupDims) {
     reductionEntries[i] = makeIntAttr(ctx, kNoTileDimVal);
   }
   for (unsigned i : dims.k) {
+    if (llvm::is_contained(fusedIgemmKDims, i) || i >= layoutNumLoops) {
+      continue;
+    }
     reductionEntries[i] = makeIntAttr(ctx, kUnitTileDimVal);
   }
-  reductionEntries[dims.k.back()] =
+  reductionEntries[layoutNumLoops - 1] =
       IntKnobAttr::get(ctx, makeVarName(kKnobRedPrefix, dims.k.back()));
   knobsEntries.emplace_back(kKnobReductionKey,
                             ArrayAttr::get(ctx, reductionEntries));
 
   // Build subgroup entries.
   // M and N dims are knobbed, other untiled dims get 0.
-  SmallVector<Attribute> subgroupEntries(loopInfo.numLoops,
+  SmallVector<Attribute> subgroupEntries(layoutNumLoops,
                                          makeIntAttr(ctx, kNoTileDimVal));
   SmallVector<unsigned> knobbedSubgroupDims;
   llvm::append_range(knobbedSubgroupDims, dims.m);
@@ -484,6 +563,15 @@ buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
                             ArrayAttr::get(ctx, wgSizeKnobs));
   knobsEntries.emplace_back(kKnobSubgroupSizeKey,
                             IntKnobAttr::get(ctx, kKnobSgSizeName));
+
+  // Conv-only: use_igemm_convolution one-of knob with options "false"/"true".
+  if (isConv) {
+    knobsEntries.emplace_back(
+        kKnobUseIgemmConvolutionKey,
+        OneOfKnobAttr::get(
+            ctx, kKnobUseIgemmConvolutionName,
+            {StringAttr::get(ctx, "false"), StringAttr::get(ctx, "true")}));
+  }
 
   return DictionaryAttr::get(ctx, knobsEntries);
 }
@@ -756,10 +844,15 @@ static LogicalResult emitVectorDistributeConstraints(
 }
 
 /// Emit TileAndFuse constraints for contraction-like dims (matmul/conv).
+/// When `options.useIgemm` is true, also emits the `use_igemm_convolution`
+/// one-of knob and bounds constraints on its option index.
+/// `options.fusedIgemmKDims` lists original conv K indices that fuse in
+/// IGEMM, excluding innermost.
 static LogicalResult emitTileAndFuseConstraints(
     OpBuilder &builder, linalg::LinalgOp linalgOp,
     const ContractionLikeDims &dims, IREE::GPU::TargetAttr gpuTarget,
-    ArrayRef<Value> smtDimArgs, ArrayRef<Attribute> compatibleMMAs) {
+    ArrayRef<Value> smtDimArgs, ArrayRef<Attribute> compatibleMMAs,
+    TileAndFuseConstraintOptions options = {}) {
   Location loc = linalgOp.getLoc();
 
   // Hardware constants.
@@ -861,9 +954,33 @@ static LogicalResult emitTileAndFuseConstraints(
       emitAlignUpToMultiple(builder, loc, smtDimArgs[mInnerDim], mmaMLookup);
   Value problemInnerNAligned =
       emitAlignUpToMultiple(builder, loc, smtDimArgs[nInnerDim], mmaNLookup);
-  // problemInnerKAligned = ceil(dim_k / mma_k) * mma_k.
-  Value problemInnerKAligned =
+  // problemInnerKAligned = ceil(dim_k / mma_k) * mma_k, or dim_k * dim_fused
+  // with IGEMM.
+  Value alignedInnerK =
       emitAlignUpToMultiple(builder, loc, smtDimArgs[kInnerDim], mmaKLookup);
+  Value problemInnerKAligned = alignedInnerK;
+  Value useIgemmTrue;
+  if (options.useIgemm) {
+    // use_igemm_convolution knob, 0 -> direct conv, 1 -> IGEMM conv
+    Value useIgemmIdx = mkKnob(builder, loc, kKnobUseIgemmConvolutionName);
+    assertBounds(builder, loc, useIgemmIdx, kKnobUseIgemmConvolutionName,
+                 mkIntConst(builder, loc, 0), "0", mkIntConst(builder, loc, 1),
+                 "1");
+
+    SmallVector<Value> fusedDimValues;
+    fusedDimValues.reserve(options.fusedIgemmKDims.size());
+    for (unsigned dim : options.fusedIgemmKDims) {
+      fusedDimValues.push_back(smtDimArgs[dim]);
+    }
+    Value dimFused = emitProduct(builder, loc, fusedDimValues);
+    Value igemmInnerK = smt::IntMulOp::create(
+        builder, loc, ValueRange{smtDimArgs[kInnerDim], dimFused});
+
+    useIgemmTrue = smt::EqOp::create(builder, loc, useIgemmIdx,
+                                     mkIntConst(builder, loc, 1));
+    problemInnerKAligned = smt::IteOp::create(builder, loc, useIgemmTrue,
+                                              igemmInnerK, alignedInnerK);
+  }
 
   // Constraint 0: Set concrete values for knobs.
   // sg_size == preferred_subgroup_size.
@@ -884,6 +1001,11 @@ static LogicalResult emitTileAndFuseConstraints(
       problemDim = problemInnerMAligned;
     } else if (dim == nInnerDim) {
       problemDim = problemInnerNAligned;
+    } else if (options.useIgemm && (llvm::is_contained(dims.m, dim) ||
+                                    llvm::is_contained(dims.n, dim))) {
+      Value overpaddedDim = emitOverpaddedBound(builder, loc, problemDim);
+      problemDim = smt::IteOp::create(builder, loc, useIgemmTrue, overpaddedDim,
+                                      problemDim);
     }
     // dim % wg == 0.
     assertDivisible(
@@ -1050,8 +1172,9 @@ emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
 
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
-  if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
-                    !linalg::isaConvolutionOpInterface(linalgOp))) {
+
+  bool isConv = linalg::isaConvolutionOpInterface(linalgOp);
+  if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) && !isConv)) {
     return success();
   }
 
@@ -1079,13 +1202,22 @@ emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
 
   MLIRContext *ctx = rootOp->getContext();
   OpBuilder builder(ctx);
+  SmallVector<unsigned> fusedIgemmKDims = {};
   DictionaryAttr knobs;
-  if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+  switch (pipeline) {
+  case IREE::GPU::LoweringPipeline::VectorDistribute:
     knobs =
         buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
-  } else if (pipeline == IREE::GPU::LoweringPipeline::TileAndFuse) {
-    knobs = buildTileAndFuseKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
-  } else {
+    break;
+  case IREE::GPU::LoweringPipeline::TileAndFuse:
+    if (isConv) {
+      fusedIgemmKDims = getFusedIgemmKDimIndices(linalgOp, dims->k);
+    }
+    knobs = buildTileAndFuseKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs,
+                                      /*isConv=*/isConv,
+                                      /*fusedIgemmKDims=*/fusedIgemmKDims);
+    break;
+  default:
     return success();
   }
   auto pipelineAttr = IREE::GPU::PipelineAttr::get(ctx, pipeline);
@@ -1093,15 +1225,17 @@ emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
       createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
                                loopInfo->numLoops, loopInfo->indexingMaps);
 
-  if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+  switch (pipeline) {
+  case IREE::GPU::LoweringPipeline::VectorDistribute:
     return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
                                            shell.smtDimArgs, compatibleMMAs);
+  case IREE::GPU::LoweringPipeline::TileAndFuse:
+    return emitTileAndFuseConstraints(
+        builder, linalgOp, *dims, gpuTarget, shell.smtDimArgs, compatibleMMAs,
+        {/*useIgemm=*/isConv, /*fusedIgemmKDims=*/fusedIgemmKDims});
+  default:
+    return success();
   }
-  if (pipeline == IREE::GPU::LoweringPipeline::TileAndFuse) {
-    return emitTileAndFuseConstraints(builder, linalgOp, *dims, gpuTarget,
-                                      shell.smtDimArgs, compatibleMMAs);
-  }
-  return success();
 }
 
 /// Multiple root ops may be present in a set, e.g. <set = 0>:

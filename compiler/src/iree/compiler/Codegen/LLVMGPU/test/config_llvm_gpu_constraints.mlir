@@ -120,10 +120,10 @@ func.func @conv_2d_nhwc_hwcf()
 // CHECK:       iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
 // CHECK-NEXT:  knobs = {
 // CHECK-DAG:   mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>
-// CHECK-DAG:   reduction = [0, 0, 0, 0, 1, 1, #iree_codegen.smt.int_knob<"red_6">]
-// CHECK-DAG:   subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, #iree_codegen.smt.int_knob<"sg_2">, #iree_codegen.smt.int_knob<"sg_3">, 0, 0, 0]
+// CHECK-DAG:   reduction = [0, 0, 0, 0, #iree_codegen.smt.int_knob<"red_6">]
+// CHECK-DAG:   subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, #iree_codegen.smt.int_knob<"sg_2">, #iree_codegen.smt.int_knob<"sg_3">, 0]
 // CHECK-DAG:   subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
-// CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0, 0, 0]
+// CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
 // CHECK:       iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
