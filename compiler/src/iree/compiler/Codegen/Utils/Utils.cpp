@@ -300,6 +300,11 @@ bool isRISCV64(DictionaryAttr targetConfig) {
   return triple && triple.value().isRISCV64();
 }
 
+static bool hasAnySVEFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+sve") ||
+         hasFeature(targetConfig, "+sve2");
+}
+
 std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
   // TODO(MaheshRavishankar): For now the target info is only available for
   // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
@@ -1748,11 +1753,14 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
 
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
-    // On AArch64 the scalable vector length will always be between 128-bit and
-    // 2048-bit. This works out as a vscale range of 1 to 16. See:
-    // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
-    return vector::VscaleRange{1, 16};
+  if (targetAttr) {
+    DictionaryAttr targetConfig = targetAttr.getConfiguration();
+    if (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig)) {
+      // For Arm SVE/SVE2 the scalable vector length is between 128-bit and
+      // 2048-bit, corresponding to a vscale range of 1 to 16. See:
+      // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
+      return vector::VscaleRange{1, 16};
+    }
   }
   // TODO: Implement for other architectures.
   return std::nullopt;
