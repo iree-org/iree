@@ -156,6 +156,10 @@ struct ConstraintEvaluator {
                     smt::IntDivOp, smt::IntModOp, smt::IntMulOp, smt::IntSubOp,
                     smt::IteOp, smt::NotOp, smt::OrOp>(
                   [&](auto op) { return eval(op); })
+              .Case<smt::DeclareFunOp>([&](smt::DeclareFunOp declOp) {
+                intValues[declOp.getResult()] = std::nullopt;
+                return success();
+              })
               .Default([](Operation *unhandled) {
                 return unhandled->emitError(
                     "unsupported op in constraint evaluator");

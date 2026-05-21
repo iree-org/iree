@@ -75,8 +75,6 @@ func.func @matmul_e2e_generated_violation_tf(
       -> tensor<128x256xf32>
   // expected-error @below {{pipeline constraints violated}}
   // expected-note @below {{dim_0 must be divisible by wg_0 (128 % 48 == 0)}}
-  // expected-note @below {{sg_num <= 10}}
-  // expected-note @below {{wg_size_x == total_threads}}
   %result = linalg.matmul {
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [48, 64, 0],
@@ -163,8 +161,6 @@ func.func @conv_e2e_generated_violation_tf(
       -> tensor<1x16x128x128xf32>
   // expected-error @below {{pipeline constraints violated}}
   // expected-note @below {{dim_2 must be divisible by wg_2 (128 % 48 == 0)}}
-  // expected-note @below {{sg_num <= 10}}
-  // expected-note @below {{wg_size_x == total_threads}}
   %result = linalg.conv_2d_nhwc_hwcf {
       dilations = dense<1> : tensor<2xi64>,
       lowering_config = #iree_gpu.lowering_config<{
