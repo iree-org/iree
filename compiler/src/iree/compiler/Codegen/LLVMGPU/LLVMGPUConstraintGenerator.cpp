@@ -182,22 +182,22 @@ static Value emitAlignUpToMultiple(OpBuilder &builder, Location loc, Value lhs,
   return smt::IntMulOp::create(builder, loc, ValueRange{div, rhs});
 }
 
-/// Emit tuner-style overpadded bound for a dimension.
+/// Emit overpadded bound for a dimension.
 /// If dim > 128: align up to 128. Else if dim > 32: align up to 32.
 /// Otherwise keep dim unchanged.
 static Value emitOverpaddedBound(OpBuilder &builder, Location loc, Value dim) {
-  Value c32 = mkIntConst(builder, loc, 32);
-  Value c33 = mkIntConst(builder, loc, 33);
-  Value c128 = mkIntConst(builder, loc, 128);
-  Value c129 = mkIntConst(builder, loc, 129);
-  Value align32 = emitAlignUpToMultiple(builder, loc, dim, c32);
-  Value align128 = emitAlignUpToMultiple(builder, loc, dim, c128);
-  Value gt32 =
-      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, dim, c33);
-  Value gt128 =
-      smt::IntCmpOp::create(builder, loc, smt::IntPredicate::ge, dim, c129);
-  Value padded32 = smt::IteOp::create(builder, loc, gt32, align32, dim);
-  return smt::IteOp::create(builder, loc, gt128, align128, padded32);
+  Value smallAlign = mkIntConst(builder, loc, 32);
+  Value largeAlign = mkIntConst(builder, loc, 128);
+  Value alignedSmall = emitAlignUpToMultiple(builder, loc, dim, smallAlign);
+  Value alignedLarge = emitAlignUpToMultiple(builder, loc, dim, largeAlign);
+  Value exceedsSmall = smt::IntCmpOp::create(
+      builder, loc, smt::IntPredicate::gt, dim, smallAlign);
+  Value exceedsLarge = smt::IntCmpOp::create(
+      builder, loc, smt::IntPredicate::gt, dim, largeAlign);
+  Value paddedSmall =
+      smt::IteOp::create(builder, loc, exceedsSmall, alignedSmall, dim);
+  return smt::IteOp::create(builder, loc, exceedsLarge, alignedLarge,
+                            paddedSmall);
 }
 
 /// Emit product(values[0], values[1], ..., values[n-1]).
