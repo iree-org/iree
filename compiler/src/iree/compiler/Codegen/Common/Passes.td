@@ -356,7 +356,7 @@ def DecomposeSoftmaxPass :
   ];
 }
 
-def DropSchedulePass : Pass<"transform-dialect-drop-schedule", ""> {
+def DropSchedulePass : Pass<"iree-transform-dialect-drop-schedule", ""> {
   let summary = "Drop the schedule from the operation";
 }
 

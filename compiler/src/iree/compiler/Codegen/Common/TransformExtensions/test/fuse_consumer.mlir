@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter --transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s --iree-transform-dialect-interpreter --iree-transform-dialect-drop-schedule | FileCheck %s
 
 #map = affine_map<(d0) -> (d0 * 16)>
 #map1 = affine_map<(d0) -> (d0)>

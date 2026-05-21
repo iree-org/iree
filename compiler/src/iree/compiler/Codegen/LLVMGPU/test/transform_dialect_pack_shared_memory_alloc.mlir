@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 // CHECK-LABEL: shared_memory_disjoint
 //   CHECK-NOT:   gpu.barrier
