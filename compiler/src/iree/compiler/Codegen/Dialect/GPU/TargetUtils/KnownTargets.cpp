@@ -975,7 +975,7 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 
 // Reports initial NVIDIA Blackwell 12.1 target capabilities for GPU target
 // selection. CUDA execution limits are based on sm_121 GB10 device properties.
-const WgpDetails *getBlackwellWgpDetails() {
+const WgpDetails *getSM121WgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
@@ -983,20 +983,20 @@ const WgpDetails *getBlackwellWgpDetails() {
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
-  static const WgpDetails blackwellWgp = {allComputeBits,
-                                          allStorageBits,
-                                          allSubgroupOps,
-                                          allDotProductOps,
-                                          std::size(mmaOps),
-                                          mmaOps,
-                                          0,
-                                          nullptr,
-                                          {32, 32},
-                                          {1024, 1024, 64},
-                                          1024,
-                                          99 * 1024,
-                                          {0x7fffffff, 0xffff, 0xffff}};
-  return &blackwellWgp;
+  static const WgpDetails sm121Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 64},
+                                      1024,
+                                      99 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
+  return &sm121Wgp;
 }
 
 // Reports Ampere-class NVIDIA tensor core capabilities for GPU target
@@ -1086,7 +1086,7 @@ const WgpDetails *getPascalWgpDetails() {
 
 // Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
-  const WgpDetails *blackwellWgp = getBlackwellWgpDetails();
+  const WgpDetails *sm121Wgp = getSM121WgpDetails();
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
   const WgpDetails *voltaWgp = getVoltaWgpDetails();
@@ -1128,7 +1128,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       // Initial support for sm_121 / GB10. Other Blackwell compute
       // capabilities, including sm_120, are intentionally left for follow-up
       // validation.
-      .Case("sm_121", TargetDetails{blackwellWgp, nullptr})
+      .Case("sm_121", TargetDetails{sm121Wgp, nullptr})
       .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
