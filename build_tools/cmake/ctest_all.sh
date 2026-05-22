@@ -125,7 +125,7 @@ label_exclude_args+=(${extra_label_exclude_args[@]})
 # platforms it doesn't support, but that would require editing through layers
 # of CMake functions. Hopefully this list stays very short.
 declare -a excluded_tests=()
-if [[ "${OSTYPE}" =~ ^msys ]]; then
+if [[ "${OSTYPE}" =~ ^(msys|cygwin) ]]; then
   # These tests are failing on Windows.
   excluded_tests+=(
     # TODO(#11077): INVALID_ARGUMENT: argument/result signature mismatch
