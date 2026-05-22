@@ -333,6 +333,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/VectorExt/IR:IREEVectorExtDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:AMDGPUTransforms",
         "@llvm-project//mlir:ArmSMEDialect",
         "@llvm-project//mlir:AsyncDialect",
         "@llvm-project//mlir:ArithDialect",

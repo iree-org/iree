@@ -287,6 +287,7 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgTransformDialect
     LLVMSupport
+    MLIRAMDGPUTransforms
     MLIRAffineDialect
     MLIRAffineTransformOps
     MLIRAffineUtils

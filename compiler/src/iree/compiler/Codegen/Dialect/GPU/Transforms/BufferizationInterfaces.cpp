@@ -209,10 +209,11 @@ struct BarrierRegionOpBufferizationInterface
     ArrayAttr addressSpaces = fencedGpuAddressSpaces(
         rewriter, llvm::concat<Value>(*newOperands, *newResults));
     rewriter.setInsertionPoint(barrierOp);
-    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces,
+                           /*named_barrier=*/Value{});
     rewriter.setInsertionPointAfter(barrierOp);
-    auto afterBarrier =
-        gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
+    auto afterBarrier = gpu::BarrierOp::create(
+        rewriter, barrierOp.getLoc(), addressSpaces, /*named_barrier=*/Value{});
 
     rewriter.inlineBlockBefore(barrierOp.getBody(), afterBarrier,
                                tensorizedOperands);
@@ -285,7 +286,8 @@ struct ValueBarrierOpBufferizationInterface
     }
 
     ArrayAttr addressSpaces = fencedGpuAddressSpaces(rewriter, buffers);
-    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces);
+    gpu::BarrierOp::create(rewriter, barrierOp.getLoc(), addressSpaces,
+                           /*named_barrier=*/Value{});
 
     // This operation bufferizes in place
     bufferization::replaceOpWithBufferizedValues(rewriter, op, buffers);
