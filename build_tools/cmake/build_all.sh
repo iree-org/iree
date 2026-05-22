@@ -76,9 +76,24 @@ declare -a CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
 )
 
-# sccache doesn't work with MSVC's /Zi (shared PDB files). Use /Z7 to embed
-# debug info in each .obj instead, avoiding PDB contention across parallel jobs.
-if [[ "${OSTYPE}" =~ ^msys ]] && (( ${IREE_USE_SCCACHE:-0} == 1 )); then
+# Force /Z7 (embedded per-.obj debug info) instead of /Zi (shared per-target
+# .pdb serialized through mspdbsrv.exe via /FS) on Windows.
+#
+# With /Zi, every cl.exe invocation in a target writes to the same
+# LLVM*.pdb. The failure rate of this race scales with the number of
+# concurrent writers, and MSVC 19.44.35227.0 broke it badly enough that
+# LLVM-scale targets no longer survive: empirically on iree-org/iree CI,
+# LLVMDemangle (6 TUs / shared PDB) loses ~3/6 to fatal error C1041
+# ("cannot open program database"), and LLVMSupport (~165 TUs / shared
+# PDB) loses ~165/165. The previous toolchain (19.44.35224.0) tolerated
+# the same concurrency without failures.
+#
+# /Z7 eliminates the shared PDB entirely (debug info embedded in each
+# .obj, consolidated by the linker into the final PDB), sidestepping the
+# race regardless of toolchain. It is also the configuration sccache and
+# ccache require, since they cannot cache outputs written to a shared
+# external file.
+if [[ "${OSTYPE}" =~ ^(msys|cygwin) ]]; then
   CMAKE_ARGS+=("-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded")
 fi
 
