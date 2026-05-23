@@ -107,7 +107,7 @@ constexpr int64_t kUnitTileDimVal = 1;
 // `reduction`, `promote_operands` + `promotion_types`,
 // `decomposition_config`).
 constexpr StringLiteral kKnobPromoteOperandsKey = "promote_operands";
-// `kDecompositionConfigKey` lives in SMTConstraintUtils.h so the
+// `kDecompositionConfigKey` lives in IREECodegenAttrs.h so the
 // materializer reads back the same string this emitter writes.
 
 // Decomposition-config nested keys (per OnlineAttentionOp's getQKAttrStr /

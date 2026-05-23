@@ -20,17 +20,6 @@ namespace mlir::iree_compiler {
 // Name prefix for problem size dimensions in diagnostics.
 constexpr StringLiteral kLoopRangePrefix = "dim_";
 
-// Named materialization output for the pipeline-specific compilation_info
-// repackaging path.
-constexpr StringLiteral kCompilationInfoOutputName = "compilation_info";
-
-// Key for the nested per-matmul attention decomposition sub-dictionary.
-// Lives in the shared header so the attention constraint emitter (which
-// writes it under `knobs`) and the materializer (which reads it back out)
-// reference the same string -- drift between two redeclared copies would
-// be a silent failure mode.
-constexpr StringLiteral kDecompositionConfigKey = "decomposition_config";
-
 /// Result of creating a ConstraintsOp shell with common constraints.
 struct ConstraintsOpShell {
   IREE::Codegen::ConstraintsOp op;
