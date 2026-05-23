@@ -52,9 +52,11 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// HoistableConversionOp tag constants — definitions live in
+// HoistableConversionOp tag constants: definitions live in
 // `Codegen/Utils/MMAUtils.h` so paired tags (which match by string) can't
 // silently drift between translation units.
+using ::mlir::iree_compiler::kCompilationInfoOutputName;
+using ::mlir::iree_compiler::kDecompositionConfigKey;
 using ::mlir::iree_compiler::IREE::Codegen::distributeMmaFragmentToIntrinsics;
 using ::mlir::iree_compiler::IREE::Codegen::incrementIndices;
 using ::mlir::iree_compiler::IREE::Codegen::kDataTiledAccDistribute;
@@ -76,9 +78,25 @@ static bool isTranslationInfoKey(StringRef key) {
 }
 
 static bool isFlatMetadataKey(StringRef key) {
-  return llvm::is_contained(
-      {kConfigAttrName, kTranslationInfoKey, kPipelineKey, kCodegenSpecKey},
-      key);
+  return llvm::is_contained({kConfigAttrName, kTranslationInfoKey, kPipelineKey,
+                             kCodegenSpecKey, kDecompositionConfigKey},
+                            key);
+}
+
+static bool isCompilationInfoMaterializationInput(StringRef key) {
+  return key != kDecompositionConfigKey;
+}
+
+static DictionaryAttr
+getCompilationInfoMaterializationInputs(MLIRContext *ctx,
+                                        DictionaryAttr knobs) {
+  SmallVector<NamedAttribute> entries;
+  for (NamedAttribute entry : knobs) {
+    if (isCompilationInfoMaterializationInput(entry.getName().getValue())) {
+      entries.push_back(entry);
+    }
+  }
+  return DictionaryAttr::get(ctx, entries);
 }
 
 static void
@@ -3436,13 +3454,31 @@ PipelineAttr::emitConstraints(ArrayRef<Operation *> rootOps) const {
   return emitter(*this, rootOps);
 }
 
-FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
-    DictionaryAttr knobs, function_ref<InFlightDiagnostic()> emitError) const {
+FailureOr<Attribute> PipelineAttr::materializeConfigurationAttr(
+    StringRef attrName, DictionaryAttr knobs,
+    function_ref<FailureOr<Attribute>(Attribute)> materializeAttr,
+    function_ref<InFlightDiagnostic()> emitError) const {
+  if (attrName != kCompilationInfoOutputName) {
+    if (Attribute attr = knobs.get(attrName)) {
+      return materializeAttr(attr);
+    }
+    emitError() << "constraints op has no '" << attrName
+                << "' entry in its knobs dictionary";
+    return failure();
+  }
+
   MLIRContext *ctx = getContext();
-  DictionaryAttr loweringSource = knobs;
+  FailureOr<Attribute> materializedAttr =
+      materializeAttr(getCompilationInfoMaterializationInputs(ctx, knobs));
+  if (failed(materializedAttr)) {
+    return failure();
+  }
+
+  auto materializedKnobs = cast<DictionaryAttr>(*materializedAttr);
+  DictionaryAttr loweringSource = materializedKnobs;
   bool flatLoweringSource = true;
-  if (auto nestedLowering =
-          dyn_cast_if_present<DictionaryAttr>(knobs.get(kConfigAttrName))) {
+  if (auto nestedLowering = dyn_cast_if_present<DictionaryAttr>(
+          materializedKnobs.get(kConfigAttrName))) {
     loweringSource = nestedLowering;
     flatLoweringSource = false;
   }
@@ -3453,10 +3489,10 @@ FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
   auto loweringConfig =
       LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, loweringEntries));
 
-  DictionaryAttr translationSource = knobs;
+  DictionaryAttr translationSource = materializedKnobs;
   bool nestedTranslationSource = false;
-  if (auto nestedTranslation =
-          dyn_cast_if_present<DictionaryAttr>(knobs.get(kTranslationInfoKey))) {
+  if (auto nestedTranslation = dyn_cast_if_present<DictionaryAttr>(
+          materializedKnobs.get(kTranslationInfoKey))) {
     translationSource = nestedTranslation;
     nestedTranslationSource = true;
   }

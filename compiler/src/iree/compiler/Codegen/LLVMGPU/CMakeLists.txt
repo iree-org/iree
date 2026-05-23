@@ -79,6 +79,8 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

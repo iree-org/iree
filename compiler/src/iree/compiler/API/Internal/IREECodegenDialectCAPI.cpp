@@ -281,10 +281,10 @@ MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(MlirOperation op,
   return wrap(attr);
 }
 
-MlirAttribute ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
-    MlirOperation op, size_t numAssignments,
-    const MlirStringRef *assignmentNames, const int64_t *assignmentValues,
-    MlirAttribute *diagnosticMessage) {
+MlirAttribute ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+    MlirOperation op, MlirStringRef configurationAttrName,
+    size_t numAssignments, const MlirStringRef *assignmentNames,
+    const int64_t *assignmentValues, MlirAttribute *diagnosticMessage) {
   auto constraintsOp = llvm::cast<ConstraintsOp>(unwrap(op));
   if (diagnosticMessage) {
     *diagnosticMessage = wrap(mlir::Attribute());
@@ -305,10 +305,10 @@ MlirAttribute ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
         return mlir::success();
       });
 
-  llvm::FailureOr<CompilationInfoAttr> compilationInfo =
-      mlir::iree_compiler::materializeCompilationInfoFromConstraints(
-          constraintsOp, assignments);
-  if (failed(compilationInfo)) {
+  llvm::FailureOr<mlir::Attribute> attr =
+      mlir::iree_compiler::materializeConfigurationAttrFromConstraints(
+          constraintsOp, unwrap(configurationAttrName), assignments);
+  if (failed(attr)) {
     diagnosticStream.flush();
     if (diagnosticMessage && !diagnostics.empty()) {
       mlir::Attribute diagnosticAttr =
@@ -317,7 +317,7 @@ MlirAttribute ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
     }
     return wrap(mlir::Attribute());
   }
-  return wrap(*compilationInfo);
+  return wrap(*attr);
 }
 
 ireeCodegenAttentionOpDetail

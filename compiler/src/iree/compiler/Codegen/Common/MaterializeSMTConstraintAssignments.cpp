@@ -7,13 +7,16 @@
 // Materializes a concrete tuning assignment for an
 // `iree_codegen.smt.constraints` op. The common code only substitutes SMT knob
 // leaves with assigned values; each pipeline owns the mechanical repackaging of
-// that materialized knob dictionary into its concrete compilation_info attr.
+// selected outputs such as compilation_info.
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/SMTConstraintUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
+#include "mlir/IR/AttrTypeSubElements.h"
+
+#include <optional>
 
 namespace mlir::iree_compiler {
 
@@ -28,102 +31,82 @@ using IREE::Codegen::IntKnobAttr;
 using IREE::Codegen::OneOfKnobAttr;
 using IREE::Codegen::PipelineAttrInterface;
 
-static InFlightDiagnostic emitMaterializationError(ConstraintsOp op) {
-  return op.emitError(
-      "failed to materialize compilation_info from constraints: ");
+static InFlightDiagnostic emitMaterializationError(ConstraintsOp op,
+                                                   StringRef attrName) {
+  InFlightDiagnostic diag = op.emitError("failed to materialize ");
+  diag << attrName << " from constraints: ";
+  return diag;
 }
 
 // Recursively substitutes knob attributes in `attr` using `assignments`.
 // Returns the materialized attribute tree, or null after emitting a diagnostic.
 static Attribute
 materializeKnobAttribute(ConstraintsOp op, Attribute attr,
-                         const DenseMap<StringRef, int64_t> &assignments) {
+                         const DenseMap<StringRef, int64_t> &assignments,
+                         StringRef attrName) {
   MLIRContext *ctx = op.getContext();
-  return llvm::TypeSwitch<Attribute, Attribute>(attr)
-      .Case([&](IntKnobAttr knob) -> Attribute {
-        StringRef name = knob.getName().getValue();
-        auto it = assignments.find(name);
-        if (it == assignments.end()) {
-          emitMaterializationError(op)
-              << "missing assignment for knob '" << name << "'";
-          return {};
-        }
-        return IntegerAttr::get(IntegerType::get(ctx, 64), it->second);
-      })
-      .Case([&](OneOfKnobAttr knob) -> Attribute {
-        StringRef name = knob.getName().getValue();
-        auto it = assignments.find(name);
-        if (it == assignments.end()) {
-          emitMaterializationError(op)
-              << "missing assignment for knob '" << name << "'";
-          return {};
-        }
-        ArrayAttr options = knob.getOptions();
-        int64_t index = it->second;
-        if (index < 0 || index >= static_cast<int64_t>(options.size())) {
-          emitMaterializationError(op)
-              << "assignment for knob '" << name
-              << "' is out of range: " << index << " is not in [0, "
-              << options.size() << ")";
-          return {};
-        }
-        return options[index];
-      })
-      .Case([&](ArrayAttr array) -> Attribute {
-        SmallVector<Attribute> materialized;
-        materialized.reserve(array.size());
-        for (Attribute element : array) {
-          Attribute materializedElement =
-              materializeKnobAttribute(op, element, assignments);
-          if (!materializedElement) {
-            return {};
-          }
-          materialized.push_back(materializedElement);
-        }
-        return ArrayAttr::get(ctx, materialized);
-      })
-      .Case([&](DictionaryAttr dict) -> Attribute {
-        SmallVector<NamedAttribute> materialized;
-        materialized.reserve(dict.size());
-        for (NamedAttribute entry : dict) {
-          Attribute materializedValue =
-              materializeKnobAttribute(op, entry.getValue(), assignments);
-          if (!materializedValue) {
-            return {};
-          }
-          materialized.emplace_back(entry.getName(), materializedValue);
-        }
-        return DictionaryAttr::get(ctx, materialized);
-      })
-      .Default([](Attribute attr) { return attr; });
-}
+  bool failedToMaterialize = false;
+  AttrTypeReplacer replacer;
+  replacer.addReplacement([&](IntKnobAttr knob) -> std::optional<Attribute> {
+    StringRef name = knob.getName().getValue();
+    auto it = assignments.find(name);
+    if (it == assignments.end()) {
+      emitMaterializationError(op, attrName)
+          << "missing assignment for knob '" << name << "'";
+      failedToMaterialize = true;
+      return Attribute();
+    }
+    return IntegerAttr::get(IntegerType::get(ctx, 64), it->second);
+  });
+  replacer.addReplacement([&](OneOfKnobAttr knob) -> std::optional<Attribute> {
+    StringRef name = knob.getName().getValue();
+    auto it = assignments.find(name);
+    if (it == assignments.end()) {
+      emitMaterializationError(op, attrName)
+          << "missing assignment for knob '" << name << "'";
+      failedToMaterialize = true;
+      return Attribute();
+    }
+    ArrayAttr options = knob.getOptions();
+    int64_t index = it->second;
+    if (index < 0 || index >= static_cast<int64_t>(options.size())) {
+      emitMaterializationError(op, attrName)
+          << "assignment for knob '" << name << "' is out of range: " << index
+          << " is not in [0, " << options.size() << ")";
+      failedToMaterialize = true;
+      return Attribute();
+    }
+    return options[index];
+  });
 
-static DictionaryAttr
-materializeKnobsDictionary(ConstraintsOp op,
-                           const DenseMap<StringRef, int64_t> &assignments) {
-  if (Attribute materialized =
-          materializeKnobAttribute(op, op.getKnobsAttr(), assignments)) {
-    return cast<DictionaryAttr>(materialized);
+  Attribute materialized = replacer.replace(attr);
+  if (failedToMaterialize || !materialized) {
+    return {};
   }
-  return {};
+  return materialized;
 }
 
-static FailureOr<CompilationInfoAttr>
-materializeCompilationInfo(ConstraintsOp op, DictionaryAttr materializedKnobs) {
+static FailureOr<Attribute>
+materializeConfigurationAttr(ConstraintsOp op, StringRef attrName,
+                             const DenseMap<StringRef, int64_t> &assignments) {
   PipelineAttrInterface pipeline = op.getPipeline();
-  auto emitError = [op]() -> InFlightDiagnostic {
-    return emitMaterializationError(op);
+  auto emitError = [op, attrName]() -> InFlightDiagnostic {
+    return emitMaterializationError(op, attrName);
+  };
+  auto materializeAttr =
+      [op, attrName, &assignments](Attribute attr) -> FailureOr<Attribute> {
+    if (Attribute materialized =
+            materializeKnobAttribute(op, attr, assignments, attrName)) {
+      return materialized;
+    }
+    return failure();
   };
 
   // This helper intentionally only substitutes knob leaves and repackages the
   // resulting template. Constraint satisfaction is checked by the verifier/SMT
   // solver path, not by materialization.
-  FailureOr<Attribute> attr =
-      pipeline.materializeCompilationInfo(materializedKnobs, emitError);
-  if (failed(attr)) {
-    return failure();
-  }
-  return cast<CompilationInfoAttr>(*attr);
+  return pipeline.materializeConfigurationAttr(attrName, op.getKnobs(),
+                                               materializeAttr, emitError);
 }
 
 static FailureOr<DenseMap<StringRef, int64_t>>
@@ -182,11 +165,18 @@ struct TestMaterializeSMTConstraintAssignmentsPass final
 
 FailureOr<CompilationInfoAttr> materializeCompilationInfoFromConstraints(
     ConstraintsOp op, const DenseMap<StringRef, int64_t> &assignments) {
-  if (DictionaryAttr materializedKnobs =
-          materializeKnobsDictionary(op, assignments)) {
-    return materializeCompilationInfo(op, materializedKnobs);
+  FailureOr<Attribute> output = materializeConfigurationAttrFromConstraints(
+      op, kCompilationInfoOutputName, assignments);
+  if (failed(output)) {
+    return failure();
   }
-  return failure();
+  return cast<CompilationInfoAttr>(*output);
+}
+
+FailureOr<Attribute> materializeConfigurationAttrFromConstraints(
+    ConstraintsOp op, StringRef attrName,
+    const DenseMap<StringRef, int64_t> &assignments) {
+  return materializeConfigurationAttr(op, attrName, assignments);
 }
 
 } // namespace mlir::iree_compiler

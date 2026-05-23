@@ -163,7 +163,8 @@ hal.executable @verify_skip_partial_knobs_ex {
         %empty = tensor.empty() : tensor<128x256xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<128x256xf32>) -> tensor<128x256xf32>
         // Config has workgroup but NOT reduction. The knobs template
-        // references both, so extraction fails and verification is skipped.
+        // references both, so strict extraction fails instead of silently
+        // skipping verification.
         %result = linalg.matmul {
             lowering_config = #iree_gpu.lowering_config<{workgroup = [32, 64, 0]}>,
             root_op = #iree_codegen.root_op<set = 0>}
@@ -172,8 +173,7 @@ hal.executable @verify_skip_partial_knobs_ex {
         %c128 = arith.constant 128 : index
         %c256 = arith.constant 256 : index
         %c64 = arith.constant 64 : index
-        // No expected-error -- should be silently erased because
-        // reduction knob can't be resolved.
+        // expected-error @below {{failed to extract SMT knob values from the selected lowering configuration; constraints template does not match the materialized configuration}}
         iree_codegen.smt.constraints target = <set = 0>,
             pipeline = #iree_gpu.pipeline<VectorDistribute>,
             knobs = {workgroup = [#iree_codegen.smt.int_knob<"wg_0">],

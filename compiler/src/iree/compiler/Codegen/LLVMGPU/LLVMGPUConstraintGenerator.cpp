@@ -14,12 +14,17 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/DebugLog.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SMT/IR/SMTOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/ValueRange.h"
 
+#define DEBUG_TYPE "iree-codegen-llvmgpu-constraint-generator"
 namespace mlir::iree_compiler {
 
 using AssertOp = IREE::Codegen::AssertOp;
@@ -92,6 +97,35 @@ constexpr StringLiteral kKnobSgPrefix = "sg_";
 constexpr int64_t kNoTileDimVal = 0;
 constexpr int64_t kUnitTileDimVal = 1;
 
+//===-------------------------------------------------------------------===//
+// Attention-specific keys + knob names. Attention has two matmuls (QK and PV),
+// so MMA selection is tracked separately for each decomposition leg.
+//===-------------------------------------------------------------------===//
+
+// Top-level attention lowering_config keys (mirrors native attention
+// codegen output from KernelConfig.cpp's setAttention...: `workgroup`,
+// `reduction`, `promote_operands` + `promotion_types`,
+// `decomposition_config`).
+constexpr StringLiteral kKnobPromoteOperandsKey = "promote_operands";
+// `kDecompositionConfigKey` lives in IREECodegenAttrs.h so the
+// materializer reads back the same string this emitter writes.
+
+// Decomposition-config nested keys (per OnlineAttentionOp's getQKAttrStr /
+// getPVAttrStr -- verbatim "qk_attrs" / "pv_attrs").
+constexpr StringLiteral kKnobQKAttrsKey = "qk_attrs";
+constexpr StringLiteral kKnobPVAttrsKey = "pv_attrs";
+constexpr StringLiteral kKnobLoweringConfigKey = "lowering_config";
+
+// Per-matmul mma_idx knob names (one_of_knob over compatible MMAs).
+constexpr StringLiteral kKnobQKMmaIdxName = "qk_mma_idx";
+constexpr StringLiteral kKnobPVMmaIdxName = "pv_mma_idx";
+
+// Top-level tile knob names (the M/N/K of the attention iteration domain;
+// here K refers to K2, the key sequence length, per AttentionOpDetail).
+constexpr StringLiteral kKnobAttnMTileName = "m_tile";
+constexpr StringLiteral kKnobAttnNTileName = "n_tile";
+constexpr StringLiteral kKnobAttnK2TileName = "red_k2";
+
 } // namespace
 
 // TODO(#23535): These constraints are derived from existing tuner constraints.
@@ -160,6 +194,13 @@ getLhsRhsOperandBytes(OpBuilder &builder, Location loc,
   Value rhsBytes =
       mkIntConst(builder, loc, rhsType.getElementTypeBitWidth() / 8);
   return {lhsBytes, rhsBytes};
+}
+
+/// Assert: lhs == rhs.
+static void assertEq(OpBuilder &builder, Location loc, Value lhs, Value rhs,
+                     StringRef msg) {
+  Value eq = smt::EqOp::create(builder, loc, lhs, rhs);
+  AssertOp::create(builder, loc, eq, msg);
 }
 
 /// Helper to build a knob variable name from a prefix.
@@ -448,18 +489,25 @@ buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
 }
 
 /// Emit smt.lookup ops to derive MMA m/n/k shape values from the mma_idx knob.
-/// Returns {mmaMLookup, mmaNLookup, mmaKLookup} SSA values.
-/// Also asserts bounds on mma_idx: 0 <= mma_idx <= N-1.
-static std::tuple<Value, Value, Value>
-emitMMALookup(OpBuilder &builder, Location loc, ArrayRef<Attribute> mmaAttrs) {
-
-  Value mmaIdx = mkKnob(builder, loc, kKnobMmaIdxName);
+/// Returns {mmaIdxKnob, mmaMLookup, mmaNLookup, mmaKLookup} SSA values.
+/// The first element is the MMA-index knob itself so attention's
+/// downstream layout-binding can re-use it (the verifier rejects
+/// duplicate KnobOps for the same knob name).
+/// Also asserts bounds on the MMA index knob: 0 <= idx <= N-1.
+/// `mmaIdxKnobName` parameterizes the knob name so attention (which has
+/// two independent MMA selections -- QK and PV) can call this twice with
+/// distinct names ("qk_mma_idx" / "pv_mma_idx") and not collide on
+/// "mma_idx".
+static std::tuple<Value, Value, Value, Value>
+emitMMALookup(OpBuilder &builder, Location loc, ArrayRef<Attribute> mmaAttrs,
+              StringRef mmaIdxKnobName = kKnobMmaIdxName) {
+  Value mmaIdx = mkKnob(builder, loc, mmaIdxKnobName);
   Value minMmaIdxVal = mkIntConst(builder, loc, 0);
   int64_t maxMmaIdx = static_cast<int64_t>(mmaAttrs.size()) - 1;
   Value maxMmaIdxVal = mkIntConst(builder, loc, maxMmaIdx);
   std::string maxMmaIdxName = Twine(maxMmaIdx).str();
-  // Assert bounds: 0 <= mma_idx <= N-1.
-  assertBounds(builder, loc, mmaIdx, kKnobMmaIdxName, minMmaIdxVal, "0",
+  // Assert bounds: 0 <= idx <= N-1.
+  assertBounds(builder, loc, mmaIdx, mmaIdxKnobName, minMmaIdxVal, "0",
                maxMmaIdxVal, maxMmaIdxName);
 
   // Build lookup tables for m, n, k.
@@ -472,7 +520,7 @@ emitMMALookup(OpBuilder &builder, Location loc, ArrayRef<Attribute> mmaAttrs) {
     kVals.push_back(k);
   }
   auto intTy = smt::IntType::get(builder.getContext());
-  return {LookupOp::create(builder, loc, intTy, mmaIdx, keys, mVals),
+  return {mmaIdx, LookupOp::create(builder, loc, intTy, mmaIdx, keys, mVals),
           LookupOp::create(builder, loc, intTy, mmaIdx, keys, nVals),
           LookupOp::create(builder, loc, intTy, mmaIdx, keys, kVals)};
 }
@@ -518,8 +566,10 @@ static LogicalResult emitVectorDistributeConstraints(
   // Create intermediate variables.
   // Do not create these as knobs because they are not in the knob dict
   // and would fail constraint verification.
-  // mma_m, mma_n, mma_k
-  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
+  // mma_m, mma_n, mma_k. The first tuple element (the mma_idx knob
+  // itself) is unused on the matmul path -- only attention needs to
+  // re-use it for the layout-binding lookups.
+  auto [unusedMmaIdx, mmaMLookup, mmaNLookup, mmaKLookup] =
       emitMMALookup(builder, loc, compatibleMMAs);
   // sg_num, number of subgroups per workgroup
   Value sgNum = smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
@@ -763,8 +813,10 @@ static LogicalResult emitTileAndFuseConstraints(
   // Create intermediate variables.
   // Do not create these as knobs because they are not in the knob dict
   // and would fail constraint verification.
-  // mma_m, mma_n, mma_k
-  auto [mmaMLookup, mmaNLookup, mmaKLookup] =
+  // mma_m, mma_n, mma_k. The first tuple element (the mma_idx knob
+  // itself) is unused on the TileAndFuse matmul path -- only attention
+  // needs to re-use it for the layout-binding lookups.
+  auto [unusedMmaIdx, mmaMLookup, mmaNLookup, mmaKLookup] =
       emitMMALookup(builder, loc, compatibleMMAs);
   auto buildWgProd = [&](ArrayRef<unsigned> axisDims) -> Value {
     SmallVector<Value> values;
@@ -970,11 +1022,32 @@ static LogicalResult emitTileAndFuseConstraints(
   return success();
 }
 
+/// Forward-decl: attention emitter (defined further below -- has its own
+/// knob template and constraint body distinct from contraction/conv).
+static LogicalResult
+emitVectorDistributeAttentionConstraintsForOp(Operation *rootOp,
+                                              RootOpAttr rootOpAttr);
+
 /// Emit constraints for a single root op under a supported LLVMGPU pipeline.
-/// Only supports linalg contraction and convolution today.
+/// Supports linalg contraction/convolution under both VectorDistribute and
+/// TileAndFuse, plus `iree_linalg_ext.online_attention` under VectorDistribute
+/// (dispatched to its own emitter -- attention has a distinct knob template
+/// and constraint body).
 static LogicalResult
 emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
                      IREE::GPU::LoweringPipeline pipeline) {
+  // Attention path: route OnlineAttentionOp under VectorDistribute to the
+  // attention emitter. Attention is not (yet) supported under TileAndFuse;
+  // returning success() silently here matches the existing
+  // "shape/op unsupported -> fall through to default heuristics" pattern
+  // for the contraction-only entries below.
+  if (isa<IREE::LinalgExt::OnlineAttentionOp>(rootOp)) {
+    if (pipeline == IREE::GPU::LoweringPipeline::VectorDistribute) {
+      return emitVectorDistributeAttentionConstraintsForOp(rootOp, rootOpAttr);
+    }
+    return success();
+  }
+
   // Gate on contraction-like linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
   if (!linalgOp || (!linalg::isaContractionOpInterface(linalgOp) &&
@@ -1044,11 +1117,994 @@ static Operation *getTunableOp(ArrayRef<Operation *> rootOps) {
                      linalg::isaConvolutionOpInterface(linalgOp))) {
       return rootOp;
     }
-    if (auto attnOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(rootOp)) {
+    if (isa<IREE::LinalgExt::OnlineAttentionOp>(rootOp)) {
       return rootOp;
     }
   }
   return nullptr;
+}
+
+//===-------------------------------------------------------------------===//
+// VectorDistribute attention constraints.
+//
+// Ports `generate_attention_vector_distribute_constraints` from amdsharktuner
+// (rocm_dispatch_constraints.py:465-638) to SMT emission in IREE. This covers:
+//   - QK and PV intrinsic divisibility against the attention dims
+//   - Tile-size divisibility by subgroup counts and selected intrinsic sizes
+//   - Subgroup-count bounds and subgroup-product pin
+//   - Workgroup thread-count limit
+//   - qk_acc == pv_acc layout matching
+//   - QK-output reuse predicate derived from layout matches
+//   - is_valid_vector_distribute_mma_schedule helpers for QK and PV
+//   - Shared-memory budget, including the Python tuner's QK-output reuse term
+//===-------------------------------------------------------------------===//
+
+namespace {
+
+/// Per-op decomposition + static sizes for an OnlineAttentionOp.
+struct AttentionDimInfo {
+  // Loop-dim index lists (positions into the iteration domain).
+  SmallVector<int64_t> batch;
+  SmallVector<int64_t> m;
+  SmallVector<int64_t> k1;
+  SmallVector<int64_t> k2;
+  SmallVector<int64_t> n;
+  unsigned domainRank;
+  // Static sizes for the inner-most dim of each list. v0 only models the
+  // innermost dim of each role; multi-dim per role is deferred.
+  int64_t mSize;
+  int64_t k1Size;
+  int64_t k2Size;
+  int64_t nSize;
+  // Element types.
+  Type queryElemType;
+  Type keyElemType;
+  Type valueElemType;
+  Type outputElemType;
+  // Transpose flags: true if the inner-most loop dim that the schedule
+  // groups along is NOT in the last result position of the operand's
+  // indexing map. The Python tuner's
+  // `is_valid_vector_distribute_mma_schedule` uses these to choose
+  // between m_wg_size and k_wg_size for the inner LHS/RHS dim.
+  //   transposedQ: Q's k1 dim is not in the last result position.
+  //   transposedK: K's k1 dim is not in the last result position.
+  //   transposedV: V's k2 dim is not in the last result position.
+  bool transposedQ;
+  bool transposedK;
+  bool transposedV;
+};
+
+} // namespace
+
+/// Pull the attention-domain dim decomposition + static sizes out of an
+/// `OnlineAttentionOp`. Returns `failure` if dim inference fails or any
+/// of the inner-most M/K1/K2/N dims is dynamic (v0 limitation).
+static FailureOr<AttentionDimInfo>
+inferAttentionDimInfo(IREE::LinalgExt::OnlineAttentionOp attnOp) {
+  auto detail = IREE::LinalgExt::AttentionOpDetail::get(
+      attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+      attnOp.getOutputMap());
+  if (failed(detail)) {
+    return failure();
+  }
+  AttentionDimInfo info;
+  info.batch = llvm::to_vector(detail->getBatchDims());
+  info.m = llvm::to_vector(detail->getMDims());
+  info.k1 = llvm::to_vector(detail->getK1Dims());
+  info.k2 = llvm::to_vector(detail->getK2Dims());
+  info.n = llvm::to_vector(detail->getNDims());
+  info.domainRank = detail->getDomainRank();
+  if (info.m.empty() || info.k1.empty() || info.k2.empty() || info.n.empty()) {
+    return failure();
+  }
+  // v0 limitation: the constraint body uses a single SMT variable per
+  // attention role (m_tile, n_tile, red_k2, qk_mma_k etc.) and indexes
+  // `staticBounds` at the innermost dim of each role. If a role
+  // decomposes into multiple iteration dims (e.g. multi-head attention
+  // with M = [b_head, m_inner]), silently dropping the outer dims would
+  // under-constrain the problem and emit garbage candidates. Reject the
+  // multi-dim case explicitly until the constraint body learns to
+  // factor across multiple dims per role.
+  if (info.m.size() != 1 || info.k1.size() != 1 || info.k2.size() != 1 ||
+      info.n.size() != 1) {
+    return failure();
+  }
+  SmallVector<int64_t, 4> staticBounds = attnOp.getStaticLoopRanges();
+  auto staticSize = [&](int64_t dim) -> int64_t {
+    return (dim >= 0 && dim < (int64_t)staticBounds.size())
+               ? staticBounds[dim]
+               : ShapedType::kDynamic;
+  };
+  info.mSize = staticSize(info.m.back());
+  info.k1Size = staticSize(info.k1.back());
+  info.k2Size = staticSize(info.k2.back());
+  info.nSize = staticSize(info.n.back());
+  if (ShapedType::isDynamic(info.mSize) || ShapedType::isDynamic(info.k1Size) ||
+      ShapedType::isDynamic(info.k2Size) || ShapedType::isDynamic(info.nSize)) {
+    return failure();
+  }
+  info.queryElemType = getElementTypeOrSelf(attnOp.getQuery().getType());
+  info.keyElemType = getElementTypeOrSelf(attnOp.getKey().getType());
+  info.valueElemType = getElementTypeOrSelf(attnOp.getValue().getType());
+  info.outputElemType = getElementTypeOrSelf(attnOp.getOutput().getType());
+
+  // Compute transpose flags by checking whether the matmul's "natural
+  // inner dim" sits in the last result position of each operand's
+  // indexing map. Direct port of the Python tuner's per-operand flag
+  // (sharktuner/constraint_generator.py:678-680):
+  //   transposed_q = k1Dim != position_of_last_q_result   (Q's K dim is K1)
+  //   transposed_k = k1Dim != position_of_last_k_result   (K's K dim is K1)
+  //   transposed_v = k2Dim != position_of_last_v_result   (V's K dim is K2)
+  // Note V uses K2 (PV matmul's contracting dim) not N -- keeping the
+  // per-operand contracting-dim convention regardless of whether the
+  // operand is the matmul's LHS or RHS. Schedule-validity inverts these
+  // when picking the inner load dim (kWg vs nWg) for vector loads.
+  auto innerDimIsLast = [&](AffineMap map, int64_t reductionDim) -> bool {
+    if (map.getNumResults() == 0) {
+      return false;
+    }
+    auto dimExpr =
+        dyn_cast<AffineDimExpr>(map.getResult(map.getNumResults() - 1));
+    if (!dimExpr) {
+      return false;
+    }
+    return static_cast<int64_t>(dimExpr.getPosition()) == reductionDim;
+  };
+  info.transposedQ = !innerDimIsLast(attnOp.getQueryMap(), info.k1.back());
+  info.transposedK = !innerDimIsLast(attnOp.getKeyMap(), info.k1.back());
+  info.transposedV = !innerDimIsLast(attnOp.getValueMap(), info.k2.back());
+  return info;
+}
+
+/// Filter MMA intrinsics that can target a `(lhs, rhs, init) -> result`
+/// matmul-shaped problem with the given element types and sizes. Used
+/// twice for attention: once for QK (Q x K^T -> intermediate f32) and
+/// once for PV (intermediate x V -> output). Mirrors `getCompatibleMMAAttrs`
+/// but takes element types explicitly instead of reading them from a
+/// `linalg::LinalgOp` (attention's operand structure is different).
+static SmallVector<Attribute>
+getCompatibleAttentionMMAAttrs(IREE::GPU::TargetAttr gpuTarget, int64_t mSize,
+                               int64_t nSize, int64_t kSize, Type lhsElemType,
+                               Type rhsElemType, Type initElemType) {
+  if (gpuTarget.getWgp().getMma().empty()) {
+    return {};
+  }
+  SmallVector<Attribute> mmaAttrs;
+  const int64_t targetSubgroupSize = gpuTarget.getPreferredSubgroupSize();
+  GPUMatmulShapeType problem{mSize,       nSize,       kSize,
+                             lhsElemType, rhsElemType, initElemType};
+  auto getIntrinsic = [](IREE::GPU::MMAAttr mma) -> GPUIntrinsicType {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    return GPUIntrinsicType{mSize, nSize, kSize, aType, bType, cType, mma};
+  };
+  auto getVirtualIntrinsic =
+      [](IREE::GPU::VirtualMMAAttr vmma) -> GPUIntrinsicType {
+    auto [m, n, k] = vmma.getMNKShape();
+    auto [a, b, c] = vmma.getABCElementTypes();
+    return GPUIntrinsicType{m, n, k, a, b, c, vmma};
+  };
+
+  // Square-mn filter (matches Python tuner): the attention constraint
+  // formulation uses a single `intrinsic_mn` z3 variable for both M and N
+  // intrinsic dims. That implicitly excludes MMAs with M != N -- e.g.
+  // VDMFMA_F32_8x16x64x2_F16 (m=8, n=16). Mirroring the filter here keeps
+  // the candidate sets aligned for parity. (Square-mn MMAs are the only
+  // ones the IREE attention codegen currently exercises in practice.)
+  auto isSquareMN = [](IREE::Codegen::InnerTileDescAttrInterface attr) -> bool {
+    if (auto mma = dyn_cast<IREE::GPU::MMAAttr>(attr)) {
+      auto [m, n, k] = mma.getMNKShape();
+      return m == n;
+    }
+    if (auto vmma = dyn_cast<IREE::GPU::VirtualMMAAttr>(attr)) {
+      auto [m, n, k] = vmma.getMNKShape();
+      return m == n;
+    }
+    return false;
+  };
+
+  MLIRContext *ctx = gpuTarget.getContext();
+  for (IREE::GPU::MMAAttr mma : gpuTarget.getWgp().getMma()) {
+    if (mma.getSubgroupSize() != targetSubgroupSize) {
+      continue;
+    }
+    if (mma.isBlockIntrinsic()) {
+      continue;
+    }
+    if (!mma.getDistributionMappingKind()) {
+      continue;
+    }
+    if (!isSquareMN(mma)) {
+      continue;
+    }
+    if (succeeded(canTargetIntrinsic(problem, getIntrinsic(mma),
+                                     targetSubgroupSize, /*canUpcastAcc=*/true,
+                                     /*mustBeAligned=*/false))) {
+      if (!llvm::is_contained(mmaAttrs, mma)) {
+        mmaAttrs.push_back(mma);
+      }
+    }
+    // Virtual MMA variants of this MMA -- VMFMA / VDMFMA / etc.
+    // Attention enumerates these (Python tuner sets
+    // allow_virtual_mma=True). Each virtual variant is a different
+    // tiling/unroll of the underlying MMA shape, so they have distinct layouts
+    // that the match_layout constraints pick up.
+    for (IREE::GPU::VirtualMMAIntrinsic vIntrinsic :
+         mma.getVirtualIntrinsics()) {
+      auto vmma = IREE::GPU::VirtualMMAAttr::get(ctx, vIntrinsic);
+      if (vmma.getSubgroupSize() != targetSubgroupSize) {
+        continue;
+      }
+      if (!vmma.getDistributionMappingKind()) {
+        continue;
+      }
+      if (!isSquareMN(vmma)) {
+        continue;
+      }
+      if (failed(canTargetIntrinsic(problem, getVirtualIntrinsic(vmma),
+                                    targetSubgroupSize,
+                                    /*canUpcastAcc=*/true,
+                                    /*mustBeAligned=*/false))) {
+        continue;
+      }
+      if (!llvm::is_contained(mmaAttrs, Attribute(vmma))) {
+        mmaAttrs.push_back(vmma);
+      }
+    }
+  }
+  return mmaAttrs;
+}
+
+/// Build a per-matmul `iree_gpu.lowering_config` knob template containing
+/// every field IREE's attention codegen (`KernelConfig.cpp::setAttention...`)
+/// expects: `mma_kind` (knob), `promote_operands` + matching
+/// `promotion_types`, and `subgroup_basis` (the basis counts re-use the
+/// top-level sg_m_cnt / sg_n_cnt knobs so the materialized per-matmul
+/// counts stay consistent with the top-level subgroup assignment).
+///
+/// Must produce a `LoweringConfigAttr` (typed), not a raw `DictionaryAttr`,
+/// because the attention decomposition (AggregatedOpInterfaceImpl) casts
+/// `decomposition_config.qk_attrs.lowering_config` to `LoweringConfigAttr`
+/// -- a raw dict here causes the cast to silently fail and codegen falls
+/// back to default per-matmul behavior (every tuning candidate compiles
+/// to the same binary).
+///
+/// `promotedOperands` is fixed per matmul: `{0, 1}` for QK (promote Q
+/// and K), `{1}` for PV (promote V only); these mirror the native
+/// codegen path's `appendPromotedOperandsListWithDerivedThread` calls.
+///
+/// `projectedDims` are the iteration-domain dims this matmul does NOT
+/// touch (so they are projected out of the subgroup_basis mapping): N
+/// dims for QK, K1 dims for PV.
+static IREE::GPU::LoweringConfigAttr buildPerMatmulLoweringConfigAttr(
+    MLIRContext *ctx, const AttentionDimInfo &dims, StringRef mmaIdxName,
+    ArrayRef<Attribute> compatibleMMAs, ArrayRef<int64_t> promotedOperands,
+    ArrayRef<int64_t> projectedDims) {
+  SmallVector<NamedAttribute> entries;
+  entries.emplace_back(kKnobMmaKindKey,
+                       OneOfKnobAttr::get(ctx, mmaIdxName, compatibleMMAs));
+
+  SmallVector<Attribute> promoteEntries;
+  promoteEntries.reserve(promotedOperands.size());
+  for (int64_t idx : promotedOperands) {
+    promoteEntries.push_back(makeIntAttr(ctx, idx));
+  }
+  entries.emplace_back(kKnobPromoteOperandsKey,
+                       ArrayAttr::get(ctx, promoteEntries));
+
+  SmallVector<Attribute> promotionTypes(
+      promotedOperands.size(), IREE::GPU::DerivedThreadConfigAttr::get(ctx));
+  entries.emplace_back(StringRef("promotion_types"),
+                       ArrayAttr::get(ctx, promotionTypes));
+
+  // subgroup_basis = [[counts], [mapping]] where counts has one entry per
+  // iteration-domain dim (with sg_m_cnt / sg_n_cnt knobs at the M / N
+  // positions, 1 elsewhere) and mapping is 0..domainRank-1 minus the
+  // projected dims.
+  SmallVector<Attribute> counts(dims.domainRank, makeIntAttr(ctx, 1));
+  counts[dims.m.back()] = IntKnobAttr::get(ctx, kKnobSgMCntName);
+  counts[dims.n.back()] = IntKnobAttr::get(ctx, kKnobSgNCntName);
+  llvm::SmallDenseSet<int64_t, 4> projectedSet(projectedDims.begin(),
+                                               projectedDims.end());
+  SmallVector<Attribute> mapping;
+  for (int64_t i = 0, e = static_cast<int64_t>(dims.domainRank); i < e; ++i) {
+    if (!projectedSet.contains(i)) {
+      mapping.push_back(makeIntAttr(ctx, i));
+    }
+  }
+  SmallVector<Attribute> basisPair = {ArrayAttr::get(ctx, counts),
+                                      ArrayAttr::get(ctx, mapping)};
+  entries.emplace_back(StringRef("subgroup_basis"),
+                       ArrayAttr::get(ctx, basisPair));
+
+  return IREE::GPU::LoweringConfigAttr::get(ctx,
+                                            DictionaryAttr::get(ctx, entries));
+}
+
+/// SSA values for the 6 per-(matmul, operand) layout fields, returned from
+/// `emitLayoutValues` so downstream constraints (match_layout in v1.4, the
+/// qk_acc == pv_acc invariant below) can reuse them.
+struct LayoutValues {
+  Value elementX;
+  Value elementY;
+  Value threadX;
+  Value threadY;
+  Value tstridesX;
+  Value tstridesY;
+};
+
+/// Create the 6 derived layout values for a single (matmul, operand) pair via
+/// `iree_codegen.smt.lookup` ops over the MMA index knob. Returns the SSA
+/// lookup results so the caller can compose match_layout-style assertions on
+/// them.
+///
+/// `mmaIdxValue` is the *already-created* SSA value for the MMA index
+/// knob (the qk_mma_idx / pv_mma_idx knob constructed by `emitMMALookup` for
+/// the shape lookups).
+///
+/// `operandIndex` is one of `IREE::GPU::kMMAOperand{Lhs,Rhs,Acc}`. The
+/// `MMASingleSubgroupLayout` returned by `getSingleSubgroupLayout` has
+/// 2-element vectors for `element`, `thread`, `tstrides` (indexed [0]=x,
+/// [1]=y); we only emit the 6 fields the v1 `matchLayout` test compares (outer
+/// is omitted -- no constraint depends on it).
+static LayoutValues emitLayoutValues(OpBuilder &builder, Location loc,
+                                     ArrayRef<Attribute> mmaList,
+                                     Value mmaIdxValue, int operandIndex) {
+  LayoutValues result{};
+  if (mmaList.empty()) {
+    return result;
+  }
+
+  SmallVector<int64_t> keys;
+  SmallVector<int64_t> elementX, elementY;
+  SmallVector<int64_t> threadX, threadY;
+  SmallVector<int64_t> tstridesX, tstridesY;
+  for (auto [i, attr] : llvm::enumerate(mmaList)) {
+    auto interfaceAttr = cast<IREE::Codegen::InnerTileDescAttrInterface>(attr);
+    IREE::GPU::MMASingleSubgroupLayout layout =
+        IREE::GPU::getSingleSubgroupLayout(interfaceAttr, operandIndex);
+    // Each of element/thread/tstrides is a 2-element vector in canonical
+    // (x, y) order. If anything is degenerate (size < 2), treat the
+    // missing entry as 1 so the lookup table is well-formed.
+    auto safeGet = [](ArrayRef<int64_t> v, size_t k) -> int64_t {
+      return k < v.size() ? v[k] : 1;
+    };
+    keys.push_back(static_cast<int64_t>(i));
+    elementX.push_back(safeGet(layout.element, 0));
+    elementY.push_back(safeGet(layout.element, 1));
+    threadX.push_back(safeGet(layout.thread, 0));
+    threadY.push_back(safeGet(layout.thread, 1));
+    tstridesX.push_back(safeGet(layout.tstrides, 0));
+    tstridesY.push_back(safeGet(layout.tstrides, 1));
+  }
+
+  auto intTy = smt::IntType::get(builder.getContext());
+  auto lookupField = [&](ArrayRef<int64_t> values) -> Value {
+    return LookupOp::create(builder, loc, intTy, mmaIdxValue, keys, values);
+  };
+  result.elementX = lookupField(elementX);
+  result.elementY = lookupField(elementY);
+  result.threadX = lookupField(threadX);
+  result.threadY = lookupField(threadY);
+  result.tstridesX = lookupField(tstridesX);
+  result.tstridesY = lookupField(tstridesY);
+  return result;
+}
+
+/// Emit the v1 schedule-validity constraints
+/// (`is_valid_vector_distribute_mma_schedule` from the Python tuner).
+/// For a single matmul schedule, asserts:
+///   1. `schedule_aligned`: matmul shape divides the derived workgroup tile on
+///      each of M, N, K -- i.e. the workgroup tile partitions the matmul
+///      cleanly.
+///   2. `lhs_distributable` / `rhs_distributable`: the inner load/store
+///      dimension of each operand divides either
+///      (wg_threads x elems_per_thread) or vice versa -- so vectorized
+///      loads at the max-vector-load bitwidth distribute across the
+///      workgroup without remainder.
+///
+/// `transposedLhs` / `transposedRhs` flip which axis of the workgroup
+/// tile is the "inner" dim (the contiguous one for vector loads). For
+/// LHS: K is inner when not transposed, M is inner when transposed.
+/// For RHS: N is inner when not transposed, K is inner when transposed.
+///
+/// `rhsBitwidth` is the bit width of the RHS element type -- drives the
+/// elements-per-thread count for the inner-dim vectorization check.
+/// (The Python tuner uses RHS type for both LHS and RHS; mirroring.)
+static void emitScheduleValidityConstraints(
+    OpBuilder &builder, Location loc, StringRef matmulName, Value matmulM,
+    Value matmulN, Value matmulK, Value mSize, Value nSize, Value kSize,
+    Value mSubgroupCount, Value nSubgroupCount, Value mTileCount,
+    Value nTileCount, Value kTileCount, Value wgThreads, bool transposedLhs,
+    bool transposedRhs, unsigned rhsBitwidth) {
+  Value mPartition = smt::IntMulOp::create(
+      builder, loc, ValueRange{mSubgroupCount, mTileCount, mSize});
+  Value nPartition = smt::IntMulOp::create(
+      builder, loc, ValueRange{nSubgroupCount, nTileCount, nSize});
+  Value kPartition =
+      smt::IntMulOp::create(builder, loc, ValueRange{kTileCount, kSize});
+  assertDivisible(builder, loc, matmulM, mPartition,
+                  llvm::formatv("{0}.m must be divisible by the derived M "
+                                "workgroup tile",
+                                matmulName)
+                      .str());
+  assertDivisible(builder, loc, matmulN, nPartition,
+                  llvm::formatv("{0}.n must be divisible by the derived N "
+                                "workgroup tile",
+                                matmulName)
+                      .str());
+  assertDivisible(builder, loc, matmulK, kPartition,
+                  llvm::formatv("{0}.k must be divisible by the derived K "
+                                "workgroup tile",
+                                matmulName)
+                      .str());
+
+  // lhs/rhs distributable: inner_dim / elems_per_thread distributes
+  // across wg_threads. The Python tuner picks elems_per_thread =
+  // max_vector_load_bitwidth (128) / rhs_bitwidth. 128 is the AMD
+  // global_load_dwordx4 / ds_read_b128 width on gfx9 and the
+  // `max_load_instruction_bits` value all GPU targets in
+  // `gpu_targets.json` advertise -- the constant should track that
+  // descriptor field if it ever varies per arch.
+  constexpr int64_t kMaxVectorLoadBitWidth = 128;
+  if (rhsBitwidth < 8) {
+    // Sub-byte or unknown bitwidth -- skip vector-load distribution
+    // check (matches the Python tuner's silent fallthrough for
+    // dynamic shapes; revisit when sub-byte support lands).
+    return;
+  }
+  int64_t elemsPerThread = kMaxVectorLoadBitWidth / rhsBitwidth;
+  if (elemsPerThread <= 0) {
+    return;
+  }
+  Value elemsPerThreadVal = mkIntConst(builder, loc, elemsPerThread);
+
+  // Mirrors GPUMMASchedule.m/n/k_wg_size in rocm_dispatch_constraints.py.
+  Value mWg = mPartition;
+  Value nWg = nPartition;
+  Value kWg = kPartition;
+
+  Value innerLhs = transposedLhs ? mWg : kWg;
+  Value innerRhs = transposedRhs ? kWg : nWg;
+  // NOTE: Tightening zero-division schedule validity is tracked with the
+  // Python-parity follow-ups in TODO(#23535) near the attention emitter.
+  Value lhsDiv =
+      smt::IntDivOp::create(builder, loc, innerLhs, elemsPerThreadVal);
+  Value rhsDiv =
+      smt::IntDivOp::create(builder, loc, innerRhs, elemsPerThreadVal);
+
+  // distributable: `inner_div % wg_threads == 0  OR  wg_threads %
+  // inner_div == 0`. Encoded as the disjunction of two `eq 0` ops.
+  auto mkDistributable = [&](Value innerDiv, StringRef operandName) {
+    Value zero = mkIntConst(builder, loc, 0);
+    Value mod1 = smt::IntModOp::create(builder, loc, innerDiv, wgThreads);
+    Value cmp1 = smt::EqOp::create(builder, loc, mod1, zero);
+    Value mod2 = smt::IntModOp::create(builder, loc, wgThreads, innerDiv);
+    Value cmp2 = smt::EqOp::create(builder, loc, mod2, zero);
+    Value either = smt::OrOp::create(builder, loc, ValueRange{cmp1, cmp2});
+    AssertOp::create(
+        builder, loc, either,
+        llvm::formatv("{0}.{1} inner dim distributable across wg_threads",
+                      matmulName, operandName)
+            .str());
+  };
+  mkDistributable(lhsDiv, "lhs");
+  mkDistributable(rhsDiv, "rhs");
+}
+
+/// Build the attention knob dictionary. Mirrors the top-level attention
+/// lowering_config (`workgroup`, `reduction`, `promote_operands`)
+/// plus the nested `decomposition_config` carrying per-matmul
+/// `lowering_config`s for QK and PV.
+static DictionaryAttr
+buildVectorDistributeAttentionKnobsDict(MLIRContext *ctx,
+                                        const AttentionDimInfo &dims,
+                                        ArrayRef<Attribute> compatibleQKMMAs,
+                                        ArrayRef<Attribute> compatiblePVMMAs) {
+  SmallVector<NamedAttribute> knobsEntries;
+
+  // workgroup: batch=1, M dim gets m_tile knob, K1/K2=0, N dim gets n_tile
+  // knob. Batch entries set to 1 (each workgroup handles one batch slice) --
+  // matches native attention codegen output (KernelConfig.cpp's
+  // setAttention...).
+  SmallVector<Attribute> workgroupEntries(dims.domainRank,
+                                          makeIntAttr(ctx, kNoTileDimVal));
+  for (int64_t b : dims.batch) {
+    workgroupEntries[b] = makeIntAttr(ctx, 1);
+  }
+  workgroupEntries[dims.m.back()] = IntKnobAttr::get(ctx, kKnobAttnMTileName);
+  workgroupEntries[dims.n.back()] = IntKnobAttr::get(ctx, kKnobAttnNTileName);
+  knobsEntries.emplace_back(kKnobWorkgroupKey,
+                            ArrayAttr::get(ctx, workgroupEntries));
+
+  // reduction: K2 dim gets red_k2 knob, others 0. Attention codegen reads
+  // this under the key `reduction` (not `partial_reduction`, which is a
+  // different tiling level -- see GPULoweringConfigUtils.cpp's level names).
+  SmallVector<Attribute> reductionEntries(dims.domainRank,
+                                          makeIntAttr(ctx, kNoTileDimVal));
+  reductionEntries[dims.k2.back()] = IntKnobAttr::get(ctx, kKnobAttnK2TileName);
+  knobsEntries.emplace_back(StringRef("reduction"),
+                            ArrayAttr::get(ctx, reductionEntries));
+
+  // promote_operands = [0, 1, 2] (Q, K, V; fixed for v0) with matching
+  // promotion_types = [derived_thread_config, derived_thread_config,
+  //                    derived_thread_config].
+  SmallVector<Attribute> promoteEntries = {
+      makeIntAttr(ctx, 0), makeIntAttr(ctx, 1), makeIntAttr(ctx, 2)};
+  knobsEntries.emplace_back(kKnobPromoteOperandsKey,
+                            ArrayAttr::get(ctx, promoteEntries));
+  SmallVector<Attribute> promotionTypes(
+      3, IREE::GPU::DerivedThreadConfigAttr::get(ctx));
+  knobsEntries.emplace_back(StringRef("promotion_types"),
+                            ArrayAttr::get(ctx, promotionTypes));
+
+  // decomposition_config = {qk_attrs = {lowering_config = ...},
+  //                          pv_attrs = {lowering_config = ...}}.
+  // Each inner lowering_config is a typed LoweringConfigAttr carrying
+  // mma_kind + promote_operands + promotion_types + subgroup_basis,
+  // because IREE attention decomposition casts the inner attribute to
+  // LoweringConfigAttr (a raw DictAttr would be silently rejected).
+  IREE::GPU::LoweringConfigAttr qkLoweringConfig =
+      buildPerMatmulLoweringConfigAttr(
+          ctx, dims, kKnobQKMmaIdxName, compatibleQKMMAs,
+          /*promotedOperands=*/{0, 1}, /*projectedDims=*/dims.n);
+  IREE::GPU::LoweringConfigAttr pvLoweringConfig =
+      buildPerMatmulLoweringConfigAttr(
+          ctx, dims, kKnobPVMmaIdxName, compatiblePVMMAs,
+          /*promotedOperands=*/{1}, /*projectedDims=*/dims.k1);
+  SmallVector<NamedAttribute> qkAttrs = {
+      {StringAttr::get(ctx, kKnobLoweringConfigKey), qkLoweringConfig}};
+  SmallVector<NamedAttribute> pvAttrs = {
+      {StringAttr::get(ctx, kKnobLoweringConfigKey), pvLoweringConfig}};
+  SmallVector<NamedAttribute> decompEntries = {
+      {StringAttr::get(ctx, kKnobQKAttrsKey),
+       DictionaryAttr::get(ctx, qkAttrs)},
+      {StringAttr::get(ctx, kKnobPVAttrsKey),
+       DictionaryAttr::get(ctx, pvAttrs)},
+  };
+  knobsEntries.emplace_back(kDecompositionConfigKey,
+                            DictionaryAttr::get(ctx, decompEntries));
+  // Note: top-level no longer carries `subgroup_m_count` /
+  // `subgroup_n_count` -- the per-matmul `subgroup_basis` above is what
+  // attention codegen consumes for subgroup partitioning. The sg_m_cnt /
+  // sg_n_cnt knobs are still declared (and constrained) via the per-matmul
+  // basis counts, so the materializer wires them up consistently.
+
+  // workgroup_size: 3D, x = derived from sg_cnts * sg_size, y/z fixed at 1.
+  SmallVector<Attribute> wgSizeKnobs = {IntKnobAttr::get(ctx, kKnobWgSizeXName),
+                                        makeIntAttr(ctx, 1),
+                                        makeIntAttr(ctx, 1)};
+  knobsEntries.emplace_back(kKnobWorkgroupSizeKey,
+                            ArrayAttr::get(ctx, wgSizeKnobs));
+  knobsEntries.emplace_back(kKnobSubgroupSizeKey,
+                            IntKnobAttr::get(ctx, kKnobSgSizeName));
+
+  return DictionaryAttr::get(ctx, knobsEntries);
+}
+
+/// Emit the attention constraint body. See the section header above for the
+/// Python tuner pieces covered here.
+static LogicalResult emitVectorDistributeAttentionConstraints(
+    OpBuilder &builder, IREE::LinalgExt::OnlineAttentionOp attnOp,
+    const AttentionDimInfo &dims, IREE::GPU::TargetAttr gpuTarget,
+    ArrayRef<Value> smtDimArgs, ArrayRef<Attribute> compatibleQKMMAs,
+    ArrayRef<Attribute> compatiblePVMMAs) {
+  Location loc = attnOp.getLoc();
+
+  // Hardware constants.
+  Value subgroupSizeVal =
+      mkIntConst(builder, loc, gpuTarget.getPreferredSubgroupSize());
+  Value maxThreadsVal = mkIntConst(
+      builder, loc, gpuTarget.getWgp().getMaxThreadCountPerWorkgroup());
+  Value maxSharedMemVal =
+      mkIntConst(builder, loc, gpuTarget.getWgp().getMaxWorkgroupMemoryBytes());
+  // VGPR-budgeted upper bound on any single tile axis (mirrors the matmul
+  // emitter's 512 constant and the Python tuner's
+  // `rocm_dispatch_constraints.py:generate_attention_vector_distribute_constraints`
+  // `max_tile = 512` line). 512 is the per-thread VGPR count on CDNA3
+  // (gfx942); revisit when the target descriptor exposes a per-thread
+  // VGPR count instead of hardcoding it here.
+  Value maxVGPRsVal = mkIntConst(builder, loc, 512);
+  Value oneVal = mkIntConst(builder, loc, 1);
+
+  // Per-dim SMT arg references.
+  unsigned mDim = dims.m.back();
+  unsigned nDim = dims.n.back();
+  unsigned k2Dim = dims.k2.back();
+  std::string mDimName = makeVarName(kLoopRangePrefix, mDim);
+  std::string nDimName = makeVarName(kLoopRangePrefix, nDim);
+  std::string k2DimName = makeVarName(kLoopRangePrefix, k2Dim);
+
+  // Knobs.
+  Value mTile = mkKnob(builder, loc, kKnobAttnMTileName);
+  Value nTile = mkKnob(builder, loc, kKnobAttnNTileName);
+  Value k2Tile = mkKnob(builder, loc, kKnobAttnK2TileName);
+  Value sgMCnt = mkKnob(builder, loc, kKnobSgMCntName);
+  Value sgNCnt = mkKnob(builder, loc, kKnobSgNCntName);
+  Value sgSize = mkKnob(builder, loc, kKnobSgSizeName);
+  Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
+
+  // Per-matmul intrinsic shape lookups. Each yields (mma_m, mma_n, mma_k).
+  // For attention: QK shapes correspond to the QxK^T matmul, PV shapes
+  // to the PxV matmul (different K dimensions). `emitMMALookup` creates
+  // the MMA-index knob with the name passed in, so the two attention
+  // matmuls get distinct `qk_mma_idx` / `pv_mma_idx` knobs.
+  auto [qkMmaIdx, qkMmaM, qkMmaN, qkMmaK] =
+      emitMMALookup(builder, loc, compatibleQKMMAs, kKnobQKMmaIdxName);
+  auto [pvMmaIdx, pvMmaM, pvMmaN, pvMmaK] =
+      emitMMALookup(builder, loc, compatiblePVMMAs, kKnobPVMmaIdxName);
+
+  // Single-intrinsic-mn invariant. The Python tuner uses ONE
+  // `intrinsic_mn` SMT variable across both attention matmuls (see
+  // rocm_dispatch_constraints.py:generate_attention_vector_distribute_constraints);
+  // we model the two MMAs as independent `one_of_knob`s for binding
+  // flexibility, then re-impose the equality here so the candidate set
+  // matches. Without these asserts, a satisfying solution could pick
+  // (qk=32x32x8, pv=16x16x16) -- the layout-match invariant rejects
+  // most such cross combinations in practice (different MMA shapes
+  // produce different per-subgroup layouts) but the explicit shape
+  // equality is the load-bearing constraint, not an emergent property
+  // of layout matching. Belt-and-suspenders.
+  //
+  // Placement: these must remain after both `emitMMALookup` calls above; the
+  // asserts reference the `qkMmaM`/`pvMmaM`/`qkMmaN`/`pvMmaN` SSA values those
+  // produce.
+  assertEq(builder, loc, qkMmaM, pvMmaM,
+           "qk_mma_m == pv_mma_m (single intrinsic_mn)");
+  assertEq(builder, loc, qkMmaN, pvMmaN,
+           "qk_mma_n == pv_mma_n (single intrinsic_mn)");
+
+  // Derive per-operand layout fields (element/thread/tstrides x x/y) from the
+  // chosen MMA via lookup ops. The layout-match asserts below (and the v1.4
+  // match_layout-derived booleans) can use these SSA values directly; they do
+  // not need separate solver knobs.
+  LayoutValues qkAccLayout = emitLayoutValues(
+      builder, loc, compatibleQKMMAs, qkMmaIdx, IREE::GPU::kMMAOperandAcc);
+  LayoutValues pvLhsLayout = emitLayoutValues(
+      builder, loc, compatiblePVMMAs, pvMmaIdx, IREE::GPU::kMMAOperandLhs);
+  LayoutValues pvRhsLayout = emitLayoutValues(
+      builder, loc, compatiblePVMMAs, pvMmaIdx, IREE::GPU::kMMAOperandRhs);
+  LayoutValues pvAccLayout = emitLayoutValues(
+      builder, loc, compatiblePVMMAs, pvMmaIdx, IREE::GPU::kMMAOperandAcc);
+
+  // match_layout(a, b): conjunction of the 6 field equalities. Returns an
+  // !smt.bool so callers can directly compose the Python tuner's
+  // match-layout-derived predicates.
+  auto buildMatchLayoutBool = [&](const LayoutValues &a,
+                                  const LayoutValues &b) -> Value {
+    Value eqEx = smt::EqOp::create(builder, loc, a.elementX, b.elementX);
+    Value eqEy = smt::EqOp::create(builder, loc, a.elementY, b.elementY);
+    Value eqTx = smt::EqOp::create(builder, loc, a.threadX, b.threadX);
+    Value eqTy = smt::EqOp::create(builder, loc, a.threadY, b.threadY);
+    Value eqSx = smt::EqOp::create(builder, loc, a.tstridesX, b.tstridesX);
+    Value eqSy = smt::EqOp::create(builder, loc, a.tstridesY, b.tstridesY);
+    return smt::AndOp::create(builder, loc,
+                              ValueRange{eqEx, eqEy, eqTx, eqTy, eqSx, eqSy});
+  };
+
+  // Derived match_layout booleans. Matching QK acc with PV rhs controls
+  // col-major materialization; matching either PV operand controls QK-output
+  // reuse in the shared-memory budget below.
+  Value qkAccMatchesPvRhs = buildMatchLayoutBool(qkAccLayout, pvRhsLayout);
+  Value qkAccMatchesPvLhs = buildMatchLayoutBool(qkAccLayout, pvLhsLayout);
+  Value canReuseIsTrue = smt::OrOp::create(
+      builder, loc, ValueRange{qkAccMatchesPvLhs, qkAccMatchesPvRhs});
+
+  // Layout-match invariant: QK accumulator layout MUST equal PV
+  // accumulator layout. This is the structural correctness constraint
+  // for online attention -- the running max/sum bookkeeping requires
+  // QK's output and PV's output to live in the same per-subgroup
+  // layout so they accumulate over the same partition.
+  // (Python tuner: rocm_dispatch_constraints.py:527,
+  //   `match_layout(qk_mma_acc_layout, pv_mma_acc_layout)`.)
+  assertEq(builder, loc, qkAccLayout.elementX, pvAccLayout.elementX,
+           "qk_acc.element_x == pv_acc.element_x");
+  assertEq(builder, loc, qkAccLayout.elementY, pvAccLayout.elementY,
+           "qk_acc.element_y == pv_acc.element_y");
+  assertEq(builder, loc, qkAccLayout.threadX, pvAccLayout.threadX,
+           "qk_acc.thread_x == pv_acc.thread_x");
+  assertEq(builder, loc, qkAccLayout.threadY, pvAccLayout.threadY,
+           "qk_acc.thread_y == pv_acc.thread_y");
+  assertEq(builder, loc, qkAccLayout.tstridesX, pvAccLayout.tstridesX,
+           "qk_acc.tstrides_x == pv_acc.tstrides_x");
+  assertEq(builder, loc, qkAccLayout.tstridesY, pvAccLayout.tstridesY,
+           "qk_acc.tstrides_y == pv_acc.tstrides_y");
+
+  // Constraint 0: sg_size pinned to the target's preferred subgroup size.
+  assertEq(builder, loc, sgSize, subgroupSizeVal,
+           "sg_size == preferred_subgroup_size");
+
+  // Constraint 1: tile sizes must divide problem sizes.
+  assertDivisible(
+      builder, loc, smtDimArgs[mDim], mTile,
+      llvm::formatv("{0} must be divisible by m_tile", mDimName).str());
+  assertDivisible(
+      builder, loc, smtDimArgs[nDim], nTile,
+      llvm::formatv("{0} must be divisible by n_tile", nDimName).str());
+  assertDivisible(
+      builder, loc, smtDimArgs[k2Dim], k2Tile,
+      llvm::formatv("{0} must be divisible by red_k2", k2DimName).str());
+
+  // Constraint 2: tile sizes bounded by pv intrinsic shape and VGPR cap.
+  // (Python tuner uses PV intrinsic for the attention-domain tile bounds.)
+  assertCmp(builder, loc, smt::IntPredicate::ge, mTile, pvMmaM,
+            "m_tile >= pv_mma_m");
+  assertCmp(builder, loc, smt::IntPredicate::ge, nTile, pvMmaN,
+            "n_tile >= pv_mma_n");
+  assertCmp(builder, loc, smt::IntPredicate::ge, k2Tile, pvMmaK,
+            "red_k2 >= pv_mma_k");
+  assertCmp(builder, loc, smt::IntPredicate::le, mTile, maxVGPRsVal,
+            "m_tile <= 512 (max VGPRs)");
+  assertCmp(builder, loc, smt::IntPredicate::le, nTile, maxVGPRsVal,
+            "n_tile <= 512 (max VGPRs)");
+  assertCmp(builder, loc, smt::IntPredicate::le, k2Tile, maxVGPRsVal,
+            "red_k2 <= 512 (max VGPRs)");
+
+  // Constraint 3: tile-size factorization. Derive schedule partition factors
+  // from the materialized tile sizes, subgroup counts, and selected MMA
+  // intrinsic sizes. The equality after each quotient keeps the division exact.
+  Value mScheduleDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, pvMmaM});
+  Value mScheduleQuotient =
+      smt::IntDivOp::create(builder, loc, mTile, mScheduleDenom);
+  Value mFactor = smt::IntMulOp::create(
+      builder, loc, ValueRange{mScheduleDenom, mScheduleQuotient});
+  assertEq(builder, loc, mTile, mFactor,
+           "m_tile must be divisible by sg_m_cnt * pv_mma_m");
+  Value nScheduleDenom =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgNCnt, pvMmaN});
+  Value nScheduleQuotient =
+      smt::IntDivOp::create(builder, loc, nTile, nScheduleDenom);
+  Value nFactor = smt::IntMulOp::create(
+      builder, loc, ValueRange{nScheduleDenom, nScheduleQuotient});
+  assertEq(builder, loc, nTile, nFactor,
+           "n_tile must be divisible by sg_n_cnt * pv_mma_n");
+  Value k2ScheduleQuotient =
+      smt::IntDivOp::create(builder, loc, k2Tile, pvMmaK);
+  Value k2Factor = smt::IntMulOp::create(
+      builder, loc, ValueRange{pvMmaK, k2ScheduleQuotient});
+  assertEq(builder, loc, k2Tile, k2Factor,
+           "red_k2 must be divisible by pv_mma_k");
+
+  // QK K1 dim must be a whole multiple of qk_mma_k (Q x K^T has its
+  // own K dim, distinct from the attention-domain K2).
+  Value k1Static = mkIntConst(builder, loc, dims.k1Size);
+  assertDivisible(builder, loc, k1Static, qkMmaK,
+                  "dim_k1 must be divisible by qk_mma_k");
+
+  // Constraint 4: subgroup count bounds. Mirrors the Python tuner's
+  // `rocm_dispatch_constraints.py:generate_attention_vector_distribute_constraints`
+  // bounds: sg_m_cnt in [1, 32] (32 = max VGPRs / min MMA size = 512 / 16
+  // for the smallest valid MFMA intrinsic) and sg_n_cnt pinned to 1
+  // (attention's PV matmul partitions only along M for v0).
+  Value maxSgCntVal = mkIntConst(builder, loc, 32);
+  assertBounds(builder, loc, sgMCnt, "sg_m_cnt", oneVal, "1", maxSgCntVal,
+               "32");
+  assertEq(builder, loc, sgNCnt, oneVal, "sg_n_cnt == 1");
+
+  // Constraint 5: subgroup-product pin. The Python tuner hard-codes
+  // `num_subgroups = 4` (rocm_dispatch_constraints.py default) for the
+  // attention path -- empirically the best LDS/occupancy trade-off across
+  // the heads/seq-lens we tune over. Encoded as an equality so the
+  // candidate set matches the legacy generator exactly.
+  Value sgNum = smt::IntMulOp::create(builder, loc, ValueRange{sgMCnt, sgNCnt});
+  Value numSubgroupsVal = mkIntConst(builder, loc, 4);
+  assertEq(builder, loc, sgNum, numSubgroupsVal, "sg_m_cnt * sg_n_cnt == 4");
+
+  // Constraint 6: total thread count fits per-workgroup limit.
+  Value totalThreads =
+      smt::IntMulOp::create(builder, loc, ValueRange{sgNum, sgSize});
+  assertCmp(builder, loc, smt::IntPredicate::le, totalThreads, maxThreadsVal,
+            "sg_m_cnt * sg_n_cnt * sg_size <= max_threads");
+
+  // Constraint 7: wg_size_x derivation (1D workgroup; y/z fixed in template).
+  assertEq(builder, loc, wgSizeX, totalThreads,
+           "wg_size_x == sg_m_cnt * sg_n_cnt * sg_size");
+
+  // Constraint 7b: schedule-validity for QK and PV matmuls (ports
+  // `is_valid_vector_distribute_mma_schedule` from the Python tuner).
+  // Note QK's N tile uses PV's K intrinsic dim; this is the intermediate dim
+  // shared between the two matmuls. QK's K schedule quotient is derived from
+  // the static K1 size and selected QK intrinsic K.
+  unsigned rhsBitsQK = dims.keyElemType.getIntOrFloatBitWidth();
+  unsigned rhsBitsPV = dims.valueElemType.getIntOrFloatBitWidth();
+
+  // QK schedule: matmul is (M, K2, K1) with M=mSize, N=k2Size, K=k1Size.
+  Value qkM = mkIntConst(builder, loc, dims.mSize);
+  Value qkN = mkIntConst(builder, loc, dims.k2Size);
+  Value qkK = k1Static;
+  Value qkKScheduleQuotient =
+      smt::IntDivOp::create(builder, loc, k1Static, qkMmaK);
+  emitScheduleValidityConstraints(
+      builder, loc, "qk_schedule", qkM, qkN, qkK,
+      /*mSize=*/pvMmaM, /*nSize=*/pvMmaK, /*kSize=*/qkMmaK,
+      /*mSubgroupCount=*/sgMCnt, /*nSubgroupCount=*/oneVal,
+      /*mTileCount=*/mScheduleQuotient,
+      /*nTileCount=*/k2ScheduleQuotient,
+      /*kTileCount=*/qkKScheduleQuotient, /*wgThreads=*/totalThreads,
+      dims.transposedQ, dims.transposedK, rhsBitsQK);
+
+  // PV schedule: matmul is (M, N, K2) with M=mSize, N=nSize, K=k2Size.
+  Value pvM = mkIntConst(builder, loc, dims.mSize);
+  Value pvN = mkIntConst(builder, loc, dims.nSize);
+  Value pvK = mkIntConst(builder, loc, dims.k2Size);
+  emitScheduleValidityConstraints(
+      builder, loc, "pv_schedule", pvM, pvN, pvK,
+      /*mSize=*/pvMmaM, /*nSize=*/pvMmaN, /*kSize=*/pvMmaK,
+      /*mSubgroupCount=*/sgMCnt, /*nSubgroupCount=*/sgNCnt,
+      /*mTileCount=*/mScheduleQuotient,
+      /*nTileCount=*/nScheduleQuotient,
+      /*kTileCount=*/k2ScheduleQuotient, /*wgThreads=*/totalThreads,
+      /*transposedLhs=*/false, dims.transposedV, rhsBitsPV);
+
+  // Constraint 8: shared memory budget. Mirrors the Python tuner's
+  // per-matmul tile-based formula (rocm_dispatch_constraints.py:444-461,
+  // 618-630): each matmul's shared-memory usage is the LHS-tile bytes
+  // plus the RHS-tile bytes. The total is
+  //   qk_shared + (can_reuse ? pv_shared / 2 : pv_shared)
+  // where reuse means PV's LHS shares memory with QK's accumulator (so PV LHS
+  // doesn't need its own slot).
+  //
+  // Skipped entirely if any element type is sub-byte (v0 caveat,
+  // matches matmul emitter behavior).
+  auto wholeByteSize = [&](Type ty) -> int64_t {
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(ty);
+    if (bitWidth < 8) {
+      return -1;
+    }
+    return bitWidth / 8;
+  };
+  int64_t qBytes = wholeByteSize(dims.queryElemType);
+  int64_t kBytes = wholeByteSize(dims.keyElemType);
+  int64_t vBytes = wholeByteSize(dims.valueElemType);
+  if (qBytes > 0 && kBytes > 0 && vBytes > 0) {
+    // QK schedule tile dims (matches the qk_schedule struct used in
+    // schedule-validity above):
+    //   tile_m = m_tile
+    //   tile_n = red_k2
+    //   tile_k = mma_qk_k x (k1Static / mma_qk_k) == k1Static
+    Value pvMmaMVal = pvMmaM;
+    Value pvMmaKVal = pvMmaK;
+    Value qkTileM = smt::IntMulOp::create(
+        builder, loc, ValueRange{pvMmaMVal, mScheduleQuotient, sgMCnt});
+    Value qkTileN = smt::IntMulOp::create(
+        builder, loc, ValueRange{pvMmaKVal, k2ScheduleQuotient});
+    Value qkTileK = k1Static; // qk_intrinsic_k x (k1 / qk_intrinsic_k) = k1
+    Value qkLhsBytes = smt::IntMulOp::create(
+        builder, loc,
+        ValueRange{qkTileM, qkTileK, mkIntConst(builder, loc, qBytes)});
+    Value qkRhsBytes = smt::IntMulOp::create(
+        builder, loc,
+        ValueRange{qkTileN, qkTileK, mkIntConst(builder, loc, kBytes)});
+    Value qkShared =
+        smt::IntAddOp::create(builder, loc, ValueRange{qkLhsBytes, qkRhsBytes});
+
+    // PV schedule tile dims:
+    //   tile_m = m_tile
+    //   tile_n = n_tile
+    //   tile_k = red_k2
+    Value pvTileM = qkTileM;
+    Value pvTileN = smt::IntMulOp::create(
+        builder, loc, ValueRange{pvMmaN, nScheduleQuotient, sgNCnt});
+    Value pvTileK = smt::IntMulOp::create(
+        builder, loc, ValueRange{pvMmaKVal, k2ScheduleQuotient});
+    // PV LHS/RHS dtype == value dtype, matching the Python dispatch parser's
+    // PV matmul model.
+    Value pvLhsBytes = smt::IntMulOp::create(
+        builder, loc,
+        ValueRange{pvTileM, pvTileK, mkIntConst(builder, loc, vBytes)});
+    Value pvRhsBytes = smt::IntMulOp::create(
+        builder, loc,
+        ValueRange{pvTileN, pvTileK, mkIntConst(builder, loc, vBytes)});
+    Value pvShared =
+        smt::IntAddOp::create(builder, loc, ValueRange{pvLhsBytes, pvRhsBytes});
+
+    // If QK output can be reused as PV input, PV's LHS slot is shared with QK's
+    // accumulator and PV's LHS bytes drop out of the total. The Python tuner
+    // approximates this by halving pv_shared
+    // (rocm_dispatch_constraints.py:622 `pv_shared //= 2`), which is
+    // exact when pvLhsBytes == pvRhsBytes (square tiles, equal
+    // operand widths -- the common attention case) and slightly off
+    // otherwise. Mirroring the approximation here keeps the candidate
+    // set bijective vs the Python tuner; switching to the structurally
+    // exact `qkShared + pvRhsBytes` would diverge.
+    //
+    // The division floors (off-by-one in the LDS-friendly direction --
+    // it admits at most one extra byte's worth of candidates that the
+    // codegen would still accept), matching Python's `//` semantics.
+    Value pvSharedHalf = smt::IntDivOp::create(builder, loc, pvShared,
+                                               mkIntConst(builder, loc, 2));
+    Value totalShared = smt::IteOp::create(builder, loc, canReuseIsTrue,
+                                           pvSharedHalf, pvShared);
+    totalShared =
+        smt::IntAddOp::create(builder, loc, ValueRange{qkShared, totalShared});
+    assertCmp(builder, loc, smt::IntPredicate::le, totalShared, maxSharedMemVal,
+              "per-matmul shared memory must fit in workgroup memory");
+  }
+  // If any operand has sub-byte elements, the constraint is skipped (v0).
+
+  return success();
+}
+
+// TODO(#23535): These constraints intentionally mirror the Python tuner
+// bug-for-bug.
+// Do not change solver semantics here unless the Python constraints change
+// first. Known follow-ups include materializing col-major MMA attrs from the
+// qk_acc/pv_rhs layout match, moving gfx942 defaults (max_tile=512,
+// num_subgroups=4, vector load width=128) into target data, and tightening
+// sub-byte/div-zero schedule validity handling.
+
+/// Emit attention constraints for a single root op under VectorDistribute.
+/// v0: gates on `IREE::LinalgExt::OnlineAttentionOp`; static-shape only.
+static LogicalResult
+emitVectorDistributeAttentionConstraintsForOp(Operation *rootOp,
+                                              RootOpAttr rootOpAttr) {
+  auto attnOp = dyn_cast<IREE::LinalgExt::OnlineAttentionOp>(rootOp);
+  if (!attnOp) {
+    return success();
+  }
+
+  IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(rootOp);
+  if (!gpuTarget) {
+    return success();
+  }
+
+  FailureOr<AttentionDimInfo> dims = inferAttentionDimInfo(attnOp);
+  if (failed(dims)) {
+    // Don't propagate this as a compile error -- many shapes that the
+    // tuner doesn't yet support (multi-dim M/N/K1/K2 roles, dynamic
+    // inner dims, malformed indexing maps) still reach codegen and
+    // should fall through to the default heuristics. Surface the miss
+    // only in -debug-only=DEBUG_TYPE so unsupported shapes remain
+    // non-fatal while still being debuggable with `iree-compile
+    // --mlir-disable-threading -debug-only=...`.
+    LDBG() << "attention constraint emitter: skipping " << *rootOp
+           << ": inferAttentionDimInfo failed (likely multi-dim role, dynamic "
+              "inner dim, or unsupported indexing maps)";
+    return success();
+  }
+
+  // Compatible MMAs for QK: Q x K^T -> intermediate (f32 accumulator,
+  // following the Python tuner -- `qk_matmul.acc_type` is typically f32).
+  // The intermediate type lives nowhere on the attention op as a result;
+  // the Python tuner uses f32 for the QK accumulator. We mirror that
+  // choice here.
+  MLIRContext *ctx = rootOp->getContext();
+  Type qkAccType = Float32Type::get(ctx);
+  SmallVector<Attribute> compatibleQKMMAs = getCompatibleAttentionMMAAttrs(
+      gpuTarget, dims->mSize, dims->k2Size, dims->k1Size, dims->queryElemType,
+      dims->keyElemType, qkAccType);
+  if (compatibleQKMMAs.empty()) {
+    return success();
+  }
+
+  // Compatible MMAs for PV: intermediate x V -> output. The Python dispatch
+  // parser models the post-softmax probability as the V element type for the
+  // PV matmul LHS and RHS; mirror that here for bug-for-bug parity.
+  SmallVector<Attribute> compatiblePVMMAs = getCompatibleAttentionMMAAttrs(
+      gpuTarget, dims->mSize, dims->nSize, dims->k2Size, dims->valueElemType,
+      dims->valueElemType, dims->outputElemType);
+  if (compatiblePVMMAs.empty()) {
+    return success();
+  }
+
+  OpBuilder builder(ctx);
+  DictionaryAttr knobs = buildVectorDistributeAttentionKnobsDict(
+      ctx, *dims, compatibleQKMMAs, compatiblePVMMAs);
+  auto pipelineAttr = IREE::GPU::PipelineAttr::get(
+      ctx, IREE::GPU::LoweringPipeline::VectorDistribute);
+  // Reuse the generic shell builder; attention's indexing maps come
+  // straight from the op interface.
+  SmallVector<AffineMap> indexingMaps = {
+      attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+      attnOp.getOutputMap()};
+  ConstraintsOpShell shell =
+      createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
+                               dims->domainRank, indexingMaps);
+
+  return emitVectorDistributeAttentionConstraints(
+      builder, attnOp, *dims, gpuTarget, shell.smtDimArgs, compatibleQKMMAs,
+      compatiblePVMMAs);
 }
 
 LogicalResult emitLLVMGPUConstraints(Attribute attr,

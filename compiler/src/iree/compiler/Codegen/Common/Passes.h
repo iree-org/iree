@@ -201,6 +201,13 @@ materializeCompilationInfoFromConstraints(
     IREE::Codegen::ConstraintsOp op,
     const DenseMap<StringRef, int64_t> &assignments);
 
+/// Materializes a named configuration attr from a ConstraintsOp and a flat knob
+/// assignment mapping. The pipeline decides whether the attr name is special
+/// (for example `compilation_info`) or generic.
+FailureOr<Attribute> materializeConfigurationAttrFromConstraints(
+    IREE::Codegen::ConstraintsOp op, StringRef attrName,
+    const DenseMap<StringRef, int64_t> &assignments);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
