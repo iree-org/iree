@@ -20,32 +20,16 @@ namespace mlir::iree_compiler {
 // Name prefix for problem size dimensions in diagnostics.
 constexpr StringLiteral kLoopRangePrefix = "dim_";
 
+// Named materialization output for the pipeline-specific compilation_info
+// repackaging path.
+constexpr StringLiteral kCompilationInfoOutputName = "compilation_info";
+
 // Key for the nested per-matmul attention decomposition sub-dictionary.
 // Lives in the shared header so the attention constraint emitter (which
 // writes it under `knobs`) and the materializer (which reads it back out)
-// reference the same string — drift between two redeclared copies would
+// reference the same string -- drift between two redeclared copies would
 // be a silent failure mode.
 constexpr StringLiteral kDecompositionConfigKey = "decomposition_config";
-
-// Names of the SMT-only auxiliary sub-dictionaries the constraint
-// emitters attach under `knobs` (subgroup tile counts, MMA layout
-// fields, match_layout-driven booleans). Codegen never reads these and
-// the materializer never propagates them to a user's lowering_config,
-// so they're expected to be missing at verification time — see
-// `VerifyPipelineConstraints::extractKnobValues`. Centralized here so
-// the producer (attention emitter) and consumer (verifier) reference
-// the same strings; a typo on either side would otherwise either
-// declare a knob the verifier rejects as unknown, or accept a real
-// missing entry as "intentional SMT-aux."
-constexpr StringLiteral kSMTAuxSubgroupTileCountsKey =
-    "smt_internal_subgroup_tile_counts";
-constexpr StringLiteral kSMTAuxMmaLayoutsKey = "smt_internal_mma_layouts";
-constexpr StringLiteral kSMTAuxBoolsKey = "smt_internal_bools";
-constexpr StringLiteral kSMTAuxKnobKeys[] = {
-    kSMTAuxSubgroupTileCountsKey,
-    kSMTAuxMmaLayoutsKey,
-    kSMTAuxBoolsKey,
-};
 
 /// Result of creating a ConstraintsOp shell with common constraints.
 struct ConstraintsOpShell {

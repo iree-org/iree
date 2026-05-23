@@ -573,27 +573,22 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 /// through typed wrapper attributes (e.g. iree_gpu.lowering_config wraps
 /// a DictionaryAttr that may carry knob references); a TypeSwitch limited
 /// to DictionaryAttr/ArrayAttr would silently miss those.
+template <typename KnobAttr>
+constexpr auto kKnobNameMatcher = [](StringRef name, bool &found) {
+  return [name, &found](KnobAttr knob) -> WalkResult {
+    if (knob.getName().getValue() == name) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  };
+};
+
 static bool hasKnobName(Attribute attr, StringRef name) {
   bool found = false;
   AttrTypeWalker walker;
-  // The two `addWalk` calls below take strongly-typed `function_ref`s,
-  // so a generic-lambda factor-out doesn't apply here — `addWalk`
-  // deduces the concrete attribute type from the callback's parameter
-  // type. Keep the duplicated bodies.
-  walker.addWalk([&](IntKnobAttr knob) -> WalkResult {
-    if (knob.getName().getValue() == name) {
-      found = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  walker.addWalk([&](OneOfKnobAttr knob) -> WalkResult {
-    if (knob.getName().getValue() == name) {
-      found = true;
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
+  walker.addWalk(kKnobNameMatcher<IntKnobAttr>(name, found));
+  walker.addWalk(kKnobNameMatcher<OneOfKnobAttr>(name, found));
   walker.walk(attr);
   return found;
 }

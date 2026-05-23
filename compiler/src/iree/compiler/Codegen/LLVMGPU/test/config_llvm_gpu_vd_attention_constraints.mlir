@@ -4,7 +4,7 @@
 // RUN:   | FileCheck %s
 
 // Per-constraint coverage for the VectorDistribute attention emitter.
-// Locks in the attention knob template (workgroup, partial_reduction,
+// Locks in the attention knob template (workgroup, reduction,
 // promote_operands, decomposition_config carrying per-matmul lowering_config
 // templates for QK / PV, workgroup_size, subgroup_size) and verifies the
 // v0 assert families.
@@ -79,19 +79,14 @@ func.func @attention_f16(%q: tensor<4x1024x64xf16>, %k: tensor<4x1024x64xf16>,
 // Constraint families. CHECK-DAG so the order inside the region doesn't
 // matter; one per assert message family that the emitter must produce.
 //
-// Ordering anchor — the two single-intrinsic_mn asserts must appear in
-// the input BEFORE the first layout-binding assert. The layout-binding
-// `lookup(qk_mma_idx)` / `lookup(pv_mma_idx)` ops read the MMA-index
-// knobs the intrinsic_mn equality constrains, so hoisting the
-// intrinsic_mn asserts past the bindings is a correctness regression.
-// The three ordered CHECK lines below pin that ordering; all CHECK-DAGs
-// further down are unconstrained except that they must match AFTER the
-// last anchor. (Every existing CHECK-DAG string is emitted later in the
-// output than `qk_acc_element_x == lookup(qk_mma_idx)`, so the ordering
-// is compatible with the existing matchers.)
+// Ordering anchor -- keep the single-intrinsic_mn asserts near the
+// layout-binding asserts so the emitted template stays easy to audit. The
+// three ordered CHECK lines below pin only that local grouping; all CHECK-DAGs
+// further down are otherwise unconstrained except that they must match after
+// the last anchor.
 // CHECK:     "qk_mma_m == pv_mma_m (single intrinsic_mn)"
 // CHECK:     "qk_mma_n == pv_mma_n (single intrinsic_mn)"
-// CHECK:     "qk_acc_element_x == lookup(qk_mma_idx)"
+// CHECK:     "qk_acc.element_x == pv_acc.element_x"
 //
 // Top-level (sg_size pin, tile bounds, factorization, sg counts):
 // CHECK-DAG: "sg_size == preferred_subgroup_size"
@@ -104,12 +99,9 @@ func.func @attention_f16(%q: tensor<4x1024x64xf16>, %k: tensor<4x1024x64xf16>,
 // CHECK-DAG: "m_tile <= 512 (max VGPRs)"
 // CHECK-DAG: "n_tile <= 512 (max VGPRs)"
 // CHECK-DAG: "red_k2 <= 512 (max VGPRs)"
-// CHECK-DAG: "m_tile == sg_m_cnt * sg_m_tcnt * pv_mma_m"
-// CHECK-DAG: "n_tile == sg_n_cnt * sg_n_tcnt * pv_mma_n"
-// CHECK-DAG: "red_k2 == sg_k_tcnt * pv_mma_k"
-// CHECK-DAG: "sg_m_tcnt >= 1"
-// CHECK-DAG: "sg_n_tcnt >= 1"
-// CHECK-DAG: "sg_k_tcnt >= 1"
+// CHECK-DAG: "m_tile must be divisible by sg_m_cnt * pv_mma_m"
+// CHECK-DAG: "n_tile must be divisible by sg_n_cnt * pv_mma_n"
+// CHECK-DAG: "red_k2 must be divisible by pv_mma_k"
 // CHECK-DAG: "dim_k1 must be divisible by qk_mma_k ({} % {} == 0)"
 // (Single-intrinsic_mn invariant is locked in by the ordered CHECK
 // lines above; no CHECK-DAG mirror here would consume the same
@@ -117,32 +109,24 @@ func.func @attention_f16(%q: tensor<4x1024x64xf16>, %k: tensor<4x1024x64xf16>,
 // CHECK-DAG: "sg_m_cnt >= 1"
 // CHECK-DAG: "sg_m_cnt <= 32"
 // CHECK-DAG: "sg_n_cnt == 1"
-// CHECK-DAG: "sg_num == 4"
-// CHECK-DAG: "total_threads <= max_threads"
-// CHECK-DAG: "wg_size_x == sg_num * sg_size"
+// CHECK-DAG: "sg_m_cnt * sg_n_cnt == 4"
+// CHECK-DAG: "sg_m_cnt * sg_n_cnt * sg_size <= max_threads"
+// CHECK-DAG: "wg_size_x == sg_m_cnt * sg_n_cnt * sg_size"
 // CHECK-DAG: "per-matmul shared memory must fit in workgroup memory"
-// Layout-binding asserts (one lookup-assert per (layout × field), 4 layouts × 6 fields = 24):
-// (qk_acc_element_x is covered by the ordering anchor above.)
-// CHECK-DAG: "qk_acc_tstrides_y == lookup(qk_mma_idx)"
-// CHECK-DAG: "pv_lhs_element_x == lookup(pv_mma_idx)"
-// CHECK-DAG: "pv_rhs_thread_x == lookup(pv_mma_idx)"
-// CHECK-DAG: "pv_acc_tstrides_y == lookup(pv_mma_idx)"
 // qk_acc == pv_acc match invariant (6 field equalities):
-// CHECK-DAG: "qk_acc.element_x == pv_acc.element_x"
+// CHECK-DAG: "qk_acc.element_y == pv_acc.element_y"
+// CHECK-DAG: "qk_acc.thread_x == pv_acc.thread_x"
+// CHECK-DAG: "qk_acc.thread_y == pv_acc.thread_y"
+// CHECK-DAG: "qk_acc.tstrides_x == pv_acc.tstrides_x"
 // CHECK-DAG: "qk_acc.tstrides_y == pv_acc.tstrides_y"
-// v1.4 bools (use_col_major, can_reuse_qk):
-// CHECK-DAG: "use_col_major >= 0"
-// CHECK-DAG: "use_col_major <= 1"
-// CHECK-DAG: "use_col_major == match_layout(qk_acc, pv_rhs)"
-// CHECK-DAG: "can_reuse_qk_output_for_pv_input == (match_layout(qk_acc, pv_lhs) OR  match_layout(qk_acc, pv_rhs))"
 // Schedule-validity (per is_valid_vector_distribute_mma_schedule):
-// CHECK-DAG: "qk_schedule.m must divide (m_sg_cnt * m_tcnt * mma_m) ({} % {} == 0)"
-// CHECK-DAG: "qk_schedule.n must divide (n_sg_cnt * n_tcnt * mma_n) ({} % {} == 0)"
-// CHECK-DAG: "qk_schedule.k must divide (k_tcnt * mma_k) ({} % {} == 0)"
+// CHECK-DAG: "qk_schedule.m must be divisible by the derived M workgroup tile ({} % {} == 0)"
+// CHECK-DAG: "qk_schedule.n must be divisible by the derived N workgroup tile ({} % {} == 0)"
+// CHECK-DAG: "qk_schedule.k must be divisible by the derived K workgroup tile ({} % {} == 0)"
 // CHECK-DAG: "qk_schedule.lhs inner dim distributable across wg_threads"
 // CHECK-DAG: "qk_schedule.rhs inner dim distributable across wg_threads"
-// CHECK-DAG: "pv_schedule.m must divide (m_sg_cnt * m_tcnt * mma_m) ({} % {} == 0)"
-// CHECK-DAG: "pv_schedule.n must divide (n_sg_cnt * n_tcnt * mma_n) ({} % {} == 0)"
-// CHECK-DAG: "pv_schedule.k must divide (k_tcnt * mma_k) ({} % {} == 0)"
+// CHECK-DAG: "pv_schedule.m must be divisible by the derived M workgroup tile ({} % {} == 0)"
+// CHECK-DAG: "pv_schedule.n must be divisible by the derived N workgroup tile ({} % {} == 0)"
+// CHECK-DAG: "pv_schedule.k must be divisible by the derived K workgroup tile ({} % {} == 0)"
 // CHECK-DAG: "pv_schedule.lhs inner dim distributable across wg_threads"
 // CHECK-DAG: "pv_schedule.rhs inner dim distributable across wg_threads"

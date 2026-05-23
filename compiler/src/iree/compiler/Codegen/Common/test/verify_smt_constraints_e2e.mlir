@@ -60,6 +60,45 @@ func.func @matmul_e2e_generated_violation_vd(
 #exec_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
+    pipeline = #iree_gpu.pipeline<VectorDistribute>
+    workgroup_size = [64, 1, 1] subgroup_size = 64>
+
+func.func @matmul_e2e_missing_required_knob_vd(
+    %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
+    -> tensor<128x256xf32>
+    attributes {hal.executable.target = #exec_target,
+                translation_info = #translation} {
+  %cst = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<128x256xf32>
+  %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 0>}
+      ins(%cst : f32) outs(%init : tensor<128x256xf32>)
+      -> tensor<128x256xf32>
+  // expected-error @below {{failed to extract SMT knob values from the selected lowering configuration; constraints template does not match the materialized configuration}}
+  %result = linalg.matmul {
+      lowering_config = #iree_gpu.lowering_config<{
+          workgroup = [64, 64, 0],
+          mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+          subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>,
+      root_op = #iree_codegen.root_op<set = 0>}
+      ins(%lhs, %rhs : tensor<128x64xf32>, tensor<64x256xf32>)
+      outs(%fill : tensor<128x256xf32>) -> tensor<128x256xf32>
+  return %result : tensor<128x256xf32>
+}
+
+// -----
+
+#gpu_target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  mma = [<MFMA_F32_16x16x4_F32>],
+  subgroup_size_choices = [64],
+  max_load_instruction_bits = 128,
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536,
+  max_workgroup_counts = [2147483647, 2147483647, 2147483647]
+>>
+#exec_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+    {iree_codegen.target_info = #gpu_target}>
+#translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<TileAndFuse>
     workgroup_size = [64, 1, 1] subgroup_size = 64>
 
@@ -336,19 +375,17 @@ func.func @conv_e2e_constraints_erased_tf(
 // position or vice versa) surfaces as a verification failure here
 // rather than silently passing under symmetry.
 //
-// Implied SMT-internal knob values (not in the user's lowering_config —
-// these are SMT-aux, see kSMTAuxKnobKeys in SMTConstraintUtils.h; the
-// verifier resolves them as unknown and silently skips constraints
-// that reference them. Spelling them out here so a future contributor
-// can adjust m_tile / n_tile without re-deriving by hand):
+// Derived schedule values from the materialized tiles, subgroup counts, and
+// MMA choices. Spelling them out here so a future contributor can adjust
+// m_tile / n_tile without re-deriving by hand:
 //
 //   pv_mma_m = pv_mma_n = pv_mma_k = 16     (MFMA_F32_16x16x16_F16)
 //   sg_m_cnt = 4, sg_n_cnt = 1              (from subgroup_basis)
-//   sg_m_tcnt = m_tile / (sg_m_cnt × pv_mma_m) = 128 / (4 × 16) = 2
-//   sg_n_tcnt = n_tile / (sg_n_cnt × pv_mma_n) = 64 / (1 × 16) = 4
-//   sg_k_tcnt = red_k2 / pv_mma_k            = 64 / 16            = 4
-//   sg_num    = sg_m_cnt × sg_n_cnt          = 4                  (== Constraint 5 pin)
-//   total_threads = sg_num × sg_size         = 4 × 64 = 256       (≤ 1024)
+//   M factor = m_tile / (sg_m_cnt x pv_mma_m) = 128 / (4 x 16) = 2
+//   N factor = n_tile / (sg_n_cnt x pv_mma_n) = 64 / (1 x 16) = 4
+//   K factor = red_k2 / pv_mma_k             = 64 / 16         = 4
+//   sg_m_cnt x sg_n_cnt                        = 4               (pin)
+//   threads = sg_m_cnt x sg_n_cnt x sg_size    = 4 x 64 = 256    (<= 1024)
 //
 // LDS budget (approx): qkShared (Q tile + K tile) + pvShared (P tile +
 // V tile) at f16 (2 B/elt) is well under 65536 B for this small fixture.
@@ -421,9 +458,15 @@ func.func @attention_e2e_constraints_passing(
 // CHECK:       iree_linalg_ext.online_attention
 // CHECK-NOT:   iree_codegen.smt.constraints
 
+// The verifier can evaluate materialized knobs plus derived schedule factors,
+// MMA layout values, layout-match predicates, schedule-validity predicates, and
+// shared-memory budget here. This fixture also verifies the nested
+// lowering_config form, not separately materialized side attrs such as
+// decomposition_config.
+
 // -----
 
-// Attention configuration with a violating m_tile (60) that does not
+// Attention configuration with a violating m_tile (96) that does not
 // divide M (1024). The verifier must surface the corresponding note.
 
 #gpu_target_attn_v = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
@@ -459,6 +502,7 @@ func.func @attention_e2e_generated_violation(
                 translation_info = #translation_attn_v} {
   // expected-error @below {{pipeline constraints violated}}
   // expected-note @below {{dim_1 must be divisible by m_tile (1024 % 96 == 0)}}
+  // expected-note @below {{m_tile must be divisible by sg_m_cnt * pv_mma_m}}
   %res:3 = iree_linalg_ext.online_attention {
       root_op = #iree_codegen.root_op<set = 0>,
       indexing_maps = [#qmap_v, #kmap_v, #vmap_v, #smap_v, #omap_v, #stmap_v, #stmap_v],

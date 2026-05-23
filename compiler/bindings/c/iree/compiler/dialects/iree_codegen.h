@@ -113,16 +113,10 @@ MLIR_CAPI_EXPORTED MlirAttribute ireeCodegenConvertConstraintsOpToSMTLIB(
     MlirOperation constraintsOp, bool emitReset);
 
 MLIR_CAPI_EXPORTED MlirAttribute
-ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
-    MlirOperation constraintsOp, size_t numAssignments,
-    const MlirStringRef *assignmentNames, const int64_t *assignmentValues,
-    MlirAttribute *diagnosticMessage);
-
-MLIR_CAPI_EXPORTED MlirAttribute
-ireeCodegenMaterializeDecompositionConfigFromConstraintsOp(
-    MlirOperation constraintsOp, size_t numAssignments,
-    const MlirStringRef *assignmentNames, const int64_t *assignmentValues,
-    MlirAttribute *diagnosticMessage);
+ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+    MlirOperation constraintsOp, MlirStringRef configurationAttrName,
+    size_t numAssignments, const MlirStringRef *assignmentNames,
+    const int64_t *assignmentValues, MlirAttribute *diagnosticMessage);
 
 struct ireeCodegenAttentionOpDetail {
   MlirAttribute batch;

@@ -29,8 +29,7 @@ EXPORTS
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenIntKnobAttrGetName
   ireeCodegenIntKnobAttrGetTypeID
-  ireeCodegenMaterializeCompilationInfoFromConstraintsOp
-  ireeCodegenMaterializeDecompositionConfigFromConstraintsOp
+  ireeCodegenMaterializeConfigurationAttrFromConstraintsOp
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenNoPipelineAttrGet

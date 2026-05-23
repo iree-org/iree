@@ -815,10 +815,12 @@ NB_MODULE(_ireeCompilerDialects, m) {
         }
 
         MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirStringRef configurationAttrName =
+            mlirStringRefCreateFromCString("compilation_info");
         MlirAttribute attr =
-            ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
-                op, nameRefs.size(), nameRefs.data(), values.data(),
-                &diagnosticMessage);
+            ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+                op, configurationAttrName, nameRefs.size(), nameRefs.data(),
+                values.data(), &diagnosticMessage);
         if (mlirAttributeIsNull(attr)) {
           if (!mlirAttributeIsNull(diagnosticMessage)) {
             throw std::runtime_error(
@@ -834,8 +836,9 @@ NB_MODULE(_ireeCompilerDialects, m) {
       py::arg("constraints_op"), py::arg("assignments"));
 
   iree_codegen_module.def(
-      "materialize_decomposition_config",
-      [](MlirOperation op, py::dict assignments) -> MlirAttribute {
+      "materialize_configuration_attr",
+      [](MlirOperation op, std::string configurationAttrName,
+         py::dict assignments) -> MlirAttribute {
         std::vector<MlirStringRef> nameRefs;
         std::vector<int64_t> values;
         nameRefs.reserve(assignments.size());
@@ -852,25 +855,27 @@ NB_MODULE(_ireeCompilerDialects, m) {
         }
 
         MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirStringRef configurationAttrNameRef = mlirStringRefCreate(
+            configurationAttrName.data(), configurationAttrName.size());
         MlirAttribute attr =
-            ireeCodegenMaterializeDecompositionConfigFromConstraintsOp(
-                op, nameRefs.size(), nameRefs.data(), values.data(),
-                &diagnosticMessage);
+            ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+                op, configurationAttrNameRef, nameRefs.size(), nameRefs.data(),
+                values.data(), &diagnosticMessage);
         if (mlirAttributeIsNull(attr)) {
           if (!mlirAttributeIsNull(diagnosticMessage)) {
             throw std::runtime_error(
                 unwrap(mlirStringAttrGetValue(diagnosticMessage)).str());
           }
           throw std::runtime_error(
-              "decomposition_config materialization from constraints failed");
+              "configuration attr materialization from constraints failed");
         }
         return attr;
       },
-      "Materialize a decomposition_config dictionary attr from a constraints "
-      "op and flat knob assignment dictionary. Used for attention dispatches "
-      "where the per-matmul (qk / pv) lowering_config sub-dicts are carried "
-      "separately from the top-level compilation_info.",
-      py::arg("constraints_op"), py::arg("assignments"));
+      "Materialize a named configuration attr from a constraints op and flat "
+      "knob "
+      "assignment dictionary.",
+      py::arg("constraints_op"), py::arg("configuration_attr_name"),
+      py::arg("assignments"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps

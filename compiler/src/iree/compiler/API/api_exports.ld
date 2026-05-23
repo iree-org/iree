@@ -30,8 +30,7 @@ VER_0 {
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenIntKnobAttrGetName;
     ireeCodegenIntKnobAttrGetTypeID;
-    ireeCodegenMaterializeCompilationInfoFromConstraintsOp;
-    ireeCodegenMaterializeDecompositionConfigFromConstraintsOp;
+    ireeCodegenMaterializeConfigurationAttrFromConstraintsOp;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenNoPipelineAttrGet;

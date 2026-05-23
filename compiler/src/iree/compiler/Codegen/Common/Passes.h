@@ -201,14 +201,11 @@ materializeCompilationInfoFromConstraints(
     IREE::Codegen::ConstraintsOp op,
     const DenseMap<StringRef, int64_t> &assignments);
 
-/// Materializes the `decomposition_config` DictionaryAttr from a ConstraintsOp
-/// knobs dictionary and a flat knob assignment mapping. Used by attention
-/// tuning where the lowering carries both a top-level CompilationInfoAttr
-/// (via materializeCompilationInfoFromConstraints) and a per-matmul
-/// decomposition config (via this helper); the latter gets attached to the
-/// attention op via setDecompositionConfigAttr.
-FailureOr<Attribute> materializeDecompositionConfigFromConstraints(
-    IREE::Codegen::ConstraintsOp op,
+/// Materializes a named configuration attr from a ConstraintsOp and a flat knob
+/// assignment mapping. The pipeline decides whether the attr name is special
+/// (for example `compilation_info`) or generic.
+FailureOr<Attribute> materializeConfigurationAttrFromConstraints(
+    IREE::Codegen::ConstraintsOp op, StringRef attrName,
     const DenseMap<StringRef, int64_t> &assignments);
 
 } // namespace mlir::iree_compiler

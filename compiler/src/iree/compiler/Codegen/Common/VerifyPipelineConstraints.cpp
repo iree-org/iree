@@ -23,65 +23,59 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_VERIFYSMTCONSTRAINTSPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-/// Returns true if `attr` (or anything reachable from it through MLIR's
-/// generic sub-element walker) is an IntKnobAttr or OneOfKnobAttr.
-/// Used by the `extractKnobValue` `Default` arm to refuse equality-only
-/// matching for typed wrapper attributes that hide knobs inside — without
-/// this guard a future typed wrapper containing knobs would silently
-/// bypass extraction and the inner knobs would resolve to std::nullopt,
-/// causing the evaluator to skip every constraint that touches them.
-static bool containsKnob(Attribute attr) {
-  bool found = false;
-  AttrTypeWalker walker;
-  walker.addWalk([&](IREE::Codegen::IntKnobAttr) -> WalkResult {
-    found = true;
-    return WalkResult::interrupt();
-  });
-  walker.addWalk([&](IREE::Codegen::OneOfKnobAttr) -> WalkResult {
-    found = true;
-    return WalkResult::interrupt();
-  });
-  walker.walk(attr);
-  return found;
-}
-
 /// Walk a knobs template dictionary and extract concrete values from the
-/// corresponding lowering config. Returns failure if any knob has no
-/// matching value in the config (caller should skip verification).
+/// corresponding lowering config. Returns failure if a knob does not match.
+/// Sets `missingRequiredEntry` when the mismatch was caused by a missing config
+/// entry instead of by a fixed-value/template mismatch.
 static LogicalResult extractKnobValue(Attribute templateAttr,
                                       Attribute configAttr,
-                                      DenseMap<StringAttr, int64_t> &result) {
+                                      DenseMap<StringAttr, int64_t> &result,
+                                      bool &missingRequiredEntry) {
   return llvm::TypeSwitch<Attribute, LogicalResult>(templateAttr)
       .Case([&](DictionaryAttr nestedTemplate) -> LogicalResult {
-        auto nestedConfig = dyn_cast_or_null<DictionaryAttr>(configAttr);
+        auto nestedConfig = dyn_cast_if_present<DictionaryAttr>(configAttr);
         if (!nestedConfig) {
+          if (!configAttr) {
+            missingRequiredEntry = true;
+          }
           return failure();
         }
         for (NamedAttribute entry : nestedTemplate) {
-          if (failed(extractKnobValue(entry.getValue(),
-                                      nestedConfig.get(entry.getName()),
-                                      result))) {
+          Attribute nestedConfigAttr = nestedConfig.get(entry.getName());
+          if (!nestedConfigAttr) {
+            missingRequiredEntry = true;
+            return failure();
+          }
+          if (failed(extractKnobValue(entry.getValue(), nestedConfigAttr,
+                                      result, missingRequiredEntry))) {
             return failure();
           }
         }
         return success();
       })
       .Case([&](ArrayAttr templateArr) -> LogicalResult {
-        auto configArr = dyn_cast_or_null<ArrayAttr>(configAttr);
+        auto configArr = dyn_cast_if_present<ArrayAttr>(configAttr);
         if (!configArr || configArr.size() != templateArr.size()) {
+          if (!configAttr) {
+            missingRequiredEntry = true;
+          }
           return failure();
         }
         for (auto [tmpl, actual] :
              llvm::zip_equal(templateArr.getValue(), configArr.getValue())) {
-          if (failed(extractKnobValue(tmpl, actual, result))) {
+          if (failed(extractKnobValue(tmpl, actual, result,
+                                      missingRequiredEntry))) {
             return failure();
           }
         }
         return success();
       })
       .Case([&](IREE::Codegen::IntKnobAttr knob) -> LogicalResult {
-        auto intVal = dyn_cast_or_null<IntegerAttr>(configAttr);
+        auto intVal = dyn_cast_if_present<IntegerAttr>(configAttr);
         if (!intVal) {
+          if (!configAttr) {
+            missingRequiredEntry = true;
+          }
           return failure();
         }
         result[knob.getName()] = intVal.getInt();
@@ -89,6 +83,7 @@ static LogicalResult extractKnobValue(Attribute templateAttr,
       })
       .Case([&](IREE::Codegen::OneOfKnobAttr knob) -> LogicalResult {
         if (!configAttr) {
+          missingRequiredEntry = true;
           return failure();
         }
         ArrayAttr options = knob.getOptions();
@@ -100,76 +95,70 @@ static LogicalResult extractKnobValue(Attribute templateAttr,
         return success();
       })
       .Case([&](IntegerAttr templateInt) -> LogicalResult {
-        auto configInt = dyn_cast_or_null<IntegerAttr>(configAttr);
+        auto configInt = dyn_cast_if_present<IntegerAttr>(configAttr);
         if (!configInt || configInt.getInt() != templateInt.getInt()) {
+          if (!configAttr) {
+            missingRequiredEntry = true;
+          }
           return failure();
         }
         return success();
       })
-      .Case([&](IREE::GPU::LoweringConfigAttr lcTemplate) -> LogicalResult {
-        // `LoweringConfigAttr` wraps a DictionaryAttr; recurse into the
-        // inner attrs and require the config side to also be a
-        // LoweringConfigAttr (otherwise the materialized form drifted).
-        auto lcConfig =
-            dyn_cast_or_null<IREE::GPU::LoweringConfigAttr>(configAttr);
-        if (!lcConfig) {
-          return failure();
-        }
-        return extractKnobValue(lcTemplate.getAttributes(),
-                                lcConfig.getAttributes(), result);
-      })
       .Default([&](Attribute fixedTemplateAttr) -> LogicalResult {
-        // Fallback for fixed typed leaf attrs (e.g.
-        // `#iree_gpu.derived_thread_config` inside a per-matmul
-        // promotion_types list): no knob to extract, just require the
-        // config side to be identical. Without this case the typed
-        // leaf would silently fail extraction and the entire knob
-        // resolution would be skipped, so concrete violations would
-        // never be flagged.
-        //
-        // Guard: refuse to apply equality-only matching to any typed
-        // wrapper attribute that hides knobs inside. If a future typed
-        // attr wraps a dictionary carrying IntKnobAttr/OneOfKnobAttr
-        // references, equality with a structurally-equal config side
-        // would silently bypass extraction; those knobs would then
-        // resolve to std::nullopt at evaluation time, and every
-        // assertion touching them would be silently skipped. Force
-        // the caller to add an explicit case for any such wrapper.
-        if (containsKnob(fixedTemplateAttr)) {
+        if (!configAttr ||
+            fixedTemplateAttr.getTypeID() != configAttr.getTypeID()) {
+          if (!configAttr) {
+            missingRequiredEntry = true;
+          }
           return failure();
         }
-        if (fixedTemplateAttr != configAttr) {
+
+        SmallVector<Attribute> templateSubAttrs;
+        SmallVector<Attribute> configSubAttrs;
+        SmallVector<Type> templateSubTypes;
+        SmallVector<Type> configSubTypes;
+        fixedTemplateAttr.walkImmediateSubElements(
+            [&](Attribute attr) { templateSubAttrs.push_back(attr); },
+            [&](Type type) { templateSubTypes.push_back(type); });
+        configAttr.walkImmediateSubElements(
+            [&](Attribute attr) { configSubAttrs.push_back(attr); },
+            [&](Type type) { configSubTypes.push_back(type); });
+        if (templateSubAttrs.size() != configSubAttrs.size() ||
+            templateSubTypes.size() != configSubTypes.size() ||
+            !llvm::equal(templateSubTypes, configSubTypes)) {
           return failure();
+        }
+        if (templateSubAttrs.empty()) {
+          return success(fixedTemplateAttr == configAttr);
+        }
+        for (auto [templateSubAttr, configSubAttr] :
+             llvm::zip_equal(templateSubAttrs, configSubAttrs)) {
+          if (failed(extractKnobValue(templateSubAttr, configSubAttr, result,
+                                      missingRequiredEntry))) {
+            return failure();
+          }
         }
         return success();
       });
 }
 
-// `kSMTAuxKnobKeys` (the whitelist of SMT-only auxiliary sub-dict names
-// the emitter declares but the materializer never propagates) lives in
-// SMTConstraintUtils.h so the producer (LLVMGPUConstraintGenerator's
-// attention emitter) and consumer (this verifier) reference the same
-// strings.
-
 static LogicalResult extractKnobValues(DictionaryAttr knobsTemplate,
                                        DictionaryAttr configAttrs,
-                                       DenseMap<StringAttr, int64_t> &result) {
+                                       DenseMap<StringAttr, int64_t> &result,
+                                       bool &missingRequiredEntry) {
   for (NamedAttribute entry : knobsTemplate) {
     Attribute configAttr = configAttrs.get(entry.getName());
     if (!configAttr) {
-      // The only legitimate "no config counterpart" case is the small
-      // whitelist of SMT-only auxiliary sub-dicts above. Anything else
-      // (a missing `workgroup`, `reduction`, etc.) means the materialized
-      // config is incomplete or has drifted from the template, and the
-      // evaluator would otherwise treat the resulting unresolved knobs as
-      // std::nullopt and silently skip every constraint that touches them
-      // — masking real violations. Fail verification instead.
-      if (!llvm::is_contained(kSMTAuxKnobKeys, entry.getName().getValue())) {
-        return failure();
-      }
-      continue;
+      // A missing `workgroup`, `reduction`, etc. means the materialized config
+      // is incomplete or has drifted from the template. The evaluator would
+      // otherwise treat the resulting unresolved knobs as std::nullopt and
+      // silently skip every constraint that touches them, masking real
+      // violations. Fail verification instead.
+      missingRequiredEntry = true;
+      return failure();
     }
-    if (failed(extractKnobValue(entry.getValue(), configAttr, result))) {
+    if (failed(extractKnobValue(entry.getValue(), configAttr, result,
+                                missingRequiredEntry))) {
       return failure();
     }
   }
@@ -561,8 +550,17 @@ void VerifySMTConstraintsPass::runOnOperation() {
 
       DictionaryAttr combinedDict =
           buildCombinedConfigDict(gpuConfig, translationInfo);
-      if (failed(extractKnobValues(knobsTemplate, combinedDict, knobValues))) {
-        continue;
+      bool missingRequiredEntry = false;
+      if (failed(extractKnobValues(knobsTemplate, combinedDict, knobValues,
+                                   missingRequiredEntry))) {
+        if (!missingRequiredEntry) {
+          continue;
+        }
+        constraintsOp.emitError()
+            << "failed to extract SMT knob values from the selected lowering "
+               "configuration; constraints template does not match the "
+               "materialized configuration";
+        return signalPassFailure();
       }
     }
 
