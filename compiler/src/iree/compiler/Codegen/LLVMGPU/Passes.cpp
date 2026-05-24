@@ -912,6 +912,8 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  funcPassManager.addPass(createFoldMemRefCopyIntoDPSOpsPass());
+
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
@@ -978,6 +980,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   FunctionLikeNest(modulePassManager)
+      // Fold value-semantic update temporaries before lowering DPS ops.
+      .addPass(createFoldMemRefCopyIntoDPSOpsPass)
+
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
 

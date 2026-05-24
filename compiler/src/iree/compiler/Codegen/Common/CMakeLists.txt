@@ -101,6 +101,7 @@ iree_cc_library(
     "FlattenMemRefs.cpp"
     "FlattenSwizzleHintAllocs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
+    "FoldMemRefCopyIntoDPSOps.cpp"
     "FoldSplitReductionAndWorkgroupMappingLoops.cpp"
     "FoldTensorExtractOp.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
