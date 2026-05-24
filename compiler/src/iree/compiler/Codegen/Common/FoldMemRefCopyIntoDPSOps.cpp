@@ -7,15 +7,22 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/AliasAnalysis.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include <limits>
 
 namespace mlir::iree_compiler {
 
@@ -25,9 +32,9 @@ namespace mlir::iree_compiler {
 namespace {
 
 // Peel view-like memref producers to the allocation, global, or interface
-// binding that defines the addressed storage. This deliberately relies on MLIR's
-// ViewLikeOpInterface instead of assuming that every one-memref-operand op is an
-// aliasing view.
+// binding that defines the addressed storage. This deliberately relies on
+// MLIR's ViewLikeOpInterface instead of assuming that every one-memref-operand
+// op is an aliasing view.
 static Value getMemRefViewRoot(Value value) {
   auto memrefValue = dyn_cast<MemrefValue>(value);
   if (!memrefValue) {
@@ -44,9 +51,9 @@ static bool isDerivedFromLocalAlloc(Value value) {
   return isa_and_nonnull<memref::AllocOp, memref::AllocaOp>(root);
 }
 
-// Return the symbol for a memref global after peeling view-like aliases. Globals
-// with different symbols are distinct storage objects, which generic MLIR alias
-// analysis does not infer from memref.get_global by itself.
+// Return the symbol for a memref global after peeling view-like aliases.
+// Globals with different symbols are distinct storage objects, which generic
+// MLIR alias analysis does not infer from memref.get_global by itself.
 static std::optional<FlatSymbolRefAttr> getMemRefGlobalRoot(Value value) {
   auto getGlobalOp =
       getMemRefViewRoot(value).getDefiningOp<memref::GetGlobalOp>();
@@ -57,8 +64,8 @@ static std::optional<FlatSymbolRefAttr> getMemRefGlobalRoot(Value value) {
 }
 
 // Reuse IREE's existing source-subspan walk for memrefs derived from HAL
-// interface bindings. Binding identity is the IREE-specific alias fact this pass
-// needs on top of generic MLIR local alias analysis.
+// interface bindings. Binding identity is the IREE-specific alias fact this
+// pass needs on top of generic MLIR local alias analysis.
 static std::optional<IREE::HAL::InterfaceBindingSubspanOp>
 getSourceSubspan(Value value) {
   auto typedValue = dyn_cast<TypedValue<MemRefType>>(value);
@@ -159,7 +166,8 @@ static bool hasInterveningTargetAccess(Operation *first, Operation *last,
 
 // The final target is about to replace the temporary DPS init, so none of the
 // values read by the DPS op can alias it. The original copy source is included
-// because preserving a partial update requires copying it into the target first.
+// because preserving a partial update requires copying it into the target
+// first.
 static bool targetMayAliasDpsReads(DestinationStyleOpInterface dpsOp,
                                    OpOperand *forwardedInitOperand,
                                    Value copySource, Value target,
@@ -176,6 +184,197 @@ static bool targetMayAliasDpsReads(DestinationStyleOpInterface dpsOp,
         mayAlias(operand.get(), target, aliasAnalysis)) {
       return true;
     }
+  }
+  return false;
+}
+
+// Return the static element count only when every dimension is known and the
+// product fits in int64_t. Unknown or overflowing shapes make the overwrite
+// proof fail conservatively.
+static std::optional<int64_t> getStaticNumElements(ArrayRef<int64_t> shape) {
+  int64_t numElements = 1;
+  for (int64_t dim : shape) {
+    if (ShapedType::isDynamic(dim) || dim < 0) {
+      return std::nullopt;
+    }
+    if (dim == 0) {
+      return 0;
+    }
+    if (numElements > std::numeric_limits<int64_t>::max() / dim) {
+      return std::nullopt;
+    }
+    numElements *= dim;
+  }
+  return numElements;
+}
+
+// A linalg op fully overwrites its init when the output element is not read and
+// every output point is written exactly once. We prove that only for fills,
+// copies, and parallel identity-mapped generics.
+static bool linalgOpFullyOverwritesInit(linalg::LinalgOp linalgOp,
+                                        OpOperand *initOperand) {
+  Operation *op = linalgOp.getOperation();
+  if (isa<linalg::FillOp, linalg::CopyOp>(op)) {
+    return true;
+  }
+
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) {
+    return false;
+  }
+
+  if (!llvm::all_of(genericOp.getIteratorTypesArray(),
+                    linalg::isParallelIterator)) {
+    return false;
+  }
+
+  AffineMap initMap = genericOp.getMatchingIndexingMap(initOperand);
+  auto initType = dyn_cast<MemRefType>(initOperand->get().getType());
+  if (!initType || initMap.getNumDims() != initType.getRank() ||
+      initMap.getNumResults() != initType.getRank() || !initMap.isIdentity()) {
+    return false;
+  }
+
+  Value blockArg = genericOp.getMatchingBlockArgument(initOperand);
+  return blockArg && blockArg.use_empty();
+}
+
+// Extract constant integer data from a memref global. Scatter overwrite proofs
+// require concrete indices so that we can prove every destination element is
+// covered exactly once.
+static DenseIntElementsAttr getDenseGlobalIntegerElements(Value value) {
+  auto getGlobal = value.getDefiningOp<memref::GetGlobalOp>();
+  if (!getGlobal) {
+    return {};
+  }
+
+  auto globalOp = dyn_cast_if_present<memref::GlobalOp>(
+      SymbolTable::lookupNearestSymbolFrom(getGlobal, getGlobal.getNameAttr()));
+  if (!globalOp || !globalOp.getConstant()) {
+    return {};
+  }
+  return dyn_cast_if_present<DenseIntElementsAttr>(
+      globalOp.getInitialValueAttr());
+}
+
+// Prove that a scatter writes the entire init without reading old values. This
+// is intentionally narrow: unique scalar updates, identity dimension map,
+// static shapes, constant indices, and an unused old-value block argument.
+static bool scatterFullyOverwritesInit(IREE::LinalgExt::ScatterOp scatterOp,
+                                       OpOperand *initOperand) {
+  if (initOperand != scatterOp.getDpsInitOperand(0)) {
+    return false;
+  }
+  if (scatterOp.getMask() || !scatterOp.getUniqueIndices()) {
+    return false;
+  }
+
+  Block &body = scatterOp.getRegion().front();
+  if (body.getNumArguments() != 2 || !body.getArgument(1).use_empty()) {
+    return false;
+  }
+
+  ShapedType originalType = scatterOp.getOriginalType();
+  ShapedType updateType = scatterOp.getUpdateType();
+  ShapedType indicesType = scatterOp.getIndicesType();
+  if (!originalType.hasStaticShape() || !updateType.hasStaticShape() ||
+      !indicesType.hasStaticShape()) {
+    return false;
+  }
+
+  int64_t indexDepth = scatterOp.getIndexDepth();
+  int64_t batchRank = scatterOp.getBatchRank();
+  if (!scatterOp.isScalarUpdate()) {
+    return false;
+  }
+  for (auto [index, dimension] : llvm::enumerate(scatterOp.getDimensionMap())) {
+    if (dimension != static_cast<int64_t>(index)) {
+      return false;
+    }
+  }
+  bool omittedIndexDepthDim = indicesType.getRank() == batchRank;
+  if (omittedIndexDepthDim && indexDepth != 1) {
+    return false;
+  }
+
+  std::optional<int64_t> batchElementCount =
+      getStaticNumElements(updateType.getShape().take_front(batchRank));
+  std::optional<int64_t> indexedElementCount =
+      getStaticNumElements(originalType.getShape().take_front(indexDepth));
+  if (!batchElementCount || !indexedElementCount ||
+      *batchElementCount != *indexedElementCount) {
+    return false;
+  }
+
+  DenseIntElementsAttr indicesAttr =
+      getDenseGlobalIntegerElements(scatterOp.getIndices());
+  if (!indicesAttr) {
+    return false;
+  }
+
+  int64_t elementsPerIndex = omittedIndexDepthDim ? 1 : indexDepth;
+  if (*batchElementCount >
+      std::numeric_limits<int64_t>::max() / elementsPerIndex) {
+    return false;
+  }
+  int64_t expectedIndexElementCount = *batchElementCount * elementsPerIndex;
+  if (indicesAttr.getNumElements() != expectedIndexElementCount) {
+    return false;
+  }
+
+  SmallVector<int64_t> indexValues;
+  indexValues.reserve(expectedIndexElementCount);
+  for (APInt value : indicesAttr.getValues<APInt>()) {
+    if (value.getBitWidth() > 64) {
+      return false;
+    }
+    indexValues.push_back(value.getSExtValue());
+  }
+
+  ArrayRef<int64_t> dimensionMap = scatterOp.getDimensionMap();
+  ArrayRef<int64_t> originalShape = originalType.getShape();
+  llvm::DenseSet<int64_t> covered;
+  covered.reserve(*batchElementCount);
+  for (int64_t batchIndex = 0; batchIndex < *batchElementCount; ++batchIndex) {
+    SmallVector<int64_t> destinationIndices(indexDepth, 0);
+    if (omittedIndexDepthDim) {
+      destinationIndices[dimensionMap[0]] = indexValues[batchIndex];
+    } else {
+      for (int64_t index = 0; index < indexDepth; ++index) {
+        destinationIndices[dimensionMap[index]] =
+            indexValues[batchIndex * indexDepth + index];
+      }
+    }
+
+    int64_t linearIndex = 0;
+    for (int64_t dim = 0; dim < indexDepth; ++dim) {
+      int64_t coordinate = destinationIndices[dim];
+      int64_t dimSize = originalShape[dim];
+      if (coordinate < 0 || coordinate >= dimSize ||
+          linearIndex > std::numeric_limits<int64_t>::max() / dimSize) {
+        return false;
+      }
+      linearIndex = linearIndex * dimSize + coordinate;
+    }
+    if (!covered.insert(linearIndex).second) {
+      return false;
+    }
+  }
+
+  return covered.size() == static_cast<size_t>(*indexedElementCount);
+}
+
+// Decide whether the initial copy into the temporary can be dropped entirely.
+// If this returns false, the pass still forwards the temporary into the final
+// target but preserves the source copy before the DPS op.
+static bool dpsInitCopyCanBeElided(DestinationStyleOpInterface dpsOp,
+                                   OpOperand *forwardedInitOperand) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(dpsOp.getOperation())) {
+    return linalgOpFullyOverwritesInit(linalgOp, forwardedInitOperand);
+  }
+  if (auto scatterOp =
+          dyn_cast<IREE::LinalgExt::ScatterOp>(dpsOp.getOperation())) {
+    return scatterFullyOverwritesInit(scatterOp, forwardedInitOperand);
   }
   return false;
 }
@@ -242,8 +441,10 @@ struct FoldTemporaryCopyIntoDpsOp final : OpRewritePattern<memref::CopyOp> {
     }
 
     rewriter.setInsertionPoint(copyIn);
-    memref::CopyOp::create(rewriter, copyIn.getLoc(), copyIn.getSource(),
-                           finalTarget);
+    if (!dpsInitCopyCanBeElided(dpsOp, forwardedInitOperand)) {
+      memref::CopyOp::create(rewriter, copyIn.getLoc(), copyIn.getSource(),
+                             finalTarget);
+    }
     forwardedInitOperand->set(finalTarget);
 
     rewriter.eraseOp(copyOut);
