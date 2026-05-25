@@ -1,0 +1,87 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library")
+load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_TARGET_BACKEND_LLVM_CPU)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+#===------------------------------------------------------------------------===#
+# UKernel bitcode files
+#===------------------------------------------------------------------------===#
+#
+# Each entry below compiles one .c file to one .bc file for a specific
+# (arch, features) tuple. Each .c file is named after the MMA intrinsic it
+# implements (lowercased, with `iree_uk_` prefix), matching the
+# verbatim-intrinsic convention used by the AMDGPU C ukernels. The bitcode
+# output name appends the build-side `<arch>_<features>` suffix so the
+# compiler-side lookup in `EmbeddedDataDirectory` can find the right bitcode
+# for a given target's feature set. See README.md for the design.
+
+X86_64_AVX512_BF16_COPTS = [
+    "-mavx512f",
+    "-mavx512bf16",
+]
+
+X86_64_AVX512_VNNI_COPTS = [
+    "-mavx512f",
+    "-mavx512vnni",
+]
+
+# (stem, features, copts) for each x86_64 ukernel. `stem` is both the .c file
+# base name and the ukernel function name; `features` is the ISA-extension
+# suffix appended (as `_x86_64_<features>` to the library name and
+# `.x86_64_<features>.bc` to the output) for the EmbeddedDataDirectory lookup.
+X86_64_UKERNELS = [
+    (
+        "iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16",
+        "avx512bf16",
+        X86_64_AVX512_BF16_COPTS,
+    ),
+    (
+        "iree_uk_mma_x86_avx512vnni_16x16x2_i32_i8_casti16",
+        "avx512vnni",
+        X86_64_AVX512_VNNI_COPTS,
+    ),
+]
+
+[iree_bitcode_library(
+    name = "%s_x86_64_%s" % (stem, features),
+    srcs = ["%s.c" % stem],
+    out = "%s.x86_64_%s.bc" % (stem, features),
+    arch = "x86_64",
+    copts = copts,
+    internal_hdrs = ["common.h"],
+) for (stem, features, copts) in X86_64_UKERNELS]
+
+#===------------------------------------------------------------------------===#
+# Embedded bitcode TOC
+#===------------------------------------------------------------------------===#
+
+iree_c_embed_data(
+    name = "iree_uk_cpu_bitcode",
+    srcs = [
+        ":%s.x86_64_%s.bc" % (stem, features)
+        for (stem, features, copts) in X86_64_UKERNELS
+    ],
+    c_file_output = "iree_uk_cpu_bitcode.c",
+    flatten = True,
+    h_file_output = "iree_uk_cpu_bitcode.h",
+)

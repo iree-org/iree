@@ -1150,9 +1150,12 @@ class BuildFileFunctions(object):
             f"  PUBLIC\n)\n\n"
         )
 
-    def iree_bitcode_library(self, name, arch, srcs, internal_hdrs=None, copts=None):
+    def iree_bitcode_library(
+        self, name, arch, srcs, internal_hdrs=None, copts=None, out=None
+    ):
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
         arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
+        out_block = self._convert_string_arg_block("OUT", out, quote=True)
         hdrs_block = self._convert_srcs_block(internal_hdrs, block_name="INTERNAL_HDRS")
         srcs_block = self._convert_srcs_block(srcs)
         copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
@@ -1161,6 +1164,7 @@ class BuildFileFunctions(object):
             f"iree_bitcode_library(\n"
             f"{name_block}"
             f"{arch_block}"
+            f"{out_block}"
             f"{hdrs_block}"
             f"{srcs_block}"
             f"{copts_block}"

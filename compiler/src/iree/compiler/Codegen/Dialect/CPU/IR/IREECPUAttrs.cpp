@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1092,6 +1094,22 @@ void InnerTiledSemanticsAttr::getTileTypes(
 }
 
 bool InnerTiledSemanticsAttr::getOpaque() const { return false; }
+
+//===----------------------------------------------------------------------===//
+// UKernelProviderAttr
+//===----------------------------------------------------------------------===//
+
+std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
+    RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
+    Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
+    SmallVectorImpl<Value> &otherOperands) const {
+  // Fall through to the default UKernelGenericOp construction in
+  // LowerBitcodeUKernelsPass. Specialized handling of `inner_tiled` ops
+  // (threading `intrinsics_{m,n,k}` and the outer K count as scalar operands)
+  // will be added in a follow-up commit alongside the SelectUKernels pass that
+  // sets the `iree_codegen.ukernel` descriptor and attaches the bitcode.
+  return std::nullopt;
+}
 
 //===----------------------------------------------------------------------===//
 // Attribute Registration

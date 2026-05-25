@@ -131,6 +131,37 @@ def IREECPU_DataTiledMMAAttr
 }
 
 //===----------------------------------------------------------------------===//
+// UKernelProvider attribute
+//===----------------------------------------------------------------------===//
+
+def IREECPU_UKernelProviderAttr  :
+    AttrDef<IREECPU_Dialect, "UKernelProvider", [
+    DeclareAttrInterfaceMethods<IREECodegen_UKernelProviderInterface, [
+        "createAndReplaceWithUkernelOp"
+      ]>
+    ]> {
+  let mnemonic = "ukernel_provider";
+  let summary = [{
+    Provides built-in C-bitcode ukernel implementations for the LLVMCPU
+    target backend.
+  }];
+  let description = [{
+    Implements the `UKernelProviderInterface` for the LLVMCPU target.
+    `createAndReplaceWithUkernelOp` rewrites an `iree_codegen.inner_tiled` op
+    carrying an `iree_cpu.data_tiled_mma_layout` and an
+    `iree_codegen.ukernel = "<name>"` descriptor into an
+    `iree_codegen.ukernel.generic` call, and attaches the matching ukernel
+    bitcode as a `hal.executable_object` on the dispatch's executable variant.
+
+    Bitcode is resolved by name: first against any `hal.executable.objects`
+    already attached above the op (so user-supplied bitcode wins), then
+    against ukernels embedded into `iree-compile` at LLVMCPU plugin init.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+}
+
+//===----------------------------------------------------------------------===//
 // CPU Pipeline Attribute
 //===----------------------------------------------------------------------===//
 
