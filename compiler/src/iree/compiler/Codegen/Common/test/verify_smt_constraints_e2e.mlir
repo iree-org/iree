@@ -534,6 +534,7 @@ func.func @attention_e2e_generated_violation(
        } -> tensor<4x1024x64xf16>, tensor<4x1024xf16>, tensor<4x1024xf16>
   return %res#0, %res#1, %res#2
       : tensor<4x1024x64xf16>, tensor<4x1024xf16>, tensor<4x1024xf16>
+}
 
 // -----
 
