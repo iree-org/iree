@@ -59,6 +59,8 @@ func.func @matmul_and_fill() attributes {hal.executable.target = #exec_target} {
 // CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
+// CHECK-NOT:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
+
 // CHECK:       iree_codegen.smt.constraints target = <set = [[SET]]>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
 // CHECK-NEXT:  knobs = {
 // CHECK-DAG:   mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>
@@ -68,6 +70,7 @@ func.func @matmul_and_fill() attributes {hal.executable.target = #exec_target} {
 // CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
+// CHECK-NOT:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
 // CHECK:       "dim_0 must be divisible by wg_0 ({} % {} == 0)"
 // CHECK:       "dim_1 must be divisible by wg_1 ({} % {} == 0)"
 // CHECK:       "dim_2 must be divisible by red_2 ({} % {} == 0)"
@@ -118,27 +121,17 @@ func.func @conv_2d_nhwc_hwcf()
 // CHECK:       linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:  #iree_codegen.root_op<set = 1>
 // CHECK:       iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
-// CHECK-NEXT:  knobs = {
-// CHECK-DAG:   mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>
+// Non fused k dims for direct conv.
 // CHECK-DAG:   reduction = [0, 0, 0, 0, 1, 1, #iree_codegen.smt.int_knob<"red_6">]
-// CHECK-DAG:   subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, #iree_codegen.smt.int_knob<"sg_2">, #iree_codegen.smt.int_knob<"sg_3">, 0, 0, 0]
-// CHECK-DAG:   subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
-// CHECK-DAG:   workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0, 0, 0]
-// CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
-// CHECK-SAME:  }
+// CHECK-DAG:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
+// CHECK:       "use_igemm_idx == 0 (use_igemm_convolution=false)"
+// CHECK:       iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_gpu.pipeline<TileAndFuse>,
+// k dims fused in igemm conv.
+// CHECK-DAG:   reduction = [0, 0, 0, 0, #iree_codegen.smt.int_knob<"red_6">]
+// CHECK-DAG:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
+// CHECK:       "use_igemm_idx == 1 (use_igemm_convolution=true)"
 // CHECK:       iree_codegen.smt.constraints target = <set = 1>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
-// CHECK-NEXT:  knobs = {
-// CHECK-DAG:   mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>
-// CHECK-DAG:   reduction = [0, 0, 0, 0, 1, 1, #iree_codegen.smt.int_knob<"red_6">]
-// CHECK-DAG{LITERAL}: subgroup_basis = [[1, 1, #iree_codegen.smt.int_knob<"sg_m_cnt">, #iree_codegen.smt.int_knob<"sg_n_cnt">, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6]]
-// CHECK-DAG:   subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
-// CHECK-DAG:   workgroup = [1, 1, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0, 0, 0]
-// CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
-// CHECK-SAME:  }
-// CHECK:       "dim_2 must be divisible by wg_2 ({} % {} == 0)"
-// CHECK:       "dim_3 must be divisible by wg_3 ({} % {} == 0)"
-// CHECK:       "dim_6 must be divisible by red_6 ({} % {} == 0)"
-// CHECK-NOT:   "dim_{{[0-9]+}} must be divisible by {{.*}}"
+// CHECK-NOT:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
 
 #map_lhs = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map_rhs = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
@@ -181,6 +174,7 @@ func.func @expanded_matmul()
 // CHECK-DAG:   workgroup = [1, 1, #iree_codegen.smt.int_knob<"wg_2">, #iree_codegen.smt.int_knob<"wg_3">, 0]
 // CHECK-DAG:   workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]
 // CHECK-SAME:  }
+// CHECK-NOT:   use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_idx", [false, true]>
 // CHECK:       "dim_2 must be divisible by wg_2 ({} % {} == 0)"
 // CHECK:       "dim_3 must be divisible by wg_3 ({} % {} == 0)"
 // CHECK:       "dim_4 must be divisible by red_4 ({} % {} == 0)"

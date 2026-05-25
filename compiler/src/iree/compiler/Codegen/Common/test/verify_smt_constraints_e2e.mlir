@@ -535,3 +535,53 @@ func.func @attention_e2e_generated_violation(
   return %res#0, %res#1, %res#2
       : tensor<4x1024x64xf16>, tensor<4x1024xf16>, tensor<4x1024xf16>
 }
+
+// -----
+
+// Test: TileAndFuse direct-convolution config explicitly sets
+// use_igemm_convolution = false and constraints are still verified.
+#gpu_target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <
+  compute = fp32, storage = b32, subgroup = shuffle,
+  mma = [<MFMA_F32_16x16x4_F32>],
+  subgroup_size_choices = [64],
+  max_load_instruction_bits = 128,
+  max_workgroup_sizes = [1024, 1024, 1024], max_thread_count_per_workgroup = 1024,
+  max_workgroup_memory_bytes = 65536,
+  max_workgroup_counts = [2147483647, 2147483647, 2147483647]
+>>
+#exec_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
+    {iree_codegen.target_info = #gpu_target}>
+#translation = #iree_codegen.translation_info<
+    pipeline = #iree_gpu.pipeline<TileAndFuse>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
+
+func.func @conv_e2e_generated_violation_tf_direct_conv(
+    %input: tensor<1x18x130x64xf32>, %filter: tensor<3x3x64x128xf32>)
+    -> tensor<1x16x128x128xf32>
+    attributes {hal.executable.target = #exec_target,
+                translation_info = #translation} {
+  %cst = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<1x16x128x128xf32>
+  %fill = linalg.fill {root_op = #iree_codegen.root_op<set = 2>}
+      ins(%cst : f32) outs(%init : tensor<1x16x128x128xf32>)
+      -> tensor<1x16x128x128xf32>
+  // expected-error @below {{pipeline constraints violated}}
+  // expected-note @below {{dim_2 must be divisible by wg_2 (128 % 48 == 0)}}
+  %result = linalg.conv_2d_nhwc_hwcf {
+      dilations = dense<1> : tensor<2xi64>,
+      lowering_config = #iree_gpu.lowering_config<{
+          workgroup = [1, 1, 48, 64, 0, 0, 0],
+          reduction = [0, 0, 0, 0, 1, 1, 16],
+          mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
+          subgroup = [1, 1, 1, 1, 0, 0, 0]}>,
+      root_op = #iree_codegen.root_op<set = 2>,
+      strides = dense<1> : tensor<2xi64>}
+      ins(%input, %filter : tensor<1x18x130x64xf32>,
+                               tensor<3x3x64x128xf32>)
+      outs(%fill : tensor<1x16x128x128xf32>) -> tensor<1x16x128x128xf32>
+  return %result : tensor<1x16x128x128xf32>
+}
