@@ -69,6 +69,7 @@ iree_cc_library(
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::compiler::plugins::target::LLVMCPU::builtins::Builtins
+    iree::compiler::plugins::target::LLVMCPU::builtins::ukernel::iree_uk_cpu_bitcode
   PUBLIC
 )
 

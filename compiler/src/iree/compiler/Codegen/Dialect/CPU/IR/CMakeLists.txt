@@ -45,6 +45,9 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::Utils
     iree::compiler::Codegen::Dialect::Codegen::Utils::MMAUtils
     iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 
