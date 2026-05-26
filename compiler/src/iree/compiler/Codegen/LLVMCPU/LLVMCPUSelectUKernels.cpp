@@ -54,6 +54,10 @@ IREE::Codegen::UKernelDescriptorAttr selectCPUUKernel(Operation *op) {
     return {};
   }
 
+  // Any positive `intrinsics_{m,n,k}` is supported: the ukernel takes them as
+  // arguments and loops over them, and those loops fully unroll after the
+  // ukernel is inlined into its (constant-`intrinsics_*`) caller.
+
   auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (!execTarget) {
     return {};
@@ -74,7 +78,16 @@ IREE::Codegen::UKernelDescriptorAttr selectCPUUKernel(Operation *op) {
   // (`ensureUKernelBitcodeAndFinalizeConfig` in
   // `compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.cpp`)
   // and makes the configuration-pass output self-contained for lit tests.
-  IREE::CPU::attachUKernelBitcodeOnOp(op, name);
+  //
+  // Only select the ukernel if its bitcode actually exists. Not every
+  // `MMAIntrinsic` the cost model picks has a built-in ukernel — e.g. the
+  // M<->N-swapped `MMA_X86_AVX512BF16_16x1x2_F32_BF16` orientation has no
+  // seed even though its natural sibling does — and matching one without
+  // bitcode would dangle an undefined symbol at link time. When absent, fall
+  // back to codegen by returning {}.
+  if (!IREE::CPU::attachUKernelBitcodeOnOp(op, name)) {
+    return {};
+  }
 
   MLIRContext *context = op->getContext();
   return IREE::Codegen::UKernelDescriptorAttr::get(
