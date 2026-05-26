@@ -180,6 +180,16 @@ public:
     configItems.emplace_back(
         b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
         IREE::CPU::CPUEncodingResolverAttr::get(context, {}));
+    // When at least one LLVM-bitcode ukernel category is enabled, install
+    // the CPU `UKernelProviderAttr` so `LowerBitcodeUKernelsPass` can find
+    // and attach the matching bitcode. Mirrors the ROCM side's
+    // `addConfig("iree_codegen.ukernel_provider", …)` and is the bridge
+    // between the `--iree-llvmcpu-enable-llvm-ukernels` CL flag and the
+    // generic provider-lookup machinery.
+    if (!target.llvmUkernels.empty()) {
+      configItems.emplace_back(b.getStringAttr(kUKernelProviderName),
+                               IREE::CPU::UKernelProviderAttr::get(context));
+    }
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
