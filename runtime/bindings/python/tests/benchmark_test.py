@@ -12,6 +12,7 @@ from pathlib import Path
 import iree.compiler
 import iree.runtime
 from iree.runtime.benchmark import (
+    _build_benchmark_args as build_benchmark_args,
     benchmark_module,
     BenchmarkTimeoutError,
 )
@@ -73,6 +74,55 @@ def create_large_matmul_module(instance):
 class BenchmarkTest(unittest.TestCase):
     def setUp(self):
         super().setUp()
+
+    def testBuildBenchmarkArgs(self):
+        args, flatbuffer = build_benchmark_args(
+            module="test_module.vmfb",
+            entry_function="test_func",
+            inputs=[np.array([1.0, 2.0], dtype=np.float32)],
+            # kwargs should be passed through as --{k}={v}
+            device="test_device",
+            extra_arg="extra_value",
+        )
+        ref_args = [
+            iree.runtime.benchmark_exe(),
+            "--module=test_module.vmfb",
+            "--function=test_func",
+            "--device=test_device",
+            "--extra_arg=extra_value",
+            "--input=2xf32=1.0,2.0",
+        ]
+        self.assertEqual(args, ref_args)
+        self.assertIsNone(flatbuffer)
+
+    def testBuildBenchmarkArgsInputs(self):
+        all_inputs = [
+            # empty
+            [],
+            # single input
+            [np.ones([2], dtype=np.float16)],
+            # multiple inputs
+            [np.ones([2], dtype=np.float64), np.ones([3], dtype=np.int8)],
+            # string input
+            ["input_string"],
+            # explicit values
+            [np.array([0, 1, 2, 3], dtype=np.uint8)],
+        ]
+        ref_args = [
+            [],
+            ["--input=2xf16=1.0"],
+            ["--input=2xf64=1.0", "--input=3xi8=1"],
+            ["--input=input_string"],
+            ["--input=4xi8=0,1,2,3"],
+        ]
+        for inp, ref in zip(all_inputs, ref_args):
+            args, flatbuffer = build_benchmark_args(
+                module="test_module.vmfb",
+                entry_function="test_func",
+                inputs=inp,
+            )
+            self.assertEqual(args[3:], ref)
+            self.assertIsNone(flatbuffer)
 
     def testBenchmarkModule(self):
         ctx = iree.runtime.SystemContext()
