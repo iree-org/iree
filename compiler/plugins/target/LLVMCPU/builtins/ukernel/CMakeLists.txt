@@ -43,6 +43,7 @@ iree_bitcode_library(
     "iree_uk_mma_x86_avx512vnni_16x16x2_i32_i8_casti16.c"
   COPTS
     "-mavx512f"
+    "-mavx512bw"
     "-mavx512vnni"
 )
 
