@@ -68,6 +68,14 @@ IREE::Codegen::UKernelDescriptorAttr selectCPUUKernel(Operation *op) {
     return {};
   }
 
+  // Resolve and attach the bitcode on the op now (at kernel-config time),
+  // so it survives all the way down to `LowerUKernelOpsToCalls` as a
+  // discardable attribute. Mirrors the GPU side
+  // (`ensureUKernelBitcodeAndFinalizeConfig` in
+  // `compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.cpp`)
+  // and makes the configuration-pass output self-contained for lit tests.
+  IREE::CPU::attachUKernelBitcodeOnOp(op, name);
+
   MLIRContext *context = op->getContext();
   return IREE::Codegen::UKernelDescriptorAttr::get(
       context, StringAttr::get(context, name),
