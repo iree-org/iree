@@ -68,6 +68,7 @@ iree_compiler_cc_library(
         "LLVMCPUMmt4dVectorLowering.cpp",
         "LLVMCPUPeel.cpp",
         "LLVMCPUSelectLoweringStrategy.cpp",
+        "LLVMCPUSelectUKernels.cpp",
         "LLVMCPUSplitReduction.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTile.cpp",
@@ -87,6 +88,7 @@ iree_compiler_cc_library(
     hdrs = [
         "DispatchABI.h",
         "KernelDispatch.h",
+        "LLVMCPUSelectUKernels.h",
         "Passes.h",
         "TargetMLTransformInfo.h",
         "Utils.h",

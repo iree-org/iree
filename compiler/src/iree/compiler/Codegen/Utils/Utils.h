@@ -94,6 +94,13 @@ bool isGPUBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 // is enabled at all.
 bool hasUkernel(DictionaryAttr attr, StringRef ukernelName = "");
 
+// Like `hasUkernel`, but for the LLVM-bitcode ukernels under
+// `compiler/plugins/target/LLVMCPU/builtins/ukernel/` (gated by the
+// `iree-llvmcpu-enable-llvm-ukernels` CL flag / `llvm_ukernels` target
+// config string). Distinct from `hasUkernel` because the two families have
+// independent enable flags and overlapping category names.
+bool hasLlvmUkernel(DictionaryAttr attr, StringRef ukernelCategory = "");
+
 /// Returns true if `attr` has `feature` in its CPU features.
 bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
 

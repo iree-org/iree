@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "lookup_builtin_and_byo.mlir"
     "lower_inner_tiled_to_bitcode_ukernel.mlir"
     "lower_inner_tiled_to_bitcode_ukernel_i8_vnni.mlir"
+    "select_ukernel.mlir"
   TOOLS
     FileCheck
     iree-opt
