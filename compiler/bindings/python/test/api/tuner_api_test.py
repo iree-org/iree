@@ -746,11 +746,14 @@ _MATERIALIZE_CONSTRAINTS_MODULE = """
     module {
         iree_codegen.smt.constraints
             target = <set = 0>,
-            pipeline = #iree_gpu.pipeline<VectorDistribute>,
+            pipeline = #iree_gpu.pipeline<TileAndFuse>,
             knobs = {
                 workgroup = [#iree_codegen.smt.int_knob<"wg_0">, 1, 1],
                 workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, 1, 1],
-                subgroup_size = #iree_codegen.smt.int_knob<"sg_size">
+                subgroup_size = #iree_codegen.smt.int_knob<"sg_size">,
+                gpu_pipeline_options = {prefetch_num_stages = #iree_codegen.smt.int_knob<"prefetch_num_stages">,
+                                        no_reduce_shared_memory_bank_conflicts = false,
+                                        use_igemm_convolution = #iree_codegen.smt.one_of_knob<"use_igemm_convolution", [false, true]>}
             }
             dims() {
             }
@@ -775,6 +778,8 @@ def test_materialize_compilation_info_happy_path():
             "wg_0": 64,
             "wg_size_x": 128,
             "sg_size": 64,
+            "prefetch_num_stages": 2,
+            "use_igemm_convolution": False,
         },
     )
     assert isinstance(compilation_info, iree_codegen.CompilationInfoAttr)
@@ -786,7 +791,15 @@ def test_materialize_compilation_info_happy_path():
     )
     assert list(translation_info.workgroup_size) == [128, 1, 1]
     assert translation_info.subgroup_size == 64
-    assert str(translation_info.pass_pipeline) == "#iree_gpu.pipeline<VectorDistribute>"
+    assert str(translation_info.pass_pipeline) == "#iree_gpu.pipeline<TileAndFuse>"
+
+    translation_info_str = str(translation_info)
+    assert (
+        "gpu_pipeline_options = #iree_gpu.pipeline_options<"
+        "prefetch_num_stages = 2, "
+        "no_reduce_shared_memory_bank_conflicts = false, "
+        "use_igemm_convolution = false>"
+    ) in translation_info_str
 
 
 @run
@@ -799,6 +812,8 @@ def test_materialize_compilation_info_error_diagnostic():
             {
                 "wg_size_x": 128,
                 "sg_size": 64,
+                "prefetch_num_stages": 2,
+                "use_igemm_convolution": False,
             },
         )
         assert False, "expected missing wg_0 assignment to fail"

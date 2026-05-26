@@ -72,9 +72,20 @@ constexpr StringLiteral kSubgroupSizeKey = "subgroup_size";
 constexpr StringLiteral kTranslationInfoKey = "translation_info";
 constexpr StringLiteral kPipelineKey = "pipeline";
 constexpr StringLiteral kCodegenSpecKey = "codegen_spec";
+constexpr StringLiteral kGpuPipelineOptionsKey = "gpu_pipeline_options";
+constexpr StringLiteral kPrefetchNumStagesKey = "prefetch_num_stages";
+constexpr StringLiteral kNoReduceSharedMemoryBankConflictsKey =
+    "no_reduce_shared_memory_bank_conflicts";
+constexpr StringLiteral kUseIgemmConvolutionKey = "use_igemm_convolution";
+constexpr StringLiteral kReorderWorkgroupsStrategyKey =
+    "reorder_workgroups_strategy";
 
-static bool isTranslationInfoKey(StringRef key) {
+static bool isDefaultTranslationInfoKey(StringRef key) {
   return llvm::is_contained({kWorkgroupSizeKey, kSubgroupSizeKey}, key);
+}
+
+static bool isTranslationInfoConfigKey(StringRef key) {
+  return llvm::is_contained({kGpuPipelineOptionsKey}, key);
 }
 
 static bool isFlatMetadataKey(StringRef key) {
@@ -105,7 +116,9 @@ appendLoweringConfigEntries(DictionaryAttr source,
                             bool flatSource) {
   for (NamedAttribute entry : source) {
     StringRef key = entry.getName().getValue();
-    if (flatSource && (isFlatMetadataKey(key) || isTranslationInfoKey(key))) {
+    if (flatSource &&
+        (isFlatMetadataKey(key) || isDefaultTranslationInfoKey(key) ||
+         isTranslationInfoConfigKey(key))) {
       continue;
     }
     entries.push_back(entry);
@@ -117,12 +130,76 @@ static DictionaryAttr buildTranslationConfiguration(MLIRContext *ctx,
   SmallVector<NamedAttribute> entries;
   for (NamedAttribute entry : source) {
     StringRef key = entry.getName().getValue();
-    if (isTranslationInfoKey(key) || key == kCodegenSpecKey) {
+    if (isDefaultTranslationInfoKey(key) || key == kCodegenSpecKey) {
       continue;
     }
     entries.push_back(entry);
   }
   return DictionaryAttr::get(ctx, entries);
+}
+
+static FailureOr<DictionaryAttr> buildGpuPipelineOptionsConfiguration(
+    MLIRContext *ctx, Attribute gpuPipelineOptions,
+    function_ref<InFlightDiagnostic()> emitError) {
+  auto optionsDict = dyn_cast<DictionaryAttr>(gpuPipelineOptions);
+  if (!optionsDict) {
+    emitError() << "expected '" << kGpuPipelineOptionsKey
+                << "' to be a dictionary";
+    return failure();
+  }
+
+  unsigned prefetchNumStages = 0;
+  if (Attribute prefetchAttr = optionsDict.get(kPrefetchNumStagesKey)) {
+    auto prefetchInt = dyn_cast<IntegerAttr>(prefetchAttr);
+    if (!prefetchInt || prefetchInt.getInt() < 0) {
+      emitError() << "expected '" << kPrefetchNumStagesKey
+                  << "' to be a non-negative integer";
+      return failure();
+    }
+    prefetchNumStages = static_cast<unsigned>(prefetchInt.getInt());
+  }
+
+  bool noReduceSharedMemoryBankConflicts = false;
+  if (Attribute noReduceAttr =
+          optionsDict.get(kNoReduceSharedMemoryBankConflictsKey)) {
+    auto noReduceBool = dyn_cast<BoolAttr>(noReduceAttr);
+    if (!noReduceBool) {
+      emitError() << "expected '" << kNoReduceSharedMemoryBankConflictsKey
+                  << "' to be a boolean";
+      return failure();
+    }
+    noReduceSharedMemoryBankConflicts = noReduceBool.getValue();
+  }
+
+  bool useIgemmConvolution = false;
+  if (Attribute useIgemmAttr = optionsDict.get(kUseIgemmConvolutionKey)) {
+    auto useIgemmBool = dyn_cast<BoolAttr>(useIgemmAttr);
+    if (!useIgemmBool) {
+      emitError() << "expected '" << kUseIgemmConvolutionKey
+                  << "' to be a boolean";
+      return failure();
+    }
+    useIgemmConvolution = useIgemmBool.getValue();
+  }
+
+  std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy;
+  if (Attribute reorderStrategyAttr =
+          optionsDict.get(kReorderWorkgroupsStrategyKey)) {
+    auto reorderAttr =
+        dyn_cast<ReorderWorkgroupsStrategyAttr>(reorderStrategyAttr);
+    if (!reorderAttr) {
+      emitError() << "expected '" << kReorderWorkgroupsStrategyKey
+                  << "' to be a reorder strategy attr";
+      return failure();
+    }
+    reorderWorkgroupsStrategy = reorderAttr.getValue();
+  }
+
+  auto typedOptions = GPUPipelineOptionsAttr::get(
+      ctx, prefetchNumStages, noReduceSharedMemoryBankConflicts,
+      useIgemmConvolution, reorderWorkgroupsStrategy);
+  return DictionaryAttr::get(
+      ctx, {{StringAttr::get(ctx, kGpuPipelineOptionsKey), typedOptions}});
 }
 
 static int64_t extractI64(Attribute attr) {
@@ -3520,6 +3597,15 @@ FailureOr<Attribute> PipelineAttr::materializeConfigurationAttr(
   DictionaryAttr configuration;
   if (nestedTranslationSource) {
     configuration = buildTranslationConfiguration(ctx, translationSource);
+  } else if (Attribute gpuPipelineOptions =
+                 materializedKnobs.get(kGpuPipelineOptionsKey)) {
+    FailureOr<DictionaryAttr> optionsConfig =
+        buildGpuPipelineOptionsConfiguration(ctx, gpuPipelineOptions,
+                                             emitError);
+    if (failed(optionsConfig)) {
+      return failure();
+    }
+    configuration = *optionsConfig;
   }
 
   Attribute pipeline = *this;
