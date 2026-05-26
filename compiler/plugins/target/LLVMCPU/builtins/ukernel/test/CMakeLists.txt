@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "e2e_inner_tiled_pipeline.mlir"
     "lookup_builtin_and_byo.mlir"
     "lower_inner_tiled_to_bitcode_ukernel.mlir"
     "lower_inner_tiled_to_bitcode_ukernel_i8_vnni.mlir"

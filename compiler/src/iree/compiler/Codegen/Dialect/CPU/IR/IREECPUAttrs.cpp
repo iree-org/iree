@@ -18,6 +18,8 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -1192,51 +1194,204 @@ getUKernelBitcode(MLIRContext *context, ArrayAttr sourceExecutableObjects,
       cast<IREE::Util::SerializableAttrInterface>(bitcodeDenseAttr));
 }
 
+// Idempotently appends `bitcodeObject` to the `hal.executable.objects`
+// array on `op`. Returns true if the array already contained an
+// equivalent entry (i.e. nothing was changed).
+static bool addBitcodeObjectIfMissing(Operation *op, StringAttr attrId,
+                                      Attribute bitcodeObject) {
+  ArrayAttr existing = op->getAttrOfType<ArrayAttr>(attrId);
+  if (existing) {
+    for (Attribute a : existing) {
+      if (a == bitcodeObject) {
+        return true;
+      }
+    }
+  }
+  SmallVector<Attribute> objects;
+  if (existing) {
+    objects.append(existing.begin(), existing.end());
+  }
+  objects.push_back(bitcodeObject);
+  op->setAttr(attrId, ArrayAttr::get(op->getContext(), objects));
+  return false;
+}
+
+bool attachUKernelBitcodeOnOp(Operation *op, StringRef name) {
+  MLIRContext *context = op->getContext();
+  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(op);
+  IREE::HAL::ExecutableObjectAttr bitcodeObject =
+      getUKernelBitcode(context, sourceExecutableObjects, name);
+  if (!bitcodeObject) {
+    return false;
+  }
+  auto attrId = StringAttr::get(context, kHalExecutableObjectsAttrName);
+  addBitcodeObjectIfMissing(op, attrId, bitcodeObject);
+
+  // Also attach to the enclosing `hal.executable.variant`'s `objects` (a
+  // first-class operand attribute, not a discardable attr). This is the
+  // long-lived home for the bitcode: it survives codegen passes that
+  // would otherwise strip discardable attributes off intermediate ops,
+  // and matches the destination that `iree-hal-hoist-executable-objects`
+  // would eventually hoist to. Doing it eagerly here just shortens the
+  // distance the bitcode has to travel.
+  Operation *parent = op->getParentOp();
+  while (parent) {
+    if (auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(parent)) {
+      SmallVector<Attribute> variantObjects;
+      if (std::optional<ArrayAttr> existing = variantOp.getObjects()) {
+        for (Attribute a : *existing) {
+          if (a == bitcodeObject) {
+            return true;
+          }
+          variantObjects.push_back(a);
+        }
+      }
+      variantObjects.push_back(bitcodeObject);
+      variantOp.setObjectsAttr(ArrayAttr::get(context, variantObjects));
+      return true;
+    }
+    parent = parent->getParentOp();
+  }
+  return true;
+}
+
+// Returns the index, in the ACC operand's shape, of the innermost
+// CrossIntrinsic dimension (the N cross-intrinsic dim for our layouts), or
+// nullopt if it is dynamic / absent. The ukernel needs this dim's stride to
+// address each unrolled intrinsic's ACC fragment.
+//
+// Example: with `MMA_X86_AVX512BF16_1x16x2` (each intrinsic produces a 1x16
+// f32 fragment) and intrinsics_m = intrinsics_n = 2, the ACC tile holds a 2x2
+// grid of such fragments. The two CrossIntrinsic dims are that grid's M and N;
+// the innermost is N, so this returns the index of the N-grid dim in the ACC
+// result shape, whose stride is the element distance from fragment (m, n) to
+// (m, n+1).
+static std::optional<unsigned>
+getAccInnermostCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op,
+                                 DataTiledMMAAttr mma) {
+  auto outputType = dyn_cast<ShapedType>(op.getResultTypes()[0]);
+  if (!outputType) {
+    return std::nullopt;
+  }
+  Codegen::TileSwizzle accSwizzle = getSwizzle(mma, /*operandIdx=*/2);
+  SmallVector<Codegen::TileSwizzle::Dim> swizzleDims;
+  for (const Codegen::TileSwizzle::ExpandShapeDimVectorType &group :
+       accSwizzle.expandShape()) {
+    swizzleDims.append(group.begin(), group.end());
+  }
+  applyPermutationToVector(swizzleDims, accSwizzle.permutation());
+  int rankDiff = outputType.getRank() - static_cast<int>(swizzleDims.size());
+  auto crossIntrinsic = Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
+  for (size_t i = swizzleDims.size(); i-- > 0;) {
+    if (swizzleDims[i].kind() != crossIntrinsic) {
+      continue;
+    }
+    int outputIdx = i + rankDiff;
+    if (outputType.isDynamicDim(outputIdx)) {
+      return std::nullopt;
+    }
+    return outputIdx;
+  }
+  // No CrossIntrinsic dims (intrinsics_m == intrinsics_n == 1): the single
+  // fragment sits at the start of the inner tile.
+  if (!swizzleDims.empty()) {
+    return rankDiff;
+  }
+  return std::nullopt;
+}
+
+// Rewrites an `inner_tiled` carrying a CPU `DataTiledMMAAttr` to a
+// `ukernel.generic`, threading the data-tiled-MMA scalar parameters as
+// operands so the ukernel can loop over arbitrary `intrinsics_{m,n,k}`:
+//   ins(lhs, rhs) outs(acc) (k_outer, intrinsics_m, intrinsics_n, intrinsics_k)
+// plus a `strided_dims` entry giving the ACC's innermost cross-intrinsic
+// stride.
+static LogicalResult
+handleInnerTiledMmaUkernel(RewriterBase &rewriter, StringRef name,
+                           IREE::Codegen::InnerTiledOp op, DataTiledMMAAttr mma,
+                           ArrayRef<Value> inputs, ArrayRef<Value> outputs,
+                           DictionaryAttr fnDefAttrs) {
+  std::optional<unsigned> accInnerDim =
+      getAccInnermostCrossIntrinsicDim(op, mma);
+  if (!accInnerDim) {
+    return rewriter.notifyMatchFailure(
+        op, "ACC innermost cross-intrinsic dim is dynamic or absent");
+  }
+  Location loc = op.getLoc();
+  Type i32 = rewriter.getI32Type();
+  auto constI32 = [&](int64_t v) {
+    return arith::ConstantIntOp::create(rewriter, loc, i32, v);
+  };
+  // Outer-K tile count: the LHS operand's outer dims are (m_outer, k_outer),
+  // so dim 1 is the K-tile count the ukernel loops over.
+  Value kOuter = arith::IndexCastOp::create(
+      rewriter, loc, i32,
+      tensor::DimOp::create(rewriter, loc, op.getInputs()[0], 1));
+  // `strided_dims` is the `ukernel.generic` ABI knob for which dims' strides
+  // are passed to the C function: a list per shaped operand (here LHS, RHS,
+  // ACC), each naming the dims whose stride follows that operand's
+  // `(base, offset)` in the call. An empty list passes `base, offset` only; a
+  // null attribute (the default, used by simpler ukernels) passes all strides.
+  // Here only ACC needs one — the innermost cross-intrinsic (N) dim — so the
+  // ukernel can address each unrolled intrinsic's ACC fragment. LHS/RHS are
+  // contiguous in the data-tiled layout, so they take no stride argument.
+  SmallVector<SmallVector<int64_t>> stridedDims(3, {});
+  stridedDims[2].push_back(*accInnerDim);
+  DictionaryAttr discardableAttrs = op->getDiscardableAttrDictionary();
+  auto newOp = rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+      op, op.getOutputs().getTypes(), name, inputs, outputs,
+      ValueRange{kOuter, constI32(mma.getIntrinsicsM()),
+                 constI32(mma.getIntrinsicsN()),
+                 constI32(mma.getIntrinsicsK())},
+      fnDefAttrs, stridedDims);
+  newOp->setDiscardableAttrs(discardableAttrs);
+  return success();
+}
+
 std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
     Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
     SmallVectorImpl<Value> &otherOperands) const {
-  // Resolve the bitcode for this ukernel: user-supplied
-  // `hal.executable.objects` first (BYO and BYO-override paths), falling
-  // back to the built-in bitcode embedded into `iree-compile` at LLVMCPU
-  // plugin init. If found, attach it as `hal.executable.objects` on the
-  // source op so the default `LowerBitcodeUKernelsPass` rewrite preserves
-  // it on the resulting `ukernel.generic`. If the source op already
-  // carries a matching object, this is a no-op (the BYO case).
-  //
-  // We return `std::nullopt` to let the pass run its default
-  // `UKernelGenericOp` construction. Specialized `inner_tiled` handling
-  // (threading `intrinsics_{m,n,k}` and the outer K count as scalar
-  // operands, and computing the ACC inner stride) lands in a follow-up
-  // alongside SelectUKernels.
+  // Idempotent: in the normal flow `LLVMCPUSelectUKernels` attached the
+  // bitcode at kernel-config time, so this is a no-op. Still defensive
+  // for tests / future paths that bypass SelectUKernels.
+  rewriter.modifyOpInPlace(
+      contextualOp, [&] { attachUKernelBitcodeOnOp(contextualOp, name); });
+
+  // We build the `ukernel.generic` ourselves (rather than returning nullopt
+  // and letting the default fallback in `LowerBitcodeUKernelsPass` handle it)
+  // for two reasons: (1) to set `fn_def_attrs = {hal.import.bitcode = true}`,
+  // and (2) for `inner_tiled` ops, to thread the `DataTiledMMAAttr` scalar
+  // parameters as operands. The `hal.import.bitcode` flag propagates onto the
+  // `func.func` declaration that `LowerUKernelOpsToCalls` synthesizes;
+  // `RewriteExternCallOpToDynamicImportCallOp` (in LLVMCPU's ConvertToLLVM)
+  // keys on it to *skip* the import-table indirection it otherwise applies to
+  // every external call, letting the call resolve directly against the linked
+  // bitcode at LLVM optimization time. Without it the new framework would
+  // accidentally re-use the legacy runtime-resolved-import path.
   MLIRContext *context = rewriter.getContext();
-  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(contextualOp);
-  IREE::HAL::ExecutableObjectAttr bitcodeObject =
-      getUKernelBitcode(context, sourceExecutableObjects, name);
-  if (bitcodeObject) {
-    auto attrId = StringAttr::get(context, kHalExecutableObjectsAttrName);
-    ArrayAttr existing = contextualOp->getAttrOfType<ArrayAttr>(attrId);
-    bool alreadyOnOp = false;
-    if (existing) {
-      for (Attribute a : existing) {
-        if (a == bitcodeObject) {
-          alreadyOnOp = true;
-          break;
-        }
-      }
-    }
-    if (!alreadyOnOp) {
-      SmallVector<Attribute> objects;
-      if (existing) {
-        objects.append(existing.begin(), existing.end());
-      }
-      objects.push_back(bitcodeObject);
-      rewriter.modifyOpInPlace(contextualOp, [&] {
-        contextualOp->setAttr(attrId, ArrayAttr::get(context, objects));
-      });
+  auto fnDefAttrs = DictionaryAttr::get(
+      context, {{rewriter.getStringAttr("hal.import.bitcode"),
+                 rewriter.getBoolAttr(true)}});
+
+  // `inner_tiled` with a CPU `DataTiledMMAAttr`: thread the unrolling factors,
+  // outer-K count and ACC stride so the ukernel can loop over the intrinsics.
+  if (auto innerTiled = dyn_cast<IREE::Codegen::InnerTiledOp>(contextualOp)) {
+    if (auto mma = dyn_cast<DataTiledMMAAttr>(innerTiled.getKind())) {
+      return handleInnerTiledMmaUkernel(rewriter, name, innerTiled, mma, inputs,
+                                        outputs, fnDefAttrs);
     }
   }
-  return std::nullopt;
+
+  // Any other op: a plain `ukernel.generic` with no extra operands.
+  DictionaryAttr discardableAttrs =
+      contextualOp->getDiscardableAttrDictionary();
+  auto newOp = rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
+      contextualOp, contextualOp->getResults().getTypes(), name, inputs,
+      outputs, otherOperands, fnDefAttrs,
+      /*num_strided_outer_dims=*/0);
+  newOp->setDiscardableAttrs(discardableAttrs);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
