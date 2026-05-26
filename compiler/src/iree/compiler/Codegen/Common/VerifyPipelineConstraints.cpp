@@ -183,19 +183,37 @@ buildCombinedConfigDict(IREE::GPU::LoweringConfigAttr gpuConfig,
   entries.emplace_back("subgroup_size",
                        b.getI64IntegerAttr(translationInfo.getSubgroupSize()));
 
-  // TODO(#23535): This is a temporary hack to add the use_igemm_convolution
-  // knob from translation info config to support IGEMM convolution. It should
-  // be automatically handled by each backend in the future.
+  // TODO(#23535): This is a temporary hack to add GPU pipeline-options knobs
+  // from translation info config. It should be automatically handled by each
+  // backend in the future.
+  int64_t prefetchNumStages = 0;
+  bool noReduceSharedMemoryBankConflicts = false;
   bool useIgemmConvolution = false;
   if (DictionaryAttr config = translationInfo.getConfiguration()) {
     if (auto pipelineOptions =
             dyn_cast_or_null<IREE::GPU::GPUPipelineOptionsAttr>(config.get(
                 IREE::GPU::GPUPipelineOptionsAttr::getDictKeyName()))) {
+      if (std::optional<int64_t> prefetchAttr =
+              pipelineOptions.getPrefetchNumStages()) {
+        prefetchNumStages = *prefetchAttr;
+      }
+      if (BoolAttr noReduceAttr =
+              pipelineOptions.getNoReduceSharedMemoryBankConflicts()) {
+        noReduceSharedMemoryBankConflicts = noReduceAttr.getValue();
+      }
       if (BoolAttr useIgemmAttr = pipelineOptions.getUseIgemmConvolution()) {
         useIgemmConvolution = useIgemmAttr.getValue();
       }
     }
   }
+  DictionaryAttr gpuPipelineOptionsDict = DictionaryAttr::get(
+      ctx, {{b.getStringAttr("prefetch_num_stages"),
+             b.getI64IntegerAttr(prefetchNumStages)},
+            {b.getStringAttr("no_reduce_shared_memory_bank_conflicts"),
+             b.getBoolAttr(noReduceSharedMemoryBankConflicts)},
+            {b.getStringAttr("use_igemm_convolution"),
+             b.getBoolAttr(useIgemmConvolution)}});
+  entries.emplace_back("gpu_pipeline_options", gpuPipelineOptionsDict);
   entries.emplace_back("use_igemm_convolution",
                        BoolAttr::get(ctx, useIgemmConvolution));
   return DictionaryAttr::get(ctx, entries);

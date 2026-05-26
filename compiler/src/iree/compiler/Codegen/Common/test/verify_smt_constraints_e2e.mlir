@@ -20,7 +20,11 @@
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<VectorDistribute>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @matmul_e2e_generated_violation_vd(
     %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
@@ -38,6 +42,9 @@ func.func @matmul_e2e_generated_violation_vd(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [48, 64, 0],
           reduction = [0, 0, 16],
+          promote_operands = [0, 1],
+          promotion_types = [#iree_gpu.derived_thread_config,
+                             #iree_gpu.derived_thread_config],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>,
       root_op = #iree_codegen.root_op<set = 0>}
@@ -61,7 +68,11 @@ func.func @matmul_e2e_generated_violation_vd(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<VectorDistribute>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @matmul_e2e_missing_required_knob_vd(
     %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
@@ -100,7 +111,11 @@ func.func @matmul_e2e_missing_required_knob_vd(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<TileAndFuse>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @matmul_e2e_generated_violation_tf(
     %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
@@ -118,6 +133,7 @@ func.func @matmul_e2e_generated_violation_tf(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [48, 64, 0],
           reduction = [0, 0, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup = [1, 1, 0]}>,
       root_op = #iree_codegen.root_op<set = 0>}
@@ -141,7 +157,11 @@ func.func @matmul_e2e_generated_violation_tf(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<VectorDistribute>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @conv_e2e_generated_violation_vd(
     %input: tensor<1x18x130x64xf32>, %filter: tensor<3x3x64x128xf32>)
@@ -160,6 +180,7 @@ func.func @conv_e2e_generated_violation_vd(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 1, 48, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup_basis = [[1, 1, 1, 1, 1, 1, 1],
                             [0, 1, 2, 3, 4, 5, 6]]}>,
@@ -186,7 +207,11 @@ func.func @conv_e2e_generated_violation_vd(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<TileAndFuse>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @conv_e2e_generated_violation_tf(
     %input: tensor<1x18x130x64xf32>, %filter: tensor<3x3x64x128xf32>)
@@ -205,6 +230,7 @@ func.func @conv_e2e_generated_violation_tf(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 1, 48, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup = [1, 1, 1, 1, 0, 0, 0]}>,
       root_op = #iree_codegen.root_op<set = 1>,
@@ -233,7 +259,11 @@ func.func @conv_e2e_generated_violation_tf(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<VectorDistribute>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @matmul_e2e_constraints_erased_vd(
     %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
@@ -249,6 +279,9 @@ func.func @matmul_e2e_constraints_erased_vd(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [32, 64, 0],
           reduction = [0, 0, 16],
+          promote_operands = [0, 1],
+          promotion_types = [#iree_gpu.derived_thread_config,
+                             #iree_gpu.derived_thread_config],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup_basis = [[1, 1, 1], [0, 1, 2]]}>,
       root_op = #iree_codegen.root_op<set = 0>}
@@ -276,6 +309,7 @@ func.func @conv_e2e_constraints_erased_vd(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 1, 64, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup_basis = [[1, 1, 1, 1, 1, 1, 1],
                             [0, 1, 2, 3, 4, 5, 6]]}>,
@@ -306,7 +340,11 @@ func.func @conv_e2e_constraints_erased_vd(
     {iree_codegen.target_info = #gpu_target}>
 #translation = #iree_codegen.translation_info<
     pipeline = #iree_gpu.pipeline<TileAndFuse>
-    workgroup_size = [64, 1, 1] subgroup_size = 64>
+    workgroup_size = [64, 1, 1] subgroup_size = 64,
+    {gpu_pipeline_options = #iree_gpu.pipeline_options<
+        prefetch_num_stages = 2,
+        no_reduce_shared_memory_bank_conflicts = false,
+        use_igemm_convolution = false>}>
 
 func.func @matmul_e2e_constraints_erased_tf(
     %lhs: tensor<128x64xf32>, %rhs: tensor<64x256xf32>)
@@ -322,6 +360,7 @@ func.func @matmul_e2e_constraints_erased_tf(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [16, 16, 0],
           reduction = [0, 0, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup = [1, 1, 0]}>,
       root_op = #iree_codegen.root_op<set = 0>}
@@ -349,6 +388,7 @@ func.func @conv_e2e_constraints_erased_tf(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 1, 16, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup = [0, 1, 0, 1, 1, 0, 0]}>,
       root_op = #iree_codegen.root_op<set = 1>,
@@ -576,6 +616,7 @@ func.func @conv_e2e_generated_violation_tf_direct_conv(
       lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 1, 48, 64, 0, 0, 0],
           reduction = [0, 0, 0, 0, 1, 1, 16],
+          promote_operands = [0, 1],
           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>,
           subgroup = [1, 1, 1, 1, 0, 0, 0]}>,
       root_op = #iree_codegen.root_op<set = 2>,

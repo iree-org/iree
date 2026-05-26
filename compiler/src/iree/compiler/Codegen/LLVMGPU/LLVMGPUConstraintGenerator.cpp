@@ -67,16 +67,29 @@ struct TileAndFuseConstraintOptions {
 //   reduction = [..., ..., red_#], only innermost K dim is knobbed.
 //   mma_kind = mma_idx
 //   subgroup_basis = [[..., sg_m_cnt, sg_n_cnt, ...], [0, 1, 2, ...]]
+//   promote_operands = [0, 1]
+//   promotion_types=[#iree_gpu.derived_thread_config, ...] optional for matmul
+
+// Translation info knob list (VD):
+//   workgroup_size = [wg_size_x, wg_size_y, wg_size_z]
+//   subgroup_size = sg_size
+//   gpu_pipeline_options = {prefetch_num_stages = prefetch_num_stages,
+//   no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution =
+//   false}
 
 // Lowering config knob list for TileAndFuse (TF):
 //   workgroup = [wg_#, wg_#, ...], B, M, N dims are knobbed.
 //   reduction = [..., ..., red_#], only innermost K dim is knobbed.
 //   mma_kind = mma_idx
 //   subgroup = [sg_#, sg_#, ...], M and N dims are knobbed.
+//   promote_operands = [0, 1]
 
 // Translation info knob list (shared by both pipelines):
 //   workgroup_size = [wg_size_x, wg_size_y, wg_size_z]
 //   subgroup_size = sg_size
+//   gpu_pipeline_options = {prefetch_num_stages = prefetch_num_stages,
+//   no_reduce_shared_memory_bank_conflicts = false, use_igemm_convolution =
+//   use_igemm_idx}
 
 // Translation info knob list (TileAndFuse only):
 //   use_igemm_convolution = use_igemm_idx (one_of_knob<bool>)
@@ -88,6 +101,12 @@ constexpr StringLiteral kKnobSubgroupBasisKey = "subgroup_basis";
 constexpr StringLiteral kKnobSubgroupKey = "subgroup";
 constexpr StringLiteral kKnobWorkgroupSizeKey = "workgroup_size";
 constexpr StringLiteral kKnobSubgroupSizeKey = "subgroup_size";
+constexpr StringLiteral kKnobPromoteOperandsKey = "promote_operands";
+constexpr StringLiteral kKnobPromotionTypesKey = "promotion_types";
+constexpr StringLiteral kKnobGpuPipelineOptionsKey = "gpu_pipeline_options";
+constexpr StringLiteral kKnobPrefetchNumStagesKey = "prefetch_num_stages";
+constexpr StringLiteral kKnobNoReduceSharedMemoryBankConflictsKey =
+    "no_reduce_shared_memory_bank_conflicts";
 constexpr StringLiteral kKnobUseIgemmConvolutionKey = "use_igemm_convolution";
 
 // SMT variable names for knob values used in constraints.
@@ -120,7 +139,6 @@ constexpr int64_t kUnitTileDimVal = 1;
 // codegen output from KernelConfig.cpp's setAttention...: `workgroup`,
 // `reduction`, `promote_operands` + `promotion_types`,
 // `decomposition_config`).
-constexpr StringLiteral kKnobPromoteOperandsKey = "promote_operands";
 // `kDecompositionConfigKey` lives in IREECodegenAttrs.h so the
 // materializer reads back the same string this emitter writes.
 
@@ -414,11 +432,11 @@ getFusedIgemmKDimIndices(linalg::LinalgOp linalgOp,
   return fusedConvKDims;
 }
 
-/// Build the VectorDistribute knobs dict for contraction-like dims.
-static DictionaryAttr
-buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
-                               const ContractionLikeDims &dims,
-                               ArrayRef<Attribute> compatibleMMAs) {
+/// Build the VectorDistribute knob dictionary entries for contraction-like
+/// dims.
+static SmallVector<NamedAttribute> buildVectorDistributeBasicKnobsDict(
+    MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+    const ContractionLikeDims &dims, ArrayRef<Attribute> compatibleMMAs) {
   SmallVector<NamedAttribute> knobsEntries;
 
   // Build workgroup entries from lowering config semantics: untiled dims get 0,
@@ -488,19 +506,61 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   knobsEntries.emplace_back(kKnobSubgroupSizeKey,
                             IntKnobAttr::get(ctx, kKnobSgSizeName));
 
-  return DictionaryAttr::get(ctx, knobsEntries);
+  return knobsEntries;
 }
 
-/// Build the TileAndFuse knobs dict for contraction-like dims.
-/// When `options.isConv` is true, exposes both use_igemm_convolution options
-/// in one_of_knob. The emitted constraints then pin a single branch.
-static DictionaryAttr
-buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
-                          const ContractionLikeDims &dims,
-                          ArrayRef<Attribute> compatibleMMAs,
-                          TileAndFuseConstraintOptions options = {}) {
-  bool isConv = options.isConv;
-  ArrayRef<unsigned> fusedIgemmKDims = options.fusedIgemmKDims;
+/// Build the VectorDistribute knob dictionary entries for contraction-like
+/// dims.
+static SmallVector<NamedAttribute>
+buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                               const ContractionLikeDims &dims,
+                               ArrayRef<Attribute> compatibleMMAs,
+                               bool isConv) {
+  SmallVector<NamedAttribute> knobsEntries =
+      buildVectorDistributeBasicKnobsDict(ctx, loopInfo, dims, compatibleMMAs);
+
+  // TODO: IREE constraints currently hardcoded some optional knob attr for VD
+  // matmul and conv: promote_operands = [0, 1]
+  Attribute promoteOperandsEntries[] = {makeIntAttr(ctx, 0),
+                                        makeIntAttr(ctx, 1)};
+  knobsEntries.emplace_back(kKnobPromoteOperandsKey,
+                            ArrayAttr::get(ctx, promoteOperandsEntries));
+
+  // TODO: This is hardcoded by IREE constraints:
+  // promotion_types = [#iree_gpu.derived_thread_config,
+  // #iree_gpu.derived_thread_config]
+  if (!isConv) {
+    Attribute promotionTypesEntries[] = {
+        IREE::GPU::DerivedThreadConfigAttr::get(ctx),
+        IREE::GPU::DerivedThreadConfigAttr::get(ctx)};
+    knobsEntries.emplace_back(kKnobPromotionTypesKey,
+                              ArrayAttr::get(ctx, promotionTypesEntries));
+  }
+
+  // Add gpu pipeline options as a nested translation config entry.
+  // TODO: This is hardcoded by IREE constraints:
+  // prefetch_num_stages = IntKnob, default to 2 later on in the constraints.
+  // no_reduce_shared_memory_bank_conflicts = false
+  // use_igemm_convolution = false
+  DictionaryAttr gpuPipelineOptionsEntries = DictionaryAttr::get(
+      ctx,
+      {{kKnobPrefetchNumStagesKey,
+        IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
+       {kKnobNoReduceSharedMemoryBankConflictsKey, BoolAttr::get(ctx, false)},
+       {kKnobUseIgemmConvolutionKey, BoolAttr::get(ctx, false)}});
+  knobsEntries.emplace_back(kKnobGpuPipelineOptionsKey,
+                            gpuPipelineOptionsEntries);
+
+  return knobsEntries;
+}
+
+/// Build the basic TileAndFuse knob dictionary entries for contraction-like
+/// dims.
+static SmallVector<NamedAttribute>
+buildTileAndFuseBasicKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                               const ContractionLikeDims &dims,
+                               ArrayRef<Attribute> compatibleMMAs,
+                               ArrayRef<unsigned> fusedIgemmKDims = {}) {
   SmallVector<NamedAttribute> knobsEntries;
 
   unsigned layoutNumLoops = loopInfo.numLoops;
@@ -569,14 +629,54 @@ buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   knobsEntries.emplace_back(kKnobSubgroupSizeKey,
                             IntKnobAttr::get(ctx, kKnobSgSizeName));
 
-  // Conv-only: expose both branches via one_of and pin inside constraints.
+  // TODO: IREE constraints currently hardcoded some optional knob attr for TF
+  // matmul and conv:
+  // promote_operands = [0, 1]
+  Attribute promoteOperandsEntries[] = {makeIntAttr(ctx, 0),
+                                        makeIntAttr(ctx, 1)};
+  knobsEntries.emplace_back(kKnobPromoteOperandsKey,
+                            ArrayAttr::get(ctx, promoteOperandsEntries));
+
+  return knobsEntries;
+}
+
+/// Build the TileAndFuse knobs dict for contraction-like dims.
+/// For convolution, gpu_pipeline_options.use_igemm_convolution is emitted as a
+/// one_of_knob<bool>. The emitted constraints then pin a single branch.
+static DictionaryAttr
+buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
+                          const ContractionLikeDims &dims,
+                          ArrayRef<Attribute> compatibleMMAs,
+                          TileAndFuseConstraintOptions options = {}) {
+  bool isConv = options.isConv;
+  SmallVector<NamedAttribute> knobsEntries = buildTileAndFuseBasicKnobsDict(
+      ctx, loopInfo, dims, compatibleMMAs, options.fusedIgemmKDims);
+
+  // TODO: This is hardcoded by IREE constraints:
+  // no_reduce_shared_memory_bank_conflicts = false
+  // use_igemm_convolution = false(matmul), one_of_knob<bool>(conv)
+  // prefetch_num_stages is an IntKnob and is pinned in constraints.
+  Attribute useIgemmConvolutionAttr = BoolAttr::get(ctx, false);
   if (isConv) {
     SmallVector<Attribute> useIgemmOptions = {BoolAttr::get(ctx, false),
                                               BoolAttr::get(ctx, true)};
-    knobsEntries.emplace_back(
-        kKnobUseIgemmConvolutionKey,
-        OneOfKnobAttr::get(ctx, kKnobUseIgemmConvolutionName, useIgemmOptions));
+    useIgemmConvolutionAttr =
+        OneOfKnobAttr::get(ctx, kKnobUseIgemmConvolutionName, useIgemmOptions);
   }
+  DictionaryAttr gpuPipelineOptionsEntries = DictionaryAttr::get(
+      ctx,
+      {{kKnobPrefetchNumStagesKey,
+        IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
+       {kKnobNoReduceSharedMemoryBankConflictsKey, BoolAttr::get(ctx, false)},
+       {kKnobUseIgemmConvolutionKey, useIgemmConvolutionAttr}});
+  knobsEntries.emplace_back(kKnobGpuPipelineOptionsKey,
+                            gpuPipelineOptionsEntries);
+
+  // TODO: Enable support for optional TF matmul/conv knob attrs:
+  // promotion_types = [...]
+  // padding = [...]
+  // padding_conv = [...]
+  // convert_acc_gemm = ...
 
   return DictionaryAttr::get(ctx, knobsEntries);
 }
@@ -655,6 +755,7 @@ static LogicalResult emitVectorDistributeConstraints(
   Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
+  Value prefetchNumStages = mkKnob(builder, loc, kKnobPrefetchNumStagesKey);
 
   // Create intermediate variables.
   // Do not create these as knobs because they are not in the knob dict
@@ -845,6 +946,14 @@ static LogicalResult emitVectorDistributeConstraints(
       builder, loc, redK, mmaMLookup,
       llvm::join_items("", redKName, " must be divisible by mma_m"));
 
+  // Constraint 10: Add gpu pipeline options.
+  // TODO: Expand prefetch_num_stages tunable values, currently set to
+  // default 2.
+  Value prefetchNumStagesEq = smt::EqOp::create(builder, loc, prefetchNumStages,
+                                                mkIntConst(builder, loc, 2));
+  AssertOp::create(builder, loc, prefetchNumStagesEq,
+                   "prefetch_num_stages == 2");
+
   return success();
 }
 
@@ -906,6 +1015,7 @@ static LogicalResult emitTileAndFuseConstraints(
   Value wgSizeX = mkKnob(builder, loc, kKnobWgSizeXName);
   Value wgSizeY = mkKnob(builder, loc, kKnobWgSizeYName);
   Value wgSizeZ = mkKnob(builder, loc, kKnobWgSizeZName);
+  Value prefetchNumStages = mkKnob(builder, loc, kKnobPrefetchNumStagesKey);
   if (options.isConv) {
     Value useIgemmIdx = mkKnob(builder, loc, kKnobUseIgemmConvolutionName);
     int64_t expectedUseIgemmIdx = options.useIgemm ? 1 : 0;
@@ -1143,6 +1253,19 @@ static LogicalResult emitTileAndFuseConstraints(
       smt::EqOp::create(builder, loc, wgSizeZ, mkIntConst(builder, loc, 1));
   AssertOp::create(builder, loc, wgZEq, "wg_size_z == 1");
 
+  // Constraint 7: Add gpu pipeline options.
+  // TODO: Expand prefetch_num_stages tunable values, currently pinned to
+  // default value 2 for matmul and igemm conv, 0 for direct conv.
+  int64_t expectedPrefetchNumStages = options.useIgemm ? 0 : 2;
+  Value prefetchNumStagesEq =
+      smt::EqOp::create(builder, loc, prefetchNumStages,
+                        mkIntConst(builder, loc, expectedPrefetchNumStages));
+  AssertOp::create(
+      builder, loc, prefetchNumStagesEq,
+      options.useIgemm
+          ? "prefetch_num_stages == 0 (use_igemm_convolution=true)"
+          : "prefetch_num_stages == 2 (use_igemm_convolution=false)");
+
   return success();
 }
 
@@ -1151,6 +1274,23 @@ static LogicalResult emitTileAndFuseConstraints(
 static LogicalResult
 emitVectorDistributeAttentionConstraintsForOp(Operation *rootOp,
                                               RootOpAttr rootOpAttr);
+/// Emit VectorDistribute ConstraintsOps for one contraction-like root op.
+static LogicalResult emitVectorDistributeConstraintsOps(
+    OpBuilder &builder, Operation *rootOp, linalg::LinalgOp linalgOp,
+    RootOpAttr rootOpAttr, IREE::GPU::PipelineAttr pipelineAttr,
+    const RootOpLoopInfo &loopInfo, const ContractionLikeDims &dims,
+    IREE::GPU::TargetAttr gpuTarget, ArrayRef<Attribute> compatibleMMAs,
+    bool isConv) {
+  MLIRContext *ctx = rootOp->getContext();
+  SmallVector<NamedAttribute> knobEntries = buildVectorDistributeKnobsDict(
+      ctx, loopInfo, dims, compatibleMMAs, isConv);
+  DictionaryAttr knobs = DictionaryAttr::get(ctx, knobEntries);
+  ConstraintsOpShell shell =
+      createConstraintsOpShell(builder, rootOp, rootOpAttr, pipelineAttr, knobs,
+                               loopInfo.numLoops, loopInfo.indexingMaps);
+  return emitVectorDistributeConstraints(builder, linalgOp, dims, gpuTarget,
+                                         shell.smtDimArgs, compatibleMMAs);
+}
 /// Emit TileAndFuse ConstraintsOps for one root op. For convolution roots,
 /// emits two ops (one with use_igemm_convolution = false and one with true);
 /// for non-conv roots, emits a single op.
@@ -1251,15 +1391,10 @@ emitConstraintsForOp(Operation *rootOp, RootOpAttr rootOpAttr,
   auto pipelineAttr = IREE::GPU::PipelineAttr::get(ctx, pipeline);
 
   switch (pipeline) {
-  case IREE::GPU::LoweringPipeline::VectorDistribute: {
-    DictionaryAttr knobs =
-        buildVectorDistributeKnobsDict(ctx, *loopInfo, *dims, compatibleMMAs);
-    ConstraintsOpShell shell = createConstraintsOpShell(
-        builder, rootOp, rootOpAttr, pipelineAttr, knobs, loopInfo->numLoops,
-        loopInfo->indexingMaps);
-    return emitVectorDistributeConstraints(builder, linalgOp, *dims, gpuTarget,
-                                           shell.smtDimArgs, compatibleMMAs);
-  }
+  case IREE::GPU::LoweringPipeline::VectorDistribute:
+    return emitVectorDistributeConstraintsOps(
+        builder, rootOp, linalgOp, rootOpAttr, pipelineAttr, *loopInfo, *dims,
+        gpuTarget, compatibleMMAs, isConv);
   case IREE::GPU::LoweringPipeline::TileAndFuse:
     return emitTileAndFuseConstraintsOps(builder, rootOp, linalgOp, rootOpAttr,
                                          pipelineAttr, *loopInfo, *dims,
