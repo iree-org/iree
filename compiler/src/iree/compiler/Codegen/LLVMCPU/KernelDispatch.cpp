@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/LLVMCPU/LLVMCPUSelectUKernels.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -3048,6 +3049,17 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::Codegen::InnerTiledOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+  // Annotate the op with a ukernel descriptor if `selectUKernel` matches one.
+  // This is gated by `--iree-llvmcpu-enable-llvm-ukernels=inner_tiled` on the
+  // target config; off by default. Tile sizes and translation_info below stay
+  // the same — the ukernel handles only the innermost intrinsic execution,
+  // and the surrounding tiling continues to do its job. The bitcode is
+  // resolved and attached as `hal.executable.objects` later by the
+  // `#iree_cpu.ukernel_provider` during `LowerBitcodeUKernelsPass`.
+  if (IREE::Codegen::UKernelDescriptorAttr ukernelDescriptor =
+          selectCPUUKernel(op)) {
+    setUKernelDescriptor(op, ukernelDescriptor);
+  }
   SmallVector<int64_t> bounds;
   op.getIterationBounds(bounds);
   unsigned numLoops = bounds.size();
