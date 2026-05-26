@@ -1,5 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' \
 // RUN:   --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy,func.func(iree-codegen-lower-bitcode-ukernels))' \
+// RUN:   --split-input-file %s | FileCheck %s --check-prefix=CHAIN
 
 // Drives the LLVMCPU `LLVMCPUSelectLoweringStrategy` pass on
 // `inner_tiled` rooted dispatches carrying a CPU `DataTiledMMAAttr`. The
@@ -10,10 +12,12 @@
 // doesn't run target-option serialization).
 
 // Enabled case: `selectCPUUKernel` matches the BF16 1x16x2 intrinsic and
-// annotates the op with `iree_codegen.ukernel = …`.
+// annotates the op with `iree_codegen.ukernel = …`. The chained CHAIN run
+// additionally lowers that descriptor to a `ukernel.generic`.
 #executable_target_enabled = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   cpu_features = "+avx512f,+avx512bf16",
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  iree_codegen.ukernel_provider = #iree_cpu.ukernel_provider,
   llvm_ukernels = "inner_tiled",
   native_vector_size = 64 : index,
   target_triple = "x86_64-unknown-unknown-eabi-elf"
@@ -36,9 +40,21 @@ func.func @bf16_inner_tiled_ukernel_enabled(
   } : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
   return %0 : tensor<2x2x1x16xf32>
 }
+// The reduction (K) dim is left untiled: the ukernel owns the K loop, so the
+// lowering_config carries no `vector_reduction` entry (contrast the disabled
+// case below, which tiles it to `vector_reduction = [0, 0, 1]`).
+// CHECK:       #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0]>
 // CHECK-LABEL: func.func @bf16_inner_tiled_ukernel_enabled
 // CHECK:         iree_codegen.inner_tiled
 // CHECK-SAME:      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16", bitcode>
+
+// The next pass lowers the descriptor to a `ukernel.generic` carrying the
+// resolved bitcode, and the original `inner_tiled` is gone.
+// CHAIN-LABEL: func.func @bf16_inner_tiled_ukernel_enabled
+// CHAIN:         iree_codegen.ukernel.generic
+// CHAIN-SAME:      hal.executable.objects = [{{.*}}"iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16.x86_64_avx512bf16.bc"
+// CHAIN-SAME:      "iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16"
+// CHAIN-NOT:     iree_codegen.inner_tiled
 
 // -----
 
@@ -69,6 +85,16 @@ func.func @bf16_inner_tiled_ukernel_disabled(
   } : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
   return %0 : tensor<2x2x1x16xf32>
 }
+// Without a ukernel, the reduction (K) dim is tiled normally.
+// CHECK:       #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 // CHECK-LABEL: func.func @bf16_inner_tiled_ukernel_disabled
 // CHECK:         iree_codegen.inner_tiled
 // CHECK-NOT:     iree_codegen.ukernel = #iree_codegen.ukernel_descriptor
+
+// Same with the chained pipeline: SelectLoweringStrategy doesn't attach a
+// descriptor, so LowerBitcodeUKernels has nothing to rewrite and the
+// `inner_tiled` survives untouched.
+// CHAIN-LABEL: func.func @bf16_inner_tiled_ukernel_disabled
+// CHAIN:         iree_codegen.inner_tiled
+// CHAIN-NOT:     iree_codegen.ukernel.generic
+// CHAIN-NOT:     hal.executable.objects

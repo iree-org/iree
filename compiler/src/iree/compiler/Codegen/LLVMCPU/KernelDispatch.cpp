@@ -3051,13 +3051,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
   // Annotate the op with a ukernel descriptor if `selectUKernel` matches one.
   // This is gated by `--iree-llvmcpu-enable-llvm-ukernels=inner_tiled` on the
-  // target config; off by default. Tile sizes and translation_info below stay
-  // the same — the ukernel handles only the innermost intrinsic execution,
-  // and the surrounding tiling continues to do its job. The bitcode is
-  // resolved and attached as `hal.executable.objects` later by the
+  // target config; off by default. When a ukernel is selected, the bitcode
+  // is resolved and attached as `hal.executable.objects` later by the
   // `#iree_cpu.ukernel_provider` during `LowerBitcodeUKernelsPass`.
-  if (IREE::Codegen::UKernelDescriptorAttr ukernelDescriptor =
-          selectCPUUKernel(op)) {
+  IREE::Codegen::UKernelDescriptorAttr ukernelDescriptor = selectCPUUKernel(op);
+  if (ukernelDescriptor) {
     setUKernelDescriptor(op, ukernelDescriptor);
   }
   SmallVector<int64_t> bounds;
@@ -3085,11 +3083,21 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  // Vector tiling: every iter dim down to a single inner tile. The
-  // generator's `splitParallelAndReductionTiles` lifts the parallel entries
-  // into `vector_common_parallel` and the reduction entries into
-  // `vector_reduction`.
+  // Vector tiling: every parallel iter dim down to a single inner tile.
+  // Reduction dims tile to 1 by default — codegen unrolls the K loop. But
+  // when a ukernel is in play, leave reduction dims untiled (size 0): the
+  // ukernel's C function takes the outer K count as a runtime argument
+  // (`k_outer`) and runs the K loop itself; pre-unrolling it here would
+  // both defeat that and bloat the IR. This mirrors the equivalent split
+  // in `setDataTiledMmaInnerTiledLoweringConfig` on the GPU side.
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
+  if (ukernelDescriptor) {
+    for (auto [i, kind] : llvm::enumerate(iteratorTypes)) {
+      if (kind == utils::IteratorType::reduction) {
+        vecTileSizes[i] = 0;
+      }
+    }
+  }
 
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
