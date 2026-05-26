@@ -1027,7 +1027,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
     // This pass needs to run before the ResolveSwizzleHints pass.
-    funcPassManager.addPass(amdgpu::createAmdgpuFoldMemRefOpsPass);
+    funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass);
   }
 
   funcPassManager
