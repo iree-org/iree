@@ -521,8 +521,8 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
 
   // TODO: IREE constraints currently hardcoded some optional knob attr for VD
   // matmul and conv: promote_operands = [0, 1]
-  SmallVector<Attribute> promoteOperandsEntries = {makeIntAttr(ctx, 0),
-                                                   makeIntAttr(ctx, 1)};
+  Attribute promoteOperandsEntries[] = {makeIntAttr(ctx, 0),
+                                        makeIntAttr(ctx, 1)};
   knobsEntries.emplace_back(kKnobPromoteOperandsKey,
                             ArrayAttr::get(ctx, promoteOperandsEntries));
 
@@ -530,8 +530,9 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   // promotion_types = [#iree_gpu.derived_thread_config,
   // #iree_gpu.derived_thread_config]
   if (!isConv) {
-    SmallVector<Attribute> promotionTypesEntries(
-        2, IREE::GPU::DerivedThreadConfigAttr::get(ctx));
+    Attribute promotionTypesEntries[] = {
+        IREE::GPU::DerivedThreadConfigAttr::get(ctx),
+        IREE::GPU::DerivedThreadConfigAttr::get(ctx)};
     knobsEntries.emplace_back(kKnobPromotionTypesKey,
                               ArrayAttr::get(ctx, promotionTypesEntries));
   }
@@ -542,12 +543,11 @@ buildVectorDistributeKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   // no_reduce_shared_memory_bank_conflicts = false
   // use_igemm_convolution = false
   DictionaryAttr gpuPipelineOptionsEntries = DictionaryAttr::get(
-      ctx, {{StringAttr::get(ctx, kKnobPrefetchNumStagesKey),
-             IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
-            {StringAttr::get(ctx, kKnobNoReduceSharedMemoryBankConflictsKey),
-             BoolAttr::get(ctx, false)},
-            {StringAttr::get(ctx, kKnobUseIgemmConvolutionKey),
-             BoolAttr::get(ctx, false)}});
+      ctx,
+      {{kKnobPrefetchNumStagesKey,
+        IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
+       {kKnobNoReduceSharedMemoryBankConflictsKey, BoolAttr::get(ctx, false)},
+       {kKnobUseIgemmConvolutionKey, BoolAttr::get(ctx, false)}});
   knobsEntries.emplace_back(kKnobGpuPipelineOptionsKey,
                             gpuPipelineOptionsEntries);
 
@@ -632,8 +632,8 @@ buildTileAndFuseBasicKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
   // TODO: IREE constraints currently hardcoded some optional knob attr for TF
   // matmul and conv:
   // promote_operands = [0, 1]
-  SmallVector<Attribute> promoteOperandsEntries = {makeIntAttr(ctx, 0),
-                                                   makeIntAttr(ctx, 1)};
+  Attribute promoteOperandsEntries[] = {makeIntAttr(ctx, 0),
+                                        makeIntAttr(ctx, 1)};
   knobsEntries.emplace_back(kKnobPromoteOperandsKey,
                             ArrayAttr::get(ctx, promoteOperandsEntries));
 
@@ -664,12 +664,11 @@ buildTileAndFuseKnobsDict(MLIRContext *ctx, const RootOpLoopInfo &loopInfo,
         OneOfKnobAttr::get(ctx, kKnobUseIgemmConvolutionName, useIgemmOptions);
   }
   DictionaryAttr gpuPipelineOptionsEntries = DictionaryAttr::get(
-      ctx, {{StringAttr::get(ctx, kKnobPrefetchNumStagesKey),
-             IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
-            {StringAttr::get(ctx, kKnobNoReduceSharedMemoryBankConflictsKey),
-             BoolAttr::get(ctx, false)},
-            {StringAttr::get(ctx, kKnobUseIgemmConvolutionKey),
-             useIgemmConvolutionAttr}});
+      ctx,
+      {{kKnobPrefetchNumStagesKey,
+        IntKnobAttr::get(ctx, kKnobPrefetchNumStagesKey)},
+       {kKnobNoReduceSharedMemoryBankConflictsKey, BoolAttr::get(ctx, false)},
+       {kKnobUseIgemmConvolutionKey, useIgemmConvolutionAttr}});
   knobsEntries.emplace_back(kKnobGpuPipelineOptionsKey,
                             gpuPipelineOptionsEntries);
 

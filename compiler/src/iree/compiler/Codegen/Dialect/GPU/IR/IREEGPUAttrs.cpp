@@ -85,7 +85,7 @@ static bool isDefaultTranslationInfoKey(StringRef key) {
 }
 
 static bool isTranslationInfoConfigKey(StringRef key) {
-  return llvm::is_contained({kGpuPipelineOptionsKey}, key);
+  return key == kGpuPipelineOptionsKey;
 }
 
 static bool isFlatMetadataKey(StringRef key) {
