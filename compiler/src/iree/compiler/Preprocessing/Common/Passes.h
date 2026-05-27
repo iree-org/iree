@@ -32,6 +32,12 @@ enum class TransposeMatmulInput {
   Rhs
 };
 
+// Enum for selecting the target type for promotion
+enum class PromoteType { F16, BF16 };
+
+// Enum for selecting which operations to promote
+enum class PromoteOperation { All, Conv, Matmul, None };
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
