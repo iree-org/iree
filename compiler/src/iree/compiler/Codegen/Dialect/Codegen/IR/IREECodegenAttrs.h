@@ -31,6 +31,10 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 bool shouldSetTunerAttributes();
 /// Returns whether pipeline constraints should be emitted for root ops.
 bool shouldEmitPipelineConstraints();
+/// Returns whether emitted pipeline constraints should be verified.
+bool shouldVerifyPipelineConstraints();
+/// Returns whether emitted pipeline constraints should remain in the IR.
+bool shouldPreservePipelineConstraints();
 } // namespace mlir::iree_compiler
 
 // clang-format off
