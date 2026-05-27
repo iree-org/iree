@@ -56,6 +56,7 @@ iree_cc_library(
     "CombineLayoutTransformation.h"
     "EmulateNarrowType.h"
     "EncodingUtils.h"
+    "ErrorCheckingTrackingListener.h"
     "FastMathPatterns.h"
     "PassUtils.h"
     "Passes.h"
@@ -96,6 +97,7 @@ iree_cc_library(
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
+    "ErrorCheckingTrackingListener.cpp"
     "FastMathPatterns.cpp"
     "FissionTransferOpsInControlFlow.cpp"
     "FlattenMemRefSubspan.cpp"
@@ -180,7 +182,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREELinalgTransformDialect
     LLVMCore
     LLVMSupport
     MLIRAMDGPUDialect
@@ -287,8 +288,6 @@ iree_cc_library(
     ::Common
     ::PassHeaders
     ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAMDGPUTransforms
     MLIRAffineDialect

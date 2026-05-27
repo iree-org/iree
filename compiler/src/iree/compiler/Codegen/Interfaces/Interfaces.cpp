@@ -18,9 +18,6 @@
 #include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-// TODO: Remove this dependency once the transform dialect extensions
-// have a better registration mechanism.
-#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
@@ -90,11 +87,8 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
   registerTensorMaskingOpInterface(registry);
-  // TODO: Remove this dependency once the transform dialect extensions
-  // have a better registration mechanism.
   // TODO: when warranted, move to its own file.
-  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
-                         transform_ext::StructuredTransformOpsExtension>();
+  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
   });
