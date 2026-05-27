@@ -3496,6 +3496,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-preprocessing-promote-linalg-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-preprocessing-promote-linalg-outputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-preprocessing-promote-linalg-outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-preprocessing-swap-strided-insert-slice-with-contraction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3519,7 +3547,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_5" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -3547,7 +3575,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -6515,6 +6543,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-preprocessing-promote-linalg-outputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-preprocessing-promote-linalg-outputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="-iree-preprocessing-promote-linalg-outputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-preprocessing-swap-strided-insert-slice-with-contraction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6538,7 +6594,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_5" class="md-nav__link">
+  <a href="#options_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -6566,7 +6622,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_6" class="md-nav__link">
+  <a href="#options_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -6650,6 +6706,12 @@ function-like operation.</p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-pad-target-type : Pad target-op type that is being specified.
 </code></pre></div>
+<h3 id="-iree-preprocessing-promote-linalg-outputs"><code>-iree-preprocessing-promote-linalg-outputs</code><a class="headerlink" href="#-iree-preprocessing-promote-linalg-outputs" title="Permanent link">link</a></h3>
+<p><em>Promotes outputs of linalg ops from a narrower type to f32.</em></p>
+<h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-type      : Select the target type for promotion.
+-operation : Select the type of operations to promote.
+</code></pre></div>
 <h3 id="-iree-preprocessing-swap-strided-insert-slice-with-contraction"><code>-iree-preprocessing-swap-strided-insert-slice-with-contraction</code><a class="headerlink" href="#-iree-preprocessing-swap-strided-insert-slice-with-contraction" title="Permanent link">link</a></h3>
 <p><em>Swap strided insert_slice into zeros with consumer contraction for 1x1 backward convolutions.</em></p>
 <h3 id="-iree-preprocessing-transform-interpreter"><code>-iree-preprocessing-transform-interpreter</code><a class="headerlink" href="#-iree-preprocessing-transform-interpreter" title="Permanent link">link</a></h3>
@@ -6659,13 +6721,13 @@ sequence transformation named <code>__transform_main</code>.</p>
 <p>TODO: Drop this pass in favor of the one upstream. The one upstream requires
 separate loading of the module and thus isn't suited for single-use
 transform scripts.</p>
-<h4 id="options_5">Options<a class="headerlink" href="#options_5" title="Permanent link">link</a></h4>
+<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-disable-expensive-checks : Disable expensive checks in the interpreter for a faster run.
 -transform-spec-path      : File path to the transform spec to use.
 </code></pre></div>
 <h3 id="-iree-preprocessing-transpose-matmul-pass"><code>-iree-preprocessing-transpose-matmul-pass</code><a class="headerlink" href="#-iree-preprocessing-transpose-matmul-pass" title="Permanent link">link</a></h3>
 <p><em>Convert Linalg matmul ops to transposed variants</em></p>
-<h4 id="options_6">Options<a class="headerlink" href="#options_6" title="Permanent link">link</a></h4>
+<h4 id="options_7">Options<a class="headerlink" href="#options_7" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-input : Input to transpose, one of: &#39;lhs&#39; (default), &#39;rhs&#39;
 </code></pre></div>
 
