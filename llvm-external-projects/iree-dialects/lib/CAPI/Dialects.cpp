@@ -6,7 +6,6 @@
 
 #include "iree-dialects-c/Dialects.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
@@ -21,14 +20,6 @@
 using namespace mlir;
 
 //===--------------------------------------------------------------------===//
-// IREELinalgTransform
-//===--------------------------------------------------------------------===//
-
-void mlirIREELinalgTransformRegisterPasses() {
-  mlir::linalg::transform::registerDropSchedulePass();
-}
-
-//===--------------------------------------------------------------------===//
 // TransformDialect
 //===--------------------------------------------------------------------===//
 
@@ -38,8 +29,4 @@ void ireeRegisterTransformExtensions(MlirContext context) {
   registry
       .addExtensions<mlir::transform_ext::StructuredTransformOpsExtension>();
   ctx->appendDialectRegistry(registry);
-}
-
-void mlirIREETransformRegisterPasses() {
-  mlir::linalg::transform::registerDropSchedulePass();
 }

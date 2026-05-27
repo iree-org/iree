@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule | FileCheck %s
 
 #executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map1 = affine_map<(d0, d1) -> (d0, d1)>

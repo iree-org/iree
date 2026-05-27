@@ -4,26 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassRegistry.h"
 
-using namespace mlir;
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_DROPSCHEDULEPASS
+#include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
 
-struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DropSchedulePass)
-
-  StringRef getArgument() const final {
-    return "transform-dialect-drop-schedule";
-  }
-
-  StringRef getDescription() const final {
-    return "Drop the schedule from the operation";
-  }
-
+struct DropSchedulePass : public impl::DropSchedulePassBase<DropSchedulePass> {
   bool canScheduleOn(RegisteredOperationName opName) const override {
     return true;
   }
@@ -54,14 +46,6 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
     }
   }
 };
+
 } // namespace
-
-/// Create a Linalg pass to drop the schedule from the module.
-std::unique_ptr<Pass> mlir::createDropSchedulePass() {
-  return std::make_unique<DropSchedulePass>();
-}
-
-/// Registration hook for the Linalg drop schedule from module pass.
-void mlir::linalg::transform::registerDropSchedulePass() {
-  PassRegistration<DropSchedulePass>();
-}
+} // namespace mlir::iree_compiler

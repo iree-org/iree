@@ -130,7 +130,6 @@ iree_cc_library(
     ::ROCDLPassHeaders
     ::ROCDLPassesIncGen
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAMDGPUToROCDL

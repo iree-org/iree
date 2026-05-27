@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 // Basic case: expand_shape source of parallel_insert_slice triggers
 // dest collapse, hoisting expand_shape out of the forall body.

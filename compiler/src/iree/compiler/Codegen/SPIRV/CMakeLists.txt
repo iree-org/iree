@@ -79,7 +79,6 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect

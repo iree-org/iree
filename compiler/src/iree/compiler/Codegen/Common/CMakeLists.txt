@@ -90,6 +90,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "DecomposeSoftmax.cpp"
+    "DropSchedule.cpp"
     "DropVectorUnitDims.cpp"
     "EmulateNarrowType.cpp"
     "EncodingUtils.cpp"
@@ -230,6 +231,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms

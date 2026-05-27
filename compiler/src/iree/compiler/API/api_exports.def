@@ -539,8 +539,6 @@ EXPORTS
   mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel
   mlirGreedyRewriteDriverConfigSetStrictness
   mlirGreedyRewriteDriverConfigSetUseTopDownTraversal
-  mlirIREELinalgTransformRegisterPasses
-  mlirIREETransformRegisterPasses
   mlirIRRewriterCreate
   mlirIRRewriterCreateFromOp
   mlirIRRewriterDestroy

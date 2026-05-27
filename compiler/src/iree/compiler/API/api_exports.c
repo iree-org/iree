@@ -549,8 +549,6 @@ extern void mlirGreedyRewriteDriverConfigSetMaxNumRewrites();
 extern void mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel();
 extern void mlirGreedyRewriteDriverConfigSetStrictness();
 extern void mlirGreedyRewriteDriverConfigSetUseTopDownTraversal();
-extern void mlirIREELinalgTransformRegisterPasses();
-extern void mlirIREETransformRegisterPasses();
 extern void mlirIRRewriterCreate();
 extern void mlirIRRewriterCreateFromOp();
 extern void mlirIRRewriterDestroy();
@@ -1727,8 +1725,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel;
   x += (uintptr_t)&mlirGreedyRewriteDriverConfigSetStrictness;
   x += (uintptr_t)&mlirGreedyRewriteDriverConfigSetUseTopDownTraversal;
-  x += (uintptr_t)&mlirIREELinalgTransformRegisterPasses;
-  x += (uintptr_t)&mlirIREETransformRegisterPasses;
   x += (uintptr_t)&mlirIRRewriterCreate;
   x += (uintptr_t)&mlirIRRewriterCreateFromOp;
   x += (uintptr_t)&mlirIRRewriterDestroy;

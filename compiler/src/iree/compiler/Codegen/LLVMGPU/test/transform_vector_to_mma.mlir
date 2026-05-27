@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s --split-input-file -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,

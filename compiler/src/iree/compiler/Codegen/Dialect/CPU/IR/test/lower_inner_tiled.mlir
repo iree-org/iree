@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 // AVX-512 1×16×1 f32 → f32 with intrinsics_m=1, intrinsics_n=1, intrinsics_k=1.
 // Exercises the FMA shape (no widening) on the simplest singly-unrolled case.
