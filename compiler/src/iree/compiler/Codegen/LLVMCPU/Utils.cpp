@@ -89,11 +89,6 @@ bool hasAnyVFeature(DictionaryAttr targetConfig) {
          hasFeature(targetConfig, "+zve64d");
 }
 
-bool hasAnySVEFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+sve") ||
-         hasFeature(targetConfig, "+sve2") || hasFeature(targetConfig, "+v9a");
-}
-
 bool hasSMEFeature(DictionaryAttr targetConfig) {
   return hasFeature(targetConfig, "+sme");
 }

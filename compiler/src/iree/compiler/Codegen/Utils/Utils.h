@@ -340,9 +340,6 @@ bool isFullSlice(OffsetSizeAndStrideOpInterface sliceLoadStoreOp,
 // Scalable size utility functions
 //===---------------------------------------------------------------------===//
 
-std::optional<vector::VscaleRange>
-getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 using SizesAndScalableFlags =
     std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 

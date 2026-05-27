@@ -49,6 +49,15 @@ unsigned getUserVscaleValue();
 /// of `op`'s results is used as an operand of `rootOp`.
 bool isProducerOfRootOp(Operation *op, Operation *rootOp);
 
+/// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
+/// features or any other feature flag that includes them.
+bool hasAnySVEFeature(DictionaryAttr targetConfig);
+
+/// Returns the default vscale range for the given target. Currently only
+/// returns a range for AArch64 targets with SVE/SVE2 enabled.
+std::optional<vector::VscaleRange>
+getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_

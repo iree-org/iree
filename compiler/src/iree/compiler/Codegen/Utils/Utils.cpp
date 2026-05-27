@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -298,11 +299,6 @@ bool isRISCV32(DictionaryAttr targetConfig) {
 bool isRISCV64(DictionaryAttr targetConfig) {
   std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV64();
-}
-
-static bool hasAnySVEFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+sve") ||
-         hasFeature(targetConfig, "+sve2");
 }
 
 std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
@@ -1749,21 +1745,6 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   }
 
   return llvm::any_of(backwardSlice, llvm::IsaPred<linalg::LinalgOp>);
-}
-
-std::optional<vector::VscaleRange>
-getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (targetAttr) {
-    DictionaryAttr targetConfig = targetAttr.getConfiguration();
-    if (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig)) {
-      // For Arm SVE/SVE2 the scalable vector length is between 128-bit and
-      // 2048-bit, corresponding to a vscale range of 1 to 16. See:
-      // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
-      return vector::VscaleRange{1, 16};
-    }
-  }
-  // TODO: Implement for other architectures.
-  return std::nullopt;
 }
 
 std::optional<SizesAndScalableFlags>
