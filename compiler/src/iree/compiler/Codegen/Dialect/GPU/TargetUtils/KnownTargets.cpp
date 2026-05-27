@@ -944,7 +944,8 @@ const WgpDetails *getSM120WgpDetails() {
   // TODO: Model Blackwell-specific capabilities once IREE has target details
   // for the architecture. Reuse the existing NVIDIA capability model for now
   // so canonical CUDA targets such as sm_120 can be represented.
-  // See: https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html#nvidia-blackwell-tuning
+  // See:
+  // https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html#nvidia-blackwell-tuning
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
@@ -952,18 +953,18 @@ const WgpDetails *getSM120WgpDetails() {
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails sm120Wgp = {allComputeBits,
-                                          allStorageBits,
-                                          allSubgroupOps,
-                                          allDotProductOps,
-                                          std::size(mmaOps),
-                                          mmaOps,
-                                          0,
-                                          nullptr,
-                                          {32, 32},
-                                          {1024, 1024, 1024},
-                                          1024,
-                                          163 * 1024,
-                                          {0x7fffffff, 0xffff, 0xffff}};
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      163 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
   return &sm120Wgp;
 }
 
