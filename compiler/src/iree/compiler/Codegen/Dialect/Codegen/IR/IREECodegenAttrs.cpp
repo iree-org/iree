@@ -44,10 +44,20 @@ static ArrayAttr getIndexArrayAttr(MLIRContext *context,
 
 bool shouldSetTunerAttributes() {
   return CodegenOptions::setTunerAttributes ||
+         CodegenOptions::verifyPipelineConstraints ||
          CodegenOptions::emitPipelineConstraints;
 }
 
 bool shouldEmitPipelineConstraints() {
+  return CodegenOptions::verifyPipelineConstraints ||
+         CodegenOptions::emitPipelineConstraints;
+}
+
+bool shouldVerifyPipelineConstraints() {
+  return CodegenOptions::verifyPipelineConstraints;
+}
+
+bool shouldPreservePipelineConstraints() {
   return CodegenOptions::emitPipelineConstraints;
 }
 

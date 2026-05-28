@@ -517,8 +517,12 @@ void VerifySMTConstraintsPass::runOnOperation() {
     return;
   }
 
-  // Erase all constraints ops on scope exit regardless of outcome.
+  // Erase all constraints ops on scope exit unless the caller explicitly wants
+  // the configured IR to carry the constraints for external tools.
   llvm::scope_exit eraseAll([&]() {
+    if (shouldPreservePipelineConstraints()) {
+      return;
+    }
     for (IREE::Codegen::ConstraintsOp op : constraintsOps) {
       op.erase();
     }

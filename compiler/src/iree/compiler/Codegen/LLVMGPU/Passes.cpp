@@ -1150,9 +1150,11 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   if (shouldEmitPipelineConstraints()) {
-    FunctionLikeNest(modulePassManager)
-        .addPass(createInsertSMTConstraintsPass)
-        .addPass(createVerifySMTConstraintsPass);
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createInsertSMTConstraintsPass);
+    if (shouldVerifyPipelineConstraints()) {
+      funcPassManager.addPass(createVerifySMTConstraintsPass);
+    }
   }
 }
 

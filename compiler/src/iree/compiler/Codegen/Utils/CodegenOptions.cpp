@@ -54,6 +54,7 @@ void applyOptLevelDefaults(CodegenOptionsT &opts,
 
 std::string CodegenOptions::tuningSpecPath = "";
 bool CodegenOptions::setTunerAttributes = false;
+bool CodegenOptions::verifyPipelineConstraints = false;
 bool CodegenOptions::emitPipelineConstraints = false;
 
 llvm::OptimizationLevel
@@ -94,9 +95,16 @@ void CodegenOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<bool>(
       "iree-codegen-experimental-verify-pipeline-constraints",
-      emitPipelineConstraints, llvm::cl::cat(category),
+      verifyPipelineConstraints, llvm::cl::cat(category),
       llvm::cl::desc("Emit and verify SMT pipeline constraints for root ops. "
                      "Implies --iree-codegen-add-tuner-attributes."));
+  binder.opt<bool>(
+      "iree-codegen-emit-pipeline-constraints", emitPipelineConstraints,
+      llvm::cl::cat(category),
+      llvm::cl::desc("Emit SMT pipeline constraints and keep them in the IR. "
+                     "Implies --iree-codegen-add-tuner-attributes. Intended "
+                     "for use with "
+                     "--compile-to=executable-configurations."));
 }
 
 void CPUCodegenOptions::setWithOptLevel(llvm::OptimizationLevel level) {
