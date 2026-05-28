@@ -1180,6 +1180,14 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   return &androidWgp;
 }
 
+std::optional<TargetDetails> getBroadcomProfileDetails(StringRef target) {
+  const WgpDetails *baseline2022Wgp = getAndroidBaseline2022WgpDetails();
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Case("videocore_vii", TargetDetails{baseline2022Wgp, nullptr})
+      .Default(std::nullopt);
+}
+
 std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
   const WgpDetails *baseline2022Wgp = getAndroidBaseline2022WgpDetails();
 
@@ -1277,6 +1285,11 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
+  }
+  if (std::optional<TargetDetails> details =
+          getBroadcomProfileDetails(target)) {
+    return createTargetAttr(*details, target,
+                            /*features=*/"spirv:v1.3,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {

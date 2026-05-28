@@ -1284,6 +1284,8 @@ IREE::GPU::TargetAttr getCLGPUTarget(MLIRContext *context) {
       backend = "vulkan";
     } else if (StringRef(clTestTarget).starts_with("valhall")) {
       backend = "vulkan";
+    } else if (StringRef(clTestTarget).starts_with("videocore")) {
+      backend = "vulkan";
     }
   }
   auto [arch, features] = StringRef(archAndFeatures).split(':');
