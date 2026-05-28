@@ -49,10 +49,6 @@ bool hasZve64xFeature(DictionaryAttr targetConfig);
 /// cpu features.
 bool hasAnyVFeature(DictionaryAttr targetConfig);
 
-/// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
-/// features or any other feature flag that includes them.
-bool hasAnySVEFeature(DictionaryAttr targetConfig);
-
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(DictionaryAttr targetConfig);
 

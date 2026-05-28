@@ -125,4 +125,24 @@ bool isProducerOfRootOp(Operation *op, Operation *rootOp) {
   return false;
 }
 
+bool hasAnySVEFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+sve") ||
+         hasFeature(targetConfig, "+sve2") || hasFeature(targetConfig, "+v9a");
+}
+
+std::optional<vector::VscaleRange>
+getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (targetAttr) {
+    DictionaryAttr targetConfig = targetAttr.getConfiguration();
+    if (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig)) {
+      // For Arm SVE/SVE2 the scalable vector length is between 128-bit and
+      // 2048-bit, corresponding to a vscale range of 1 to 16. See:
+      // https://developer.arm.com/Architectures/Scalable%20Vector%20Extensions
+      return vector::VscaleRange{1, 16};
+    }
+  }
+  // TODO: Implement for other architectures.
+  return std::nullopt;
+}
+
 } // namespace mlir::iree_compiler
