@@ -9,6 +9,7 @@
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -31,11 +32,37 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
     return v.getParentRegion()->getParentOp() != dispatch;
   };
 
-  // Check that all operands are defined outside the dispatch and all operand
-  // and result types are scalars or vectors.
-  return llvm::all_of(op->getOperands(), isOutsideDispatch) &&
-         llvm::all_of(op->getOperandTypes(), isIntOrIndex) &&
-         llvm::all_of(op->getResultTypes(), isIntOrIndex);
+  // Arith candidates are uniform when all operands are defined outside the
+  // dispatch and all operand/result types are int/index scalars.
+  if (isa<arith::ArithDialect>(op->getDialect())){
+    return llvm::all_of(op->getOperands(), isOutsideDispatch) &&
+          llvm::all_of(op->getOperandTypes(), isIntOrIndex) &&
+          llvm::all_of(op->getResultTypes(), isIntOrIndex);
+  }  
+
+  // A tensor.extract is only uniform scalar metadata when it extracts the sole
+  // int/index element from a tensor and all extraction dependencies are already
+  // outside this dispatch.
+  if (auto extractOp = dyn_cast<tensor::ExtractOp>(op)) {
+    auto tensorType =
+        dyn_cast<RankedTensorType>(extractOp.getTensor().getType());
+    return tensorType && tensorType.hasStaticShape() &&
+           tensorType.getNumElements() == 1 &&
+           extractOp.getResult().getType().isIntOrIndex() &&
+           isOutsideDispatch(extractOp.getTensor()) &&
+           llvm::all_of(extractOp.getIndices(), isOutsideDispatch);
+  }
+
+  return false;
+
+}
+
+// Restrict to arith ops and scalar extracts from one-element
+// tensors to avoid unexpected hoisting of flow/stream/hal.dispatch
+// workgroups count/id ops.
+static bool isHoistCandidate(Operation *op) {
+  return isa<arith::ArithDialect>(op->getDialect()) ||
+         isa<tensor::ExtractOp>(op);
 }
 
 namespace {
@@ -52,11 +79,9 @@ struct HoistUniformScalarComputePass
         funcOp.walk([&](IREE::Flow::DispatchRegionOp dispatch) {
           for (Block &body : dispatch.getBody()) {
             SmallVector<Operation *> ops;
-            // Restrict to arith ops to avoid unexpected hoisting of
-            // flow/stream/hal.dispatch.workgroups.count/id ops.
             // TODO: Add an op trait to tie count/id ops to region ops.
             for (Operation &op : body.getOperations()) {
-              if (isa<arith::ArithDialect>(op.getDialect())) {
+              if (isHoistCandidate(&op)) {
                 ops.push_back(&op);
               }
             }
