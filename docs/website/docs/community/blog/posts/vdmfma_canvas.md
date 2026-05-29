@@ -120,13 +120,13 @@ lanes to select positions `{2,3}`, then for a load with 8 contiguous elements al
 K0 K1 K2 K3 K4 K5 K6 K7
 ```
 
-We would want even lane to hold:
+We would want even lanes to hold:
 
 ```text
 K0 K1 K4 K5
 ```
 
-and odd lane to hold
+and odd lanes to hold
 
 ```text
 K2 K3 K6 K7
