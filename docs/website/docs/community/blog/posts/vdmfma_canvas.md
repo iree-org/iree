@@ -81,7 +81,7 @@ old `D` value is the accumulator, and the encoded third source is sparse index
 metadata, not a separate `C` matrix operand. The 4:2 structured-sparse
 operand is defined along `K`: in each group of four `K` positions, the sparse
 index metadata tells the
-instruction which two positions are present.
+instruction which two positions are non-zero.
 
 On CDNA3/gfx942, the relevant sparse instruction has the same physical `16x16`
 output tile and the same number of cycles. For
@@ -110,7 +110,7 @@ so the result again has the normal dense `M=8` meaning.
 ## Original HuggingFace Approach
 
 On the standard path for processing data enroute to MFMA instructions, we go
-through global memory -> LDS/Shared memory -> Registers -> MFMA instruction.*
+through global memory -> LDS/Shared memory -> Registers -> MFMA instruction*.
 In the original Hugging Face skinny GEMM kernel, data from matrix `A` is shuffled
 on the way into LDS. The shuffle is necessary to meet the semantics of using the
 sparse trick. If we were to use even lanes to select positions `{0,1}` and odd
@@ -181,8 +181,7 @@ only when the problem's total
 `M` fits in the virtual `M=8` tile and total `K` is divisible by the VDMFMA
 selection tile. But the abstraction is an `8`-row virtual MMA, not an encoded
 storage format for an entire matmul. A future selector could tile a larger
-multiple-of-8 `M` problem into VDMFMA-sized pieces without making producers
-materialize a fake sparse `A` tensor.
+multiple-of-8 `M` problem into VDMFMA-sized pieces.
 
 Concretely, we represent VDMFMA in the following form:
 
@@ -213,7 +212,7 @@ SparseIndex : vector<4xi8>
 ```
 
 VDMFMA is the adapter between these two views. It expands the accumulator,
-chooses sparse metadata from lane parity, slices `A`, interleaves the per-lane
+chooses sparse metadata from lane parity, slices `A` and `B`, shuffles the per-lane
 `B` register fragment, issues the sparse MFMAs, and collapses the accumulator
 back to the dense virtual shape.
 
@@ -387,7 +386,7 @@ VDMFMA is a small compiler abstraction around a target-specific instruction
 mapping. This is represented in the IR as a "virtual dense" `8x16xK` MMA.
 The generated code for the F16 kernel above uses paired `ds_read2_b64` LDS reads
 to form dense per-lane fragments; the virtual MMA lowering then uses lane
-parity, `B` register interleaving, sparse MFMA instructions and accumulator
+parity, `B` register shuffling, sparse MFMA instructions and accumulator
 reduction to fulfill the conditions of the sparse trick for skinny GEMMs. At
 configuration time, it is currently selected only for skinny shapes where the
 total `M` fits within the virtual `M=8` tile and total `K`
