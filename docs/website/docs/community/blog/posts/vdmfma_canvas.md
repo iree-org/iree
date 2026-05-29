@@ -189,7 +189,7 @@ storage format for an entire matmul. A future selector could tile a larger
 multiple-of-8 `M` problem into VDMFMA-sized pieces without making producers
 materialize a fake sparse `A` tensor.
 
-Concretely, IREE represents VDMFMA as a virtual MMA layout:
+Concretely, we represent VDMFMA in the following form:
 
 ```mlir
 #iree_gpu.virtual_mma_layout<VDMFMA_F32_8x16x64x2_F16>
@@ -200,7 +200,7 @@ accumulation. The trailing `x2` says that, on the
 CDNA3 F16 path, the virtual operation lowers to two native sparse MFMA
 instructions along `K`.
 
-At the virtual interface, each lane sees dense fragments:
+At the virtual MMA level, each lane sees dense fragments:
 
 ```text
 A   : vector<8xf16>
@@ -208,7 +208,7 @@ B   : vector<16xf16>
 Acc : vector<2xf32>
 ```
 
-The native sparse instruction wants a different physical view:
+The sparse instruction wants a different physical view:
 
 ```text
 A           : vector<4xf16>
@@ -253,7 +253,7 @@ contributes the values placed in positions `{2, 3}`. The `B` operand has to be
 interleaved in that same physical order. Otherwise the dense `K` positions
 covered by the two lanes would be multiplied by the wrong `B` values.
 
-The lowering is:
+The lowering is logically represented as:
 
 ```text
 [c0, c1] -> [c0, 0, c1, 0]
