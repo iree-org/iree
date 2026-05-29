@@ -34,11 +34,11 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
 
   // Arith candidates are uniform when all operands are defined outside the
   // dispatch and all operand/result types are int/index scalars.
-  if (isa<arith::ArithDialect>(op->getDialect())){
+  if (isa<arith::ArithDialect>(op->getDialect())) {
     return llvm::all_of(op->getOperands(), isOutsideDispatch) &&
-          llvm::all_of(op->getOperandTypes(), isIntOrIndex) &&
-          llvm::all_of(op->getResultTypes(), isIntOrIndex);
-  }  
+           llvm::all_of(op->getOperandTypes(), isIntOrIndex) &&
+           llvm::all_of(op->getResultTypes(), isIntOrIndex);
+  }
 
   // A tensor.extract is only uniform scalar metadata when it extracts the sole
   // int/index element from a tensor and all extraction dependencies are already
@@ -54,7 +54,6 @@ static bool isUniformScalarForDispatch(Operation *op, Operation *dispatch) {
   }
 
   return false;
-
 }
 
 // Restrict to arith ops and scalar extracts from one-element

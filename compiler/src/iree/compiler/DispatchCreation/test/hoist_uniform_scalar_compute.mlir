@@ -68,3 +68,48 @@ util.func public @no_hoist_dep_inside_dispatch(%arg0: tensor<?xf32>, %m: index) 
 // CHECK:         arith.muli
 // CHECK:         tensor.empty
 // CHECK:         flow.return
+
+// -----
+
+util.func public @hoist_one_element_tensor_extract(%arg0: tensor<1xi64>, %m: index) -> tensor<?xf32> {
+  %0 = flow.dispatch.region -> (tensor<?xf32>{%m}) {
+    %c0 = arith.constant 0 : index
+    %extracted = tensor.extract %arg0[%c0] : tensor<1xi64>
+    %idx = arith.index_cast %extracted : i64 to index
+    %sum = arith.addi %idx, %m : index
+    %1 = tensor.empty(%sum) : tensor<?xf32>
+    flow.return %1 : tensor<?xf32>
+  }
+  util.return %0 : tensor<?xf32>
+}
+
+// CHECK-LABEL: @hoist_one_element_tensor_extract
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<1xi64>, %[[M:.+]]: index
+// CHECK:       %[[C0:.+]] = arith.constant 0 : index
+// CHECK:       %[[EXTRACT:.+]] = tensor.extract %[[ARG0]][%[[C0]]] : tensor<1xi64>
+// CHECK:       %[[IDX:.+]] = arith.index_cast %[[EXTRACT]] : i64 to index
+// CHECK:       %[[SUM:.+]] = arith.addi %[[IDX]], %[[M]] : index
+// CHECK:       flow.dispatch.region
+// CHECK:         tensor.empty(%[[SUM]])
+// CHECK:         flow.return
+
+// -----
+
+util.func public @dont_hoist_extract_from_multi_element_tensor(%arg0: tensor<4xi64>, %i: index, %m: index) -> tensor<?xf32> {
+  %0 = flow.dispatch.region -> (tensor<?xf32>{%m}) {
+    %extracted = tensor.extract %arg0[%i] : tensor<4xi64>
+    %idx = arith.index_cast %extracted : i64 to index
+    %sum = arith.addi %idx, %m : index
+    %1 = tensor.empty(%sum) : tensor<?xf32>
+    flow.return %1 : tensor<?xf32>
+  }
+  util.return %0 : tensor<?xf32>
+}
+
+// CHECK-LABEL: @dont_hoist_extract_from_multi_element_tensor
+// CHECK:       flow.dispatch.region
+// CHECK:         %[[EXTRACT:.+]] = tensor.extract
+// CHECK:         %[[IDX:.+]] = arith.index_cast %[[EXTRACT]]
+// CHECK:         %[[SUM:.+]] = arith.addi %[[IDX]]
+// CHECK:         tensor.empty(%[[SUM]])
+// CHECK:         flow.return
