@@ -1237,7 +1237,7 @@ const WgpDetails *getVideocoreWgpDetails() {
       /*scaledMmaCount=*/0,     /*scaledMmaOps=*/nullptr,
       {16, 16},                 {256, 256, 256},          32,
       16384,
-      {65535, 65535, 65535}};
+      {0xffff, 0xffff, 0xffff}};
   // clang-format on
   return &androidWgp;
 }
