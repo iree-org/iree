@@ -107,11 +107,18 @@ so the result again has the normal dense `M=8` meaning.
 ## Original HuggingFace Approach
 
 On the standard path for processing data enroute to MFMA instructions, we go
-through global memory -> LDS/Shared memory -> Registers -> MFMA instruction. In
-the original Hugging Face skinny GEMM kernel, data from matrix A is shuffled on
-the way into LDS. The shuffle is necessary to meet the semantics of using the
-sparse trick. If we were to use even lanes to select positions 0,1 and odd lanes
-to select positions 2,3, then for a load with 8 contiguous elements along K:
+through global memory -> LDS/Shared memory -> Registers -> MFMA instruction.\*
+In the original Hugging Face skinny GEMM kernel, data from matrix A is shuffled
+on the way into LDS. The shuffle is necessary to meet the semantics of using the
+sparse trick. If we were to use even lanes to select positions 0,1 and odd
+lanes to select positions 2,3, then for a load with 8 contiguous elements along
+K:
+
+??? note "* Shared-memory hierarchy note"
+
+    This path is a simplified storyline. The complete hierarchy has more detail
+    than is useful for the VDMFMA discussion; refer to the AMDGPU ISA
+    documentation for the full memory hierarchy and instruction-level behavior.
 
 ```text
 K0 K1 K2 K3 K4 K5 K6 K7
@@ -215,7 +222,7 @@ back to the dense virtual shape.
 
 A native F16 sparse MFMA consumes four F16 `A` values per lane. The VDMFMA F16
 fragment has eight, so the lowering emits two native sparse MFMAs. Each one
-uses a different half of `A` and a different per-lane `vector.shuffle` of `B`.
+uses a different half of `A` and a different per-lane shuffle of `B`.
 
 For one lane pair, the two instructions can be visualized as follows. The `K`
 numbering below is the numbering in the dense per-lane fragment after
