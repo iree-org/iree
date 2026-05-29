@@ -40,7 +40,7 @@ func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor
   %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
   %4:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"]} ins(%arg0 : tensor<1x1x1x?xf32>) outs(%3, %1 : tensor<1x1x1xf32>, tensor<1x1x1xi64>) {
   ^bb0(%in: f32, %out: f32, %out_0: i64):
-    %5 = linalg.index 1 : index
+    %5 = linalg.index 3 : index
     %6 = arith.index_cast %5 : index to i64
     %7 = arith.maximumf %in, %out : f32
     %8 = arith.cmpf ogt, %in, %out : f32
