@@ -159,15 +159,16 @@ static LogicalResult bubbleUpSetEncoding(RewriterBase &rewriter,
 }
 
 /// Returns true if the op is hoistable outside dispatches, which indicates that
-/// the ops can be either mappable to Flow ops or get hoisted to globals.
+/// the op can be moved across the dispatch boundary by this pass or hoisted to
+/// globals.
 static bool isHoistableOp(Operation *op) {
   if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
     SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
     SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
     SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
     ArrayRef<int64_t> srcShape = sliceOp.getSourceType().getShape();
-    return IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
-                                                           strides, srcShape);
+    return IREE::Flow::isOffsetSizeAndStrideStructurallyMappableToFlow(
+        offsets, sizes, strides, srcShape);
   }
   // ConstExprHoistingPolicy has an assumption that any root op is not hoistable
   // because they are already hoisted. This is not the case when the parent op
