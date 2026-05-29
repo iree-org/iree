@@ -101,7 +101,8 @@ static iree_status_t iree_tooling_create_run_context(
     iree_vm_instance_t* instance, iree_string_view_t default_device_uri,
     iree_const_byte_span_t module_contents, iree_allocator_t host_allocator,
     iree_vm_context_t** out_context, iree_vm_function_t* out_function,
-    iree_hal_device_t** out_device, iree_hal_allocator_t** out_device_allocator,
+    iree_hal_device_list_t** out_device_list,
+    iree_hal_allocator_t** out_device_allocator,
     iree_hal_replay_recorder_t** out_replay_recorder) {
   // Load all modules specified by --module= flags.
   iree_tooling_module_list_t module_list;
@@ -145,14 +146,14 @@ static iree_status_t iree_tooling_create_run_context(
   // loaded (like the HAL) and special things like the HAL device and allocator
   // are returned for convenience. Note that not all programs need the HAL.
   iree_vm_context_t* context = NULL;
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
   iree_hal_replay_recorder_t* replay_recorder = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
         iree_tooling_create_context_from_flags(
             instance, module_list.count, module_list.values, default_device_uri,
-            host_allocator, &context, &device, &device_allocator,
+            host_allocator, &context, &device_list, &device_allocator,
             &replay_recorder),
         "creating VM context");
   }
@@ -178,7 +179,7 @@ static iree_status_t iree_tooling_create_run_context(
   if (iree_status_is_ok(status)) {
     *out_context = context;
     *out_function = function;
-    *out_device = device;
+    *out_device_list = device_list;
     *out_device_allocator = device_allocator;
     *out_replay_recorder = replay_recorder;
   } else {
@@ -191,7 +192,7 @@ static iree_status_t iree_tooling_create_run_context(
       iree_hal_replay_recorder_release(replay_recorder);
     }
     iree_hal_allocator_release(device_allocator);
-    iree_hal_device_release(device);
+    iree_hal_device_list_free(device_list);
   }
   return status;
 }
@@ -427,15 +428,19 @@ iree_status_t iree_tooling_run_module_with_data(
   // This also returns the HAL device and allocator (if any) for I/O handling.
   iree_vm_context_t* context = NULL;
   iree_vm_function_t function = {0};
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   iree_hal_allocator_t* device_allocator = NULL;
   iree_hal_replay_recorder_t* replay_recorder = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_tooling_create_run_context(
-          instance, default_device_uri, module_contents, host_allocator,
-          &context, &function, &device, &device_allocator, &replay_recorder),
+      iree_tooling_create_run_context(instance, default_device_uri,
+                                      module_contents, host_allocator, &context,
+                                      &function, &device_list,
+                                      &device_allocator, &replay_recorder),
       "creating run context");
+
+  iree_hal_device_t* device =
+      device_list ? iree_hal_device_list_at(device_list, 0) : NULL;
 
   // Parse inputs, run the function, and process outputs.
   iree_status_t status =
@@ -473,13 +478,20 @@ iree_status_t iree_tooling_run_module_with_data(
 
   // Print statistics after we've released the inputs/outputs and the context
   // which may be holding on to resources like constants/variables.
-  if (device_allocator && FLAG_print_statistics) {
-    status = iree_status_join(
-        status, iree_hal_allocator_statistics_fprint(stderr, device_allocator));
+  if (FLAG_print_statistics && device_list) {
+    for (iree_host_size_t i = 0; i < device_list->count; ++i) {
+      iree_hal_device_t* dev = iree_hal_device_list_at(device_list, i);
+      iree_string_view_t device_id = iree_hal_device_id(dev);
+      fprintf(stderr, "Device: %.*s\n", (int)device_id.size, device_id.data);
+      iree_hal_allocator_t* allocator = iree_hal_device_allocator(dev);
+      status = iree_status_join(
+          status, iree_hal_allocator_statistics_fprint(stderr, allocator));
+      fprintf(stderr, "\n");
+    }
   }
 
   iree_hal_allocator_release(device_allocator);
-  iree_hal_device_release(device);
+  iree_hal_device_list_free(device_list);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

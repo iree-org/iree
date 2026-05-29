@@ -565,14 +565,18 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
 
   // Create the context with our support module and all --module= flags.
   iree_vm_context_t* context = NULL;
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   iree_hal_replay_recorder_t* replay_recorder = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_tooling_create_context_from_flags(
         instance, module_list.count, module_list.values,
         /*default_device_uri=*/iree_string_view_empty(), host_allocator,
-        &context, &device, /*out_device_allocator=*/NULL, &replay_recorder);
+        &context, &device_list, /*out_device_allocator=*/NULL,
+        &replay_recorder);
   }
+
+  iree_hal_device_t* device =
+      device_list ? iree_hal_device_list_at(device_list, 0) : NULL;
 
   // Ensure the test module is possible to run.
   if (iree_status_is_ok(status)) {
@@ -607,7 +611,7 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
                                "closing HAL replay capture"));
     iree_hal_replay_recorder_release(replay_recorder);
   }
-  iree_hal_device_release(device);
+  iree_hal_device_list_free(device_list);
   iree_vm_instance_release(instance);
 
   IREE_TRACE_ZONE_END(z0);
