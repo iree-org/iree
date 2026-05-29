@@ -24,9 +24,9 @@ their intended size.
 On AMDGPUs and in particular on the MI3XX Instinct (CDNA) series, these
 instructions are known as MFMA instructions; for example,
 `V_MFMA_F32_16x16x16_F16`. One useful part of the name is the `MxNxK`
-tile shape, where `M` is the number of rows of the left hand matrix, `N` is the
-number of columns of the right hand matrix, and `K` is the shared dimension of
-both.
+tile shape consumed, where `M` is the number of rows of the left hand matrix,
+`N` is the number of columns of the right hand matrix, and `K` is the shared
+dimension of both.
 
 <!-- more -->
 
@@ -78,12 +78,13 @@ physical rows of the hardware instruction more carefully.
 AMD sparse MFMA instructions, `V_SMFMAC`, are matrix-core accumulate
 instructions for a 4:2 structured-sparse `A` matrix and a dense `B` matrix. The
 old `D` value is the accumulator, and the encoded third source is sparse index
-metadata, not a separate `C` matrix operand. The `A` operand is sparse along
-`K`: in each group of four `K` positions, the sparse index metadata tells the
+metadata, not a separate `C` matrix operand. The 4:2 structured-sparse
+operand is defined along `K`: in each group of four `K` positions, the sparse
+index metadata tells the
 instruction which two positions are present.
 
 On CDNA3/gfx942, the relevant sparse instruction has the same physical `16x16`
-output tile but twice the K-depth of the corresponding dense 16x16 MFMA. For
+output tile and the same number of cycles. For
 F16/BF16, dense `V_MFMA_F32_16X16X16_F16` and sparse
 `V_SMFMAC_F32_16X16X32_F16` are both 16-cycle instructions on gfx942. For
 8-bit inputs, the analogous 16-cycle sparse instruction is `16x16x64`.
@@ -149,7 +150,7 @@ inner K tile, these partials are then reduced to yield the full dense result.
     more detail than is useful for the VDMFMA discussion; refer to the AMDGPU ISA
     documentation for the full memory hierarchy and instruction-level behavior.
 
-## Design and Implementation in IREE
+## Adaptation in IREE as VDMFMA
 
 The HF kernel makes `A` sparse-trick "friendly" before we read it from shared
 memory. If IREE wanted to materialize that shuffled `A` form as a
@@ -161,26 +162,20 @@ model described in IREE's [data-tiling path](data-tiling-walkthrough.md). In the
 GPU data-tiling path, encoded contractions reach
 `#iree_gpu.data_tiled_mma_layout` on `iree_codegen.inner_tiled`.
 
-Instead, we take advantage of "virtual MMAs" in IREE. Virtual MMAs in IREE
+Instead, we take advantage of "virtual" MMAs in IREE. Virtual MMAs in IREE
 represent a lowering which is intended to match real MFMAs in the same way but
 are otherwise composed of or are a modification of ordinary MFMAs.
 `#iree_gpu.virtual_mma_layout` is an MMA/inner-tile descriptor: it supplies the
-semantic tile shape, distributed fragment layout, and target lowering, while the
-promoted/shared-memory layouts remain dense and ordinary. Using VDMFMAs, we do
-not need to write a sparse-trick friendly `A` tile to LDS and we do not make the
-promoted shared-memory layout carry the sparse trick. Instead, the
-subgroup-level MMA lowering keeps `A` as the dense per-lane fragment loaded from
-LDS, slices that fragment into native sparse-MFMA chunks, and performs a
-per-lane shuffle of the `B` matrix register data so the dense `K` values line up
-with the positions selected by the sparse metadata. Choosing to shuffle `B` in
+semantic tile shape, distributed thread layout, and target lowering, while the
+promoted/shared-memory layouts remain unchanged. The
+subgroup level MMA lowering keeps `A` as is when loaded from LDS and performs a
+per-lane shuffle of the `B` matrix register data. Choosing to shuffle `B` in
 registers keeps this part local to the virtual MMA; shuffling `A` into LDS would
 also need a matching promotion/read layout for that operand. The final assembly
-forms those fragments with `ds_read2_b64` LDS reads, which incidentally loads
-twice as much data from LDS as the HF kernel. For CDNA3 F16/BF16, the virtual
-`8x16x64` operation lowers to two native `16x16x32` SMFMAC instructions because
-each native sparse instruction covers `K=32`.
+forms generates `ds_read2_b64` LDS reads, which incidentally loads
+twice as much data from LDS as the HF kernel.
 
-In doing so, we give flexibility and keep the sparse trick from becoming a
+With VDMFMA, we give flexibility and keep the sparse trick from becoming a
 skinny-only tensor layout. The current selector still uses it conservatively,
 only when the problem's total
 `M` fits in the virtual `M=8` tile and total `K` is divisible by the VDMFMA
@@ -222,10 +217,6 @@ chooses sparse metadata from lane parity, slices `A`, interleaves the per-lane
 `B` register fragment, issues the sparse MFMAs, and collapses the accumulator
 back to the dense virtual shape.
 
-A native F16 sparse MFMA consumes four F16 `A` values per lane. The VDMFMA F16
-fragment has eight, so the lowering emits two native sparse MFMAs. Each one
-uses a different half of `A` and a different per-lane shuffle of `B`.
-
 For one lane pair, the two instructions can be visualized as follows. The `K`
 numbering below is the numbering in the dense per-lane fragment after
 distribution. `--` marks `A` positions that are implied zero for that physical
@@ -234,7 +225,7 @@ them back to positions within each `K` group of four.
 
 ```text
                          first smfmac                         second smfmac
-sparse A positions       0   1   2   3 | 0   1   2    3       0   1   2    3 | 0   1   2    3
+sparse indices           0   1   2   3 | 0   1   2    3       0   1   2    3 | 0   1   2    3
 L0, selector 0x44        K0  K1  --  --| K2  K3  --   --      K4  K5  --   --| K6  K7  --   --
 L1, selector 0xEE        --  --  K8  K9| --  --  K10  K11     --  --  K12  K13| --  --  K14  K15
 B after shuffle          B0  B1  B8  B9| B2  B3  B10  B11     B4  B5  B12  B13| B6  B7  B14  B15
@@ -247,23 +238,17 @@ first smfmac  B shuffle: [0, 1, 8, 9, 2, 3, 10, 11]
 second smfmac B shuffle: [4, 5, 12, 13, 6, 7, 14, 15]
 ```
 
-Within each physical sparse group of four, the even lane contributes the values
-that the sparse selector places in positions `{0, 1}`, while the odd lane
-contributes the values placed in positions `{2, 3}`. The `B` operand has to be
-interleaved in that same physical order. Otherwise the dense `K` positions
-covered by the two lanes would be multiplied by the wrong `B` values.
-
-The lowering is logically represented as:
+The lowering may thus be logically represented as:
 
 ```text
-[c0, c1] -> [c0, 0, c1, 0]
+acc = [d0, d1] -> [d0, 0, d1, 0]
 
 sparse_index = (lane_id & 1) ? 0xEE : 0x44
 
-smfmac(A[0:4], shuffle(B, [0, 1, 8, 9, 2, 3, 10, 11]))
-smfmac(A[4:8], shuffle(B, [4, 5, 12, 13, 6, 7, 14, 15]))
+acc = smfmac(A[0:4], shuffle(B, [0, 1, 8, 9, 2, 3, 10, 11]), acc, sparse_index)
+acc = smfmac(A[4:8], shuffle(B, [4, 5, 12, 13, 6, 7, 14, 15]), acc, sparse_index)
 
-[d0, d1, d2, d3] -> [d0 + d1, d2 + d3]
+acc = [d0, d1, d2, d3] -> [d0 + d1, d2 + d3]
 ```
 
 The accumulator conversions are wrapped in `util.hoistable_conversion`. In
@@ -274,20 +259,21 @@ that marshaling expands the logical two-element accumulator into the
 four-element SMFMAC form before the sparse MFMA chain, then collapses the native
 accumulator back by summing lane-pair partials.
 
-## Reading the Single-Subgroup Layout
+## Virtual MMA Layout in VDMFMA
 
 The virtual MMA layout uses `MMASingleSubgroupLayout`, so it is worth unpacking
 the terminology.
 
-A single-subgroup layout describes how one operand of one subgroup-level matrix
-operation is distributed across lanes. For each semantic operand dimension, such
-as `M`, `N`, or `K`, it has:
+A single subgroup layout describes how one operand of one subgroup-level matrix
+operation is distributed across lanes in IREE. More precisely, it maps a lane id
+and a per-lane vector element index to semantic operand dimensions such as `M`,
+`N`, and `K`. For each semantic operand dimension, it has:
 
-* `outer`: repetitions outside the lane decomposition;
-* `thread`: the logical thread grid over that dimension;
-* `tstrides`: the lane-id stride for each cross-thread dimension;
-* `element`: the contiguous logical element tile for one thread-grid position,
-  before any `physicalLanesPerThread` split.
+* `outer`: outer repetitions of element tiles in the logical per-thread operand
+  vector;
+* `thread`: the logical thread grid over all dimensions;
+* `tstrides`: the lane-id stride for moving by one element tile along that dimension;
+* `element`: the contiguous logical element tile within that vector
 
 For each dimension, `outer[i] * thread[i] * element[i]` is the semantic tile
 size. For the F16 VDMFMA LHS, IREE uses:
@@ -300,22 +286,35 @@ element  = {1, 16}
 ```
 
 The semantic dimensions are `M` and `K`, so this is an `8x64` LHS tile:
-`1 * 8 * 1 = 8` rows and `1 * 4 * 16 = 64` reduction elements.
+`1 * 8 * 1 = 8` rows and `1 * 4 * 16 = 64` reduction elements. The thread-grid
+part can be visualized as adjacent lane pairs over the `8x4` M/K grid:
 
-For the LHS layout, the product of `thread` is 32, while the VDMFMA subgroup has
-64 lanes. With `tstrides = {2, 16}`,
-lanes `2p` and `2p+1` share the same logical M/K thread-grid coordinates. We then
-then split the divisible element dimension, K, so lane `2p` receives the lower
-8 elements of the 16-wide `K` element tile and lane `2p+1` receives the upper 8.
-The RHS and accumulator layouts use 64 logical thread positions and are not split
-in the same way.
+```text
+                         K thread coordinate
+                  0          1          2          3
+    M0         T0, T1    T16, T17   T32, T33   T48, T49
+    M1         T2, T3    T18, T19   T34, T35   T50, T51
+    M2         T4, T5    T20, T21   T36, T37   T52, T53
+    M3         T6, T7    T22, T23   T38, T39   T54, T55
+    M4         T8, T9    T24, T25   T40, T41   T56, T57
+    M5        T10, T11   T26, T27   T42, T43   T58, T59
+    M6        T12, T13   T28, T29   T44, T45   T60, T61
+    M7        T14, T15   T30, T31   T46, T47   T62, T63
+```
+
+For ordinary layouts, `prod(outer) * prod(element)` is the actual per-lane
+vector length. Here, the product of `thread` is 32, while the CDNA3 subgroup
+size is 64. This means that lanes `2p` and `2p+1` therefore share the same
+logical M/K thread-grid coordinates. IREE then splits the divisible element
+dimension, K, so lane `2p`
+receives the lower 8 elements of the 16-wide `K` element tile and lane `2p+1`
+receives the upper 8. The RHS and accumulator layouts have thread products of
+64, so their logical thread-grid positions already match the physical lanes.
 
 This is the layout-side part that gives VDMFMA the "virtual dense" behavior: the
 compiler still distributes a dense `8x64` LHS tile, but the physical lanes are
 grouped so that each even/odd lane pair owns the two dense halves that the sparse
-instruction trick will reinterpret. The `{0, 1}` versus `{2, 3}` sparse-position
-meaning is introduced later by the MMA lowering: lane-parity sparse metadata,
-`B` interleaving, sparse MFMA emission, and accumulator collapse.
+instruction trick will reinterpret.
 
 ## Selecting VDMFMA
 
@@ -325,11 +324,6 @@ TileAndFuse. TileAndFuse derives VDMFMA candidates from the target's concrete
 MFMA capabilities. On the CDNA3 F16 path, the
 virtual `VDMFMA_F32_8x16x64x2_F16` candidate is derived from
 `MFMA_F32_16x16x16_F16`.
-
-The selector is intentionally narrow today: it only considers VDMFMA when the
-problem's total `M` is at most 8, and when the total `K` is divisible by the
-VDMFMA K tile size used by the selector. For `VDMFMA_F32_8x16x64x2_F16`, that
-selection tile is `2 * 64 = 128` elements along `K`.
 
 There is one tuning detail that is easy to miss. Since sparse MFMAs have twice
 the K-depth as dense MFMAs, the compute phase is shorter than the padded dense
@@ -390,12 +384,13 @@ CDNA3, compared with the padded dense baseline:
 ## Conclusion
 
 VDMFMA is a small compiler abstraction around a target-specific instruction
-mapping. At the IR boundary, it is a dense `8x16xK` virtual MMA. The generated
-code for the F16 kernel above uses paired `ds_read2_b64` LDS reads to form
-dense per-lane fragments; the virtual MMA lowering then uses lane parity, sparse
-selectors, `B` register interleaving, and accumulator folding to invoke AMD
-sparse MFMA instructions. At configuration time, it is selected only for skinny
-shapes where the total `M` fits within the virtual `M=8` tile and total `K`
+mapping. This is represented in the IR as a "virtual dense" `8x16xK` MMA.
+The generated code for the F16 kernel above uses paired `ds_read2_b64` LDS reads
+to form dense per-lane fragments; the virtual MMA lowering then uses lane
+parity, `B` register interleaving, sparse MFMA instructions and accumulator
+reduction to fulfill the conditions of the sparse trick for skinny GEMMs. At
+configuration time, it is currently selected only for skinny shapes where the
+total `M` fits within the virtual `M=8` tile and total `K`
 is divisible by the VDMFMA selection tile. The result is an end-to-end
 adaptation of a hand-written HIP optimization into IREE's AMDGPU codegen
 pipeline.
