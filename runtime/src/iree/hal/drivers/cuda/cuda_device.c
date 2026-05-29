@@ -396,8 +396,11 @@ static iree_hal_cuda_device_t* iree_hal_cuda_device_cast_unsafe(
 // Advances the frontier tracker epoch for the device.
 // Called at submit time (deferred work queue enqueue) because the CUDA work
 // queue is FIFO-ordered: submission order = causal ordering.
+// No-op for standalone devices not assigned to a topology group
+// (frontier_tracker is NULL until iree_hal_device_assign_topology_info).
 static void iree_hal_cuda_device_advance_frontier(
     iree_hal_cuda_device_t* device) {
+  if (!device->frontier_tracker) return;
   uint64_t epoch = (uint64_t)iree_atomic_fetch_add(&device->epoch, 1,
                                                    iree_memory_order_acq_rel) +
                    1;
