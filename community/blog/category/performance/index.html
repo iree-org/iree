@@ -5609,6 +5609,8 @@
       
         
       
+        
+      
     
     
     
@@ -5655,6 +5657,36 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/2026/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2026
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -5917,6 +5949,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtual Dense MFMAs for Skinny GEMM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#data-tiling-walkthrough" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6079,6 +6122,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtual Dense MFMAs for Skinny GEMM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#data-tiling-walkthrough" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6136,6 +6190,69 @@
       <header class="md-typeset">
         <h1 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">link</a></h1>
       </header>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/efric.png" alt="Eric Feng">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2026-05-28 00:00:00+00:00">May 28, 2026</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="./" class="md-meta__link">Performance</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              10 min read
+            
+          </li>
+        
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="virtual-dense-mfmas-for-skinny-gemm"><a class="toclink" href="../../2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">Virtual Dense MFMAs for Skinny GEMM</a></h2>
+<p>When we have a GEMM <code>A * B = C</code>, and it is the situation that <code>A</code> has a
+small number of rows and many columns, we classify this problem as a skinny
+GEMM. The decode phase of LLM inference is a common sight of this problem: a
+small batch of tokens multiplies against a large weight matrix. Skinny GEMMs are
+less convenient for modern GPU architectures than their non-skinny cousins. One
+reason is because modern GPUs take advantage of matrix core units which offer
+instructions that are specifically designed for matrix multiplication and
+operate on fixed tile sizes, and skinny GEMMs are too small to utilize them to
+their intended size.</p>
+<p>On AMDGPUs and in particular on the MI3XX Instinct (CDNA) series, these
+instructions are known as MFMA instructions; for example,
+<code>V_MFMA_F32_16x16x16_F16</code>. One useful part of the name is the <code>MxNxK</code>
+tile shape consumed, where <code>M</code> is the number of rows of the left hand matrix,
+<code>N</code> is the number of columns of the right hand matrix, and <code>K</code> is the shared
+dimension of both.</p>
+
+    
+      <nav class="md-post__action">
+        <a href="../../2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">
+          Continue reading
+        </a>
+      </nav>
+    
+    
+  </div>
+</article>
       
         <article class="md-post md-post--excerpt">
   <header class="md-post__header">

@@ -61,6 +61,10 @@
          <lastmod>2026-05-29</lastmod>
     </url>
     <url>
+         <loc>https://iree.dev/community/blog/2026-05-28-virtual-dense-mfmas-for-skinny-gemm/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/</loc>
          <lastmod>2026-05-29</lastmod>
     </url>
@@ -482,6 +486,10 @@
     </url>
     <url>
          <loc>https://iree.dev/reference/mlir-passes/VM/</loc>
+         <lastmod>2026-05-29</lastmod>
+    </url>
+    <url>
+         <loc>https://iree.dev/community/blog/archive/2026/</loc>
          <lastmod>2026-05-29</lastmod>
     </url>
     <url>

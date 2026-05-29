@@ -8,13 +8,11 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/reference/mlir-passes/CodegenDialectVectorExt/">
+        <link rel="canonical" href="https://iree.dev/community/blog/2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">
       
       
-        <link rel="prev" href="../CodegenDialectPCF/">
+        <link rel="prev" href="../2025-08-25-data-tiling-walkthrough/">
       
-      
-        <link rel="next" href="../CodegenLLVMCPU/">
       
       
         
@@ -25,7 +23,7 @@
     
     
       
-        <title>Dialect/VectorExt - IREE</title>
+        <title>Virtual Dense MFMAs for Skinny GEMM - IREE</title>
       
     
     
@@ -80,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#-iree-vector-ext-fold-unit-extent-dims" class="md-skip">
+        <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-skip">
           Skip to content
         </a>
       
@@ -115,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Dialect/VectorExt
+              Virtual Dense MFMAs for Skinny GEMM
             
           </span>
         </div>
@@ -281,13 +279,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../../reference/" class="md-tabs__link">
           
   
   
@@ -327,11 +323,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../../community/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
           
   
   
@@ -362,7 +360,9 @@
           
             
               
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -1314,8 +1314,6 @@
       
   
   
-    
-  
   
   
     
@@ -1337,23 +1335,22 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../../reference/" class="md-nav__link ">
               
   
   
@@ -1371,13 +1368,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1413,13 +1410,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1428,7 +1422,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_2" >
         
           
-          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
             
   
   
@@ -1464,7 +1458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../glossary/" class="md-nav__link">
+      <a href="../../../reference/glossary/" class="md-nav__link">
         
   
   
@@ -1494,7 +1488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../optimization-options/" class="md-nav__link">
+      <a href="../../../reference/optimization-options/" class="md-nav__link">
         
   
   
@@ -1524,7 +1518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tuning/" class="md-nav__link">
+      <a href="../../../reference/tuning/" class="md-nav__link">
         
   
   
@@ -1562,7 +1556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../extensions/" class="md-nav__link">
+      <a href="../../../reference/extensions/" class="md-nav__link">
         
   
   
@@ -1616,13 +1610,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1632,7 +1623,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../bindings/" class="md-nav__link ">
+            <a href="../../../reference/bindings/" class="md-nav__link ">
               
   
   
@@ -1650,7 +1641,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1676,7 +1667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../bindings/c-api/" class="md-nav__link">
+      <a href="../../../reference/bindings/c-api/" class="md-nav__link">
         
   
   
@@ -1706,7 +1697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../bindings/python/" class="md-nav__link">
+      <a href="../../../reference/bindings/python/" class="md-nav__link">
         
   
   
@@ -1764,13 +1755,10 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
@@ -1780,7 +1768,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../mlir-dialects/" class="md-nav__link ">
+            <a href="../../../reference/mlir-dialects/" class="md-nav__link ">
               
   
   
@@ -1800,7 +1788,7 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -1892,7 +1880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Flow/" class="md-nav__link">
         
   
   
@@ -1920,7 +1908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HAL/" class="md-nav__link">
         
   
   
@@ -1948,7 +1936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Stream/" class="md-nav__link">
         
   
   
@@ -1976,7 +1964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Util/" class="md-nav__link">
         
   
   
@@ -2004,7 +1992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VM/" class="md-nav__link">
         
   
   
@@ -2102,7 +2090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Encoding/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Encoding/" class="md-nav__link">
         
   
   
@@ -2130,7 +2118,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/LinalgExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/LinalgExt/" class="md-nav__link">
         
   
   
@@ -2158,7 +2146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/TensorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/TensorExt/" class="md-nav__link">
         
   
   
@@ -2262,7 +2250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREECodegen/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREECodegen/" class="md-nav__link">
         
   
   
@@ -2290,7 +2278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREECPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREECPU/" class="md-nav__link">
         
   
   
@@ -2318,7 +2306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREEGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEGPU/" class="md-nav__link">
         
   
   
@@ -2346,7 +2334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IREEVectorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEVectorExt/" class="md-nav__link">
         
   
   
@@ -2374,7 +2362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/PCF/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/PCF/" class="md-nav__link">
         
   
   
@@ -2402,7 +2390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/VMVX/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
         
   
   
@@ -2500,7 +2488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/Check/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Check/" class="md-nav__link">
         
   
   
@@ -2588,7 +2576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALInline/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
         
   
   
@@ -2616,7 +2604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/HALLoader/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
         
   
   
@@ -2710,7 +2698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../mlir-dialects/IOParameters/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IOParameters/" class="md-nav__link">
         
   
   
@@ -2759,8 +2747,6 @@
                 
   
   
-    
-  
   
   
     
@@ -2782,21 +2768,20 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../reference/mlir-passes/" class="md-nav__link ">
               
   
   
@@ -2816,13 +2801,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2908,7 +2893,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Flow/" class="md-nav__link">
         
   
   
@@ -2936,7 +2921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/HAL/" class="md-nav__link">
         
   
   
@@ -2964,7 +2949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Stream/" class="md-nav__link">
         
   
   
@@ -2992,7 +2977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Util/" class="md-nav__link">
         
   
   
@@ -3020,7 +3005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/VM/" class="md-nav__link">
         
   
   
@@ -3122,7 +3107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ConstEval/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/ConstEval/" class="md-nav__link">
         
   
   
@@ -3150,7 +3135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../DispatchCreation/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/DispatchCreation/" class="md-nav__link">
         
   
   
@@ -3178,7 +3163,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../GlobalOptimization/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/GlobalOptimization/" class="md-nav__link">
         
   
   
@@ -3206,7 +3191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../InputConversion/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/InputConversion/" class="md-nav__link">
         
   
   
@@ -3234,7 +3219,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../Preprocessing/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Preprocessing/" class="md-nav__link">
         
   
   
@@ -3267,10 +3252,8 @@
                 
   
   
-    
   
   
-  
     
     
       
@@ -3303,11 +3286,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_5_4" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5_4" >
         
           
           <label class="md-nav__link" for="__nav_4_5_4" id="__nav_4_5_4_label" tabindex="0">
@@ -3328,7 +3313,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_5_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4_5_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -3346,7 +3331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenCommon/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommon/" class="md-nav__link">
         
   
   
@@ -3374,7 +3359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenCommonCPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommonCPU/" class="md-nav__link">
         
   
   
@@ -3402,7 +3387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenCommonGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommonGPU/" class="md-nav__link">
         
   
   
@@ -3430,7 +3415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenDialectGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenDialectGPU/" class="md-nav__link">
         
   
   
@@ -3458,7 +3443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenDialectPCF/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenDialectPCF/" class="md-nav__link">
         
   
   
@@ -3483,35 +3468,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Dialect/VectorExt
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../reference/mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
         
   
   
@@ -3527,57 +3487,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vector-ext-fold-unit-extent-dims" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-vector-ext-fold-unit-extent-dims
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vector-ext-lower-arg-compare-to-vector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-vector-ext-lower-arg-compare-to-vector
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#-iree-vector-ext-lower-transfer-gather-scatter-to-vector" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-vector-ext-lower-transfer-gather-scatter-to-vector
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3590,7 +3499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenLLVMCPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
         
   
   
@@ -3618,7 +3527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenLLVMGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
         
   
   
@@ -3646,7 +3555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenSPIRV/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenSPIRV/" class="md-nav__link">
         
   
   
@@ -3674,7 +3583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CodegenVMVX/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenVMVX/" class="md-nav__link">
         
   
   
@@ -5535,6 +5444,8 @@
       
   
   
+    
+  
   
   
     
@@ -5552,22 +5463,23 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../community/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -5585,13 +5497,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -5608,6 +5520,8 @@
                 
   
   
+    
+  
   
   
     
@@ -5627,20 +5541,21 @@
       
       
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
+          
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2" >
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../community/blog/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -5660,13 +5575,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_6_2" id="__nav_6_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -5752,7 +5667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/archive/2026/" class="md-nav__link">
+      <a href="../archive/2026/" class="md-nav__link">
         
   
   
@@ -5782,7 +5697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/archive/2025/" class="md-nav__link">
+      <a href="../archive/2025/" class="md-nav__link">
         
   
   
@@ -5812,7 +5727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/archive/2024/" class="md-nav__link">
+      <a href="../archive/2024/" class="md-nav__link">
         
   
   
@@ -5842,7 +5757,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/archive/2021/" class="md-nav__link">
+      <a href="../archive/2021/" class="md-nav__link">
         
   
   
@@ -5942,7 +5857,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/category/frontends/" class="md-nav__link">
+      <a href="../category/frontends/" class="md-nav__link">
         
   
   
@@ -5972,7 +5887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/category/performance/" class="md-nav__link">
+      <a href="../category/performance/" class="md-nav__link">
         
   
   
@@ -6002,7 +5917,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/blog/category/platforms/" class="md-nav__link">
+      <a href="../category/platforms/" class="md-nav__link">
         
   
   
@@ -6046,7 +5961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../community/tags/" class="md-nav__link">
+      <a href="../../tags/" class="md-nav__link">
         
   
   
@@ -6084,6 +5999,8 @@
             
             
               
+                
+              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -6093,6 +6010,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -6101,10 +6020,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#-iree-vector-ext-fold-unit-extent-dims" class="md-nav__link">
+  <a href="#removing-padding-with-sparse-mfma" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-vector-ext-fold-unit-extent-dims
+        Removing Padding with Sparse MFMA
       
     </span>
   </a>
@@ -6112,10 +6031,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-vector-ext-lower-arg-compare-to-vector" class="md-nav__link">
+  <a href="#original-huggingface-approach" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-vector-ext-lower-arg-compare-to-vector
+        Original HuggingFace Approach
       
     </span>
   </a>
@@ -6123,10 +6042,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-vector-ext-lower-transfer-gather-scatter-to-vector" class="md-nav__link">
+  <a href="#adaptation-in-iree-as-vdmfma" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-vector-ext-lower-transfer-gather-scatter-to-vector
+        Adaptation in IREE as VDMFMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#virtual-mma-layout-in-vdmfma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Virtual MMA Layout in VDMFMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#selecting-vdmfma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selecting VDMFMA
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Conclusion
       
     </span>
   </a>
@@ -6142,15 +6105,118 @@
             
           
           
-            <div class="md-content" data-md-component="content">
-              
-              <article class="md-content__inner md-typeset">
+  <div class="md-content md-content--post" data-md-component="content">
+    <div class="md-sidebar md-sidebar--post" data-md-component="sidebar" data-md-type="navigation">
+      <div class="md-sidebar__scrollwrap">
+        <div class="md-sidebar__inner md-post">
+          <nav class="md-nav md-nav--primary">
+            <div class="md-post__back">
+              <div class="md-nav__title md-nav__container">
+                <a href="../" class="md-nav__link">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+                  <span class="md-ellipsis">
+                    Back to index
+                  </span>
+                </a>
+              </div>
+            </div>
+            
+              <div class="md-post__authors md-typeset">
                 
-                  
+                  <div class="md-profile md-post__profile">
+                    <span class="md-author md-author--long">
+                      <img src="https://github.com/efric.png" alt="Eric Feng">
+                    </span>
+                    <span class="md-profile__description">
+                      <strong>
+                        
+                          <a href="https://github.com/efric">Eric Feng</a>
+                        
+                      </strong>
+                      <br>
+                      Software Engineer
+                    </span>
+                  </div>
+                
+              </div>
+            
+            <ul class="md-post__meta md-nav__list">
+              <li class="md-nav__item md-nav__item--section">
+                <div class="md-post__title">
+                  <span class="md-ellipsis">
+                    Metadata
+                  </span>
+                </div>
+                <nav class="md-nav">
+                  <ul class="md-nav__list">
+                    <li class="md-nav__item">
+                      <div class="md-nav__link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>
+                        <time datetime="2026-05-28 00:00:00+00:00" class="md-ellipsis">May 28, 2026</time>
+                      </div>
+                    </li>
+                    
+                    
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 3v15h3V3zm3 2 4 13 3-1-4-13zM5 5v13h3V5zM3 19v2h18v-2z"/></svg>
+                          <span class="md-ellipsis">
+                            in
+                            
+                              <a href="../category/performance/">Performance</a></span>
+                        </div>
+                      </li>
+                    
+                    
+                      
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg>
+                          <span class="md-ellipsis">
+                            
+                              10 min read
+                            
+                          </span>
+                        </div>
+                      </li>
+                    
+                  </ul>
+                </nav>
+              </li>
+            </ul>
+            
+          </nav>
+          
+        </div>
+      </div>
+    </div>
+    <article class="md-content__inner md-typeset">
+      
+        
+  
+
+
+  <nav class="md-tags" >
+    
+      
+      
+      
+      
+        <a href="../../tags/#tag:codegen" class="md-tag">Codegen</a>
+      
+    
+      
+      
+      
+      
+        <a href="../../tags/#tag:gpu" class="md-tag">GPU</a>
+      
+    
+  </nav>
 
 
   
-    <a href="https://github.com/iree-org/iree/tree/main/Codegen/Dialect/VectorExt/Transforms" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/community/blog/posts/vdmfma_canvas.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
     </a>
@@ -6158,16 +6224,359 @@
   
 
 
-  <h1>Dialect/VectorExt</h1>
+<h1 id="virtual-dense-mfmas-for-skinny-gemm">Virtual Dense MFMAs for Skinny GEMM<a class="headerlink" href="#virtual-dense-mfmas-for-skinny-gemm" title="Permanent link">link</a></h1>
+<p>When we have a GEMM <code>A * B = C</code>, and it is the situation that <code>A</code> has a
+small number of rows and many columns, we classify this problem as a skinny
+GEMM. The decode phase of LLM inference is a common sight of this problem: a
+small batch of tokens multiplies against a large weight matrix. Skinny GEMMs are
+less convenient for modern GPU architectures than their non-skinny cousins. One
+reason is because modern GPUs take advantage of matrix core units which offer
+instructions that are specifically designed for matrix multiplication and
+operate on fixed tile sizes, and skinny GEMMs are too small to utilize them to
+their intended size.</p>
+<p>On AMDGPUs and in particular on the MI3XX Instinct (CDNA) series, these
+instructions are known as MFMA instructions; for example,
+<code>V_MFMA_F32_16x16x16_F16</code>. One useful part of the name is the <code>MxNxK</code>
+tile shape consumed, where <code>M</code> is the number of rows of the left hand matrix,
+<code>N</code> is the number of columns of the right hand matrix, and <code>K</code> is the shared
+dimension of both.</p>
+<!-- more -->
 
-<!-- Autogenerated by mlir-tblgen; don't manually edit -->
+<p>For the ordinary dense GEMM MFMA path available to AMDGPU CDNA series, the
+relevant 16-bit and 8-bit MFMAs have at least 16 rows in M. Consider M=8, which
+is larger than the path we take in IREE for GEMV-like problems, but evidently
+smaller than 16. The previous codegen path in IREE handled this by padding the
+workgroup <code>M</code> tile to 16 and
+using the ordinary dense MFMA configuration. The IR snippet below shows this
+directly: the logical <code>M=8</code> operation is configured with <code>padding = [16, ...]</code>,
+a dense <code>mma_layout</code>, and a <code>workgroup</code> tile of 16 rows.</p>
+<!-- markdownlint-disable -->
+<details><summary>IR with padding</summary>
 
-<h3 id="-iree-vector-ext-fold-unit-extent-dims"><code>-iree-vector-ext-fold-unit-extent-dims</code><a class="headerlink" href="#-iree-vector-ext-fold-unit-extent-dims" title="Permanent link">link</a></h3>
-<p><em>Folds unit dims for iree_vector_ext ops</em></p>
-<h3 id="-iree-vector-ext-lower-arg-compare-to-vector"><code>-iree-vector-ext-lower-arg-compare-to-vector</code><a class="headerlink" href="#-iree-vector-ext-lower-arg-compare-to-vector" title="Permanent link">link</a></h3>
-<p><em>Lower iree_vector_ext.arg_compare to vector/SCF ops</em></p>
-<h3 id="-iree-vector-ext-lower-transfer-gather-scatter-to-vector"><code>-iree-vector-ext-lower-transfer-gather-scatter-to-vector</code><a class="headerlink" href="#-iree-vector-ext-lower-transfer-gather-scatter-to-vector" title="Permanent link">link</a></h3>
-<p><em>Lower transfer_gather/transfer_scatter to vector.gather/vector.scatter</em></p>
+<div class="highlight"><pre><span></span><code>%10 = linalg.generic {
+  indexing_maps = [
+    affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;,
+    affine_map&lt;(d0, d1, d2) -&gt; (d1, d2)&gt;,
+    affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
+  ],
+  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]
+} ins(%6, %7 : tensor&lt;8x16384xf16&gt;, tensor&lt;13312x16384xf16&gt;)
+  outs(%9 : tensor&lt;8x13312xf32&gt;)
+  attrs = {
+    lowering_config = #iree_gpu.lowering_config&lt;{
+      mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_16x16x16_F16&gt;,
+      padding = [16, 64, 128],
+      promote_operands = [0, 1],
+      reduction = [0, 0, 8],
+      subgroup = [1, 2, 0],
+      workgroup = [16, 64, 0]
+    }&gt;
+  } {
+  ...
+}
+</code></pre></div>
+
+</details>
+<!-- markdownlint-restore -->
+
+<p>Padding is simple and robust, but we would be wasting cycles on rows that are
+not present in the original matrix. The question is whether we can use the 16
+physical rows of the hardware instruction more carefully.</p>
+<h2 id="removing-padding-with-sparse-mfma">Removing Padding with Sparse MFMA<a class="headerlink" href="#removing-padding-with-sparse-mfma" title="Permanent link">link</a></h2>
+<p>AMD sparse MFMA instructions, <code>V_SMFMAC</code>, are matrix-core accumulate
+instructions for a 4:2 structured-sparse <code>A</code> matrix and a dense <code>B</code> matrix. The
+old <code>D</code> value is the accumulator, and the encoded third source is sparse index
+metadata, not a separate <code>C</code> matrix operand. The 4:2 structured-sparse
+operand is defined along <code>K</code>: in each group of four <code>K</code> positions, the sparse
+index metadata tells the
+instruction which two positions are non-zero.</p>
+<p>On CDNA3/gfx942, the relevant sparse instruction has the same physical <code>16x16</code>
+output tile and the same number of cycles. For
+F16/BF16, dense <code>V_MFMA_F32_16X16X16_F16</code> and sparse
+<code>V_SMFMAC_F32_16X16X32_F16</code> are both 16-cycle instructions on gfx942. For
+8-bit inputs, the analogous 16-cycle sparse instruction is <code>16x16x64</code>.</p>
+<p>The idea, described in the Hugging Face
+<a href="https://huggingface.co/blog/mi300kernels">MI300 kernel article</a>, is to make
+two sparse rows represent one dense row. One lane selects positions
+<code>{0, 1}</code> in each group of four. Its paired lane selects positions <code>{2, 3}</code>.
+Together, the two lanes cover the dense <code>K</code> positions for one logical row. The
+benefit, in addition to removing padding, is that a 16-cycle sparse
+instruction covers twice the logical <code>K</code> depth of the corresponding dense
+16-cycle F16/BF16 MFMA.</p>
+<p><img alt="Using sparsity for skinny inputs" src="https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/blog/mi300kernels/sparsity_trick.png" /></p>
+<p>Figure: "Using sparsity for skinny inputs" from
+<a href="https://huggingface.co/blog/mi300kernels">Creating custom kernels for the AMD MI300</a>.</p>
+<p>After the sparse MFMA, the four-element native accumulator contains pairs of
+partial sums for the same logical rows. The lowering adds those pairs together,
+so the result again has the normal dense <code>M=8</code> meaning.</p>
+<h2 id="original-huggingface-approach">Original HuggingFace Approach<a class="headerlink" href="#original-huggingface-approach" title="Permanent link">link</a></h2>
+<p>On the standard path for processing data enroute to MFMA instructions, we go
+through global memory -&gt; LDS/Shared memory -&gt; Registers -&gt; MFMA instruction*.
+In the original Hugging Face skinny GEMM kernel, data from matrix <code>A</code> is shuffled
+on the way into LDS. The shuffle is necessary to meet the semantics of using the
+sparse trick. If we were to use even lanes to select positions <code>{0,1}</code> and odd
+lanes to select positions <code>{2,3}</code>, then for a load with 8 contiguous elements along
+<code>K</code>:</p>
+<div class="highlight"><pre><span></span><code>K0 K1 K2 K3 K4 K5 K6 K7
+</code></pre></div>
+<p>We would want even lanes to hold:</p>
+<div class="highlight"><pre><span></span><code>K0 K1 K4 K5
+</code></pre></div>
+<p>and odd lanes to hold</p>
+<div class="highlight"><pre><span></span><code>K2 K3 K6 K7
+</code></pre></div>
+<p>In other words, the data loaded from LDS looks exactly like:</p>
+<div class="highlight"><pre><span></span><code>lane 0: K0 K1 _  _  K4 K5 _  _
+lane 1: _  _  K2 K3 _  _  K6 K7
+</code></pre></div>
+<p>Together (as an even/odd pair), and across all threads in the subgroup, these
+precisely reconstruct the original dense rows. Following the loop around the
+inner K tile, these partials are then reduced to yield the full dense result.</p>
+<details class="note">
+<summary>* Shared-memory hierarchy note</summary>
+<p>This path is a simplified storyline. The actual shared-memory hierarchy has
+more detail than is useful for the VDMFMA discussion; refer to the AMDGPU ISA
+documentation for the full memory hierarchy and instruction-level behavior.</p>
+</details>
+<h2 id="adaptation-in-iree-as-vdmfma">Adaptation in IREE as VDMFMA<a class="headerlink" href="#adaptation-in-iree-as-vdmfma" title="Permanent link">link</a></h2>
+<p>The HF kernel makes <code>A</code> sparse-trick "friendly" before we read it from shared
+memory. If IREE wanted to materialize that shuffled <code>A</code> form as a
+compiler-owned tensor or storage layout, the natural existing mechanism would be
+data tiling: attach an encoding, carry the encoded tensor type through the
+producer/consumer boundary, and materialize the layout change with
+packing/unpacking or other physical layout operations when needed. That is the
+model described in IREE's <a href="../2025-08-25-data-tiling-walkthrough/">data-tiling path</a>. In the
+GPU data-tiling path, encoded contractions reach
+<code>#iree_gpu.data_tiled_mma_layout</code> on <code>iree_codegen.inner_tiled</code>.</p>
+<p>Instead, we take advantage of "virtual" MMAs in IREE. Virtual MMAs in IREE
+represent a lowering which is intended to match real MFMAs in the same way but
+are otherwise composed of or are a modification of ordinary MFMAs.
+<code>#iree_gpu.virtual_mma_layout</code> is an MMA/inner-tile descriptor: it supplies the
+semantic tile shape, distributed thread layout, and target lowering, while the
+promoted/shared-memory layouts remain unchanged. The
+subgroup level MMA lowering keeps <code>A</code> as is when loaded from LDS and performs a
+per-lane shuffle of the <code>B</code> matrix register data. Choosing to shuffle <code>B</code> in
+registers keeps this part local to the virtual MMA; shuffling <code>A</code> into LDS would
+also need a matching promotion/read layout for that operand. The final assembly
+forms generates <code>ds_read2_b64</code> LDS reads, which incidentally loads
+twice as much data from LDS as the HF kernel.</p>
+<p>With VDMFMA, we give flexibility and keep the sparse trick from becoming a
+skinny-only tensor layout. The current selector still uses it conservatively,
+only when the problem's total
+<code>M</code> fits in the virtual <code>M=8</code> tile and total <code>K</code> is divisible by the VDMFMA
+selection tile. But the abstraction is an <code>8</code>-row virtual MMA, not an encoded
+storage format for an entire matmul. A future selector could tile a larger
+multiple-of-8 <code>M</code> problem into VDMFMA-sized pieces.</p>
+<p>Concretely, we represent VDMFMA in the following form:</p>
+<div class="highlight"><pre><span></span><code>#iree_gpu.virtual_mma_layout&lt;VDMFMA_F32_8x16x64x2_F16&gt;
+</code></pre></div>
+<p>Read this as a dense <code>8x16x64</code> virtual operation with F16 inputs and F32
+accumulation. The trailing <code>x2</code> says that, on the
+CDNA3 F16 path, the virtual operation lowers to two native sparse MFMA
+instructions along <code>K</code>.</p>
+<p>At the virtual MMA level, each lane sees dense fragments:</p>
+<div class="highlight"><pre><span></span><code>A   : vector&lt;8xf16&gt;
+B   : vector&lt;16xf16&gt;
+Acc : vector&lt;2xf32&gt;
+</code></pre></div>
+<p>The sparse instruction wants a different physical view:</p>
+<div class="highlight"><pre><span></span><code>A           : vector&lt;4xf16&gt;
+B           : vector&lt;8xf16&gt;
+Acc/D       : vector&lt;4xf32&gt;
+SparseIndex : vector&lt;4xi8&gt;
+</code></pre></div>
+<p>VDMFMA is the adapter between these two views. It expands the accumulator,
+chooses sparse metadata from lane parity, slices <code>A</code> and <code>B</code>, shuffles the per-lane
+<code>B</code> register fragment, issues the sparse MFMAs, and collapses the accumulator
+back to the dense virtual shape.</p>
+<p>For one lane pair, the two instructions can be visualized as follows. The <code>K</code>
+numbering below is the numbering in the dense per-lane fragment after
+distribution. <code>--</code> marks <code>A</code> positions that are implied zero for that physical
+sparse row. The non-zero <code>A</code> samples are packed, and sparse index metadata maps
+them back to positions within each <code>K</code> group of four.</p>
+<div class="highlight"><pre><span></span><code>                         first smfmac                         second smfmac
+sparse indices           0   1   2   3 | 0   1   2    3       0   1   2    3 | 0   1   2    3
+L0, selector 0x44        K0  K1  --  --| K2  K3  --   --      K4  K5  --   --| K6  K7  --   --
+L1, selector 0xEE        --  --  K8  K9| --  --  K10  K11     --  --  K12  K13| --  --  K14  K15
+B after shuffle          B0  B1  B8  B9| B2  B3  B10  B11     B4  B5  B12  B13| B6  B7  B14  B15
+</code></pre></div>
+<p>The corresponding shuffle indices in the lowering are:</p>
+<div class="highlight"><pre><span></span><code>first smfmac  B shuffle: [0, 1, 8, 9, 2, 3, 10, 11]
+second smfmac B shuffle: [4, 5, 12, 13, 6, 7, 14, 15]
+</code></pre></div>
+<p>The lowering may thus be logically represented as:</p>
+<div class="highlight"><pre><span></span><code>acc = [d0, d1] -&gt; [d0, 0, d1, 0]
+
+sparse_index = (lane_id &amp; 1) ? 0xEE : 0x44
+
+acc = smfmac(A[0:4], shuffle(B, [0, 1, 8, 9, 2, 3, 10, 11]), acc, sparse_index)
+acc = smfmac(A[4:8], shuffle(B, [4, 5, 12, 13, 6, 7, 14, 15]), acc, sparse_index)
+
+acc = [d0, d1, d2, d3] -&gt; [d0 + d1, d2 + d3]
+</code></pre></div>
+<p>The accumulator conversions are wrapped in <code>util.hoistable_conversion</code>. In
+IREE, this marks temporary marshaling between the layout used by <code>inner_tiled</code>
+and the layout expected by the target intrinsic, so matching conversions can be
+moved out of loops or canceled when the surrounding IR permits it. For VDMFMA,
+that marshaling expands the logical two-element accumulator into the
+four-element SMFMAC form before the sparse MFMA chain, then collapses the native
+accumulator back by summing lane-pair partials.</p>
+<h2 id="virtual-mma-layout-in-vdmfma">Virtual MMA Layout in VDMFMA<a class="headerlink" href="#virtual-mma-layout-in-vdmfma" title="Permanent link">link</a></h2>
+<p>The virtual MMA layout uses <code>MMASingleSubgroupLayout</code>, so it is worth unpacking
+the terminology.</p>
+<p>A single subgroup layout describes how one operand of one subgroup-level matrix
+operation is distributed across lanes in IREE. More precisely, it maps a lane id
+and a per-lane vector element index to semantic operand dimensions such as <code>M</code>,
+<code>N</code>, and <code>K</code>. For each semantic operand dimension, it has:</p>
+<ul>
+<li><code>outer</code>: outer repetitions of element tiles in the logical per-thread operand
+  vector;</li>
+<li><code>thread</code>: the logical thread grid over all dimensions;</li>
+<li><code>tstrides</code>: the lane-id stride for moving by one element tile along that dimension;</li>
+<li><code>element</code>: the contiguous logical element tile within that vector</li>
+</ul>
+<p>For each dimension, <code>outer[i] * thread[i] * element[i]</code> is the semantic tile
+size. For the F16 VDMFMA LHS, IREE uses:</p>
+<div class="highlight"><pre><span></span><code>outer    = {1, 1}
+thread   = {8, 4}
+tstrides = {2, 16}
+element  = {1, 16}
+</code></pre></div>
+<p>The semantic dimensions are <code>M</code> and <code>K</code>, so this is an <code>8x64</code> LHS tile:
+<code>1 * 8 * 1 = 8</code> rows and <code>1 * 4 * 16 = 64</code> reduction elements. The thread-grid
+part can be visualized as adjacent lane pairs over the <code>8x4</code> M/K grid:</p>
+<div class="highlight"><pre><span></span><code>                         K thread coordinate
+                  0          1          2          3
+    M0         T0, T1    T16, T17   T32, T33   T48, T49
+    M1         T2, T3    T18, T19   T34, T35   T50, T51
+    M2         T4, T5    T20, T21   T36, T37   T52, T53
+    M3         T6, T7    T22, T23   T38, T39   T54, T55
+    M4         T8, T9    T24, T25   T40, T41   T56, T57
+    M5        T10, T11   T26, T27   T42, T43   T58, T59
+    M6        T12, T13   T28, T29   T44, T45   T60, T61
+    M7        T14, T15   T30, T31   T46, T47   T62, T63
+</code></pre></div>
+<p>For ordinary layouts, <code>prod(outer) * prod(element)</code> is the actual per-lane
+vector length. Here, the product of <code>thread</code> is 32, while the CDNA3 subgroup
+size is 64. This means that lanes <code>2p</code> and <code>2p+1</code> therefore share the same
+logical M/K thread-grid coordinates. IREE then splits the divisible element
+dimension, K, so lane <code>2p</code>
+receives the lower 8 elements of the 16-wide <code>K</code> element tile and lane <code>2p+1</code>
+receives the upper 8. The RHS and accumulator layouts have thread products of
+64, so their logical thread-grid positions already match the physical lanes.</p>
+<p>This is the layout-side part that gives VDMFMA the "virtual dense" behavior: the
+compiler still distributes a dense <code>8x64</code> LHS tile, but the physical lanes are
+grouped so that each even/odd lane pair owns the two dense halves that the sparse
+instruction trick will reinterpret.</p>
+<h2 id="selecting-vdmfma">Selecting VDMFMA<a class="headerlink" href="#selecting-vdmfma" title="Permanent link">link</a></h2>
+<p>VDMFMA is not selected for every matmul. IREE has multiple codegen pipelines,
+and the one which is relevant for the shape of skinny GEMMs belongs to
+TileAndFuse. TileAndFuse derives VDMFMA candidates from the target's concrete
+MFMA capabilities. On the CDNA3 F16 path, the
+virtual <code>VDMFMA_F32_8x16x64x2_F16</code> candidate is derived from
+<code>MFMA_F32_16x16x16_F16</code>.</p>
+<p>There is one tuning detail that is easy to miss. Since sparse MFMAs have twice
+the K-depth as dense MFMAs, the compute phase is shorter than the padded dense
+MFMA sequence it replaces.
+In a software-pipelined loop, that can reduce the amount of compute available
+to hide the next tile's memory latency. The final selection change scales the
+reduction tile count by the virtual intrinsic's K unroll factor to compensate
+for the shorter compute phase.</p>
+<p>With VDMFMA selected for the same shape, the new IR excerpt
+has no <code>M=16</code> padding. The workgroup <code>M</code> tile is 8, and the MMA kind is the
+virtual layout.</p>
+<!-- markdownlint-disable -->
+<details><summary>IR with VDMFMA</summary>
+
+<div class="highlight"><pre><span></span><code>%10 = linalg.generic {
+  indexing_maps = [
+    affine_map&lt;(d0, d1, d2) -&gt; (d0, d2)&gt;,
+    affine_map&lt;(d0, d1, d2) -&gt; (d1, d2)&gt;,
+    affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
+  ],
+  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]
+} ins(%6, %7 : tensor&lt;8x16384xf16&gt;, tensor&lt;13312x16384xf16&gt;)
+  outs(%9 : tensor&lt;8x13312xf32&gt;)
+  attrs = {
+    lowering_config = #iree_gpu.lowering_config&lt;{
+      mma_kind =
+        #iree_gpu.virtual_mma_layout&lt;VDMFMA_F32_8x16x64x2_F16&gt;,
+      promote_operands = [0, 1],
+      reduction = [0, 0, 4],
+      subgroup = [1, 2, 0],
+      workgroup = [8, 64, 0]
+    }&gt;
+  } {
+  ...
+}
+</code></pre></div>
+
+</details>
+<!-- markdownlint-restore -->
+
+<h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">link</a></h2>
+<p>The first end-to-end 16-bit selection change reported the following numbers on
+CDNA3, compared with the padded dense baseline:</p>
+<table>
+<thead>
+<tr>
+<th>Shape</th>
+<th style="text-align: right;">VDMFMA</th>
+<th style="text-align: right;">Baseline</th>
+<th style="text-align: right;">Improvement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>f16_8x13312x16384</code></td>
+<td style="text-align: right;">189 us</td>
+<td style="text-align: right;">206 us</td>
+<td style="text-align: right;">+8.3%</td>
+</tr>
+<tr>
+<td><code>f16_8x13312x8192</code></td>
+<td style="text-align: right;">117 us</td>
+<td style="text-align: right;">116 us</td>
+<td style="text-align: right;">-</td>
+</tr>
+<tr>
+<td><code>f16_8x2304x16384</code></td>
+<td style="text-align: right;">133 us</td>
+<td style="text-align: right;">138 us</td>
+<td style="text-align: right;">+3.6%</td>
+</tr>
+<tr>
+<td><code>f16_8x2304x8192</code></td>
+<td style="text-align: right;">103 us</td>
+<td style="text-align: right;">110 us</td>
+<td style="text-align: right;">+6.4%</td>
+</tr>
+<tr>
+<td><code>f16_8x6656x16384</code></td>
+<td style="text-align: right;">127 us</td>
+<td style="text-align: right;">130 us</td>
+<td style="text-align: right;">+2.3%</td>
+</tr>
+<tr>
+<td><code>f16_8x6656x8192</code></td>
+<td style="text-align: right;">102 us</td>
+<td style="text-align: right;">109 us</td>
+<td style="text-align: right;">+6.4%</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conclusion">Conclusion<a class="headerlink" href="#conclusion" title="Permanent link">link</a></h2>
+<p>VDMFMA is a small compiler abstraction around a target-specific instruction
+mapping. This is represented in the IR as a "virtual dense" <code>8x16xK</code> MMA.
+The generated code for the F16 kernel above uses paired <code>ds_read2_b64</code> LDS reads
+to form dense per-lane fragments; the virtual MMA lowering then uses lane
+parity, <code>B</code> register shuffling, sparse MFMA instructions and accumulator
+reduction to fulfill the conditions of the sparse trick for skinny GEMMs. At
+configuration time, it is currently selected only for skinny shapes where the
+total <code>M</code> fits within the virtual <code>M=8</code> tile and total <code>K</code>
+is divisible by the VDMFMA selection tile. The result is an end-to-end
+adaptation of a hand-written HIP optimization into IREE's AMDGPU codegen
+pipeline.</p>
 
 
 
@@ -6181,12 +6590,14 @@
 
 
 
+  
 
 
-                
-              </article>
-            </div>
-          
+
+      
+    </article>
+  </div>
+
           
   <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
 
