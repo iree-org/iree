@@ -12,6 +12,12 @@ extend-exclude = [
     "**/runtime/src/iree/tokenizer/testdata/",
 ]
 
+[default]
+extend-ignore-re = [
+    # Markdown emphasis for the IREE acronym expansion splits "Environment".
+    '\*\*I\*\*ntermediate \*\*R\*\*epresentation \*\*E\*\*xecution \*\*E\*\*nvironment',
+]
+
 [default.extend-words]
 # AMD Heterogeneous System Architecture.
 hsa = "hsa"

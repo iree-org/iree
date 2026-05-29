@@ -5,7 +5,7 @@ hide:
 
 # IREE
 
-IREE (**I**ntermediate **R**epresentation **E**xecution **E**environment[^1]) is
+IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment[^1]) is
 an [MLIR](https://mlir.llvm.org/)-based end-to-end compiler and runtime that
 lowers Machine Learning (ML) models to a unified IR that scales up to meet the
 needs of the datacenter and down to satisfy the constraints and special
