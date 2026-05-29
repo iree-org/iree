@@ -21,18 +21,20 @@ instructions that are specifically designed for matrix multiplication and
 operate on fixed tile sizes, and skinny GEMMs are too small to utilize them to
 their intended size.
 
-On AMDGPUs and in particular on the MI3XX Instinct series, these
-instructions are known as MFMA instructions. One useful part of the name is the
-`MxNxK` tile shape, where M is the number of rows of the left hand matrix, N is
-the number of columns of the right hand matrix, and K is the shared dimension of
+On AMDGPUs and in particular on the MI3XX Instinct (CDNA) series, these
+instructions are known as MFMA instructions; for example,
+`V_MFMA_F32_16x16x16_F16`. One useful part of the name is the `MxNxK`
+tile shape, where `M` is the number of rows of the left hand matrix, `N` is the
+number of columns of the right hand matrix, and `K` is the shared dimension of
 both.
 
 <!-- more -->
 
-For the ordinary dense GEMM MFMA path used here, the relevant 16-bit and
-8-bit MFMAs have at least 16 rows in M. Consider M=8, which is larger than the
-path we take in IREE for matvec, but evidently smaller than 16. The previous
-codegen path in IREE handled this by padding the workgroup `M` tile to 16 and
+For the ordinary dense GEMM MFMA path available to AMDGPU CDNA series, the
+relevant 16-bit and 8-bit MFMAs have at least 16 rows in M. Consider M=8, which
+is larger than the path we take in IREE for GEMV-like problems, but evidently
+smaller than 16. The previous codegen path in IREE handled this by padding the
+workgroup `M` tile to 16 and
 using the ordinary dense MFMA configuration. The IR snippet below shows this
 directly: the logical `M=8` operation is configured with `padding = [16, ...]`,
 a dense `mma_layout`, and a `workgroup` tile of 16 rows.
@@ -68,7 +70,7 @@ a dense `mma_layout`, and a `workgroup` tile of 16 rows.
 <!-- markdownlint-restore -->
 
 Padding is simple and robust, but we would be wasting cycles on rows that are
-not present in the original program. The question is whether we can use the 16
+not present in the original matrix. The question is whether we can use the 16
 physical rows of the hardware instruction more carefully.
 
 ## Removing Padding with Sparse MFMA
@@ -77,8 +79,8 @@ AMD sparse MFMA instructions, `V_SMFMAC`, are matrix-core accumulate
 instructions for a 4:2 structured-sparse `A` matrix and a dense `B` matrix. The
 old `D` value is the accumulator, and the encoded third source is sparse index
 metadata, not a separate `C` matrix operand. The `A` operand is sparse along
-`K`: in each group of four `K` positions, metadata tells the instruction which
-two positions are present.
+`K`: in each group of four `K` positions, the sparse index metadata tells the
+instruction which two positions are present.
 
 On CDNA3/gfx942, the relevant sparse instruction has the same physical `16x16`
 output tile but twice the K-depth of the corresponding dense 16x16 MFMA. For
@@ -88,8 +90,8 @@ F16/BF16, dense `V_MFMA_F32_16X16X16_F16` and sparse
 
 The idea, described in the Hugging Face
 [MI300 kernel article](https://huggingface.co/blog/mi300kernels), is to make
-two physical sparse rows represent one dense row. One lane selects positions
-`0, 1` in each group of four. Its paired lane selects positions `2, 3`.
+two sparse rows represent one dense row. One lane selects positions
+`{0, 1}` in each group of four. Its paired lane selects positions `{2, 3}`.
 Together, the two lanes cover the dense `K` positions for one logical row. The
 benefit, in addition to removing padding, is that a 16-cycle sparse
 instruction covers twice the logical `K` depth of the corresponding dense
@@ -107,18 +109,12 @@ so the result again has the normal dense `M=8` meaning.
 ## Original HuggingFace Approach
 
 On the standard path for processing data enroute to MFMA instructions, we go
-through global memory -> LDS/Shared memory -> Registers -> MFMA instruction.\*
-In the original Hugging Face skinny GEMM kernel, data from matrix A is shuffled
+through global memory -> LDS/Shared memory -> Registers -> MFMA instruction.*
+In the original Hugging Face skinny GEMM kernel, data from matrix `A` is shuffled
 on the way into LDS. The shuffle is necessary to meet the semantics of using the
-sparse trick. If we were to use even lanes to select positions 0,1 and odd
-lanes to select positions 2,3, then for a load with 8 contiguous elements along
-K:
-
-??? note "* Shared-memory hierarchy note"
-
-    This path is a simplified storyline. The complete hierarchy has more detail
-    than is useful for the VDMFMA discussion; refer to the AMDGPU ISA
-    documentation for the full memory hierarchy and instruction-level behavior.
+sparse trick. If we were to use even lanes to select positions `{0,1}` and odd
+lanes to select positions `{2,3}`, then for a load with 8 contiguous elements along
+`K`:
 
 ```text
 K0 K1 K2 K3 K4 K5 K6 K7
@@ -146,6 +142,12 @@ lane 1: _  _  K2 K3 _  _  K6 K7
 Together (as an even/odd pair), and across all threads in the subgroup, these
 precisely reconstruct the original dense rows. Following the loop around the
 inner K tile, these partials are then reduced to yield the full dense result.
+
+??? note "* Shared-memory hierarchy note"
+
+    This path is a simplified storyline. The actual shared-memory hierarchy has
+    more detail than is useful for the VDMFMA discussion; refer to the AMDGPU ISA
+    documentation for the full memory hierarchy and instruction-level behavior.
 
 ## Design and Implementation in IREE
 
@@ -246,8 +248,8 @@ second smfmac B shuffle: [4, 5, 12, 13, 6, 7, 14, 15]
 ```
 
 Within each physical sparse group of four, the even lane contributes the values
-that the sparse selector places in positions `0, 1`, while the odd lane
-contributes the values placed in positions `2, 3`. The `B` operand has to be
+that the sparse selector places in positions `{0, 1}`, while the odd lane
+contributes the values placed in positions `{2, 3}`. The `B` operand has to be
 interleaved in that same physical order. Otherwise the dense `K` positions
 covered by the two lanes would be multiplied by the wrong `B` values.
 
@@ -302,8 +304,8 @@ The semantic dimensions are `M` and `K`, so this is an `8x64` LHS tile:
 
 For the LHS layout, the product of `thread` is 32, while the VDMFMA subgroup has
 64 lanes. With `tstrides = {2, 16}`,
-lanes `2p` and `2p+1` share the same logical M/K thread-grid coordinates. IREE
-then splits the divisible element dimension, K, so lane `2p` receives the lower
+lanes `2p` and `2p+1` share the same logical M/K thread-grid coordinates. We then
+then split the divisible element dimension, K, so lane `2p` receives the lower
 8 elements of the 16-wide `K` element tile and lane `2p+1` receives the upper 8.
 The RHS and accumulator layouts use 64 logical thread positions and are not split
 in the same way.
