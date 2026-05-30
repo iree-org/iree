@@ -17,5 +17,10 @@ namespace mlir::iree_compiler {
 void populateMapDistributeGenericPatterns(RewritePatternSet &patterns,
                                           Value threadId);
 
+/// Adds PackLayout-specific patterns for distributing memory ops
+/// (transfer_gather) using PackLayoutAttr.
+void populateMapDistributeMemoryPatterns(RewritePatternSet &patterns,
+                                         Value threadId);
+
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_DIALECT_MAP_TRANSFORMS_MAPPATTERNS_H_
