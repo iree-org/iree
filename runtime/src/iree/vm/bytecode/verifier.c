@@ -72,9 +72,13 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
         iree_vm_RodataSegmentDef_external_data_offset(segment);
     uint64_t segment_length =
         iree_vm_RodataSegmentDef_external_data_length(segment);
-    uint64_t segment_end =
-        archive_rodata_offset + segment_offset + segment_length;
-    if (segment_end > archive_contents.data_length) {
+    // Use non-overflowing comparisons instead of summing three uint64_t values:
+    // archive_rodata_offset + segment_offset + segment_length could wrap 2^64,
+    // producing a small segment_end that falsely passes the bounds check.
+    iree_host_size_t avail = archive_contents.data_length;
+    if (archive_rodata_offset > avail ||
+        segment_offset > avail - archive_rodata_offset ||
+        segment_length > avail - archive_rodata_offset - segment_offset) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "rodata[%zu] external reference out of range", i);
     }
