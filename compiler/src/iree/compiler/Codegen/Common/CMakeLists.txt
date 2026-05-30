@@ -68,6 +68,7 @@ iree_cc_library(
   SRCS
     "AbsorbSwizzleHintToAlloc.cpp"
     "AddFastMathFlags.cpp"
+    "AlignMemRefOps.cpp"
     "BlockDynamicDimensions.cpp"
     "BubbleUpOrdinalOps.cpp"
     "BufferizationAnalysis.cpp"
