@@ -6,6 +6,7 @@
 
 # Tests for common transforms.
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -28,6 +29,7 @@ iree_lit_test_suite(
             "config_gather_like_ops.mlir",
             "config_horizontally_fused_ops.mlir",
             "config_llvm_gpu_constraints.mlir",
+            "config_llvm_gpu_vd_attention_constraints.mlir",
             "config_matmul.mlir",
             "config_matvec.mlir",
             "config_root_op_attribute.mlir",
@@ -67,8 +69,6 @@ iree_lit_test_suite(
             "rocdl_pipeline_spirv_test.mlir",
             "rocdl_pipeline_test.mlir",
             "rocdl_prepare_for_spirv.mlir",
-            "rocm_spirv_serialize.mlir",
-            "rocm_spirv_serialize_target_attr.mlir",
             "sort_pipeline_test.mlir",
             "tensorcore_vectorization.mlir",
             "transform_dialect_bufferize.mlir",
@@ -92,6 +92,8 @@ iree_lit_test_suite(
         # tensor_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
         exclude = [
+            "rocm_spirv_serialize.mlir",
+            "rocm_spirv_serialize_target_attr.mlir",
             "transform_dialect_codegen_bufferize_spec.mlir",
             "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
             "transform_dialect_codegen_vector_distribution_spec.mlir",
@@ -109,4 +111,31 @@ iree_lit_test_suite(
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+if(IREE_TARGET_BACKEND_ROCM)
+""",
+    inline = True,
+)
+
+iree_lit_test_suite(
+    name = "lit_rocm",
+    srcs = [
+        "rocm_spirv_serialize.mlir",
+        "rocm_spirv_serialize_target_attr.mlir",
+    ],
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

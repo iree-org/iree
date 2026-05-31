@@ -286,5 +286,38 @@ TEST_F(HipAllocatorTest, DeviceLocalWithoutMappingStaysDeviceOnly) {
       iree_all_bits_set(compat_params.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
 }
 
+// Check that a standalone HIP device (no topology group) doesn't crash when a
+// queue operation is executed.
+TEST_F(HipAllocatorTest, StandaloneDeviceH2DTransferDoesNotCrash) {
+  constexpr iree_device_size_t kSize = 256;
+
+  iree_hal_buffer_params_t device_params = {0};
+  device_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  device_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  device_params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE;
+  iree_hal_buffer_t* device_buffer = nullptr;
+  IREE_ASSERT_OK(
+      iree_hal_allocator_allocate_buffer(iree_hal_device_allocator(device_),
+                                         device_params, kSize, &device_buffer));
+
+  uint8_t host_data[kSize];
+  memset(host_data, 0xAB, kSize);
+  IREE_EXPECT_OK(iree_hal_device_transfer_h2d(
+      device_, host_data, device_buffer, /*target_offset=*/0, kSize,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+
+  uint8_t readback[kSize];
+  memset(readback, 0, kSize);
+  IREE_EXPECT_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0, readback, kSize,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+
+  EXPECT_EQ(0, memcmp(host_data, readback, kSize))
+      << "Data corrupted across H2D + D2H round-trip";
+
+  iree_hal_buffer_release(device_buffer);
+}
+
 }  // namespace
 }  // namespace iree::hal::hip

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-transform-dialect-interpreter -transform-dialect-drop-schedule %s | FileCheck %s
+// RUN: iree-opt --split-input-file -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule %s | FileCheck %s
 
 func.func @non_entry_bb_allocs() {
   cf.br ^bb1

@@ -75,11 +75,11 @@ iree_cc_library(
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
     "Verifiers.cpp"
+    "VideoCoreConfig.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgTransformDialect
-    IREELinalgTransformDialectPasses
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect

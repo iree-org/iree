@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 #map = affine_map<(oi, oj, ok, ii, ij, ik) -> (oi, ok, ii, ik)>
 #map1 = affine_map<(oi, oj, ok, ii, ij, ik) -> (ok, oj, ik, ij)>

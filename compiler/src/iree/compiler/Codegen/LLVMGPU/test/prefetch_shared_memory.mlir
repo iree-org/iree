@@ -904,7 +904,7 @@ func.func @gather_to_lds_pre_loop_wait_before_non_adjacent_read(
 // CHECK:   gpu.barrier
 // CHECK:   vector.transfer_write
 func.func @prefetch_global_transpose_load(
-    %src: memref<128x8xbf16>,
+    %src: memref<128x8xbf16, #gpu.address_space<global>>,
     %out: memref<f32>) {
   %cst_f32 = arith.constant 0.0 : f32
   %cst_bf16 = arith.constant 0.0 : bf16
@@ -913,7 +913,7 @@ func.func @prefetch_global_transpose_load(
   %c128 = arith.constant 128 : index
   %alloc = memref.alloc() : memref<8xbf16, #gpu.address_space<workgroup>>
   %result = scf.for %k = %c0 to %c128 step %c1 iter_args(%acc = %cst_f32) -> f32 {
-    %tr = amdgpu.global_transpose_load %src[%k, %c0] : memref<128x8xbf16> -> vector<8xbf16>
+    %tr = amdgpu.global_transpose_load %src[%k, %c0] : memref<128x8xbf16, #gpu.address_space<global>> -> vector<8xbf16>
     vector.transfer_write %tr, %alloc[%c0] {in_bounds = [true]}
         : vector<8xbf16>, memref<8xbf16, #gpu.address_space<workgroup>>
     %v = vector.transfer_read %alloc[%c0], %cst_bf16

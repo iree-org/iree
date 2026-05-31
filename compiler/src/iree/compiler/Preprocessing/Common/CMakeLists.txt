@@ -39,6 +39,7 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
+    "PromoteLinalgOutputs.cpp"
     "SwapStridedInsertSliceWithContraction.cpp"
     "TransposeMatmul.cpp"
   DEPS
@@ -52,6 +53,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
@@ -73,6 +75,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::TensorExt::IR

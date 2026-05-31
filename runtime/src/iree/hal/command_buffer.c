@@ -173,6 +173,57 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hal_buffer_ref_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_ref_normalize(iree_hal_buffer_ref_t* buffer_ref) {
+  IREE_ASSERT(buffer_ref);
+  // no buffer, referring to binding slot, nothing to do
+  if (!buffer_ref->buffer) {
+    return iree_ok_status();
+  }
+  // re-use binding normalization
+  iree_hal_buffer_binding_t binding = {.buffer = buffer_ref->buffer,
+                                       .offset = buffer_ref->offset,
+                                       .length = buffer_ref->length};
+  iree_status_t status = iree_hal_buffer_binding_normalize(&binding);
+  buffer_ref->buffer = binding.buffer;
+  buffer_ref->offset = binding.offset;
+  buffer_ref->length = binding.length;
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_buffer_binding_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_binding_normalize(iree_hal_buffer_binding_t* binding) {
+  IREE_ASSERT(binding);
+  // replace whole buffer with actual length
+  if (binding->length == IREE_HAL_WHOLE_BUFFER) {
+    binding->length =
+        iree_hal_buffer_byte_length(binding->buffer) - binding->offset;
+  }
+  // check if subspan is within allocated buffer
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(binding->buffer);
+  iree_device_size_t allocated_length =
+      iree_hal_buffer_byte_length(allocated_buffer);
+  iree_device_size_t subspan_offset =
+      iree_hal_buffer_byte_offset(binding->buffer);
+  IREE_ASSERT(
+      subspan_offset + binding->offset + binding->length <= allocated_length,
+      "subspan exceeds range of allocated buffer");
+  // change binding to point to beginning of same range in underlying allocated
+  // buffer
+  binding->buffer = allocated_buffer;
+  binding->offset += subspan_offset;
+  return iree_ok_status();
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
 

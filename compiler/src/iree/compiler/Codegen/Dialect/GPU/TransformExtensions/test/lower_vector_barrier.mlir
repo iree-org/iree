@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 func.func @lower_value_barrier(%input: vector<4xf32>) -> vector<4xf32> {
   %0 = iree_gpu.value_barrier %input : vector<4xf32>

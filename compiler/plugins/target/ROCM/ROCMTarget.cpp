@@ -567,9 +567,11 @@ public:
     modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass(
         LLVMGPUSelectLoweringStrategyPassOptions{codegenOptions}));
     if (shouldEmitPipelineConstraints()) {
-      FunctionLikeNest(modulePassManager)
-          .addPass(createInsertSMTConstraintsPass)
-          .addPass(createVerifySMTConstraintsPass);
+      FunctionLikeNest funcPassManager(modulePassManager);
+      funcPassManager.addPass(createInsertSMTConstraintsPass);
+      if (shouldVerifyPipelineConstraints()) {
+        funcPassManager.addPass(createVerifySMTConstraintsPass);
+      }
     }
   }
 

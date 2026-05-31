@@ -152,8 +152,8 @@ iree_codegen.smt.constraints
 
 // -----
 
-// Reports unsupported pipelines that do not generate constraints.
-// expected-error @below {{failed to materialize compilation_info from constraints: pipeline does not support compilation_info materialization}}
+// Reports missing named materialization outputs generically.
+// expected-error @below {{failed to materialize compilation_info from constraints: pipeline does not support materializing configuration attr 'compilation_info'}}
 iree_codegen.smt.constraints
     target = <set = 0>,
     pipeline = #iree_codegen.transform_dialect_codegen,

@@ -815,10 +815,12 @@ NB_MODULE(_ireeCompilerDialects, m) {
         }
 
         MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirStringRef configurationAttrName =
+            mlirStringRefCreateFromCString("compilation_info");
         MlirAttribute attr =
-            ireeCodegenMaterializeCompilationInfoFromConstraintsOp(
-                op, nameRefs.size(), nameRefs.data(), values.data(),
-                &diagnosticMessage);
+            ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+                op, configurationAttrName, nameRefs.size(), nameRefs.data(),
+                values.data(), &diagnosticMessage);
         if (mlirAttributeIsNull(attr)) {
           if (!mlirAttributeIsNull(diagnosticMessage)) {
             throw std::runtime_error(
@@ -832,6 +834,48 @@ NB_MODULE(_ireeCompilerDialects, m) {
       "Materialize a compilation_info attr from a constraints op and flat knob "
       "assignment dictionary.",
       py::arg("constraints_op"), py::arg("assignments"));
+
+  iree_codegen_module.def(
+      "materialize_configuration_attr",
+      [](MlirOperation op, std::string configurationAttrName,
+         py::dict assignments) -> MlirAttribute {
+        std::vector<MlirStringRef> nameRefs;
+        std::vector<int64_t> values;
+        nameRefs.reserve(assignments.size());
+        values.reserve(assignments.size());
+        for (auto [key, value] : assignments) {
+          Py_ssize_t nameSize = 0;
+          const char *nameData = PyUnicode_AsUTF8AndSize(key.ptr(), &nameSize);
+          if (!nameData) {
+            throw py::python_error();
+          }
+          nameRefs.push_back(
+              mlirStringRefCreate(nameData, static_cast<size_t>(nameSize)));
+          values.push_back(py::cast<int64_t>(value));
+        }
+
+        MlirAttribute diagnosticMessage = mlirAttributeGetNull();
+        MlirStringRef configurationAttrNameRef = mlirStringRefCreate(
+            configurationAttrName.data(), configurationAttrName.size());
+        MlirAttribute attr =
+            ireeCodegenMaterializeConfigurationAttrFromConstraintsOp(
+                op, configurationAttrNameRef, nameRefs.size(), nameRefs.data(),
+                values.data(), &diagnosticMessage);
+        if (mlirAttributeIsNull(attr)) {
+          if (!mlirAttributeIsNull(diagnosticMessage)) {
+            throw std::runtime_error(
+                unwrap(mlirStringAttrGetValue(diagnosticMessage)).str());
+          }
+          throw std::runtime_error(
+              "configuration attr materialization from constraints failed");
+        }
+        return attr;
+      },
+      "Materialize a named configuration attr from a constraints op and flat "
+      "knob "
+      "assignment dictionary.",
+      py::arg("constraints_op"), py::arg("configuration_attr_name"),
+      py::arg("assignments"));
 
   //===-------------------------------------------------------------------===//
   // Binding to utility function ireeCodegenGetTunerRootOps

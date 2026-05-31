@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -66,8 +65,6 @@ int main(int argc, char **argv) {
   memref::registerMemRefPasses();
   registerTransformsPasses();
   registerSCFPasses();
-  // Local dialect passes.
-  mlir::linalg::transform::registerDropSchedulePass();
 
   // External models.
   mlir::func::registerInlinerExtension(registry);

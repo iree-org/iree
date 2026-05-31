@@ -97,6 +97,8 @@ LogicalResult setAppleCodeGenConfig(IREE::GPU::TargetAttr target,
                                     Operation *rootOp);
 LogicalResult setAMDCodeGenConfig(IREE::GPU::TargetAttr target,
                                   Operation *rootOp);
+LogicalResult setVideoCoreCodeGenConfig(IREE::GPU::TargetAttr target,
+                                        Operation *rootOp);
 LogicalResult setMaliCodeGenConfig(IREE::GPU::TargetAttr target,
                                    Operation *rootOp);
 LogicalResult setNVIDIACodeGenConfig(IREE::GPU::TargetAttr target,

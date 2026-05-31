@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func @no_lowering_config() -> index {
   %0 = arith.constant 0 : index

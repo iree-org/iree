@@ -182,4 +182,41 @@ def GeneralizeLinalgMatMulPass :
   ];
 }
 
+def PromoteLinalgOutputsPass
+    : Pass<"iree-preprocessing-promote-linalg-outputs", ""> {
+  let summary = "Promotes outputs of linalg ops from a narrower type to f32.";
+  let options =
+      [Option<"promoteType", "type",
+              "mlir::iree_compiler::Preprocessing::PromoteType",
+              /*default=*/"", "Select the target type for promotion.",
+              [{::llvm::cl::values(
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteType::F16,
+                        "f16",
+                        "Promote from f16."),
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteType::BF16,
+                        "bf16",
+                        "Promote from bf16.")
+           )}]>,
+       Option<"promoteOperation", "operation",
+              "mlir::iree_compiler::Preprocessing::PromoteOperation",
+              /*default=*/
+              "mlir::iree_compiler::Preprocessing::PromoteOperation::None",
+              "Select the type of operations to promote.",
+              [{::llvm::cl::values(
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::All,
+                        "all",
+                        "Promote all ops."),
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::Conv,
+                        "conv",
+                        "Only promote convolution ops."),
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::Matmul,
+                        "matmul",
+                        "Only promote matmul ops."),
+             clEnumValN(mlir::iree_compiler::Preprocessing::PromoteOperation::None,
+                        "none",
+                        "Promote no ops.")
+           )}]>,
+  ];
+}
+
 #endif  // IREE_PREPROCESSING_COMMON_PASSES

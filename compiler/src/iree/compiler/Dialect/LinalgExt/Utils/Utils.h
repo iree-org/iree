@@ -15,6 +15,8 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
+#include <optional>
+
 namespace mlir {
 struct Range;
 }; // namespace mlir
@@ -241,6 +243,27 @@ bool isGatherlikeOp(Operation *op);
 /// The expectation is that the LHS is common, and all the operands are
 /// different RHS.
 bool isaHorizontallyFusedContraction(Operation *op);
+
+enum class ArgmaxKind {
+  Canonical,
+  StableHloSelectStyle,
+};
+
+struct ArgmaxCombinerInfo {
+  ArgmaxKind kind;
+  Operation *maximumOp;
+  DictionaryAttr maximumAttrs;
+  DictionaryAttr greaterThanCmpAttrs;
+  DictionaryAttr isNanCmpAttrs;
+  DictionaryAttr equalCmpAttrs;
+  DictionaryAttr valueSelectAttrs;
+  DictionaryAttr indexSelectAttrs;
+};
+
+/// Returns the argmax combiner info represented by the given linalg.generic, if
+/// any.
+std::optional<ArgmaxCombinerInfo>
+getArgmaxCombinerInfo(linalg::GenericOp genericOp);
 
 /// Check if a linalg.generic is representing an argmax operation.
 bool isArgmaxOp(linalg::GenericOp genericOp);

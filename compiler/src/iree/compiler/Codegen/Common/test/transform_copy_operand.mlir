@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule --split-input-file | FileCheck %s
 
 func.func @main(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   return %arg0 : tensor<?xf32>

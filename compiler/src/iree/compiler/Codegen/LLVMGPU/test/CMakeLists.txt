@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "config_gather_like_ops.mlir"
     "config_horizontally_fused_ops.mlir"
     "config_llvm_gpu_constraints.mlir"
+    "config_llvm_gpu_vd_attention_constraints.mlir"
     "config_matmul.mlir"
     "config_matvec.mlir"
     "config_root_op_attribute.mlir"
@@ -62,8 +63,6 @@ iree_lit_test_suite(
     "rocdl_pipeline_spirv_test.mlir"
     "rocdl_pipeline_test.mlir"
     "rocdl_prepare_for_spirv.mlir"
-    "rocm_spirv_serialize.mlir"
-    "rocm_spirv_serialize_target_attr.mlir"
     "sort_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
     "transform_dialect_bufferize.mlir"
@@ -91,5 +90,20 @@ iree_lit_test_suite(
     transform_dialect_codegen_vector_distribution_spec.mlir
     transform_dialect_codegen_vector_warp_execute_on_lane_0_spec.mlir
 )
+
+if(IREE_TARGET_BACKEND_ROCM)
+
+iree_lit_test_suite(
+  NAME
+    lit_rocm
+  SRCS
+    "rocm_spirv_serialize.mlir"
+    "rocm_spirv_serialize_target_attr.mlir"
+  TOOLS
+    FileCheck
+    iree-opt
+)
+
+endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

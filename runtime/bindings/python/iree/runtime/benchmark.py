@@ -35,13 +35,17 @@ BenchmarkResult = namedtuple(
 )
 
 DTYPE_TO_ABI_TYPE = {
-    numpy.dtype(numpy.float32): "f32",
-    numpy.dtype(numpy.int32): "i32",
-    numpy.dtype(numpy.int64): "i64",
-    numpy.dtype(numpy.float64): "f64",
-    numpy.dtype(numpy.int16): "i16",
     numpy.dtype(numpy.float16): "f16",
+    numpy.dtype(numpy.float32): "f32",
+    numpy.dtype(numpy.float64): "f64",
     numpy.dtype(numpy.int8): "i8",
+    numpy.dtype(numpy.uint8): "i8",
+    numpy.dtype(numpy.int16): "i16",
+    numpy.dtype(numpy.uint16): "i16",
+    numpy.dtype(numpy.int32): "i32",
+    numpy.dtype(numpy.uint32): "i32",
+    numpy.dtype(numpy.int64): "i64",
+    numpy.dtype(numpy.uint64): "i64",
     numpy.dtype(numpy.bool_): "i1",
 }
 
@@ -66,14 +70,13 @@ def benchmark_exe():
     )
 
 
-def benchmark_module(
+def _build_benchmark_args(
     module: Union[VmModule, PathLike],
-    entry_function=None,
-    inputs=[],
-    timeout=None,
+    entry_function: str | None = None,
+    inputs: list[Union[str, numpy.ndarray]] | None = None,
     **kwargs,
-):
-    args = [iree.runtime.benchmark_exe()]
+) -> tuple[list[str], bytes | None]:
+    args = [benchmark_exe()]
 
     if isinstance(module, VmModule):
         funcs = [a for a in module.function_names if a != "__init"]
@@ -115,6 +118,20 @@ def benchmark_module(
             values = ",".join([str(v) for v in values])
 
         args.append(f"--input={shape}x{abitype}={values}")
+
+    return args, flatbuffer
+
+
+def benchmark_module(
+    module: Union[VmModule, PathLike],
+    entry_function: str | None = None,
+    inputs: list[Union[str, numpy.ndarray]] | None = None,
+    timeout: float | None = None,
+    **kwargs,
+):
+    args, flatbuffer = _build_benchmark_args(
+        module=module, entry_function=entry_function, inputs=inputs, **kwargs
+    )
 
     try:
         benchmark_process = subprocess.run(

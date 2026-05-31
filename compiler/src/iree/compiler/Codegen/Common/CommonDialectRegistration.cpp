@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "mlir/Dialect/AMDGPU/Transforms/MemoryAccessOpInterfacesImpl.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -112,6 +113,7 @@ void registerTransformDialectTranslationDependentDialects(
   transform::registerLoopExtension(registry);
   vector::registerSubsetOpInterfaceExternalModels(registry);
   vector::registerTransformDialectExtension(registry);
+  amdgpu::registerMemoryAccessOpInterfacesExternalModels(registry);
 }
 
 } // namespace mlir::iree_compiler

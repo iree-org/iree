@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter --transform-dialect-drop-schedule | FileCheck %s
+// RUN: iree-opt %s --iree-transform-dialect-interpreter --iree-transform-dialect-drop-schedule | FileCheck %s
 
 // CHECK-LABEL: func.func @pad_alloc
 // CHECK:         %[[A:.*]] = memref.alloc() : memref<64x68xf16, #gpu.address_space<workgroup>>

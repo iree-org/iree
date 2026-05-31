@@ -568,24 +568,29 @@ void WorkgroupCountHintOp::build(OpBuilder &builder, OperationState &state,
 // ConstraintsOp
 //===----------------------------------------------------------------------===//
 
-/// Recursively check whether `name` appears as a knob name in `attr`.
-/// Checks IntKnobAttr/OneOfKnobAttr names and recurses into
-/// DictionaryAttr/ArrayAttr.
+/// Recursively check whether `name` appears as a knob name anywhere in
+/// `attr`. Uses MLIR's generic sub-element walker so the check sees
+/// through typed wrapper attributes (e.g. iree_gpu.lowering_config wraps
+/// a DictionaryAttr that may carry knob references); a TypeSwitch limited
+/// to DictionaryAttr/ArrayAttr would silently miss those.
+template <typename KnobAttr>
+constexpr auto kKnobNameMatcher = [](StringRef name, bool &found) {
+  return [name, &found](KnobAttr knob) -> WalkResult {
+    if (knob.getName().getValue() == name) {
+      found = true;
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  };
+};
+
 static bool hasKnobName(Attribute attr, StringRef name) {
-  return TypeSwitch<Attribute, bool>(attr)
-      .Case<IntKnobAttr, OneOfKnobAttr>(
-          [&](auto knob) { return knob.getName().getValue() == name; })
-      .Case([&](DictionaryAttr dict) {
-        return llvm::any_of(dict, [&](NamedAttribute entry) {
-          return hasKnobName(entry.getValue(), name);
-        });
-      })
-      .Case([&](ArrayAttr array) {
-        return llvm::any_of(array, [&](Attribute element) {
-          return hasKnobName(element, name);
-        });
-      })
-      .Default(false);
+  bool found = false;
+  AttrTypeWalker walker;
+  walker.addWalk(kKnobNameMatcher<IntKnobAttr>(name, found));
+  walker.addWalk(kKnobNameMatcher<OneOfKnobAttr>(name, found));
+  walker.walk(attr);
+  return found;
 }
 
 LogicalResult ConstraintsOp::verify() {

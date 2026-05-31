@@ -185,6 +185,24 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
 }
 
 //===----------------------------------------------------------------------===//
+// LLVMPIPE
+//===----------------------------------------------------------------------===//
+const WgpDetails *getLLVMPIPEWgpDetails() {
+  ComputeBitwidths computeBitwdiths = allComputeBits;
+  // clang-format off
+  static const WgpDetails llvmpipeWgp = {
+      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0, /*scaledMmaOps=*/nullptr,
+      /*subgroupSizeChoices=*/{8, 8}, /*maxWorkgroupSizes=*/{1024, 1024, 1024},
+      /*maxThreadSize=*/1024,
+      /*maxWorkgroupMemoryBytes=*/32 * 1024, // Vulkan: maxComputeSharedMemorySize
+      /*maxWorkgroupCounts=*/{0xffff, 0xffff, 0xffff}};
+  // clang-format on
+  return &llvmpipeWgp;
+}
+
+//===----------------------------------------------------------------------===//
 // Known AMD target details
 //
 // Note: the max workgroup size is given as signed int32 max because MLIR's
@@ -723,14 +741,56 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
                                             {ComputeBitwidths::FP8, 205.0f}}};
 
   // AMD RDNA3.
-  static const ChipDetails rx7900xtxChip = {96 / 2, "rx7900xtx"};
-  static const ChipDetails rx7900xtChip = {84 / 2, "rx7900xt"};
-  static const ChipDetails rx7800xtChip = {60 / 2, "rx7800xt"};
-  static const ChipDetails rx7700xtChip = {54 / 2, "rx7700xt"};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xtx.html
+  static const ChipDetails rx7900xtxChip = {96 / 2,
+                                            "rx7900xtx",
+                                            0.96f,
+                                            {{ComputeBitwidths::FP32, 61.4f},
+                                             {ComputeBitwidths::FP16, 123.0f},
+                                             {ComputeBitwidths::Int8, 123.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7900xt.html
+  static const ChipDetails rx7900xtChip = {84 / 2,
+                                           "rx7900xt",
+                                           0.80f,
+                                           {{ComputeBitwidths::FP32, 51.6f},
+                                            {ComputeBitwidths::FP16, 103.0f},
+                                            {ComputeBitwidths::Int8, 103.0f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7800-xt.html
+  static const ChipDetails rx7800xtChip = {60 / 2,
+                                           "rx7800xt",
+                                           0.62f,
+                                           {{ComputeBitwidths::FP32, 37.3f},
+                                            {ComputeBitwidths::FP16, 74.6f},
+                                            {ComputeBitwidths::Int8, 74.6f}}};
+  // https://www.amd.com/en/products/graphics/desktops/radeon/7000-series/amd-radeon-rx-7700-xt.html
+  static const ChipDetails rx7700xtChip = {54 / 2,
+                                           "rx7700xt",
+                                           0.43f,
+                                           {{ComputeBitwidths::FP32, 35.2f},
+                                            {ComputeBitwidths::FP16, 70.3f},
+                                            {ComputeBitwidths::Int8, 70.3f}}};
   static const ChipDetails v710Chip = {54 / 2, "v710"};
-  static const ChipDetails w7900Chip = {96 / 2, "w7900"};
-  static const ChipDetails w7800Chip = {70 / 2, "w7800"};
-  static const ChipDetails w7700Chip = {48 / 2, "w7700"};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7900.html
+  static const ChipDetails w7900Chip = {96 / 2,
+                                        "w7900",
+                                        0.86f,
+                                        {{ComputeBitwidths::FP32, 61.3f},
+                                         {ComputeBitwidths::FP16, 123.0f},
+                                         {ComputeBitwidths::Int8, 123.0f}}};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7800.html
+  static const ChipDetails w7800Chip = {70 / 2,
+                                        "w7800",
+                                        0.58f,
+                                        {{ComputeBitwidths::FP32, 45.2f},
+                                         {ComputeBitwidths::FP16, 90.4f},
+                                         {ComputeBitwidths::Int8, 90.4f}}};
+  // https://www.amd.com/en/products/graphics/workstations/radeon-pro/w7700.html
+  static const ChipDetails w7700Chip = {48 / 2,
+                                        "w7700",
+                                        0.58f,
+                                        {{ComputeBitwidths::FP32, 28.3f},
+                                         {ComputeBitwidths::FP16, 56.6f},
+                                         {ComputeBitwidths::Int8, 56.6f}}};
   static const ChipDetails phoenixChip = {12 / 2, "phoenix"};
   static const ChipDetails strixPointChip = {16 / 2, "strix-point"};
   static const ChipDetails strixHaloChip = {40 / 2, "strix-halo"};
@@ -913,6 +973,32 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 // cooperative matrix layouts are opaque. We need to create NVIDIA specific WMMA
 // intrinsics if we need to have explicit layout analysis and register mapping.
 
+// Reports initial NVIDIA Blackwell 12.1 target capabilities for GPU target
+// selection. CUDA execution limits are based on sm_121 GB10 device properties.
+const WgpDetails *getSM121WgpDetails() {
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
+  };
+  static const WgpDetails sm121Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 64},
+                                      1024,
+                                      99 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
+  return &sm121Wgp;
+}
+
 // Reports Ampere-class NVIDIA tensor core capabilities for GPU target
 // selection.
 const WgpDetails *getAmpereWgpDetails() {
@@ -1028,6 +1114,7 @@ const WgpDetails *getPascalWgpDetails() {
 
 // Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
+  const WgpDetails *sm121Wgp = getSM121WgpDetails();
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *sm120Wgp = getSM120WgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
@@ -1067,6 +1154,10 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
       .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
+      // Initial support for sm_121 / GB10. Other Blackwell compute
+      // capabilities, including sm_120, are intentionally left for follow-up
+      // validation.
+      .Case("sm_121", TargetDetails{sm121Wgp, nullptr})
       .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
       .Case("sm_120", TargetDetails{sm120Wgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
@@ -1210,6 +1301,34 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   return &androidWgp;
 }
 
+const WgpDetails *getVideocoreWgpDetails() {
+  // The following details are taken from running vulkaninfo on the RPI5.
+  // The broadcom chip does not have much documentation but for the most part
+  // we know the workgroup and subgroup sizes. However, memory and thread counts
+  // are more of a guess as they are not explicit in the log output.
+
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::FP32;
+  auto storageBitwidths = StorageBitwidths::B32;
+  // clang-format off
+  static const WgpDetails androidWgp = {
+      computeBitwdiths,         storageBitwidths,         SubgroupOps::None,
+      DotProductOps::None,      /*mmaCount=*/0,           /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0,     /*scaledMmaOps=*/nullptr,
+      {16, 16},                 {256, 256, 256},          32,
+      16384,
+      {0xffff, 0xffff, 0xffff}};
+  // clang-format on
+  return &androidWgp;
+}
+
+std::optional<TargetDetails> getBroadcomProfileDetails(StringRef target) {
+  const WgpDetails *baselineWgp = getVideocoreWgpDetails();
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Case("videocore_vii", TargetDetails{baselineWgp, nullptr})
+      .Default(std::nullopt);
+}
+
 std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
   const WgpDetails *baseline2022Wgp = getAndroidBaseline2022WgpDetails();
 
@@ -1309,6 +1428,11 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (std::optional<TargetDetails> details =
+          getBroadcomProfileDetails(target)) {
+    return createTargetAttr(*details, target,
+                            /*features=*/"spirv:v1.3,cap:Shader", context);
+  }
+  if (std::optional<TargetDetails> details =
           getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
@@ -1317,6 +1441,14 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
           getQualcommGPUTargetDetails(target)) {
     return createTargetAttr(*details, target,
                             /*features=*/"spirv:v1.6,cap:Shader", context);
+  }
+  if (target == "llvmpipe") {
+    return createTargetAttr(
+        {getLLVMPIPEWgpDetails(), nullptr}, target,
+        /*features=*/
+        "spirv:v1.6,cap:Shader,cap:PhysicalStorageBufferAddresses,cap:"
+        "PhysicalStorageBuffer64,cap:Int64,cap:Float64",
+        context);
   }
 
   // Go through common profiles if not hit in the above.

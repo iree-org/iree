@@ -30,7 +30,7 @@ VER_0 {
     ireeCodegenInferScaledContractionDimensions;
     ireeCodegenIntKnobAttrGetName;
     ireeCodegenIntKnobAttrGetTypeID;
-    ireeCodegenMaterializeCompilationInfoFromConstraintsOp;
+    ireeCodegenMaterializeConfigurationAttrFromConstraintsOp;
     ireeCodegenMlirOperationIsACodegenAttentionOp;
     ireeCodegenMlirOperationIsAScaledContractionOp;
     ireeCodegenNoPipelineAttrGet;
@@ -540,8 +540,6 @@ VER_0 {
     mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel;
     mlirGreedyRewriteDriverConfigSetStrictness;
     mlirGreedyRewriteDriverConfigSetUseTopDownTraversal;
-    mlirIREELinalgTransformRegisterPasses;
-    mlirIREETransformRegisterPasses;
     mlirIRRewriterCreate;
     mlirIRRewriterCreateFromOp;
     mlirIRRewriterDestroy;

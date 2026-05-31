@@ -375,13 +375,6 @@ struct LinalgExtOpInterface
     : bufferization::DstBufferizableOpInterfaceExternalModel<
           LinalgExtOpInterface<OpTy>, OpTy> {
 
-  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                              const AnalysisState &state) const {
-    // TODO: Revisit this for ScatterOp. We can then get rid of
-    //       `bufferizesToMemoryRead` completely.
-    return !isa<IREE::LinalgExt::ScatterOp>(op);
-  }
-
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options,
                           bufferization::BufferizationState &state) const {

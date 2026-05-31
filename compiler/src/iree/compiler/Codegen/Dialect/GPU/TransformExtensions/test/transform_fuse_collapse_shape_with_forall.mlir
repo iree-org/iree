@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule -canonicalize -cse --split-input-file | FileCheck %s
+// RUN: iree-opt %s -iree-transform-dialect-interpreter -iree-transform-dialect-drop-schedule -canonicalize -cse --split-input-file | FileCheck %s
 
 #map = affine_map<(d0) -> (d0 * 2)>
 module {

@@ -356,6 +356,10 @@ def DecomposeSoftmaxPass :
   ];
 }
 
+def DropSchedulePass : Pass<"iree-transform-dialect-drop-schedule", ""> {
+  let summary = "Drop the schedule from the operation";
+}
+
 def DropVectorUnitDimsPass :
     InterfacePass<"iree-codegen-drop-vector-unit-dims", "mlir::FunctionOpInterface"> {
   let summary = "Pass to drop vector unit dims.";

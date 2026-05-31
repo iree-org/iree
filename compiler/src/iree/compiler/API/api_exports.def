@@ -29,7 +29,7 @@ EXPORTS
   ireeCodegenInferScaledContractionDimensions
   ireeCodegenIntKnobAttrGetName
   ireeCodegenIntKnobAttrGetTypeID
-  ireeCodegenMaterializeCompilationInfoFromConstraintsOp
+  ireeCodegenMaterializeConfigurationAttrFromConstraintsOp
   ireeCodegenMlirOperationIsACodegenAttentionOp
   ireeCodegenMlirOperationIsAScaledContractionOp
   ireeCodegenNoPipelineAttrGet
@@ -539,8 +539,6 @@ EXPORTS
   mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel
   mlirGreedyRewriteDriverConfigSetStrictness
   mlirGreedyRewriteDriverConfigSetUseTopDownTraversal
-  mlirIREELinalgTransformRegisterPasses
-  mlirIREETransformRegisterPasses
   mlirIRRewriterCreate
   mlirIRRewriterCreateFromOp
   mlirIRRewriterDestroy

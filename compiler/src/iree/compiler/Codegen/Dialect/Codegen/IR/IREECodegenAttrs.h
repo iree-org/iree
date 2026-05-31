@@ -31,6 +31,10 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 bool shouldSetTunerAttributes();
 /// Returns whether pipeline constraints should be emitted for root ops.
 bool shouldEmitPipelineConstraints();
+/// Returns whether emitted pipeline constraints should be verified.
+bool shouldVerifyPipelineConstraints();
+/// Returns whether emitted pipeline constraints should remain in the IR.
+bool shouldPreservePipelineConstraints();
 } // namespace mlir::iree_compiler
 
 // clang-format off
@@ -56,6 +60,8 @@ namespace mlir::iree_compiler {
 // Constant names.
 //===----------------------------------------------------------------------===//
 constexpr StringLiteral kConfigAttrName = "lowering_config";
+constexpr StringLiteral kCompilationInfoOutputName = "compilation_info";
+constexpr StringLiteral kDecompositionConfigKey = "decomposition_config";
 constexpr StringLiteral kTuningSpecDefaultEntrypointAttrName =
     "iree_codegen.tuning_spec_with_default_entrypoint";
 constexpr StringLiteral kTuningSpecEntrypointAttrName =

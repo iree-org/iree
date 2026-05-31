@@ -8,7 +8,6 @@
 
 #include <cstdint>
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/CombineLayoutTransformation.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
@@ -1027,7 +1026,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
     funcPassManager.addPass(amdgpu::createAmdgpuMaskedloadToLoadPass);
     // This pass needs to run before the ResolveSwizzleHints pass.
-    funcPassManager.addPass(amdgpu::createAmdgpuFoldMemRefOpsPass);
+    funcPassManager.addPass(createIREECodegenFoldMemRefAliasOpsPass);
   }
 
   funcPassManager
@@ -1151,9 +1150,11 @@ static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
   modulePassManager.addPass(createMaterializeUserConfigsPass());
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
   if (shouldEmitPipelineConstraints()) {
-    FunctionLikeNest(modulePassManager)
-        .addPass(createInsertSMTConstraintsPass)
-        .addPass(createVerifySMTConstraintsPass);
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createInsertSMTConstraintsPass);
+    if (shouldVerifyPipelineConstraints()) {
+      funcPassManager.addPass(createVerifySMTConstraintsPass);
+    }
   }
 }
 

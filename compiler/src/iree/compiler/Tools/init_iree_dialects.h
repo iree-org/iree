@@ -12,7 +12,6 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
 #define IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_
 
-#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"

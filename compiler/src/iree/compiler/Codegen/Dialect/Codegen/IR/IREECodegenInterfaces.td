@@ -794,19 +794,26 @@ def IREECodegen_PipelineAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Materialize the pipeline-specific compilation_info attribute from a
-        knobs dictionary whose knob leaves have already been substituted with
-        concrete values. Implementations should only mechanically repackage the
-        dictionary into the appropriate CompilationInfoAttr.
+        Materialize a named configuration attr from a knobs dictionary.
+
+        Pipelines own which attrs are special repackaging operations (for
+        example `compilation_info`) and which attrs are generic top-level knob
+        entries (for example side attrs such as `decomposition_config`). The
+        `materializeAttr` callback substitutes concrete assignment values into
+        the selected attribute subtree, letting the pipeline choose which
+        entries are relevant before missing auxiliary knobs become errors.
       }],
       /*retTy=*/"::mlir::FailureOr<::mlir::Attribute>",
-      /*methodName=*/"materializeCompilationInfo",
-      /*args=*/(ins "::mlir::DictionaryAttr":$knobs,
+      /*methodName=*/"materializeConfigurationAttr",
+      /*args=*/(ins "::llvm::StringRef":$attrName,
+                    "::mlir::DictionaryAttr":$knobs,
+                    "::llvm::function_ref<::mlir::FailureOr<::mlir::Attribute>(::mlir::Attribute)>":$materializeAttr,
                     "::llvm::function_ref<::mlir::InFlightDiagnostic()>":$emitError),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        (void)knobs;
-        emitError() << "pipeline does not support compilation_info materialization";
+        emitError() << "pipeline does not support materializing configuration "
+                       "attr '"
+                    << attrName << "'";
         return ::mlir::failure();
       }]
     >

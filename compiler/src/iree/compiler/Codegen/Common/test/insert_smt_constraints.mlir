@@ -48,9 +48,28 @@ hal.executable @matmul_f32_ex {
 // CHECK:           linalg.fill
 // CHECK-NOT:       iree_codegen.smt.constraints
 // CHECK:           linalg.matmul
+// CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<TileAndFuse>
+// CHECK-NEXT{LITERAL}: knobs = {
+// CHECK-SAME{LITERAL}: gpu_pipeline_options = {no_reduce_shared_memory_bank_conflicts = false, prefetch_num_stages = #iree_codegen.smt.int_knob<"prefetch_num_stages">, use_igemm_convolution = false},
+// CHECK-SAME{LITERAL}: mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>,
+// CHECK-SAME{LITERAL}: promote_operands = [0, 1],
+// CHECK-SAME{LITERAL}: reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">],
+// CHECK-SAME{LITERAL}: subgroup = [#iree_codegen.smt.int_knob<"sg_0">, #iree_codegen.smt.int_knob<"sg_1">, 0],
+// CHECK-SAME{LITERAL}: subgroup_size = #iree_codegen.smt.int_knob<"sg_size">,
+// CHECK-SAME{LITERAL}: workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0],
+// CHECK-SAME{LITERAL}: workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]}
 //
 // CHECK:           iree_codegen.smt.constraints target = <set = 0>, pipeline = #iree_gpu.pipeline<VectorDistribute>,
-// CHECK-NEXT{LITERAL}: knobs = {mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>, reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">], subgroup_basis = [[#iree_codegen.smt.int_knob<"sg_m_cnt">, #iree_codegen.smt.int_knob<"sg_n_cnt">, 1], [0, 1, 2]], subgroup_size = #iree_codegen.smt.int_knob<"sg_size">, workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0], workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]}
+// CHECK-NEXT{LITERAL}: knobs = {
+// CHECK-SAME{LITERAL}: gpu_pipeline_options = {no_reduce_shared_memory_bank_conflicts = false, prefetch_num_stages = #iree_codegen.smt.int_knob<"prefetch_num_stages">, use_igemm_convolution = false},
+// CHECK-SAME{LITERAL}: mma_kind = #iree_codegen.smt.one_of_knob<"mma_idx", [#iree_gpu.mma_layout<MFMA_F32_16x16x4_F32>]>,
+// CHECK-SAME{LITERAL}: promote_operands = [0, 1],
+// CHECK-SAME{LITERAL}: promotion_types = [#iree_gpu.derived_thread_config, #iree_gpu.derived_thread_config],
+// CHECK-SAME{LITERAL}: reduction = [0, 0, #iree_codegen.smt.int_knob<"red_2">],
+// CHECK-SAME{LITERAL}: subgroup_basis = [[#iree_codegen.smt.int_knob<"sg_m_cnt">, #iree_codegen.smt.int_knob<"sg_n_cnt">, 1], [0, 1, 2]],
+// CHECK-SAME{LITERAL}: subgroup_size = #iree_codegen.smt.int_knob<"sg_size">,
+// CHECK-SAME{LITERAL}: workgroup = [#iree_codegen.smt.int_knob<"wg_0">, #iree_codegen.smt.int_knob<"wg_1">, 0],
+// CHECK-SAME{LITERAL}: workgroup_size = [#iree_codegen.smt.int_knob<"wg_size_x">, #iree_codegen.smt.int_knob<"wg_size_y">, #iree_codegen.smt.int_knob<"wg_size_z">]}
 // CHECK:           ^bb0(%[[M:.+]]: !smt.int, %[[N:.+]]: !smt.int, %[[K:.+]]: !smt.int):
 //
 // Common: static dims.

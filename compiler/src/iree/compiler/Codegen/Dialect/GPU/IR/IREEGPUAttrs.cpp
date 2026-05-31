@@ -52,9 +52,11 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// HoistableConversionOp tag constants — definitions live in
+// HoistableConversionOp tag constants: definitions live in
 // `Codegen/Utils/MMAUtils.h` so paired tags (which match by string) can't
 // silently drift between translation units.
+using ::mlir::iree_compiler::kCompilationInfoOutputName;
+using ::mlir::iree_compiler::kDecompositionConfigKey;
 using ::mlir::iree_compiler::IREE::Codegen::distributeMmaFragmentToIntrinsics;
 using ::mlir::iree_compiler::IREE::Codegen::incrementIndices;
 using ::mlir::iree_compiler::IREE::Codegen::kDataTiledAccDistribute;
@@ -70,15 +72,42 @@ constexpr StringLiteral kSubgroupSizeKey = "subgroup_size";
 constexpr StringLiteral kTranslationInfoKey = "translation_info";
 constexpr StringLiteral kPipelineKey = "pipeline";
 constexpr StringLiteral kCodegenSpecKey = "codegen_spec";
+constexpr StringLiteral kGpuPipelineOptionsKey = "gpu_pipeline_options";
+constexpr StringLiteral kPrefetchNumStagesKey = "prefetch_num_stages";
+constexpr StringLiteral kNoReduceSharedMemoryBankConflictsKey =
+    "no_reduce_shared_memory_bank_conflicts";
+constexpr StringLiteral kUseIgemmConvolutionKey = "use_igemm_convolution";
+constexpr StringLiteral kReorderWorkgroupsStrategyKey =
+    "reorder_workgroups_strategy";
 
-static bool isTranslationInfoKey(StringRef key) {
+static bool isDefaultTranslationInfoKey(StringRef key) {
   return llvm::is_contained({kWorkgroupSizeKey, kSubgroupSizeKey}, key);
 }
 
+static bool isTranslationInfoConfigKey(StringRef key) {
+  return key == kGpuPipelineOptionsKey;
+}
+
 static bool isFlatMetadataKey(StringRef key) {
-  return llvm::is_contained(
-      {kConfigAttrName, kTranslationInfoKey, kPipelineKey, kCodegenSpecKey},
-      key);
+  return llvm::is_contained({kConfigAttrName, kTranslationInfoKey, kPipelineKey,
+                             kCodegenSpecKey, kDecompositionConfigKey},
+                            key);
+}
+
+static bool isCompilationInfoMaterializationInput(StringRef key) {
+  return key != kDecompositionConfigKey;
+}
+
+static DictionaryAttr
+getCompilationInfoMaterializationInputs(MLIRContext *ctx,
+                                        DictionaryAttr knobs) {
+  SmallVector<NamedAttribute> entries;
+  for (NamedAttribute entry : knobs) {
+    if (isCompilationInfoMaterializationInput(entry.getName().getValue())) {
+      entries.push_back(entry);
+    }
+  }
+  return DictionaryAttr::get(ctx, entries);
 }
 
 static void
@@ -87,7 +116,9 @@ appendLoweringConfigEntries(DictionaryAttr source,
                             bool flatSource) {
   for (NamedAttribute entry : source) {
     StringRef key = entry.getName().getValue();
-    if (flatSource && (isFlatMetadataKey(key) || isTranslationInfoKey(key))) {
+    if (flatSource &&
+        (isFlatMetadataKey(key) || isDefaultTranslationInfoKey(key) ||
+         isTranslationInfoConfigKey(key))) {
       continue;
     }
     entries.push_back(entry);
@@ -99,12 +130,76 @@ static DictionaryAttr buildTranslationConfiguration(MLIRContext *ctx,
   SmallVector<NamedAttribute> entries;
   for (NamedAttribute entry : source) {
     StringRef key = entry.getName().getValue();
-    if (isTranslationInfoKey(key) || key == kCodegenSpecKey) {
+    if (isDefaultTranslationInfoKey(key) || key == kCodegenSpecKey) {
       continue;
     }
     entries.push_back(entry);
   }
   return DictionaryAttr::get(ctx, entries);
+}
+
+static FailureOr<DictionaryAttr> buildGpuPipelineOptionsConfiguration(
+    MLIRContext *ctx, Attribute gpuPipelineOptions,
+    function_ref<InFlightDiagnostic()> emitError) {
+  auto optionsDict = dyn_cast<DictionaryAttr>(gpuPipelineOptions);
+  if (!optionsDict) {
+    emitError() << "expected '" << kGpuPipelineOptionsKey
+                << "' to be a dictionary";
+    return failure();
+  }
+
+  unsigned prefetchNumStages = 0;
+  if (Attribute prefetchAttr = optionsDict.get(kPrefetchNumStagesKey)) {
+    auto prefetchInt = dyn_cast<IntegerAttr>(prefetchAttr);
+    if (!prefetchInt || prefetchInt.getInt() < 0) {
+      emitError() << "expected '" << kPrefetchNumStagesKey
+                  << "' to be a non-negative integer";
+      return failure();
+    }
+    prefetchNumStages = static_cast<unsigned>(prefetchInt.getInt());
+  }
+
+  bool noReduceSharedMemoryBankConflicts = false;
+  if (Attribute noReduceAttr =
+          optionsDict.get(kNoReduceSharedMemoryBankConflictsKey)) {
+    auto noReduceBool = dyn_cast<BoolAttr>(noReduceAttr);
+    if (!noReduceBool) {
+      emitError() << "expected '" << kNoReduceSharedMemoryBankConflictsKey
+                  << "' to be a boolean";
+      return failure();
+    }
+    noReduceSharedMemoryBankConflicts = noReduceBool.getValue();
+  }
+
+  bool useIgemmConvolution = false;
+  if (Attribute useIgemmAttr = optionsDict.get(kUseIgemmConvolutionKey)) {
+    auto useIgemmBool = dyn_cast<BoolAttr>(useIgemmAttr);
+    if (!useIgemmBool) {
+      emitError() << "expected '" << kUseIgemmConvolutionKey
+                  << "' to be a boolean";
+      return failure();
+    }
+    useIgemmConvolution = useIgemmBool.getValue();
+  }
+
+  std::optional<ReorderWorkgroupsStrategy> reorderWorkgroupsStrategy;
+  if (Attribute reorderStrategyAttr =
+          optionsDict.get(kReorderWorkgroupsStrategyKey)) {
+    auto reorderAttr =
+        dyn_cast<ReorderWorkgroupsStrategyAttr>(reorderStrategyAttr);
+    if (!reorderAttr) {
+      emitError() << "expected '" << kReorderWorkgroupsStrategyKey
+                  << "' to be a reorder strategy attr";
+      return failure();
+    }
+    reorderWorkgroupsStrategy = reorderAttr.getValue();
+  }
+
+  auto typedOptions = GPUPipelineOptionsAttr::get(
+      ctx, prefetchNumStages, noReduceSharedMemoryBankConflicts,
+      useIgemmConvolution, reorderWorkgroupsStrategy);
+  return DictionaryAttr::get(
+      ctx, {{StringAttr::get(ctx, kGpuPipelineOptionsKey), typedOptions}});
 }
 
 static int64_t extractI64(Attribute attr) {
@@ -3436,13 +3531,31 @@ PipelineAttr::emitConstraints(ArrayRef<Operation *> rootOps) const {
   return emitter(*this, rootOps);
 }
 
-FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
-    DictionaryAttr knobs, function_ref<InFlightDiagnostic()> emitError) const {
+FailureOr<Attribute> PipelineAttr::materializeConfigurationAttr(
+    StringRef attrName, DictionaryAttr knobs,
+    function_ref<FailureOr<Attribute>(Attribute)> materializeAttr,
+    function_ref<InFlightDiagnostic()> emitError) const {
+  if (attrName != kCompilationInfoOutputName) {
+    if (Attribute attr = knobs.get(attrName)) {
+      return materializeAttr(attr);
+    }
+    emitError() << "constraints op has no '" << attrName
+                << "' entry in its knobs dictionary";
+    return failure();
+  }
+
   MLIRContext *ctx = getContext();
-  DictionaryAttr loweringSource = knobs;
+  FailureOr<Attribute> materializedAttr =
+      materializeAttr(getCompilationInfoMaterializationInputs(ctx, knobs));
+  if (failed(materializedAttr)) {
+    return failure();
+  }
+
+  auto materializedKnobs = cast<DictionaryAttr>(*materializedAttr);
+  DictionaryAttr loweringSource = materializedKnobs;
   bool flatLoweringSource = true;
-  if (auto nestedLowering =
-          dyn_cast_if_present<DictionaryAttr>(knobs.get(kConfigAttrName))) {
+  if (auto nestedLowering = dyn_cast_if_present<DictionaryAttr>(
+          materializedKnobs.get(kConfigAttrName))) {
     loweringSource = nestedLowering;
     flatLoweringSource = false;
   }
@@ -3453,10 +3566,10 @@ FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
   auto loweringConfig =
       LoweringConfigAttr::get(ctx, DictionaryAttr::get(ctx, loweringEntries));
 
-  DictionaryAttr translationSource = knobs;
+  DictionaryAttr translationSource = materializedKnobs;
   bool nestedTranslationSource = false;
-  if (auto nestedTranslation =
-          dyn_cast_if_present<DictionaryAttr>(knobs.get(kTranslationInfoKey))) {
+  if (auto nestedTranslation = dyn_cast_if_present<DictionaryAttr>(
+          materializedKnobs.get(kTranslationInfoKey))) {
     translationSource = nestedTranslation;
     nestedTranslationSource = true;
   }
@@ -3484,6 +3597,15 @@ FailureOr<Attribute> PipelineAttr::materializeCompilationInfo(
   DictionaryAttr configuration;
   if (nestedTranslationSource) {
     configuration = buildTranslationConfiguration(ctx, translationSource);
+  } else if (Attribute gpuPipelineOptions =
+                 materializedKnobs.get(kGpuPipelineOptionsKey)) {
+    FailureOr<DictionaryAttr> optionsConfig =
+        buildGpuPipelineOptionsConfiguration(ctx, gpuPipelineOptions,
+                                             emitError);
+    if (failed(optionsConfig)) {
+      return failure();
+    }
+    configuration = *optionsConfig;
   }
 
   Attribute pipeline = *this;

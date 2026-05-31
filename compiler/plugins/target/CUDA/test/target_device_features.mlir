@@ -8,6 +8,7 @@
 // RUN:   --iree-cuda-target=sm_89 --iree-cuda-target-features=+ptx80 %s | FileCheck %s --check-prefix=PTX80
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_120 --iree-cuda-target-features=+ptx87 %s | FileCheck %s --check-prefix=SM120
+// RUN:   --iree-cuda-target=sm_121 --iree-cuda-target-features=+ptx88 %s | FileCheck %s --check-prefix=SM121
 
 // SM89: target_info = #iree_gpu.target<arch = "sm_89", features = "+ptx78",
 // SM89-SAME: wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
@@ -19,6 +20,7 @@
 
 // PTX80: target_info = #iree_gpu.target<arch = "sm_89", features = "+ptx80",
 // SM120: target_info = #iree_gpu.target<arch = "sm_120", features = "+ptx87",
+// SM121: target_info = #iree_gpu.target<arch = "sm_121", features = "+ptx88",
 
 stream.executable public @target_device_features {
   stream.executable.export @target_device_features workgroups()
