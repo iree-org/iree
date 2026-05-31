@@ -12,7 +12,7 @@ from typing import (
 )
 import asyncio
 
-from .typing import HalModuleBufferViewTraceCallback
+from ._typing import HalModuleBufferViewTraceCallback
 
 def create_hal_module(
     instance: VmInstance,
