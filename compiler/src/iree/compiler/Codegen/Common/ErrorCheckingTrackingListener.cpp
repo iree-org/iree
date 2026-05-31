@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Common/ErrorCheckingTrackingListener.h"
 
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #define DEBUG_TYPE "iree-codegen-error-checking-tracking-listener"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
