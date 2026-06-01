@@ -24,7 +24,7 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
-  addConversion([=](RankedTensorType type) {
+  addConversion([this](RankedTensorType type) {
     return cast<RankedTensorType>(getLayoutAttr().convertType(type));
   });
   addConversion([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
@@ -47,7 +47,8 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
       return isa<IREE::Encoding::ContractionEncodingAttrInterface,
                  IREE::Encoding::LayoutAttr>(tensorType.getEncoding());
     };
-    auto valueHasDataTilingEncoding = [=](Value v) -> bool {
+    auto valueHasDataTilingEncoding =
+        [typeHasDataTilingEncoding](Value v) -> bool {
       return typeHasDataTilingEncoding(v.getType());
     };
     bool hasOperandOrResultsWithEncoding =

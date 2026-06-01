@@ -268,10 +268,11 @@ struct VMVXSession final
                     PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"vmvx", ...
-    targets.add("vmvx",
-                [=]() { return std::make_shared<VMVXTargetBackend>(options); });
+    targets.add("vmvx", [this]() {
+      return std::make_shared<VMVXTargetBackend>(options);
+    });
     // #hal.executable.target<"vmvx-inline", ...
-    targets.add("vmvx-inline", [=]() {
+    targets.add("vmvx-inline", [this]() {
       return std::make_shared<VMVXInlineTargetBackend>(options);
     });
   }

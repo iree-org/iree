@@ -874,7 +874,7 @@ struct LLVMCPUSession final
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"llvm-cpu", ...
     // Use session-scoped codegen options bound in createUninitializedSession.
-    targets.add("llvm-cpu", [=]() {
+    targets.add("llvm-cpu", [this]() {
       return std::make_shared<LLVMCPUTargetBackend>(options.getTargetOptions(),
                                                     codegenOptions);
     });

@@ -125,9 +125,10 @@ public:
   // IdentityResolverAttr is returned.
   IREE::Stream::ResolveLayoutAttrFn
   makeLayoutAttrResolver(ModuleOp moduleOp) const {
-    return [=](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
-               llvm::DenseMap<IREE::Stream::AffinityAndOpPair,
-                              SetVector<Attribute>> &layoutAttrs)
+    return [this,
+            moduleOp](ArrayRef<IREE::Stream::AffinityAndOpPair> batchQueries,
+                      llvm::DenseMap<IREE::Stream::AffinityAndOpPair,
+                                     SetVector<Attribute>> &layoutAttrs)
                -> LogicalResult {
       // This needs to be in the lambda because the moduleOp could be modified.
       IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);

@@ -18,7 +18,7 @@ struct LocalSession
                     PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"local", ...
-    targets.add("local", [=]() {
+    targets.add("local", [this]() {
       return std::make_shared<IREE::HAL::LocalDevice>(options);
     });
   }
