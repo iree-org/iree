@@ -1114,9 +1114,9 @@ const WgpDetails *getPascalWgpDetails() {
 
 // Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
+  const WgpDetails *sm120Wgp = getSM120WgpDetails();
   const WgpDetails *sm121Wgp = getSM121WgpDetails();
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
-  const WgpDetails *sm120Wgp = getSM120WgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
   const WgpDetails *voltaWgp = getVoltaWgpDetails();
   const WgpDetails *pascalWgp = getPascalWgpDetails();
@@ -1157,9 +1157,9 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       // Initial support for sm_121 / GB10. Other Blackwell compute
       // capabilities, including sm_120, are intentionally left for follow-up
       // validation.
+      .Case("sm_120", TargetDetails{sm120Wgp, nullptr})
       .Case("sm_121", TargetDetails{sm121Wgp, nullptr})
       .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
-      .Case("sm_120", TargetDetails{sm120Wgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
              TargetDetails{ampereWgp, nullptr})
       .Cases({"turing", "sm_75"}, TargetDetails{turingWgp, nullptr})
