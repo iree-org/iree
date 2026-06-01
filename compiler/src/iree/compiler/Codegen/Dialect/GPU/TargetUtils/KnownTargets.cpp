@@ -1026,6 +1026,34 @@ const WgpDetails *getAmpereWgpDetails() {
   return &ampereWgp;
 }
 
+const WgpDetails *getSM120WgpDetails() {
+  // TODO: Model Blackwell-specific capabilities once IREE has target details
+  // for the architecture. Reuse the existing NVIDIA capability model for now
+  // so canonical CUDA targets such as sm_120 can be represented.
+  // See:
+  // https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html#nvidia-blackwell-tuning
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
+      MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
+  };
+  static const WgpDetails sm120Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      allDotProductOps,
+                                      std::size(mmaOps),
+                                      mmaOps,
+                                      0,
+                                      nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      163 * 1024,
+                                      {0x7fffffff, 0xffff, 0xffff}};
+  return &sm120Wgp;
+}
+
 const WgpDetails *getTuringWgpDetails() {
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
@@ -1086,6 +1114,7 @@ const WgpDetails *getPascalWgpDetails() {
 
 // Maps NVIDIA target aliases to the GPU capability model used by codegen.
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
+  const WgpDetails *sm120Wgp = getSM120WgpDetails();
   const WgpDetails *sm121Wgp = getSM121WgpDetails();
   const WgpDetails *ampereWgp = getAmpereWgpDetails();
   const WgpDetails *turingWgp = getTuringWgpDetails();
@@ -1128,6 +1157,7 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       // Initial support for sm_121 / GB10. Other Blackwell compute
       // capabilities, including sm_120, are intentionally left for follow-up
       // validation.
+      .Case("sm_120", TargetDetails{sm120Wgp, nullptr})
       .Case("sm_121", TargetDetails{sm121Wgp, nullptr})
       .Cases({"ada", "sm_89"}, TargetDetails{ampereWgp, nullptr})
       .Cases({"ampere", "sm_80", "sm_86", "sm_87"},
