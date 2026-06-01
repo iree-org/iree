@@ -8,6 +8,7 @@
 // RUN:   --iree-cuda-target=sm_89 --iree-cuda-target-features=+ptx80 %s | FileCheck %s --check-prefix=PTX80
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_120 --iree-cuda-target-features=+ptx87 %s | FileCheck %s --check-prefix=SM120
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_121 --iree-cuda-target-features=+ptx88 %s | FileCheck %s --check-prefix=SM121
 
 // SM89: target_info = #iree_gpu.target<arch = "sm_89", features = "+ptx78",
