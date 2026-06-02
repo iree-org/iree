@@ -345,7 +345,9 @@ struct VectorReductionToGPUPass final
         funcOp->emitOpError("missing subgroup size");
         return signalPassFailure();
       }
-      auto groupReductionFn = [=](Location loc, OpBuilder &builder, Value input,
+      auto groupReductionFn = [subgroupSize, &expandSubgroupReduction =
+                                                 this->expandSubgroupReduction](
+                                  Location loc, OpBuilder &builder, Value input,
                                   vector::CombiningKind kind,
                                   uint32_t size) -> Value {
         return emitGPUGroupReduction(loc, builder, input, kind, size,

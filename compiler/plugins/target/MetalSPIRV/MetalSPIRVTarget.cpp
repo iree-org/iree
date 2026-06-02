@@ -328,12 +328,13 @@ struct MetalSPIRVSession final
                     PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) final {
     // #hal.device.target<"metal", ...
-    targets.add("metal",
-                [=]() { return std::make_shared<MetalTargetDevice>(options); });
+    targets.add("metal", [this]() {
+      return std::make_shared<MetalTargetDevice>(options);
+    });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) final {
     // #hal.executable.target<"metal-spirv", ...
-    targets.add("metal-spirv", [=]() {
+    targets.add("metal-spirv", [this]() {
       return std::make_shared<MetalSPIRVTargetBackend>(options);
     });
   }
