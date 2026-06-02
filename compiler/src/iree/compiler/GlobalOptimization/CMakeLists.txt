@@ -38,7 +38,6 @@ iree_cc_library(
     GlobalOptimization
   HDRS
     "Passes.h"
-    "TransformMatchers.h"
     "Utils.h"
   SRCS
     "CleanupNumericNarrowing.cpp"
@@ -63,7 +62,6 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
-    "TransformMatchers.cpp"
     "Utils.cpp"
     "WarnOnUninitializedValues.cpp"
   DEPS
@@ -71,30 +69,24 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
-    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
-    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
-    MLIRRewrite
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTensorUtils
-    MLIRTransformDialect
-    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Common
