@@ -478,7 +478,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_I32(value_reg);
       IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.global.load.i32 .rwdata[%u]", byte_offset));
+          b, " = vm.global.load.i32 .rwdata[%" PRIu32 "]",
+          (uint32_t)byte_offset));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(
           vm_global_load_i32(module_state->rwdata_storage.data, byte_offset));
       break;
@@ -492,7 +493,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
+          iree_string_builder_append_format(b, ", .rwdata[%" PRIu32 "]",
+                                            (uint32_t)byte_offset));
       break;
     }
 
@@ -529,7 +531,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_I64(value_reg);
       IREE_VM_ISA_EMIT_I32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.global.load.i64 .rwdata[%u]", byte_offset));
+          b, " = vm.global.load.i64 .rwdata[%" PRIu32 "]",
+          (uint32_t)byte_offset));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(
           module_state->rwdata_storage.data[byte_offset]);
       break;
@@ -543,7 +546,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_I64_REG_NAME(value_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_I64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
+          iree_string_builder_append_format(b, ", .rwdata[%" PRIu32 "]",
+                                            (uint32_t)byte_offset));
       break;
     }
 
@@ -1835,7 +1839,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_F32(value_reg);
       IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.global.load.f32 .rwdata[%u]", byte_offset));
+          b, " = vm.global.load.f32 .rwdata[%" PRIu32 "]",
+          (uint32_t)byte_offset));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(
           module_state->rwdata_storage.data[byte_offset]);
       break;
@@ -1849,7 +1854,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_F32_REG_NAME(value_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F32(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
+          iree_string_builder_append_format(b, ", .rwdata[%" PRIu32 "]",
+                                            (uint32_t)byte_offset));
       break;
     }
 
@@ -2223,7 +2229,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_DECODE_RESULT_F64(value_reg);
       IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-          b, " = vm.global.load.f64 .rwdata[%u]", byte_offset));
+          b, " = vm.global.load.f64 .rwdata[%" PRIu32 "]",
+          (uint32_t)byte_offset));
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(
           module_state->rwdata_storage.data[byte_offset]);
       break;
@@ -2237,7 +2244,8 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
       IREE_VM_ISA_EMIT_F64_REG_NAME(value_reg);
       IREE_VM_ISA_EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
+          iree_string_builder_append_format(b, ", .rwdata[%" PRIu32 "]",
+                                            (uint32_t)byte_offset));
       break;
     }
 
@@ -2699,7 +2707,7 @@ iree_status_t iree_vm_bytecode_trace_disassembly(
     iree_string_view_t function_name = iree_vm_function_name(&frame->function);
     if (iree_string_view_is_empty(function_name)) {
       status = iree_string_builder_append_format(
-          &b, "@%u", (uint32_t)frame->function.ordinal);
+          &b, "@%" PRIu32, (uint32_t)frame->function.ordinal);
     } else {
       status = iree_string_builder_append_format(
           &b, ".%.*s", (int)function_name.size, function_name.data);

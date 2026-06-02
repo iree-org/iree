@@ -90,7 +90,7 @@ iree_bitfield_format(uint32_t value, iree_host_size_t mapping_count,
           iree_string_builder_append_string(string_builder, IREE_SV("|")));
     }
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
-        string_builder, "%Xh", remaining_bits));
+        string_builder, "%" PRIX32 "h", remaining_bits));
   }
   return iree_ok_status();
 }

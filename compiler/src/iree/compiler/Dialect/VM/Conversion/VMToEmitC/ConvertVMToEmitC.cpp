@@ -2061,6 +2061,11 @@ private:
     bool isZero;
   };
 
+  struct InputLayoutItem {
+    Type type;
+    SmallVector<Type, 4> preAlignTypes;
+  };
+
   LogicalResult createVariadicImportShims(IREE::VM::ImportOp &importOp,
                                           OpBuilder &builder) const {
     SetVector<const void *> arities;
@@ -2177,8 +2182,10 @@ private:
 
       builder.setInsertionPointToStart(block);
 
-      MaybeZeroValue argumentSize = buildSizeExpression(
-          flattenInputTypes(importOp, segmentSizes, builder), builder, loc);
+      SmallVector<InputLayoutItem> inputLayout =
+          buildInputLayout(importOp, segmentSizes, builder);
+      MaybeZeroValue argumentSize =
+          buildSizeExpression(inputLayout, builder, loc);
       MaybeZeroValue resultSize =
           buildSizeExpression(importOp.getResultTypes(), builder, loc);
 
@@ -2194,9 +2201,8 @@ private:
         return importOp.emitError() << "failed to create call struct";
       }
 
-      if (failed(packArgumentBuffer(
-              flattenInputTypes(importOp, segmentSizes, builder), newFuncOp,
-              call.value(), builder, loc))) {
+      if (failed(packArgumentBuffer(inputLayout, newFuncOp, call.value(),
+                                    builder, loc))) {
         return importOp.emitError() << "failed to pack argument struct";
       }
 
@@ -2210,9 +2216,8 @@ private:
       // Release refs in argument buffer after call returns. Refs that were
       // taken by the callee (via assign_ref+memset) will be null and release
       // will be a no-op.
-      if (failed(releaseArgumentBuffer(
-              flattenInputTypes(importOp, segmentSizes, builder), call.value(),
-              builder, loc))) {
+      if (failed(
+              releaseArgumentBuffer(inputLayout, call.value(), builder, loc))) {
         return importOp.emitError() << "failed to release argument buffer";
       }
 
@@ -2296,8 +2301,48 @@ private:
     return ptr;
   }
 
+  size_t getMaxAlignment(ArrayRef<Type> types) const {
+    size_t maxAlignment = 1;
+    for (Type type : types) {
+      Type valueType = typeConverter.convertTypeAsNonPointer(type);
+      size_t alignment = getTypeAlignment(valueType);
+      if (alignment > maxAlignment) {
+        maxAlignment = alignment;
+      }
+    }
+    return maxAlignment;
+  }
+
+  Value alignSizeForTypes(OpBuilder &builder, Location loc, Value size,
+                          ArrayRef<Type> types) const {
+    size_t alignment = getMaxAlignment(types);
+    if (alignment > 1) {
+      return emitc_builders::alignTo(builder, loc, size, alignment);
+    }
+    return size;
+  }
+
+  Value alignPtrForTypes(OpBuilder &builder, Location loc, Value ptr,
+                         ArrayRef<Type> types) const {
+    size_t alignment = getMaxAlignment(types);
+    if (alignment > 1) {
+      return emitc_builders::alignPtr(builder, loc, ptr, alignment);
+    }
+    return ptr;
+  }
+
   MaybeZeroValue buildSizeExpression(ArrayRef<Type> types, OpBuilder &builder,
                                      Location loc) const {
+    SmallVector<InputLayoutItem> inputLayout;
+    inputLayout.reserve(types.size());
+    for (Type type : types) {
+      inputLayout.push_back(InputLayoutItem{/*type=*/type});
+    }
+    return buildSizeExpression(inputLayout, builder, loc);
+  }
+
+  MaybeZeroValue buildSizeExpression(ArrayRef<InputLayoutItem> inputLayout,
+                                     OpBuilder &builder, Location loc) const {
     auto ctx = builder.getContext();
 
     Type hostSizeType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
@@ -2310,8 +2355,21 @@ private:
             .getResult();
     bool isZero = true;
     size_t maxAlignment = 1;
-    for (Type type : types) {
-      Type valueType = typeConverter.convertTypeAsNonPointer(type);
+    for (const InputLayoutItem &item : inputLayout) {
+      if (!item.preAlignTypes.empty()) {
+        result = alignSizeForTypes(builder, loc, result, item.preAlignTypes);
+        size_t alignment = getMaxAlignment(item.preAlignTypes);
+        if (alignment > maxAlignment) {
+          maxAlignment = alignment;
+        }
+        isZero = false;
+      }
+
+      if (!item.type) {
+        continue;
+      }
+
+      Type valueType = typeConverter.convertTypeAsNonPointer(item.type);
 
       // Align before adding this element.
       result = alignSizeForType(builder, loc, result, valueType);
@@ -2432,11 +2490,11 @@ private:
     return byteSpan;
   }
 
-  LogicalResult packArgumentBuffer(ArrayRef<Type> inputTypes,
+  LogicalResult packArgumentBuffer(ArrayRef<InputLayoutItem> inputLayout,
                                    mlir::emitc::FuncOp &funcOp,
                                    TypedValue<emitc::LValueType> call,
                                    OpBuilder &builder, Location loc) const {
-    if (inputTypes.empty()) {
+    if (inputLayout.empty()) {
       return success();
     }
 
@@ -2459,8 +2517,18 @@ private:
                                                  /*type=*/bytePtrType,
                                                  /*memberName=*/"data",
                                                  /*operand=*/arguments);
-    for (size_t i = 0; i < inputTypes.size(); i++) {
-      BlockArgument arg = funcOp.getArgument(i + inputOffset);
+    size_t inputIndex = 0;
+    for (const InputLayoutItem &item : inputLayout) {
+      if (!item.preAlignTypes.empty()) {
+        uint8Ptr = alignPtrForTypes(builder, loc, uint8Ptr, item.preAlignTypes);
+      }
+
+      if (!item.type) {
+        continue;
+      }
+
+      BlockArgument arg = funcOp.getArgument(inputIndex + inputOffset);
+      ++inputIndex;
 
       Type argType = arg.getType();
       assert(!isa<IREE::VM::RefType>(argType));
@@ -2499,17 +2567,13 @@ private:
         emitc_builders::memcpy(builder, loc, uint8Ptr, argPtr, size);
       }
 
-      // Skip the addition in the last iteration.
-      if (i < inputTypes.size() - 1) {
-        Value size =
-            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-
-        uint8Ptr =
-            emitc::AddOp::create(builder,
-                                 /*location=*/loc, /*type=*/bytePtrType,
-                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                .getResult();
-      }
+      Value size =
+          emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
+      uint8Ptr =
+          emitc::AddOp::create(builder,
+                               /*location=*/loc, /*type=*/bytePtrType,
+                               /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+              .getResult();
     }
     return success();
   }
@@ -2518,15 +2582,15 @@ private:
   // This mirrors packArgumentBuffer but releases instead of retaining.
   // Refs that were taken by the callee (via assign_ref+memset) will be null
   // and release will be a no-op.
-  LogicalResult releaseArgumentBuffer(ArrayRef<Type> inputTypes,
+  LogicalResult releaseArgumentBuffer(ArrayRef<InputLayoutItem> inputLayout,
                                       TypedValue<emitc::LValueType> call,
                                       OpBuilder &builder, Location loc) const {
     // Find the last ref type index. We only need to iterate up to and including
     // that index to release all refs. This avoids generating unused pointer
     // arithmetic for trailing non-ref types.
     std::optional<size_t> lastRefIndex;
-    for (size_t i = 0; i < inputTypes.size(); i++) {
-      if (isa<IREE::VM::RefType>(inputTypes[i])) {
+    for (size_t i = 0; i < inputLayout.size(); i++) {
+      if (inputLayout[i].type && isa<IREE::VM::RefType>(inputLayout[i].type)) {
         lastRefIndex = i;
       }
     }
@@ -2554,16 +2618,23 @@ private:
 
     // Only iterate up to and including the last ref type.
     for (size_t i = 0; i <= *lastRefIndex; i++) {
-      Type inputType = inputTypes[i];
+      const InputLayoutItem &item = inputLayout[i];
+      if (!item.preAlignTypes.empty()) {
+        uint8Ptr = alignPtrForTypes(builder, loc, uint8Ptr, item.preAlignTypes);
+      }
+
+      if (!item.type) {
+        continue;
+      }
 
       // Get the value type and compute alignment (must match packArgumentBuffer
       // exactly to ensure we're releasing the correct locations).
-      Type valueType = typeConverter.convertTypeAsNonPointer(inputType);
+      Type valueType = typeConverter.convertTypeAsNonPointer(item.type);
       uint8Ptr = alignPtrForType(builder, loc, uint8Ptr, valueType);
 
       // Release refs. If the callee took ownership and zeroed the ref,
       // iree_vm_ref_release on a null ref is a no-op.
-      if (isa<IREE::VM::RefType>(inputType)) {
+      if (isa<IREE::VM::RefType>(item.type)) {
         Type refPtrType = emitc::PointerType::get(
             emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
         Value refPtr = emitc::CastOp::create(builder,
@@ -2574,16 +2645,13 @@ private:
         emitc_builders::ireeVmRefRelease(builder, loc, refPtr);
       }
 
-      // Advance pointer to next element (only if not at the last ref).
-      if (i < *lastRefIndex) {
-        Value size =
-            emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr =
-            emitc::AddOp::create(builder,
-                                 /*location=*/loc, /*type=*/bytePtrType,
-                                 /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                .getResult();
-      }
+      Value size =
+          emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
+      uint8Ptr =
+          emitc::AddOp::create(builder,
+                               /*location=*/loc, /*type=*/bytePtrType,
+                               /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+              .getResult();
     }
     return success();
   }
@@ -2715,6 +2783,62 @@ private:
     return success();
   }
 
+  void appendFlattenedTypes(Type type, SmallVectorImpl<Type> &result) const {
+    if (auto tupleType = dyn_cast<TupleType>(type)) {
+      for (Type inner : tupleType) {
+        result.push_back(inner);
+      }
+    } else {
+      result.push_back(type);
+    }
+  }
+
+  SmallVector<InputLayoutItem> buildInputLayout(
+      IREE::VM::ImportOp importOp, DenseIntElementsAttr segmentSizes,
+      OpBuilder &builder) const {
+    assert(!segmentSizes ||
+           (importOp.getNumArguments() == segmentSizes.size()));
+
+    SmallVector<InputLayoutItem> result;
+    for (size_t i = 0; i < importOp.getNumArguments(); i++) {
+      Type type = importOp.getFunctionType().getInput(i);
+
+      if (!importOp.isFuncArgumentVariadic(i)) {
+        SmallVector<Type, 4> flattenedTypes;
+        appendFlattenedTypes(type, flattenedTypes);
+        for (Type flattenedType : flattenedTypes) {
+          result.push_back(InputLayoutItem{/*type=*/flattenedType});
+        }
+        continue;
+      }
+
+      assert(segmentSizes && "segmentSizes must not be nullptr");
+      APInt segmentSize = *(segmentSizes.begin() + i);
+      int64_t size = segmentSize.getSExtValue();
+      assert(size >= 0);
+
+      result.push_back(InputLayoutItem{/*type=*/builder.getI32Type()});
+
+      SmallVector<Type, 4> elementTypes;
+      appendFlattenedTypes(type, elementTypes);
+      if (size == 0) {
+        InputLayoutItem marker;
+        marker.preAlignTypes = elementTypes;
+        result.push_back(marker);
+      }
+      for (int64_t j = 0; j < size; j++) {
+        InputLayoutItem marker;
+        marker.preAlignTypes = elementTypes;
+        result.push_back(marker);
+        for (Type elementType : elementTypes) {
+          result.push_back(InputLayoutItem{/*type=*/elementType});
+        }
+      }
+    }
+
+    return result;
+  }
+
   // A span count of -1 means a non variadic call
   SmallVector<Type> flattenInputTypes(IREE::VM::ImportOp importOp,
                                       DenseIntElementsAttr segmentSizes,
@@ -2723,15 +2847,6 @@ private:
            (importOp.getNumArguments() == segmentSizes.size()));
 
     SmallVector<Type> result;
-    auto expandType = [&result](Type type) {
-      if (auto tupleType = dyn_cast<TupleType>(type)) {
-        for (Type inner : tupleType) {
-          result.push_back(inner);
-        }
-      } else {
-        result.push_back(type);
-      }
-    };
 
     for (size_t i = 0; i < importOp.getNumArguments(); i++) {
       Type type = importOp.getFunctionType().getInput(i);
@@ -2744,10 +2859,10 @@ private:
 
         assert(size >= 0);
         for (int j = 0; j < size; j++) {
-          expandType(type);
+          appendFlattenedTypes(type, result);
         }
       } else {
-        expandType(type);
+        appendFlattenedTypes(type, result);
       }
     }
 
