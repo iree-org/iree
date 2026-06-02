@@ -80,6 +80,9 @@ module {
 // CHECK-LABEL:     func.func @aligned_unpack_generic
 // CHECK:             %[[SRC:.+]] = hal.interface.binding.subspan {{.*}} : memref<24x32x16x16xf32, #hal.descriptor_type<storage_buffer>>
 // CHECK:             %[[ASSUMED_SRC:.+]] = memref.assume_alignment %[[SRC]], 64
+// The unpack source tile is `vector<16x16xf32>`: its trailing dim is a full
+// 512-bit `vector<16xf32>`, so transfer flattening leaves it alone and plain
+// rank reduction lowers it to one `vector<16xf32>` load per row.
 // CHECK-COUNT-15:        vector.load %[[ASSUMED_SRC]]
 // CHECK:                 %[[LAST_LOAD:.+]] = vector.load %[[ASSUMED_SRC]]
 // CHECK:                 %[[IN_0:.+]] = vector.broadcast %{{.+}} : vector<16xf32> to vector<16x16xf32>
