@@ -639,12 +639,21 @@ static FailureOr<Value> matchSoftmax(linalg::LinalgOp rootOp) {
     return failure();
   }
 
-  // max = reduce_max(src), reducing the same source the subtraction reads.
+  // max = reduce_max(src), reducing the same source the subtraction reads. The
+  // init must be -inf or the lowest finite value. Accept both arith.maximumf
+  // (NaN-propagating, as emitted by e.g. StableHLO frontends) and arith.maxnumf
+  // (NaN-ignoring, which is what linalg.softmax itself decomposes to), since
+  // both denote the stabilizing max of a softmax.
+  auto isNegInfOrLowest = [](APFloat f) {
+    return (f.isLargest() || f.isInfinity()) && f.isNegative();
+  };
   Value source = subSource->get();
   Value reducedValue =
-      matchInnermostReduction<arith::MaximumFOp>(maxValue, [](APFloat f) {
-        return (f.isLargest() || f.isInfinity()) && f.isNegative();
-      });
+      matchInnermostReduction<arith::MaximumFOp>(maxValue, isNegInfOrLowest);
+  if (!reducedValue) {
+    reducedValue =
+        matchInnermostReduction<arith::MaxNumFOp>(maxValue, isNegInfOrLowest);
+  }
   if (reducedValue != source) {
     return failure();
   }
