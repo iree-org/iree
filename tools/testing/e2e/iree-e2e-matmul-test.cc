@@ -50,7 +50,7 @@ REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 REFERENCE_MATMUL(uint8_t, int8_t, int32_t, int32_t)
 REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
 
-// Reference mamtul for the f16 input, f16 accumulation, and f16 result.
+// Reference matmul for the f16 input, f16 accumulation, and f16 result.
 // [f16 <= f16 * f16 + f16]
 static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -68,7 +68,7 @@ static void reference_matmul_f16_f16_f16_f16(
   result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
 }
 
-// Reference mamtul for the f16 input, f32 accumulation, and f32 result.
+// Reference matmul for the f16 input, f32 accumulation, and f32 result.
 // [f32 <= f16 * f16 + f32]
 static void reference_matmul_f16_f16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -85,7 +85,7 @@ static void reference_matmul_f16_f16_f32_f32(
   result_data[n + m * n_size] = acc;
 }
 
-// Reference mamtul for the bf16 input, bf16 accumulation, and bf16 result.
+// Reference matmul for the bf16 input, bf16 accumulation, and bf16 result.
 // [bf16 <= bf16 * bf16 + bf16]
 static void reference_matmul_bf16_bf16_bf16_bf16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -103,7 +103,7 @@ static void reference_matmul_bf16_bf16_bf16_bf16(
   result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
 }
 
-// Reference mamtul for the bf16 input, f32 accumulation, and f32 result.
+// Reference matmul for the bf16 input, f32 accumulation, and f32 result.
 // [f32 <= bf16 * bf16 + f32]
 static void reference_matmul_bf16_bf16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,

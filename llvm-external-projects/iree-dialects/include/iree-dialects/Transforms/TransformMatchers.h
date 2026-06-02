@@ -1105,7 +1105,7 @@ void makeMatmulMatcher(MatcherContext &matcherContext,
                        MatchedMatmulCaptures &captures,
                        bool mustMatchEntireFunc);
 
-/// Create a group of matchers of batch mamtul with a fill:
+/// Create a group of matchers of batch matmul with a fill:
 ///
 ///  batch_matmul(*, *, fill())
 ///
