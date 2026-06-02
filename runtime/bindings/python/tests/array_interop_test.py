@@ -102,6 +102,14 @@ class DeviceHalTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = np.asarray(ary)
 
+    def testIllegalImplicitHostTransferForUfunc(self):
+        init_ary = np.zeros([3, 4], dtype=np.int32) + 2
+        ary = iree.runtime.asdevicearray(self.device, init_ary)
+        with self.assertRaises(ValueError):
+            _ = ary + 1
+        with self.assertRaises(ValueError):
+            _ = np.add(ary, 1)
+
     def testImplicitHostArithmetic(self):
         init_ary = np.zeros([3, 4], dtype=np.int32) + 2
         ary = iree.runtime.asdevicearray(

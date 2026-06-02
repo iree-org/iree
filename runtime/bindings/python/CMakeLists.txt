@@ -295,6 +295,21 @@ endif()
 # Tests
 ################################################################################
 
+if(IREE_BUILD_PYTHON_BINDINGS AND IREE_BUILD_TESTS)
+  find_program(PYRIGHT_EXECUTABLE NAMES pyright REQUIRED)
+  add_test(
+    NAME iree/runtime/bindings/pyright
+    COMMAND
+      "${PYRIGHT_EXECUTABLE}"
+      "-p"
+      "${CMAKE_CURRENT_SOURCE_DIR}/pyrightconfig.json"
+    WORKING_DIRECTORY
+      "${CMAKE_CURRENT_SOURCE_DIR}"
+  )
+  set_property(TEST iree/runtime/bindings/pyright PROPERTY LABELS "runtime;lint")
+  set_property(TEST iree/runtime/bindings/pyright PROPERTY TIMEOUT 120)
+endif()
+
 iree_py_test(
   NAME
     array_interop_test

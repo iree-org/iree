@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """BufferView and Python Array Protocol interop."""
 
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple, cast
 import logging
 import ml_dtypes
 import numpy as np
@@ -99,6 +99,18 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
             func, types, args, kwargs
         )  # pytype: disable=attribute-error
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        def transfer_input(inp):
+            if isinstance(inp, DeviceArray):
+                return inp._transfer_to_host(True)
+            return inp
+
+        host_inputs = [transfer_input(inp) for inp in inputs]
+        if kwargs.get("out") is not None:
+            kwargs = dict(kwargs)
+            kwargs["out"] = tuple(transfer_input(inp) for inp in kwargs["out"])
+        return getattr(ufunc, method)(*host_inputs, **kwargs)
+
     def __repr__(self):
         return f"<IREE DeviceArray: shape={np.shape(self)}, dtype={self.dtype}>"
 
@@ -142,7 +154,9 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
         # TODO: When synchronization is enabled, need to block here.
         raw_dtype = self._get_raw_dtype()
         mapped_memory = self._buffer_view.map()
-        host_array = mapped_memory.asarray(self._buffer_view.shape, raw_dtype)
+        host_array = cast(
+            np.ndarray, mapped_memory.asarray(self._buffer_view.shape, raw_dtype)
+        )
         # Detect if we need to force an explicit conversion. This happens when
         # we were requested to pretend that the array is in a specific dtype,
         # even if that is not representable on the device. You guessed it:
@@ -216,7 +230,12 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     def shape(self):
         return np.shape(self)
 
-    def astype(self, dtype, casting="unsafe", copy=True):
+    def astype(
+        self,
+        dtype,
+        casting: Literal["no", "equiv", "safe", "same_kind", "unsafe"] = "unsafe",
+        copy=True,
+    ):
         if self.dtype == dtype and not copy:
             return self
         host_ary = self.to_host()
@@ -305,6 +324,8 @@ def asdevicearray(
         buffer=a,
         element_type=element_type,
     )
+    if not isinstance(buffer_view, HalBufferView):
+        raise TypeError("Expected allocate_buffer_copy to return a HalBufferView")
     return DeviceArray(
         device,
         buffer_view,

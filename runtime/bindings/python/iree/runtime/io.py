@@ -26,20 +26,22 @@ __all__ = [
 class SplatValue:
     def __init__(
         self,
-        pattern: Union[array.array, np.ndarray],
+        pattern: Union[array.array, np.ndarray, np.generic],
         count: Union[Sequence[int], int],
     ):
-        if hasattr(pattern, "shape"):
+        if isinstance(pattern, np.ndarray):
             shape = pattern.shape
             if not shape:
                 total_elements = 1
             else:
-                total_elements = reduce(lambda x, y: x * y, pattern.shape)
+                total_elements = reduce(lambda x, y: x * y, shape)
+        elif isinstance(pattern, np.generic):
+            total_elements = 1
         else:
             total_elements = len(pattern)
         item_size = pattern.itemsize
         if total_elements != 1:
-            raise ValueError(f"SplatValue requires an array of a single element")
+            raise ValueError("SplatValue requires an array of a single element")
         self.pattern = pattern
         if isinstance(count, int):
             logical_length = count
@@ -162,23 +164,23 @@ def parameter_index_entry_as_numpy_ndarray(
 
 
 _DTYPE_TO_NAME = (
-    (np.float16, "float16"),
-    (np.float32, "float32"),
-    (np.float64, "float64"),
-    (np.int32, "int32"),
-    (np.int64, "int64"),
-    (np.int16, "int16"),
-    (np.int8, "int8"),
-    (np.uint32, "uint32"),
-    (np.uint64, "uint64"),
-    (np.uint16, "uint16"),
-    (np.uint8, "uint8"),
-    (np.bool_, "bool"),
-    (np.complex64, "complex64"),
-    (np.complex128, "complex128"),
+    (np.dtype(np.float16), "float16"),
+    (np.dtype(np.float32), "float32"),
+    (np.dtype(np.float64), "float64"),
+    (np.dtype(np.int32), "int32"),
+    (np.dtype(np.int64), "int64"),
+    (np.dtype(np.int16), "int16"),
+    (np.dtype(np.int8), "int8"),
+    (np.dtype(np.uint32), "uint32"),
+    (np.dtype(np.uint64), "uint64"),
+    (np.dtype(np.uint16), "uint16"),
+    (np.dtype(np.uint8), "uint8"),
+    (np.dtype(np.bool_), "bool"),
+    (np.dtype(np.complex64), "complex64"),
+    (np.dtype(np.complex128), "complex128"),
 )
 
-_NAME_TO_DTYPE: dict[str, np.dtype] = {
+_NAME_TO_DTYPE: dict[str, np.dtype[Any]] = {
     name: np_dtype for np_dtype, name in _DTYPE_TO_NAME
 }
 

@@ -3,3 +3,4 @@
 cmake>=3.26
 ninja
 packaging
+pyright==1.1.410

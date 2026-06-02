@@ -31,7 +31,7 @@ import logging
 import os
 import sys
 
-from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, List, MutableMapping, Optional, Sequence, Tuple, Union
 
 from . import _binding
 from .function import FunctionInvoker
@@ -77,7 +77,9 @@ class Config:
         self.default_vm_modules = (hal_module,)
 
 
-def _bool_to_int8(array: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+def _bool_to_int8(
+    array: Any,
+) -> Optional[Union[np.ndarray, List[Any], Tuple[Any], dict[Any, Any]]]:
     if not isinstance(array, np.ndarray):
         return array
 
@@ -88,7 +90,9 @@ def _bool_to_int8(array: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any
     return array
 
 
-def normalize_value(value: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[Any]]]:
+def normalize_value(
+    value: Any,
+) -> Optional[Union[np.ndarray, List[Any], Tuple[Any], dict[Any, Any]]]:
     """Normalizes the given value for input to (or comparison with) IREE."""
     if value is None:
         # Exclude None from falling through to blanket np.asarray conversion.
@@ -112,7 +116,7 @@ def normalize_value(value: Any) -> Optional[Union[np.ndarray, List[Any], Tuple[A
 def _convert_lists_to_tuples(pytree):
     if isinstance(pytree, Sequence):
         return tuple(_convert_lists_to_tuples(leaf) for leaf in pytree)
-    elif isinstance(pytree, Mapping):
+    elif isinstance(pytree, MutableMapping):
         for key in pytree:
             pytree[key] = _convert_lists_to_tuples(pytree[key])
         return pytree
@@ -180,12 +184,17 @@ class BoundModules(dict):
 class SystemContext:
     """Global system."""
 
-    def __init__(self, vm_modules=None, config: Optional[Config] = None):
+    def __init__(
+        self,
+        vm_modules: Optional[Sequence[_binding.VmModule]] = None,
+        config: Optional[Config] = None,
+    ):
         self._config = config if config is not None else Config()
         self._is_dynamic = vm_modules is None
         if self._is_dynamic:
             init_vm_modules = None
         else:
+            assert vm_modules is not None
             init_vm_modules = self._config.default_vm_modules + tuple(vm_modules)
 
         self._vm_context = _binding.VmContext(
@@ -201,6 +210,7 @@ class SystemContext:
                 ]
             )
         else:
+            assert init_vm_modules is not None
             self._bound_modules = BoundModules(
                 [(m.name, BoundModule(self, m)) for m in init_vm_modules]
             )

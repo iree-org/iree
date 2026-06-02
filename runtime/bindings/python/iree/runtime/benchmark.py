@@ -19,7 +19,6 @@ from collections import namedtuple
 from typing import Union
 from os import PathLike
 
-import iree.runtime
 from . import VmModule
 import numpy
 import os
@@ -105,7 +104,7 @@ def _build_benchmark_args(
         v = kwargs[k]
         args.append(f"--{k}={v}")
 
-    for inp in inputs:
+    for inp in inputs or []:
         if isinstance(inp, str):
             args.append(f"--input={inp}")
             continue

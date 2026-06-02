@@ -49,6 +49,8 @@ def get_device(device_uri: str, cache: bool = True) -> HalDevice:
         if cache:
             existing = _GLOBAL_DEVICES_BY_URI.get(device_uri)
             if existing is not None:
+                if isinstance(existing, Exception):
+                    raise existing
                 return existing
 
         driver = get_driver(device_uri)
