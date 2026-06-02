@@ -175,9 +175,9 @@ void GlobalTable::eraseGlobal(StringRef globalName) {
   assert(global.loadOps.empty() && "must not be used");
   assert(global.referencingOps.empty() && "must not be referenced");
   global.eraseStores();
+  global.op.erase();
   globalMap.erase(globalName);
   llvm::erase(globalOrder, globalName);
-  global.op.erase();
 }
 
 } // namespace mlir::iree_compiler::IREE::Util
