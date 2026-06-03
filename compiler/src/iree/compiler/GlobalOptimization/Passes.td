@@ -101,7 +101,7 @@ def GeneralizeLinalgNamedOpsPass :
   let summary = "Convert some Linalg named ops into linalg.generics.";
   let options = [
     Option<"enableGeneralizeMatmul", "enable-generalize-matmul", "bool",
-           /*default=*/"false", "Convert linalg named opt to generic ops.">,
+           /*default=*/"false", "Convert linalg named matmul ops to generic ops.">,
   ];
 }
 
