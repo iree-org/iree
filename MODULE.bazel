@@ -60,7 +60,6 @@ use_repo(
     "mpfr",
     "nanobind",
     "pfm",
-    "pybind11",
     "pyyaml",
     "robin_map",
     # Note: vulkan_headers is provided by iree_ext with IREE's custom BUILD.overlay
@@ -96,6 +95,12 @@ use_repo(
     "wasi_sdk",
     "webgpu_headers",
 )
+
+# The LLVM overlay imports @llvm-raw from its own llvm_repos_extension, which
+# only generates it when the overlay is the root module. IREE is the root
+# module here, so inject IREE's @llvm-raw (created by iree_extension) into the
+# overlay extension to satisfy its use_repo("llvm-raw").
+inject_repo(llvm_repos_ext, "llvm-raw")
 
 # Configure LLVM using the llvm-raw repo (creates llvm-project)
 llvm_configure = use_repo_rule("@llvm-raw//utils/bazel:configure.bzl", "llvm_configure")

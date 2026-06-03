@@ -19,7 +19,7 @@
 #include "./binding.h"
 #include "./status_utils.h"
 #include "./vm.h"
-#include "iree/base/string_view.h"
+#include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/debugging.h"
 
