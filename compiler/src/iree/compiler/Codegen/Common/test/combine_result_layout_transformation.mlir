@@ -513,3 +513,45 @@ func.func @pack_divisible_static_dim_tile_size_8_no_pad_loop(%source : tensor<16
 // Verify no padding loops are generated.
 //   DISPATCH-SCOPE-NOT:   scf.forall
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
+
+// -----
+
+// Test: Pack with dynamic (vscale-based) inner tile generates padding only
+// for the dynamic dimension, not for the tile-1 dimension.
+func.func @fold_pack_op_dynamic_inner_tiles(%source : tensor<250x250xf32>, %result : memref<?x250x?x1xf32>) {
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %c8, %vscale : index
+  %dim0 = affine.apply affine_map<()[s0] -> (250 ceildiv s0)>()[%c8_vscale]
+  %cst = arith.constant 0.0 : f32
+  %dest = tensor.empty(%dim0, %c8_vscale) : tensor<?x250x?x1xf32>
+  %pack = linalg.pack %source padding_value(%cst : f32)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%c8_vscale, 1]
+      into %dest : tensor<250x250xf32> -> tensor<?x250x?x1xf32>
+  iree_codegen.store_to_buffer %pack, %result : tensor<?x250x?x1xf32> into memref<?x250x?x1xf32>
+  return
+}
+//       DISPATCH-SCOPE: #[[$CEILDIV_MAP:.+]] = affine_map<()[s0] -> (250 ceildiv s0)>
+//       DISPATCH-SCOPE: #[[$PAD_UB_MAP:.+]] = affine_map<()[s0] -> (s0 * (250 ceildiv s0))>
+//       DISPATCH-SCOPE: #[[$TILE_MIN0_MAP:.+]] = affine_map<(d0)[s0] -> (d0 + 1, s0 * (250 ceildiv s0))>
+//       DISPATCH-SCOPE: #[[$TILE_MIN1_MAP:.+]] = affine_map<(d0) -> (250, d0 + 64)>
+// DISPATCH-SCOPE-LABEL: @fold_pack_op_dynamic_inner_tiles
+//  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+//  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//       DISPATCH-SCOPE:   %[[C8_VSCALE:.+]] = arith.muli %{{.+}}, %{{.+}} : index
+//       DISPATCH-SCOPE:   %[[DIM0:.+]] = affine.apply #[[$CEILDIV_MAP]]()[%[[C8_VSCALE]]]
+//       DISPATCH-SCOPE:   iree_linalg_ext.map_store
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer
+// High padding for dimension 0 (dynamic vscale tile)
+//       DISPATCH-SCOPE:   %[[PAD_UB:.+]] = affine.apply #[[$PAD_UB_MAP]]()[%[[C8_VSCALE]]]
+//       DISPATCH-SCOPE:   scf.forall (%[[IV0:.+]], %[[IV1:.+]]) = (250, 0) to (%[[PAD_UB]], 250) step (1, 64) {
+//  DISPATCH-SCOPE-DAG:     %[[TILE_UB0:.+]] = affine.min #[[$TILE_MIN0_MAP]](%[[IV0]])[%[[C8_VSCALE]]]
+//  DISPATCH-SCOPE-DAG:     %[[TILE_UB1:.+]] = affine.min #[[$TILE_MIN1_MAP]](%[[IV1]])
+//       DISPATCH-SCOPE:     scf.for %[[IDX0:.+]] = %[[IV0]] to %[[TILE_UB0]] step %{{.+}} {
+//       DISPATCH-SCOPE:       scf.for %[[IDX1:.+]] = %[[IV1]] to %[[TILE_UB1]] step %{{.+}} {
+//       DISPATCH-SCOPE:         %[[DELIN:.+]]:2 = affine.delinearize_index %[[IDX0]] into (%[[DIM0]], %[[C8_VSCALE]])
+//       DISPATCH-SCOPE:         memref.store %{{.+}}, %[[RESULT]][%[[DELIN]]#0, %[[IDX1]], %[[DELIN]]#1, %{{.+}}] : memref<?x250x?x1xf32>
+//       DISPATCH-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
+// Verify no second padding loop (inner tile size 1 needs no padding)
+//   DISPATCH-SCOPE-NOT:   scf.forall
+//       DISPATCH-SCOPE:   return
