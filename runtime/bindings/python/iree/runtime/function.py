@@ -8,6 +8,7 @@ from typing import Dict, Optional
 
 import json
 import logging
+from typing import cast
 
 import numpy as np
 
@@ -364,7 +365,9 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
             # since this is higher level and it preserves layering. Note that
             # the reflection case also does this conversion.
             if isinstance(converted, VmRef):
-                converted_buffer_view = converted.deref(HalBufferView, True)
+                converted_buffer_view = cast(
+                    HalBufferView | None, converted.deref(HalBufferView, True)
+                )
                 if converted_buffer_view:
                     converted = DeviceArray(
                         inv.device, converted_buffer_view, implicit_host_transfer=True
@@ -382,7 +385,7 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
                 raise
             except Exception as e:
                 _raise_return_error(
-                    inv, f"exception converting from VM type to Python", e
+                    inv, "exception converting from VM type to Python", e
                 )
         results.append(converted)
     return results
