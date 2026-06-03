@@ -19,15 +19,22 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/base/threading/futex.h"
 
-// NOTE: clang cannot support thread annotations in C code due to some
-// representational bugs... which means that we can't use it here. Boo.
-// There's some workarounds I've seen but getting TSAN working would be much
-// easier as a starting point.
-#if 0  // defined(IREE_COMPILER_CLANG)
+// Clang thread-safety analysis is a C++ language extension. The capability
+// model requires capabilities to be C++ records with annotated acquire/release
+// member functions, and GUARDED_BY() uses C++ name lookup to resolve the
+// capability object. These assumptions do not hold in C: the attribute may be
+// ignored or mis-parsed by the C frontend, and free-function lock/unlock
+// primitives lack the this-based capability tracking that the analysis relies
+// on. The analysis therefore only fires meaningfully in C++.
+// See https://clang.llvm.org/docs/ThreadSafetyAnalysis.html ("Introduction").
+// Enable the annotations when compiling C++ with Clang so that callers can use
+// IREE_GUARDED_BY et al. and iree_slim_mutex_t carries the required capability
+// annotation.
+#if defined(__cplusplus) && defined(__clang__)
 #define IREE_THREAD_ANNOTATION_ATTRIBUTE(x) __attribute__((x))
 #else
 #define IREE_THREAD_ANNOTATION_ATTRIBUTE(x)
-#endif  // IREE_COMPILER_CLANG
+#endif  // __cplusplus && __clang__
 
 #ifdef __cplusplus
 // Documents if a shared field or global variable needs to be protected by a
@@ -46,6 +53,12 @@
 #else
 #define IREE_PTR_GUARDED_BY(x)
 #endif  // __cplusplus
+
+// Disables thread-safety analysis for a function. Use on init/destroy functions
+// that access mutex-guarded data before/after the mutex is live, where single-
+// threaded access is guaranteed by the caller's lifecycle contract.
+#define IREE_NO_THREAD_SAFETY_ANALYSIS \
+  IREE_THREAD_ANNOTATION_ATTRIBUTE(no_thread_safety_analysis)
 
 // Allow users to fully disable all synchronization for systems that are known
 // to never need it. This removes our dependency on pthreads.
@@ -83,8 +96,7 @@ extern "C" {
 //
 // Windows: Slim Reader/Writer (SRW) Locks
 // All others: pthread_mutex_t
-typedef struct iree_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
-    capability("mutex")) {
+typedef struct iree_mutex_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   int reserved;
 #elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
@@ -97,7 +109,7 @@ typedef struct iree_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
 #if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_SLOW_LOCKS)
   uint32_t lock_id;
 #endif  // IREE_TRACING_FEATURE_SLOW_LOCKS
-} iree_mutex_t;
+} IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) iree_mutex_t;
 
 #if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_SLOW_LOCKS)
 // Initializes |out_mutex| to the well-defined unlocked contents.
@@ -224,8 +236,7 @@ IREE_API_EXPORT void iree_mutex_unlock(iree_mutex_t* mutex)
 //   https://man7.org/linux/man-pages/man2/futex.2.html
 //   https://eli.thegreenplace.net/2018/basics-of-futexes/
 //   https://bartoszmilewski.com/2008/09/01/thin-lock-vs-futex/
-typedef struct iree_slim_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
-    capability("mutex")) {
+typedef struct iree_slim_mutex_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   int reserved;
 #elif (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
@@ -239,7 +250,7 @@ typedef struct iree_slim_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
 #else
   iree_mutex_t impl;  // fallback
 #endif  // IREE_PLATFORM_*
-} iree_slim_mutex_t;
+} IREE_THREAD_ANNOTATION_ATTRIBUTE(capability("mutex")) iree_slim_mutex_t;
 
 #if (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FAST_LOCKS)
 // Initializes |out_mutex| to the well-defined unlocked contents.
