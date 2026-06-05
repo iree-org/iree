@@ -4,6 +4,12 @@
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=WORKGROUP-SCOPE
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=dispatch-reshape},canonicalize,cse))" \
 // RUN:   -split-input-file %s | FileCheck %s --check-prefixes=RESHAPE-SCOPE
+// Scalarize the index transformations to show that the per-group fold keeps
+// the lowered body division-free, while a global `delinearize_index` over a
+// dynamic shape would scalarize to runtime-divisor `arith.divsi`/`remsi`.
+// Gated on the EXPAND prefix.
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-combine-result-layout-transformation{scope=dispatch},canonicalize,cse,affine-expand-index-ops,canonicalize,cse))" \
+// RUN:   -split-input-file %s | FileCheck %s --check-prefixes=EXPAND
 
 func.func @fold_collapse_shape_op(%source : tensor<2x4x16xf32>, %result : memref<8x16xf32>) {
   %collapse = tensor.collapse_shape %source [[0, 1], [2]] : tensor<2x4x16xf32> into tensor<8x16xf32>
@@ -250,7 +256,6 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
   iree_codegen.store_to_buffer %unpack, %result : tensor<?x?xf32> into memref<?x?xf32>
   return
 }
-//       DISPATCH-SCOPE: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
 // DISPATCH-SCOPE-LABEL: @fold_unpack_op
 //  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
@@ -260,23 +265,62 @@ func.func @fold_unpack_op(%source : tensor<?x?x128x128xf32>, %result : memref<?x
 //   DISPATCH-SCOPE-DAG:   %[[RES_D1:.+]] = memref.dim %[[RESULT]], %[[C1]] : memref<?x?xf32>
 //   DISPATCH-SCOPE-DAG:   %[[SRC_D0:.+]] = tensor.dim %[[SOURCE]], %[[C0]] : tensor<?x?x128x128xf32>
 //   DISPATCH-SCOPE-DAG:   %[[SRC_D1:.+]] = tensor.dim %[[SOURCE]], %[[C1]] : tensor<?x?x128x128xf32>
-//   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE0:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D0]]]
-//   DISPATCH-SCOPE-DAG:   %[[COLLAPSE_SIZE1:.+]] = affine.apply #[[$MAP]]()[%[[SRC_D1]]]
 //   DISPATCH-SCOPE-DAG:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty(%[[RES_D0]], %[[RES_D1]]) : tensor<?x?xf32>
 //       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
 //  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
 //  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index, %[[IDX2:.+]]: index, %[[IDX3:.+]]: index):
-//       DISPATCH-SCOPE:     %[[LINEARIZE:.+]] = affine.linearize_index
-//  DISPATCH-SCOPE-SAME:       [%[[IDX0]], %[[IDX2]], %[[IDX1]], %[[IDX3]]]
-//  DISPATCH-SCOPE-SAME:       by (%[[SRC_D0]], 128, %[[SRC_D1]], 128)
-//       DISPATCH-SCOPE:     %[[DELINEARIZE:.+]]:2 = affine.delinearize_index %[[LINEARIZE]]
-//  DISPATCH-SCOPE-SAME:       into (%[[COLLAPSE_SIZE0]], %[[COLLAPSE_SIZE1]])
-//       DISPATCH-SCOPE:     %[[BOUND0:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#0, %[[RES_D0]]
-//       DISPATCH-SCOPE:     %[[BOUND1:.+]] = arith.cmpi ult, %[[DELINEARIZE]]#1, %[[RES_D1]]
+// Each collapsed dimension folds independently, so the merge factors stay
+// per-group rather than going through one global linearize + delinearize.
+//       DISPATCH-SCOPE:     %[[LIN0:.+]] = affine.linearize_index disjoint
+//  DISPATCH-SCOPE-SAME:       [%[[IDX0]], %[[IDX2]]] by (%[[SRC_D0]], 128)
+//       DISPATCH-SCOPE:     %[[LIN1:.+]] = affine.linearize_index disjoint
+//  DISPATCH-SCOPE-SAME:       [%[[IDX1]], %[[IDX3]]] by (%[[SRC_D1]], 128)
+//       DISPATCH-SCOPE:     %[[BOUND0:.+]] = arith.cmpi ult, %[[LIN0]], %[[RES_D0]]
+//       DISPATCH-SCOPE:     %[[BOUND1:.+]] = arith.cmpi ult, %[[LIN1]], %[[RES_D1]]
 //       DISPATCH-SCOPE:     %[[MASK:.+]] = arith.andi %[[BOUND0]], %[[BOUND1]] : i1
-//       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[DELINEARIZE]]#0, %[[DELINEARIZE]]#1, %[[MASK]]
+//       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[LIN0]], %[[LIN1]], %[[MASK]]
 //       DISPATCH-SCOPE:   } : tensor<?x?x128x128xf32> into tensor<?x?xf32> -> tensor<?x?xf32>
 //       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<?x?xf32> into memref<?x?xf32>
+
+// -----
+
+// Dynamic-shape companion of @fold_pack_op. Mirrors @fold_unpack_op's
+// 2-reassociation-group shape (dim -> dynamic-outer + 128-tile), but going
+// the other way -- exercises the expand-case per-group `delinearize_index`
+// path on dimensions that don't canonicalize away (the case the pre-PR
+// global linearize + delinearize would have scalarized to a per-element
+// dynamic integer division).
+func.func @fold_pack_op_dynamic(%source : tensor<?x?xf32>, %result : memref<?x?x128x128xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = memref.dim %result, %c0 : memref<?x?x128x128xf32>
+  %d1 = memref.dim %result, %c1 : memref<?x?x128x128xf32>
+  %dest = tensor.empty(%d0, %d1) : tensor<?x?x128x128xf32>
+  %pack = linalg.pack %source padding_value(%cst : f32)
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest : tensor<?x?xf32> -> tensor<?x?x128x128xf32>
+  iree_codegen.store_to_buffer %pack, %result : tensor<?x?x128x128xf32> into memref<?x?x128x128xf32>
+  return
+}
+// DISPATCH-SCOPE-LABEL: @fold_pack_op_dynamic
+//  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
+//  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
+//   DISPATCH-SCOPE-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   DISPATCH-SCOPE-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   DISPATCH-SCOPE-DAG:   %[[RES_D0:.+]] = memref.dim %[[RESULT]], %[[C0]] : memref<?x?x128x128xf32>
+//   DISPATCH-SCOPE-DAG:   %[[RES_D1:.+]] = memref.dim %[[RESULT]], %[[C1]] : memref<?x?x128x128xf32>
+//   DISPATCH-SCOPE-DAG:   %[[MAP_SCATTER_DEST:.+]] = tensor.empty(%[[RES_D0]], %[[RES_D1]]) : tensor<?x?x128x128xf32>
+//       DISPATCH-SCOPE:   %[[MAP_SCATTER:.+]] = iree_linalg_ext.map_store
+//  DISPATCH-SCOPE-SAME:     %[[SOURCE]] into %[[MAP_SCATTER_DEST]] {
+//  DISPATCH-SCOPE-NEXT:   ^bb0(%[[IDX0:.+]]: index, %[[IDX1:.+]]: index):
+// Each expanded dimension folds independently, so the split factors stay
+// per-group rather than going through one global linearize + delinearize.
+//       DISPATCH-SCOPE:     %[[DELIN0:.+]]:2 = affine.delinearize_index %[[IDX0]] into (%[[RES_D0]], 128)
+//       DISPATCH-SCOPE:     %[[DELIN1:.+]]:2 = affine.delinearize_index %[[IDX1]] into (%[[RES_D1]], 128)
+//       DISPATCH-SCOPE:     iree_linalg_ext.yield %[[DELIN0]]#0, %[[DELIN1]]#0, %[[DELIN0]]#1, %[[DELIN1]]#1
+//       DISPATCH-SCOPE:   } : tensor<?x?xf32> into tensor<?x?x128x128xf32> -> tensor<?x?x128x128xf32>
+//       DISPATCH-SCOPE:   iree_codegen.store_to_buffer %[[MAP_SCATTER]], %[[RESULT]] : tensor<?x?x128x128xf32> into memref<?x?x128x128xf32>
 
 // -----
 
@@ -600,3 +644,55 @@ func.func @pure_transpose_skipped_under_dispatch_reshape(
 // RESHAPE-SCOPE-LABEL: @pure_transpose_skipped_under_dispatch_reshape
 //       RESHAPE-SCOPE:   linalg.transpose
 //   RESHAPE-SCOPE-NOT:   iree_linalg_ext.map_store
+
+// -----
+
+// Lowering contrast: scalarizing the per-group `(de)linearize_index` the
+// combine pass emits leaves the body division-free -- multiplies and adds by
+// the static tile size -- while a global `delinearize_index` over the full
+// dynamic result shape scalarizes to runtime-divisor `arith.divsi`/`remsi`.
+
+func.func @lowered_per_group_no_division(%source : tensor<?x?x128x128xf32>,
+                                          %result : memref<?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = memref.dim %result, %c0 : memref<?x?xf32>
+  %d1 = memref.dim %result, %c1 : memref<?x?xf32>
+  %dest = tensor.empty(%d0, %d1) : tensor<?x?xf32>
+  %unpack = linalg.unpack %source
+      outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [128, 128]
+      into %dest : tensor<?x?x128x128xf32> -> tensor<?x?xf32>
+  iree_codegen.store_to_buffer %unpack, %result : tensor<?x?xf32> into memref<?x?xf32>
+  return
+}
+// The per-group `linearize_index` lowers to `muli`/`addi` by the static tile
+// size 128 -- no division of any kind.
+//       EXPAND-LABEL: @lowered_per_group_no_division
+//         EXPAND-DAG: %[[C128:.+]] = arith.constant 128 : index
+//             EXPAND: iree_linalg_ext.map_store
+//             EXPAND: arith.muli %{{.+}}, %[[C128]]
+//             EXPAND: arith.addi
+//             EXPAND: arith.muli %{{.+}}, %[[C128]]
+//             EXPAND: arith.addi
+//         EXPAND-NOT: arith.divsi
+//         EXPAND-NOT: arith.floordivsi
+//         EXPAND-NOT: arith.remsi
+
+// -----
+
+// Negative case for contrast: a global `affine.delinearize_index` over a
+// fully dynamic result shape -- the per-group fold avoids producing this IR.
+func.func @lowered_global_dynamic_divisor(
+    %idx: index, %d0: index, %d1: index, %d2: index, %d3: index
+) -> (index, index, index, index) {
+  %r:4 = affine.delinearize_index %idx into (%d0, %d1, %d2, %d3)
+       : index, index, index, index
+  return %r#0, %r#1, %r#2, %r#3 : index, index, index, index
+}
+// Scalarizes to runtime-divisor `arith.divsi`/`remsi` (divisors are
+// `arith.muli` products of the dynamic factors) -- the cost the per-group
+// fold avoids.
+//       EXPAND-LABEL: @lowered_global_dynamic_divisor
+//             EXPAND: arith.muli
+//             EXPAND: arith.divsi
+//             EXPAND: arith.remsi

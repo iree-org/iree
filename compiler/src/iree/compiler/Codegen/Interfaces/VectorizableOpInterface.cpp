@@ -462,6 +462,18 @@ struct MapStoreOpVectorizationModel
       return false;
     }
     ShapedType inputType = mapStoreOp.getInputType();
+    // `vectorize()` below emits an unmasked, full-tile `vector.transfer_read`,
+    // so the input must be statically shaped. A `map_store` iterates its
+    // *input*, so it only vectorizes when that input is already statically
+    // tiled. For a data-tiling encoding relayout the input is the un-padded
+    // source tensor, which has no static tile structure -- so a CPU-tiled
+    // `map_store` reaches here dynamically shaped and is left to scalarize.
+    // The padded, statically-tiled side of an encoding relayout is its
+    // *output*; a relayout rooted there -- a `map_load`, which iterates its
+    // result -- tiles into complete static tiles by construction. So a CPU
+    // encoding relayout should be combined into a `map_load`, not a
+    // `map_store`. (GPU also forms `map_store` for these but tiles them
+    // statically via its thread-grid distribution, so it does not hit this.)
     if (!inputType.hasStaticShape()) {
       return false;
     }
