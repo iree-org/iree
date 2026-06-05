@@ -370,6 +370,10 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
     return Tuple{1, 16, 4};
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
     return Tuple{16, 1, 4};
+  // 16x16x2: the LHS and RHS tiles *are* row-major (16x2 i8 panels); only the
+  // ACC tile has a non-row-major layout, hand-rolled in `getIntrinsicSwizzle`.
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
+    return Tuple{16, 16, 2};
   default:
     if (isGenericScalar(intrinsic)) {
       return Tuple{1, 1, 1};
@@ -464,6 +468,24 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
           Dim::internal(4, Dim::SymbolicMultiplier::ArmSveVLIn128bitUnits));
     }
     return fixupSwizzle(std::move(swizzle));
+  }
+
+  // 16x16x2 i8: LHS/RHS are plain row-major 16x2 i8 panels (handled by the
+  // row-major path below), but the 16x16 i32 ACC tile uses a block-interleaved
+  // layout that mirrors the mmt4d ukernel's in-register `acc[4][4]` scheme.
+  // The lowering computes ACC element (r, c) in the dword lane of intrinsic
+  // `vpdpwssd` #(i, cb) where i = r%4, cb = c%4... — concretely the 256 i32
+  // are ordered (rlo, chi, rhi, clo) with r = 4*rhi + rlo, c = 4*chi + clo.
+  // As a TileSwizzle: split M into [rhi(4), rlo(4)] and N into [chi(4),
+  // clo(4)] (expanded dims 0..3), then permute to (rlo, chi, rhi, clo).
+  if (mma == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16 &&
+      operandIdx == 2) {
+    TileSwizzle swizzle;
+    swizzle.expandShape().resize(2);
+    swizzle.expandShape()[0] = {Dim::internal(4), Dim::internal(4)};
+    swizzle.expandShape()[1] = {Dim::internal(4), Dim::internal(4)};
+    swizzle.permutation() = {1, 2, 0, 3};
+    return swizzle;
   }
 
   auto maybeMnkTuple = getRowMajorTilesMNKShape(mma);
@@ -582,6 +604,7 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return {i8, i8, i32};
   // vpdpbusd: returned types preserve signedness for the cost model to
   // match against the encoding's `element_types`; tile types in IR are
@@ -686,12 +709,88 @@ DataTiledMMAAttr::getDistributionWorkerCount(OpBuilder &builder, Location loc,
   return OpFoldResult();
 }
 
+// Lowers one `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` intrinsic: a full
+// 16x16x2 i8 matmul tile, mirroring the mmt4d ukernel's hot loop.
+//
+// Operands (already distributed by the swizzle machinery):
+//   `lhs`, `rhs`: vector<32xi8>, a row-major 16x2 i8 panel.
+//   `acc`:        vector<256xi32>, the 16x16 i32 tile in the block-interleaved
+//                 layout from `getIntrinsicSwizzle` — ordered (rlo, chi, rhi,
+//                 clo) with r = 4*rhi + rlo, c = 4*chi + clo. So the 16 i32 at
+//                 offset (4*rlo + chi)*16 are one `vpdpwssd` accumulator: its
+//                 dword `4*rhi + clo` holds ACC element (r, c).
+//
+// Per call: one `vpmovsxbw` widen of each i8 panel to <32xi16>; 4 `vpshufd`
+// fan each LHS row across its 128-bit lane; 4 128-bit-block broadcasts spread
+// each group of 4 RHS columns across all lanes; 16 `vpdpwssd` over the grid.
+static Value lowerX86Avx512Vnni16x16x2I8(OpBuilder &b, Location loc, Value lhs,
+                                         Value rhs, Value acc) {
+  Type i16 = b.getI16Type();
+  Type i32 = b.getI32Type();
+  auto v32i16 = VectorType::get({32}, i16);
+  auto v16i32 = VectorType::get({16}, i32);
+
+  // Widen each i8 panel to i16 once (one `vpmovsxbw`), then view as 16 i32
+  // dwords so the dword shuffles below are lane-addressable. Dword `x` holds
+  // the (k=0, k=1) i16 pair of LHS row `x` (resp. RHS column `x`).
+  Value lhsDwords = vector::BitCastOp::create(
+      b, loc, v16i32, arith::ExtSIOp::create(b, loc, v32i16, lhs));
+  Value rhsDwords = vector::BitCastOp::create(
+      b, loc, v16i32, arith::ExtSIOp::create(b, loc, v32i16, rhs));
+
+  // lhsDup[i]: `vpshufd` broadcasting dword `4*lane + i` across each 128-bit
+  // lane, so lane L holds LHS row 4*L + i replicated to all 4 dwords.
+  // rhsBcast[cb]: broadcast the 128-bit block of columns [4*cb, 4*cb+4) to all
+  // 4 lanes (a `vbroadcasti32x4`).
+  SmallVector<Value, 4> lhsDup, rhsBcast;
+  for (int s = 0; s < 4; ++s) {
+    SmallVector<int64_t, 16> dupMask, bcastMask;
+    for (int lane = 0; lane < 4; ++lane) {
+      for (int e = 0; e < 4; ++e) {
+        dupMask.push_back(4 * lane + s);
+        bcastMask.push_back(4 * s + e);
+      }
+    }
+    lhsDup.push_back(
+        vector::ShuffleOp::create(b, loc, lhsDwords, lhsDwords, dupMask));
+    rhsBcast.push_back(
+        vector::ShuffleOp::create(b, loc, rhsDwords, rhsDwords, bcastMask));
+  }
+
+  // 16 `vpdpwssd` over the 4x4 grid. Accumulator #(rlo, chi) lives at flat
+  // offset (4*rlo + chi)*16 in the (rlo, chi, rhi, clo)-ordered ACC vector.
+  Value result = acc;
+  for (int rlo = 0; rlo < 4; ++rlo) {
+    for (int chi = 0; chi < 4; ++chi) {
+      int64_t offset = (4 * rlo + chi) * 16;
+      Value accZmm = vector::ExtractStridedSliceOp::create(
+          b, loc, result, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{16},
+          ArrayRef<int64_t>{1});
+      Value a16 = vector::BitCastOp::create(b, loc, v32i16, lhsDup[rlo]);
+      Value b16 = vector::BitCastOp::create(b, loc, v32i16, rhsBcast[chi]);
+      Value dot =
+          LLVM::CallIntrinsicOp::create(
+              b, loc, v16i32, b.getStringAttr("llvm.x86.avx512.vpdpwssd.512"),
+              ValueRange{accZmm, a16, b16})
+              .getResult(0);
+      result = vector::InsertStridedSliceOp::create(
+          b, loc, dot, result, ArrayRef<int64_t>{offset}, ArrayRef<int64_t>{1});
+    }
+  }
+  return result;
+}
+
 // Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
 // additional ops (potentially broadcasting or widening LHS/RHS or creating an
 // add op if the intrinsic isn't already adding the accumulator).
 static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                                        MMAIntrinsic intrinsic, Value lhs,
                                        Value rhs, Value acc) {
+  // The 16x16x2 i8 intrinsic processes whole panels and has its own widen /
+  // shuffle scheme; it bypasses the per-row widen + broadcast path below.
+  if (intrinsic == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16) {
+    return lowerX86Avx512Vnni16x16x2I8(builder, loc, lhs, rhs, acc);
+  }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
   // intrinsic only exists at the wider type.
