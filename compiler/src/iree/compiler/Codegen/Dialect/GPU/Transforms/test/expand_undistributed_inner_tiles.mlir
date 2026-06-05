@@ -478,7 +478,10 @@ func.func @expand_output_tile_scaled_mfma_32x32x64(%lhs: tensor<?x?x1x32x2x32xf4
 
 // CHECK-LABEL: func @expand_output_tile_scaled_mfma_32x32x64
 // CHECK-SAME: %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x32x32xf32>
-// CHECK-INPUTS-NOT: tensor.expand_shape
+// The CDNA4 layout for `MFMA_SCALE_F32_32x32x64_B32` splits the per-lane K
+// dimension, so inputs need to be expand_shape'd along that axis too.
+// CHECK-INPUTS: tensor.expand_shape
+// CHECK-INPUTS: tensor.expand_shape
 // CHECK-INPUTS: return
 // CHECK-OUTPUTS: tensor.expand_shape %[[ACC]]
 // CHECK-OUTPUTS-SAME: tensor<?x?x4x8x32xf32>
@@ -513,6 +516,8 @@ func.func @expand_output_tile_scaled_mfma_32x32x64_col_major(%lhs: tensor<?x?x1x
 
 // CHECK-LABEL: func @expand_output_tile_scaled_mfma_32x32x64_col_major
 // CHECK-SAME: %[[ACC:[A-Za-z0-9]+]]: tensor<?x?x32x32xf32>
-// CHECK-INPUTS-NOT: tensor.expand_shape
+// As above: the CDNA4 layout splits the per-lane K dimension.
+// CHECK-INPUTS: tensor.expand_shape
+// CHECK-INPUTS: tensor.expand_shape
 // CHECK-OUTPUTS: tensor.expand_shape %[[ACC]]
 // CHECK-OUTPUTS-SAME: tensor<?x?x32x4x8xf32>

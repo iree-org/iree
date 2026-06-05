@@ -2351,14 +2351,19 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
   switch (intrinsic) {
   case ScaledMMAIntrinsic::MFMA_SCALE_F32_16x16x128_B32:
     switch (operandIndex) {
+    // CDNA4 ISA 7.1.5 (V_MFMA_F32_16x16x128_F8F6F4): each lane's 32 K-elements
+    // are two halves 64 apart, not 32 contiguous. With g = lane/16, the lane
+    // holds k in [16g, 16g+16) (low half) and [64+16g, 64+16g+16) (high half),
+    // i.e. K = 64*(elem/16) + 16*g + (elem%16). Verified on MI350 silicon.
+    // Semantic dims are [M, Kscale(4), Kblock(32)] with K = Kscale*32 + Kblock.
     case kScaledMMAOperandLhs:
-      return {/*outer=*/{1, 1, 1}, /*thread=*/{16, 4, 1},
-              /*tstrides=*/{1, 16, 1},
-              /*element=*/{1, 1, 32}};
+      return {/*outer=*/{1, 2, 1}, /*thread=*/{16, 2, 2},
+              /*tstrides=*/{1, 32, 16},
+              /*element=*/{1, 1, 16}};
     case kScaledMMAOperandRhs:
-      return {/*outer=*/{1, 1, 1}, /*thread=*/{4, 1, 16},
-              /*tstrides=*/{16, 1, 1},
-              /*element=*/{1, 32, 1}};
+      return {/*outer=*/{2, 1, 1}, /*thread=*/{2, 2, 16},
+              /*tstrides=*/{32, 16, 1},
+              /*element=*/{1, 16, 1}};
     case kScaledMMAOperandLhsScale:
       return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*tstrides=*/{1, 16},
               /*element=*/{1, 1}};
@@ -2370,14 +2375,18 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(ScaledMMAIntrinsic intrinsic,
     }
   case ScaledMMAIntrinsic::MFMA_SCALE_F32_32x32x64_B32:
     switch (operandIndex) {
+    // CDNA4 ISA 7.1.5 (V_MFMA_F32_32x32x64_F8F6F4): with kq = (k%32)/16,
+    // A[m][k] @ lane 32*kq + m, register byte = (k/32)*16 + (k%16); i.e.
+    // K = Kscale*32 + 16*kq + (elem%16), Kscale = elem/16. Verified on MI350.
+    // Semantic dims [M, Kscale(2), Kblock(32)], K = Kscale*32 + Kblock.
     case kScaledMMAOperandLhs:
-      return {/*outer=*/{1, 1, 1}, /*thread=*/{32, 2, 1},
-              /*tstrides=*/{1, 32, 1},
-              /*element=*/{1, 1, 32}};
+      return {/*outer=*/{1, 2, 1}, /*thread=*/{32, 1, 2},
+              /*tstrides=*/{1, 1, 32},
+              /*element=*/{1, 1, 16}};
     case kScaledMMAOperandRhs:
-      return {/*outer=*/{1, 1, 1}, /*thread=*/{2, 1, 32},
-              /*tstrides=*/{32, 1, 1},
-              /*element=*/{1, 32, 1}};
+      return {/*outer=*/{2, 1, 1}, /*thread=*/{1, 2, 32},
+              /*tstrides=*/{1, 32, 1},
+              /*element=*/{1, 16, 1}};
     case kScaledMMAOperandLhsScale:
       return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*tstrides=*/{1, 32},
               /*element=*/{1, 1}};

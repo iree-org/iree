@@ -28,13 +28,13 @@
 func.func @data_tiled_scaled_mma_inner_tiled()
   attributes {hal.executable.target = #executable_target_rocm, translation_info = #translation_info} {
   %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x8x4x4x16x32xf4E2M1FN>>
-  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>>
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x8x4x2x2x2x16x16xf4E2M1FN>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x4x2x4x2x2x2x16x16xf4E2M1FN>>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x8x4x16x4xf8E8M0FNU>>
   %3 = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x4x2x4x16x4xf8E8M0FNU>>
   %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(4) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>>
-  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 1, 8, 4, 4, 16, 32], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x8x4x4x16x32xf4E2M1FN>> -> tensor<9x9x1x8x4x4x16x32xf4E2M1FN>
-  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 1, 4, 2, 4, 4, 16, 32], strides = [1, 1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>> -> tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>
+  %5 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 1, 8, 4, 2, 2, 2, 16, 16], strides = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x8x4x2x2x2x16x16xf4E2M1FN>> -> tensor<9x9x1x8x4x2x2x2x16x16xf4E2M1FN>
+  %6 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 1, 4, 2, 4, 2, 2, 2, 16, 16], strides = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x1x4x2x4x2x2x2x16x16xf4E2M1FN>> -> tensor<9x9x1x4x2x4x2x2x2x16x16xf4E2M1FN>
   %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0], sizes = [9, 9, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x8x4x16x4xf8E8M0FNU>> -> tensor<9x9x8x4x16x4xf8E8M0FNU>
   %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x4x2x4x16x4xf8E8M0FNU>> -> tensor<9x9x4x2x4x16x4xf8E8M0FNU>
   %9 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>> -> tensor<9x9x4x8x2x4x16x4xf32>
@@ -56,7 +56,7 @@ func.func @data_tiled_scaled_mma_inner_tiled()
       lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32,
       intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
-    : tensor<9x9x1x8x4x4x16x32xf4E2M1FN>, tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>, tensor<9x9x8x4x16x4xf8E8M0FNU>, tensor<9x9x4x2x4x16x4xf8E8M0FNU> into tensor<9x9x4x8x2x4x16x4xf32>
+    : tensor<9x9x1x8x4x2x2x2x16x16xf4E2M1FN>, tensor<9x9x1x4x2x4x2x2x2x16x16xf4E2M1FN>, tensor<9x9x8x4x16x4xf8E8M0FNU>, tensor<9x9x4x2x4x16x4xf8E8M0FNU> into tensor<9x9x4x8x2x4x16x4xf32>
   iree_tensor_ext.dispatch.tensor.store %10, %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<9x9x4x8x2x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>>
   return
 }
@@ -80,64 +80,29 @@ func.func @data_tiled_scaled_mma_inner_tiled()
 // CHECK-DAG:  %[[BINDING_C:.+]] = hal.interface.binding.subspan {{.*}} binding(4)
 // CHECK-DAG:  %[[ASSUMED_BINDING_C:.+]] = memref.assume_alignment %[[BINDING_C]]
 // CHECK-DAG:  %[[BUFFER_C:.+]] = amdgpu.fat_raw_buffer_cast %[[ASSUMED_BINDING_C]]
-// CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x1x8x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
-// CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x1x4x2x4x4x16x32xf4E2M1FN, #gpu.address_space<workgroup>>
-// CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
-// CHECK:      %[[LOOP:.+]]:16 = scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args(%arg[[#ITER_BASE:]] = {{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-// CHECK-DAG:    %[[A_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_A]]{{.*}} vector<32xf4E2M1FN>
-// CHECK-DAG:    %[[B_GLOBAL_LOAD:.+]] = vector.transfer_read %[[BUFFER_B]]{{.*}} vector<32xf4E2M1FN>
-// CHECK-DAG:    vector.transfer_write %[[A_GLOBAL_LOAD]], %[[A_ALLOC]]
-// CHECK-DAG:    vector.transfer_write %[[B_GLOBAL_LOAD]], %[[B_ALLOC]]
-// CHECK:        gpu.barrier memfence [#gpu.address_space<workgroup>]
-// CHECK-DAG:    %[[A_READ:.+]] = vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_READ:.+]] = vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_SCALE_READ:.+]] = vector.transfer_read %[[BUFFER_A_SCALE]]{{.*}} vector<8x1x1x4xf8E8M0FNU>
-// CHECK-DAG:    %[[B_SCALE_READ:.+]] = vector.transfer_read %[[BUFFER_B_SCALE]]{{.*}} vector<2x1x1x4xf8E8M0FNU>
-// CHECK-DAG:    %[[A_EXTRACT00:.+]] = vector.extract %[[A_READ]][0, 0, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT01:.+]] = vector.extract %[[A_READ]][0, 1, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT02:.+]] = vector.extract %[[A_READ]][0, 2, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT03:.+]] = vector.extract %[[A_READ]][0, 3, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT70:.+]] = vector.extract %[[A_READ]][7, 0, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT71:.+]] = vector.extract %[[A_READ]][7, 1, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT72:.+]] = vector.extract %[[A_READ]][7, 2, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_EXTRACT73:.+]] = vector.extract %[[A_READ]][7, 3, 0, 0] : vector<32xf4E2M1FN> from vector<8x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT00:.+]] = vector.extract %[[B_READ]][0, 0, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT01:.+]] = vector.extract %[[B_READ]][0, 1, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT02:.+]] = vector.extract %[[B_READ]][0, 2, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT03:.+]] = vector.extract %[[B_READ]][0, 3, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT10:.+]] = vector.extract %[[B_READ]][1, 0, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT11:.+]] = vector.extract %[[B_READ]][1, 1, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT12:.+]] = vector.extract %[[B_READ]][1, 2, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[B_EXTRACT13:.+]] = vector.extract %[[B_READ]][1, 3, 0, 0] : vector<32xf4E2M1FN> from vector<2x4x1x1x32xf4E2M1FN>
-// CHECK-DAG:    %[[A_SCALE_VECTOR0:.+]] = vector.extract_strided_slice {{.*}} {offsets = [0], sizes = [4], strides = [1]} : vector<32xf8E8M0FNU> to vector<4xf8E8M0FNU>
-// CHECK-DAG:    %[[A_SCALE_VECTOR7:.+]] = vector.extract_strided_slice {{.*}} {offsets = [28], sizes = [4], strides = [1]} : vector<32xf8E8M0FNU> to vector<4xf8E8M0FNU>
-// CHECK-DAG:    %[[B_SCALE_VECTOR0:.+]] = vector.extract_strided_slice {{.*}} {offsets = [0], sizes = [4], strides = [1]} : vector<8xf8E8M0FNU> to vector<4xf8E8M0FNU>
-// CHECK-DAG:    %[[B_SCALE_VECTOR1:.+]] = vector.extract_strided_slice {{.*}} {offsets = [4], sizes = [4], strides = [1]} : vector<8xf8E8M0FNU> to vector<4xf8E8M0FNU>
-// CHECK-DAG:    %[[C_00_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %arg[[#ITER_BASE]]
-// CHECK-DAG:    %[[C_00_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_00_1]]
-// CHECK-DAG:    %[[C_00_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_00_2]]
-// CHECK-DAG:    %[[C_00_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_00_3]]
-// CHECK-DAG:    %[[C_01_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][0] * %[[A_EXTRACT00]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %arg[[#ITER_BASE+1]]
-// CHECK-DAG:    %[[C_01_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][1] * %[[A_EXTRACT01]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_01_1]]
-// CHECK-DAG:    %[[C_01_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][2] * %[[A_EXTRACT02]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_01_2]]
-// CHECK-DAG:    %[[C_01_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR0]][3] * %[[A_EXTRACT03]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_01_3]]
-// CHECK-DAG:    %[[C_70_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR0]][0] * %[[B_EXTRACT00]]) + %arg[[#ITER_BASE+14]]
-// CHECK-DAG:    %[[C_70_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR0]][1] * %[[B_EXTRACT01]]) + %[[C_70_1]]
-// CHECK-DAG:    %[[C_70_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR0]][2] * %[[B_EXTRACT02]]) + %[[C_70_2]]
-// CHECK-DAG:    %[[C_70_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR0]][3] * %[[B_EXTRACT03]]) + %[[C_70_3]]
-// CHECK-DAG:    %[[C_71_1:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][0] * %[[A_EXTRACT70]]) * (%[[B_SCALE_VECTOR1]][0] * %[[B_EXTRACT10]]) + %arg[[#ITER_BASE+15]]
-// CHECK-DAG:    %[[C_71_2:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][1] * %[[A_EXTRACT71]]) * (%[[B_SCALE_VECTOR1]][1] * %[[B_EXTRACT11]]) + %[[C_71_1]]
-// CHECK-DAG:    %[[C_71_3:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][2] * %[[A_EXTRACT72]]) * (%[[B_SCALE_VECTOR1]][2] * %[[B_EXTRACT12]]) + %[[C_71_2]]
-// CHECK-DAG:    %[[C_71_4:.+]] = amdgpu.scaled_mfma 16x16x128 (%[[A_SCALE_VECTOR7]][3] * %[[A_EXTRACT73]]) * (%[[B_SCALE_VECTOR1]][3] * %[[B_EXTRACT13]]) + %[[C_71_3]]
-// CHECK:        scf.yield
-// CHECK:      vector.insert_strided_slice %[[LOOP]]#0, %{{.+}} {offsets = [0, 0, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:      vector.insert_strided_slice %[[LOOP]]#1, %{{.+}} {offsets = [0, 1, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:      vector.insert_strided_slice %[[LOOP]]#14, %{{.+}} {offsets = [7, 0, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:      vector.insert_strided_slice %[[LOOP]]#15, %{{.+}} {offsets = [7, 1, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
-// CHECK:      vector.transfer_read %[[BUFFER_C]]
-// CHECK:      arith.addf
-// CHECK:      vector.transfer_write
-// CHECK:      iree_codegen.dispatch_config @data_tiled_scaled_mma_inner_tiled workgroup_size = [256, 1, 1] subgroup_size = 64
+//   CHECK-DAG:  %[[A_ALLOC:.+]] = memref.alloc() : memref<1x1x1x8x4x2x2x2x16x16xf4E2M1FN, #gpu.address_space<workgroup>>
+//   CHECK-DAG:  %[[B_ALLOC:.+]] = memref.alloc() : memref<1x1x1x4x2x4x2x2x2x16x16xf4E2M1FN, #gpu.address_space<workgroup>>
+//       CHECK:  gpu.barrier memfence [#gpu.address_space<workgroup>]
+//       CHECK:  %[[LOOP:.+]]:16 = scf.for {{.*}} %[[C0]] to %[[C9]] step %[[C1]] iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
+// Per-lane K is now two 16-element halves (CDNA4 layout), so the global
+// loads are vector<16xf4E2M1FN>, and the staged shared-memory reads have
+// rank-7 inner shapes (extra outer/scaled dims show through).
+//   CHECK-DAG:    vector.transfer_read %[[BUFFER_A]]{{.*}} vector<16xf4E2M1FN>
+//   CHECK-DAG:    vector.transfer_read %[[BUFFER_B]]{{.*}} vector<16xf4E2M1FN>
+//   CHECK-DAG:    vector.transfer_read %[[A_ALLOC]]{{.*}} vector<8x4x2x1x1x1x16xf4E2M1FN>
+//   CHECK-DAG:    vector.transfer_read %[[B_ALLOC]]{{.*}} vector<2x4x2x1x1x1x16xf4E2M1FN>
+// Each per-lane half is shape-cast to the 32-element MMA input vector;
+// 32 scaled_mfma calls cover the 8x2 (intrinsics_m x intrinsics_n) tile
+// times the 4 intrinsics_k unroll.
+// CHECK-COUNT-32:    vector.shape_cast {{.+}} : vector<2x1x1x1x16xf4E2M1FN> to vector<32xf4E2M1FN>
+// CHECK-COUNT-64:    amdgpu.scaled_mfma 16x16x128
+//       CHECK:    scf.yield
+//       CHECK:  vector.insert_strided_slice %[[LOOP]]#0, %{{.+}} {offsets = [0, 0, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+//       CHECK:  vector.insert_strided_slice %[[LOOP]]#15, %{{.+}} {offsets = [7, 1, 0, 0, 0]{{.*}}} : vector<4xf32> into vector<8x2x1x1x4xf32>
+//       CHECK:  vector.transfer_read %[[BUFFER_C]]
+//       CHECK:  arith.addf
+//       CHECK:  vector.transfer_write
+//       CHECK:  iree_codegen.dispatch_config @data_tiled_scaled_mma_inner_tiled workgroup_size = [256, 1, 1] subgroup_size = 64
 
 // -----
 

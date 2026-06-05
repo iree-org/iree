@@ -324,7 +324,7 @@ func.func @small_scaled_matmul(
 
 module {
   func.func @data_tiled_scaled_mma_inner_tiled(
-      %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
+      %lhs: tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>,
       %lhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>,
       %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf32> {
     %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
@@ -336,7 +336,7 @@ module {
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>,
       semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
-      : tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
+      : tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
       return %0 : tensor<1x1x2x2x4x16x4xf32>
   }
 }
@@ -353,7 +353,7 @@ module {
 
 #map0 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>
 func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
-    %lhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x4x16x32xf4E2M1FN>,
+    %lhs: tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, %rhs: tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>,
     %lhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>, %rhs_scales: tensor<1x1x2x4x16x4xf8E8M0FNU>,
     %acc: tensor<1x1x2x2x4x16x4xf32>) -> tensor<1x1x2x2x4x16x4xf16> {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs, %lhs_scales, %rhs_scales) outs(%acc) {
@@ -365,7 +365,7 @@ func.func @data_tiled_scaled_mma_inner_tiled_with_copy(
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, subgroups_m = 2, subgroups_n = 2, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
-    : tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x1x2x4x4x16x32xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
+    : tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, tensor<1x1x1x2x4x2x2x2x16x16xf4E2M1FN>, tensor<1x1x2x4x16x4xf8E8M0FNU>, tensor<1x1x2x4x16x4xf8E8M0FNU> into tensor<1x1x2x2x4x16x4xf32>
   %empty = tensor.empty() : tensor<1x1x2x2x4x16x4xf16>
   %1 = linalg.generic {indexing_maps = [#map0, #map0], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%0 : tensor<1x1x2x2x4x16x4xf32>) outs(%empty : tensor<1x1x2x2x4x16x4xf16>) {
   ^bb0(%in: f32, %out: f16):
