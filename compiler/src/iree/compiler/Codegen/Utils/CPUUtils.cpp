@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include <numeric>
 
@@ -56,7 +57,8 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
     }
 
     if (isa<TilingInterface>(op) &&
-        !isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
+        !isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp,
+             IREE::LinalgExt::MapLoadOp, IREE::LinalgExt::MapStoreOp>(op)) {
       // All other operations that implement this interface are root ops.
       rootOperation = op;
       break;
@@ -74,9 +76,14 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   }
 
   if (!rootOperation) {
-    // Check for pad/pack/unpack ops by themselves.
+    // Check for relayout ops (pad/pack/unpack and the map_load/map_store
+    // scatter/gather ops that encoding materialization folds into) by
+    // themselves. These are excluded from the sweeps above so that a real
+    // compute op in the same dispatch wins; a pure-relayout dispatch (e.g. a
+    // `set_encoding` dispatch) still picks one of them here.
     for (auto op : llvm::reverse(computeOps)) {
-      if (isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp>(op)) {
+      if (isa<tensor::PadOp, linalg::PackOp, linalg::UnPackOp,
+              IREE::LinalgExt::MapLoadOp, IREE::LinalgExt::MapStoreOp>(op)) {
         rootOperation = op;
         break;
       }

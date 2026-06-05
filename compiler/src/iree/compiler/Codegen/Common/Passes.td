@@ -199,6 +199,8 @@ def CombineResultLayoutTransformationPass :
            ::llvm::cl::values(
              clEnumValN(IREE::Codegen::RelayoutCombinationScope::Dispatch, "dispatch",
                "Combine relayout ops starting from iree_codegen.store_to_buffer"),
+             clEnumValN(IREE::Codegen::RelayoutCombinationScope::DispatchReshape, "dispatch-reshape",
+               "Like dispatch, but only for chains containing an expand/collapse_shape"),
              clEnumValN(IREE::Codegen::RelayoutCombinationScope::Workgroup, "workgroup",
                "Combine relayout ops starting from workgroup forall terminator ops"))
            }]>
