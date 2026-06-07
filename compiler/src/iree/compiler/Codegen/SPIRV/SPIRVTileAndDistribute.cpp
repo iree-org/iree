@@ -16,6 +16,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -128,6 +129,14 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
   mlir::FunctionOpInterface funcOp = getOperation();
   if (!isEntryPoint(funcOp)) {
+    return;
+  }
+
+  // A dispatch whose root compute op (e.g. `iree_linalg_ext.gather`) has
+  // already been canonicalized away by the time invocation-level tiling runs
+  // should be a no-op for this pass. Downstream `memref.copy -> linalg.copy ->
+  // scf` lowering takes care of distribution. Bail gracefully in such cases.
+  if (getComputeOps(funcOp).empty()) {
     return;
   }
 
