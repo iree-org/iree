@@ -1,8 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_120 \
+// RUN: iree-opt --split-input-file \
 // RUN:   --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
 
-// Test that the sm_120 TileAndFuse pipeline with NV_MMA_SYNC generates
-// nvgpu.mma.sync operations.
+// Test that TileAndFuse pipeline with NV_MMA_SYNC generates nvgpu.mma.sync operations.
 
 #executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<bindings = [
@@ -46,18 +45,18 @@ func.func @matmul_tile_and_fuse_mma_sync()
 //       CHECK:       vector.transfer_read {{.*}} vector<{{.*}}xf16>
 //       CHECK:       vector.transfer_write
 //       CHECK:       gpu.barrier
-// Verify LHS transpose for mma.sync column-major ordering.
+// Verify LHS transpose for mma.sync column-major ordering
 // TileAndFuse produces 2x1x2x2 -> reshape to 2x2x2 -> transpose [1,0,2] -> reshape to 4x2
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x1x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x2xf16> to vector<4x2xf16>
-// Verify nvgpu.mma.sync is generated with correct shape.
+// Verify nvgpu.mma.sync is generated with correct shape
 // CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]}
 //       CHECK:   scf.yield
 
 // -----
 
-// Test with F16 accumulator.
+// Test with F16 accumulator
 
 #executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout_f16 = #hal.pipeline.layout<bindings = [
@@ -91,9 +90,9 @@ func.func @matmul_tile_and_fuse_mma_sync_f16()
 }
 
 // CHECK-LABEL: func @matmul_tile_and_fuse_mma_sync_f16
-// Verify LHS transpose for mma.sync column-major ordering, same pattern as f32.
+// Verify LHS transpose for mma.sync column-major ordering (same pattern as f32)
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x1x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x2xf16> to vector<4x2xf16>
-// Verify nvgpu.mma.sync is generated with f16 output type.
+// Verify nvgpu.mma.sync is generated with f16 output type
 // CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : ({{.*}}) -> vector<2x2xf16>
