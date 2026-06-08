@@ -62,7 +62,7 @@ func.func @matmul_256x256x256_f16_f16() {
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 32
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 8], subgroup = [2, 4, 0], workgroup = [64, 64, 0]
 
 // -----
 
@@ -91,4 +91,4 @@ func.func @matmul_accumulate_256x256x256_f16_f32() {
 
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     convert_acc_gemm
-//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 8], subgroup = [2, 4, 0], workgroup = [64, 64, 0]

@@ -11,7 +11,7 @@
 ]>
 #config = #iree_gpu.lowering_config<{
   workgroup = [64, 64, 0],
-  reduction = [0, 0, 2],
+  reduction = [0, 0, 8],
   subgroup = [2, 4],
   mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>,
   promote_operands = [0, 1]
@@ -66,7 +66,7 @@ func.func @matmul_tile_and_fuse_mma_sync()
 ]>
 #config_f16 = #iree_gpu.lowering_config<{
   workgroup = [64, 64, 0],
-  reduction = [0, 0, 2],
+  reduction = [0, 0, 8],
   subgroup = [2, 4],
   mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>,
   promote_operands = [0, 1]
