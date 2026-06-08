@@ -67,14 +67,6 @@ public:
     return {other.isRef(), /*isMove=*/false, other.byteWidth(), ordinal};
   }
 
-  static Register getEmptyKey() { return Register(); }
-  static Register getTombstoneKey() {
-    auto reg = Register();
-    reg.null_ = 0;
-    reg.tombstone_ = 1;
-    return reg;
-  }
-
   Register()
       : null_(1), tombstone_(0), isRef_(0), isMove_(0), byteWidth_(0),
         reserved_(0), ordinal_(0) {}
@@ -299,12 +291,6 @@ namespace llvm {
 template <>
 struct DenseMapInfo<mlir::iree_compiler::Register> {
   using Register = mlir::iree_compiler::Register;
-
-  static inline Register getEmptyKey() { return Register::getEmptyKey(); }
-
-  static inline Register getTombstoneKey() {
-    return Register::getTombstoneKey();
-  }
 
   static unsigned getHashValue(const Register &val) {
     return val.getHashValue();

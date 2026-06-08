@@ -1320,7 +1320,7 @@ func.func @exp_reduction_shaped_input(%S: f32) -> tensor<2xf32> {
   %M = tensor.empty() : tensor<2xf32>
   %out = tensor.empty() : tensor<2xf32>
 
-  // expected-error@+1 {{operand #0 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  // expected-error@+1 {{operand #0 must be variadic of ranked tensor of any non-token type values, but got 'f32'}}
   %max, %sum = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(M,N)->()>,
@@ -1347,7 +1347,7 @@ func.func @exp_reduction_shaped_input(%S: f32) -> tensor<2xf32> {
 func.func @exp_reduction_shaped_init(%S: tensor<2x3xf32>, %M : f32) -> tensor<2xf32> {
   %out = tensor.empty() : tensor<2xf32>
 
-  // expected-error@+1 {{operand #1 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  // expected-error@+1 {{operand #1 must be variadic of ranked tensor of any non-token type values, but got 'f32'}}
   %max, %sum = iree_linalg_ext.exp_reduction {
     indexing_maps = [
       affine_map<(M,N)->(M,N)>,
@@ -1878,7 +1878,7 @@ func.func @custom_op_memref_operand(%arg0 : memref<?xf32>, %arg1 : tensor<?xf32>
 
 func.func @custom_op_scalar_outs_argument(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>, %arg2 : f32) -> f32 {
   %c0 = arith.constant 0 : index
-  // expected-error @+1 {{operand #2 must be variadic of ranked tensor of any type values, but got 'f32'}}
+  // expected-error @+1 {{operand #2 must be variadic of ranked tensor of any non-token type values, but got 'f32'}}
   %0 = iree_linalg_ext.custom_op {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
       iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}

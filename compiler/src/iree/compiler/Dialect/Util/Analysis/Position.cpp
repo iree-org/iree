@@ -8,20 +8,11 @@
 
 namespace mlir::iree_compiler {
 
-// static
-const Position Position::EmptyKey(ENC_BLOCK,
-                                  llvm::DenseMapInfo<void *>::getEmptyKey(), 0);
-
-// static
-const Position
-    Position::TombstoneKey(ENC_BLOCK,
-                           llvm::DenseMapInfo<void *>::getTombstoneKey(), 0);
-
 void Position::print(llvm::raw_ostream &os) const {
-  if (*this == Position::EmptyKey) {
+  // A default-constructed Position carries a null block pointer; printing an
+  // empty position must not dereference it.
+  if (enc.getPointer() == nullptr) {
     os << "(empty)";
-  } else if (*this == Position::TombstoneKey) {
-    os << "(tombstone)";
   } else {
     // Suboptimal printing, but it's not worth instantiating an AsmState.
     // Use the print(os, asmState) version instead of <<.
@@ -47,10 +38,10 @@ void Position::print(llvm::raw_ostream &os) const {
 }
 
 void Position::print(llvm::raw_ostream &os, AsmState &asmState) const {
-  if (*this == Position::EmptyKey) {
+  // A default-constructed Position carries a null block pointer; printing an
+  // empty position must not dereference it.
+  if (enc.getPointer() == nullptr) {
     os << "(empty)";
-  } else if (*this == Position::TombstoneKey) {
-    os << "(tombstone)";
   } else {
     switch (enc.getInt()) {
     case Position::ENC_VALUE: {

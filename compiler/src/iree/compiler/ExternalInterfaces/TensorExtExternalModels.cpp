@@ -78,7 +78,8 @@ struct TensorLikeTypeExternalModel
       return emitError() << "could not infer memory space";
     }
     return cast<bufferization::BufferLikeType>(
-        getMemRefType(tensorType, options, /*layout=*/{}, *memSpace));
+        bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
+                                                             *memSpace));
   }
 
   LogicalResult verifyCompatibleBufferType(

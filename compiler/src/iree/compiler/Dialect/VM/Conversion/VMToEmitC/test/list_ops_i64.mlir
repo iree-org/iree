@@ -7,7 +7,7 @@ vm.module @my_module {
     // CHECK-NEXT: %1 = apply "&"(%0) : (!emitc.lvalue<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
     // CHECK-NEXT: %2 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %3 = call_opaque "iree_vm_list_deref"(%2) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_value_as"(%3, %arg4, %1) {args = [0 : index, 1 : index, #emitc.opaque<"IREE_VM_VALUE_TYPE_I64">, 2 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_value_as"(%3, %arg4, %1) <{args = [0 : index, 1 : index, #emitc.opaque<"IREE_VM_VALUE_TYPE_I64">, 2 : index]}> : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.opaque<"iree_status_t">
     %0 = vm.list.get.i64 %arg0, %arg1 : (!vm.list<i64>, i32) -> i64
     vm.return %0 : i64
   }
