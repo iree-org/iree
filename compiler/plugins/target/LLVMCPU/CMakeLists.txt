@@ -68,7 +68,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::PluginAPI
     iree::compiler::Utils
-    iree::compiler::plugins::target::LLVMCPU::Builtins
+    iree::compiler::plugins::target::LLVMCPU::builtins::Builtins
   PUBLIC
 )
 
