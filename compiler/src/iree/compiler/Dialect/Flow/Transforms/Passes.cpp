@@ -81,6 +81,11 @@ static llvm::cl::opt<bool> clTransferToReplicateGlobals(
         "Use transfers to replicate globals for each unique affinity."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDisableDeduplication(
+    "iree-flow-disable-deduplication",
+    llvm::cl::desc("Disable deduplication of executables"),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -181,7 +186,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+  if (!clDisableDeduplication) {
+    passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
+  }
 
   // Create one function per exported program entry point that can be used with
   // iree-benchmark-module to benchmark each function individually. Whether
