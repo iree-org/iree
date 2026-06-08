@@ -56,6 +56,18 @@ class FunctionTest(unittest.TestCase):
         self.assertEqual("[<VmVariantList(2): [1, 2]>]", vm_context.mock_arg_reprs)
         self.assertEqual((3, 4), result)
 
+    def testNoReflectionBfloat16Ndarray(self):
+        def invoke(arg_list, ret_list):
+            ret_list.push_int(3)
+
+        vm_context = MockVmContext(invoke)
+        vm_function = MockVmFunction(reflection={})
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
+        arg = np.arange(4, dtype=np.dtype("bfloat16")).reshape(2, 2)
+        result = invoker(arg)
+        self.assertEqual(3, result)
+        self.assertIn("HalBufferView", vm_context.mock_arg_reprs)
+
     def testKeywordArgs(self):
         def invoke(arg_list, ret_list):
             ret_list.push_int(3)

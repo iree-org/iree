@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Dict, Optional
+from typing import Optional
 
 import json
 import logging
@@ -27,11 +27,11 @@ from ._binding import (
 )
 
 from .array_interop import (
-    map_dtype_to_element_type,
     DeviceArray,
 )
-from .flags import (
-    FUNCTION_INPUT_VALIDATION,
+
+from .dtypes import (
+    map_abi_type_to_dtype_info,
 )
 
 __all__ = [
@@ -204,7 +204,7 @@ def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int, desc)
     buffer_view = vm_list.get_as_object(vm_index, HalBufferView)
     dtype_str = desc[1]
     try:
-        dtype = ABI_TYPE_TO_DTYPE[dtype_str]
+        dtype = map_abi_type_to_dtype_info(dtype_str).dtype
     except KeyError:
         _raise_return_error(inv, f"unrecognized dtype '{dtype_str}'")
     x = DeviceArray(
@@ -279,40 +279,10 @@ VM_TO_PYTHON_CONVERTERS = {
     "bf16": _vm_to_scalar(float),
 }
 
-ABI_TYPE_TO_DTYPE = {
-    # TODO: Others.
-    "f32": np.float32,
-    "i32": np.int32,
-    "i64": np.int64,
-    "f64": np.float64,
-    "i16": np.int16,
-    "i8": np.int8,
-    "i1": np.bool_,
-}
-
 # When we get an ndarray as an argument and are implicitly converting it to a
 # buffer view, flags for doing so.
 IMPLICIT_BUFFER_ARG_MEMORY_TYPE = MemoryType.DEVICE_LOCAL
 IMPLICIT_BUFFER_ARG_USAGE = BufferUsage.DEFAULT
-
-
-def _is_ndarray_descriptor(desc):
-    return desc and desc[0] == "ndarray"
-
-
-def _is_0d_ndarray_descriptor(desc):
-    # Example: ["ndarray", "f32", 0]
-    return desc and desc[0] == "ndarray" and desc[2] == 0
-
-
-def _cast_scalar_to_ndarray(inv: Invocation, x, desc):
-    # Example descriptor: ["ndarray", "f32", 0]
-    dtype_str = desc[1]
-    try:
-        dtype = ABI_TYPE_TO_DTYPE[dtype_str]
-    except KeyError:
-        _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
-    return dtype(x)
 
 
 class ArgumentError(ValueError):

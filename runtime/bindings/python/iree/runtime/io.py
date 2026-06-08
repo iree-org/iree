@@ -13,6 +13,7 @@ import numpy as np
 from os import PathLike
 
 from ._binding import ParameterIndex, ParameterIndexEntry
+from .dtypes import map_name_to_dtype_info, map_dtype_to_dtype_info
 
 __all__ = [
     "parameter_index_add_numpy_ndarray",
@@ -151,9 +152,11 @@ def parameter_index_entry_as_numpy_ndarray(
 
     # Unpack/validate.
     try:
-        dtype = _NAME_TO_DTYPE[dtype_name]
-    except KeyError:
-        raise ValueError(f"Unknown dtype name '{dtype_name}'")
+        dtype = map_name_to_dtype_info(dtype_name).dtype
+    except KeyError as e:
+        raise ValueError(
+            f"Unsupported dtype for parameter entry {index_entry.key}"
+        ) from e
     try:
         shape = [int(d) for d in shape]
     except ValueError as e:
@@ -161,36 +164,6 @@ def parameter_index_entry_as_numpy_ndarray(
 
     t = parameter_index_entry_as_numpy_flat_ndarray(index_entry)
     return t.view(dtype=dtype).reshape(shape)
-
-
-_DTYPE_TO_NAME = (
-    (np.dtype(np.float16), "float16"),
-    (np.dtype(np.float32), "float32"),
-    (np.dtype(np.float64), "float64"),
-    (np.dtype(np.int32), "int32"),
-    (np.dtype(np.int64), "int64"),
-    (np.dtype(np.int16), "int16"),
-    (np.dtype(np.int8), "int8"),
-    (np.dtype(np.uint32), "uint32"),
-    (np.dtype(np.uint64), "uint64"),
-    (np.dtype(np.uint16), "uint16"),
-    (np.dtype(np.uint8), "uint8"),
-    (np.dtype(np.bool_), "bool"),
-    (np.dtype(np.complex64), "complex64"),
-    (np.dtype(np.complex128), "complex128"),
-)
-
-_NAME_TO_DTYPE: dict[str, np.dtype[Any]] = {
-    name: np_dtype for np_dtype, name in _DTYPE_TO_NAME
-}
-
-
-def _map_dtype_to_name(dtype) -> str:
-    for match_dtype, dtype_name in _DTYPE_TO_NAME:
-        if match_dtype == dtype:
-            return dtype_name
-
-    raise KeyError(f"Numpy dtype {dtype} not found.")
 
 
 _metadata_version = "TENSORv0"
@@ -209,20 +182,17 @@ The metadata has the following format <format-version><separator><metadata>"""
 def _make_tensor_metadata(t: np.ndarray) -> str:
     """Makes a tensor metadata blob that can be used to reconstruct the tensor."""
     dtype = t.dtype
-    dtype_name = _map_dtype_to_name(dtype)
-    is_complex = np.issubdtype(dtype, np.complexfloating)
-    is_floating_point = np.issubdtype(dtype, np.floating)
-    is_signed = np.issubdtype(dtype, np.signedinteger)
+    dtype_info = map_dtype_to_dtype_info(dtype)
     dtype_desc = {
         "class_name": type(dtype).__name__,
-        "is_complex": is_complex,
-        "is_floating_point": is_floating_point,
-        "is_signed": is_signed,
+        "is_complex": dtype_info.is_complex,
+        "is_floating_point": dtype_info.is_floating_point,
+        "is_signed": dtype_info.is_signed,
         "itemsize": dtype.itemsize,
     }
     d = {
         "type": "Tensor",
-        "dtype": dtype_name,
+        "dtype": dtype_info.name,
         "shape": list(t.shape),
         "dtype_desc": dtype_desc,
     }

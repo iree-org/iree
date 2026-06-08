@@ -23,6 +23,7 @@ from . import VmModule
 import numpy
 import os
 import subprocess
+from .dtypes import DTYPE_TO_ABI_TYPE
 
 __all__ = [
     "benchmark_exe",
@@ -32,21 +33,6 @@ __all__ = [
 BenchmarkResult = namedtuple(
     "BenchmarkResult", "benchmark_name time cpu_time iterations user_counters"
 )
-
-DTYPE_TO_ABI_TYPE = {
-    numpy.dtype(numpy.float16): "f16",
-    numpy.dtype(numpy.float32): "f32",
-    numpy.dtype(numpy.float64): "f64",
-    numpy.dtype(numpy.int8): "i8",
-    numpy.dtype(numpy.uint8): "i8",
-    numpy.dtype(numpy.int16): "i16",
-    numpy.dtype(numpy.uint16): "i16",
-    numpy.dtype(numpy.int32): "i32",
-    numpy.dtype(numpy.uint32): "i32",
-    numpy.dtype(numpy.int64): "i64",
-    numpy.dtype(numpy.uint64): "i64",
-    numpy.dtype(numpy.bool_): "i1",
-}
 
 
 class BenchmarkToolError(Exception):
@@ -95,7 +81,7 @@ def _build_benchmark_args(
         args.append(f"--module={module}")
         if entry_function is None:
             raise ValueError(
-                f"When specifying the module as a filepath the entry function must be specified."
+                "When specifying the module as a filepath the entry function must be specified."
             )
 
     args.append(f"--function={entry_function}")
