@@ -52,6 +52,8 @@ struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
           srcOp.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
       if (tiedAttr) {
         tiedOperands.push_back(tiedAttr.getInt());
+        // Synaptics change
+        anyTiedOperands = true;
       } else {
         tiedOperands.push_back(-1);
       }

@@ -593,6 +593,13 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   wrapperOp.setAllArgAttrs(argAttrDict);
   wrapperOp.setAllResultAttrs(resultAttrDict);
 
+  // Synaptics change {
+  // Propagate tied operands from the export so that stream allocation can reuse
+  // input buffers for tied results (e.g. KV-cache in-place updates).
+  if (auto tiedAttr = exportOp->getAttrOfType<ArrayAttr>("tied_operands"))
+    wrapperOp->setAttr("tied_operands", tiedAttr);
+  // } Synaptics change
+
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
   exportOp->removeAttr("iree.reflection");
@@ -627,6 +634,22 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     }
     resultStorages[outputAttr.getInt()] = storageArg;
   }
+
+  // Synaptics change {
+  // For tied results, use the tied input argument's buffer as output storage.
+  // This tells the stream allocator to reuse the input buffer for the output.
+  if (auto tiedOperandsAttr =
+          exportOp->getAttrOfType<ArrayAttr>("tied_operands")) {
+    for (auto [resultIndex, tiedIdxAttr] :
+         llvm::enumerate(tiedOperandsAttr.getValue())) {
+      int64_t tiedArgIndex =
+          cast<IntegerAttr>(tiedIdxAttr).getValue().getSExtValue();
+      if (tiedArgIndex < 0 || resultStorages[resultIndex])
+        continue;
+      resultStorages[resultIndex] = entryBlock->getArgument(tiedArgIndex);
+    }
+  }
+  // } Synaptics change
 
   // Find the transient storage buffer if provided.
   Value transientStorage;
@@ -693,8 +716,15 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   }
 
   // Make the call with the original types.
+  // Synaptics change {
+  // Forward tied operands from the callee so the call verifier is satisfied
+  // and downstream passes can see the aliasing.
+  auto calleeTiedOperands =
+      exportOp->getAttrOfType<ArrayAttr>("tied_operands");
   auto callOp = IREE::Util::CallOp::create(entryBuilder, exportOp.getLoc(),
-                                           exportOp, arguments);
+                                           exportOp, arguments,
+                                           calleeTiedOperands);
+  // } Synaptics change
   auto asyncResults = llvm::to_vector(callOp.getResults());
 
   // Alias results to storage buffers if provided.
