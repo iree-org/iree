@@ -51,6 +51,7 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_riscv_64_v",
     srcs = [
         "mmt4d_riscv_64_v.c",
+        "mmt4d_riscv_64_v_i8.c",
     ],
     arch = "riscv_64",
     copts = ["-march=rv64gcv"],

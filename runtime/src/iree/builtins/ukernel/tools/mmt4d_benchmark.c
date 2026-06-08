@@ -185,6 +185,8 @@ int main(int argc, char** argv) {
 #elif defined(IREE_ARCH_RISCV_64)
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 7, 16, 1,
                                    "v");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 7, 32, 1,
+                                   "v");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 6, 16, 1,
                                    "zvfhmin");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 6, 16, 1,
