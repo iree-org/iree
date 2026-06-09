@@ -157,7 +157,17 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []) + ([
+        # The non-ukernel (generic-vectorized) data-tiling path is not yet
+        # optimized on RISC-V: with the large default shapes it runs for tens
+        # of seconds under the QEMU emulator and trips the e2e timeout.
+        # Skip it on RISC-V and re-add small-shape RISC-V coverage via the
+        # dedicated riscv-only rules below.
+        "noriscv",
+    ] if (not use_uk and acc_type != "f64" and lhs_rhs_type not in [
+        "f16",
+        "bf16",
+    ]) else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -311,7 +321,17 @@ iree_generated_e2e_runner_test(
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []) + ([
+        # The non-ukernel (generic-vectorized)
+        # data-tiling path is not yet optimized on RISC-V and times out under
+        # the QEMU emulator with the large default shapes. Skip it on RISC-V
+        # here and re-add small-shape RISC-V
+        # coverage via the dedicated riscv-only rules below.
+        "noriscv",
+    ] if (not use_uk and acc_type != "f64" and lhs_rhs_type not in [
+        "f16",
+        "bf16",
+    ]) else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -357,6 +377,51 @@ iree_generated_e2e_runner_test(
         ("bf16", "f32"),
     ]
 )]
+
+# RISC-V only: small-shape coverage of the non-ukernel (generic-vectorized)
+# data-tiling path. That path is not yet optimized on RISC-V, so the dt /
+# experimental_dt rules above carry "noriscv" and skip RISC-V with the large
+# default shapes, would time out under the QEMU emulator.
+# These rules re-add RISC-V coverage with small shapes only; the "riscv_64:"
+# variant restricts them to RISC-V builds, so no tests are created on other
+# architectures (which keep their full large-shape coverage above). Keep the
+# type list in sync with the "noriscv" condition above; drop these once proper
+# RVV codegen for the non-ukernel path is tested.
+[iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_%sdt_riscv_small_%s_%s" % (
+        variant_prefix,
+        lhs_rhs_type,
+        acc_type,
+    ),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-ukernels=none",
+    ] + extra_compiler_flags,
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    # The riscv_64: prefix enables this variant only on RISC-V builds; the
+    # actual RVV cpu features are supplied by the toolchain's default test
+    # flags, so the features listed here are only a label.
+    target_cpu_features_variants = ["riscv_64:rvv:+v,+zvl512b"],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+) for (variant_prefix, extra_compiler_flags) in [
+    ("", []),
+    (
+        "experimental_",
+        ["--iree-global-opt-enable-early-materialization=false"],
+    ),
+] for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f32", "f32"),
+]]
 
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_vmvx_experimental_dt%s_%s_%s" % (

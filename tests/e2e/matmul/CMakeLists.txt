@@ -138,7 +138,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "arm_64:dotprod:+dotprod"
@@ -166,7 +166,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -761,7 +761,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-enable-early-materialization=false"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "arm_64:dotprod:+dotprod"
@@ -790,7 +790,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-enable-early-materialization=false"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -1096,6 +1096,104 @@ iree_generated_e2e_runner_test(
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
     "arm_64:bf16:+bf16"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_dt_riscv_small_i8_i32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--acc_type=i32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
+  TARGET_CPU_FEATURES_VARIANTS
+    "riscv_64:rvv:+v,+zvl512b"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_dt_riscv_small_f32_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
+  TARGET_CPU_FEATURES_VARIANTS
+    "riscv_64:rvv:+v,+zvl512b"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_experimental_dt_riscv_small_i8_i32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--acc_type=i32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-global-opt-enable-early-materialization=false"
+  TARGET_CPU_FEATURES_VARIANTS
+    "riscv_64:rvv:+v,+zvl512b"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_experimental_dt_riscv_small_f32_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-global-opt-enable-early-materialization=false"
+  TARGET_CPU_FEATURES_VARIANTS
+    "riscv_64:rvv:+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
