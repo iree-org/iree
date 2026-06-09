@@ -958,7 +958,7 @@ StringRef normalizeARMGPUTarget(StringRef target) {
   return llvm::StringSwitch<StringRef>(target.lower())
       .Cases({"mali-g715", "mali-g615"}, "valhall4")
       .Cases({"mali-g710", "mali-g510", "mali-g310"}, "valhall3")
-      .Case("mali-78", "valhall2")
+      .Case("mali-g78", "valhall2")
       .Cases({"mali-g77", "mali-g57"}, "valhall1")
       .Default("");
 }
