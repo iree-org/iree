@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_80 \
+// RUN: iree-opt --split-input-file \
 // RUN:   --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' \
 // RUN:   %s | FileCheck %s
 

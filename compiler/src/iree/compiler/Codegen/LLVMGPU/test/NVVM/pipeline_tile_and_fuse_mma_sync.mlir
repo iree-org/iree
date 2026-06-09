@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_80 \
+// RUN: iree-opt --split-input-file \
 // RUN:   --iree-codegen-llvmgpu-nvvm-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
 
 // Test that TileAndFuse pipeline with NV_MMA_SYNC generates nvgpu.mma.sync operations.
@@ -11,7 +11,7 @@
 ]>
 #config = #iree_gpu.lowering_config<{
   workgroup = [64, 64, 0],
-  reduction = [0, 0, 2],
+  reduction = [0, 0, 8],
   subgroup = [2, 4],
   mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>,
   promote_operands = [0, 1]
@@ -66,7 +66,7 @@ func.func @matmul_tile_and_fuse_mma_sync()
 ]>
 #config_f16 = #iree_gpu.lowering_config<{
   workgroup = [64, 64, 0],
-  reduction = [0, 0, 2],
+  reduction = [0, 0, 8],
   subgroup = [2, 4],
   mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F16_16x8x16_F16>,
   promote_operands = [0, 1]
