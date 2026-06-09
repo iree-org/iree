@@ -6,14 +6,14 @@
 
 #include <cstdlib>
 
-#include "compiler/plugins/target/LLVMCPU/Builtins/Device.h"
-#include "compiler/plugins/target/LLVMCPU/Builtins/Musl.h"
-#include "compiler/plugins/target/LLVMCPU/Builtins/UKernel.h"
 #include "compiler/plugins/target/LLVMCPU/LLVMIRPasses.h"
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
 #include "compiler/plugins/target/LLVMCPU/LibraryBuilder.h"
 #include "compiler/plugins/target/LLVMCPU/LinkerTool.h"
 #include "compiler/plugins/target/LLVMCPU/StaticLibraryGenerator.h"
+#include "compiler/plugins/target/LLVMCPU/builtins/Device.h"
+#include "compiler/plugins/target/LLVMCPU/builtins/Musl.h"
+#include "compiler/plugins/target/LLVMCPU/builtins/UKernel.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
