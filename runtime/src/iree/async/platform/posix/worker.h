@@ -52,9 +52,10 @@ typedef enum iree_async_posix_worker_state_e {
 // wait on the same notification, and enqueue_for_execution posts to it to
 // wake exactly one idle worker.
 //
-// Alignment is added to ensure struct spans at least one cache line (64 bytes) to
-// minimize false sharing when workers are stored in a contiguous array.
-typedef struct iree_alignas(iree_hardware_destructive_interference_size) iree_async_posix_worker_t {
+// Alignment is added to ensure struct spans at least one cache line (64 bytes)
+// to minimize false sharing when workers are stored in a contiguous array.
+typedef struct iree_alignas(iree_hardware_destructive_interference_size)
+    iree_async_posix_worker_t {
   // Current state (atomic for cross-thread visibility).
   // Written by request_exit, read by worker loop.
   iree_atomic_int32_t state;
