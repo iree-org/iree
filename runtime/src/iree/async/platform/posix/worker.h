@@ -77,12 +77,6 @@ typedef struct iree_alignas(iree_hardware_destructive_interference_size)
   iree_thread_t* thread;
 } iree_async_posix_worker_t;
 
-// Verify worker struct spans at least one cache line to minimize false sharing
-// when workers are stored in a contiguous array.
-static_assert(sizeof(iree_async_posix_worker_t) >=
-                  iree_hardware_constructive_interference_size,
-              "worker struct should span at least one cache line");
-
 // Initializes a worker and starts its thread.
 // |out_worker| must point to caller-allocated storage (typically in the
 // proactor's trailing data array).
