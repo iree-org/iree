@@ -51,6 +51,9 @@ typedef enum iree_async_posix_worker_state_e {
 // Workers share proactor->ready_notification for work-stealing: all workers
 // wait on the same notification, and enqueue_for_execution posts to it to
 // wake exactly one idle worker.
+//
+// Alignment is added to ensure struct spans at least one cache line (64 bytes) to
+// minimize false sharing when workers are stored in a contiguous array.
 typedef struct iree_alignas(iree_hardware_constructive_interference_size) iree_async_posix_worker_t {
   // Current state (atomic for cross-thread visibility).
   // Written by request_exit, read by worker loop.
