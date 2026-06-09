@@ -5,7 +5,10 @@ func.func @arithmetic_i32(%arg0: i32) -> i32 {
   // CHECK: vm.ctlz.i32
   %0 = math.ctlz %arg0 : i32
 
-  return %0 : i32
+  // CHECK: vm.abs.i32
+  %1 = math.absi %0 : i32
+
+  return %1 : i32
 }
 
 // -----
@@ -15,7 +18,10 @@ func.func @arithmetic_i64(%arg0: i64) -> i64 {
   // CHECK: vm.ctlz.i64
   %0 = math.ctlz %arg0 : i64
 
-  return %0 : i64
+  // CHECK: vm.abs.i64
+  %1 = math.absi %0 : i64
+
+  return %1 : i64
 }
 
 // -----
