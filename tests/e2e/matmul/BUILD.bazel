@@ -157,7 +157,15 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []) + ([
+        # TODO: The non-ukernel (generic-vectorized) data-tiling path is not
+        # yet properly supported on RISC-V; only the microkernel (_uk) variants
+        # are validated there. Without ukernels these fall back to a generic
+        # widening kernel that is far too slow under the RISC-V QEMU emulator
+        # and times out. Disable all non-ukernel data-tiling variants on
+        # RISC-V. Remove once proper RVV codegen for this path is tested.
+        "noriscv",
+    ] if (not use_uk and lhs_rhs_type not in ["f16", "bf16"]) else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -311,7 +319,15 @@ iree_generated_e2e_runner_test(
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []) + ([
+        # TODO: The non-ukernel (generic-vectorized) data-tiling path is not
+        # yet properly supported on RISC-V; only the microkernel (_uk) variants
+        # are validated there. Without ukernels these fall back to a generic
+        # widening kernel that is far too slow under the RISC-V QEMU emulator
+        # and times out. Disable all non-ukernel data-tiling variants on
+        # RISC-V. Remove once proper RVV codegen for this path is tested.
+        "noriscv",
+    ] if (not use_uk and lhs_rhs_type not in ["f16", "bf16"]) else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],

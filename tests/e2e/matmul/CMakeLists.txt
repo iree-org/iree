@@ -138,7 +138,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "arm_64:dotprod:+dotprod"
@@ -166,7 +166,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
@@ -195,7 +195,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-input-demote-f64-to-f32=false"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
 )
@@ -761,7 +761,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-enable-early-materialization=false"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "arm_64:dotprod:+dotprod"
@@ -790,7 +790,7 @@ iree_generated_e2e_runner_test(
     "--iree-global-opt-enable-early-materialization=false"
     "--iree-llvmcpu-enable-ukernels=none"
   LABELS
-
+    "noriscv"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
