@@ -28,6 +28,15 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=vulkan},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-vulkan-target=mali-g615 %s | FileCheck %s --check-prefixes=VALHALL,VALHALL4
 
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=vulkan},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-vulkan-target=arm5gen %s | FileCheck %s --check-prefixes=ARM5GEN
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=vulkan},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-vulkan-target=mali-g720 %s | FileCheck %s --check-prefixes=ARM5GEN
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=vulkan},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-vulkan-target=mali-g725 %s | FileCheck %s --check-prefixes=ARM5GEN
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=vulkan},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-vulkan-target=mali-g1 %s | FileCheck %s --check-prefixes=ARM5GEN
+
 // VALHALL1: target_info = #iree_gpu.target<arch = "valhall1",
 // VALHALL2: target_info = #iree_gpu.target<arch = "valhall2",
 // VALHALL3: target_info = #iree_gpu.target<arch = "valhall3",
@@ -46,6 +55,22 @@
 // VALHALL-SAME: max_thread_count_per_workgroup = 512
 // VALHALL-SAME: max_workgroup_memory_bytes = 32768
 // VALHALL-SAME: max_workgroup_counts = [65535, 65535, 65535]
+
+// ARM5GEN: target_info = #iree_gpu.target<arch = "arm5gen",
+// ARM5GEN-SAME: features = "spirv:v1.6,cap:Shader"
+// ARM5GEN-SAME: wgp = <compute =
+// ARM5GEN-SAME: fp64|fp32|fp16|int64|int32|int16|int8
+// ARM5GEN-SAME: storage =
+// ARM5GEN-SAME: b64|b32|b16|b8
+// ARM5GEN-SAME: subgroup =
+// ARM5GEN-SAME: shuffle|arithmetic
+// ARM5GEN-SAME: dot =
+// ARM5GEN-SAME: dp4xi8toi32
+// ARM5GEN-SAME: subgroup_size_choices = [16]
+// ARM5GEN-SAME: max_workgroup_sizes = [1024, 1024, 1024]
+// ARM5GEN-SAME: max_thread_count_per_workgroup = 1024
+// ARM5GEN-SAME: max_workgroup_memory_bytes = 32768
+// ARM5GEN-SAME: max_workgroup_counts = [65535, 65535, 65535]
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups() -> (index, index, index) {

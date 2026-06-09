@@ -918,7 +918,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target", [
       return getArch().starts_with("gfx") || getArch().starts_with("rdna");
     }
     bool isApple() const { return getArch().starts_with("apple"); }
-    bool isARM() const { return getArch().starts_with("valhall"); }
+    bool isARM() const { return getArch().starts_with("valhall") || getArch().starts_with("arm"); }
     bool isBroadcom() const { return getArch().starts_with("videocore_"); }
     bool isNVIDIA() const { return getArch().starts_with("sm_"); }
     bool isQualcomm() const { return getArch().starts_with("adreno"); }
