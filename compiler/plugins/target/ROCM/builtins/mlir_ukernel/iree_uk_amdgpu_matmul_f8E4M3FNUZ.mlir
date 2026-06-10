@@ -105,7 +105,7 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
       %lhs_vec_0_t = vector.transpose %lhs_vec_0, [0, 2, 1, 3] : vector<4x1x2x8xf8E4M3FNUZ> to vector<4x2x1x8xf8E4M3FNUZ>
       %rhs_vec_0_t = vector.transpose %rhs_vec_0, [0, 2, 1, 3] : vector<4x1x2x8xf8E4M3FNUZ> to vector<4x2x1x8xf8E4M3FNUZ>
 
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       // Global loads of rhs.
       %rhs_block = tensor.extract_slice %rhs [0, %i] [256, 128] [1, 1] : !in_ty_f8 to !block_in_f8
@@ -118,14 +118,14 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
       %rhs_thread_3 = tensor.extract_slice %rhs_block [%glb3, %gko] [1, 16] [1, 1] : !block_in_f8 to tensor<1x16xf8E4M3FNUZ>
       %rhs_vec_local_3 = vector.transfer_read %rhs_thread_3 [%c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x16xf8E4M3FNUZ>, vector<1x16xf8E4M3FNUZ>
 
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       %lhs_vec_2 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !mshared_exp_f8, vector<4x1x2x8xf8E4M3FNUZ>
       %rhs_vec_2 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x2x8xf8E4M3FNUZ>
       %lhs_vec_2_t = vector.transpose %lhs_vec_2, [0, 2, 1, 3] : vector<4x1x2x8xf8E4M3FNUZ> to vector<4x2x1x8xf8E4M3FNUZ>
       %rhs_vec_2_t = vector.transpose %rhs_vec_2, [0, 2, 1, 3] : vector<4x1x2x8xf8E4M3FNUZ> to vector<4x2x1x8xf8E4M3FNUZ>
 
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       // Global loads of lhs.
       %lhs_block = tensor.extract_slice %lhs [0, 0, %i] [1, 128, 128] [1, 1, 1] : !mexp_in_ty_f8 to !mexp_block_in_f8
@@ -135,7 +135,7 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
       %lhs_vec_local_1 = vector.transfer_read %lhs_thread_1 [%c0, %c0, %c0], %cst {in_bounds = [true, true]} : tensor<1x1x16xf8E4M3FNUZ>, vector<1x16xf8E4M3FNUZ>
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0_t, %rhs_vec_0_t) outs(%iter) {
@@ -147,7 +147,7 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       vector.transfer_write %rhs_vec_local_0, %rhs_shared [%glb0, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
       vector.transfer_write %rhs_vec_local_1, %rhs_shared [%glb1, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
@@ -158,7 +158,7 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
       vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1_lhs, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !mshared_f8
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2_t, %rhs_vec_2_t) outs(%dot0) {
@@ -170,7 +170,7 @@ util.func @pingpong_medium_f8E4M3FNUZ_expanded(%lhs_base: !mexp_in_ty_f8, %rhs_b
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       scf.yield %dot2 : vector<4x4x1x4xf32>
     }
@@ -305,7 +305,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
       %rhs_vec_0 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c0, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x1x8xf8E4M3FNUZ>
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot0 = iree_codegen.inner_tiled ins(%lhs_vec_0, %rhs_vec_0) outs(%iter) {
@@ -317,7 +317,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       // Global loads of rhs.
       %rhs_block = tensor.extract_slice %rhs [0, %i] [256, 128] [1, 1] : !in_ty_f8 to !block_in_f8
@@ -334,7 +334,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
       %rhs_vec_1 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c1, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x1x8xf8E4M3FNUZ>
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot1 = iree_codegen.inner_tiled ins(%lhs_vec_1, %rhs_vec_1) outs(%dot0) {
@@ -346,7 +346,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       %lhs_vec_2 = vector.transfer_read %lhs_shared_expand[%m_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<8x1x1x8xf8E4M3FNUZ>
       %rhs_vec_2 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c2, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x1x8xf8E4M3FNUZ>
@@ -355,7 +355,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
       %rhs_vec_3 = vector.transfer_read %rhs_shared_expand[%n_outer_id, %ids#3, %c3, %inner_id], %cst {in_bounds = [true, true, true, true]} : !shared_exp_f8, vector<4x1x1x8xf8E4M3FNUZ>
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot2 = iree_codegen.inner_tiled ins(%lhs_vec_2, %rhs_vec_2) outs(%dot1) {
@@ -367,7 +367,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       vector.transfer_write %lhs_vec_local_0, %lhs_shared [%glb0, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
       vector.transfer_write %lhs_vec_local_1, %lhs_shared [%glb1, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
@@ -380,7 +380,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
       vector.transfer_write %rhs_vec_local_3, %rhs_shared [%glb3, %gko] {in_bounds = [true, true]} : vector<1x16xf8E4M3FNUZ>, !shared_f8
 
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
       rocdl.s.setprio 1 { iree_gpu.swap_mfma = 1 }
 
       %dot3 = iree_codegen.inner_tiled ins(%lhs_vec_3, %rhs_vec_3) outs(%dot2) {
@@ -392,7 +392,7 @@ util.func private @pingpong_large_f8E4M3FNUZ_expanded(%lhs_base: !exp_in_ty_f8, 
 
       rocdl.s.setprio 0
       gpu.barrier memfence [#gpu.address_space<workgroup>]
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       scf.yield %dot3 : vector<8x4x1x4xf32>
     }

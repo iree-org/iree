@@ -10,7 +10,7 @@ vm.module @my_module {
     // CHECK-DAG: %[[ALLOCATOR_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "allocator"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.opaque<"iree_allocator_t">>
     // CHECK-DAG: %[[ALLOCATOR:.+]] = load %[[ALLOCATOR_LVAL]] : <!emitc.opaque<"iree_allocator_t">>
 
-    // CHECK: %[[TYPE_DEF:.+]] = call_opaque "iree_vm_make_value_type_def"() {args = [#emitc.opaque<"IREE_VM_VALUE_TYPE_I32">]} : () -> !emitc.opaque<"iree_vm_type_def_t">
+    // CHECK: %[[TYPE_DEF:.+]] = call_opaque "iree_vm_make_value_type_def"() <{args = [#emitc.opaque<"IREE_VM_VALUE_TYPE_I32">]}> : () -> !emitc.opaque<"iree_vm_type_def_t">
     // CHECK-NEXT: %[[STATUS:.+]] = call_opaque "iree_vm_list_create"(%[[TYPE_DEF]], %arg3, %[[ALLOCATOR]], %[[LIST_PTR]]) : (!emitc.opaque<"iree_vm_type_def_t">, i32, !emitc.opaque<"iree_allocator_t">, !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>>) -> !emitc.opaque<"iree_status_t">
 
     // CHECK: %[[LIST_TYPE_ID:.+]] = call_opaque "iree_vm_list_type"() : () -> !emitc.opaque<"iree_vm_ref_type_t">
@@ -70,7 +70,7 @@ vm.module @my_module {
     // CHECK-NEXT: %1 = apply "&"(%0) : (!emitc.lvalue<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
     // CHECK-NEXT: %2 = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %3 = call_opaque "iree_vm_list_deref"(%2) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
-    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_value_as"(%3, %arg4, %1) {args = [0 : index, 1 : index, #emitc.opaque<"IREE_VM_VALUE_TYPE_I32">, 2 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %{{.+}} = call_opaque "iree_vm_list_get_value_as"(%3, %arg4, %1) <{args = [0 : index, 1 : index, #emitc.opaque<"IREE_VM_VALUE_TYPE_I32">, 2 : index]}> : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>) -> !emitc.opaque<"iree_status_t">
     %0 = vm.list.get.i32 %arg0, %arg1 : (!vm.list<i32>, i32) -> i32
     vm.return %0 : i32
   }

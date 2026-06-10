@@ -26,11 +26,7 @@ namespace mlir::iree_compiler {
 // llvm/Transforms/IPO/Attributor.h).
 class Position {
 public:
-  static const Position EmptyKey;
-  static const Position TombstoneKey;
-
-  Position()
-      : Position(ENC_BLOCK, llvm::DenseMapInfo<void *>::getEmptyKey(), 0) {}
+  Position() : Position(ENC_BLOCK, nullptr, 0) {}
 
   static const Position forValue(Value value) {
     return Position(ENC_VALUE, value.getAsOpaquePointer(), 0);
@@ -144,8 +140,6 @@ using mlir::iree_compiler::Position;
 // Helper that allows Position as a key in a DenseMap.
 template <>
 struct DenseMapInfo<Position> {
-  static inline Position getEmptyKey() { return Position::EmptyKey; }
-  static inline Position getTombstoneKey() { return Position::TombstoneKey; }
   static unsigned getHashValue(const Position &pos) {
     return (DenseMapInfo<void *>::getHashValue(pos) << 4) ^
            (DenseMapInfo<unsigned>::getHashValue(pos.ordinal));

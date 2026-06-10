@@ -9,7 +9,7 @@ vm.module @my_module {
     // CHECK-NEXT: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[RWDATA_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "rwdata"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<ui8>>
     // CHECK-NEXT: %[[RWDATA:.+]] = load %[[RWDATA_LVAL]] : <!emitc.ptr<ui8>>
-    // CHECK-NEXT: %[[RES:.+]] = call_opaque "vm_global_load_i32"(%[[RWDATA]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<ui8>) -> i32
+    // CHECK-NEXT: %[[RES:.+]] = call_opaque "vm_global_load_i32"(%[[RWDATA]]) <{args = [0 : index, 0 : ui32]}> : (!emitc.ptr<ui8>) -> i32
     %0 = vm.global.load.i32 @c42 : i32
     vm.return %0 : i32
   }
@@ -26,7 +26,7 @@ vm.module @my_module {
     // CHECK-NEXT: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-NEXT: %[[RWDATA_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "rwdata"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.ptr<ui8>>
     // CHECK-NEXT: %[[RWDATA:.+]] = load %[[RWDATA_LVAL]] : <!emitc.ptr<ui8>>
-    // CHECK-NEXT: call_opaque "vm_global_store_i32"(%[[RWDATA]], %arg3) {args = [0 : index, 0 : ui32, 1 : index]} : (!emitc.ptr<ui8>, i32) -> ()
+    // CHECK-NEXT: call_opaque "vm_global_store_i32"(%[[RWDATA]], %arg3) <{args = [0 : index, 0 : ui32, 1 : index]}> : (!emitc.ptr<ui8>, i32) -> ()
     vm.global.store.i32 %arg0, @c107_mut : i32
     vm.return
   }
@@ -47,7 +47,7 @@ vm.module @my_module {
     // CHECK-NEXT: %[[REF:.+]] = subscript %[[REFS]][%[[REF_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[REF_0:.+]] = apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK: %[[C:.+]] = call_opaque "iree_vm_type_def_as_ref"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.opaque<"iree_vm_ref_type_t">
-    // CHECK: %{{.+}} = call_opaque "iree_vm_ref_retain_or_move_checked"(%[[REF_0]], %[[C]], %arg3) {args = [false, 0 : index, 1 : index, 2 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_vm_ref_type_t">, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %{{.+}} = call_opaque "iree_vm_ref_retain_or_move_checked"(%[[REF_0]], %[[C]], %arg3) <{args = [false, 0 : index, 1 : index, 2 : index]}> : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_vm_ref_type_t">, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     %0 = vm.global.load.ref @g0 : !vm.buffer
     vm.return %0 : !vm.buffer
   }
@@ -68,7 +68,7 @@ vm.module @my_module {
     // CHECK-NEXT: %[[REF:.+]] = subscript %[[REFS]][%[[REF_INDEX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[REF_0:.+]] = apply "&"(%[[REF]]) : (!emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>
     // CHECK: %[[C:.+]] = call_opaque "iree_vm_type_def_as_ref"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.opaque<"iree_vm_ref_type_t">
-    // CHECK: %{{.+}} = call_opaque "iree_vm_ref_retain_or_move_checked"(%arg3, %[[C]], %[[REF_0]]) {args = [false, 0 : index, 1 : index, 2 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_vm_ref_type_t">, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
+    // CHECK: %{{.+}} = call_opaque "iree_vm_ref_retain_or_move_checked"(%arg3, %[[C]], %[[REF_0]]) <{args = [false, 0 : index, 1 : index, 2 : index]}> : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_vm_ref_type_t">, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     vm.global.store.ref %arg0, @g0_mut : !vm.buffer
     vm.return
   }

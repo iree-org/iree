@@ -282,7 +282,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
       %lhs_scale_byte_vec_t = vector.shape_cast %lhs_scale_byte_vec : vector<1x8xi8> to !lhs_scale_byte_vec_ty
       %lhs_scale_vec = vector.bitcast %lhs_scale_byte_vec_t : !lhs_scale_byte_vec_ty to !lhs_scale_vec_ty
 
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       %rhs_byte_vec = vector.transfer_read %rhs_shared_base[%rhs_outer, %rhs_inner],
         %cst_rhs {in_bounds = [true, true]} : !rhs_shared_ty, vector<16x16xi8>
@@ -295,7 +295,7 @@ util.func @pingpong_dt_medium_f4E2M1FN(
       %rhs_scale_vec = vector.bitcast %rhs_scale_byte_vec_t : !rhs_scale_byte_vec_ty to !rhs_scale_vec_ty
 
       amdgpu.lds_barrier
-      rocdl.sched.barrier 0
+      rocdl.sched.barrier none
 
       %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
         indexing_maps = #contraction_accesses,

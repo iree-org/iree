@@ -39,7 +39,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
-    // CHECK: amdgpu.sched_barrier allow = <none>
+    // CHECK: amdgpu.sched_barrier allow = none
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]]
 
@@ -48,7 +48,7 @@ func.func @prefetch_add(%arg0: memref<128xf32>) {
     // CHECK-3STAGE: vector.transfer_read %alloc
     // CHECK-3STAGE: arith.addf
     // CHECK-3STAGE: gpu.barrier memfence [#gpu.address_space<workgroup>]
-    // CHECK-3STAGE: amdgpu.sched_barrier allow = <none>
+    // CHECK-3STAGE: amdgpu.sched_barrier allow = none
     // CHECK-3STAGE: vector.transfer_write
     // CHECK-3STAGE: arith.constant 2
     // CHECK-3STAGE: arith.addi
@@ -106,7 +106,7 @@ func.func @prefetch_multi_scf_return(%arg0: memref<128xf32>) -> (vector<1xf32>, 
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     %4 = arith.addf %3, %arg3 : vector<1xf32>
     // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
-    // CHECK: amdgpu.sched_barrier allow = <none>
+    // CHECK: amdgpu.sched_barrier allow = none
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]], %[[COMPUTE2]]
     scf.yield %3, %4 : vector<1xf32>, vector<1xf32>
@@ -162,7 +162,7 @@ func.func @prefetch_add_with_if(%arg0: memref<128xf32>) {
     // CHECK: %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
     %3 = arith.addf %2, %arg2 : vector<1xf32>
     // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
-    // CHECK: amdgpu.sched_barrier allow = <none>
+    // CHECK: amdgpu.sched_barrier allow = none
     // CHECK: vector.transfer_write %[[KER_READ]], %[[SHARED]]
     // CHECK: scf.yield %[[COMPUTE]]
     scf.yield %3 : vector<1xf32>
@@ -248,7 +248,7 @@ func.func @prefetch_scf_if(%arg0: memref<128xf32>, %cond : i1) {
 // CHECK:   %[[COMPUTE_READ:.*]] = vector.transfer_read %[[WG_ALLOC]][%[[C0]]]
 // CHECK:   %[[COMPUTE:.*]] = arith.addf %[[COMPUTE_READ]], %[[ARG]]
 // CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
-// CHECK:   amdgpu.sched_barrier allow = <none>
+// CHECK:   amdgpu.sched_barrier allow = none
 // CHECK:   scf.if %[[COND]] {
 // CHECK:     %[[COMPUTE_RELOAD:.*]] = vector.transfer_read %[[PRIV_ALLOC2]][%[[C0]]]
 // CHECK:     vector.transfer_write %[[COMPUTE_RELOAD]], %[[WG_ALLOC]][%[[C0]]]
@@ -360,7 +360,7 @@ func.func @prefetch_scf_if_transientreadwrite(%arg0: memref<128xf32>, %cond : i1
 // CHECK:   scf.if
 // CHECK:   %[[READ4:.*]] = vector.transfer_read %[[PRIV_ALLOC3]]
 // CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
-// CHECK:   amdgpu.sched_barrier allow = <none>
+// CHECK:   amdgpu.sched_barrier allow = none
 // CHECK:   vector.transfer_write %[[READ4]], %[[WG_ALLOC]]
 // CHECK:   scf.yield %[[COMP]]
 
@@ -711,7 +711,7 @@ func.func @prefetch_transpose_load(%arg0: memref<128xf16>) {
     // CHECK-NEXT: amdgpu.transpose_load %[[SHARED]]
     // CHECK:      arith.addf
     // CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
-    // CHECK-NEXT: amdgpu.sched_barrier allow = <none>
+    // CHECK-NEXT: amdgpu.sched_barrier allow = none
     // CHECK:      vector.transfer_write {{.*}}, %[[SHARED]]
     // CHECK:      scf.yield
     %2 = amdgpu.transpose_load %alloc[%c0] : memref<4xf16, #gpu.address_space<workgroup>> -> vector<4xf16>

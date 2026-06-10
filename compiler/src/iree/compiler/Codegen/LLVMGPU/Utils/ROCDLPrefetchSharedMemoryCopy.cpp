@@ -950,8 +950,8 @@ insertBarriersInRange(RewriterBase &rewriter, Location loc,
       if (addSchedBarrier) {
         amdgpu::SchedBarrierOp::create(
             rewriter, loc,
-            amdgpu::sched_barrier_opt_enumAttr::get(
-                rewriter.getContext(), amdgpu::sched_barrier_opt_enum::none));
+            ROCDL::SchedGroupMaskAttr::get(rewriter.getContext(),
+                                           ROCDL::SchedGroupMask::none));
       }
       state.needBarrierBeforeWrite = false;
     }

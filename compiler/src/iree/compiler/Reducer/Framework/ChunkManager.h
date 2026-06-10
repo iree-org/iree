@@ -62,16 +62,6 @@ using Chunk = mlir::iree_compiler::Reducer::Chunk;
 
 template <>
 struct DenseMapInfo<Chunk> {
-  static inline Chunk getEmptyKey() {
-    return Chunk(DenseMapInfo<unsigned>::getEmptyKey(),
-                 DenseMapInfo<unsigned>::getEmptyKey());
-  }
-
-  static inline Chunk getTombstoneKey() {
-    return Chunk(DenseMapInfo<unsigned>::getTombstoneKey(),
-                 DenseMapInfo<unsigned>::getTombstoneKey());
-  }
-
   static unsigned getHashValue(const Chunk &val) {
     std::pair<unsigned, unsigned> pair(val.getBegin(), val.getEnd());
     return DenseMapInfo<std::pair<unsigned, unsigned>>::getHashValue(pair);

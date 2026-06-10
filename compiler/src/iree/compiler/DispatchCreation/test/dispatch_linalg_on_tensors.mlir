@@ -673,11 +673,9 @@ util.func public @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247
 //   CHECK-DAG:     %[[C9:.+]] = arith.constant 9 : i32
 //   CHECK-DAG:     %[[ARG4V:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG3]]
 //   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG4V]]
-//   CHECK-DAG:     %[[CMP1:.+]] = arith.cmpi slt, %[[EXTRACT]]
-//   CHECK-DAG:     %[[SELECT1:.+]] = arith.select %[[CMP1]], %[[EXTRACT]], %[[C9]]
-//   CHECK-DAG:     %[[CMP2:.+]] = arith.cmpi sgt, %[[SELECT1]], %[[C0]]
-//   CHECK-DAG:     %[[SELECT2:.+]] = arith.select %[[CMP2]], %[[SELECT1]], %[[C0]]
-//   CHECK-DAG:     %[[INDEX_CAST:.+]] = arith.index_cast %[[SELECT2]]
+//   CHECK-DAG:     %[[MIN:.+]] = arith.minsi %[[EXTRACT]], %[[C9]]
+//   CHECK-DAG:     %[[MAX:.+]] = arith.maxsi %[[MIN]], %[[C0]]
+//   CHECK-DAG:     %[[INDEX_CAST:.+]] = arith.index_cast %[[MAX]]
 //   CHECK-DAG:     %[[SLICE:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG4]], offsets = [%[[INDEX_CAST]]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[SLICE]] : tensor<9xi32>)
@@ -720,14 +718,12 @@ util.func public @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tens
 //       CHECK:     %[[LEAF2:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG2]]
 //       CHECK:     %[[INIT:.+]] = tensor.empty() : tensor<i16>
 //       CHECK:     %[[OP1:.+]] = tensor.extract %[[LEAF2]][] : tensor<i32>
-//       CHECK:     %[[OP2:.+]] = arith.cmpi slt, %[[OP1]], %[[C3]] : i32
-//       CHECK:     %[[OP3:.+]] = arith.select %[[OP2]], %[[OP1]], %[[C3]] : i32
-//       CHECK:     %[[OP4:.+]] = arith.cmpi sgt, %[[OP3]], %[[C0]] : i32
-//       CHECK:     %[[OP5:.+]] = arith.select %[[OP4]], %[[OP3]], %[[C0]] : i32
-//       CHECK:     %[[OP6:.+]] = arith.index_cast %[[OP5]] : i32 to index
-//       CHECK:     %[[OP7:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG3]], offsets = [%[[OP6]]]
+//       CHECK:     %[[OP2:.+]] = arith.minsi %[[OP1]], %[[C3]] : i32
+//       CHECK:     %[[OP3:.+]] = arith.maxsi %[[OP2]], %[[C0]] : i32
+//       CHECK:     %[[OP4:.+]] = arith.index_cast %[[OP3]] : i32 to index
+//       CHECK:     %[[OP5:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG3]], offsets = [%[[OP4]]]
 //       CHECK:     %[[RES:.+]] = linalg.generic
-//  CHECK-SAME:       ins(%[[OP7]] : tensor<i32>)
+//  CHECK-SAME:       ins(%[[OP5]] : tensor<i32>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<i16>) {
 //       CHECK:     ^bb0(%[[ARG5:.+]]: i32, %{{.+}}: i16):
 //       CHECK:       %[[TRUNC:.+]] = arith.trunci %[[ARG5]] : i32 to i16
@@ -812,14 +808,10 @@ util.func public @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg
 //  CHECK-SAME:       %[[DEST_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x?xi32>>
 //   CHECK-DAG:     iree_tensor_ext.dispatch.tensor.load %[[ARG2_CAPTURE]]
 //   CHECK-DAG:     iree_tensor_ext.dispatch.tensor.load %[[ARG1_CAPTURE]]
-//   CHECK-DAG:     cmpi
-//   CHECK-DAG:     arith.select
-//   CHECK-DAG:     cmpi
-//   CHECK-DAG:     arith.select
-//   CHECK-DAG:     cmpi
-//   CHECK-DAG:     cmpi
-//   CHECK-DAG:     arith.select
-//   CHECK-DAG:     arith.select
+//   CHECK-DAG:     arith.minsi
+//   CHECK-DAG:     arith.minsi
+//   CHECK-DAG:     arith.maxsi
+//   CHECK-DAG:     arith.maxsi
 //   CHECK-DAG:     index_cast
 //   CHECK-DAG:     index_cast
 //       CHECK:     iree_tensor_ext.dispatch.tensor.load %[[ARG0_CAPTURE]]
