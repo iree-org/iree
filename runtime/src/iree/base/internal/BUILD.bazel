@@ -29,13 +29,13 @@ iree_runtime_cc_library(
     srcs = [],
     hdrs = [
         "atomics.h",
-        "debugging.h",
-        "inline_array.h",
-        "math.h",
         "atomics_clang.h",
         "atomics_disabled.h",
         "atomics_gcc.h",
         "atomics_msvc.h",
+        "debugging.h",
+        "inline_array.h",
+        "math.h",
     ],
     deps = [
         "//runtime/src/iree/base:core_headers",

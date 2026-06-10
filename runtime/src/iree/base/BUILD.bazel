@@ -37,8 +37,8 @@ iree_runtime_cc_library(
         "//conditions:default": ["allocator_libc.c"],
     }),
     hdrs = [
-        "api.h",
         "allocator.h",
+        "api.h",
         "assert.h",
         "bitfield.h",
         "bitmap.h",

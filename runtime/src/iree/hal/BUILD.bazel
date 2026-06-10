@@ -36,8 +36,8 @@ iree_assert_no_dependency(
 iree_runtime_cc_library(
     name = "hal",
     srcs = [
-        "allocator_heap.c",
         "allocator.c",
+        "allocator_heap.c",
         "buffer.c",
         "buffer_heap.c",
         "buffer_transfer.c",
@@ -67,8 +67,8 @@ iree_runtime_cc_library(
         "topology_builder.c",
     ],
     hdrs = [
-        "api.h",
         "allocator.h",
+        "api.h",
         "buffer.h",
         "buffer_heap_impl.h",
         "buffer_transfer.h",
