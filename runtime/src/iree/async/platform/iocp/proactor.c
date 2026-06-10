@@ -294,10 +294,7 @@ iree_status_t iree_async_proactor_create_iocp(
   // Allocate the proactor structure with trailing data.
   iree_async_proactor_iocp_t* proactor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc_aligned(allocator, total_size,
-                                    iree_hardware_destructive_interference_size,
-                                    0, (void**)&proactor));
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&proactor));
   memset(proactor, 0, total_size);
 
   // Initialize base fields.
