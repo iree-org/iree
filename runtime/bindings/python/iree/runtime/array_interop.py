@@ -7,7 +7,6 @@
 
 from typing import Literal, Optional, Tuple, cast
 import logging
-import ml_dtypes
 import numpy as np
 import numpy.lib.mixins
 
@@ -21,6 +20,7 @@ from ._binding import (
     MemoryType,
     HalFence,
 )
+from .dtypes import map_dtype_to_hal_element_type
 
 __all__ = [
     "asdevicearray",
@@ -334,37 +334,5 @@ def asdevicearray(
     )
 
 
-# NOTE: Numpy dtypes are not hashable and exist in a hierarchy that should
-# be queried via isinstance checks. This should be done as a fallback but
-# this is a linear list for quick access to the most common. There may also
-# be a better way to do this.
-_DTYPE_TO_HAL_ELEMENT_TYPE = (
-    (np.float16, HalElementType.FLOAT_16),
-    (np.float32, HalElementType.FLOAT_32),
-    (np.float64, HalElementType.FLOAT_64),
-    (np.int32, HalElementType.SINT_32),
-    (np.int64, HalElementType.SINT_64),
-    (np.int16, HalElementType.SINT_16),
-    (np.int8, HalElementType.SINT_8),
-    (np.uint32, HalElementType.UINT_32),
-    (np.uint64, HalElementType.UINT_64),
-    (np.uint16, HalElementType.UINT_16),
-    (np.uint8, HalElementType.UINT_8),
-    (np.bool_, HalElementType.BOOL_8),
-    (np.complex64, HalElementType.COMPLEX_64),
-    (np.complex128, HalElementType.COMPLEX_128),
-    (ml_dtypes.bfloat16, HalElementType.BFLOAT_16),
-    (ml_dtypes.float8_e4m3fn, HalElementType.FLOAT_8_E4M3_FN),
-    (ml_dtypes.float8_e4m3fnuz, HalElementType.FLOAT_8_E4M3_FNUZ),
-    (ml_dtypes.float8_e5m2, HalElementType.FLOAT_8_E5M2),
-    (ml_dtypes.float8_e5m2fnuz, HalElementType.FLOAT_8_E5M2_FNUZ),
-    (ml_dtypes.float8_e8m0fnu, HalElementType.FLOAT_8_E8M0_FNU),
-)
-
-
 def map_dtype_to_element_type(dtype) -> Optional[HalElementType]:
-    for match_dtype, element_type in _DTYPE_TO_HAL_ELEMENT_TYPE:
-        if match_dtype == dtype:
-            return element_type
-    else:
-        return None
+    return map_dtype_to_hal_element_type(dtype)

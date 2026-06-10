@@ -132,6 +132,7 @@ iree_py_library(
     "iree/runtime/_binding.pyi"
     "iree/runtime/array_interop.py"
     "iree/runtime/benchmark.py"
+    "iree/runtime/dtypes.py"
     "iree/runtime/flags.py"
     "iree/runtime/function.py"
     "iree/runtime/io.py"
@@ -315,6 +316,13 @@ iree_py_test(
     array_interop_test
   SRCS
     "tests/array_interop_test.py"
+)
+
+iree_py_test(
+  NAME
+    dtypes_test
+  SRCS
+    "tests/dtypes_test.py"
 )
 
 iree_py_test(
