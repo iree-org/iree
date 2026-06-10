@@ -11928,7 +11928,7 @@ view into another buffer.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>index or signless integer or floating-point or complex-type or vector of any type values</td>
+<td>index or signless integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -11952,7 +11952,7 @@ view into another buffer.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>index or signless integer or floating-point or complex-type or vector of any type values</td>
+<td>index or signless integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>target_buffer</code></td>
@@ -13505,7 +13505,7 @@ forever; all non-experimental keys should be vetted.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -14280,7 +14280,7 @@ result in propagated semaphore failure or device loss.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15168,7 +15168,7 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workgroupKey</code></td>
@@ -15176,11 +15176,11 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>loadValue</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>base</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
@@ -15199,7 +15199,7 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15226,7 +15226,7 @@ bytes have been stored to the given resolved pointer by the workgroup.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workgroupKey</code></td>
@@ -15234,11 +15234,11 @@ bytes have been stored to the given resolved pointer by the workgroup.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>storeValue</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>base</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
@@ -15257,7 +15257,7 @@ bytes have been stored to the given resolved pointer by the workgroup.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15290,7 +15290,7 @@ instrumentation storage buffers with redundant strings.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workgroupKey</code></td>
@@ -15298,7 +15298,7 @@ instrumentation storage buffers with redundant strings.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15330,7 +15330,7 @@ debugging purposes.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>workgroupKey</code></td>
@@ -15338,7 +15338,7 @@ debugging purposes.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15353,7 +15353,7 @@ debugging purposes.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15388,7 +15388,7 @@ instrumentation events.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>buffer</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dispatchId</code></td>
@@ -15471,7 +15471,7 @@ will be the minimum of the two.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15693,7 +15693,7 @@ forced with the <code>--iree-hal-memoization=false</code> flag.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15809,7 +15809,7 @@ used for execution.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>arguments</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>argument_dims</code></td>
@@ -15832,7 +15832,7 @@ used for execution.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15890,7 +15890,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
@@ -15917,7 +15917,7 @@ the compiler consumes or produces the aliased memory consistent with itself.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -15943,7 +15943,7 @@ tensors by signaling a fence. The source tensors are returned for chaining.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>sources</code></td>
-<td>variadic of tensor of any type values</td>
+<td>variadic of tensor of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>signal_fence</code></td>
@@ -15962,7 +15962,7 @@ tensors by signaling a fence. The source tensors are returned for chaining.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of tensor of any type values</td>
+<td>variadic of tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -16007,7 +16007,7 @@ types, etc.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
@@ -16107,7 +16107,7 @@ importer atomically.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>target</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -16162,7 +16162,7 @@ lowered away during compilation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>source_dims</code></td>
@@ -16185,7 +16185,7 @@ lowered away during compilation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>tensor of any type values</td>
+<td>tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>

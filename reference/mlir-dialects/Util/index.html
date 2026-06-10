@@ -8793,7 +8793,7 @@ for the data they are accessing.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>offset</code></td>
@@ -9015,7 +9015,7 @@ other hoistable conversions.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9030,7 +9030,7 @@ other hoistable conversions.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9054,7 +9054,7 @@ has no effect at runtime.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9069,7 +9069,7 @@ has no effect at runtime.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9095,7 +9095,7 @@ std.constant wrapped in an util.optimization_barrier.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">&laquo;unnamed&raquo;</td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9236,7 +9236,7 @@ global load and store indirect ops.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9268,7 +9268,7 @@ tables.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9358,7 +9358,7 @@ may disable optimizations on those globals.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>global</code></td>
@@ -9390,7 +9390,7 @@ may disable optimizations on those globals.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9420,7 +9420,7 @@ sets.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9517,7 +9517,7 @@ may be null if the element is null or the type does not match.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9577,7 +9577,7 @@ with the default list value of the element type.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9933,7 +9933,7 @@ a cast is performed within the callee.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -9948,7 +9948,7 @@ a cast is performed within the callee.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10038,7 +10038,7 @@ util.initializer {
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10122,7 +10122,7 @@ stripped during translation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operand</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10137,7 +10137,7 @@ stripped during translation.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10162,11 +10162,11 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10206,11 +10206,11 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>lhs</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>rhs</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -10250,7 +10250,7 @@ null/undefined/optional/etc values.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>

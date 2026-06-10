@@ -10068,7 +10068,7 @@ asynchronous host call with 'coarse-fences' instead.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>variadic of resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type or any type</td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource or index or integer or floating-point or complex-type or any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
@@ -10981,7 +10981,7 @@ resource with the update applied.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -11149,7 +11149,7 @@ value.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -12433,7 +12433,7 @@ binding may have multiple subviews at different byte offsets.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -12646,7 +12646,7 @@ explicitly.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -12691,7 +12691,7 @@ Asynchronous calls must have no side-effects.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>resource_operands</code></td>
-<td>variadic of index or integer or floating-point or complex-type or resource or external resource or transient resource or variable resource or constant resource or any type</td>
+<td>variadic of index or integer or floating-point or complex-type or resource or external resource or transient resource or variable resource or constant resource or any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>resource_operand_sizes</code></td>
@@ -13494,7 +13494,7 @@ through host buffers.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -13592,7 +13592,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -13639,7 +13639,7 @@ importer atomically.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_encoding_dims</code></td>
@@ -14027,7 +14027,7 @@ introduce a yield point if the staging resource needs to be transferred.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -14290,7 +14290,7 @@ introduce a yield point if the staging resource needs to be acquired.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -14666,7 +14666,7 @@ types and those that prior to lowering do not handle them.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>external_values</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -14718,7 +14718,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -14783,7 +14783,7 @@ types and those that prior to lowering do not handle them.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -15320,7 +15320,7 @@ resource with the update applied.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -15567,7 +15567,7 @@ copy-on-write operation.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>index or integer or floating-point or complex-type or vector of any type values</td>
+<td>index or integer or floating-point or complex-type or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -15896,7 +15896,7 @@ requiring HAL/etc dialect dependencies.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>args</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>wait_fence_likes</code></td>
@@ -15919,7 +15919,7 @@ requiring HAL/etc dialect dependencies.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>

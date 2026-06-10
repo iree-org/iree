@@ -6851,7 +6851,7 @@ to a given block, or return from the parent.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>dest_operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -7143,7 +7143,7 @@ is determined by the ConvertSRefToMemRef analysis pass.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>memref of any type values</td>
+<td>memref of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7217,7 +7217,7 @@ elements have undefined value.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>ranked tensor of any type values or vector of any type values</td>
+<td>ranked tensor of any non-token type values or vector of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7314,7 +7314,7 @@ carries an implicit fence one may still occur after the parent has finished.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>operands</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 </tbody>
 </table>

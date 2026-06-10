@@ -6902,7 +6902,7 @@ as follows</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -6917,7 +6917,7 @@ as follows</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7020,19 +7020,19 @@ in the result, which is useful when reducing over a tiled or sliced subregion.</
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input_value</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>input_index</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_value</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_index</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>index_base</code></td>
@@ -7051,7 +7051,7 @@ in the result, which is useful when reducing over a tiled or sliced subregion.</
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7090,15 +7090,15 @@ the scale to use.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>query</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>key</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>scale</code></td>
@@ -7106,11 +7106,11 @@ the scale to use.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>mask</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7125,7 +7125,7 @@ the scale to use.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7248,11 +7248,11 @@ the scale to use.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7267,7 +7267,7 @@ the scale to use.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7301,23 +7301,23 @@ context, they will be the second and third inputs.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>stage</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>real_coeff</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>imag_coeff</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>real</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>imag</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7332,7 +7332,7 @@ context, they will be the second and third inputs.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7406,7 +7406,7 @@ update, leaving <code>output</code> unchanged for that batch element.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7574,11 +7574,11 @@ coordinate is the M coordinate directly.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>kernel_size</code></td>
@@ -7610,7 +7610,7 @@ coordinate is the M coordinate directly.</p>
 </tr>
 <tr>
 <td style="text-align: center;"><code>pad_value</code></td>
-<td>any type</td>
+<td>any non-token type</td>
 </tr>
 </tbody>
 </table>
@@ -7625,7 +7625,7 @@ coordinate is the M coordinate directly.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of shaped of any type values</td>
+<td>variadic of shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7662,7 +7662,7 @@ represents the value to use if the computed source indices are out of bounds.</p
 <tbody>
 <tr>
 <td style="text-align: center;"><code>source</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
@@ -7681,7 +7681,7 @@ represents the value to use if the computed source indices are out of bounds.</p
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7719,7 +7719,7 @@ the mask value is true, the input value will be written.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
@@ -7738,7 +7738,7 @@ the mask value is true, the input value will be written.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7797,15 +7797,15 @@ this operation is decomposed into lower-level operations. It supports:
 <tbody>
 <tr>
 <td style="text-align: center;"><code>query</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>key</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>value</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>scale</code></td>
@@ -7813,19 +7813,19 @@ this operation is decomposed into lower-level operations. It supports:
 </tr>
 <tr>
 <td style="text-align: center;"><code>mask</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>max</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>sum</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7840,7 +7840,7 @@ this operation is decomposed into lower-level operations. It supports:
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7875,15 +7875,15 @@ this operation is decomposed into lower-level operations. It supports:
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>accumulator</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7898,7 +7898,7 @@ this operation is decomposed into lower-level operations. It supports:
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -7994,7 +7994,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8029,11 +8029,11 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <tbody>
 <tr>
 <td style="text-align: center;"><code>inputs</code></td>
-<td>variadic of any type</td>
+<td>variadic of any non-token type</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>outputs</code></td>
-<td>variadic of shaped of any type values</td>
+<td>variadic of shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8048,7 +8048,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8094,19 +8094,19 @@ Note: when the two values are equal, the first occurrence is always selected.</p
 <tbody>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>indices</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_values</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_indices</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8121,7 +8121,7 @@ Note: when the two values are equal, the first occurrence is always selected.</p
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8178,19 +8178,19 @@ ordered before the second.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>values</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>input_indices</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_values</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output_indices</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8205,7 +8205,7 @@ ordered before the second.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>results</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8252,11 +8252,11 @@ and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8271,7 +8271,7 @@ and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8317,11 +8317,11 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8336,7 +8336,7 @@ of this operator is first collapsed and then fed to a batch matmul op.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8386,11 +8386,11 @@ only the non-padded part of the output.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>input</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
-<td>shaped of any type values</td>
+<td>shaped of any non-token type values</td>
 </tr>
 </tbody>
 </table>
@@ -8405,7 +8405,7 @@ only the non-padded part of the output.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
-<td>variadic of ranked tensor of any type values</td>
+<td>variadic of ranked tensor of any non-token type values</td>
 </tr>
 </tbody>
 </table>
