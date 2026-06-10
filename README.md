@@ -85,7 +85,7 @@ See [our website](https://iree.dev/) for more information.
 
 ## Presentations and talks
 
-Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@iree4356)
+Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@iree-org)
 
 Date | Title | Recording | Slides
 ---- | ----- | --------- | ------
