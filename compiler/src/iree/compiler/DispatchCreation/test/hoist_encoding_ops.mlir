@@ -239,6 +239,88 @@ util.func public @hoist_convertible_slice_op(%input: tensor<1024x320xf32>) -> te
 
 // -----
 
+// Do not hoist a `set_encoding` whose source is a structurally flow-mappable
+// slice if the dynamic offset is still produced by a tensor.extract inside the
+// dispatch. HoistUniformScalarCompute is responsible for moving such scalar
+// metadata out first.
+
+#encoding = #iree_encoding.testing<>
+util.func private @get_tensor(tensor<64x256xi1, #encoding>) -> tensor<64x256xi1>
+util.func public @no_hoist_slice_with_dispatch_local_extract_offset(%input: tensor<256x256xi1>, %offsets: tensor<1xi64>) -> tensor<64x256xi1> {
+  %0 = flow.dispatch.region -> (tensor<64x256xi1>) {
+    %c0 = arith.constant 0 : index
+    %offset_i64 = tensor.extract %offsets[%c0] : tensor<1xi64>
+    %offset = arith.index_cast %offset_i64 : i64 to index
+    %1 = tensor.extract_slice %input[%offset, 0] [64, 256] [1, 1] : tensor<256x256xi1> to tensor<64x256xi1>
+    %2 = iree_encoding.set_encoding %1 : tensor<64x256xi1> -> tensor<64x256xi1, #encoding>
+    %3 = util.call @get_tensor(%2) : (tensor<64x256xi1, #encoding>) -> tensor<64x256xi1>
+    flow.return %3 : tensor<64x256xi1>
+  }
+  util.return %0 : tensor<64x256xi1>
+}
+// CHECK-LABEL: util.func public @no_hoist_slice_with_dispatch_local_extract_offset(
+// CHECK:         flow.dispatch.region
+// CHECK:           %[[OFFSET_I64:.+]] = tensor.extract
+// CHECK:           %[[OFFSET:.+]] = arith.index_cast %[[OFFSET_I64]]
+// CHECK:           %[[SRC:.+]] = tensor.extract_slice %{{.*}}[%[[OFFSET]], 0] [64, 256] [1, 1]
+// CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
+// CHECK:           flow.return
+
+// -----
+
+// Hoist a `set_encoding` whose source is a structurally flow-mappable slice,
+// even if a dynamic offset is derived from a scalar tensor.extract that has
+// already been hoisted outside the dispatch.
+
+#encoding = #iree_encoding.testing<>
+util.func private @get_tensor(tensor<64x256xi1, #encoding>) -> tensor<64x256xi1>
+util.func public @hoist_slice_with_external_extract_offset(%input: tensor<256x256xi1>, %offsets: tensor<1xi64>) -> tensor<64x256xi1> {
+  %c0 = arith.constant 0 : index
+  %offset_i64 = tensor.extract %offsets[%c0] : tensor<1xi64>
+  %offset = arith.index_cast %offset_i64 : i64 to index
+  %0 = flow.dispatch.region -> (tensor<64x256xi1>) {
+    %1 = tensor.extract_slice %input[%offset, 0] [64, 256] [1, 1] : tensor<256x256xi1> to tensor<64x256xi1>
+    %2 = iree_encoding.set_encoding %1 : tensor<64x256xi1> -> tensor<64x256xi1, #encoding>
+    %3 = util.call @get_tensor(%2) : (tensor<64x256xi1, #encoding>) -> tensor<64x256xi1>
+    flow.return %3 : tensor<64x256xi1>
+  }
+  util.return %0 : tensor<64x256xi1>
+}
+// CHECK-LABEL: util.func public @hoist_slice_with_external_extract_offset(
+// CHECK-SAME:    %[[INPUT:.+]]: tensor<256x256xi1>, %[[OFFSETS:.+]]: tensor<1xi64>
+// CHECK:         %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[OFFSET_I64:.+]] = tensor.extract %[[OFFSETS]][%[[C0]]] : tensor<1xi64>
+// CHECK:         %[[OFFSET:.+]] = arith.index_cast %[[OFFSET_I64]] : i64 to index
+// CHECK:         %[[SRC:.+]] = tensor.extract_slice %[[INPUT]][%[[OFFSET]], 0] [64, 256] [1, 1]
+// CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
+// CHECK:         flow.dispatch.region
+
+// -----
+
+// Do not hoist a `set_encoding` whose source is an `extract_slice` that is NOT
+// structurally flow-mappable: dim 1 has size 12 (not 1) while dim 2 is
+// partially sliced, so the slice is not a single contiguous byte range.
+
+#encoding = #iree_encoding.testing<>
+util.func private @get_tensor(tensor<12x100x64xf16, #encoding>) -> tensor<12x100x64xf16>
+util.func public @no_hoist_non_flow_mappable_slice(%input: tensor<1x12x2080x64xf16>) -> tensor<12x100x64xf16> {
+  %0 = flow.dispatch.region -> (tensor<12x100x64xf16>) {
+    %1 = tensor.extract_slice %input[0, 0, 0, 0] [1, 12, 100, 64] [1, 1, 1, 1]
+        : tensor<1x12x2080x64xf16> to tensor<12x100x64xf16>
+    %2 = iree_encoding.set_encoding %1 : tensor<12x100x64xf16> -> tensor<12x100x64xf16, #encoding>
+    %3 = util.call @get_tensor(%2) : (tensor<12x100x64xf16, #encoding>) -> tensor<12x100x64xf16>
+    flow.return %3 : tensor<12x100x64xf16>
+  }
+  util.return %0 : tensor<12x100x64xf16>
+}
+// CHECK-LABEL: util.func public @no_hoist_non_flow_mappable_slice(
+// CHECK:         flow.dispatch.region
+// CHECK:           %[[SRC:.+]] = tensor.extract_slice
+// CHECK:           %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[SRC]]
+// CHECK:           flow.return
+
+// -----
+
 // Avoid hoisting `set_encoding` operations that have pad encodings
 
 #encoding = #iree_encoding.padding<[0, ?]>

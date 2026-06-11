@@ -14,7 +14,14 @@
 namespace mlir::iree_compiler::IREE::Flow {
 
 /// Indicates whether the given offsets/sizes/strides representing a slice from
-/// baseShape is a contiguous slice, and this is mappable to Flow ops.
+/// baseShape is a contiguous slice structurally representable by Flow ops.
+bool isOffsetSizeAndStrideStructurallyMappableToFlow(
+    llvm::ArrayRef<OpFoldResult> offsets, llvm::ArrayRef<OpFoldResult> sizes,
+    llvm::ArrayRef<OpFoldResult> strides, llvm::ArrayRef<int64_t> baseShape);
+
+/// Indicates whether the given offsets/sizes/strides representing a slice from
+/// baseShape is mappable to Flow ops without tensor-load-derived dynamic
+/// offsets/sizes/strides.
 bool isOffsetSizeAndStrideMappableToFlow(llvm::ArrayRef<OpFoldResult> offsets,
                                          llvm::ArrayRef<OpFoldResult> sizes,
                                          llvm::ArrayRef<OpFoldResult> strides,
