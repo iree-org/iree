@@ -160,7 +160,10 @@ iree_status_t iree_async_proactor_create_posix_with_backend(
   // Single allocation for everything.
   iree_async_proactor_posix_t* proactor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(allocator, total_size, (void**)&proactor));
+      z0,
+      iree_allocator_malloc_aligned(allocator, total_size,
+                                    iree_hardware_destructive_interference_size,
+                                    0, (void**)&proactor));
   memset(proactor, 0, total_size);
 
   // Initialize base proactor.
@@ -348,7 +351,7 @@ static void iree_async_proactor_posix_destroy(
 
   // Free the single allocation.
   iree_allocator_t allocator = proactor->base.allocator;
-  iree_allocator_free(allocator, proactor);
+  iree_allocator_free_aligned(allocator, proactor);
 
   IREE_TRACE_ZONE_END(z0);
 }
