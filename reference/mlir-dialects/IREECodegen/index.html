@@ -9635,23 +9635,23 @@ id which is then typically delinearized based on the problem space.</p>
 <tbody>
 <tr>
 <td style="text-align: center;">LastUnary</td>
-<td style="text-align: center;"><code>13</code></td>
+<td style="text-align: center;"><code>16</code></td>
 <td>LastUnary</td>
 </tr>
 <tr>
 <td style="text-align: center;">LastBinary</td>
-<td style="text-align: center;"><code>23</code></td>
+<td style="text-align: center;"><code>26</code></td>
 <td>LastBinary</td>
 </tr>
 <tr>
 <td style="text-align: center;">LastTernary</td>
-<td style="text-align: center;"><code>24</code></td>
+<td style="text-align: center;"><code>27</code></td>
 <td>LastTernary</td>
 </tr>
 </tbody>
 </table>
 <h3 id="elementwisekind">ElementwiseKind<a class="headerlink" href="#elementwisekind" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23</em></p>
+<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26</em></p>
 <h4 id="cases_4">Cases:<a class="headerlink" href="#cases_4" title="Permanent link">link</a></h4>
 <table>
 <thead>
@@ -9728,58 +9728,73 @@ id which is then typically delinearized based on the problem space.</p>
 <td>erf</td>
 </tr>
 <tr>
-<td style="text-align: center;">add</td>
+<td style="text-align: center;">sin</td>
 <td style="text-align: center;"><code>13</code></td>
+<td>sin</td>
+</tr>
+<tr>
+<td style="text-align: center;">cos</td>
+<td style="text-align: center;"><code>14</code></td>
+<td>cos</td>
+</tr>
+<tr>
+<td style="text-align: center;">tan</td>
+<td style="text-align: center;"><code>15</code></td>
+<td>tan</td>
+</tr>
+<tr>
+<td style="text-align: center;">add</td>
+<td style="text-align: center;"><code>16</code></td>
 <td>add</td>
 </tr>
 <tr>
 <td style="text-align: center;">sub</td>
-<td style="text-align: center;"><code>14</code></td>
+<td style="text-align: center;"><code>17</code></td>
 <td>sub</td>
 </tr>
 <tr>
 <td style="text-align: center;">mul</td>
-<td style="text-align: center;"><code>15</code></td>
+<td style="text-align: center;"><code>18</code></td>
 <td>mul</td>
 </tr>
 <tr>
 <td style="text-align: center;">div</td>
-<td style="text-align: center;"><code>16</code></td>
+<td style="text-align: center;"><code>19</code></td>
 <td>div</td>
 </tr>
 <tr>
 <td style="text-align: center;">div_unsigned</td>
-<td style="text-align: center;"><code>17</code></td>
+<td style="text-align: center;"><code>20</code></td>
 <td>div_unsigned</td>
 </tr>
 <tr>
 <td style="text-align: center;">max_signed</td>
-<td style="text-align: center;"><code>18</code></td>
+<td style="text-align: center;"><code>21</code></td>
 <td>max_signed</td>
 </tr>
 <tr>
 <td style="text-align: center;">min_signed</td>
-<td style="text-align: center;"><code>19</code></td>
+<td style="text-align: center;"><code>22</code></td>
 <td>min_signed</td>
 </tr>
 <tr>
 <td style="text-align: center;">max_unsigned</td>
-<td style="text-align: center;"><code>20</code></td>
+<td style="text-align: center;"><code>23</code></td>
 <td>max_unsigned</td>
 </tr>
 <tr>
 <td style="text-align: center;">min_unsigned</td>
-<td style="text-align: center;"><code>21</code></td>
+<td style="text-align: center;"><code>24</code></td>
 <td>min_unsigned</td>
 </tr>
 <tr>
 <td style="text-align: center;">powf</td>
-<td style="text-align: center;"><code>22</code></td>
+<td style="text-align: center;"><code>25</code></td>
 <td>powf</td>
 </tr>
 <tr>
 <td style="text-align: center;">select</td>
-<td style="text-align: center;"><code>23</code></td>
+<td style="text-align: center;"><code>26</code></td>
 <td>select</td>
 </tr>
 </tbody>
@@ -9881,7 +9896,7 @@ id which is then typically delinearized based on the problem space.</p>
 </tbody>
 </table>
 <h3 id="unaryfn">UnaryFn<a class="headerlink" href="#unaryfn" title="Permanent link">link</a></h3>
-<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12</em></p>
+<p><em>Allowed 32-bit signless integer cases: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15</em></p>
 <h4 id="cases_9">Cases:<a class="headerlink" href="#cases_9" title="Permanent link">link</a></h4>
 <table>
 <thead>
@@ -9956,6 +9971,21 @@ id which is then typically delinearized based on the problem space.</p>
 <td style="text-align: center;">erf</td>
 <td style="text-align: center;"><code>12</code></td>
 <td>erf</td>
+</tr>
+<tr>
+<td style="text-align: center;">sin</td>
+<td style="text-align: center;"><code>13</code></td>
+<td>sin</td>
+</tr>
+<tr>
+<td style="text-align: center;">cos</td>
+<td style="text-align: center;"><code>14</code></td>
+<td>cos</td>
+</tr>
+<tr>
+<td style="text-align: center;">tan</td>
+<td style="text-align: center;"><code>15</code></td>
+<td>tan</td>
 </tr>
 </tbody>
 </table>
