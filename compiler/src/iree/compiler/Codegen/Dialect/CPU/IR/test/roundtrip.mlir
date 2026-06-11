@@ -69,3 +69,16 @@ func.func @test_arbitrary_keys() attributes {
 // CHECK-SAME:      test = 123 : i32
 // CHECK-LABEL: @test_arbitrary_keys()
 // CHECK-SAME:    lowering_config = #[[$CONFIG]]
+
+// -----
+
+// Round-trip the LLVMCPU ukernel provider attribute. This is the CPU analogue
+// of #rocm.ukernel_provider, set on a `hal.executable.target` config to enable
+// the built-in C-bitcode ukernels under
+// compiler/plugins/target/LLVMCPU/builtins/ukernel/.
+func.func @test_ukernel_provider() attributes {
+    iree_codegen.ukernel_provider = #iree_cpu.ukernel_provider} {
+  return
+}
+// CHECK-LABEL: @test_ukernel_provider()
+// CHECK-SAME:    iree_codegen.ukernel_provider = #iree_cpu.ukernel_provider
