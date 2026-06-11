@@ -900,6 +900,21 @@ std::optional<TargetDetails> getAppleTargetDetails() {
 // Known ARM target details
 //===----------------------------------------------------------------------===//
 
+const WgpDetails *get5GenArmWgpDetails() {
+  ComputeBitwidths computeBitwdiths = allComputeBits;
+  // clang-format off
+  static const WgpDetails fifthGenWgp = {
+      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      /*scaledMmaCount=*/0, /*scaledMmaOps=*/nullptr,
+      /*subgroupSizeChoices=*/{16, 16}, /*maxWorkgroupSizes=*/{1024, 1024, 1024},
+      /*maxThreadSize=*/1024,
+      /*maxWorkgroupMemoryBytes=*/32 * 1024, // Vulkan: maxComputeSharedMemorySize
+      /*maxWorkgroupCounts=*/{0xffff, 0xffff, 0xffff}};
+  // clang-format on
+  return &fifthGenWgp;
+}
+
 const WgpDetails *getValhallWgpDetails() {
   // Recent drivers report support for shaderInt64. Aside from not widely
   // applicable, we don't know whether that's emulated and how performant it is.
@@ -927,12 +942,16 @@ const WgpDetails *getValhallWgpDetails() {
 
 std::optional<TargetDetails> getARMGPUTargetDetails(StringRef target) {
   const WgpDetails *valhallWgp = getValhallWgpDetails();
+  const WgpDetails *fifthGenArmWgp = get5GenArmWgpDetails();
 
   // Note that the underlying GPU may have certain capabilities but the Android
   // version and driver stack may not expose them. So the following is just and
   // will always be approximate.
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      // Mali-G720: https://vulkan.gpuinfo.org/displayreport.php?id=36655
+      .Cases({"mali-g720", "mali-g725", "mali-g1", "arm5gen"},
+             TargetDetails{fifthGenArmWgp, nullptr})
       // Mali-G715: https://vulkan.gpuinfo.org/displayreport.php?id=29754
       .Cases({"mali-g715", "mali-g615", "valhall4"},
              TargetDetails{valhallWgp, nullptr})
@@ -956,6 +975,7 @@ StringRef normalizeARMGPUTarget(StringRef target) {
   }
 
   return llvm::StringSwitch<StringRef>(target.lower())
+      .Cases({"mali-g720", "mali-g725", "mali-g1", "arm5gen"}, "arm5gen")
       .Cases({"mali-g715", "mali-g615"}, "valhall4")
       .Cases({"mali-g710", "mali-g510", "mali-g310"}, "valhall3")
       .Case("mali-g78", "valhall2")
