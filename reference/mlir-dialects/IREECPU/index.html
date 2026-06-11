@@ -2428,6 +2428,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ukernelproviderattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelProviderAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmvxencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6319,6 +6330,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#ukernelproviderattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKernelProviderAttr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#vmvxencodingresolverattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6450,6 +6472,7 @@ LLVM are handled separately.</p>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
 <li><a href="#pipelineattr">PipelineAttr</a></li>
+<li><a href="#ukernelproviderattr">UKernelProviderAttr</a></li>
 <li><a href="#vmvxencodingresolverattr">VMVXEncodingResolverAttr</a></li>
 </ul>
 </li>
@@ -6676,6 +6699,19 @@ LoweringPipeline enum values.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="ukernelproviderattr">UKernelProviderAttr<a class="headerlink" href="#ukernelproviderattr" title="Permanent link">link</a></h3>
+<p><em>Provides built-in C-bitcode ukernel implementations for the LLVMCPU
+    target backend.</em></p>
+<p>Syntax: <code>#iree_cpu.ukernel_provider</code></p>
+<p>Implements the <code>UKernelProviderInterface</code> for the LLVMCPU target.
+<code>createAndReplaceWithUkernelOp</code> rewrites an <code>iree_codegen.inner_tiled</code> op
+carrying an <code>iree_cpu.data_tiled_mma_layout</code> and an
+<code>iree_codegen.ukernel = "&lt;name&gt;"</code> descriptor into an
+<code>iree_codegen.ukernel.generic</code> call, and attaches the matching ukernel
+bitcode as a <code>hal.executable_object</code> on the dispatch's executable variant.</p>
+<p>Bitcode is resolved by name: first against any <code>hal.executable.objects</code>
+already attached above the op (so user-supplied bitcode wins), then
+against ukernels embedded into <code>iree-compile</code> at LLVMCPU plugin init.</p>
 <h3 id="vmvxencodingresolverattr">VMVXEncodingResolverAttr<a class="headerlink" href="#vmvxencodingresolverattr" title="Permanent link">link</a></h3>
 <p><em>The encoding layout attribute for VMVX backend.</em></p>
 <p>Syntax:</p>
