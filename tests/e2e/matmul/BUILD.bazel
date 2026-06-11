@@ -270,6 +270,72 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ("bf16", "f32"),
 ]]
 
+# LLVMCPU, data-tiling lowering to iree_codegen.inner_tiled AND routing the
+# inner_tiled op through a built-in C-bitcode microkernel via
+# `--iree-llvmcpu-enable-llvm-ukernels=inner_tiled`. Restricted to the
+# avx512bf16 variant, which is the one for which a bf16 ukernel
+# (`iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16`) exists; this is the
+# numerical end-to-end check that the ukernel (and the generic
+# `intrinsics_{m,n,k}` unrolling + operand threading) computes correct
+# results, complementing the IR-level lit tests under
+# compiler/plugins/target/LLVMCPU/builtins/ukernel/test/.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_llvm_ukernel_bf16_f32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+        "--iree-llvmcpu-enable-llvm-ukernels=inner_tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=bf16",
+        "--acc_type=f32",
+    ],
+    tags = [
+        # bf16 triggers internal LLVM assertion errors on riscv and wasm.
+        "noriscv",
+        "nowasm",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = [
+        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
+# Companion of the bf16 test above for the symmetric signed-i8 -> i32 path:
+# routes the data-tiled inner_tiled op through the C-bitcode microkernel
+# `iree_uk_mma_x86_avx512vnni_16x16x2_i32_i8_casti16` (x86 AVX-512 VNNI
+# `vpdpwssd`, with the s8 inputs widened to i16). Restricted to the
+# avx512vnni variant, which is the one for which that ukernel exists; this
+# is the numerical end-to-end check that the ukernel computes correct
+# results, complementing the IR-level lit tests under
+# compiler/plugins/target/LLVMCPU/builtins/ukernel/test/.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_llvm_ukernel_i8_i32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+        "--iree-llvmcpu-enable-llvm-ukernels=inner_tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=i8",
+        "--acc_type=i32",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = [
+        "x86_64:avx512vnni:" + ",".join(X86_64_AVX512_VNNI),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 # Mixed unsigned-LHS / signed-RHS i8 matmul: exercises x86 AVX-512 VNNI
 # `vpdpbusd`, our first asymmetric MMA. The `generic` variant exercises
 # the standard codegen fallback (no matching MMA intrinsic).
