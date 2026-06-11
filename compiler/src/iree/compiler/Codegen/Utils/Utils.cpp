@@ -248,6 +248,29 @@ bool hasUkernel(DictionaryAttr targetConfig, StringRef ukernelName) {
   return false;
 }
 
+bool hasLlvmUkernel(DictionaryAttr targetConfig, StringRef ukernelCategory) {
+  auto enabled = targetConfig.getAs<StringAttr>("llvm_ukernels");
+  StringRef enabledStr = enabled ? enabled.getValue() : StringRef{};
+  // No `default`/`none`/`all` resolution: empty means off, anything else is
+  // a comma-separated list of categories. If the caller passes an empty
+  // `ukernelCategory`, the question is "is any LLVM-ukernel category
+  // enabled?".
+  if (enabledStr.empty()) {
+    return false;
+  }
+  if (ukernelCategory.empty()) {
+    return true;
+  }
+  while (!enabledStr.empty()) {
+    auto split = enabledStr.split(',');
+    if (split.first == ukernelCategory) {
+      return true;
+    }
+    enabledStr = split.second;
+  }
+  return false;
+}
+
 // TODO(dcaballe): If we have to check for a significantly large number of
 // features in the future, we may want to consider a persistent state to carry
 // over processed HAL information or keeping the TTI instance alive and query

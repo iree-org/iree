@@ -47,6 +47,12 @@ struct LLVMTarget {
   static constexpr const char *DEFAULT_ENABLE_UKERNELS = "default";
   static constexpr bool DEFAULT_LINK_UKERNEL_BITCODE = true;
   static constexpr bool DEFAULT_ENABLE_INNER_TILED = false;
+  // The "LLVM ukernels" — i.e. the new-style C-bitcode ukernels under
+  // `compiler/plugins/target/LLVMCPU/builtins/ukernel/`. Empty default
+  // means off; values are a comma-separated list of categories to enable,
+  // e.g. `inner_tiled`. Distinct from the legacy `ukernels` field above,
+  // which controls the runtime-side `mmt4d`-style ukernels.
+  static constexpr const char *DEFAULT_ENABLE_LLVM_UKERNELS = "";
 
   // Default initialize all fields.
   LLVMTarget();
@@ -129,6 +135,11 @@ struct LLVMTarget {
   // enable, e.g. `mmt4d`.
   std::string ukernels = DEFAULT_ENABLE_UKERNELS;
 
+  // Enables LLVM-bitcode ukernels (the new-style C ukernels under
+  // `compiler/plugins/target/LLVMCPU/builtins/ukernel/`). Comma-separated
+  // list of categories to enable, e.g. `inner_tiled`. Empty = off.
+  std::string llvmUkernels = DEFAULT_ENABLE_LLVM_UKERNELS;
+
   // Link built-in ukernel bitcode libraries into generated executables.
   bool linkUkernelBitcode = DEFAULT_LINK_UKERNEL_BITCODE;
 
@@ -205,6 +216,7 @@ struct LLVMCPUTargetCLOptions {
   llvm::cl::PowerOf2ByteSize targetMaxStackAllocSizeInBytes =
       LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   std::string enableUkernels = LLVMTarget::DEFAULT_ENABLE_UKERNELS;
+  std::string enableLlvmUkernels = LLVMTarget::DEFAULT_ENABLE_LLVM_UKERNELS;
   bool linkUKernelBitcode = LLVMTarget::DEFAULT_LINK_UKERNEL_BITCODE;
   bool enableInnerTiled = LLVMTarget::DEFAULT_ENABLE_INNER_TILED;
   bool listTargets; // Ignored - used with llvm::cl::ValueDisallowed.
