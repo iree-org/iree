@@ -348,6 +348,15 @@ void addMmt4dTilingExpertPassPipeline(
   funcPassManager.addPass(createCPUPrepareUkernelsPass());
   funcPassManager.addPass(createCPULowerToUKernelsPass(
       pipelineOpt.cpuOpts.skipIntermediateRoundings));
+  // Rewrite `inner_tiled` ops carrying an `iree_codegen.ukernel` descriptor
+  // to `iree_codegen.ukernel.generic` calls (set earlier by `selectUKernel`
+  // in `KernelDispatch`, gated by `--iree-llvmcpu-enable-llvm-ukernels`).
+  // Must run after the parallel-tile pass above so the inner_tiled has its
+  // M/N outer extents tiled to single tiles, and before bufferization since
+  // the rewrite happens on tensors (the eventual `ukernel.generic` -> func
+  // call lowering happens after bufferize). A nop when no op carries the
+  // descriptor, so safe to leave in the default pipeline.
+  funcPassManager.addPass(createLowerBitcodeUKernelsPass());
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   // `VectorInnerParallelTiles` level models the tiling and fusion for the
