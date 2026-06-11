@@ -102,6 +102,7 @@ struct VulkanSPIRVTargetOptions {
   // lowest common denominator to guarantee the generated SPIR-V is widely
   // accepted for now. Eventually we want to use a list for multi-targeting.
   std::string target = "vp_android_baseline_2022";
+  std::string targetFeatures;
   VulkanDispatchAbi dispatchAbi = VulkanDispatchAbi::Descriptors;
 
   void bindOptions(OptionsBinder &binder) {
@@ -118,6 +119,12 @@ struct VulkanSPIRVTargetOptions {
             "GPUs. See "
             "https://iree.dev/guides/deployment-configurations/gpu-vulkan/ for "
             "more details."));
+    binder.opt<std::string>(
+        "iree-vulkan-target-features", targetFeatures,
+        llvm::cl::desc(
+            "Vulkan target features (SPIR-V version, capabilities, "
+            "extensions, etc.) to use. If provided, replaces the default "
+            "features for the target."));
     binder.opt<VulkanDispatchAbi>(
         "iree-vulkan-dispatch-abi", dispatchAbi,
         llvm::cl::desc("Selects the Vulkan dispatch ABI emitted for generated "
@@ -326,6 +333,11 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
+      if (!options_.targetFeatures.empty()) {
+        target = IREE::GPU::TargetAttr::get(context, target.getArch(),
+                                            options_.targetFeatures,
+                                            target.getWgp(), target.getChip());
+      }
       if (useBdaRootAbi) {
         target = getTargetAttrWithBdaRootAbiFeatures(target);
       }
