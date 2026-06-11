@@ -136,7 +136,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     });
   }
 
-  if (isX86(targetConfig) || isRISCV(targetConfig)) {
+  // TODO(egebeysel): setting this per target is not the nicest approach.
+  // Ideally, we would use a control function here so that we can do this on a
+  // more fine granular basis.
+  if (isX86(targetConfig) ||
+      (isRISCV(targetConfig) && !isScalableVectorizationEnabled())) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
   pipelineOpts.decomposePackUnPackOps =
