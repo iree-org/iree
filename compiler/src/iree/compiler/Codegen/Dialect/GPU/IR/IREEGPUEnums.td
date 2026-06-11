@@ -477,6 +477,42 @@ def IREEGPU_ScaledMMAIntrinsic : IREEGPU_I32Enum<"ScaledMMAIntrinsic",
     ]>;
 
 //===----------------------------------------------------------------------===//
+// Shared memory hardware model
+//
+// Encodes all LDS-related hardware properties for a given architecture:
+// bank count, phase scheduling, and bank width. Use the getter functions
+// in KnownTargets.h to query derived values from the model.
+
+// Unknown or not applicable -- shared memory analysis is unavailable.
+def IREEGPU_SharedMemModelNone
+    : I32EnumAttrCase<"None", 0, "none">;
+// CDNA2-3 (gfx90a, gfx942): 32 banks, 4-byte bank width.
+def IREEGPU_SharedMemModelCDNA2
+    : I32EnumAttrCase<"CDNA2", 1, "cdna2">;
+def IREEGPU_SharedMemModelCDNA3
+    : I32EnumAttrCase<"CDNA3", 2, "cdna3">;
+// CDNA4 (gfx950): 64 banks, 4-byte bank width. Non-contiguous 4-phase
+// scheduling for ds_read_b128.
+def IREEGPU_SharedMemModelCDNA4
+    : I32EnumAttrCase<"CDNA4", 3, "cdna4">;
+// RDNA3 (gfx1100+): 64 banks, 4-byte bank width.
+def IREEGPU_SharedMemModelRDNA3
+    : I32EnumAttrCase<"RDNA3", 4, "rdna3">;
+// RDNA4 (gfx1200+): 64 banks, 4-byte bank width.
+def IREEGPU_SharedMemModelRDNA4
+    : I32EnumAttrCase<"RDNA4", 5, "rdna4">;
+
+def IREEGPU_SharedMemoryModel : IREEGPU_I32EnumAttr<"SharedMemoryModel",
+    "Shared memory hardware model", [
+      IREEGPU_SharedMemModelNone,
+      IREEGPU_SharedMemModelCDNA2,
+      IREEGPU_SharedMemModelCDNA3,
+      IREEGPU_SharedMemModelCDNA4,
+      IREEGPU_SharedMemModelRDNA3,
+      IREEGPU_SharedMemModelRDNA4
+    ]>;
+
+//===----------------------------------------------------------------------===//
 // Tiling levels
 
 def Workgroup : I32EnumAttrCase<"Workgroup", 0>;

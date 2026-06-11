@@ -58,7 +58,7 @@ struct WgpDetails {
   std::optional<int32_t> simdsPerWgp;
   std::optional<int32_t> vgprSpaceBits;
   std::optional<ArrayRef<int64_t>> dmaSizes;
-  std::optional<int32_t> workgroupMemoryBankCount;
+  SharedMemoryModel sharedMemModel = SharedMemoryModel::None;
 };
 
 // Chip level feature/limit details
@@ -152,7 +152,8 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes,
       DenseI32ArrayAttr::get(context, wgp->maxWorkgroupCounts),
       wgp->maxLoadInstructionBits, wgp->simdsPerWgp, wgp->vgprSpaceBits,
-      dmaSizesAttr, wgp->workgroupMemoryBankCount, DictionaryAttr{});
+      dmaSizesAttr, SharedMemoryModelAttr::get(context, wgp->sharedMemModel),
+      DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip) {
@@ -287,7 +288,7 @@ const WgpDetails *getCDNA4WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/512 * 32,
       /*dmaSizes=*/ArrayRef<int64_t>(cdna4DMASizes),
-      /*workgroupMemoryBankCount=*/64};
+      /*sharedMemModel=*/SharedMemoryModel::CDNA4};
   return &cdna4Wgp;
 }
 
@@ -347,7 +348,7 @@ const WgpDetails *getCDNA3WgpDetails() {
       /*simdsPerWgp=*/4,
       /*vgprSpaceBits=*/512 * 32,
       /*dmaSizes=*/ArrayRef<int64_t>(cdna3DMASizes),
-      /*workgroupMemoryBankCount=*/32};
+      /*sharedMemModel=*/SharedMemoryModel::CDNA3};
   return &cdna3Wgp;
 }
 
@@ -381,24 +382,25 @@ const WgpDetails *getCDNA2WgpDetails() {
       MMAIntrinsic::MFMA_I32_16x16x4x4B_I8,
       MMAIntrinsic::MFMA_I32_32x32x4x2B_I8,
   };
-  static const WgpDetails cdna2Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      std::size(cdna2MMAOps),
-                                      cdna2MMAOps,
-                                      0,
-                                      nullptr,
-                                      {64, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/32};
+  static const WgpDetails cdna2Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(cdna2MMAOps),
+      cdna2MMAOps,
+      0,
+      nullptr,
+      {64, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/256 * 32,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::CDNA2};
   return &cdna2Wgp;
 }
 
@@ -437,8 +439,7 @@ const WgpDetails *getCDNA1WgpDetails() {
                                       /*maxLoadInstructionBits=*/128,
                                       /*simdsPerWgp=*/4,
                                       /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/32};
+                                      /*dmaSizes=*/std::nullopt};
   return &cdna1Wgp;
 }
 
@@ -454,24 +455,25 @@ const WgpDetails *getRDNA4WgpDetails() {
       MMAIntrinsic::WMMAR4_F32_16x16x16_F8E4M3FN_F8E5M2,
       MMAIntrinsic::WMMAR4_I32_16x16x16_I8,
   };
-  static const WgpDetails rdna4Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      std::size(rdna4MMAOps),
-                                      rdna4MMAOps,
-                                      0,
-                                      nullptr,
-                                      {32, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/64};
+  static const WgpDetails rdna4Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(rdna4MMAOps),
+      rdna4MMAOps,
+      0,
+      nullptr,
+      {32, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/256 * 32,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::RDNA4};
   return &rdna4Wgp;
 }
 
@@ -484,24 +486,25 @@ const WgpDetails *getRDNA3WgpDetails() {
       MMAIntrinsic::WMMAR3_I32_16x16x16_I8,
 
   };
-  static const WgpDetails rdna3Wgp = {allComputeBits,
-                                      allStorageBits,
-                                      allSubgroupOps,
-                                      allDotProductOps,
-                                      std::size(rdna3MMAOps),
-                                      rdna3MMAOps,
-                                      0,
-                                      nullptr,
-                                      {32, 64},
-                                      {1024, 1024, 1024},
-                                      1024,
-                                      64 * 1024,
-                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                      /*maxLoadInstructionBits=*/128,
-                                      /*simdsPerWgp=*/4,
-                                      /*vgprSpaceBits=*/256 * 32,
-                                      /*dmaSizes=*/std::nullopt,
-                                      /*workgroupMemoryBankCount=*/64};
+  static const WgpDetails rdna3Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      allDotProductOps,
+      std::size(rdna3MMAOps),
+      rdna3MMAOps,
+      0,
+      nullptr,
+      {32, 64},
+      {1024, 1024, 1024},
+      1024,
+      64 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      /*vgprSpaceBits=*/256 * 32,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::RDNA3};
   return &rdna3Wgp;
 }
 
@@ -570,25 +573,26 @@ const WgpDetails *getGfx1250WgpDetails() {
       MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2,
   };
 
-  static const WgpDetails gfx1250Wgp = {allComputeBits,
-                                        allStorageBits,
-                                        allSubgroupOps,
-                                        DotProductOps::None,
-                                        /*mmaCount=*/std::size(gfx1250MMAOps),
-                                        /*mmaOps=*/gfx1250MMAOps,
-                                        /*scaledMmaCount=*/0,
-                                        /*scaledMmaOps=*/nullptr,
-                                        {32, 32},
-                                        {1024, 1024, 1024},
-                                        1024,
-                                        320 * 1024,
-                                        {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                        /*maxLoadInstructionBits=*/128,
-                                        /*simdsPerWgp=*/4,
-                                        // 4 banks of 256 32-bit registers.
-                                        /*vgprSpaceBits=*/256 * 4 * 32,
-                                        /*dmaSizes=*/std::nullopt,
-                                        /*workgroupMemoryBankCount=*/64};
+  static const WgpDetails gfx1250Wgp = {
+      allComputeBits,
+      allStorageBits,
+      allSubgroupOps,
+      DotProductOps::None,
+      /*mmaCount=*/std::size(gfx1250MMAOps),
+      /*mmaOps=*/gfx1250MMAOps,
+      /*scaledMmaCount=*/0,
+      /*scaledMmaOps=*/nullptr,
+      {32, 32},
+      {1024, 1024, 1024},
+      1024,
+      320 * 1024,
+      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+      /*maxLoadInstructionBits=*/128,
+      /*simdsPerWgp=*/4,
+      // 4 banks of 256 32-bit registers.
+      /*vgprSpaceBits=*/256 * 4 * 32,
+      /*dmaSizes=*/std::nullopt,
+      /*sharedMemModel=*/SharedMemoryModel::RDNA4};
   return &gfx1250Wgp;
 }
 
@@ -1362,6 +1366,80 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 //===----------------------------------------------------------------------===//
 // Query functions
 //===----------------------------------------------------------------------===//
+
+int64_t getSharedMemBankCount(SharedMemoryModel model) {
+  if (llvm::is_contained({SharedMemoryModel::CDNA4, SharedMemoryModel::RDNA3,
+                          SharedMemoryModel::RDNA4},
+                         model)) {
+    return 64;
+  }
+  return 32;
+}
+
+int64_t getSharedMemBankWidth(SharedMemoryModel model) {
+  assert(model != SharedMemoryModel::None && "no shared memory model");
+  return 4;
+}
+
+// TODO: Add a read/write access type parameter to distinguish read vs write
+// phase groups. Currently only read phases are modeled; write operations
+// (ds_write_*) may have different phase scheduling.
+std::optional<SmallVector<SmallVector<int64_t>>>
+getPhaseGroups(SharedMemoryModel model, int64_t readBytes, int64_t numThreads) {
+  if (model != SharedMemoryModel::CDNA4) {
+    return std::nullopt;
+  }
+
+  SmallVector<SmallVector<int64_t>> phases;
+  int64_t bankWidth = getSharedMemBankWidth(model);
+  int64_t banksPerAccess = std::max<int64_t>(1, readBytes / bankWidth);
+  int64_t threadsPerPhase = numThreads / banksPerAccess;
+  if (threadsPerPhase == 0) {
+    threadsPerPhase = numThreads;
+  }
+
+  auto buildContiguous = [&]() {
+    int64_t numPhases = numThreads / threadsPerPhase;
+    phases.resize(numPhases);
+    for (int64_t t = 0; t < numThreads; ++t) {
+      phases[t / threadsPerPhase].push_back(t);
+    }
+  };
+
+  // Bail out if the thread count is not evenly divisible -- the contiguous
+  // phase grouping would be ill-defined.
+  if (numThreads % threadsPerPhase != 0) {
+    return std::nullopt;
+  }
+
+  if (readBytes <= 8) {
+    // ds_read_b32/b64: contiguous phase scheduling on CDNA4.
+    buildContiguous();
+    return phases;
+  }
+
+  if (readBytes <= 16) {
+    // ds_read_b128 on CDNA4: 4 phases of 16 threads, non-contiguous.
+    // Phase assignment determined from internal LDS design spec. See also:
+    // https://rocm.blogs.amd.com/software-tools-optimization/lds-bank-conflict/README.html
+    static constexpr int64_t kCDNA4WavefrontSize = 64;
+    if (numThreads != kCDNA4WavefrontSize) {
+      return std::nullopt;
+    }
+    static const int64_t cdna4B128Phases[kCDNA4WavefrontSize] = {
+        0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0,
+        0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3,
+        1, 1, 1, 1, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3};
+    int64_t numPhases = 4;
+    phases.resize(numPhases);
+    for (int64_t t = 0; t < kCDNA4WavefrontSize; ++t) {
+      phases[cdna4B128Phases[t]].push_back(t);
+    }
+    return phases;
+  }
+
+  return std::nullopt;
+}
 
 std::optional<L1CacheInfo> getL1CacheInfo(TargetAttr target) {
   // TODO(kuhar): Add L1 cache query for other HIP targets.
