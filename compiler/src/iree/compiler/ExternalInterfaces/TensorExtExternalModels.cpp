@@ -73,7 +73,8 @@ struct TensorLikeTypeExternalModel
       llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
     auto dispatchTensorType = cast<IREE::TensorExt::DispatchTensorType>(type);
     auto tensorType = cast<TensorType>(dispatchTensorType.asRankedTensorType());
-    auto memSpace = options.defaultMemorySpaceFn(tensorType);
+    auto memSpace = options.defaultMemorySpaceFn(
+        cast<bufferization::TensorLikeType>(tensorType));
     if (!memSpace.has_value()) {
       return emitError() << "could not infer memory space";
     }

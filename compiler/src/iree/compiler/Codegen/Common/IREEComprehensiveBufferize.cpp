@@ -153,16 +153,19 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
   // This type converter converts tensor types to memref types when no exact
   // memref type can be inferred from the context.
-  options.unknownTypeConverterFn = [](TensorType tensorType,
-                                      Attribute memorySpace,
-                                      const BufferizationOptions &options) {
+  options.unknownTypeConverterFn =
+      [](bufferization::TensorLikeType tensorLikeType, Attribute memorySpace,
+         const BufferizationOptions &options) -> bufferization::BufferLikeType {
+    auto tensorType = cast<TensorType>(tensorLikeType);
     if (tensorType.hasStaticShape()) {
-      return bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
-                                                                  memorySpace);
+      return cast<bufferization::BufferLikeType>(
+          bufferization::getMemRefTypeWithStaticIdentityLayout(tensorType,
+                                                               memorySpace));
     }
     // Default case: Fully dynamic layout map for best compatibility.
-    return bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
-                                                              memorySpace);
+    return cast<bufferization::BufferLikeType>(
+        bufferization::getMemRefTypeWithFullyDynamicLayout(tensorType,
+                                                           memorySpace));
   };
 
   return options;
@@ -282,7 +285,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   // backend-specific optimizations (e.g., scalar reads on AMDGPU).
   if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(funcOp))) {
     options.defaultMemorySpaceFn =
-        [](TensorType t) -> std::optional<Attribute> {
+        [](bufferization::TensorLikeType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
                                         gpu::AddressSpace::Constant);
     };
@@ -311,7 +314,8 @@ void IREEBufferizeConstantsPass::runOnOperation() {
   // Place constants in the GPU constant address space to enable
   // backend-specific optimizations (e.g., scalar reads on AMDGPU).
   if (isGPUBackend(IREE::HAL::ExecutableTargetAttr::lookup(getOperation()))) {
-    opt.defaultMemorySpaceFn = [](TensorType t) -> std::optional<Attribute> {
+    opt.defaultMemorySpaceFn =
+        [](bufferization::TensorLikeType t) -> std::optional<Attribute> {
       return gpu::AddressSpaceAttr::get(t.getContext(),
                                         gpu::AddressSpace::Constant);
     };
