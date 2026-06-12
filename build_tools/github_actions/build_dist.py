@@ -43,6 +43,9 @@ a directory and:
 
 
 That is not a perfect approximation but is close.
+
+To build without the compiler (primarily for the purposes of deubgging this script),
+use --without-compiler
 """
 
 import json
@@ -118,7 +121,7 @@ def configure_bazel():
     subprocess.check_call([sys.executable, CONFIGURE_BAZEL_PY])
 
 
-def build_main_dist():
+def build_main_dist(build_compiler=True):
     """Builds the main distribution binaries.
 
     Additional packages that are installable as part of a full build and do not
@@ -143,7 +146,7 @@ def build_main_dist():
             # consistency in built packages, so hard-code it.
             "-DCMAKE_INSTALL_LIBDIR=lib",
             f"-DCMAKE_BUILD_TYPE=Release",
-            f"-DIREE_BUILD_COMPILER=ON",
+            f"-DIREE_BUILD_COMPILER=" + ("ON" if build_compiler else "OFF"),
             f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
             f"-DIREE_BUILD_SAMPLES=OFF",
         ],
@@ -226,7 +229,11 @@ def build_py_tf_compiler_tools_pkg():
 
 command = sys.argv[1]
 if command == "main-dist":
-    build_main_dist()
+    if len(sys.argv) > 2 and sys.argv[2] == '--without-compiler':
+        print(f"*** NOT building compiler ***")
+        build_main_dist(build_compiler=False)
+    else: 
+        build_main_dist()
 elif command == "py-tf-compiler-tools-pkg":
     build_py_tf_compiler_tools_pkg()
 else:
