@@ -71,14 +71,34 @@ namespace {
 // Utilities.
 //===----------------------------------------------------------------------===//
 
+/// Determines which tile dimensions should be scalable for a given target.
+/// For AArch64 SVE/SVE2 and RISC-V with the V extension (when not using static
+/// vectors), the N dimension is made scalable to take advantage of scalable
+/// vector registers.
+/// Returns failure if scalable tiling is not applicable for the target.
 static FailureOr<IREE::Codegen::ScalableTileFlags>
 getScalableTileFlags(linalg::ContractionDimensions cDims,
                      IREE::Encoding::EncodingAttr encoding,
                      DictionaryAttr config) {
   // TODO(egebeysel): I think this isScalable*Enabled flag should be temporary
   // and the temporary SME flag should probably come next to it.
-  if (!isAArch64(config) || !isScalableVectorizationEnabled()) {
-    LDBG() << "Pre-conditions to enable scalable tiling are not met!";
+  if (!isScalableVectorizationEnabled()) {
+    LDBG() << "Scalable vectorization is not enabled!";
+    return failure();
+  }
+
+  // Check if target supports scalable vectors.
+  bool isAArch64Target = isAArch64(config);
+  bool isRISCV64Target = isRISCV64(config);
+  bool hasAArch64ScalableSupport =
+      isAArch64Target &&
+      (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
+  // RISC-V V extension uses scalable vectors when not using static VLEN-based
+  // tile sizes. vscale = VLEN/64 by convention.
+  bool hasRISCVScalableSupport = isRISCV64Target && hasFeature(config, "+v");
+
+  if (!hasAArch64ScalableSupport && !hasRISCVScalableSupport) {
+    LDBG() << "Target does not support scalable vectors!";
     return failure();
   }
 
@@ -90,7 +110,9 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
                       : encoding.mapDimToOperandIndex(cDims.n[0]);
   std::optional<unsigned> kDim = encoding.mapDimToOperandIndex(cDims.k[0]);
   IREE::Codegen::ScalableTileFlags scalableTiles;
-  // TODO(egebeysel): Add logic for SME.
+
+  // M dimension: fixed for both AArch64 SVE and RISC-V V extension.
+  // TODO(egebeysel): Add logic for SME which may have scalable M.
   if (mDim.has_value()) {
     if (hasFeature(config, "+sme")) {
       LDBG() << "SME with data-tiling is not supported yet!";
@@ -98,10 +120,17 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
     }
     scalableTiles.push_back(false);
   }
+
+  // N dimension: scalable for both AArch64 SVE/SVE2 and RISC-V V extension
+  // (when using scalable vectors). This allows the tile to grow with the
+  // vector register length.
   if (nDim.has_value()) {
-    scalableTiles.push_back(hasFeature(config, "+sve") ||
-                            hasFeature(config, "+sve2"));
+    scalableTiles.push_back(hasAArch64ScalableSupport ||
+                            hasRISCVScalableSupport);
   }
+
+  // K dimension: fixed for both targets. The reduction dimension does not
+  // benefit from scalability in the same way as the N dimension.
   if (kDim.has_value()) {
     scalableTiles.push_back(false);
   }
@@ -219,7 +248,7 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
                            IREE::Encoding::MatmulNarrowDim narrowDim) {
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
-  if (narrowDim.isN()) {
+  if (narrowDim.isN() && !isScalableVectorizationEnabled()) {
     narrowDim.dim = IREE::Encoding::MatmulNarrowDim::Dim::M;
     TileMxNxK tile = chooseMatmulTile(enumeratedTiles, narrowDim);
     std::swap(tile.M, tile.N);
@@ -994,18 +1023,42 @@ size_t getRISCVVVlenFromCPUFeatures(DictionaryAttr config) {
 // Enumerate tile sizes to choose from on riscv64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
+//
+// When using static VLEN-based tile sizes
+// (iree-llvmcpu-enable-scalable-vectorization=false), the N dimension is
+// computed from the VLEN using zvl* features.
+//
+// When using scalable vectors
+// (iree-llvmcpu-enable-scalable-vectorization=true), we use smaller base tile
+// sizes that scale with vscale (VLEN/64). The base tile sizes assume VLEN=64
+// bits, meaning vscale=1 at the minimum. When scalable vectorization is
+// enabled, these base sizes will be multiplied by vscale at runtime to utilize
+// the full vector register width.
+//
+// Base tile calculation for VLEN=64:
+//   - f32 (32 bits): 64/32 = 2 elements per vscale
+//   - f16 (16 bits): 64/16 = 4 elements per vscale
 static SmallVector<TileMxNxK>
 enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
-
-  // Data-Tiling is only implemented for the V extension
+  // Data-tiling is only implemented for the V extension.
   if (!hasFeature(config, "+v")) {
     return {};
   }
-  size_t vlen = getRISCVVVlenFromCPUFeatures(config);
+
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
+
+  // RVV has both static and scalable vector modes.
+  // Static mode: use VLEN-based tile sizes from zvl* features. This targets
+  // existing ukernels. Scalable mode: use base VLEN=64 bits. The scalable flag
+  // will be added accordingly.
+  constexpr size_t kBaseVlen = 64;
+  size_t vlen = isScalableVectorizationEnabled()
+                    ? kBaseVlen
+                    : getRISCVVVlenFromCPUFeatures(config);
+
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     // VLEN-aware Tile size selection
     // One concern that needs to be addressed here is that
@@ -1020,6 +1073,9 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     };
   }
   if (lhs.isF16() && rhs.isF16()) {
+    // TODO(egebeysel): currently, the F16 path uses LMUL=2 and therefore 14
+    // registers for accumulators. This has to be investigated and the
+    // corresponding microkernels have to be adjusted if need be.
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfh")) {
       return {
@@ -1326,6 +1382,23 @@ private:
       return info;
     }
     auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
+    // In case of scalable vectors, we explicitly use the narrow M dimension
+    // config to use the M dimension as to calculate padding penalties while we
+    // choose the layout.
+    // TODO(egebeysel): reconcile this with the static case. Currently,
+    // downstream legalization patterns for non-trailing scalable vectors fail
+    // compilation if we have the transpose.
+    if (isScalableVectorizationEnabled() && narrowDim.isN() &&
+        !cDims.m.empty()) {
+      int64_t m = getEncodingContractionLikeSizes(encoding).value().M;
+      if (ShapedType::isDynamic(m)) {
+        narrowDim = {};
+      } else {
+        narrowDim = {IREE::Encoding::MatmulNarrowDim::Dim::M, m};
+      }
+    }
+    // Choose a final matmul TileMxNxK from the above-enumerated tile shapes,
+    // taking narrow dimensions into account.
     TileMxNxK chosenTileMxNxK =
         chooseMatmulTile(enumeratedTileMxNxK, narrowDim);
     FailureOr<MaterializeEncodingInfo> maybeEncodingInfo =
