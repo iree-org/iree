@@ -58,11 +58,27 @@ struct DetachElementwisePattern : OpInterfaceRewritePattern<linalg::LinalgOp> {
     }
     Value outputOperand = outputOperands.front()->get();
 
-    auto outsDefiningOp = outputOperand.getDefiningOp<linalg::LinalgOp>();
-    if (!outsDefiningOp || isa<linalg::FillOp>(outsDefiningOp.getOperation())) {
-      // If not linalg op, or is a fill op, do nothing.
+    // By definition constants are read-only however some conversion paths
+    // place the bias initial value as the init/output argument of DPS
+    // operations. This later gets converted to a writable buffer. Here we
+    // detach the constant from the init argument to avoid this.
+    // Splat constant are handled later by DetachSplatConstantOutsOperands.
+    Operation *outsDefiningOp = outputOperand.getDefiningOp();
+    bool isNonSplatConstant = false;
+    if (auto constOp = dyn_cast_or_null<arith::ConstantOp>(outsDefiningOp)) {
+      auto elementsAttr = dyn_cast<ElementsAttr>(constOp.getValue());
+      isNonSplatConstant = elementsAttr && !elementsAttr.isSplat();
+    }
+
+    // outsDefiningOp is null for a block-argument init. The outsLinalgOp guard
+    // keeps the isa<FillOp> check off a null Operation*
+    auto outsLinalgOp = dyn_cast_or_null<linalg::LinalgOp>(outsDefiningOp);
+    bool needsDetach = isNonSplatConstant ||
+                       (outsLinalgOp && !isa<linalg::FillOp>(outsDefiningOp));
+    if (!needsDetach) {
       return failure();
     }
+
     auto outputType = cast<RankedTensorType>(outputOperand.getType());
     if (!outputType.getElementType().isIntOrFloat()) {
       return failure();
@@ -124,6 +140,9 @@ struct DetachElementwisePattern : OpInterfaceRewritePattern<linalg::LinalgOp> {
 /// with allocations. Using `fill` will allow for fusing with the op just like
 /// fill -> linalg ops are fused. If not as a fallback they would be converted
 /// to a splat, but both without stack allocations.
+///
+/// Non-splat constant `outs` inits on contractions/convolutions are detached
+/// separately by DetachElementwisePattern (zero fill + trailing add).
 template <typename InterfaceOp>
 struct DetachSplatConstantOutsOperands
     : OpInterfaceRewritePattern<InterfaceOp> {

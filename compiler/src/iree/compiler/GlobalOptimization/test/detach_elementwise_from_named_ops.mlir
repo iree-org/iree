@@ -201,3 +201,55 @@ util.func public @generic_cst_output(%arg0 : tensor<114x114x64xf32>) -> tensor<5
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   util.return %[[GENERIC]]
+
+// -----
+
+/// A non-splat constant init on a contraction must be detached: a constant
+/// cannot be a writable dispatch output. It is replaced with a zero fill and
+/// the constant is added back via a trailing elementwise op (as a read-only
+/// input).
+util.func public @matmul_nonsplat_cst_output(%arg0: tensor<2x3xf32>, %arg1: tensor<3x2xf32>) -> tensor<2x2xf32> {
+  %cst = arith.constant dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
+  %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x3xf32>, tensor<3x2xf32>)
+                     outs(%cst : tensor<2x2xf32>) -> tensor<2x2xf32>
+  util.return %0 : tensor<2x2xf32>
+}
+// CHECK-LABEL: util.func public @matmul_nonsplat_cst_output
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x3xf32>, %[[ARG1:.+]]: tensor<3x2xf32>
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<{{.*}}1.000000e+00, 2.000000e+00{{.*}}> : tensor<2x2xf32>
+//   CHECK-DAG:   %[[F0:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<2x2xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[F0]] : f32) outs(%[[INIT]] : tensor<2x2xf32>)
+//       CHECK:   %[[MM:.+]] = linalg.matmul
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] : tensor<2x3xf32>, tensor<3x2xf32>)
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<2x2xf32>)
+//       CHECK:   %[[EW:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[MM]], %[[CST]] : tensor<2x2xf32>, tensor<2x2xf32>)
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<2x2xf32>)
+//       CHECK:     arith.addf
+//       CHECK:   util.return %[[EW]]
+
+// -----
+
+/// A non-splat constant init on a convolution is detached the same way as a
+/// contraction: zero fill + trailing add, with the constant as a read-only
+/// input.
+util.func public @conv_nonsplat_cst_output(%input: tensor<1x4x4x2xf32>, %filter: tensor<3x3x2x2xf32>) -> tensor<1x2x2x2xf32> {
+  %cst = arith.constant dense<[[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]]> : tensor<1x2x2x2xf32>
+  %0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+      ins(%input, %filter : tensor<1x4x4x2xf32>, tensor<3x3x2x2xf32>)
+      outs(%cst : tensor<1x2x2x2xf32>) -> tensor<1x2x2x2xf32>
+  util.return %0 : tensor<1x2x2x2xf32>
+}
+// CHECK-LABEL: util.func public @conv_nonsplat_cst_output
+//   CHECK-DAG:   %[[CST:.+]] = arith.constant dense<{{.*}}> : tensor<1x2x2x2xf32>
+//   CHECK-DAG:   %[[F0:.+]] = arith.constant 0.000000e+00 : f32
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<1x2x2x2xf32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[F0]] : f32) outs(%[[INIT]] : tensor<1x2x2x2xf32>)
+//       CHECK:   %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<1x2x2x2xf32>)
+//       CHECK:   %[[EW:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[CONV]], %[[CST]] : tensor<1x2x2x2xf32>, tensor<1x2x2x2xf32>)
+//  CHECK-SAME:       outs(%[[FILL]] : tensor<1x2x2x2xf32>)
+//       CHECK:     arith.addf
+//       CHECK:   util.return %[[EW]]
