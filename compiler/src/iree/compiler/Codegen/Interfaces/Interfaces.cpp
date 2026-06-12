@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
+#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Dialect/GPU/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
 #include "iree/compiler/Codegen/Dialect/Map/ExternalInterfaces/Interfaces.h"
@@ -15,14 +16,8 @@
 #include "iree/compiler/Codegen/Interfaces/HoistableRegionOpInterface.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
-#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
-// TODO: Remove this dependency once the transform dialect extensions
-// have a better registration mechanism.
-#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
+#include "iree/compiler/Codegen/Interfaces/VectorizableOpInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
@@ -33,6 +28,7 @@
 #include "mlir/Dialect/GPU/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/GPU/Transforms/IndexedAccessOpInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
@@ -50,6 +46,7 @@
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/Dialect/Vector/Transforms/IndexedAccessOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/Transforms/SubsetOpInterfaceImpl.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -90,11 +87,8 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   registerPCFExternalInterfaces(registry);
   registerBufferizationInterfaces(registry);
   registerTensorMaskingOpInterface(registry);
-  // TODO: Remove this dependency once the transform dialect extensions
-  // have a better registration mechanism.
   // TODO: when warranted, move to its own file.
-  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
-                         transform_ext::StructuredTransformOpsExtension>();
+  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension>();
   registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
     linalg::GenericOp::attachInterface<LinalgGenericHoistableRegionModel>(*ctx);
   });

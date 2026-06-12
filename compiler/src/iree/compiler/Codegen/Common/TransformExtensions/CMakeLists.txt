@@ -31,8 +31,6 @@ iree_cc_library(
     "CommonExtensionsOps.cpp.inc"
   DEPS
     ::CommonExtensionsOpGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils

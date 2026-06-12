@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
@@ -97,8 +96,7 @@ void registerTransformDialectTranslationDependentDialects(
   vector::registerBufferizableOpInterfaceExternalModels(registry);
 
   registry.addExtensions<
-      mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension,
-      transform_ext::StructuredTransformOpsExtension>();
+      mlir::iree_compiler::IREE::LinalgExt::LinalgExtTransformOpsExtension>();
   iree_compiler::registerTransformDialectCommonExtension(registry);
   iree_compiler::registerTransformDialectLLVMCPUExtension(registry);
   iree_compiler::registerTransformDialectLLVMGPUExtension(registry);

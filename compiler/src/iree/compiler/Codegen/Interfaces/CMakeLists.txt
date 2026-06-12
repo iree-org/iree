@@ -25,7 +25,6 @@ iree_cc_library(
     ::TensorMaskingOpInterface
     ::UKernelOpInterface
     ::VectorizableOpInterface
-    IREELinalgTransformDialect
     MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRAffineTransformOps

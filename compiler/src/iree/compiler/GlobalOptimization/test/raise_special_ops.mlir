@@ -168,6 +168,158 @@ util.func public @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x
 
 // -----
 
+// The stabilizing max may use arith.maxnumf (NaN-ignoring) instead of
+// arith.maximumf -- this is the form linalg.softmax itself decomposes to.
+// CHECK-LABEL: @softmax_maxnumf
+//  CHECK-SAME: %[[ARG:.+]]: tensor<2x4xf32>
+//       CHECK:   %[[S:.+]] = linalg.softmax dimension(1) ins(%[[ARG]] : tensor<2x4xf32>)
+//       CHECK:   util.return %[[S]]
+util.func public @softmax_maxnumf(%src : tensor<2x4xf32>) -> (tensor<2x4xf32>) {
+  %cst0 = arith.constant 0.000000e+00 : f32
+  %cstlow = arith.constant -3.40282347E+38 : f32
+  %e1 = tensor.empty() : tensor<2xf32>
+  %e2 = tensor.empty() : tensor<2x4xf32>
+  %fillmax = linalg.fill ins(%cstlow : f32) outs(%e1 : tensor<2xf32>) -> tensor<2xf32>
+  %max = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%src : tensor<2x4xf32>) outs(%fillmax : tensor<2xf32>) {
+  ^bb0(%a: f32, %b: f32):
+    %m = arith.maxnumf %a, %b : f32
+    linalg.yield %m : f32
+  } -> tensor<2xf32>
+  %sub = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%src, %max : tensor<2x4xf32>, tensor<2xf32>) outs(%e2 : tensor<2x4xf32>) {
+  ^bb0(%a: f32, %b: f32, %c: f32):
+    %s = arith.subf %a, %b : f32
+    linalg.yield %s : f32
+  } -> tensor<2x4xf32>
+  %exp = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%sub : tensor<2x4xf32>) outs(%e2 : tensor<2x4xf32>) {
+  ^bb0(%a: f32, %b: f32):
+    %e = math.exp %a : f32
+    linalg.yield %e : f32
+  } -> tensor<2x4xf32>
+  %fillsum = linalg.fill ins(%cst0 : f32) outs(%e1 : tensor<2xf32>) -> tensor<2xf32>
+  %sum = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%exp : tensor<2x4xf32>) outs(%fillsum : tensor<2xf32>) {
+  ^bb0(%a: f32, %b: f32):
+    %s = arith.addf %a, %b : f32
+    linalg.yield %s : f32
+  } -> tensor<2xf32>
+  %div = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%exp, %sum : tensor<2x4xf32>, tensor<2xf32>) outs(%e2 : tensor<2x4xf32>) {
+  ^bb0(%a: f32, %b: f32, %c: f32):
+    %d = arith.divf %a, %b : f32
+    linalg.yield %d : f32
+  } -> tensor<2x4xf32>
+  util.return %div : tensor<2x4xf32>
+}
+
+// -----
+
+// Negative test: the max reduction is initialized with 0.0 instead of -inf, so
+// this is not a numerically-stabilized softmax and must not be raised.
+// CHECK-LABEL: @not_softmax_wrong_max_init
+//   CHECK-NOT:   linalg.softmax
+util.func public @not_softmax_wrong_max_init(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
+  %cst = arith.constant 1.000000e+00 : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c_0_index = arith.constant 0 : index
+  %c_1_index = arith.constant 1 : index
+  %c_2_index = arith.constant 2 : index
+  %dim_0 = tensor.dim %src, %c_0_index : tensor<?x?x?xf32>
+  %dim_1 = tensor.dim %src, %c_1_index : tensor<?x?x?xf32>
+  %dim_2 = tensor.dim %src, %c_2_index : tensor<?x?x?xf32>
+  %1 = tensor.empty(%dim_0, %dim_1) : tensor<?x?xf32>
+  // Wrong init: 0.0 rather than -inf / lowest.
+  %2 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%src : tensor<?x?x?xf32>) outs(%2 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.maximumf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %4 = tensor.empty(%dim_0, %dim_1, %dim_2) : tensor<?x?x?xf32>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%src, %3 : tensor<?x?x?xf32>, tensor<?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %11 = arith.subf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5 : tensor<?x?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = math.exp %arg0 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  %7 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%6 : tensor<?x?x?xf32>) outs(%7 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.addf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8 : tensor<?x?xf32>) outs(%1 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.divf %cst, %arg0 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%6, %9 : tensor<?x?x?xf32>, tensor<?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %11 = arith.mulf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  util.return %10 : tensor<?x?x?xf32>
+}
+
+// -----
+
+// Negative test: the max reduction reduces %src but the subtraction reads a
+// different tensor %other, so the captured source is inconsistent and the
+// pattern must not be raised.
+// CHECK-LABEL: @not_softmax_mismatched_source
+//   CHECK-NOT:   linalg.softmax
+util.func public @not_softmax_mismatched_source(%src : tensor<?x?x?xf32>, %other : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
+  %cst = arith.constant 1.000000e+00 : f32
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %cst_1 = arith.constant -3.40282347E+38 : f32
+  %c_0_index = arith.constant 0 : index
+  %c_1_index = arith.constant 1 : index
+  %c_2_index = arith.constant 2 : index
+  %dim_0 = tensor.dim %src, %c_0_index : tensor<?x?x?xf32>
+  %dim_1 = tensor.dim %src, %c_1_index : tensor<?x?x?xf32>
+  %dim_2 = tensor.dim %src, %c_2_index : tensor<?x?x?xf32>
+  %1 = tensor.empty(%dim_0, %dim_1) : tensor<?x?xf32>
+  %2 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  // Reduces %src ...
+  %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%src : tensor<?x?x?xf32>) outs(%2 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.maximumf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %4 = tensor.empty(%dim_0, %dim_1, %dim_2) : tensor<?x?x?xf32>
+  // ... but subtracts from %other.
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%other, %3 : tensor<?x?x?xf32>, tensor<?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %11 = arith.subf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%5 : tensor<?x?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = math.exp %arg0 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  %7 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"]} ins(%6 : tensor<?x?x?xf32>) outs(%7 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.addf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%8 : tensor<?x?xf32>) outs(%1 : tensor<?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32):
+    %11 = arith.divf %cst, %arg0 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?xf32>
+  %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%6, %9 : tensor<?x?x?xf32>, tensor<?x?xf32>) outs(%4 : tensor<?x?x?xf32>) {
+  ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+    %11 = arith.mulf %arg0, %arg1 : f32
+    linalg.yield %11 : f32
+  } -> tensor<?x?x?xf32>
+  util.return %10 : tensor<?x?x?xf32>
+}
+
+// -----
+
 util.func public @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
     %arg1 : tensor<40x20xf32>) -> tensor<10x40xf32> {
   %0 = tensor.empty() : tensor<20x40xf32>
