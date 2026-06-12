@@ -10,12 +10,16 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/MMAUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -1099,15 +1103,139 @@ bool InnerTiledSemanticsAttr::getOpaque() const { return false; }
 // UKernelProviderAttr
 //===----------------------------------------------------------------------===//
 
+constexpr StringLiteral kHalExecutableObjectsAttrName =
+    "hal.executable.objects";
+
+// Walks parents from `op` to return the nearest `hal.executable.objects`
+// array attribute. If a parent `hal.executable.variant` is reached, its
+// `objects` attribute is returned. Adapted from
+// `ExecutableTargetAttr::lookup`. This is how user-supplied bitcode reaches
+// the ukernel provider: a source MLIR program can attach
+// `hal.executable.objects` at any ancestor of the op (commonly the
+// module, the executable variant, or the op itself).
+static ArrayAttr lookUpExecutableObjects(Operation *op) {
+  MLIRContext *context = op->getContext();
+  auto attrId = StringAttr::get(context, kHalExecutableObjectsAttrName);
+  while (op) {
+    if (auto variantOp = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
+      if (std::optional<ArrayAttr> objects = variantOp.getObjects()) {
+        return *objects;
+      }
+    }
+    if (auto attr = op->getAttrOfType<ArrayAttr>(attrId)) {
+      return attr;
+    }
+    op = op->getParentOp();
+  }
+  return {};
+}
+
+// Returns true if `path` matches `<ukernelName>.<features>.bc`, the
+// filename convention used by the bitcode build rules under
+// `compiler/plugins/target/LLVMCPU/builtins/ukernel/`. The `<features>`
+// part is opaque to the lookup; this CPU framework currently picks
+// whichever built-in (or user-supplied) variant exists for the given
+// algorithm name. Multi-feature-variant disambiguation will arrive with
+// the SelectUKernels pass.
+static bool isMatchingUKernelFile(StringRef path, StringRef ukernelName) {
+  if (!path.ends_with(".bc")) {
+    return false;
+  }
+  if (!path.starts_with(ukernelName)) {
+    return false;
+  }
+  // Either exact name (`<name>.bc`) or features-suffixed
+  // (`<name>.<features>.bc`).
+  size_t after = ukernelName.size();
+  return after == path.size() - 3 ||
+         (after < path.size() - 3 && path[after] == '.');
+}
+
+// Returns an `ExecutableObjectAttr` carrying the bitcode for `ukernelName`.
+// First searches `sourceExecutableObjects` (the user-supplied
+// `hal.executable.objects` ancestor — the bring-your-own-ukernel path),
+// then falls back to the global `EmbeddedDataDirectory` (populated at
+// LLVMCPU plugin init from the embedded TOC). Returns null if no match.
+static IREE::HAL::ExecutableObjectAttr
+getUKernelBitcode(MLIRContext *context, ArrayAttr sourceExecutableObjects,
+                  StringRef ukernelName) {
+  if (sourceExecutableObjects) {
+    for (Attribute a : sourceExecutableObjects) {
+      auto object = dyn_cast<IREE::HAL::ExecutableObjectAttr>(a);
+      if (object && isMatchingUKernelFile(object.getPath(), ukernelName)) {
+        return object;
+      }
+    }
+  }
+  std::optional<StringRef> matchedFilename;
+  std::optional<StringRef> matchedBytes;
+  EmbeddedDataDirectory::withGlobal([&](EmbeddedDataDirectory &dir) {
+    for (auto &entry : dir.getMap()) {
+      if (isMatchingUKernelFile(entry.getKey(), ukernelName)) {
+        matchedFilename = entry.getKey();
+        matchedBytes = entry.getValue();
+        return;
+      }
+    }
+  });
+  if (!matchedFilename) {
+    return {};
+  }
+  AsmResourceBlob blob = HeapAsmResourceBlob::allocateAndCopyInferAlign(
+      ArrayRef<char>(matchedBytes->data(), matchedBytes->size()));
+  auto bitcodeDenseAttr = DenseI8ResourceElementsAttr::get(
+      VectorType::get({static_cast<int64_t>(matchedBytes->size())},
+                      IntegerType::get(context, 8)),
+      *matchedFilename, std::move(blob));
+  return IREE::HAL::ExecutableObjectAttr::get(
+      context, StringAttr::get(context, *matchedFilename),
+      cast<IREE::Util::SerializableAttrInterface>(bitcodeDenseAttr));
+}
+
 std::optional<LogicalResult> UKernelProviderAttr::createAndReplaceWithUkernelOp(
     RewriterBase &rewriter, StringRef name, DictionaryAttr targetConfiguration,
     Operation *contextualOp, ArrayRef<Value> inputs, ArrayRef<Value> outputs,
     SmallVectorImpl<Value> &otherOperands) const {
-  // Fall through to the default UKernelGenericOp construction in
-  // LowerBitcodeUKernelsPass. Specialized handling of `inner_tiled` ops
-  // (threading `intrinsics_{m,n,k}` and the outer K count as scalar operands)
-  // will be added in a follow-up commit alongside the SelectUKernels pass that
-  // sets the `iree_codegen.ukernel` descriptor and attaches the bitcode.
+  // Resolve the bitcode for this ukernel: user-supplied
+  // `hal.executable.objects` first (BYO and BYO-override paths), falling
+  // back to the built-in bitcode embedded into `iree-compile` at LLVMCPU
+  // plugin init. If found, attach it as `hal.executable.objects` on the
+  // source op so the default `LowerBitcodeUKernelsPass` rewrite preserves
+  // it on the resulting `ukernel.generic`. If the source op already
+  // carries a matching object, this is a no-op (the BYO case).
+  //
+  // We return `std::nullopt` to let the pass run its default
+  // `UKernelGenericOp` construction. Specialized `inner_tiled` handling
+  // (threading `intrinsics_{m,n,k}` and the outer K count as scalar
+  // operands, and computing the ACC inner stride) lands in a follow-up
+  // alongside SelectUKernels.
+  MLIRContext *context = rewriter.getContext();
+  ArrayAttr sourceExecutableObjects = lookUpExecutableObjects(contextualOp);
+  IREE::HAL::ExecutableObjectAttr bitcodeObject =
+      getUKernelBitcode(context, sourceExecutableObjects, name);
+  if (bitcodeObject) {
+    auto attrId = StringAttr::get(context, kHalExecutableObjectsAttrName);
+    ArrayAttr existing = contextualOp->getAttrOfType<ArrayAttr>(attrId);
+    bool alreadyOnOp = false;
+    if (existing) {
+      for (Attribute a : existing) {
+        if (a == bitcodeObject) {
+          alreadyOnOp = true;
+          break;
+        }
+      }
+    }
+    if (!alreadyOnOp) {
+      SmallVector<Attribute> objects;
+      if (existing) {
+        objects.append(existing.begin(), existing.end());
+      }
+      objects.push_back(bitcodeObject);
+      rewriter.modifyOpInPlace(contextualOp, [&] {
+        contextualOp->setAttr(attrId, ArrayAttr::get(context, objects));
+      });
+    }
+  }
   return std::nullopt;
 }
 

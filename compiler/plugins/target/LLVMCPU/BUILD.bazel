@@ -32,6 +32,7 @@ iree_compiler_cc_library(
         ":LinkerTool",
         ":StaticLibraryGenerator",
         "//compiler/plugins/target/LLVMCPU/builtins:Builtins",
+        "//compiler/plugins/target/LLVMCPU/builtins/ukernel:iree_uk_cpu_bitcode",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect/CPU/IR:IREECPUDialect",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",

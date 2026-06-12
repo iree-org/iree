@@ -14,6 +14,7 @@
 #include "compiler/plugins/target/LLVMCPU/builtins/Device.h"
 #include "compiler/plugins/target/LLVMCPU/builtins/Musl.h"
 #include "compiler/plugins/target/LLVMCPU/builtins/UKernel.h"
+#include "compiler/plugins/target/LLVMCPU/builtins/ukernel/iree_uk_cpu_bitcode.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
@@ -28,6 +29,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
+#include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -910,6 +912,23 @@ struct LLVMCPUSession final
   CPUCodegenOptions codegenOptions;
 };
 
+// Iterates over the embedded LLVMCPU C-ukernel bitcode TOC and inserts each
+// entry into the global `EmbeddedDataDirectory`. The CPU `UKernelProvider`
+// looks files up there by filename (after first checking any user-supplied
+// `hal.executable.objects` above the op), so this is what makes built-in
+// ukernels available to `iree-compile` for ops carrying a
+// `iree_codegen.ukernel` descriptor that does not come with its own bitcode.
+// Mirrors `addAMDGPUUkernelBitcodeToGlobalEmbeddedDataDirectory` in
+// `compiler/plugins/target/ROCM/ROCMTarget.cpp`.
+static void addLLVMCPUUkernelBitcodeToGlobalEmbeddedDataDirectory() {
+  EmbeddedDataDirectory::withGlobal([](EmbeddedDataDirectory &dir) {
+    const iree_file_toc_t *toc = iree_uk_cpu_bitcode_create();
+    for (size_t i = 0; i < iree_uk_cpu_bitcode_size(); ++i) {
+      dir.addFile(toc[i].name, llvm::StringRef{toc[i].data, toc[i].size});
+    }
+  });
+}
+
 } // namespace
 } // namespace mlir::iree_compiler::IREE::HAL
 
@@ -920,5 +939,7 @@ extern "C" bool iree_register_compiler_plugin_hal_target_llvm_cpu(
     mlir::iree_compiler::PluginRegistrar *registrar) {
   registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::LLVMCPUSession>(
       "hal_target_llvm_cpu");
+  mlir::iree_compiler::IREE::HAL::
+      addLLVMCPUUkernelBitcodeToGlobalEmbeddedDataDirectory();
   return true;
 }
