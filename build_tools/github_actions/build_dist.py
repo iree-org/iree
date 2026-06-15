@@ -229,10 +229,10 @@ def build_py_tf_compiler_tools_pkg():
 
 command = sys.argv[1]
 if command == "main-dist":
-    if len(sys.argv) > 2 and sys.argv[2] == '--without-compiler':
+    if len(sys.argv) > 2 and sys.argv[2] == "--without-compiler":
         print(f"*** NOT building compiler ***")
         build_main_dist(build_compiler=False)
-    else: 
+    else:
         build_main_dist()
 elif command == "py-tf-compiler-tools-pkg":
     build_py_tf_compiler_tools_pkg()
