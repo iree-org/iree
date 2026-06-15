@@ -54,28 +54,28 @@ iree_cc_library(
     base
   HDRS
     "api.h"
-  SRCS
-    "allocator.c"
     "allocator.h"
     "assert.h"
-    "bitfield.c"
     "bitfield.h"
-    "bitmap.c"
     "bitmap.h"
-    "printf.c"
     "printf.h"
-    "status.c"
     "status.h"
     "status_cc.h"
     "status_payload.h"
+    "string_builder.h"
+    "string_view.h"
+    "wait_source.h"
+  SRCS
+    "allocator.c"
+    "bitfield.c"
+    "bitmap.c"
+    "printf.c"
+    "status.c"
     "status_stack_trace.c"
     "string_builder.c"
-    "string_builder.h"
     "string_view.c"
-    "string_view.h"
     "time.c"
     "wait_source.c"
-    "wait_source.h"
     ${_IREE_ALLOCATOR_SYSTEM_SRCS}
   COPTS
     ${_IREE_ALLOCATOR_SYSTEM_COPTS}
