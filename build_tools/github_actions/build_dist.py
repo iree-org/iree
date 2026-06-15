@@ -44,7 +44,7 @@ a directory and:
 
 That is not a perfect approximation but is close.
 
-To build without the compiler (primarily for the purposes of deubgging this script),
+To build without the compiler (primarily for the purposes of debugging this script),
 use --without-compiler
 """
 
