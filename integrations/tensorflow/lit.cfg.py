@@ -17,7 +17,9 @@ import lit.formats
 
 config.name = "IREE TensorFlow Integrations"
 config.suffixes = [".mlir", ".txt"]
-config.test_format = lit.formats.ShTest(execute_external=True)
+config.test_format = lit.formats.ShTest(
+    execute_external=True, force_execute_external=True
+)
 
 # Use the most preferred temp directory.
 config.test_exec_root = (
