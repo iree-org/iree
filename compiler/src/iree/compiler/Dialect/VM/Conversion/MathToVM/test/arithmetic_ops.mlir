@@ -93,3 +93,14 @@ func.func @arithmetic_f32(%arg0: f32) -> f32 {
 
   return %20 : f32
 }
+
+// -----
+
+// CHECK-LABEL: @arithmetic_f32_i64
+func.func @arithmetic_f32_i64(%arg0: f32, %arg1: i64) -> f32 {
+
+  // CHECK: vm.fpowi.f32
+  %0 = math.fpowi %arg0, %arg1 : f32, i64
+
+  return %0 : f32
+}

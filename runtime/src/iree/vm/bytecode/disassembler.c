@@ -2144,6 +2144,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Log1pF32, "vm.log1p.f32");
     IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(Log2F32, "vm.log2.f32");
     IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(PowF32, "vm.pow.f32");
+    IREE_VM_ISA_EMIT_OP_EXT_F32_BINARY_F32(FPowI32, "vm.fpowi.f32");
     IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(RsqrtF32, "vm.rsqrt.f32");
     IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(SqrtF32, "vm.sqrt.f32");
     IREE_VM_ISA_EMIT_OP_EXT_F32_UNARY_F32(TanhF32, "vm.tanh.f32");
@@ -2533,6 +2534,7 @@ static iree_status_t iree_vm_bytecode_disassemble_op_impl(
     IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Log1pF64, "vm.log1p.f64");
     IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(Log2F64, "vm.log2.f64");
     IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(PowF64, "vm.pow.f64");
+    IREE_VM_ISA_EMIT_OP_EXT_F64_BINARY_F64(FPowI64, "vm.fpowi.f64");
     IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(RsqrtF64, "vm.rsqrt.f64");
     IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(SqrtF64, "vm.sqrt.f64");
     IREE_VM_ISA_EMIT_OP_EXT_F64_UNARY_F64(TanhF64, "vm.tanh.f64");
