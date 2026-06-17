@@ -180,6 +180,14 @@ public:
     configItems.emplace_back(
         b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
         IREE::CPU::CPUEncodingResolverAttr::get(context, {}));
+    // When at least one LLVM-bitcode ukernel category is enabled, install
+    // the CPU ukernel provider attribute so that the subsequent
+    // `LowerBitcodeUKernelsPass` can find and attach the matching
+    // bitcode.
+    if (!target.llvmUkernels.empty()) {
+      configItems.emplace_back(b.getStringAttr(kUKernelProviderName),
+                               IREE::CPU::UKernelProviderAttr::get(context));
+    }
 
     // Compute the format used at runtime to select the executable loader.
     std::string format;
