@@ -656,7 +656,7 @@ void LoopOp::build(mlir::OpBuilder &b, mlir::OperationState &result,
 }
 
 ValueRange LoopOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+  return successor.isOperation() ? getOperation()->getResults() : ValueRange();
 }
 
 void LoopOp::getSuccessorRegions(RegionBranchPoint point,
@@ -668,7 +668,7 @@ void LoopOp::getSuccessorRegions(RegionBranchPoint point,
   }
 
   // Otherwise, the region branches back to the parent operation.
-  regions.push_back(RegionSuccessor::parent());
+  regions.push_back(RegionSuccessor(getOperation()));
 }
 
 SmallVector<int64_t> LoopOp::getInitTiedResultIndices() {

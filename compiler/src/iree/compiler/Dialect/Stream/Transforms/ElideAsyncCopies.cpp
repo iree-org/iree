@@ -86,7 +86,7 @@ static bool canReachRegion(RegionBranchOpInterface op, Region *from,
     SmallVector<RegionSuccessor, 2> successors;
     op.getSuccessorRegions(*current, successors);
     for (auto &successor : successors) {
-      if (successor.isParent()) {
+      if (successor.isOperation()) {
         continue;
       }
       Region *target = successor.getSuccessor();

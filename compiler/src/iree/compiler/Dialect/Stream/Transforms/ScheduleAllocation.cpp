@@ -1176,7 +1176,7 @@ static IREE::Stream::AffinityAttr findLocalValueAffinity(Value value) {
       auto terminatorOp =
           cast<RegionBranchTerminatorOpInterface>(block.getTerminator());
       value = terminatorOp.getSuccessorOperands(
-          RegionSuccessor::parent())[resultIndex];
+          RegionSuccessor(regionOp.getOperation()))[resultIndex];
     } else if (auto tiedOp =
                    dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
       // If the producer is tied then try to get the operand.

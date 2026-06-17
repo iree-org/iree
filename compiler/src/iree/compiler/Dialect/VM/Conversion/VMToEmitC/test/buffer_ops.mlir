@@ -6,7 +6,7 @@ vm.module @my_module {
     // CHECK: %[[SIZE:.+]] = "emitc.constant"() <{value = 128 : i64}> : () -> i64
     // CHECK-DAG: %[[ALIGNMENT:.+]] = "emitc.constant"() <{value = 32 : i32}> : () -> i32
     // CHECK-DAG: %[[BUFFER_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"NULL">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
-    // CHECK-DAG: %[[BUFFER_PTR:.+]] = apply "&"(%[[BUFFER_LVAL]]) : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>) -> !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
+    // CHECK-DAG: %[[BUFFER_PTR:.+]] = address_of %[[BUFFER_LVAL]] : !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
     // CHECK-DAG: %[[STATE_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-DAG: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-DAG: %[[ALLOCATOR_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "allocator"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.opaque<"iree_allocator_t">>
@@ -35,13 +35,15 @@ vm.module @my_module {
     // CHECK-DAG: %[[ALIGNMENT:.+]] = "emitc.constant"() <{value = 64 : i32}> : () -> i32
 
     // CHECK: %[[BUFFER_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"NULL">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
-    // CHECK-DAG: %[[BUFFER_PTR:.+]] = apply "&"(%[[BUFFER_LVAL]]) : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>) -> !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
+    // CHECK-DAG: %[[BUFFER_PTR:.+]] = address_of %[[BUFFER_LVAL]] : !emitc.lvalue<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>
     // CHECK-DAG: %[[STATE_LVAL:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-DAG: assign %arg2 : !emitc.ptr<!emitc.opaque<"struct my_module_state_t">> to %[[STATE_LVAL]] : <!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>
     // CHECK-DAG: %[[ALLOCATOR_LVAL:.+]] = "emitc.member_of_ptr"(%[[STATE_LVAL]]) <{member = "allocator"}> : (!emitc.lvalue<!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>>) -> !emitc.lvalue<!emitc.opaque<"iree_allocator_t">>
     // CHECK-DAG: %[[ALLOCATOR:.+]] = load %[[ALLOCATOR_LVAL]] : <!emitc.opaque<"iree_allocator_t">>
     // CHECK-DAG: %[[BUFFER_ACCESS:.+]] = "emitc.constant"() <{value = #emitc.opaque<"IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST">}> : () -> !emitc.opaque<"iree_vm_buffer_access_t">
-    // CHECK-DAG: %[[BUFFER_REF2:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK-DAG: %[[BUFFER_REF2_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK-DAG: %[[BUFFER_REF2_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF2_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-DAG: %[[BUFFER_REF2:.+]] = load %[[BUFFER_REF2_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-DAG: %[[BUFFER_PTR2:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF2]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[STATUS:.+]] = call_opaque "iree_vm_buffer_clone"(%[[BUFFER_ACCESS]], %[[BUFFER_PTR2]], %[[C0]], %[[C32]], %[[ALIGNMENT]], %[[ALLOCATOR]], %[[BUFFER_PTR]]) : (!emitc.opaque<"iree_vm_buffer_access_t">, !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, i64, i32, !emitc.opaque<"iree_allocator_t">, !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>>) -> !emitc.opaque<"iree_status_t">
@@ -58,7 +60,9 @@ vm.module @my_module {
 // CHECK-LABEL: emitc.func private @my_module_buffer_length
 vm.module @my_module {
   vm.func @buffer_length(%buf : !vm.buffer) {
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[LENGTH:.+]] = call_opaque "iree_vm_buffer_length"(%[[BUFFER_PTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>) -> i64
@@ -76,14 +80,18 @@ vm.module @my_module {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C16:.+]] = "emitc.constant"() <{value = 16 : i64}> : () -> i64
 
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
-    // CHECK: %[[BUFFER_REF2:.+]] = apply "*"(%arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF2_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF2_LVAL:.+]] = subscript %arg4[%[[BUFFER_REF2_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF2:.+]] = load %[[BUFFER_REF2_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR2:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF2]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[RESULT:.+]] = "emitc.variable"() <{value = 0 : i32}> : () -> !emitc.lvalue<i32>
-    // CHECK-NEXT: %[[RESULT_PTR:.+]] = apply "&"(%[[RESULT]]) : (!emitc.lvalue<i32>) -> !emitc.ptr<i32>
+    // CHECK-NEXT: %[[RESULT_PTR:.+]] = address_of %[[RESULT]] : !emitc.lvalue<i32>
     // CHECK-NEXT: %[[STATUS:.+]] = call_opaque "vm_buffer_compare"(%[[BUFFER_PTR]], %[[C0]], %[[BUFFER_PTR2]], %[[C16]], %[[C16]], %[[RESULT_PTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, i64, !emitc.ptr<i32>) -> !emitc.opaque<"iree_status_t">
     %c0 = vm.const.i64 0
     %c16 = vm.const.i64 16
@@ -100,10 +108,14 @@ vm.module @my_module {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C16:.+]] = "emitc.constant"() <{value = 16 : i64}> : () -> i64
 
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
-    // CHECK: %[[BUFFER_REF2:.+]] = apply "*"(%arg4) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF2_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF2_LVAL:.+]] = subscript %arg4[%[[BUFFER_REF2_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF2:.+]] = load %[[BUFFER_REF2_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR2:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF2]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[STATUS:.+]] = call_opaque "iree_vm_buffer_copy_bytes"(%[[BUFFER_PTR]], %[[C0]], %[[BUFFER_PTR2]], %[[C16]], %[[C16]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, i64) -> !emitc.opaque<"iree_status_t">
@@ -123,7 +135,9 @@ vm.module @my_module {
     // CHECK: %[[C16:.+]] = "emitc.constant"() <{value = 16 : i64}> : () -> i64
     // CHECK: %[[C102:.+]] = "emitc.constant"() <{value = 102 : i32}> : () -> i32
 
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[STATUS:.+]] = call_opaque "vm_buffer_fill_i8"(%[[BUFFER_PTR]], %[[C0]], %[[C16]], %[[C102]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, i64, i32) -> !emitc.opaque<"iree_status_t">
@@ -162,11 +176,13 @@ vm.module @my_module {
   vm.func @buffer_load_i8s(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
 
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[RESULT:.+]] = "emitc.variable"() <{value = 0 : i32}> : () -> !emitc.lvalue<i32>
-    // CHECK-NEXT: %[[RESULT_PTR:.+]] = apply "&"(%[[RESULT]]) : (!emitc.lvalue<i32>) -> !emitc.ptr<i32>
+    // CHECK-NEXT: %[[RESULT_PTR:.+]] = address_of %[[RESULT]] : !emitc.lvalue<i32>
     // CHECK-NEXT: %[[STATUS:.+]] = call_opaque "vm_buffer_load_i8s"(%[[BUFFER_PTR]], %[[C0]], %[[RESULT_PTR]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, !emitc.ptr<i32>) -> !emitc.opaque<"iree_status_t">
 
     %c0 = vm.const.i64 0
@@ -215,7 +231,9 @@ vm.module @my_module {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C102:.+]] = "emitc.constant"() <{value = 102 : i32}> : () -> i32
 
-    // CHECK: %[[BUFFER_REF:.+]] = apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
+    // CHECK: %[[BUFFER_REF_IDX:.+]] = literal "0" : !emitc.opaque<"iree_host_size_t">
+    // CHECK: %[[BUFFER_REF_LVAL:.+]] = subscript %arg3[%[[BUFFER_REF_IDX]]] : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, !emitc.opaque<"iree_host_size_t">) -> !emitc.lvalue<!emitc.opaque<"iree_vm_ref_t">>
+    // CHECK-NEXT: %[[BUFFER_REF:.+]] = load %[[BUFFER_REF_LVAL]] : <!emitc.opaque<"iree_vm_ref_t">>
     // CHECK-NEXT: %[[BUFFER_PTR:.+]] = call_opaque "iree_vm_buffer_deref"(%[[BUFFER_REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>
 
     // CHECK: %[[STATUS:.+]] = call_opaque "vm_buffer_store_i8"(%[[BUFFER_PTR]], %[[C0]], %[[C102]]) : (!emitc.ptr<!emitc.opaque<"iree_vm_buffer_t">>, i64, i32) -> !emitc.opaque<"iree_status_t">

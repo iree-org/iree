@@ -623,7 +623,8 @@ TraversalResult Explorer::walkReturnOperands(Operation *parentOp,
   return walkReturnOps(parentOp, [&](Operation *returnOp) {
     if (auto terminatorOp =
             dyn_cast<RegionBranchTerminatorOpInterface>(returnOp)) {
-      return fn(terminatorOp.getSuccessorOperands(RegionSuccessor::parent()));
+      return fn(terminatorOp.getSuccessorOperands(
+          RegionSuccessor(terminatorOp->getParentOp())));
     } else {
       return fn(returnOp->getOperands());
     }
@@ -664,7 +665,7 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       for (auto &entrySuccessor : entrySuccessors) {
         // Skip parent-exit successors — they represent the region being
         // skipped entirely, so no values flow into the entry block.
-        if (entrySuccessor.isParent()) {
+        if (entrySuccessor.isOperation()) {
           continue;
         }
         if (fn(regionOp->getBlock(),
@@ -1014,7 +1015,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
       // the body entirely). The parent-exit path maps operands to op results,
       // but the body path already covers this connection statically
       // (init_arg → block_arg → yield → result).
-      if (entrySuccessor.isParent()) {
+      if (entrySuccessor.isOperation()) {
         continue;
       }
       auto successorInputs = regionOp.getSuccessorInputs(entrySuccessor);

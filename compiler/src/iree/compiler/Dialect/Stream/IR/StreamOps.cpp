@@ -3524,8 +3524,8 @@ AsyncExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
 }
 
 ValueRange AsyncExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? ValueRange(getResults())
-                              : ValueRange(getBodyRegion().getArguments());
+  return successor.isOperation() ? ValueRange(getResults())
+                                 : ValueRange(getBodyRegion().getArguments());
 }
 
 void AsyncExecuteOp::getSuccessorRegions(
@@ -3534,7 +3534,7 @@ void AsyncExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }
@@ -3686,8 +3686,8 @@ AsyncConcurrentOp::getEntrySuccessorOperands(RegionSuccessor successor) {
 }
 
 ValueRange AsyncConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? ValueRange(getResults())
-                              : ValueRange(getBodyRegion().getArguments());
+  return successor.isOperation() ? ValueRange(getResults())
+                                 : ValueRange(getBodyRegion().getArguments());
 }
 
 void AsyncConcurrentOp::getSuccessorRegions(
@@ -3696,7 +3696,7 @@ void AsyncConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }
@@ -4740,8 +4740,8 @@ CmdExecuteOp::getEntrySuccessorOperands(RegionSuccessor successor) {
 }
 
 ValueRange CmdExecuteOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? ValueRange()
-                              : ValueRange(getBodyRegion().getArguments());
+  return successor.isOperation() ? ValueRange()
+                                 : ValueRange(getBodyRegion().getArguments());
 }
 
 void CmdExecuteOp::getSuccessorRegions(
@@ -4750,7 +4750,7 @@ void CmdExecuteOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }
@@ -4817,7 +4817,7 @@ LogicalResult CmdSerialOp::verify() {
 }
 
 ValueRange CmdSerialOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+  return successor.isOperation() ? getOperation()->getResults() : ValueRange();
 }
 
 void CmdSerialOp::getSuccessorRegions(
@@ -4826,7 +4826,7 @@ void CmdSerialOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }
@@ -4847,7 +4847,7 @@ LogicalResult CmdConcurrentOp::verify() {
 }
 
 ValueRange CmdConcurrentOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+  return successor.isOperation() ? getOperation()->getResults() : ValueRange();
 }
 
 void CmdConcurrentOp::getSuccessorRegions(
@@ -4856,7 +4856,7 @@ void CmdConcurrentOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }
