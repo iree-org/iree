@@ -196,6 +196,9 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   if (ukernels.compare(DEFAULT_ENABLE_UKERNELS) != 0) {
     addString("ukernels", ukernels);
   }
+  if (llvmUkernels.compare(DEFAULT_ENABLE_LLVM_UKERNELS) != 0) {
+    addString("llvm_ukernels", llvmUkernels);
+  }
   if (linkUkernelBitcode != DEFAULT_LINK_UKERNEL_BITCODE) {
     addBool("link_ukernel_bitcode", linkUkernelBitcode);
   }
@@ -327,6 +330,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   }
 
   target.ukernels = getString("ukernels", target.ukernels, false);
+  target.llvmUkernels = getString("llvm_ukernels", target.llvmUkernels, false);
   target.linkUkernelBitcode =
       getBool("link_ukernel_bitcode", target.linkUkernelBitcode);
   target.enableInnerTiled =
@@ -602,6 +606,20 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Enables ukernels in the llvmcpu backend. May be "
                      "`default`, `none`, `all`, or a comma-separated list of "
                      "specific unprefixed ukernels to enable, e.g. `mmt4d`."));
+  // TODO(ukernels): this separate flag from `iree-llvmcpu-enable-ukernels`
+  // is a stopgap while the LLVM-bitcode C ukernels are the only new-style
+  // category. Once the MLIR-ukernel category exists, fold both into a single
+  // unified ukernel-enable scheme and remove this flag.
+  binder.opt<std::string>(
+      "iree-llvmcpu-enable-llvm-ukernels", enableLlvmUkernels,
+      llvm::cl::cat(category),
+      llvm::cl::desc(
+          "Enables the new-style LLVM-bitcode C ukernels under "
+          "compiler/plugins/target/LLVMCPU/builtins/ukernel/. "
+          "Comma-separated list of categories to enable, e.g. "
+          "`inner_tiled`. Empty (the default) means none. The companion "
+          "MLIR-ukernel category will share this flag in a future "
+          "extension."));
   binder.opt<bool>(
       "iree-llvmcpu-link-ukernel-bitcode", linkUKernelBitcode,
       llvm::cl::cat(category),
@@ -657,6 +675,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.vectorWidthInBytes = targetVectorWidthInBytes;
   target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
+  target.llvmUkernels = enableLlvmUkernels;
   target.linkUkernelBitcode = linkUKernelBitcode;
   target.enableInnerTiled = enableInnerTiled;
 
