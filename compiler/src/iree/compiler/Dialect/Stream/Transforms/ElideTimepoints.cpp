@@ -1489,7 +1489,7 @@ tryEliminateAwaitBeforeRegionBranchYield(IREE::Stream::TimepointAwaitOp awaitOp,
           for (auto successor : successors) {
             // Only handle yields to parent (region -> parent op results).
             // Yields to other regions would require different analysis.
-            if (!successor.isParent()) {
+            if (!successor.isOperation()) {
               continue;
             }
 

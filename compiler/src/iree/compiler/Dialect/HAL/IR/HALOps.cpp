@@ -1023,7 +1023,7 @@ void DeviceMemoizeOp::build(OpBuilder &builder, OperationState &state,
 }
 
 ValueRange DeviceMemoizeOp::getSuccessorInputs(RegionSuccessor successor) {
-  return successor.isParent() ? getOperation()->getResults() : ValueRange();
+  return successor.isOperation() ? getOperation()->getResults() : ValueRange();
 }
 
 void DeviceMemoizeOp::getSuccessorRegions(
@@ -1032,7 +1032,7 @@ void DeviceMemoizeOp::getSuccessorRegions(
   // return the correct RegionSuccessor purely based on the index being None or
   // 0.
   if (!point.isParent()) {
-    regions.push_back(RegionSuccessor::parent());
+    regions.push_back(RegionSuccessor(getOperation()));
   } else {
     regions.push_back(RegionSuccessor(&getBody()));
   }

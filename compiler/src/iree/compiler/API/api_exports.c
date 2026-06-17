@@ -711,6 +711,7 @@ extern void mlirLinalgGetIndexingMapsAttribute();
 extern void mlirLinalgInferContractionDimensions();
 extern void mlirLinalgInferContractionDimensionsFromMaps();
 extern void mlirLinalgInferConvolutionDimensions();
+extern void mlirLinalgInferConvolutionDimensionsFromMaps();
 extern void mlirLinalgIsAContractionOp();
 extern void mlirLinalgIsAConvolutionOp();
 extern void mlirLlvmRawFdOStreamCreate();
@@ -1887,6 +1888,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirLinalgInferContractionDimensions;
   x += (uintptr_t)&mlirLinalgInferContractionDimensionsFromMaps;
   x += (uintptr_t)&mlirLinalgInferConvolutionDimensions;
+  x += (uintptr_t)&mlirLinalgInferConvolutionDimensionsFromMaps;
   x += (uintptr_t)&mlirLinalgIsAContractionOp;
   x += (uintptr_t)&mlirLinalgIsAConvolutionOp;
   x += (uintptr_t)&mlirLlvmRawFdOStreamCreate;

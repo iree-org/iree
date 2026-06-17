@@ -702,6 +702,7 @@ VER_0 {
     mlirLinalgInferContractionDimensions;
     mlirLinalgInferContractionDimensionsFromMaps;
     mlirLinalgInferConvolutionDimensions;
+    mlirLinalgInferConvolutionDimensionsFromMaps;
     mlirLinalgIsAContractionOp;
     mlirLinalgIsAConvolutionOp;
     mlirLlvmRawFdOStreamCreate;

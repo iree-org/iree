@@ -99,15 +99,12 @@ void asRValues(OpBuilder builder, Location location,
 TypedValue<emitc::PointerType>
 addressOf(OpBuilder builder, Location location,
           TypedValue<emitc::LValueType> operand) {
-  auto ctx = builder.getContext();
-
-  auto result = emitc::ApplyOp::create(
+  auto result = emitc::AddressOfOp::create(
                     builder,
                     /*location=*/location,
                     /*result=*/
                     emitc::PointerType::get(operand.getType().getValueType()),
-                    /*applicableOperator=*/StringAttr::get(ctx, "&"),
-                    /*operand=*/operand)
+                    /*reference=*/operand)
                     .getResult();
 
   return cast<TypedValue<emitc::PointerType>>(result);
@@ -115,16 +112,20 @@ addressOf(OpBuilder builder, Location location,
 
 Value contentsOf(OpBuilder builder, Location location, Value operand) {
   auto ctx = builder.getContext();
+  assert(isa<emitc::PointerType>(operand.getType()));
 
-  Type type = operand.getType();
-  assert(isa<emitc::PointerType>(type));
-
-  return emitc::ApplyOp::create(
-             builder,
-             /*location=*/location,
-             /*result=*/cast<emitc::PointerType>(type).getPointee(),
-             /*applicableOperator=*/StringAttr::get(ctx, "*"),
-             /*operand=*/operand)
+  // Dereference the pointer as `ptr[0]`, which is equivalent to `*ptr`. We use
+  // subscript + load rather than emitc.dereference because the latter produces
+  // an lvalue that cannot be emitted when declaring variables at the top of a
+  // function (the mode used for vm-c output).
+  Type indexType = emitc::OpaqueType::get(ctx, "iree_host_size_t");
+  Value indexValue =
+      emitc::LiteralOp::create(builder, location, indexType, "0");
+  TypedValue<emitc::LValueType> subscript = emitc::SubscriptOp::create(
+      builder, location, cast<TypedValue<emitc::PointerType>>(operand),
+      indexValue);
+  return emitc::LoadOp::create(builder, location,
+                               subscript.getType().getValueType(), subscript)
       .getResult();
 }
 
