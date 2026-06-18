@@ -6523,7 +6523,7 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_cpu.data_tiled_mma_layout&lt;
-  ::mlir::iree_compiler::IREE::CPU::MMAIntrinsic,   # intrinsic
+  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`,   # intrinsic
   int64_t,   # intrinsics_m
   int64_t,   # intrinsics_n
   int64_t,   # intrinsics_k
@@ -6651,7 +6651,7 @@ they are not disjoint.</p>
 <p><em>Descriptor for different MMA intrinsics</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_cpu.mma_intrinsic&lt;
-  ::mlir::iree_compiler::IREE::CPU::MMAIntrinsic   # value
+  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`   # value
 &gt;
 </code></pre></div>
 <h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
@@ -6675,7 +6675,7 @@ they are not disjoint.</p>
 <p><em>CPU lowering pipeline identifier.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_cpu.pipeline&lt;
-  ::mlir::iree_compiler::IREE::CPU::LoweringPipeline   # value
+  `Default` | `DoubleTilingExpert` | `ConvTileAndDecomposeExpert` | `Mmt4dTilingExpert` | `BufferOpsTileAndVectorize` | `DataTiling` | `LinalgExtTileAndVectorize`   # value
 &gt;
 </code></pre></div>
 <p>Identifies a CPU lowering pipeline. Implements PipelineAttrInterface

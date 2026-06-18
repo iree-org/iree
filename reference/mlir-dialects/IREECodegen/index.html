@@ -8825,7 +8825,7 @@ regions in <code>iree_codegen</code> ops.</p>
 <p><em>Denormal mode for fp math</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.denormal_fp_math&lt;
-  ::mlir::iree_compiler::IREE::Codegen::DenormalFpMath   # value
+  `none` | `preserve-sign` | `positive-zero`   # value
 &gt;
 </code></pre></div>
 <p>Enum cases:
@@ -9269,7 +9269,7 @@ attribute gets propagated to the entry point function.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.ukernel_descriptor&lt;
   ::llvm::StringRef,   # ukernel_name
-  ::mlir::iree_compiler::IREE::Codegen::UKernelArgumentKind   # kind
+  `tensor` | `memref` | `bitcode`   # kind
 &gt;
 </code></pre></div>
 <h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
@@ -9425,7 +9425,7 @@ byte size is exported as the dispatch <code>workgroup_local_memory</code> requir
 <h3 id="workgroupmappingattr">WorkgroupMappingAttr<a class="headerlink" href="#workgroupmappingattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_codegen.workgroup_mapping&lt;
-  ::mlir::iree_compiler::IREE::Codegen::WorkgroupId,   # id
+  `x` | `y` | `z`,   # id
   int64_t   # delinearizedDim
 &gt;
 </code></pre></div>
