@@ -144,7 +144,6 @@ EXPORTS
   ireeMlirLspServerRunMain
   ireeOptRunMain
   ireeReduceRunMain
-  ireeRegisterTransformExtensions
   mlirAffineAddExprGet
   mlirAffineBinaryOpExprGetLHS
   mlirAffineBinaryOpExprGetRHS

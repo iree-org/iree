@@ -14,7 +14,6 @@ iree_cc_library(
   NAME
     StaticImpl
   DEPS
-    IREEDialectsCAPI
     MLIRCAPIAMDGPU
     MLIRCAPIDebug
     MLIRCAPIExportSMTLIB
@@ -82,7 +81,6 @@ set(_EXPORT_OBJECT_LIBS
   iree_compiler_API_Internal_IREEOptToolEntryPoint.objects
   iree_compiler_API_Internal_IREEReduceToolEntryPoint.objects
   iree_compiler_API_Internal_LLDToolEntryPoint.objects
-  obj.IREEDialectsCAPI
   obj.MLIRCAPIAMDGPU
   obj.MLIRCAPIDebug
   obj.MLIRCAPIExportSMTLIB

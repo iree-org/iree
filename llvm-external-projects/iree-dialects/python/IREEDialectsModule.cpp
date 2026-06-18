@@ -4,10 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects-c/Dialects.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir-c/Diagnostics.h"
+#include "mlir-c/Dialect/Transform.h"
 #include "mlir-c/RegisterEverything.h"
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
 
@@ -30,7 +30,6 @@ NB_MODULE(_ireeDialects, m) {
       [](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__transform__();
         mlirDialectHandleRegisterDialect(handle, context);
-        ireeRegisterTransformExtensions(context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
         }

@@ -53,8 +53,6 @@ iree_cc_library(
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils

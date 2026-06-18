@@ -145,7 +145,6 @@ VER_0 {
     ireeMlirLspServerRunMain;
     ireeOptRunMain;
     ireeReduceRunMain;
-    ireeRegisterTransformExtensions;
     mlirAffineAddExprGet;
     mlirAffineBinaryOpExprGetLHS;
     mlirAffineBinaryOpExprGetRHS;

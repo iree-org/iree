@@ -143,7 +143,6 @@ _ireeLinkRunMain
 _ireeMlirLspServerRunMain
 _ireeOptRunMain
 _ireeReduceRunMain
-_ireeRegisterTransformExtensions
 _mlirAffineAddExprGet
 _mlirAffineBinaryOpExprGetLHS
 _mlirAffineBinaryOpExprGetRHS

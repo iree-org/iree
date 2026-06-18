@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Async/IR/Async.h"
@@ -71,7 +70,6 @@ int main(int argc, char **argv) {
   mlir::LLVM::registerInlinerInterface(registry);
   mlir::linalg::registerTilingInterfaceExternalModels(registry);
 
-  registry.addExtensions<transform_ext::StructuredTransformOpsExtension>();
   mlir::bufferization::registerTransformDialectExtension(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);

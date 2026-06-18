@@ -27,10 +27,6 @@ class TargetConverter:
                 f"{iree_core_repo}//compiler/src/iree/compiler/API:CAPI": [
                     "IREECompilerCAPILib"
                 ],
-                # IREE llvm-external-projects
-                f"{iree_core_repo}//llvm-external-projects/iree-dialects:CAPI": [
-                    "IREEDialectsCAPI"
-                ],
                 # Disable all hard-coded codegen targets (they are expanded dynamically
                 # in CMake).
                 "@llvm-project//llvm:AArch64AsmParser": ["IREELLVMCPUTargetDeps"],

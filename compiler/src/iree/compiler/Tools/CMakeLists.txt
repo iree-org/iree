@@ -24,7 +24,6 @@ iree_cc_library(
     "init_iree_dialects.h"
     "init_iree_passes.h"
   DEPS
-    IREELinalgTransformDialect
     MLIRIR
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
