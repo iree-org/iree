@@ -168,8 +168,7 @@ util.func public @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x
 
 // -----
 
-// The stabilizing max may use arith.maxnumf (NaN-ignoring) instead of
-// arith.maximumf -- this is the form linalg.softmax itself decomposes to.
+// The stabilizing max may use arith.maxnumf (NaN-ignoring).
 // CHECK-LABEL: @softmax_maxnumf
 //  CHECK-SAME: %[[ARG:.+]]: tensor<2x4xf32>
 //       CHECK:   %[[S:.+]] = linalg.softmax dimension(1) ins(%[[ARG]] : tensor<2x4xf32>)
