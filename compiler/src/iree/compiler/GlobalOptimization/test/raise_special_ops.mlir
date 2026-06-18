@@ -210,8 +210,7 @@ util.func public @softmax_maxnumf(%src : tensor<2x4xf32>) -> (tensor<2x4xf32>) {
 
 // -----
 
-// Negative test: the max reduction is initialized with 0.0 instead of -inf, so
-// this is not a numerically-stabilized softmax and must not be raised.
+// Negative test: max init is 0.0, not -inf/lowest.
 // CHECK-LABEL: @not_softmax_wrong_max_init
 //   CHECK-NOT:   linalg.softmax
 util.func public @not_softmax_wrong_max_init(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
@@ -263,9 +262,7 @@ util.func public @not_softmax_wrong_max_init(%src : tensor<?x?x?xf32>) -> (tenso
 
 // -----
 
-// Negative test: the max reduction reduces %src but the subtraction reads a
-// different tensor %other, so the captured source is inconsistent and the
-// pattern must not be raised.
+// Negative test: max and subtraction read different sources.
 // CHECK-LABEL: @not_softmax_mismatched_source
 //   CHECK-NOT:   linalg.softmax
 util.func public @not_softmax_mismatched_source(%src : tensor<?x?x?xf32>, %other : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
