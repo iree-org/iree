@@ -125,7 +125,7 @@ func.func @binding_ptrs_dynamic() {
   // CHECK: %[[INDEX1:.+]] = llvm.mul %[[STRIDE1]], %[[C5]]
   // CHECK: %[[T1:.+]] = llvm.add %[[INDEX2]], %[[INDEX1]]
   // CHECK: %[[T2:.+]] = llvm.add %[[T1]], %[[C3]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds|nuw %[[BYTE_PTR]][%[[T2]]]
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr inbounds %[[BYTE_PTR]][%[[T2]]]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c3 = arith.constant 3 : index
   %c5 = arith.constant 5 : index
