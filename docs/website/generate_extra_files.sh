@@ -24,14 +24,13 @@ BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/build-docs}"
 source ${REPO_ROOT}/build_tools/cmake/setup_build.sh
 source ${REPO_ROOT}/build_tools/cmake/setup_ccache.sh
 
-# Build `iree-doc` and `iree-dialects-doc` CMake targets. This requires the LLVM
-# submodule and can take several minutes with an empty cache, as it builds
-# `iree-tblgen` and `mlir-tblgen`.
+# Build the `iree-doc` CMake target. This requires the LLVM submodule and can
+# take several minutes with an empty cache, as it builds `iree-tblgen` and
+# `mlir-tblgen`.
 cmake -G Ninja \
   -B "${BUILD_DIR}" "${REPO_ROOT}" \
   -DIREE_BUILD_DOCS=ON
 cmake --build "${BUILD_DIR}" --target iree-doc
-cmake --build "${BUILD_DIR}" --target iree-dialects-doc
 
 if (( IREE_USE_CCACHE == 1 )); then
   ccache --show-stats

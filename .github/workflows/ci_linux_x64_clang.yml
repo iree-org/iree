@@ -41,7 +41,5 @@ jobs:
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
         env:
           CTEST_PARALLEL_LEVEL: 32
-      - name: Test iree-dialects
-        run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       # Alerting on failure is the responsibility of the calling job.

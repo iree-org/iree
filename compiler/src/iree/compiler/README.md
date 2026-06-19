@@ -30,11 +30,9 @@ A few paths of interest include:
 Noteworthy compiler components _not_ included here include:
 
 ```
-├── compiler/plugins/
-│   └── input/                 (Input dialect support plugins)
-│   └── target/                (HAL target backend plugins)
-└── llvm-external-projects/
-    └── iree-dialects/         (IREE dialects for other projects to target)
+└── compiler/plugins/
+    └── input/                 (Input dialect support plugins)
+    └── target/                (HAL target backend plugins)
 ```
 
 Additional input/target/etc. plugins may also be defined out-of-tree.

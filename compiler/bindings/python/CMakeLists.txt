@@ -32,7 +32,6 @@ set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
 include_directories(
   "${IREE_SOURCE_DIR}/compiler/src"
   "${IREE_SOURCE_DIR}/compiler/bindings/c"
-  "${IREE_SOURCE_DIR}/llvm-external-projects/iree-dialects/include"
   "${IREE_SOURCE_DIR}/third_party/llvm-project/mlir/include"
   "${IREE_SOURCE_DIR}/third_party/stablehlo/include"
   "${IREE_SOURCE_DIR}/third_party/stablehlo"
@@ -260,10 +259,6 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
   MLIRPythonSources.Dialects.vector_transform
-
-  # iree-dialects project.
-  IREEDialectsPythonExtensions
-  IREEDialectsPythonSources
 )
 
 add_mlir_python_modules(IREECompilerPythonModules
