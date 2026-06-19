@@ -39,11 +39,9 @@ fi
 
 # Copy into a new directory before making edits, so CMake only runs when needed.
 BUILD_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects"
-BUILD_EXTERNAL_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/llvm-external-projects/mlir-iree-dialects/docs/Dialects"
 BUILD_DIALECTS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website"
 mkdir -p "${BUILD_DIALECTS_PROCESSED_DIR}"
 cp -r "${BUILD_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DIALECTS_PROCESSED_DIR}"
-cp -r "${BUILD_EXTERNAL_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DIALECTS_PROCESSED_DIR}"
 
 BUILD_PASSES_ORIGINAL_DIR="${BUILD_DIR}/doc/Passes"
 BUILD_PASSES_PROCESSED_DIR="${BUILD_DIR}/doc/Passes_for_website"
