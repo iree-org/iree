@@ -503,9 +503,6 @@ setup(
     },
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir", py_limited_api=_is_abi3_build),
-        CMakeExtension(
-            "iree.compiler._mlir_libs._ireeDialects", py_limited_api=_is_abi3_build
-        ),
         # TODO: MHLO has been broken for a while so disabling. If re-enabling,
         # it also needs to be enabled on the build side.
         # CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
