@@ -31,7 +31,6 @@ iree_cc_library(
     ::LinkerTool
     ::StaticLibraryGenerator
     IREELLVMCPUTargetDeps
-    IREELinalgTransformDialect
     LLVMAnalysis
     LLVMBitReader
     LLVMBitWriter

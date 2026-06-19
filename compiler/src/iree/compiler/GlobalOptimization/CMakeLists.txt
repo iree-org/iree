@@ -67,8 +67,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect

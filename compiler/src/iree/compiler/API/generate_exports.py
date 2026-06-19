@@ -67,10 +67,6 @@ MLIR_C_HEADER_FILES = [
     "Dialect/PDL.h",
 ]
 
-IREE_DIALECTS_HEADER_FILES = [
-    "Dialects.h",
-]
-
 IREE_COMPILER_DIALECTS_HEADER_FILES = [
     "iree_codegen.h",
     "iree_gpu.h",
@@ -100,16 +96,6 @@ def main(repo_root: Path, api_root: Path):
     # Collect symbols from local header files.
     for local_name in LOCAL_HEADER_FILES:
         export_symbols.extend(collect_header_exports(api_root / local_name))
-
-    # Collect symbols from iree-dialects header files.
-    for local_name in IREE_DIALECTS_HEADER_FILES:
-        export_symbols.extend(
-            collect_header_exports(
-                repo_root
-                / "llvm-external-projects/iree-dialects/include/iree-dialects-c"
-                / local_name
-            )
-        )
 
     # Collect symbols from iree compiler dialect header files.
     for local_name in IREE_COMPILER_DIALECTS_HEADER_FILES:

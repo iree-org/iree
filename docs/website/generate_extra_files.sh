@@ -52,7 +52,6 @@ cp -r "${BUILD_PASSES_ORIGINAL_DIR}/." "${BUILD_PASSES_PROCESSED_DIR}"
 
 # Delete any dialect docs we don't want to publish (yet?).
 rm "${BUILD_DIALECTS_PROCESSED_DIR}/SimpleIODialect.md" # Sample dialect, just ignore
-rm "${BUILD_DIALECTS_PROCESSED_DIR}/StructuredTransformOpsExt.md" # Dialect extensions
 
 # Trim "Dialect"/"Passes" suffix from file names e.g. FlowDialect.md -> Flow.md.
 for f in ${BUILD_DIALECTS_PROCESSED_DIR}/*Dialect.md; do

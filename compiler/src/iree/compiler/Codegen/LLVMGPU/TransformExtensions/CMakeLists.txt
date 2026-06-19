@@ -31,8 +31,6 @@ iree_cc_library(
     "LLVMGPUExtensionsOps.cpp.inc"
   DEPS
     ::LLVMGPUExtensionsOpGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAffineDialect

@@ -31,8 +31,6 @@ iree_cc_library(
     "LLVMCPUExtensionsOps.cpp.inc"
   DEPS
     ::LLVMCPUExtensionsOpGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     MLIRIR
     MLIRTransformDialect
   PUBLIC

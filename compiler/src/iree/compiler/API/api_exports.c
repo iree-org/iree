@@ -154,7 +154,6 @@ extern void ireeLinkRunMain();
 extern void ireeMlirLspServerRunMain();
 extern void ireeOptRunMain();
 extern void ireeReduceRunMain();
-extern void ireeRegisterTransformExtensions();
 extern void mlirAffineAddExprGet();
 extern void mlirAffineBinaryOpExprGetLHS();
 extern void mlirAffineBinaryOpExprGetRHS();
@@ -1331,7 +1330,6 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeMlirLspServerRunMain;
   x += (uintptr_t)&ireeOptRunMain;
   x += (uintptr_t)&ireeReduceRunMain;
-  x += (uintptr_t)&ireeRegisterTransformExtensions;
   x += (uintptr_t)&mlirAffineAddExprGet;
   x += (uintptr_t)&mlirAffineBinaryOpExprGetLHS;
   x += (uintptr_t)&mlirAffineBinaryOpExprGetRHS;

@@ -15,16 +15,6 @@ declare_mlir_python_sources(IREEDialectsPythonSources.Dialects
   ADD_TO_PARENT IREEDialectsPythonSources
 )
 
-declare_mlir_dialect_extension_python_bindings(
-  ADD_TO_PARENT IREEDialectsPythonSources.Dialects
-  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
-  TD_FILE dialects/IreeStructuredTransformOps.td
-  SOURCES
-    dialects/transform/iree_structured.py
-    dialects/_iree_structured_transform_ops_ext.py
-  DIALECT_NAME transform
-  EXTENSION_NAME iree_structured_transform)
-
 ################################################################################
 # Extensions
 ################################################################################
@@ -36,7 +26,7 @@ declare_mlir_python_extension(IREEDialectsPythonExtensions.Main
   SOURCES
     IREEDialectsModule.cpp
   EMBED_CAPI_LINK_LIBS
-    IREEDialectsCAPI
+    MLIRCAPITransformDialect
   PRIVATE_LINK_LIBS
     LLVMSupport
 )

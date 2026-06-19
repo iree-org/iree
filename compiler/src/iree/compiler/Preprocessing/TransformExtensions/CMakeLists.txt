@@ -31,8 +31,6 @@ iree_cc_library(
     "PreprocessingExtensionsOps.cpp.inc"
   DEPS
     ::PreprocessingExtensionsOpGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRIR
     MLIRLinalgInterfacesIncGenLib

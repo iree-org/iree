@@ -31,8 +31,6 @@ iree_cc_library(
     "FlowExtensionsOps.cpp.inc"
   DEPS
     ::FlowExtensionsOpGen
-    IREEDialectsTransforms
-    IREELinalgTransformDialect
     LLVMSupport
     MLIRAnalysis
     MLIRArithDialect

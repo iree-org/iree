@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
@@ -19,6 +18,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -28,7 +28,6 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
-using transform_ext::StructuredOpMatcher;
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -374,6 +373,293 @@ public:
 // Softmax Raising
 //===----------------------------------------------------------------------===//
 
+// Recognizing a numerically-stabilized softmax means walking a small graph of
+// `linalg.generic` ops. The helpers below match the individual nodes of that
+// graph directly, replacing the generic `transform_ext` matcher framework that
+// used to live in iree-dialects. The matched dataflow, working back from the
+// root op, is:
+//
+//   max  = reduce_max(src)           (reduction over the innermost dim)
+//   sub  = src - broadcast(max)
+//   exp  = exp(sub)
+//   sum  = reduce_add(exp)           (reduction over the innermost dim)
+//   root = exp * reciprocal(sum)  OR  exp / broadcast(sum)
+//
+// where each broadcast is either implicit (the consumer indexing map drops the
+// innermost dim) or explicit (a pass-through `linalg.generic` that broadcasts
+// along the innermost dim).
+
+// Returns true if every iterator of `op` is parallel.
+static bool isAllParallel(linalg::GenericOp op) {
+  return llvm::all_of(op.getIteratorTypesArray(), [](utils::IteratorType t) {
+    return t == utils::IteratorType::parallel;
+  });
+}
+
+// Returns true if `operand`'s indexing map is the identity.
+static bool isIdentityOperand(linalg::GenericOp op, OpOperand *operand) {
+  return op.getMatchingIndexingMap(operand).isIdentity();
+}
+
+// Returns true if `operand`'s indexing map is the projection that drops the
+// innermost (last) loop dim, e.g. (d0, d1, d2) -> (d0, d1).
+static bool dropsInnermostDim(linalg::GenericOp op, OpOperand *operand) {
+  AffineMap map = op.getMatchingIndexingMap(operand);
+  unsigned numLoops = op.getNumLoops();
+  if (!map.isProjectedPermutation() || map.getNumResults() + 1 != numLoops) {
+    return false;
+  }
+  for (unsigned i = 0, e = map.getNumResults(); i < e; ++i) {
+    if (map.getDimPosition(i) != i) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Returns the single compute op of `op`'s body when the body is exactly that op
+// followed by a `linalg.yield` of its single result; otherwise nullptr.
+static Operation *getSingleComputeOp(linalg::GenericOp op) {
+  Block *body = op.getBlock();
+  if (body->getOperations().size() != 2) {
+    return nullptr;
+  }
+  Operation *computeOp = &body->front();
+  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
+  if (computeOp->getNumResults() != 1 || yieldOp.getNumOperands() != 1 ||
+      yieldOp.getOperand(0).getDefiningOp() != computeOp) {
+    return nullptr;
+  }
+  return computeOp;
+}
+
+// Returns true if `v` references block argument number `argNumber` of `block`.
+static bool isBlockArg(Value v, Block *block, unsigned argNumber) {
+  auto arg = dyn_cast<BlockArgument>(v);
+  return arg && arg.getOwner() == block && arg.getArgNumber() == argNumber;
+}
+
+// Returns true if `op`'s body is a single `OpTy` whose operands are the leading
+// block arguments in order. When `commutative`, a two-operand body may also use
+// the arguments in swapped order.
+template <typename OpTy>
+static bool hasSingleOpBody(linalg::GenericOp op, bool commutative = false) {
+  Operation *computeOp = getSingleComputeOp(op);
+  if (!isa_and_nonnull<OpTy>(computeOp)) {
+    return false;
+  }
+  Block *body = op.getBlock();
+  if (commutative && computeOp->getNumOperands() == 2) {
+    return (isBlockArg(computeOp->getOperand(0), body, 0) &&
+            isBlockArg(computeOp->getOperand(1), body, 1)) ||
+           (isBlockArg(computeOp->getOperand(0), body, 1) &&
+            isBlockArg(computeOp->getOperand(1), body, 0));
+  }
+  for (auto [index, operand] : llvm::enumerate(computeOp->getOperands())) {
+    if (!isBlockArg(operand, body, index)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Returns true if `op`'s body just yields its (single) block argument, i.e. it
+// is a pure broadcast/transpose of the input.
+static bool isPassThroughBody(linalg::GenericOp op) {
+  Block *body = op.getBlock();
+  if (body->getOperations().size() != 1) {
+    return false;
+  }
+  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
+  for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
+    if (!isBlockArg(operand, body, index)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Returns true if `v` is a float constant satisfying `pred`.
+static bool isFloatConstant(Value v, llvm::function_ref<bool(APFloat)> pred) {
+  auto cstOp = v.getDefiningOp<arith::ConstantFloatOp>();
+  return cstOp && pred(cstOp.value());
+}
+
+// Returns true if `v` is a `linalg.fill` whose scalar value is a float constant
+// satisfying `pred`.
+static bool isFilledWith(Value v, llvm::function_ref<bool(APFloat)> pred) {
+  auto fillOp = v.getDefiningOp<linalg::FillOp>();
+  return fillOp && isFloatConstant(fillOp.getInputs()[0], pred);
+}
+
+// Matches a single-input `linalg.generic` reduction over the innermost dim with
+// a commutative `OpTy` body and an init produced by a `linalg.fill` of a
+// constant satisfying `fillPred`. Returns the reduced value on success.
+template <typename OpTy>
+static Value
+matchInnermostReduction(Value v, llvm::function_ref<bool(APFloat)> fillPred) {
+  auto op = v.getDefiningOp<linalg::GenericOp>();
+  if (!op || op.getNumDpsInputs() != 1 || op.getNumDpsInits() != 1) {
+    return {};
+  }
+  SmallVector<utils::IteratorType> iterators = op.getIteratorTypesArray();
+  if (iterators.empty() || iterators.back() != utils::IteratorType::reduction) {
+    return {};
+  }
+  for (unsigned i = 0, e = iterators.size() - 1; i < e; ++i) {
+    if (iterators[i] != utils::IteratorType::parallel) {
+      return {};
+    }
+  }
+  OpOperand *input = op.getDpsInputOperand(0);
+  OpOperand *init = op.getDpsInitOperand(0);
+  if (!isIdentityOperand(op, input) || !dropsInnermostDim(op, init) ||
+      !hasSingleOpBody<OpTy>(op, /*commutative=*/true) ||
+      !isFilledWith(init->get(), fillPred)) {
+    return {};
+  }
+  return input->get();
+}
+
+// Matches a single-input all-parallel `linalg.generic` with identity-mapped
+// input and output and an `OpTy` body. Returns the input value on success.
+template <typename OpTy>
+static Value matchUnaryElementwise(Value v) {
+  auto op = v.getDefiningOp<linalg::GenericOp>();
+  if (!op || op.getNumDpsInputs() != 1 || op.getNumDpsInits() != 1 ||
+      !isAllParallel(op)) {
+    return {};
+  }
+  if (!isIdentityOperand(op, op.getDpsInputOperand(0)) ||
+      !isIdentityOperand(op, op.getDpsInitOperand(0)) ||
+      !hasSingleOpBody<OpTy>(op)) {
+    return {};
+  }
+  return op.getDpsInputOperand(0)->get();
+}
+
+// Matches a reciprocal `linalg.generic` (body `divf 1.0, %arg0`) that is
+// single-input, all-parallel and identity-mapped. Returns the input value.
+static Value matchReciprocal(Value v) {
+  auto op = v.getDefiningOp<linalg::GenericOp>();
+  if (!op || op.getNumDpsInputs() != 1 || op.getNumDpsInits() != 1 ||
+      !isAllParallel(op)) {
+    return {};
+  }
+  if (!isIdentityOperand(op, op.getDpsInputOperand(0)) ||
+      !isIdentityOperand(op, op.getDpsInitOperand(0))) {
+    return {};
+  }
+  auto divOp = dyn_cast_or_null<arith::DivFOp>(getSingleComputeOp(op));
+  if (!divOp ||
+      !isFloatConstant(divOp.getOperand(0),
+                       [](APFloat f) { return f.convertToDouble() == 1.0; }) ||
+      !isBlockArg(divOp.getOperand(1), op.getBlock(), 0)) {
+    return {};
+  }
+  return op.getDpsInputOperand(0)->get();
+}
+
+// Resolves `operand` of `consumer`, which is expected to carry the broadcast of
+// an innermost-reduced value, to that pre-broadcast value. Handles both the
+// implicit broadcast (the operand's map drops the innermost dim) and the
+// explicit broadcast (the operand is produced by a pass-through generic that
+// broadcasts along the innermost dim).
+static Value resolveBroadcastedReduction(linalg::GenericOp consumer,
+                                         OpOperand *operand) {
+  if (dropsInnermostDim(consumer, operand)) {
+    return operand->get();
+  }
+  if (!isIdentityOperand(consumer, operand)) {
+    return {};
+  }
+  auto bcast = operand->get().getDefiningOp<linalg::GenericOp>();
+  if (!bcast || bcast.getNumDpsInputs() != 1 || bcast.getNumDpsInits() != 1 ||
+      !isAllParallel(bcast) || !isPassThroughBody(bcast) ||
+      !dropsInnermostDim(bcast, bcast.getDpsInputOperand(0)) ||
+      !isIdentityOperand(bcast, bcast.getDpsInitOperand(0))) {
+    return {};
+  }
+  return bcast.getDpsInputOperand(0)->get();
+}
+
+// Recognizes the softmax graph rooted at `rootOp` and returns the softmax
+// source value on success.
+static FailureOr<Value> matchSoftmax(linalg::LinalgOp rootOp) {
+  auto root = dyn_cast<linalg::GenericOp>(rootOp.getOperation());
+  if (!root || root.getNumDpsInputs() != 2 || root.getNumDpsInits() != 1 ||
+      !isAllParallel(root)) {
+    return failure();
+  }
+  // The numerator (exp(...)) always flows in as input 0 with an identity map.
+  OpOperand *numerator = root.getDpsInputOperand(0);
+  OpOperand *denominator = root.getDpsInputOperand(1);
+  if (!isIdentityOperand(root, numerator)) {
+    return failure();
+  }
+
+  // The root normalizes either as `exp * reciprocal(sum)` or `exp / sum`.
+  Value sumValue;
+  if (hasSingleOpBody<arith::MulFOp>(root, /*commutative=*/true)) {
+    if (!dropsInnermostDim(root, denominator)) {
+      return failure();
+    }
+    sumValue = matchReciprocal(denominator->get());
+  } else if (hasSingleOpBody<arith::DivFOp>(root)) {
+    sumValue = resolveBroadcastedReduction(root, denominator);
+  }
+  if (!sumValue) {
+    return failure();
+  }
+
+  // exp = exp(sub); sum = reduce_add(exp).
+  Value expValue = numerator->get();
+  Value subValue = matchUnaryElementwise<math::ExpOp>(expValue);
+  Value summedValue = matchInnermostReduction<arith::AddFOp>(
+      sumValue, [](APFloat f) { return f.isZero(); });
+  if (!subValue || summedValue != expValue) {
+    return failure();
+  }
+
+  // sub = src - broadcast(max).
+  auto subOp = subValue.getDefiningOp<linalg::GenericOp>();
+  if (!subOp || subOp.getNumDpsInputs() != 2 || subOp.getNumDpsInits() != 1 ||
+      !isAllParallel(subOp) ||
+      !isIdentityOperand(subOp, subOp.getDpsInitOperand(0)) ||
+      !hasSingleOpBody<arith::SubFOp>(subOp)) {
+    return failure();
+  }
+  OpOperand *subSource = subOp.getDpsInputOperand(0);
+  if (!isIdentityOperand(subOp, subSource)) {
+    return failure();
+  }
+  Value maxValue =
+      resolveBroadcastedReduction(subOp, subOp.getDpsInputOperand(1));
+  if (!maxValue) {
+    return failure();
+  }
+
+  // max = reduce_max(src), reducing the same source the subtraction reads. The
+  // init must be -inf or the lowest finite value. Accept both arith.maximumf
+  // (NaN-propagating, as emitted by e.g. StableHLO frontends) and arith.maxnumf
+  // (NaN-ignoring, which is what linalg.softmax itself decomposes to), since
+  // both denote the stabilizing max of a softmax.
+  auto isNegInfOrLowest = [](APFloat f) {
+    return (f.isLargest() || f.isInfinity()) && f.isNegative();
+  };
+  Value source = subSource->get();
+  Value reducedValue =
+      matchInnermostReduction<arith::MaximumFOp>(maxValue, isNegInfOrLowest);
+  if (!reducedValue) {
+    reducedValue =
+        matchInnermostReduction<arith::MaxNumFOp>(maxValue, isNegInfOrLowest);
+  }
+  if (reducedValue != source) {
+    return failure();
+  }
+  return source;
+}
+
 class RaiseSoftmax : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
@@ -386,19 +672,15 @@ public:
       return failure();
     }
 
-    transform_ext::MatcherContext matcherContext;
-    transform_ext::StructuredOpMatcher *maxReduction;
-    transform_ext::StructuredOpMatcher *softmaxroot;
-    makeSoftmaxMatcher(matcherContext, maxReduction, softmaxroot);
-    if (!matchPattern(linalgOp, *softmaxroot)) {
+    FailureOr<Value> src = matchSoftmax(linalgOp);
+    if (failed(src)) {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to match softmax root");
     }
 
-    Value src = maxReduction->getCaptured()->getOperand(0);
     rewriter.setInsertionPoint(linalgOp);
     rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
-        linalgOp, linalgOp->getResultTypes(), src,
+        linalgOp, linalgOp->getResultTypes(), *src,
         linalgOp.getDpsInitOperand(0)->get(), linalgOp.getNumLoops() - 1);
     return success();
   }
