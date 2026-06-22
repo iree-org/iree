@@ -102,9 +102,6 @@ artifacts/
 # VS Code DevContainer
 .devcontainer/docker-compose.yml
 
-# Local cache files
-llvm-external-projects/iree-dialects/.cache
-
 # pkgci artifacts
 artifacts/
 

@@ -61,8 +61,6 @@ jobs:
           # (For now) QEMU is required to run tests with SME
           IREE_ARM_SME_QEMU_AARCH64_BIN: /usr/bin/qemu-aarch64
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      - name: Test iree-dialects
-        run: ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0

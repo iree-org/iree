@@ -225,10 +225,6 @@ class TargetConverter:
         label = target.rsplit(":")[-1]
         return [f"iree_cuda::{label}"]
 
-    def _convert_iree_dialects_target(self, target):
-        # Just take the target name as-is.
-        return [target.rsplit(":")[-1]]
-
     def _convert_to_cmake_path(self, bazel_path_fragment: str) -> str:
         cmake_path = bazel_path_fragment
         # Bazel `//iree/base`     -> CMake `iree::base`
@@ -282,8 +278,6 @@ class TargetConverter:
 
     def _convert_iree_core_target(self, target):
         iree_core_repo = self._repo_alias("@iree_core")
-        if target.startswith(f"{iree_core_repo}//llvm-external-projects/iree-dialects"):
-            return self._convert_iree_dialects_target(target)
 
         # IREE root paths map to package names based on explicit rules.
         #   * src/iree/ directories (compiler/src/iree/ and runtime/src/iree/)

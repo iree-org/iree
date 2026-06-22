@@ -124,8 +124,4 @@ ctest \
   --label-exclude "${label_exclude_regex}"
 echo "::endgroup::"
 
-echo "::group::Running llvm-external-projects tests"
-cmake --build . --target check-iree-dialects -- -k 0
-echo "::endgroup::"
-
 popd

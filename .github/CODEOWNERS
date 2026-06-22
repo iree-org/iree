@@ -42,7 +42,6 @@
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
-/llvm-external-projects/iree-dialects/ @MaheshRavishankar
 
 # Other Top-Level Directories
 /docs/ @ScottTodd

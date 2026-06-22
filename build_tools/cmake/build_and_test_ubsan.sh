@@ -82,7 +82,3 @@ export IREE_HIP_DISABLE=1
 echo "::group::Running tests"
 build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 echo "::endgroup::"
-
-echo "::group::Running llvm-external-projects tests"
-cmake --build "${BUILD_DIR?}" --target check-iree-dialects -- -k 0
-echo "::endgroup::"
