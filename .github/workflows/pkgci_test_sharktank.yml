@@ -62,7 +62,7 @@ jobs:
       IREE_TEST_FILES: ${{ matrix.iree_test_files }}
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: false
 
@@ -78,7 +78,7 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: iree-org/iree-test-suites
           ref: 612f93663b32ea86ea442e87be549f1056a5de1c
@@ -171,7 +171,7 @@ jobs:
       TEST_OUTPUT_ARTIFACTS: ${{ github.workspace }}/model_output_artifacts
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           submodules: false
 
@@ -187,7 +187,7 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
 
       - name: Checkout test suites repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: iree-org/iree-test-suites
           ref: 612f93663b32ea86ea442e87be549f1056a5de1c
