@@ -593,11 +593,40 @@ util.func public @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
 util.func public @sliceFromZeroElements(%arg0: tensor<0xi32>) -> tensor<?xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.slice
-  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?xi32>{%c0}
+  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0xi32>
+  // CHECK: %[[CAST:.+]] = tensor.cast %[[RET]] : tensor<0xi32> to tensor<?xi32>
   %0 = flow.tensor.slice %arg0[%c0 for %c0] : tensor<0xi32> -> tensor<?xi32>{%c0}
-  // CHECK: util.return %[[RET]]
+  // CHECK: util.return %[[CAST]]
   util.return %0 : tensor<?xi32>
 }
+// -----
+
+// Folds a constant dynamic dimension operand into the static result shape.
+
+// CHECK-LABEL: @emptyFoldConstantDim
+util.func public @emptyFoldConstantDim() -> tensor<?x4xf32> {
+  %c8 = arith.constant 8 : index
+  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<8x4xf32>
+  // CHECK: %[[CAST:.+]] = tensor.cast %[[EMPTY]] : tensor<8x4xf32> to tensor<?x4xf32>
+  %0 = flow.tensor.empty : tensor<?x4xf32>{%c8}
+  // CHECK: util.return %[[CAST]]
+  util.return %0 : tensor<?x4xf32>
+}
+
+
+// -----
+
+// Leaves non-constant dynamic dimensions untouched.
+
+// CHECK-LABEL: @emptyKeepDynamicDim
+// CHECK-SAME: (%[[DIM:.+]]: index)
+util.func public @emptyKeepDynamicDim(%dim: index) -> tensor<?x4xf32> {
+  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?x4xf32>{%[[DIM]]}
+  %0 = flow.tensor.empty : tensor<?x4xf32>{%dim}
+  // CHECK: util.return %[[RET]]
+  util.return %0 : tensor<?x4xf32>
+}
+
 
 // -----
 
