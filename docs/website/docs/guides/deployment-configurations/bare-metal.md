@@ -124,6 +124,20 @@ set(IREE_BUILD_SAMPLES ON)
     Clean the list up after [#6353](https://github.com/iree-org/iree/issues/6353)
     is fixed.
 
+!!! info 
+    Disabling threading does not remove all internal synchronization primitives.
+    By default, the runtime base threading layer (found in [`runtime/src/iree/base/threading`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/base/threading)) falls back on primitives from `<pthread.h>`.
+
+    Depending on your environment, you have two choices:
+
+    - **Strictly single-threaded use**: compile with `IREE_SYNCHRONIZATION_DISABLE_UNSAFE=ON`.
+    - **With custom synchronization**: provide a small pthread/C11-thread surface to be used by the generic sync fallback.
+    
+    Run the following from the root of the IREE repository for details:
+    ```bash
+    cd runtime/src/iree/base/threading && grep -iC 1 pthread *.h
+    ```
+
 Also, set the toolchain-specific cmake file to match the tool path, target
 architecture, target abi, linker script, system library path, etc.
 
