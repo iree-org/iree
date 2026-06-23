@@ -2424,7 +2424,7 @@ class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-class VM_ComplexArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+class VM_MixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
                             list<Trait> traits = []> :
     VM_TrivialOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -2466,9 +2466,9 @@ class VM_TotalTernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     VM_TernaryArithmeticOp<type, mnemonic, opcode,
                            !listconcat(traits, [AlwaysSpeculatable])> {}
 
-class VM_TotalComplexArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+class VM_TotalMixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
                                  list<Trait> traits = []> :
-    VM_ComplexArithmeticOp<ltype, rtype, mnemonic, opcode,
+    VM_MixedBinaryArithmeticOp<ltype, rtype, mnemonic, opcode,
                           !listconcat(traits, [AlwaysSpeculatable])> {}
 
 } // OpGroupArithmeticHelperOps
@@ -2988,12 +2988,12 @@ def VM_PowF64Op :
 }
 
 def VM_FPowI32Op :
-    VM_TotalComplexArithmeticOp<F32, I64, "fpowi.f32", VM_OPC_FPowI32, [VM_ExtF32]> {
+    VM_TotalMixedBinaryArithmeticOp<F32, I64, "fpowi.f32", VM_OPC_FPowI32, [VM_ExtF32]> {
   let summary = [{Floating point raised to the integer power of operation.}];
 }
 
 def VM_FPowI64Op :
-    VM_TotalComplexArithmeticOp<F64, I64, "fpowi.f64", VM_OPC_FPowI64, [VM_ExtF64]> {
+    VM_TotalMixedBinaryArithmeticOp<F64, I64, "fpowi.f64", VM_OPC_FPowI64, [VM_ExtF64]> {
   let summary = [{Floating point raised to the integer power of operation.}];
 }
 

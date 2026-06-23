@@ -587,48 +587,8 @@ static inline float vm_log10_f32(float operand) { return log10f(operand); }
 static inline float vm_log1p_f32(float operand) { return log1pf(operand); }
 static inline float vm_log2_f32(float operand) { return log2f(operand); }
 static inline float vm_pow_f32(float b, float e) { return powf(b, e); }
-static inline float vm_fpowi_f32(float base, int64_t exp) { 
-  if (exp == 0) {
-    return 1.0;
-  }
-
-  bool isMin = (exp == 0x8000000000000000); // -2^63
-
-  if (isMin) {
-    exp = 0x7FFFFFFFFFFFFFFF; // 2^63 - 1
-  }
-
-  bool invertResult = exp < 0;
-  if (invertResult) {
-    exp = exp * -1;
-  }
-
-  float origBase = base;
-
-  while ((exp & 1) == 0) {
-    base *= base;
-    exp >>= 1;
-  }
-
-  float acc = base;
-
-  while (exp > 1) {
-    exp >>= 1;
-    base *= base;
-    if ((exp & 1) == 1) {
-      acc *= base;
-    }
-  }
-
-  if (isMin) {
-    acc *= origBase;
-  }
-
-  if (invertResult) {
-    acc = 1.0 / acc;
-  }
-
-  return acc;
+static inline float vm_fpowi_f32(float base, int64_t exp) {
+  return iree_math_float_powi_i64(base, exp);
 }
 static inline float vm_rsqrt_f32(float operand) {
   return 1.0f / sqrtf(operand);
@@ -824,47 +784,7 @@ static inline double vm_log1p_f64(double operand) { return log1p(operand); }
 static inline double vm_log2_f64(double operand) { return log2(operand); }
 static inline double vm_pow_f64(double b, double e) { return pow(b, e); }
 static inline double vm_fpowi_f64(double base, int64_t exp) {
-  if (exp == 0) {
-    return 1.0;
-  }
-
-  bool isMin = (exp == 0x8000000000000000); // -2^63
-
-  if (isMin) {
-    exp = 0x7FFFFFFFFFFFFFFF; // 2^63 - 1
-  }
-
-  bool invertResult = exp < 0;
-  if (invertResult) {
-    exp = exp * -1;
-  }
-
-  double origBase = base;
-
-  while ((exp & 1) == 0) {
-    base *= base;
-    exp >>= 1;
-  }
-
-  double acc = base;
-
-  while (exp > 1) {
-    exp >>= 1;
-    base *= base;
-    if ((exp & 1) == 1) {
-      acc *= base;
-    }
-  }
-
-  if (isMin) {
-    acc *= origBase;
-  }
-
-  if (invertResult) {
-    acc = 1.0 / acc;
-  }
-
-  return acc;
+  return iree_math_double_powi_i64(base, exp);
 }
 static inline double vm_rsqrt_f64(double operand) {
   return 1.0 / sqrt(operand);
