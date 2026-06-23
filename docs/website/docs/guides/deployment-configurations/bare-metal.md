@@ -132,11 +132,10 @@ set(IREE_BUILD_SAMPLES ON)
 
     - **Strictly single-threaded use**: compile with `IREE_SYNCHRONIZATION_DISABLE_UNSAFE=ON`.
     - **With custom synchronization**: provide a small pthread/C11-thread surface to be used by the generic sync fallback.
-    
-    Run the following from the root of the IREE repository for details:
-    ```bash
-    cd runtime/src/iree/base/threading && grep -iC 1 pthread *.h
-    ```
+        Run the following from the root of the IREE repository for details:
+        ```bash
+        cd runtime/src/iree/base/threading && grep -iC 1 pthread *.h
+        ```
 
 Also, set the toolchain-specific cmake file to match the tool path, target
 architecture, target abi, linker script, system library path, etc.
