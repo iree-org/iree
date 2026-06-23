@@ -126,7 +126,7 @@ set(IREE_BUILD_SAMPLES ON)
 
 !!! info 
     Disabling threading (`IREE_ENABLE_THREADING OFF`) does not eliminate the need for all synchronization primitives. IREE still relies on the implementation of some internal synchronization primitives, and thus retains its dependency on a threading library.
-    By default, the runtime base threading layer (found in [`runtime/src/iree/base/threading`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/base/threading)) falls back on primitives from `<pthread.h>`.
+    For the generic platform, the runtime base threading layer (found in [`runtime/src/iree/base/threading`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/base/threading)) falls back on primitives from `<pthread.h>`.
 
     Depending on your environment, you have two choices:
 
