@@ -131,7 +131,7 @@ set(IREE_BUILD_SAMPLES ON)
     Depending on your environment, you have two choices:
 
     - **Strictly single-threaded use**: compile with `IREE_SYNCHRONIZATION_DISABLE_UNSAFE=ON`.
-    - **With custom synchronization**: provide a small pthread/C11-thread surface to be used by the generic sync fallback.
+    - **With custom synchronization**: provide a small pthread surface to be used by the runtime base threading layer.
         Run the following from the root of the IREE repository for details:
         ```bash
         cd runtime/src/iree/base/threading && grep -iC 1 pthread *.h
