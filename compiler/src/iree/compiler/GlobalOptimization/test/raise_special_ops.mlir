@@ -921,3 +921,15 @@ util.func public @constant_pad_f32(%arg0: tensor<?x?xf32>, %x: index, %y: index)
 //       CHECK:   %[[PAD:.+]] = tensor.pad %[[ARG0]] low[1, 2] high[%[[H0]], %[[H1]]]
 //       CHECK:     tensor.yield %[[C1]]
 //       CHECK:   util.return %[[PAD]]
+
+// -----
+
+util.func public @matmul_memref_no_crash(%arg0: memref<10x20xf32>,
+    %arg1: memref<20x40xf32>, %arg2: memref<10x40xf32>) {
+  linalg.matmul ins(%arg0, %arg1 : memref<10x20xf32>, memref<20x40xf32>)
+      outs(%arg2 : memref<10x40xf32>)
+  util.return
+}
+// CHECK-LABEL: util.func public @matmul_memref_no_crash
+//       CHECK:   linalg.matmul
+//       CHECK:   util.return

@@ -284,6 +284,12 @@ public:
       return failure();
     }
 
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(namedOp.getOperation());
+    if (!linalgOp || !linalgOp.hasPureTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          namedOp, "expected an op with pure tensor semantics");
+    }
+
     // Look for a producer of the given operand that does an elementwise extend
     // and replace the operand with the source of the elementwise producer.
     // Returns true if the operand was updated to inform the pattern rewriter
