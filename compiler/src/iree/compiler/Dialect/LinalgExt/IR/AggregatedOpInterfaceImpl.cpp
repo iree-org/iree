@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -23,6 +24,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
@@ -186,6 +188,163 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
+static bool isRank0Tensor(Value value) {
+  auto type = dyn_cast<RankedTensorType>(value.getType());
+  return type && type.getRank() == 0;
+}
+
+static FailureOr<Value>
+getOrCreateScalarForRank0Tensor(Value value,
+                                llvm::DenseMap<Value, Value> &scalarValues,
+                                OpBuilder &builder, Location loc) {
+  if (!isRank0Tensor(value)) {
+    return failure();
+  }
+
+  auto it = scalarValues.find(value);
+  if (it != scalarValues.end()) {
+    return it->second;
+  }
+
+  auto fromElementsOp = value.getDefiningOp<tensor::FromElementsOp>();
+  if (fromElementsOp && fromElementsOp.getElements().size() == 1) {
+    Value scalar = fromElementsOp.getElements().front();
+    scalarValues[value] = scalar;
+    return scalar;
+  }
+
+  auto constantOp = value.getDefiningOp<arith::ConstantOp>();
+  if (constantOp) {
+    if (auto elementsAttr =
+            dyn_cast<DenseElementsAttr>(constantOp.getValue())) {
+      if (elementsAttr.getNumElements() == 1) {
+        auto elementType =
+            cast<RankedTensorType>(value.getType()).getElementType();
+        Attribute elementAttr =
+            elementsAttr.isSplat()
+                ? elementsAttr.getSplatValue<Attribute>()
+                : *elementsAttr.getValues<Attribute>().begin();
+        Value scalar = arith::ConstantOp::create(builder, loc, elementType,
+                                                 cast<TypedAttr>(elementAttr))
+                           .getResult();
+        scalarValues[value] = scalar;
+        return scalar;
+      }
+    }
+  }
+
+  return failure();
+}
+
+static LogicalResult
+scalarizeZeroLoopRank0Generic(OpBuilder &builder, linalg::GenericOp genericOp,
+                              llvm::DenseMap<Value, Value> &scalarValues) {
+  if (genericOp.getNumLoops() != 0 ||
+      !llvm::all_of(genericOp->getOperands(), isRank0Tensor)) {
+    return failure();
+  }
+
+  Block &body = genericOp.getRegion().front();
+  auto yieldOp = cast<linalg::YieldOp>(body.getTerminator());
+  for (Operation &op : body.without_terminator()) {
+    if (op.getNumRegions() != 0 || op.getNumSuccessors() != 0) {
+      return failure();
+    }
+  }
+
+  IRMapping mapper;
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPoint(genericOp);
+  for (auto [blockArg, operand] :
+       llvm::zip_equal(body.getArguments(), genericOp->getOperands())) {
+    FailureOr<Value> scalar = getOrCreateScalarForRank0Tensor(
+        operand, scalarValues, builder, genericOp.getLoc());
+    if (succeeded(scalar)) {
+      mapper.map(blockArg, *scalar);
+      continue;
+    }
+    if (!blockArg.use_empty()) {
+      return failure();
+    }
+  }
+
+  SmallVector<Operation *> clonedOps;
+  for (Operation &op : body.without_terminator()) {
+    clonedOps.push_back(builder.clone(op, mapper));
+  }
+
+  for (auto [result, yielded] :
+       llvm::zip_equal(genericOp.getResults(), yieldOp.getOperands())) {
+    Value scalar = mapper.lookupOrDefault(yielded);
+    if (scalar.getParentBlock() == &body) {
+      for (Operation *clonedOp : llvm::reverse(clonedOps)) {
+        clonedOp->erase();
+      }
+      return failure();
+    }
+    scalarValues[result] = scalar;
+  }
+  return success();
+}
+
+static void eraseUnusedRank0TensorPayloadOps(Block &block) {
+  SmallVector<Operation *> ops;
+  for (Operation &op : block.without_terminator()) {
+    ops.push_back(&op);
+  }
+
+  for (Operation *op : llvm::reverse(ops)) {
+    if (!op->use_empty()) {
+      continue;
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      if (genericOp.getNumLoops() == 0 &&
+          llvm::all_of(genericOp->getOperands(), isRank0Tensor)) {
+        op->erase();
+      }
+      continue;
+    }
+    if (op->getNumResults() == 1 && isRank0Tensor(op->getResult(0)) &&
+        isa<arith::ConstantOp, tensor::EmptyOp, tensor::FromElementsOp>(op)) {
+      op->erase();
+    }
+  }
+}
+
+// Flex attention score_mod callbacks are authored as rank-0 Torch tensors.
+// After Torch-to-Linalg conversion, those callbacks can appear here as nested
+// rank-0 tensor.from_elements/linalg.generic/tensor.extract payloads. This is
+// intentionally a structural cleanup, not callback lowering: the generic body
+// is already lowered, and the tensor wrapper is what blocks vectorization.
+static void scalarizeRank0TensorPayloads(Block &block, OpBuilder &builder) {
+  llvm::DenseMap<Value, Value> scalarValues;
+
+  for (Operation &op : llvm::make_early_inc_range(block.without_terminator())) {
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      (void)scalarizeZeroLoopRank0Generic(builder, genericOp, scalarValues);
+      continue;
+    }
+
+    auto extractOp = dyn_cast<tensor::ExtractOp>(op);
+    if (!extractOp || !extractOp.getIndices().empty() ||
+        !isRank0Tensor(extractOp.getTensor())) {
+      continue;
+    }
+
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPoint(extractOp);
+    FailureOr<Value> scalar = getOrCreateScalarForRank0Tensor(
+        extractOp.getTensor(), scalarValues, builder, op.getLoc());
+    if (failed(scalar)) {
+      continue;
+    }
+    extractOp.replaceAllUsesWith(*scalar);
+    extractOp.erase();
+  }
+
+  eraseUnusedRank0TensorPayloadOps(block);
+}
+
 static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
                                           Region &region, Value value) {
   auto rank = cast<RankedTensorType>(value.getType()).getRank();
@@ -212,6 +371,7 @@ static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
       op.erase();
     }
   }
+  scalarizeRank0TensorPayloads(block, builder);
 
   {
     OpBuilder::InsertionGuard withinRegion(builder);
