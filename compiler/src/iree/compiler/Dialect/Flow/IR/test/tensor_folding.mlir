@@ -616,6 +616,21 @@ util.func public @emptyFoldConstantDim() -> tensor<?x4xf32> {
 
 // -----
 
+// Folds only the constant dynamic dimension; the non-constant one stays dynamic.
+
+// CHECK-LABEL: @emptyFoldMixedDims
+// CHECK-SAME: (%[[DIM:.+]]: index)
+util.func public @emptyFoldMixedDims(%dim: index) -> tensor<?x8x?xf32> {
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<?x8x4xf32>{%[[DIM]]}
+  // CHECK: %[[CAST:.+]] = tensor.cast %[[EMPTY]] : tensor<?x8x4xf32> to tensor<?x8x?xf32>
+  %0 = flow.tensor.empty : tensor<?x8x?xf32>{%dim, %c4}
+  // CHECK: util.return %[[CAST]]
+  util.return %0 : tensor<?x8x?xf32>
+}
+
+// -----
+
 // Leaves non-constant dynamic dimensions untouched.
 
 // CHECK-LABEL: @emptyKeepDynamicDim
