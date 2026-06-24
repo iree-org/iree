@@ -1227,7 +1227,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
       // qkMatmul.K = problem.K1
       int64_t qkNTiles = pvKTile / intrinsicAN;
       SmallVector<int64_t, 2> qkKSizes = qkMatmul.kSizes;
-      qkKSizes.back() = qkMatmul.kSizes.back() / intrinsicAK;
+      qkKSizes.back() = llvm::divideCeil(qkMatmul.kSizes.back(), intrinsicAK);
       GPUMMASchedule qkSchedule{
           intrinsicA.mmaKind,
           intrinsicAM,
@@ -1283,7 +1283,7 @@ FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> deduceAttentionSchedule(
         pvSchedule->getTotalKTileSize() * pvSchedule->getTotalKSize();
     int64_t qkNTiles = pvKTile / intrinsicAN;
     SmallVector<int64_t, 2> qkKSizes = qkMatmul.kSizes;
-    qkKSizes.back() = qkMatmul.kSizes.back() / intrinsicAK;
+    qkKSizes.back() = llvm::divideCeil(qkMatmul.kSizes.back(), intrinsicAK);
     GPUMMASchedule qkSchedule{
         intrinsicA.mmaKind,
         pvSchedule->mSizes,
