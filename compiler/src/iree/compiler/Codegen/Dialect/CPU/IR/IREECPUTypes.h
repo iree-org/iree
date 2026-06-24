@@ -98,6 +98,19 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
 std::optional<std::tuple<int64_t, int64_t, int64_t>>
 getRowMajorTilesMNKShape(MMAIntrinsic intrinsic);
 
+// Idempotently attaches the bitcode for ukernel `name` as
+// `hal.executable.objects` on `op`, looking it up first in any
+// user-supplied `hal.executable.objects` ancestor, then falling back to
+// the global `EmbeddedDataDirectory` (populated at LLVMCPU plugin init).
+// No-op if `op` already carries a matching entry. Returns true if a matching
+// bitcode was found (and is now attached), false if none exists for `name` —
+// callers use the bool to decide whether a ukernel is actually available.
+// Used by both `LLVMCPUSelectUKernels` (at kernel-config time, so the bitcode
+// is on the op for the rest of codegen) and by
+// `UKernelProviderAttr::createAndReplaceWithUkernelOp` (as a backstop for
+// tests / future paths that bypass SelectUKernels).
+bool attachUKernelBitcodeOnOp(Operation *op, StringRef name);
+
 } // namespace mlir::iree_compiler::IREE::CPU
 
 // clang-format on
