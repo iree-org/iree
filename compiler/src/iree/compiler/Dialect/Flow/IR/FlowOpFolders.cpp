@@ -743,9 +743,62 @@ void TensorAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.tensor.empty
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Folds constant dynamic dimension operands of a flow.tensor.empty into the
+// static result shape, e.g. `flow.tensor.empty : tensor<?xi32>{%c4}` becomes
+// `flow.tensor.empty : tensor<4xi32>`. A cast is inserted to preserve the
+// original (dynamic) result type for existing users; it folds away once
+// those users can accept the refined static type.
+struct FoldTensorEmptyConstantDims : public OpRewritePattern<TensorEmptyOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(TensorEmptyOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resultType = cast<RankedTensorType>(op.getResult().getType());
+    ValueRange dynamicDims = op.getResultDims();
+
+    SmallVector<int64_t> newShape(resultType.getShape());
+    // Collect only dimensions that remain dynamic after folding constants.
+    SmallVector<Value> newDynamicDims;
+    unsigned dimIdx = 0;
+    bool didFold = false;
+    for (unsigned i = 0, e = resultType.getRank(); i < e; ++i) {
+      // Skip dimensions that are already static.
+      if (!resultType.isDynamicDim(i)) {
+        continue;
+      }
+      // Get the SSA operand corresponding to dynamic dimension.
+      Value dim = dynamicDims[dimIdx++];
+      std::optional<int64_t> constantDim = getConstantIntValue(dim);
+      if (constantDim && *constantDim >= 0) {
+        // Fold the constant value into the tensor's static shape.
+        newShape[i] = *constantDim;
+        didFold = true;
+      } else {
+        newDynamicDims.push_back(
+            dim); // This dim stays dynamic, so preserve its SSA operand.
+      }
+    }
+    if (!didFold) {
+      return rewriter.notifyMatchFailure(op, "no constant dynamic dims");
+    }
+
+    auto newType = RankedTensorType::get(newShape, resultType.getElementType(),
+                                         resultType.getEncoding());
+    Value newEmpty =
+        TensorEmptyOp::create(rewriter, op.getLoc(), newType, newDynamicDims);
+    // Preserve the original (dynamic) result type for existing users via a
+    // cast; it folds away once those users accept the refined static type.
+    rewriter.replaceOpWithNewOp<tensor::CastOp>(op, resultType, newEmpty);
+    return success();
+  }
+};
+
+} // namespace
+
 void TensorEmptyOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  // TODO(benvanik): fold static shapes into dims.
+  results.insert<FoldTensorEmptyConstantDims>(context);
 }
 
 //===----------------------------------------------------------------------===//
