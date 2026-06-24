@@ -921,3 +921,182 @@ util.func public @constant_pad_f32(%arg0: tensor<?x?xf32>, %x: index, %y: index)
 //       CHECK:   %[[PAD:.+]] = tensor.pad %[[ARG0]] low[1, 2] high[%[[H0]], %[[H1]]]
 //       CHECK:     tensor.yield %[[C1]]
 //       CHECK:   util.return %[[PAD]]
+
+// -----
+
+util.func public @raise_index_select_gather(%src: tensor<24576x512xf16>,
+                                            %idx: tensor<2048xi64>)
+    -> tensor<2048x512xf16> {
+  %empty = tensor.empty() : tensor<2048x512xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%idx : tensor<2048xi64>)
+      outs(%empty : tensor<2048x512xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %ci = arith.index_cast %in : i64 to index
+      %cj = linalg.index 1 : index
+      %e = tensor.extract %src[%ci, %cj] : tensor<24576x512xf16>
+      linalg.yield %e : f16
+    } -> tensor<2048x512xf16>
+  util.return %0 : tensor<2048x512xf16>
+}
+// CHECK-LABEL: util.func public @raise_index_select_gather
+//  CHECK-SAME:     %[[SRC:[A-Za-z0-9]+]]: tensor<24576x512xf16>
+//  CHECK-SAME:     %[[IDX:[A-Za-z0-9]+]]: tensor<2048xi64>
+//   CHECK-NOT:   linalg.generic
+//   CHECK-NOT:   tensor.extract
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather dimension_map = [0]
+//  CHECK-SAME:       ins(%[[SRC]], %[[IDX]] : tensor<24576x512xf16>, tensor<2048xi64>)
+//       CHECK:   util.return %[[GATHER]]
+
+// -----
+
+util.func public @raise_index_select_gather_3d(%src: tensor<1024x4x128xf16>,
+                                               %idx: tensor<8x2048xi32>)
+    -> tensor<8x2048x4x128xf16> {
+  %empty = tensor.empty() : tensor<8x2048x4x128xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+       iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%idx : tensor<8x2048xi32>)
+      outs(%empty : tensor<8x2048x4x128xf16>) {
+    ^bb0(%in: i32, %out: f16):
+      %ci = arith.index_cast %in : i32 to index
+      %cj = linalg.index 2 : index
+      %ck = linalg.index 3 : index
+      %e = tensor.extract %src[%ci, %cj, %ck] : tensor<1024x4x128xf16>
+      linalg.yield %e : f16
+    } -> tensor<8x2048x4x128xf16>
+  util.return %0 : tensor<8x2048x4x128xf16>
+}
+// CHECK-LABEL: util.func public @raise_index_select_gather_3d
+//  CHECK-SAME:     %[[SRC:[A-Za-z0-9]+]]: tensor<1024x4x128xf16>
+//  CHECK-SAME:     %[[IDX:[A-Za-z0-9]+]]: tensor<8x2048xi32>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather dimension_map = [0]
+//  CHECK-SAME:       ins(%[[SRC]], %[[IDX]] :
+//       CHECK:   util.return %[[GATHER]]
+
+// -----
+
+// Don't raise when an index doesn't come from a recognized source.
+util.func public @no_raise_offset_gather(%src: tensor<24576x512xf16>,
+                                         %idx: tensor<2048xi64>,
+                                         %off: i64) -> tensor<2048x512xf16> {
+  %empty = tensor.empty() : tensor<2048x512xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%idx : tensor<2048xi64>)
+      outs(%empty : tensor<2048x512xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %sum = arith.addi %in, %off : i64
+      %ci = arith.index_cast %sum : i64 to index
+      %cj = linalg.index 1 : index
+      %e = tensor.extract %src[%ci, %cj] : tensor<24576x512xf16>
+      linalg.yield %e : f16
+    } -> tensor<2048x512xf16>
+  util.return %0 : tensor<2048x512xf16>
+}
+// CHECK-LABEL: util.func public @no_raise_offset_gather
+//   CHECK-NOT:   iree_linalg_ext.gather
+//       CHECK:   linalg.generic
+//       CHECK:   tensor.extract
+
+// -----
+
+// Pure indexed case is the smallest possible gather.
+util.func public @raise_index_select_1d(%src: tensor<2048xf16>,
+                                        %idx: tensor<128xi64>)
+    -> tensor<128xf16> {
+  %empty = tensor.empty() : tensor<128xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+       iterator_types = ["parallel"]}
+      ins(%idx : tensor<128xi64>)
+      outs(%empty : tensor<128xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %ci = arith.index_cast %in : i64 to index
+      %e = tensor.extract %src[%ci] : tensor<2048xf16>
+      linalg.yield %e : f16
+    } -> tensor<128xf16>
+  util.return %0 : tensor<128xf16>
+}
+// CHECK-LABEL: util.func public @raise_index_select_1d
+//  CHECK-SAME:     %[[SRC:[A-Za-z0-9]+]]: tensor<2048xf16>
+//  CHECK-SAME:     %[[IDX:[A-Za-z0-9]+]]: tensor<128xi64>
+//       CHECK:   %[[GATHER:.+]] = iree_linalg_ext.gather dimension_map = [0]
+//  CHECK-SAME:       ins(%[[SRC]], %[[IDX]] : tensor<2048xf16>, tensor<128xi64>)
+//       CHECK:   util.return %[[GATHER]]
+
+// -----
+
+util.func public @no_raise_trailing_indexed(%src: tensor<512x24576xf16>,
+                                            %idx: tensor<2048xi64>)
+    -> tensor<2048x512xf16> {
+  %empty = tensor.empty() : tensor<2048x512xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      ins(%idx : tensor<2048xi64>)
+      outs(%empty : tensor<2048x512xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %ci = arith.index_cast %in : i64 to index
+      %d1 = linalg.index 1 : index
+      %e = tensor.extract %src[%d1, %ci] : tensor<512x24576xf16>
+      linalg.yield %e : f16
+    } -> tensor<2048x512xf16>
+  util.return %0 : tensor<2048x512xf16>
+}
+// CHECK-LABEL: util.func public @no_raise_trailing_indexed
+//   CHECK-NOT:   iree_linalg_ext.gather
+
+// -----
+
+// Pure slice case is basically the generic being a pure broadcast/copy,
+// not a gather.
+util.func public @no_raise_pure_slice(%src: tensor<2048x512xf16>)
+    -> tensor<2048x512xf16> {
+  %empty = tensor.empty() : tensor<2048x512xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]}
+      outs(%empty : tensor<2048x512xf16>) {
+    ^bb0(%out: f16):
+      %d0 = linalg.index 0 : index
+      %d1 = linalg.index 1 : index
+      %e = tensor.extract %src[%d0, %d1] : tensor<2048x512xf16>
+      linalg.yield %e : f16
+    } -> tensor<2048x512xf16>
+  util.return %0 : tensor<2048x512xf16>
+}
+// CHECK-LABEL: util.func public @no_raise_pure_slice
+//   CHECK-NOT:   iree_linalg_ext.gather
+
+// -----
+
+util.func public @no_raise_transposed_slice(%src: tensor<24576x4x128xf16>,
+                                            %idx: tensor<2048xi64>)
+    -> tensor<2048x128x4xf16> {
+  %empty = tensor.empty() : tensor<2048x128x4xf16>
+  %0 = linalg.generic
+      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+       iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%idx : tensor<2048xi64>)
+      outs(%empty : tensor<2048x128x4xf16>) {
+    ^bb0(%in: i64, %out: f16):
+      %ci = arith.index_cast %in : i64 to index
+      %a = linalg.index 1 : index
+      %b = linalg.index 2 : index
+      %e = tensor.extract %src[%ci, %b, %a] : tensor<24576x4x128xf16>
+      linalg.yield %e : f16
+    } -> tensor<2048x128x4xf16>
+  util.return %0 : tensor<2048x128x4xf16>
+}
+// CHECK-LABEL: util.func public @no_raise_transposed_slice
+//   CHECK-NOT:   iree_linalg_ext.gather

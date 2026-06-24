@@ -24,6 +24,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -39,6 +40,214 @@ namespace {
 //===----------------------------------------------------------------------===//
 // Slice Raising
 //===----------------------------------------------------------------------===//
+
+/// (sourceDim, loopDim) pair for each slice source dim of the gather.
+struct GatherSliceDim {
+  /// Position of this slice dim in the gather's `source` tensor.
+  int64_t sourceDim;
+  /// Loop dim of the `linalg.generic` driving this slice dim (via
+  /// `linalg.index loopDim`).
+  unsigned loopDim;
+};
+
+/// Match record for a `linalg.generic` recognized as an
+/// `iree_linalg_ext.gather`.
+struct GatherMatch {
+  /// Source tensor read by the body's `tensor.extract`.
+  Value source;
+  /// `ins` operand of the `linalg.generic` carrying the gather indices.
+  OpOperand *indicesOperand;
+  /// Source dim that is read via `indices` (becomes `dimension_map[0]`).
+  int64_t indexedDim;
+  /// Source dims read via `linalg.index` (the slice dims).
+  SmallVector<GatherSliceDim> slice;
+};
+
+/// Coarse structural filter:
+///   - Pure tensor semantics, single `outs`, all-parallel iterators.
+///   - Identity output indexing map (matches the gather op's output map).
+static bool isGatherCandidateShape(linalg::GenericOp linalgOp) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return false;
+  }
+  if (linalgOp.getNumDpsInits() != 1) {
+    return false;
+  }
+  if (!llvm::all_of(linalgOp.getIteratorTypesArray(),
+                    linalg::isParallelIterator)) {
+    return false;
+  }
+  return linalgOp.getMatchingIndexingMap(linalgOp.getDpsInitOperand(0))
+      .isIdentity();
+}
+
+/// Body match for a gather:
+///   - Exactly one `tensor.extract`, yielded directly by `linalg.yield`.
+///   - All body ops are memory-effect-free.
+///   - The extract source is captured from outside the body.
+///   - Each extract index is `linalg.index N` (slice) or
+///     `arith.index_cast %blockArg` of an `ins` block arg (indexed).
+///   - Exactly one indexed dim (`index_depth == 1`).
+///   - Every other `ins` operand has an unused block argument (we'd
+///     otherwise silently drop live computation when dropping the body).
+static FailureOr<GatherMatch> matchGatherBody(linalg::GenericOp linalgOp) {
+  Block *body = linalgOp.getBody();
+
+  auto extractOps = body->getOps<tensor::ExtractOp>();
+  if (!llvm::hasSingleElement(extractOps)) {
+    return failure();
+  }
+  tensor::ExtractOp extractOp = *extractOps.begin();
+  auto yieldOp = dyn_cast<linalg::YieldOp>(body->getTerminator());
+  if (!yieldOp || yieldOp.getNumOperands() != 1 ||
+      yieldOp.getOperand(0) != extractOp.getResult()) {
+    return failure();
+  }
+
+  for (Operation &op : body->without_terminator()) {
+    if (!isMemoryEffectFree(&op)) {
+      return failure();
+    }
+  }
+
+  Value source = extractOp.getTensor();
+  if (source.getParentBlock() == body) {
+    return failure();
+  }
+
+  std::optional<unsigned> indicesArgNo;
+  std::optional<int64_t> indexedDim;
+  SmallVector<GatherSliceDim> slice;
+  for (auto [srcDim, indexValue] : llvm::enumerate(extractOp.getIndices())) {
+    if (auto idxOp = indexValue.getDefiningOp<linalg::IndexOp>()) {
+      slice.push_back({static_cast<int64_t>(srcDim),
+                       static_cast<unsigned>(idxOp.getDim())});
+      continue;
+    }
+    auto castOp = indexValue.getDefiningOp<arith::IndexCastOp>();
+    if (!castOp) {
+      return failure();
+    }
+    auto blockArg = dyn_cast<BlockArgument>(castOp.getIn());
+    if (!blockArg || blockArg.getOwner() != body) {
+      return failure();
+    }
+    unsigned argNo = blockArg.getArgNumber();
+    if (argNo >= linalgOp.getNumDpsInputs() || indicesArgNo) {
+      return failure();
+    }
+    indicesArgNo = argNo;
+    indexedDim = static_cast<int64_t>(srcDim);
+  }
+  if (!indicesArgNo) {
+    return failure();
+  }
+
+  for (OpOperand *insOp : linalgOp.getDpsInputOperands()) {
+    unsigned argNo = insOp->getOperandNumber();
+    if (argNo == *indicesArgNo) {
+      continue;
+    }
+    if (!body->getArgument(argNo).use_empty()) {
+      return failure();
+    }
+  }
+
+  return GatherMatch{source, linalgOp.getDpsInputOperand(*indicesArgNo),
+                     *indexedDim, std::move(slice)};
+}
+
+/// Geometry check:
+///   - Iteration domain partitions cleanly into batch + slice dims.
+///   - Slice source dims align with trailing output dims.
+///   - Indices indexing map is identity-on-batch with shape equal to the
+///     output's batch portion.
+static LogicalResult verifyGatherGeometry(linalg::GenericOp linalgOp,
+                                          GatherMatch &match) {
+  auto sourceType = dyn_cast<RankedTensorType>(match.source.getType());
+  auto outputType = dyn_cast<RankedTensorType>(linalgOp.getResult(0).getType());
+  auto indicesType =
+      dyn_cast<RankedTensorType>(match.indicesOperand->get().getType());
+  if (!sourceType || !outputType || !indicesType ||
+      !indicesType.getElementType().isIntOrIndex()) {
+    return failure();
+  }
+
+  // The gather op's `dimension_map` is a permutation of [0, index_depth), so
+  // the indexed source dims are always the leading `index_depth` dims of
+  // `source`; the op has no representation for an indexed dim sitting after a
+  // slice dim - that would require an explicit source transpose, which we don't
+  // currently support.
+  if (match.indexedDim != 0) {
+    return failure();
+  }
+
+  // With index_depth == 1: output rank == batch_rank + (source_rank - 1),
+  // and source dims [1, sourceRank) are the slice dims in order.
+  int64_t sliceRank = sourceType.getRank() - /*indexDepth=*/1;
+  if (sliceRank < 0) {
+    return failure();
+  }
+  int64_t batchRank = outputType.getRank() - sliceRank;
+  if (batchRank < 1 || static_cast<int64_t>(match.slice.size()) != sliceRank) {
+    return failure();
+  }
+  llvm::sort(match.slice, [](const GatherSliceDim &a, const GatherSliceDim &b) {
+    return a.sourceDim < b.sourceDim;
+  });
+  for (auto [i, p] : llvm::enumerate(match.slice)) {
+    if (p.sourceDim != static_cast<int64_t>(i) + 1 ||
+        p.loopDim != static_cast<unsigned>(batchRank + i)) {
+      return failure();
+    }
+  }
+
+  AffineMap indicesMap = linalgOp.getMatchingIndexingMap(match.indicesOperand);
+  if (indicesMap.getNumResults() != batchRank) {
+    return failure();
+  }
+  for (unsigned d = 0; d < batchRank; ++d) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(indicesMap.getResult(d));
+    if (!dimExpr || dimExpr.getPosition() != d) {
+      return failure();
+    }
+  }
+  if (indicesType.getShape() != outputType.getShape().take_front(batchRank)) {
+    return failure();
+  }
+  return success();
+}
+
+/// Match a `linalg.generic` that should raise to `iree_linalg_ext.gather`.
+static FailureOr<GatherMatch> matchGatherOp(linalg::GenericOp linalgOp) {
+  if (!isGatherCandidateShape(linalgOp)) {
+    return failure();
+  }
+  FailureOr<GatherMatch> match = matchGatherBody(linalgOp);
+  if (failed(match)) {
+    return failure();
+  }
+  if (failed(verifyGatherGeometry(linalgOp, *match))) {
+    return failure();
+  }
+  return match;
+}
+
+/// Matches a linalg.generic operation that has the structural shape of a
+/// gather and raises it to `iree_linalg_ext.gather`. Match -> build.
+static FailureOr<IREE::LinalgExt::GatherOp>
+raiseGenericToGather(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
+  FailureOr<GatherMatch> match = matchGatherOp(linalgOp);
+  if (failed(match)) {
+    return failure();
+  }
+  Value output = linalgOp.getDpsInitOperand(0)->get();
+  SmallVector<int64_t> dimensionMap = {match->indexedDim};
+  return IREE::LinalgExt::GatherOp::create(
+      rewriter, linalgOp.getLoc(), TypeRange{linalgOp.getResult(0).getType()},
+      /*source=*/match->source, /*indices=*/match->indicesOperand->get(),
+      /*mask=*/Value{}, /*output=*/output, dimensionMap);
+}
 
 /// Matches a linalg.generic operation reading data from a tensor `source` using
 /// tensor.extract, and raises the `source` tensor to an input of the linalg
@@ -1305,9 +1514,22 @@ struct RaiseSpecialOpsPass
     funcOp->walk([&](linalg::GenericOp op) { genericOps.push_back(op); });
 
     for (linalg::GenericOp linalgOp : genericOps) {
-      // Try raising to tensor.extract to an input and create an linalg.generic.
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPoint(linalgOp);
+
+      // First, try raising the generic to iree_linalg_ext.gather. This must
+      // run before raiseTensorExtractToInput because the gather form has a
+      // tensor.extract whose indices come from a captured `ins` operand
+      // (via arith.index_cast), which raiseTensorExtractToInput doesn't
+      // recognize and would prevent us from ever lifting this to a gather.
+      FailureOr<IREE::LinalgExt::GatherOp> maybeGather =
+          raiseGenericToGather(linalgOp, rewriter);
+      if (succeeded(maybeGather)) {
+        rewriter.replaceOp(linalgOp, maybeGather->getResult(0));
+        continue;
+      }
+
+      // Try raising to tensor.extract to an input and create an linalg.generic.
       FailureOr<linalg::GenericOp> maybeNewOp =
           raiseTensorExtractToInput(linalgOp, rewriter);
       if (succeeded(maybeNewOp)) {

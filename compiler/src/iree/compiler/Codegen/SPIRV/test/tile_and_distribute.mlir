@@ -460,3 +460,32 @@ hal.executable @matvec {
 //       CHECK:       linalg.matvec
 //  CHECK-SAME:         ins(%[[INPUT]], %[[B]] : memref<1x1024xf32, strided<[1024, 1], offset: ?>>, memref<1024xf32>
 //  CHECK-SAME:         outs(%[[OUTPUT]] : memref<1xf32, strided<[1], offset: ?>>)
+
+// -----
+
+#translation = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute> workgroup_size = [64, 1, 1]>
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @copy_only_dispatch {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
+    hal.executable.export public @copy_only_dispatch layout(#pipeline_layout) attributes {
+      workgroup_size = [64: index, 1: index, 1: index],
+      translation_info = #translation
+    }
+    builtin.module {
+      func.func @copy_only_dispatch() {
+        %c0 = arith.constant 0 : index
+        %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<1x5xi32>
+        %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<1x5xi32>
+        memref.copy %src, %dst : memref<1x5xi32> to memref<1x5xi32>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @copy_only_dispatch()
+//       CHECK:   memref.copy
+//   CHECK-NOT:   gpu.thread_id
