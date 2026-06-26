@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Casting.h"
@@ -21,12 +22,76 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 #include <cassert>
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
 namespace mlir::iree_compiler {
+
+// Helper method that checks the tile sizes and scalable flags passed against
+// the inner tiles of pack/unpack operations and sets the corresponding inner
+// tile alignment hints on tile sizes corresponding to scalable inner tiles.
+static SmallVector<mlir::InnerTileAlignment>
+setAlignmentHints(ArrayRef<int64_t> innerDimsPos, ArrayRef<OpFoldResult> innerTiles,
+             int64_t rank, SizesAndScalableFlags sizesAndFlags) {
+  SmallVector<mlir::InnerTileAlignment> alignments(
+      rank, mlir::InnerTileAlignment::Unknown);
+  for (auto [pos, innerTile, tile, scalable] :
+       llvm::zip_equal(innerDimsPos, innerTiles, sizesAndFlags.first,
+                       sizesAndFlags.second)) {
+    // TODO: implement and check vscale ranges to decide if static tile
+    // sizes are multiples of scalable inner tile sizes.
+    if (!scalable) {
+      continue;
+    }
+    auto innerTileVal = dyn_cast<Value>(innerTile);
+    std::optional<int64_t> innerTileCst =
+        vector::getConstantVscaleMultiplier(innerTileVal);
+    // If we have a static or a non-scalable dynamic inner tile size, skip.
+    if (!innerTileCst) {
+      continue;
+    }
+    auto kind = mlir::InnerTileAlignment::Unknown;
+    if (tile == *innerTileCst) {
+      kind = mlir::InnerTileAlignment::Equal;
+    } else if (tile % *innerTileCst == 0) {
+      kind = mlir::InnerTileAlignment::Multiple;
+    }
+    alignments[pos] = kind;
+  }
+  return alignments;
+}
+
+scf::InnerTileAlignmentFnTy
+makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel) {
+  return [tilingLevel](
+             TilingInterface op, ArrayRef<OpFoldResult>,
+             ArrayRef<Operation *>) -> SmallVector<mlir::InnerTileAlignment> {
+    if (!isa<linalg::UnPackOp, linalg::PackOp>(op)) {
+      return {};
+    }
+    auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
+        getLoweringConfig(op).getTilingLevelAttr(
+            static_cast<unsigned>(tilingLevel)));
+    SizesAndScalableFlags sizesAndScalableFlags{
+        tileSizesAttr.getSizes(), tileSizesAttr.getScalableFlags()};
+    if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op.getOperation())) {
+      return setAlignmentHints(
+          unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles(),
+          cast<ShapedType>(unpackOp.getDest().getType()).getRank(),
+          sizesAndScalableFlags);
+    }
+    if (auto packOp = dyn_cast<linalg::PackOp>(op.getOperation())) {
+      return setAlignmentHints(
+          packOp.getInnerDimsPos(), packOp.getMixedTiles(),
+          cast<ShapedType>(packOp.getSource().getType()).getRank(),
+          sizesAndScalableFlags);
+    }
+    return {};
+  };
+}
 
 void fuseProducersOfSlices(RewriterBase &rewriter,
                            std::queue<Operation *> &worklist,
@@ -54,7 +119,9 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedResult =
-        scf::tileAndFuseProducerOfSlice(rewriter, candidateSlice, loops);
+        scf::tileAndFuseProducerOfSlice(
+            rewriter, candidateSlice, loops,
+            options.tilingOptions.innerTileAlignmentFn);
     if (!fusedResult) {
       continue;
     }
@@ -109,10 +176,11 @@ struct ConsumerFusionQueueEntry {
 };
 } // namespace
 
-FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        std::function<bool(Operation *)> filterFn) {
+FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
+    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
+    MutableArrayRef<LoopLikeOpInterface> loops,
+    std::function<bool(Operation *)> filterFn,
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn) {
   // Collect the candidate slices which can be potential consumers that can be
   // fused. Keep them in a vector reverse-sorted by dominance: the candidate
   // dominating others comes last (so it can be cheaply popped from the vector).
@@ -213,7 +281,8 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     ConsumerFusionQueueEntry entry = candidates.pop_back_val();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops);
+        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops,
+                                       innerTileAlignmentFn);
     if (failed(fusedResult)) {
       return failure();
     }
