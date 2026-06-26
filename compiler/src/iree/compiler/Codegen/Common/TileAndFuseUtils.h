@@ -31,15 +31,26 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
+/// Returns an `scf::InnerTileAlignmentFnTy` control function that asserts
+/// `kind` (typically `Multiple` at the distribution level, `Equal` at the
+/// vector level) at each scalable (dynamic) inner tile of a tiled/fused
+/// linalg.pack/linalg.unpack op, computed in that op's own iteration domain;
+/// every other op gets no hint. IREE's KernelDispatch guarantees this
+/// relationship on scalable dims, so the assertion holds. The SCF driver
+/// invokes the function per op, so it threads correctly through intervening ops
+/// such as a transposing producer (see llvm/llvm-project#150185).
+scf::InnerTileAlignmentFnTy
+makeInnerTileAlignmentFn(mlir::InnerTileAlignment kind);
+
 /// Fuse all consumers of the given `tiledOps` into the surrounding `scf.forall`
 /// unless specified otherwise by `filterFn`. Returns a list of new
 /// `tensor.extract_slice` ops with new fusion opportunities.
 FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
     RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     MutableArrayRef<LoopLikeOpInterface> loops,
-    std::function<bool(Operation *)> filterFn = [](Operation *) {
-      return true;
-    });
+    std::function<bool(Operation *)> filterFn =
+        [](Operation *) { return true; },
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn = nullptr);
 
 /// Apply a tile and fuse transformation to all payload ops and store both the
 /// tiled operation as well as the created tile loops.
