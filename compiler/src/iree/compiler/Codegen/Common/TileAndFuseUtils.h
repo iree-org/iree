@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TILEANDFUSEUTILS_H_
 
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -31,15 +32,25 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
+/// Returns an inner tile alignment control function that asserts
+/// `Multiple` at the distribution level, `Equal` at the
+/// vector level at each scalable (dynamic) inner tile of a tiled/fused
+/// linalg.pack/linalg.unpack op, computed in that op's own iteration domain;
+/// every other op gets no hint. IREE's KernelDispatch guarantees this
+/// relationship on scalable dims, so the assertion holds. The SCF driver
+/// invokes the function per op, so it threads correctly.
+scf::InnerTileAlignmentFnTy
+makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel);
+
 /// Fuse all consumers of the given `tiledOps` into the surrounding `scf.forall`
 /// unless specified otherwise by `filterFn`. Returns a list of new
 /// `tensor.extract_slice` ops with new fusion opportunities.
 FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
     RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     MutableArrayRef<LoopLikeOpInterface> loops,
-    std::function<bool(Operation *)> filterFn = [](Operation *) {
-      return true;
-    });
+    std::function<bool(Operation *)> filterFn =
+        [](Operation *) { return true; },
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn = nullptr);
 
 /// Apply a tile and fuse transformation to all payload ops and store both the
 /// tiled operation as well as the created tile loops.

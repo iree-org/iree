@@ -187,9 +187,15 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   tileSizes.resize(numLoops, 0);
   tileScalableFlags.resize(numLoops, false);
 
+  // Get the caller-asserted alignment function of a tiled/fused
+  // linalg.pack/unpack op's inner tiles to the loop tile sizes.
+  scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
+      makeInnerTileAlignmentFn(tilingLevel);
+
   scf::SCFTilingOptions tilingOptions;
   setSCFTileSizes(tilingOptions, rootOp, std::move(tileSizes),
                   std::move(tileScalableFlags));
+  tilingOptions.setInnerTileAlignmentFn(innerTileAlignmentFn);
 
   // onlyFuseProducerInputOperands implies reduction tiling.
   if (!onlyFuseProducerInputOperands) {
@@ -262,7 +268,8 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
             [&tiledAndFusedOps, &unfusableOps](Operation *op) {
               return tiledAndFusedOps.contains(op) &&
                      !unfusableOps.contains(op);
-            });
+            },
+            innerTileAlignmentFn);
 
     if (failed(newFusionOpportunities)) {
       LDBG() << "failed to fuse consumers, skip";
