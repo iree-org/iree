@@ -187,9 +187,22 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   tileSizes.resize(numLoops, 0);
   tileScalableFlags.resize(numLoops, false);
 
+  // Caller-asserted alignment of a tiled/fused linalg.pack/unpack op's inner
+  // tiles to the loop tile sizes (InnerTileAlignment;
+  // llvm/llvm-project#150185). IREE's KernelDispatch sets the vector tile size
+  // EQUAL to the inner tile on scalable dims, so each scalable dim is Equal;
+  // static dims stay Unknown and are handled by the existing static path. The
+  // control function is evaluated by the SCF driver once per tiled/fused
+  // pack/unpack op, in that op's own iteration domain (keying off its scalable,
+  // i.e. dynamic, inner tiles), so it threads correctly through intervening
+  // ops; every other op gets no hint.
+  scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
+      makeInnerTileAlignmentFn(mlir::InnerTileAlignment::Equal);
+
   scf::SCFTilingOptions tilingOptions;
   setSCFTileSizes(tilingOptions, rootOp, std::move(tileSizes),
                   std::move(tileScalableFlags));
+  tilingOptions.setInnerTileAlignmentFn(innerTileAlignmentFn);
 
   // onlyFuseProducerInputOperands implies reduction tiling.
   if (!onlyFuseProducerInputOperands) {
@@ -262,7 +275,8 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
             [&tiledAndFusedOps, &unfusableOps](Operation *op) {
               return tiledAndFusedOps.contains(op) &&
                      !unfusableOps.contains(op);
-            });
+            },
+            innerTileAlignmentFn);
 
     if (failed(newFusionOpportunities)) {
       LDBG() << "failed to fuse consumers, skip";
