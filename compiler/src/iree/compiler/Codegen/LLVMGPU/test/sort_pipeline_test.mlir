@@ -10,7 +10,8 @@ module {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi32>>
     %1 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi32>> -> tensor<4xi32>
-    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(0) outs(%1 : tensor<4xi32>) {
+    %empty = tensor.empty() : tensor<4xi32>
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(0) ins(%1 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
@@ -33,7 +34,8 @@ module {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2000x30000xi32>>
     %1 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 4], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2000x30000xi32>> -> tensor<2000x30000xi32>
-    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(1) outs(%1 : tensor<2000x30000xi32>) {
+    %empty = tensor.empty() : tensor<2000x30000xi32>
+    %2 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(1) ins(%1 : tensor<2000x30000xi32>) outs(%empty : tensor<2000x30000xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %3 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %3 : i1
@@ -63,7 +65,8 @@ module {
     %4 = iree_tensor_ext.dispatch.workload.ordinal %3, 0 : index
     %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%2) flags(Indirect) {iree_gpu.use_rocdl_buffer_instructions} : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4}
     %6 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0, 0], sizes = [%4, 2, 4], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x2x4xi32>>{%4} -> tensor<?x2x4xi32>
-    %7 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(2) outs(%6 : tensor<?x2x4xi32>) {
+    %empty = tensor.empty(%4) : tensor<?x2x4xi32>
+    %7 = iree_linalg_ext.sort {lowering_config = #lowering_config} dimension(2) ins(%6 : tensor<?x2x4xi32>) outs(%empty : tensor<?x2x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %8 = arith.cmpi slt, %arg0, %arg1 : i32
       iree_linalg_ext.yield %8 : i1

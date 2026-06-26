@@ -1,9 +1,10 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
 func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+  %empty = tensor.empty() : tensor<128xi32>
   %0 = iree_linalg_ext.sort
     dimension(0)
-    outs(%arg0 : tensor<128xi32>) {
+    ins(%arg0 : tensor<128xi32>) outs(%empty : tensor<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %1 : i1
@@ -11,16 +12,17 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   return %0 : tensor<128xi32>
 }
 // CHECK-LABEL: func.func @sort_tensor(
-// CHECK:         iree_linalg_ext.sort
-// CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs({{.*}})
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<128xi32>
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
+// CHECK:           dimension(0)
+// CHECK:           ins(%{{.+}} : tensor<128xi32>) outs(%[[EMPTY]] : tensor<128xi32>)
 // CHECK:           iree_linalg_ext.yield
 
 // -----
 
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
-    outs(%arg0 : memref<128xi32>) {
+    ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):
     %0 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %0 : i1
@@ -38,8 +40,16 @@ func.func @sort_memref(%arg0: memref<128xi32>) {
 func.func @sort_multi_result_tensor(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %c1 = arith.constant 1 : index
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %d2 = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %d3 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty0 = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %empty1 = tensor.empty(%d2, %d3) : tensor<?x?xf32>
   %0:2 = iree_linalg_ext.sort dimension(0)
-      outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
+      ins(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) outs(%empty0, %empty1 : tensor<?x?xi32>, tensor<?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
@@ -49,8 +59,18 @@ func.func @sort_multi_result_tensor(
 // CHECK-LABEL: func.func @sort_multi_result_tensor(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<?x?xf32>
-//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-//  CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
+//   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG1]], %[[C0]] : tensor<?x?xf32>
+//   CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG1]], %[[C1]] : tensor<?x?xf32>
+//   CHECK-DAG:   %[[EMPTY0:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
+//   CHECK-DAG:   %[[EMPTY1:.+]] = tensor.empty(%[[D2]], %[[D3]]) : tensor<?x?xf32>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.sort
+//       CHECK:       dimension(0)
+//       CHECK:       ins(%[[ARG0]], %[[ARG1]] : tensor<?x?xi32>,
+//       CHECK:           tensor<?x?xf32>) outs(%[[EMPTY0]], %[[EMPTY1]] : tensor<?x?xi32>, tensor<?x?xf32>)
 //       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
 
 // -----
@@ -58,7 +78,7 @@ func.func @sort_multi_result_tensor(
 func.func @sort_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort dimension(0)
-     outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
+     ins(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
        %1 = arith.cmpf ogt, %arg4, %arg5 : f32
        iree_linalg_ext.yield %1 : i1
