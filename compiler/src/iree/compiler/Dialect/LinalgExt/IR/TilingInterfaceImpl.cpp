@@ -4005,6 +4005,219 @@ LogicalResult CustomOp::getResultTilePosition(
 // tensor::ConcatOp
 //===---------------------------------------------------------------------===//
 
+// InnerTileAlignment hint-bearing TilingInterface overloads. These ops do not
+// consult the hint (only linalg.pack/unpack do); the overloads exist so that
+// the ops -- which list the hint-less method in DeclareOpInterfaceMethods --
+// also define the defaulted hint-bearing arity and avoid C++ name hiding.
+FailureOr<TilingResult> ArgCompareOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> AttentionOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> CustomOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> ExpReductionOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> FftOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> GatherOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> MapLoadOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> MapStoreOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> OnlineAttentionOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> ScanOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> ScatterOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> SortOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> TopkOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> WinogradInputTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> ArgCompareOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult> AttentionOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult> ExpReductionOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult> GatherOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult> MapLoadOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+// Additional hint-bearing TilingInterface overloads (ops added/extended since
+// the base of the InnerTileAlignment work). These ops ignore the hint.
+FailureOr<TilingResult> Im2colOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> TopkV2Op::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+FailureOr<TilingResult> Im2colOp::generateResultTileValue(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult> MapLoadOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementationFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes);
+}
+
+LogicalResult MapLoadOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getIterationDomainTileFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes, iterDomainOffsets,
+                                                iterDomainSizes);
+}
+
+FailureOr<TilingResult> MapStoreOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementationFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes);
+}
+
+LogicalResult MapStoreOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getIterationDomainTileFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes, iterDomainOffsets,
+                                                iterDomainSizes);
+}
+
+FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementationFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes);
+}
+
+LogicalResult ScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getIterationDomainTileFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes, iterDomainOffsets,
+                                                iterDomainSizes);
+}
+
 namespace {
 struct ConcatOpTilingExternalModel
     : TilingInterface::ExternalModel<ConcatOpTilingExternalModel,
@@ -4028,6 +4241,20 @@ struct ConcatOpTilingExternalModel
                           unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
                           ArrayRef<OpFoldResult> sizes) const {
     return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  FailureOr<TilingResult> getTiledImplementation(
+      Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  FailureOr<TilingResult>
+  generateResultTileValue(Operation *op, OpBuilder &builder,
+                          unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+                          ArrayRef<OpFoldResult> sizes,
+                          ArrayRef<mlir::InnerTileAlignment>) const {
+    return generateResultTileValue(op, builder, resultNumber, offsets, sizes);
   }
 
   LogicalResult
