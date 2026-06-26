@@ -8,15 +8,19 @@ func.func @sort(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xi64>) -> (tensor<3x4xf
   } -> tensor<3x4xf32>, tensor<3x4xi64>
   return %0#0, %0#1 : tensor<3x4xf32>, tensor<3x4xi64>
 }
-// CHECK-LABEL:   func.func @sort(
-// CHECK-SAME:            %[[INPUT:.*]]: tensor<3x4xf32>, %[[INDICES:.*]]: tensor<3x4xi64>) -> (tensor<3x4xf32>, tensor<3x4xi64>) {
-// CHECK:          %[[SORT:.*]]:2 = iree_linalg_ext.sort
-// CHECK-SAME:            dimension(1)
-// CHECK-SAME:            outs(%[[INPUT]], %[[INDICES]] : tensor<3x4xf32>, tensor<3x4xi64>) {
-// CHECK:          ^bb0(%[[INP1:.*]]: f32, %[[INP2:.*]]: f32, %{{.*}}: i64, %{{.*}}: i64):
-// CHECK:            %[[PREDICATE:.*]] = arith.cmpf ole, %[[INP1]], %[[INP2]] : f32
-// CHECK:            iree_linalg_ext.yield %[[PREDICATE]] : i1
-// CHECK:          } -> tensor<3x4xf32>, tensor<3x4xi64>
-// CHECK:          return %[[SORT]]#0, %[[SORT]]#1 : tensor<3x4xf32>, tensor<3x4xi64>
+// CHECK-LABEL: func.func @sort(
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<3x4xf32>
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]: tensor<3x4xi64>
+// CHECK:        %[[EMPTY_INPUT:.+]] = tensor.empty() : tensor<3x4xf32>
+// CHECK:        %[[EMPTY_INDICES:.+]] = tensor.empty() : tensor<3x4xi64>
+// CHECK:        %[[SORT:.+]]:2 = iree_linalg_ext.sort
+// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     ins(%[[INPUT]], %[[INDICES]] : tensor<3x4xf32>, tensor<3x4xi64>)
+// CHECK-SAME:     outs(%[[EMPTY_INPUT]], %[[EMPTY_INDICES]] : tensor<3x4xf32>, tensor<3x4xi64>) {
+// CHECK:        ^bb0(%[[INP1:.+]]: f32, %[[INP2:.+]]: f32, %{{.*}}: i64, %{{.*}}: i64):
+// CHECK:          %[[PREDICATE:.+]] = arith.cmpf ole, %[[INP1]], %[[INP2]] : f32
+// CHECK:          iree_linalg_ext.yield %[[PREDICATE]] : i1
+// CHECK:        } -> tensor<3x4xf32>, tensor<3x4xi64>
+// CHECK:        return %[[SORT]]#0, %[[SORT]]#1 : tensor<3x4xf32>, tensor<3x4xi64>
 
 // -----
