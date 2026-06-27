@@ -157,9 +157,11 @@ public:
                                ".spv", spvBinary);
     }
 
-    // The runtime use ordinals instead of names but Metal requires function
-    // names for constructing pipeline states. Get an ordered list of the entry
-    // point names.
+    // Collect the SPIR-V entry point function names. These are cross-compiled
+    // to MSL and used to construct Metal pipeline states; they are the MSL
+    // function names (which spirv-cross may rewrite to be MSL-legal) and are
+    // distinct from the hal.executable.export symbol names the runtime uses to
+    // look up exports by name.
     SmallVector<StringRef, 8> spirvEntryPointNames;
     spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
       spirvEntryPointNames.push_back(exportOp.getFn());
@@ -262,6 +264,7 @@ public:
          llvm::zip_equal(llvm::seq(mslShaders.size()), mslShaders,
                          mslEntryPointNames, exportOps)) {
       auto entryPointRef = builder.createString(entryPoint);
+      auto exportNameRef = builder.createString(exportOp.getName());
 
       iree_hal_metal_ThreadgroupSize_t threadgroupSize = {
           shader.threadgroupSize.x,
@@ -286,6 +289,7 @@ public:
       iree_hal_metal_PipelineDef_start(builder);
       iree_hal_metal_PipelineDef_library_ordinal_add(builder, i);
       iree_hal_metal_PipelineDef_entry_point_add(builder, entryPointRef);
+      iree_hal_metal_PipelineDef_name_add(builder, exportNameRef);
       iree_hal_metal_PipelineDef_threadgroup_size_add(builder,
                                                       &threadgroupSize);
       // TODO: embed additional metadata on threadgroup info if available.
