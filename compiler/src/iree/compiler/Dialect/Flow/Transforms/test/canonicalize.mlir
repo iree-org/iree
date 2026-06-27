@@ -71,3 +71,38 @@ util.func public @expand_affine(%arg0: index) -> index {
 //  CHECK-SAME:   %[[ARG0:.+]]: index
 //       CHECK:   %[[MUL:.+]] = arith.muli %[[ARG0]], %c4 overflow<nsw>
 //       CHECK:   util.return %[[MUL]]
+
+// -----
+
+util.func public @fold_broadcast_with_empty_tensor() -> tensor<16x64xf32> {
+  %input_empty = tensor.empty() : tensor<16xf32>
+  %init = tensor.empty() : tensor<16x64xf32>
+  %bcast = linalg.broadcast ins(%input_empty : tensor<16xf32>) outs(%init : tensor<16x64xf32>) dimensions = [1]
+  util.return %bcast : tensor<16x64xf32>
+}
+
+// CHECK-LABEL: util.func public @fold_broadcast_with_empty_tensor
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<16x64xf32>
+//       CHECK:   util.return %[[EMPTY]]
+
+// -----
+
+util.func public @fold_broadcast_generic_with_empty_tensor() -> tensor<16x64xf32> {
+  %input_empty = tensor.empty() : tensor<16xf32>
+  %init = tensor.empty() : tensor<16x64xf32>
+  %bcast = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0)>,
+      affine_map<(d0, d1) -> (d0, d1)>
+    ],
+    iterator_types = ["parallel", "parallel"]
+  } ins(%input_empty : tensor<16xf32>) outs(%init : tensor<16x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<16x64xf32>
+  util.return %bcast : tensor<16x64xf32>
+}
+
+// CHECK-LABEL: util.func public @fold_broadcast_generic_with_empty_tensor
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<16x64xf32>
+//       CHECK:   util.return %[[EMPTY]]
