@@ -303,7 +303,9 @@ iree_status_t iree_hal_metal_builtin_executable_copy_buffer(
 
   // Encode the dispatch.
   const iree_device_size_t workgroup_size = 32;
-  iree_device_size_t workgroup_count = iree_device_size_ceil_div(length, workgroup_size * 4);
+  // copy_buffer_1byte copies 1 byte/thread (no 4x expansion like the fill
+  // kernels), so the grid must span ceil(length/workgroup_size) workgroups.
+  iree_device_size_t workgroup_count = iree_device_size_ceil_div(length, workgroup_size);
   [encoder dispatchThreadgroups:MTLSizeMake(workgroup_count, 1, 1)
           threadsPerThreadgroup:MTLSizeMake(workgroup_size, 1, 1)];
 
