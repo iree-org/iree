@@ -668,6 +668,35 @@ func.func @consumer_fuse_scatter(%arg0: tensor<3x2048x2048xf32>,
 
 // -----
 
+// Scatter init is linalg.fill(tensor.empty); tile-and-fuse leaves the fill outside the workgroup
+// forall, which breaks workgroup distribution verification after bufferization. The pass should
+// move the fill into the forall body and use tensor.empty as shared_outs init.
+func.func @scatter_fill_shared_init_into_forall(
+    %updates: tensor<3x2048x2048xf32>,
+    %indices: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<3x2048x2048xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
+  %2 = iree_linalg_ext.scatter {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 256]]>}
+      dimension_map = [0] unique_indices(true)
+      ins(%updates, %indices : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%1 : tensor<3x2048x2048xf32>) {
+  ^bb0(%a: f32, %b: f32):
+    iree_linalg_ext.yield %a : f32
+  } -> tensor<3x2048x2048xf32>
+  return %2 : tensor<3x2048x2048xf32>
+}
+
+// CHECK-LABEL: func @scatter_fill_shared_init_into_forall
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty()
+//       CHECK:   %[[RESULT:.+]] = scf.forall
+//  CHECK-SAME:       shared_outs(%{{.+}} = %[[EMPTY]])
+// Tile/fuse may slice the shared tensor before the moved fill; fill must still
+// appear inside the forall before scatter (not between tensor.empty and forall).
+//       CHECK:     linalg.fill
+//       CHECK:     iree_linalg_ext.scatter
+
+// -----
+
 func.func @dont_transpose_dynamic(%0 : tensor<?x?xf32>, %1 : tensor<?x?xf32>, %2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %3 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>}
       ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>)
