@@ -19,6 +19,7 @@ iree_compiler_cc_library(
     name = "MapTransforms",
     srcs = [
         "MapDistributeGenericOps.cpp",
+        "MapDistributeMemoryOps.cpp",
         "MapDistributionUtils.cpp",
     ],
     hdrs = [
