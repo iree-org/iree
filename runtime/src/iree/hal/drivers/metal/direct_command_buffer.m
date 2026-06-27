@@ -177,6 +177,14 @@ typedef struct iree_hal_metal_command_buffer_t {
   // Per-queue shared uniform staging buffer for uploading parameters to the GPU, including argument
   // buffers and buffer update source buffers.
   iree_hal_metal_staging_buffer_t* staging_buffer;
+  // Dedicated GPU-visible source MTLBuffers backing update_buffer payloads that
+  // did not fit in the shared staging buffer. Each is a +1 reference retained for
+  // the lifetime of this command buffer's recorded segments: encoded blit copies
+  // reference them by raw handle, and the command buffer object itself is kept
+  // alive (via the device's submission resource set) until the GPU completes.
+  id<MTLBuffer>* retained_source_buffers;
+  iree_host_size_t retained_source_buffer_count;
+  iree_host_size_t retained_source_buffer_capacity;
 
   iree_allocator_t host_allocator;
 
@@ -254,6 +262,14 @@ static void iree_hal_metal_command_buffer_reset(iree_hal_metal_command_buffer_t*
   iree_hal_metal_end_compute_encoder(command_buffer);
   iree_hal_metal_command_segment_list_reset(&command_buffer->segments);
   iree_arena_reset(&command_buffer->arena);
+  // Release dedicated update_buffer source buffers captured during recording.
+  for (iree_host_size_t i = 0; i < command_buffer->retained_source_buffer_count; ++i) {
+    [command_buffer->retained_source_buffers[i] release];  // -1
+  }
+  iree_allocator_free(command_buffer->host_allocator, command_buffer->retained_source_buffers);
+  command_buffer->retained_source_buffers = NULL;
+  command_buffer->retained_source_buffer_count = 0;
+  command_buffer->retained_source_buffer_capacity = 0;
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -356,6 +372,9 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   command_buffer->builtin_executable = builtin_executable;
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->staging_buffer = staging_buffer;
+  command_buffer->retained_source_buffers = NULL;
+  command_buffer->retained_source_buffer_count = 0;
+  command_buffer->retained_source_buffer_capacity = 0;
   command_buffer->host_allocator = host_allocator;
   iree_status_t status = iree_ok_status();
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
@@ -771,6 +790,26 @@ static iree_status_t iree_hal_metal_command_segment_record_copy_buffer(
   return status;
 }
 
+// Takes ownership of the +1 reference in |buffer|, retaining it for the lifetime
+// of |command_buffer|'s recorded segments. Keeps dedicated update_buffer source
+// buffers alive until the GPU consumes them; released in command_buffer_reset.
+static iree_status_t iree_hal_metal_command_buffer_take_source_buffer(
+    iree_hal_metal_command_buffer_t* command_buffer, id<MTLBuffer> buffer) {
+  if (command_buffer->retained_source_buffer_count ==
+      command_buffer->retained_source_buffer_capacity) {
+    iree_host_size_t new_capacity = command_buffer->retained_source_buffer_capacity == 0
+                                        ? 4
+                                        : command_buffer->retained_source_buffer_capacity * 2;
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_realloc(command_buffer->host_allocator,
+                               new_capacity * sizeof(*command_buffer->retained_source_buffers),
+                               (void**)&command_buffer->retained_source_buffers));
+    command_buffer->retained_source_buffer_capacity = new_capacity;
+  }
+  command_buffer->retained_source_buffers[command_buffer->retained_source_buffer_count++] = buffer;
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref,
@@ -779,15 +818,47 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
       iree_hal_metal_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // There are no direct corresponding APIs in Metal. We update the source buffer data to the
-  // staging buffer and then copy over.
+  // There are no direct corresponding APIs in Metal. We capture the source data
+  // into a GPU-visible buffer and then blit it over. The shared per-queue staging
+  // buffer is used as a fast path; when an update does not fit its remaining
+  // capacity we spill to a dedicated shared-storage MTLBuffer so that arbitrary-
+  // size and arbitrarily-many updates never overflow the staging region.
 
   iree_const_byte_span_t source_data_span =
       iree_make_const_byte_span((uint8_t*)source_buffer + source_offset, target_ref.length);
-  uint32_t offset = 0;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_metal_staging_buffer_append(command_buffer->staging_buffer, source_data_span,
-                                               /*alignment=*/4, &offset));
+
+  id<MTLBuffer> source_device_buffer = command_buffer->staging_buffer->metal_buffer;
+  iree_device_size_t source_offset_in_buffer = 0;
+  uint32_t staging_offset = 0;
+  iree_status_t status = iree_hal_metal_staging_buffer_append(
+      command_buffer->staging_buffer, source_data_span, /*alignment=*/4, &staging_offset);
+  if (iree_status_is_resource_exhausted(status) || iree_status_is_out_of_range(status)) {
+    // Spill: allocate a dedicated shared-storage buffer sized to this payload.
+    iree_status_ignore(status);
+    id<MTLDevice> metal_device = [command_buffer->queue device];
+    MTLResourceOptions options =
+        MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined;
+    id<MTLBuffer> dedicated_buffer = [metal_device newBufferWithLength:target_ref.length
+                                                               options:options];  // +1
+    if (dedicated_buffer == nil) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "failed to allocate a dedicated Metal buffer for update_buffer");
+    }
+    memcpy(dedicated_buffer.contents, source_data_span.data, target_ref.length);
+    status = iree_hal_metal_command_buffer_take_source_buffer(command_buffer, dedicated_buffer);
+    if (!iree_status_is_ok(status)) {
+      [dedicated_buffer release];  // -1; reclaim the allocation on failure
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
+    source_device_buffer = dedicated_buffer;
+    source_offset_in_buffer = 0;
+  } else {
+    source_offset_in_buffer = (iree_device_size_t)staging_offset;
+  }
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, status);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_ref.buffer));
@@ -797,8 +868,8 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_update_buffer(
   iree_device_size_t target_offset =
       iree_hal_buffer_byte_offset(target_ref.buffer) + target_ref.offset;
 
-  iree_status_t status = iree_hal_metal_command_segment_create_copy_buffer(
-      command_buffer, command_buffer->staging_buffer->metal_buffer, offset, target_device_buffer,
+  status = iree_hal_metal_command_segment_create_copy_buffer(
+      command_buffer, source_device_buffer, source_offset_in_buffer, target_device_buffer,
       target_offset, target_ref.length);
 
   IREE_TRACE_ZONE_END(z0);
