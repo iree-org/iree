@@ -44,7 +44,7 @@ jobs:
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
       - name: Install python packages
@@ -146,7 +146,7 @@ jobs:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           # Get all history. Otherwise the latest-snapshot branch can't be
@@ -154,7 +154,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.10"
 
