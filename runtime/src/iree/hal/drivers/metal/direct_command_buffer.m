@@ -994,7 +994,9 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     segment->dispatch.workgroups_buffer = iree_hal_metal_buffer_handle(
         iree_hal_buffer_allocated_buffer(config.workgroup_count_ref.buffer));
-    segment->dispatch.workgroups_offset = config.workgroup_count_ref.offset;
+    segment->dispatch.workgroups_offset =
+        iree_hal_buffer_byte_offset(config.workgroup_count_ref.buffer) +
+        config.workgroup_count_ref.offset;
   } else {
     segment->dispatch.workgroup_count = MTLSizeMake(
         config.workgroup_count[0], config.workgroup_count[1], config.workgroup_count[2]);

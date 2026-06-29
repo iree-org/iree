@@ -387,6 +387,85 @@ TEST_P(DispatchIndirectParametersTest, DynamicParametersFromDispatch) {
   SubmitAndCheck(command_buffer, output_buffer, parameter_buffer);
 }
 
+// Regression test: the workgroup-count parameters live at a non-zero
+// iree_hal_buffer_byte_offset within their backing allocation (referenced
+// through an iree_hal_buffer_subspan view), so the driver must resolve the
+// indirect-dispatch source offset as iree_hal_buffer_byte_offset(buffer) +
+// ref.offset. A driver that drops the base byte offset (e.g. the Metal direct
+// command buffer) reads the workgroup counts from the wrong address.
+TEST_P(DispatchIndirectParametersTest, SubAllocatedParameterBuffer) {
+  constexpr iree_device_size_t kParameterPadding = 16;
+  constexpr iree_device_size_t kAllocatedByteLength =
+      kParameterPadding + kParameterByteLength;
+  // Distinct wrong counts placed at offset 0 so a base-offset drop reads a
+  // deterministic grid (2 workgroups) rather than uninitialized memory.
+  constexpr uint32_t kWrongWorkgroupCount = 2;
+
+  Ref<iree_hal_buffer_t> output_buffer;
+  IREE_ASSERT_OK(CreateSentinelOutputBuffer(output_buffer.out()));
+
+  // Allocate a backing buffer with room before the parameters.
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH_INDIRECT_PARAMETERS |
+                 IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE |
+                 IREE_HAL_BUFFER_USAGE_TRANSFER;
+  Ref<iree_hal_buffer_t> backing_buffer;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      device_allocator_, params, kAllocatedByteLength, backing_buffer.out()));
+
+  // Reference the parameters through a subspan at the non-zero base offset.
+  Ref<iree_hal_buffer_t> parameter_buffer;
+  IREE_ASSERT_OK(iree_hal_buffer_subspan(
+      backing_buffer.get(), kParameterPadding, kParameterByteLength,
+      iree_allocator_system(), parameter_buffer.out()));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
+      binding_capacity(), command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  RecordWorkgroupIdDispatch(command_buffer, output_buffer, parameter_buffer,
+                            IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS);
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  // Wrong counts at offset 0, real counts at the subspan base
+  // (kParameterPadding).
+  const uint32_t parameter_data[7] = {
+      kWrongWorkgroupCount,
+      1,
+      1,  // offset 0: what a base-offset drop reads
+      0,  // gap
+      kDispatchedWorkgroupCount,
+      1,
+      1,  // offset 16: the real counts
+  };
+  SemaphoreList update_signal(device_, {0}, {1});
+  SemaphoreList empty_wait;
+  IREE_ASSERT_OK(iree_hal_device_queue_update(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, update_signal,
+      parameter_data, /*source_offset=*/0, backing_buffer.get(),
+      /*target_offset=*/0, sizeof(parameter_data), IREE_HAL_UPDATE_FLAG_NONE));
+
+  iree_hal_buffer_binding_t binding_table_values[2];
+  iree_hal_buffer_binding_table_t binding_table =
+      BindingTable(binding_table_values, output_buffer, parameter_buffer);
+  SemaphoreList execute_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, update_signal, execute_signal,
+      command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      execute_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+
+  // The subspan points at [kDispatchedWorkgroupCount, 1, 1], so 4 workgroups
+  // run.
+  std::vector<uint32_t> output_data = ReadBufferData<uint32_t>(output_buffer);
+  std::vector<uint32_t> expected(kOutputElementCount, kSentinelValue);
+  std::iota(expected.begin(), expected.begin() + kDispatchedWorkgroupCount, 0u);
+  EXPECT_THAT(output_data, ContainerEq(expected));
+}
+
 CTS_REGISTER_EXECUTABLE_COMMAND_BUFFER_TEST_SUITE(
     DispatchIndirectParametersTest);
 
