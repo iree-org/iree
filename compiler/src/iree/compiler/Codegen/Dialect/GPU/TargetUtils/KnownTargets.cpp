@@ -1076,12 +1076,6 @@ const WgpDetails *getAmpereWgpDetails() {
 }
 
 const WgpDetails *getSM120WgpDetails() {
-  // TODO: Model sm_120-specific capabilities once IREE has confirmed hardware
-  // details for the architecture. Hardware parameters (shared memory size,
-  // max thread block dimensions) are currently conservative placeholders and
-  // should be updated once validated against real device properties.
-  // See:
-  // https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html#nvidia-blackwell-tuning
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,

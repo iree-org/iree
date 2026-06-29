@@ -14,8 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "bf16_mma_sm120.mlir"
-    "bf16_mma_sm80.mlir"
     "config_tile_and_fuse_sm120.mlir"
     "config_tile_and_fuse_sm80.mlir"
     "config_vector_distribute_sm80.mlir"
