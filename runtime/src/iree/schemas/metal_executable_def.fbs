@@ -31,7 +31,11 @@ table PipelineDef {
   // libraries list.
   library_ordinal:uint32;
 
-  // String name of the entry point MTLFunction in the library.
+  // String name of the entry point MTLFunction in the library. This is the MSL
+  // function name produced by spirv-cross, which rewrites symbols that are
+  // illegal or reserved in MSL/C (for example '.' characters become '_' and a
+  // leading reserved '__' prefix is dropped). Used to construct the
+  // MTLComputePipelineState via -[MTLLibrary newFunctionWithName:].
   entry_point:string;
 
   // The maximum number of threads in a threadgroup that can be dispatched to
@@ -55,6 +59,12 @@ table PipelineDef {
 
   // Optional debug information related to the export.
   debug_info:iree.hal.debug.ExportDef;
+
+  // Canonical hal.executable.export symbol name used by the runtime to look up
+  // the export by name (hal.executable.lookup.function). This carries the
+  // original, un-rewritten name and may differ from entry_point because MSL
+  // cannot represent all legal symbol names; dispatch lookups must match it.
+  name:string;
 }
 
 // MSL (Metal Shading Language) source code.

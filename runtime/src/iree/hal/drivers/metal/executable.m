@@ -424,18 +424,23 @@ iree_status_t iree_hal_metal_executable_create(
       iree_hal_metal_ExecutableDef_pipelines_get(executable_def);
   iree_host_size_t pipeline_count = flatbuffers_string_vec_len(pipelines_vec);
 
-  // Calculate the total number of characters across all entry point names so
-  // that we can store copies of the names as the flatbuffer storing the strings
-  // may be released while the executable is still live.
+  // Calculate the total number of characters across all export names so that we
+  // can store copies of the names as the flatbuffer storing the strings may be
+  // released while the executable is still live.
   iree_host_size_t total_pipeline_name_length = 0;
   iree_host_size_t total_debug_info_length = 0;
   for (iree_host_size_t i = 0; i < pipeline_count; ++i) {
     iree_hal_metal_PipelineDef_table_t pipeline_def =
         iree_hal_metal_PipelineDef_vec_at(pipelines_vec, i);
-    if (IREE_UNLIKELY(!iree_host_size_checked_add(
-            total_pipeline_name_length,
-            flatbuffers_string_len(iree_hal_metal_PipelineDef_entry_point_get(pipeline_def)),
-            &total_pipeline_name_length))) {
+    flatbuffers_string_t export_name = iree_hal_metal_PipelineDef_name_get(pipeline_def);
+    if (flatbuffers_string_len(export_name) == 0) {
+      // Fall back to the entry point name for executables that don't carry an
+      // explicit export name (equivalent to the pre-name-field behavior).
+      export_name = iree_hal_metal_PipelineDef_entry_point_get(pipeline_def);
+    }
+    if (IREE_UNLIKELY(!iree_host_size_checked_add(total_pipeline_name_length,
+                                                  flatbuffers_string_len(export_name),
+                                                  &total_pipeline_name_length))) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "pipeline name storage size overflow");
     }
     IREE_TRACE({
@@ -487,11 +492,14 @@ iree_status_t iree_hal_metal_executable_create(
       status = iree_hal_metal_create_pipeline(device, library, pipeline_def, pipeline);
       if (!iree_status_is_ok(status)) break;
 
-      flatbuffers_string_t entry_point = iree_hal_metal_PipelineDef_entry_point_get(pipeline_def);
-      const iree_host_size_t entry_point_length = flatbuffers_string_len(entry_point);
-      pipeline->name = iree_make_string_view(pipeline_name_ptr, entry_point_length);
-      memcpy(pipeline_name_ptr, entry_point, entry_point_length);
-      pipeline_name_ptr += entry_point_length;
+      flatbuffers_string_t export_name = iree_hal_metal_PipelineDef_name_get(pipeline_def);
+      if (flatbuffers_string_len(export_name) == 0) {
+        export_name = iree_hal_metal_PipelineDef_entry_point_get(pipeline_def);
+      }
+      const iree_host_size_t export_name_length = flatbuffers_string_len(export_name);
+      pipeline->name = iree_make_string_view(pipeline_name_ptr, export_name_length);
+      memcpy(pipeline_name_ptr, export_name, export_name_length);
+      pipeline_name_ptr += export_name_length;
 
       IREE_TRACE({
         iree_hal_debug_export_info_t* export_info = (iree_hal_debug_export_info_t*)export_info_ptr;
