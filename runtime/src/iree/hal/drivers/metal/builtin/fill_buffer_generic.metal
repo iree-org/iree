@@ -66,7 +66,7 @@ kernel void fill_buffer_1byte(device uint32_t* buffer [[buffer(0)]],
   // *little endian*, left bytes will replace high bits of the leftmost touched
   // 32-bit scalar, while right bytes will replace low bits of the rightmost
   // touched 32-bit scalar.
-  uint32_t left_mask = ~((uint64_t(1) << (8 * (4 - left_byte_count))) - 1);
+  uint32_t left_mask = ~((uint64_t(1) << (8 * left_byte_count)) - 1);
   uint32_t right_mask = (uint64_t(1) << (8 * right_byte_count)) - 1;
 
   // Indexing start points in |buffer| for the three parts.
@@ -79,13 +79,24 @@ kernel void fill_buffer_1byte(device uint32_t* buffer [[buffer(0)]],
     buffer[middle_start + id] = middle_pattern;
   }
 
-  if (left_byte_count != 0 && id == 0) {  // Left bytes
-    uint32_t old = buffer[left_start];
-    buffer[left_start] = (old & (~left_mask)) | (middle_pattern & left_mask);
-  }
-
-  if (right_byte_count != 0 && id == 0) {  // Right bytes
-    uint32_t old = buffer[right_start];
-    buffer[right_start] = (old & (~right_mask)) | (middle_pattern & right_mask);
+  if (id == 0) {
+    if (left_start == right_start) {
+      // The entire fill range fits within a single 32-bit scalar; read-modify-
+      // write only the bytes in [left_byte_count, right_byte_count).
+      uint32_t mask = left_mask & right_mask;
+      uint32_t old = buffer[left_start];
+      buffer[left_start] = (old & (~mask)) | (middle_pattern & mask);
+    } else {
+      if (left_byte_count != 0) {  // Left bytes
+        uint32_t old = buffer[left_start];
+        buffer[left_start] =
+            (old & (~left_mask)) | (middle_pattern & left_mask);
+      }
+      if (right_byte_count != 0) {  // Right bytes
+        uint32_t old = buffer[right_start];
+        buffer[right_start] =
+            (old & (~right_mask)) | (middle_pattern & right_mask);
+      }
+    }
   }
 }
