@@ -124,7 +124,7 @@ void populateMathToVMPatterns(MLIRContext *context,
                                    IREE::VM::PowF64Op>,
       // Using BinaryArithmeticOp for fpowi op, since the int is
       // coded to only be 64 bits, as this has been the only usecase
-      // so far. So a check of lhs (the float value) is sufficient. 
+      // so far. So a check of lhs (the float value) is sufficient.
       BinaryArithmeticOpConversion<math::FPowIOp, IREE::VM::FPowI32Op,
                                    IREE::VM::FPowI64Op>,
       UnaryArithmeticOpConversion<math::RsqrtOp, IREE::VM::RsqrtF32Op,
