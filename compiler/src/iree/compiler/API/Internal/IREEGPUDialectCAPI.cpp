@@ -594,6 +594,6 @@ bool ireeGPUGetXorShuffleBounds(MlirAttribute mmaIntrinsic,
 
 bool ireeGPUIsXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                               int64_t totalTileElems) {
-  return mlir::iree_compiler::isXORShuffleValid(numRowElems, numAccessElems,
+  return mlir::iree_compiler::isXorShuffleValid(numRowElems, numAccessElems,
                                                 totalTileElems);
 }
