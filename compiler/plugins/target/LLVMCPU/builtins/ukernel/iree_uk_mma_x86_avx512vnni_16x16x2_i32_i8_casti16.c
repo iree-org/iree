@@ -36,21 +36,19 @@
 // on this case.
 // ABI matches the inner_tiled -> ukernel.generic lowering (see
 // `iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16`): each shaped operand passed
-// as (base, element offset), ACC additionally as its innermost
-// cross-intrinsic stride, then the scalar `k_outer` / `intrinsics_{m,n,k}`.
+// as (base, element offset) only (no strides; the ACC tile is contiguous),
+// then the scalar `k_outer` / `intrinsics_{m,n,k}`.
 IREE_UK_ALWAYS_INLINE
 void iree_uk_mma_x86_avx512vnni_16x16x2_i32_i8_casti16(
     const void *lhs_base, int64_t lhs_offset, const void *rhs_base,
-    int64_t rhs_offset, void *acc_base, int64_t acc_offset, int64_t acc_stride,
-    int32_t k_outer, int32_t intrinsics_m, int32_t intrinsics_n,
-    int32_t intrinsics_k) {
+    int64_t rhs_offset, void *acc_base, int64_t acc_offset, int32_t k_outer,
+    int32_t intrinsics_m, int32_t intrinsics_n, int32_t intrinsics_k) {
   (void)lhs_base;
   (void)lhs_offset;
   (void)rhs_base;
   (void)rhs_offset;
   (void)acc_base;
   (void)acc_offset;
-  (void)acc_stride;
   (void)k_outer;
   (void)intrinsics_m;
   (void)intrinsics_n;
