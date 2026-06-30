@@ -133,7 +133,7 @@ func.func @conv_nhwc_unaligned_stride_2() attributes {hal.executable.target = #e
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C721:.+]] = arith.constant 721 : index
 //      CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//          CHECK:   affine.delinearize_index {{.*}} into (17, 1, 81)
+//          CHECK:   affine.delinearize_index {{.*}} into (17, 81)
 //          CHECK:   %[[LOOP:.+]] = scf.for {{.+}} = %[[C0]] to %[[C721]] step %[[C1]] {{.*}} -> (vector<4xf32>)
 //          CHECK:     gpu.barrier memfence [#gpu.address_space<workgroup>]
 //          CHECK:     vector.transfer_read {{.*}} vector<4xf16>
