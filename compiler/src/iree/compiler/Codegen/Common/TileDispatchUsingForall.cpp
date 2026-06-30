@@ -267,10 +267,25 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
+  // Caller-asserted alignment of any tiled/fused linalg.pack/unpack inner tiles
+  // to the distribution loop tile sizes (InnerTileAlignment;
+  // llvm/llvm-project#150185). At the distribution/workgroup level the loop
+  // tile size is an integer MULTIPLE of the inner tile on scalable dims (the
+  // vector tile equals the inner tile, the distribution tile is a multiple of
+  // it), so each scalable dim is Multiple; static dims stay Unknown and are
+  // handled by the existing static path. The control function is evaluated by
+  // the SCF driver once per tiled/fused pack/unpack op, in that op's own
+  // iteration domain (keying off its scalable, i.e. dynamic, inner tiles), so
+  // it threads correctly through intervening ops such as a transposing
+  // producer; every other op gets no hint.
+  scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
+      makeInnerTileAlignmentFn(mlir::InnerTileAlignment::Multiple);
+
   scf::SCFTilingOptions tilingOptions;
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
+  tilingOptions.setInnerTileAlignmentFn(innerTileAlignmentFn);
 
   IREE::Codegen::WorkgroupReorderingAttrInterface workgroupReorderingStrategy =
       getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
@@ -370,9 +385,11 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
         fuseConsumersIntoForall(
             rewriter, tileAndFuseResult->tiledAndFusedOps.getArrayRef(),
-            tilingLoops, [&tiledAndFusedOps](Operation *op) {
+            tilingLoops,
+            [&tiledAndFusedOps](Operation *op) {
               return tiledAndFusedOps.contains(op);
-            });
+            },
+            innerTileAlignmentFn);
     if (failed(newFusionOpportunities)) {
       // Continue the work if the failure is allowed.
       if (!verifyComputeOpsAfterDistribution(funcOp)) {

@@ -1498,3 +1498,73 @@ func.func @arg_compare_fold_broadcast(
 //   CHECK-NOT:     linalg.broadcast
 //       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
 //       CHECK:       iree_linalg_ext.arg_compare
+
+// -----
+
+// Distribution of a scalable linalg.pack (inner tiles [8*vscale, 1]) with an
+// elementwise-add producer fused into the workgroup forall. The distribution
+// tile (64) on the packed dimension is a static *multiple* of the scalable
+// inner tile; the driver gets that relationship from the InnerTileAlignment
+// hint (llvm/llvm-project#150185) rather than re-deriving it from scalable IR.
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @scalable_pack_distribute_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor<384x512xf32>) -> tensor<?x512x?x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = tensor.empty() : tensor<384x512xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<384x512xf32>, tensor<384x512xf32>) outs(%0 : tensor<384x512xf32>) attrs = {lowering_config = #config} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.addf %in, %in_0 : f32
+    linalg.yield %3 : f32
+  } -> tensor<384x512xf32>
+  %mouter = affine.apply affine_map<()[s0] -> (384 ceildiv s0)>()[%c8_vscale]
+  %2 = tensor.empty(%mouter, %c8_vscale) : tensor<?x512x?x1xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%c8_vscale, 1] into %2 : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
+  return %pack : tensor<?x512x?x1xf32>
+}
+// CHECK-LABEL: func.func @scalable_pack_distribute_with_producer
+// CHECK:         %[[VSCALE:.+]] = vector.vscale
+// CHECK:         %[[C8VS:.+]] = arith.muli %[[VSCALE]], %{{.+}}
+// CHECK:         scf.forall {{.*}} = (0, 0) to (384, 512) step (64, 64)
+// CHECK:           %[[GEN:.+]] = linalg.generic
+// CHECK:             arith.addf
+// CHECK:           linalg.pack %[[GEN]]
+// CHECK-SAME:        inner_tiles = [%[[C8VS]], 1]
+// CHECK:           scf.forall.in_parallel
+// CHECK:             tensor.parallel_insert_slice
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Distribution of a scalable linalg.unpack (inner tiles [7, 8*vscale]) fused as
+// the producer of an elementwise-add consumer. The distribution tile (64) on
+// the unpacked N dimension is a static *multiple* of the scalable inner tile
+// (InnerTileAlignment hint; llvm/llvm-project#150185).
+#config = #iree_codegen.lowering_config<tile_sizes = [[84, 64]]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @scalable_unpack_distribute_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: tensor<80x320xf32>) -> tensor<80x320xf32> {
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = tensor.empty() : tensor<80x320xf32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %0 : tensor<12x?x7x?xf32> -> tensor<80x320xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1, %unpack : tensor<80x320xf32>, tensor<80x320xf32>) outs(%0 : tensor<80x320xf32>) attrs = {lowering_config = #config} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %2 = arith.addf %in, %in_0 : f32
+    linalg.yield %2 : f32
+  } -> tensor<80x320xf32>
+  return %1 : tensor<80x320xf32>
+}
+// CHECK-LABEL: func.func @scalable_unpack_distribute_with_consumer
+// CHECK:         %[[VSCALE:.+]] = vector.vscale
+// CHECK:         %[[C8VS:.+]] = arith.muli %[[VSCALE]], %{{.+}}
+// CHECK:         scf.forall {{.*}} = (0, 0) to (80, 320) step (84, 64)
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack
+// CHECK-SAME:        inner_tiles = [7, %[[C8VS]]]
+// CHECK:           linalg.generic
+// CHECK-SAME:        ins(%{{.*}}, %[[UNPACK]]
+// CHECK:             arith.addf
+// CHECK:           scf.forall.in_parallel
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
