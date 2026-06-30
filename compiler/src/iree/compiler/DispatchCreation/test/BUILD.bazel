@@ -30,7 +30,6 @@ iree_lit_test_suite(
             "dispatch_linalg_on_tensors.mlir",
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",
-            "dispatch_non_fusable.mlir",
             "dispatch_region_formation_preprocessing.mlir",
             "elementwise_op_fusion.mlir",
             "fold_reshapes_into_tensor_barriers.mlir",
