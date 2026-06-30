@@ -92,3 +92,73 @@ func.func @matmul_accumulate_256x256x256_f16_f32() {
 //       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
 //  CHECK-SAME:     convert_acc_gemm
 //  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_F16>, promote_operands = [0, 1], reduction = [0, 0, 8], subgroup = [2, 4, 0], workgroup = [64, 64, 0]
+
+// -----
+
+// Mixed precision f32xbf16xf32 matmuls cannot use NVIDIA MMA intrinsics, but
+// should still avoid degenerate SIMT tiling that only computes one M element
+// per workgroup when M has enough work to tile. This is the same fallback
+// behavior as sm_80 since sm_120 has not yet received architecture-specific
+// heuristic tuning.
+func.func @mixed_precision_matmul_36x151936x896_f32xbf16xf32(
+    %lhs: tensor<36x896xf32>,
+    %rhs: tensor<151936x896xbf16>) -> tensor<36x151936xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<36x151936xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<36x151936xf32>) -> tensor<36x151936xf32>
+  %result = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%lhs, %rhs : tensor<36x896xf32>, tensor<151936x896xbf16>)
+    outs(%fill : tensor<36x151936xf32>) {
+  ^bb0(%in: f32, %in_0: bf16, %out: f32):
+    %0 = arith.extf %in_0 : bf16 to f32
+    %1 = arith.mulf %in, %0 : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<36x151936xf32>
+  return %result : tensor<36x151936xf32>
+}
+
+// CHECK-LABEL: func.func @mixed_precision_matmul_36x151936x896_f32xbf16xf32(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [32, 8, 1] subgroup_size = 32
+//       CHECK:   linalg.generic {{.*}}lowering_config = #iree_gpu.lowering_config<{{[{]}}reduction = [0, 0, 32]
+//  CHECK-SAME:     thread = [1, 16, 0]
+//  CHECK-SAME:     workgroup = [32, 128, 1]
+
+// -----
+
+// Test that BF16 matmul selects NV_MMA_SYNC_F32_16x8x16_BF16 with TileAndFuse,
+// mirroring the sm_80 BF16 coverage in bf16_mma_sm80.mlir.
+
+#pipeline_layout_bf16 = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @matmul_256x256x256_bf16_f32() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_bf16) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xbf16>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_bf16) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xbf16>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout_bf16) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xbf16>> -> tensor<256x256xbf16>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<256x256xbf16>> -> tensor<256x256xbf16>
+  %5 = tensor.empty() : tensor<256x256xf32>
+  %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+  %7 = linalg.matmul ins(%3, %4 : tensor<256x256xbf16>, tensor<256x256xbf16>) outs(%6 : tensor<256x256xf32>) -> tensor<256x256xf32>
+  iree_tensor_ext.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<256x256xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @matmul_256x256x256_bf16_f32(
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [128, 1, 1] subgroup_size = 32
+//       CHECK:   linalg.matmul {{.*}}lowering_config = #iree_gpu.lowering_config
+//  CHECK-SAME:     mma_kind = #iree_gpu.mma_layout<NV_MMA_SYNC_F32_16x8x16_BF16>
+//  CHECK-SAME:     promote_operands = [0, 1]
+//  CHECK-SAME:     reduction = [0, 0, 8]
+//  CHECK-SAME:     subgroup = [2, 4, 0]
+//  CHECK-SAME:     workgroup = [64, 64, 0]

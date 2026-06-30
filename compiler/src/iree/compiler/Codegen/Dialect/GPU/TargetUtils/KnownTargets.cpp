@@ -1076,14 +1076,10 @@ const WgpDetails *getAmpereWgpDetails() {
 }
 
 const WgpDetails *getSM120WgpDetails() {
-  // TODO: Model Blackwell-specific capabilities once IREE has target details
-  // for the architecture. Reuse the existing NVIDIA capability model for now
-  // so canonical CUDA targets such as sm_120 can be represented.
-  // See:
-  // https://docs.nvidia.com/cuda/blackwell-tuning-guide/index.html#nvidia-blackwell-tuning
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
@@ -1096,9 +1092,9 @@ const WgpDetails *getSM120WgpDetails() {
                                       0,
                                       nullptr,
                                       {32, 32},
-                                      {1024, 1024, 1024},
+                                      {1024, 1024, 64},
                                       1024,
-                                      163 * 1024,
+                                      99 * 1024,
                                       {0x7fffffff, 0xffff, 0xffff}};
   return &sm120Wgp;
 }
