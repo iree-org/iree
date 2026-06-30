@@ -782,8 +782,9 @@ static bool isScatterIndicesGenerator(Operation *op) {
 static bool hasExplicitNonFusableUsers(Operation *op) {
   bool hasNonFusableUse = false;
   for (Operation *user : op->getUsers()) {
-    if (isa<IREE::LinalgExt::LinalgFusionOpInterface>(user))
+    if (isa<IREE::LinalgExt::LinalgFusionOpInterface>(user)) {
       continue;
+    }
     hasNonFusableUse |= isa<IREE::LinalgExt::ScanOp>(user);
   }
   return hasNonFusableUse;
