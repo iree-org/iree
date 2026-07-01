@@ -144,7 +144,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.lowerToAVX2 = hasAVX2Feature(targetConfig);
   pipelineOpts.enableVectorMasking =
       isX86(targetConfig) || isRISCV(targetConfig) ||
-      (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig));
+      (isAArch64(targetConfig) &&
+       (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig)));
   // TODO(#16956): The decomposition of attention op leads to complex control
   // flow, which leads to non-trivial stack allocation. Enforcing masking for
   // targets that do not support native vector masking enables the
@@ -160,9 +161,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   if (isAArch64(targetConfig) && hasAttentionOp(funcOp)) {
     pipelineOpts.enableVectorMasking = true;
   }
-  pipelineOpts.enableAArch64SME = isAArch64(targetConfig) &&
-                                  hasAnySVEFeature(targetConfig) &&
-                                  hasSMEFeature(targetConfig);
+
+  // SME does not require classic (non-streaming) SVE: some targets
+  // (e.g., Apple Silicon) implement SME without it. See #24660.
+  pipelineOpts.enableAArch64SME =
+      isAArch64(targetConfig) && hasSMEFeature(targetConfig);
   pipelineOpts.enableAArch64I8mm =
       isAArch64(targetConfig) && hasI8mmFeature(targetConfig);
   pipelineOpts.enablePeeling = isOptEnabled(funcOp, getEnableLoopPeelingStr());
