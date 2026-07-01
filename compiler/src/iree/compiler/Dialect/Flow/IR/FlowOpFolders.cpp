@@ -1057,19 +1057,18 @@ struct FoldTensorSliceOfSlice : OpRewritePattern<TensorSliceOp> {
 
   LogicalResult matchAndRewrite(TensorSliceOp consumerSlice,
                                 PatternRewriter &rewriter) const override {
-    // Check whether the source of the current slice is produced by
-    // another TensorSliceOp.
     auto producerSlice =
         consumerSlice.getSource().getDefiningOp<TensorSliceOp>();
     if (!producerSlice) {
+      return failure();
+    }
+    if (!producerSlice->hasOneUse()) {
       return failure();
     }
 
     auto loc =
         rewriter.getFusedLoc({producerSlice.getLoc(), consumerSlice.getLoc()});
 
-    // Compute the start indices for the fused slice:
-    // fused_start = producer_start + consumer_start
     SmallVector<Value> fusedStartIndices;
     for (auto [producerStart, consumerStart] :
          llvm::zip(producerSlice.getStartIndices(),
@@ -1078,11 +1077,6 @@ struct FoldTensorSliceOfSlice : OpRewritePattern<TensorSliceOp> {
           loc, producerStart, consumerStart));
     }
 
-    // Replace:
-    //   consumerSlice(producerSlice(%src))
-    //
-    // with:
-    //   fusedSlice(%src)
     rewriter.replaceOpWithNewOp<TensorSliceOp>(
         consumerSlice, consumerSlice.getResult().getType(),
         producerSlice.getSource(), producerSlice.getSourceDims(),

@@ -720,6 +720,20 @@ util.func public @sliceOfSliceDynamic1D(%src: tensor<?xf32>, %dim: index,
 
 // -----
 
+// CHECK-LABEL: @sliceOfSliceMultiUseProducerNoFold
+util.func public @sliceOfSliceMultiUseProducerNoFold(%src: tensor<3x3xf32>) -> (tensor<1x1xf32>, tensor<2x2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  // CHECK: %[[INNER:.+]] = flow.tensor.slice %{{.*}}[%c1, %c1 for %c2, %c2]
+  %inner = flow.tensor.slice %src[%c1, %c1 for %c2, %c2] : tensor<3x3xf32> -> tensor<2x2xf32>
+  // CHECK: flow.tensor.slice %[[INNER]][%c0, %c1 for %c1, %c1]
+  %outer = flow.tensor.slice %inner[%c0, %c1 for %c1, %c1] : tensor<2x2xf32> -> tensor<1x1xf32>
+  util.return %outer, %inner : tensor<1x1xf32>, tensor<2x2xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @sliceOfSliceTripleChain
 // Three consecutive slices fully fold into one via fixed-point iteration.
 // slice1: [1 for 5], slice2: [1 for 3], slice3: [1 for 1]
