@@ -2424,6 +2424,32 @@ class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
+class VM_MixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+                            list<Trait> traits = []> :
+    VM_TrivialOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      AllTypesMatch<["lhs", "result"]>,
+    ])> {
+  let arguments = (ins
+    ltype:$lhs,
+    rtype:$rhs
+  );
+  let results = (outs
+    ltype:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"lhs", 0>,
+    VM_EncOperand<"rhs", 1>,
+    VM_EncResult<"result">,
+  ];
+}
+
 // Arithmetic ops defined for all inputs which do not exhibit UB.
 class VM_TotalUnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
                                 list<Trait> traits = []> :
@@ -2439,6 +2465,11 @@ class VM_TotalTernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
                                   list<Trait> traits = []> :
     VM_TernaryArithmeticOp<type, mnemonic, opcode,
                            !listconcat(traits, [AlwaysSpeculatable])> {}
+
+class VM_TotalMixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+                                 list<Trait> traits = []> :
+    VM_MixedBinaryArithmeticOp<ltype, rtype, mnemonic, opcode,
+                          !listconcat(traits, [AlwaysSpeculatable])> {}
 
 } // OpGroupArithmeticHelperOps
 
@@ -2954,6 +2985,16 @@ def VM_PowF32Op :
 def VM_PowF64Op :
     VM_TotalBinaryArithmeticOp<F64, "pow.f64", VM_OPC_PowF64, [VM_ExtF64]> {
   let summary = [{Floating point raised to the power of operation.}];
+}
+
+def VM_FPowI32Op :
+    VM_TotalMixedBinaryArithmeticOp<F32, I64, "fpowi.f32", VM_OPC_FPowI32, [VM_ExtF32]> {
+  let summary = [{Floating point raised to the integer power of operation.}];
+}
+
+def VM_FPowI64Op :
+    VM_TotalMixedBinaryArithmeticOp<F64, I64, "fpowi.f64", VM_OPC_FPowI64, [VM_ExtF64]> {
+  let summary = [{Floating point raised to the integer power of operation.}];
 }
 
 def VM_RsqrtF32Op :

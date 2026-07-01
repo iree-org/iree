@@ -641,4 +641,61 @@ static inline uint8_t iree_math_f32_to_f8e8m0fnu(float value) {
   return biased < 0 ? 0 : biased > 0xFF ? 0xFF : biased;
 }
 
+//==============================================================================
+// FpowI support.
+//==============================================================================
+
+// The implementation of fpowi was copied from
+// https://github.com/llvm/llvm-project/blob/c7c340b41e4fe424f0f5f68be2f2812ac6d17b41/flang-rt/lib/runtime/complex-powi.cpp#L21
+// However, since <limits> is not included the min and max of the exponent
+// were coded in hexadecimal format
+#define IREE_MATH_FPOWI(TYPE, base, exp)                  \
+  if ((exp) == 0) {                                       \
+    return (TYPE)1.0;                                     \
+  }                                                       \
+  bool invertResult = (exp) < 0;                          \
+  bool isMin = ((exp) == 0x8000000000000000); /* -2^63 */ \
+  if (isMin) {                                            \
+    (exp) = 0x7FFFFFFFFFFFFFFF; /* 2^63 - 1 */            \
+  }                                                       \
+  if ((exp) < 0) {                                        \
+    (exp) = (exp) * -1;                                   \
+  }                                                       \
+  TYPE origBase = (base);                                 \
+  while (((exp) & 1) == 0) {                              \
+    (base) *= (base);                                     \
+    (exp) >>= 1;                                          \
+  }                                                       \
+  TYPE acc = (base);                                      \
+  while ((exp) > 1) {                                     \
+    (exp) >>= 1;                                          \
+    (base) *= (base);                                     \
+    if (((exp) & 1) == 1) {                               \
+      acc *= (base);                                      \
+    }                                                     \
+  }                                                       \
+  if (isMin) {                                            \
+    acc *= origBase;                                      \
+  }                                                       \
+  if (invertResult) {                                     \
+    acc = (TYPE)1.0 / acc;                                \
+  }                                                       \
+  return acc;
+
+static inline float iree_math_float_powi_i64(float base, int64_t exp) {
+#if defined(IREE_COMPILER_GCC_COMPAT)
+  return __builtin_powif(base, exp);
+#else
+  IREE_MATH_FPOWI(float, base, exp)
+#endif
+}
+
+static inline double iree_math_double_powi_i64(double base, int64_t exp) {
+#if defined(IREE_COMPILER_GCC_COMPAT)
+  return __builtin_powi(base, exp);
+#else
+  IREE_MATH_FPOWI(double, base, exp)
+#endif
+}
+
 #endif  // IREE_BASE_INTERNAL_MATH_H_
