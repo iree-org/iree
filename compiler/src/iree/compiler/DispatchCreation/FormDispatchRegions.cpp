@@ -888,6 +888,13 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 
   // Once all root linalg ops have been tagged, put all remaining generic ops
   // into their own dispatches.
+  // TODO: when identyfing root operations, there are multiple
+  // isFusableWith[Producer|Consumer] checks being invoked, however we only
+  // access the positive results of those checks (i.e. explicit assignment to
+  // the fusion group). We should consider assigning *all* operations to fusion
+  // groups during the fuseRootsWith...() phase, creating new groups for more
+  // negative fusion cases, and potentially eliding the second iteration over
+  // the region altogether.
   for (Block &block : region) {
     SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
