@@ -1109,9 +1109,17 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                 MLIRContext *context) {
-  // TODO(benvanik): check operand and dedupe imports.
+static bool isEquivalent(TensorImportOp previous, TensorImportOp current) {
+  if (previous.getConsume()) {
+    return false;
+  }
+
+  return previous.getSource() == current.getSource() &&
+         previous.getResult().getType() == current.getResult().getType() &&
+         previous.getResultEncoding() == current.getResultEncoding() &&
+         previous.getResultEncodingDims() == current.getResultEncodingDims() &&
+         previous.getResultSize() == current.getResultSize() &&
+         previous.getAffinity() == current.getAffinity();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1132,9 +1140,58 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+static bool isEquivalent(TensorExportOp previous, TensorExportOp current) {
+  return previous.getSource() == current.getSource() &&
+         previous.getResult().getType() == current.getResult().getType() &&
+         previous.getSourceEncoding() == current.getSourceEncoding() &&
+         previous.getSourceEncodingDims() == current.getSourceEncodingDims() &&
+         previous.getSourceSize() == current.getSourceSize() &&
+         previous.getAffinity() == current.getAffinity();
+}
+
+//===----------------------------------------------------------------------===//
+// Generic deduplication pattern for tream.tensor.import and
+// stream.tensor.export
+//===----------------------------------------------------------------------===//
+
+template <typename OpTy>
+struct DeduplicateTensorOp : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpTy currentOp,
+                                PatternRewriter &rewriter) const override {
+    // Ownership-transferring imports must not be deduplicated.
+    if constexpr (std::is_same_v<OpTy, TensorImportOp>) {
+      if (currentOp.getConsume()) {
+        return failure();
+      }
+    }
+    // Search for an equivalent operation
+    for (Operation *previousOp = currentOp->getPrevNode();
+         previousOp != nullptr; previousOp = previousOp->getPrevNode()) {
+      auto previous = dyn_cast<OpTy>(previousOp);
+      if (!previous) {
+        continue;
+      }
+      if (!isEquivalent(previous, currentOp)) {
+        continue;
+      }
+      rewriter.replaceOp(currentOp, previous.getResult());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<DeduplicateTensorOp<TensorImportOp>>(context);
+}
+
 void TensorExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  // TODO(benvanik): check operand and dedupe exports.
+  results.insert<DeduplicateTensorOp<TensorExportOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
