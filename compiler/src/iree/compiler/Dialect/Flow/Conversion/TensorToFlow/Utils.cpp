@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -67,12 +68,11 @@ static bool producedByValueExtract(OpFoldResult index) {
   return hasExtract;
 }
 
-bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
-                                         ArrayRef<OpFoldResult> sizes,
-                                         ArrayRef<OpFoldResult> strides,
-                                         ArrayRef<int64_t> baseShape) {
+bool isOffsetSizeAndStrideStructurallyMappableToFlow(
+    ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+    ArrayRef<OpFoldResult> strides, ArrayRef<int64_t> baseShape) {
   if (offsets.size() != baseShape.size()) {
-    // Unhanded rank-reducing case.
+    // Unhandled rank-reducing case.
     return false;
   }
   auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
@@ -89,16 +89,6 @@ bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     OpFoldResult offset = offsets[dim - 1];
     OpFoldResult size = sizes[dim - 1];
     OpFoldResult stride = strides[dim - 1];
-
-    // The offsets and sizes dont have to be static for all dimensions. When
-    // `fullSlices` is true, the offset and sizes can be dynamic. But in some
-    // cases, the dynamic offset/size value is obtained by computing from
-    // another tensor which lives on the device. To avoid host-round tripping
-    // try to infer when a value is extracted from a tensor.
-    if (producedByValueExtract(offset) || producedByValueExtract(stride) ||
-        producedByValueExtract(size)) {
-      return false;
-    }
 
     int64_t staticOffset = getVal(offset, ShapedType::kDynamic);
     int64_t staticSize = getVal(size, ShapedType::kDynamic);
@@ -120,6 +110,29 @@ bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
             staticSize == baseShape[dim - 1])) {
         fullSlices = false;
       }
+    }
+  }
+  return true;
+}
+
+bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes,
+                                         ArrayRef<OpFoldResult> strides,
+                                         ArrayRef<int64_t> baseShape) {
+  if (!isOffsetSizeAndStrideStructurallyMappableToFlow(offsets, sizes, strides,
+                                                       baseShape)) {
+    return false;
+  }
+
+  // The offsets and sizes don't have to be static for all dimensions. When
+  // `fullSlices` is true, the offset and sizes can be dynamic. But in some
+  // cases, the dynamic offset/size value is obtained by computing from another
+  // tensor which lives on the device. To avoid host-round tripping try to infer
+  // when a value is extracted from a tensor.
+  for (auto [offset, size, stride] : llvm::zip_equal(offsets, sizes, strides)) {
+    if (producedByValueExtract(offset) || producedByValueExtract(size) ||
+        producedByValueExtract(stride)) {
+      return false;
     }
   }
   return true;

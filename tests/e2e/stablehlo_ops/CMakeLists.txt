@@ -693,7 +693,7 @@ iree_check_single_backend_test_suite(
     "pad.mlir"
     # "philox.mlir"  # TODO(#12509): WebGPU SPIR-V broken
     # "pow.mlir"  # TODO(#11321): error: value nan cannot be represented as 'f32'
-    "reduce.mlir"
+    # "reduce.mlir" # TODO(#24650): error: use of variable address space 'immediate'
     "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
