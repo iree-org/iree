@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "config_tile_and_fuse_sm89.mlir",
             "config_tile_and_fuse_sm120.mlir",
             "config_tile_and_fuse_sm80.mlir",
             "config_vector_distribute_sm80.mlir",
