@@ -271,6 +271,7 @@ nav:
               - "developers/design-docs/async-scheduling/scenarios.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
+          - "developers/integrating-llvm.md"
           - "developers/update-sdxl-golden-outputs.md"
           - "developers/vulkan-environment-setup.md"
           - "developers/lowering-config.md"
