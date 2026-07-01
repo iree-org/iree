@@ -69,6 +69,10 @@
          <lastmod>2026-07-01</lastmod>
     </url>
     <url>
+         <loc>https://iree.dev/developers/integrating-llvm/</loc>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/lowering-config/</loc>
          <lastmod>2026-07-01</lastmod>
     </url>
