@@ -1255,68 +1255,19 @@ bool attachUKernelBitcodeOnOp(Operation *op, StringRef name) {
   return true;
 }
 
-// Returns the index, in the ACC operand's shape, of the innermost
-// CrossIntrinsic dimension (the N cross-intrinsic dim for our layouts), or
-// nullopt if it is dynamic / absent. The ukernel needs this dim's stride to
-// address each unrolled intrinsic's ACC fragment.
-//
-// Example: with `MMA_X86_AVX512BF16_1x16x2` (each intrinsic produces a 1x16
-// f32 fragment) and intrinsics_m = intrinsics_n = 2, the ACC tile holds a 2x2
-// grid of such fragments. The two CrossIntrinsic dims are that grid's M and N;
-// the innermost is N, so this returns the index of the N-grid dim in the ACC
-// result shape, whose stride is the element distance from fragment (m, n) to
-// (m, n+1).
-static std::optional<unsigned>
-getAccInnermostCrossIntrinsicDim(IREE::Codegen::InnerTiledOp op,
-                                 DataTiledMMAAttr mma) {
-  auto outputType = dyn_cast<ShapedType>(op.getResultTypes()[0]);
-  if (!outputType) {
-    return std::nullopt;
-  }
-  Codegen::TileSwizzle accSwizzle = getSwizzle(mma, /*operandIdx=*/2);
-  SmallVector<Codegen::TileSwizzle::Dim> swizzleDims;
-  for (const Codegen::TileSwizzle::ExpandShapeDimVectorType &group :
-       accSwizzle.expandShape()) {
-    swizzleDims.append(group.begin(), group.end());
-  }
-  applyPermutationToVector(swizzleDims, accSwizzle.permutation());
-  int rankDiff = outputType.getRank() - static_cast<int>(swizzleDims.size());
-  auto crossIntrinsic = Codegen::TileSwizzle::Dim::Kind::CrossIntrinsic;
-  for (size_t i = swizzleDims.size(); i-- > 0;) {
-    if (swizzleDims[i].kind() != crossIntrinsic) {
-      continue;
-    }
-    int outputIdx = i + rankDiff;
-    if (outputType.isDynamicDim(outputIdx)) {
-      return std::nullopt;
-    }
-    return outputIdx;
-  }
-  // No CrossIntrinsic dims (intrinsics_m == intrinsics_n == 1): the single
-  // fragment sits at the start of the inner tile.
-  if (!swizzleDims.empty()) {
-    return rankDiff;
-  }
-  return std::nullopt;
-}
-
 // Rewrites an `inner_tiled` carrying a CPU `DataTiledMMAAttr` to a
 // `ukernel.generic`, threading the data-tiled-MMA scalar parameters as
 // operands so the ukernel can loop over arbitrary `intrinsics_{m,n,k}`:
 //   ins(lhs, rhs) outs(acc) (k_outer, intrinsics_m, intrinsics_n, intrinsics_k)
-// plus a `strided_dims` entry giving the ACC's innermost cross-intrinsic
-// stride.
+// All shaped operands are passed as `(base, offset)` only, no strides: the
+// ACC tile is contiguous, so the ukernel derives each intrinsic's ACC
+// fragment offset from the compile-time `intrinsics_{m,n}` and its own
+// (fixed, per-intrinsic) fragment size.
 static LogicalResult
 handleInnerTiledMmaUkernel(RewriterBase &rewriter, StringRef name,
                            IREE::Codegen::InnerTiledOp op, DataTiledMMAAttr mma,
                            ArrayRef<Value> inputs, ArrayRef<Value> outputs,
                            DictionaryAttr fnDefAttrs) {
-  std::optional<unsigned> accInnerDim =
-      getAccInnermostCrossIntrinsicDim(op, mma);
-  if (!accInnerDim) {
-    return rewriter.notifyMatchFailure(
-        op, "ACC innermost cross-intrinsic dim is dynamic or absent");
-  }
   Location loc = op.getLoc();
   Type i32 = rewriter.getI32Type();
   auto constI32 = [&](int64_t v) {
@@ -1327,23 +1278,15 @@ handleInnerTiledMmaUkernel(RewriterBase &rewriter, StringRef name,
   Value kOuter = arith::IndexCastOp::create(
       rewriter, loc, i32,
       tensor::DimOp::create(rewriter, loc, op.getInputs()[0], 1));
-  // `strided_dims` is the `ukernel.generic` ABI knob for which dims' strides
-  // are passed to the C function: a list per shaped operand (here LHS, RHS,
-  // ACC), each naming the dims whose stride follows that operand's
-  // `(base, offset)` in the call. An empty list passes `base, offset` only; a
-  // null attribute (the default, used by simpler ukernels) passes all strides.
-  // Here only ACC needs one — the innermost cross-intrinsic (N) dim — so the
-  // ukernel can address each unrolled intrinsic's ACC fragment. LHS/RHS are
-  // contiguous in the data-tiled layout, so they take no stride argument.
-  SmallVector<SmallVector<int64_t>> stridedDims(3, {});
-  stridedDims[2].push_back(*accInnerDim);
+  // All shaped operands (LHS, RHS, ACC) are passed as `(base, offset)` only;
+  // `num_strided_outer_dims=0` means no stride arguments are appended.
   DictionaryAttr discardableAttrs = op->getDiscardableAttrDictionary();
   auto newOp = rewriter.replaceOpWithNewOp<IREE::Codegen::UKernelGenericOp>(
       op, op.getOutputs().getTypes(), name, inputs, outputs,
       ValueRange{kOuter, constI32(mma.getIntrinsicsM()),
                  constI32(mma.getIntrinsicsN()),
                  constI32(mma.getIntrinsicsK())},
-      fnDefAttrs, stridedDims);
+      fnDefAttrs, /*num_strided_outer_dims=*/0);
   newOp->setDiscardableAttrs(discardableAttrs);
   return success();
 }

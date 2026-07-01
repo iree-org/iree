@@ -22,8 +22,9 @@
 // template.
 //
 // ABI: each shaped operand is passed as (base pointer, element offset) so the
-// caller doesn't need a GEP before the call; the accumulator additionally
-// gets the element stride of its innermost cross-intrinsic (N) dimension.
+// caller doesn't need a GEP before the call. No strides are passed: the ACC
+// tile is contiguous, so the ukernel addresses each intrinsic's fragment from
+// `intrinsics_{m,n}` and its own fixed fragment size.
 //
 // NOTE (seed scaffolding): this initial seed has a stub body. It exists so
 // that the surrounding *framework* -- bitcode build, embedding,
@@ -33,16 +34,14 @@
 IREE_UK_ALWAYS_INLINE
 void iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16(
     const uint16_t *lhs_base, int64_t lhs_offset, const uint16_t *rhs_base,
-    int64_t rhs_offset, float *acc_base, int64_t acc_offset, int64_t acc_stride,
-    int32_t k_outer, int32_t intrinsics_m, int32_t intrinsics_n,
-    int32_t intrinsics_k) {
+    int64_t rhs_offset, float *acc_base, int64_t acc_offset, int32_t k_outer,
+    int32_t intrinsics_m, int32_t intrinsics_n, int32_t intrinsics_k) {
   (void)lhs_base;
   (void)lhs_offset;
   (void)rhs_base;
   (void)rhs_offset;
   (void)acc_base;
   (void)acc_offset;
-  (void)acc_stride;
   (void)k_outer;
   (void)intrinsics_m;
   (void)intrinsics_n;
