@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
@@ -97,6 +98,30 @@ struct ScatterOpConversion
     rewriter.inlineRegionBefore(op.getRegion(), scatterOp.getRegion(),
                                 scatterOp.getRegion().begin());
     rewriter.replaceOp(op, scatterOp->getResults());
+    return success();
+  }
+};
+
+struct SortOpConversion
+    : public OpRewritePattern<mlir::torch::TMTensor::SortOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(mlir::torch::TMTensor::SortOp op,
+                                PatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    SmallVector<Value> outputs;
+    for (auto [input, result] :
+         llvm::zip_equal(op.getOutputs(), op.getResults())) {
+      auto resultType = cast<RankedTensorType>(result.getType());
+      outputs.push_back(tensor::EmptyOp::create(
+          rewriter, loc, tensor::getMixedSizes(rewriter, loc, input),
+          resultType.getElementType()));
+    }
+    auto sortOp = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, op.getResultTypes(), op.getOutputs(), outputs,
+        op.getDimensionAttr());
+    rewriter.inlineRegionBefore(op.getRegion(), sortOp.getRegion(),
+                                sortOp.getRegion().begin());
+    rewriter.replaceOp(op, sortOp->getResults());
     return success();
   }
 };
@@ -232,10 +257,10 @@ public:
 
     INSERT_TMTENSOR_CONVERSION_PATTERN(YieldOp);
     INSERT_TMTENSOR_CONVERSION_PATTERN(ScanOp);
-    INSERT_TMTENSOR_CONVERSION_PATTERN(SortOp);
 
 #undef INSERT_TMTENSOR_CONVERSION_PATTERN
 
+    patterns.add<SortOpConversion>(context);
     patterns.add<ScatterOpConversion>(context);
     patterns.add<AttentionOpConversion>(context);
 
