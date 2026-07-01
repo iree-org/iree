@@ -377,9 +377,9 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
 // -----
 
 // Checks that mixed bf16/f32 convolutions preserve the required lhs widening convert.
-// CHECK-LABEL: @convolution_mixed_filter
+// CHECK-LABEL: @convolution_mixed_precision
 // CHECK-SAME:     (%[[ARG0:.+]]: tensor<1x6144x13xbf16>, %[[ARG1:.+]]: tensor<6144x1x4xf32>)
-func.func @convolution_mixed_filter(%arg0: tensor<1x6144x13xbf16>, %arg1: tensor<6144x1x4xf32>) -> tensor<1x6144x16xf32> {
+func.func @convolution_mixed_precision(%arg0: tensor<1x6144x13xbf16>, %arg1: tensor<6144x1x4xf32>) -> tensor<1x6144x16xf32> {
   // A convolution requires compatible lhs/rhs element types. If only the lhs
   // has a widening convert, preprocessing must preserve it instead of creating
   // an invalid bf16/f32 convolution.

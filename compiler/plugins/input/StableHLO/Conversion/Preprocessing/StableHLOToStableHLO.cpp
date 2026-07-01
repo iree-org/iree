@@ -1460,13 +1460,12 @@ LogicalResult verifyFusedWidenOperands(mlir::stablehlo::ConvolutionOp op,
 // Identifies cases where a dense operation has inputs that come from widening
 // operations. For instance, a dot product widening from FP16 to FP32 is better
 // to have the casting operation fused into the dot operation. This decreases
-// the loading required during a dense computation.
+// the loading required during a dense computation. Fusion is skipped when it
+// would produce invalid operand types.
 template <class Op>
 struct FuseWidenOperands final : OpRewritePattern<Op> {
   using OpRewritePattern<Op>::OpRewritePattern;
 
-  // Fuses widening converts into dense ops after checking op-specific type
-  // rules.
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     llvm::SmallVector<Value> operands;
