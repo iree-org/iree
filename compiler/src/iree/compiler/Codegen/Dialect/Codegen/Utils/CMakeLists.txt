@@ -22,6 +22,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRSupport
     MLIRTensorDialect
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

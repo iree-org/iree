@@ -64,6 +64,7 @@ namespace mlir::iree_compiler::IREE::CPU {
 
 using IREE::Codegen::MaterializeEncodingInfo;
 using IREE::Codegen::TileMxNxK;
+using IREE::Codegen::TileOCxIC;
 
 namespace {
 
@@ -964,6 +965,138 @@ Operation *lowerContractionOpWithEncoding(
   return result;
 }
 
+/// Builds 9D linalg.generic implementing data-tiled convolution
+/// over already-packed, rank-5/6 operands.
+static linalg::GenericOp
+buildDataTiledConvOp(OpBuilder &builder, Location loc, Value packedInput,
+                     Value packedFilter, Value packedOutput,
+                     ArrayRef<int64_t> strides, ArrayRef<int64_t> dilations) {
+  auto outputType = cast<RankedTensorType>(packedOutput.getType());
+  IREE::Codegen::DataTiledConvIterationSpace space =
+      IREE::Codegen::getDataTiledConvIterationSpace(builder.getContext(),
+                                                    strides, dilations);
+  return linalg::GenericOp::create(
+      builder, loc, outputType,
+      /*inputs=*/ValueRange{packedInput, packedFilter},
+      /*outputs=*/ValueRange{packedOutput}, space.indexingMaps,
+      space.iteratorTypes, [](OpBuilder &b, Location l, ValueRange args) {
+        Value mul = arith::MulFOp::create(b, l, args[0], args[1]);
+        Value add = arith::AddFOp::create(b, l, mul, args[2]);
+        linalg::YieldOp::create(b, l, add);
+      });
+}
+
+/// Lowers a data-tiled convolution whose operands carry conv encodings.
+///
+/// Builds a 9-D linalg.generic over the packed operands:
+///   input:  [N, IC/c0, H, W, c0]
+///   filter: [OC/k0, IC/c0, FH, FW, c0, k0]
+///   output: [N, OC/k0, OH, OW, k0]
+Operation *lowerConvolutionOpWithEncoding(
+    OpBuilder &builder, linalg::LinalgOp linalgOp, ValueRange operands,
+    IREE::Encoding::LayoutMaterializerAttr layoutAttr) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return nullptr;
+  }
+
+  auto inputs = linalgOp.getDpsInputOperands();
+  auto outputs = linalgOp.getDpsInits();
+
+  auto encodedInputType = cast<RankedTensorType>(inputs[0]->get().getType());
+  auto encodedFilterType = cast<RankedTensorType>(inputs[1]->get().getType());
+  auto encodedOutputType = cast<RankedTensorType>(outputs[0].getType());
+  auto inEncoding = IREE::Encoding::getEncodingAttr(encodedInputType);
+  auto filterEncoding = IREE::Encoding::getEncodingAttr(encodedFilterType);
+  auto outEncoding = IREE::Encoding::getEncodingAttr(encodedOutputType);
+  if (!inEncoding || !filterEncoding || !outEncoding) {
+    return nullptr;
+  }
+
+  if (inEncoding.getOperandIndex().getValue() != IREE::Encoding::CONV_IN ||
+      filterEncoding.getOperandIndex().getValue() !=
+          IREE::Encoding::CONV_FILTER ||
+      outEncoding.getOperandIndex().getValue() != IREE::Encoding::CONV_OUT) {
+    return nullptr;
+  }
+
+  MaterializeEncodingInfo encodingInfo = {};
+  if (auto packedLayoutAttr =
+          dyn_cast<IREE::Codegen::PackedLayoutMaterializerAttr>(layoutAttr)) {
+    encodingInfo = packedLayoutAttr.getEncodingInfo(
+        cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
+  }
+
+  if (isIdentityLayout(encodingInfo)) {
+    return dropEncodingAndCloneOp(builder, linalgOp,
+                                  operands.take_front(inputs.size()),
+                                  operands.drop_front(inputs.size()));
+  }
+
+  Value packedInput = operands[0];
+  Value packedFilter = operands[1];
+  Value packedOutput = operands[2];
+
+  Location loc = linalgOp.getLoc();
+
+  auto packedInputType = cast<RankedTensorType>(packedInput.getType());
+  auto packedOutputType = cast<RankedTensorType>(packedOutput.getType());
+
+  // Expected packed ranks for a 2D conv: input/output rank-5 ([N, IC/c0, H, W,
+  // c0] and [N, OC/k0, OH, OW, k0]), or rank-4 if the N=1 batch dim has been
+  // folded away upstream, and filter rank-6 ([OC/k0, IC/c0, FH, FW, c0, k0]).
+  const int64_t inRank = packedInputType.getRank();
+  const int64_t outRank = packedOutputType.getRank();
+  const int64_t filterRank =
+      cast<RankedTensorType>(packedFilter.getType()).getRank();
+  if ((inRank != 4 && inRank != 5) || inRank != outRank || filterRank != 6) {
+    return nullptr;
+  }
+
+  // WORKAROUND: When N=1, upstream folding may remove the batch dimension.
+  // Restore it so the remainder of this lowering can assume rank-5 packed
+  // tensors. If batch folding before materialization is eventually prevented,
+  // this expand/collapse workaround can be dropped.
+  auto prependUnitBatchDim = [&](Value src) -> Value {
+    auto srcType = cast<RankedTensorType>(src.getType());
+
+    SmallVector<int64_t, 5> expandedShape = {1};
+    expandedShape.append(srcType.getShape().begin(), srcType.getShape().end());
+
+    SmallVector<ReassociationIndices> ri = {{0, 1}, {2}, {3}, {4}};
+
+    return tensor::ExpandShapeOp::create(
+        builder, loc,
+        RankedTensorType::get(expandedShape, srcType.getElementType()), src,
+        ri);
+  };
+
+  bool batchDimFolded = (inRank == 4);
+  if (batchDimFolded) {
+    // [IC/c0, H, W, c0] -> [1, IC/c0, H, W, c0]
+    packedInput = prependUnitBatchDim(packedInput);
+    // [OC/k0, OH, OW, k0] -> [1, OC/k0, OH, OW, k0]
+    packedOutput = prependUnitBatchDim(packedOutput);
+  }
+
+  auto cDims = linalg::inferConvolutionDims(linalgOp);
+  if (failed(cDims) || cDims->strides.size() != 2 ||
+      cDims->dilations.size() != 2) {
+    return nullptr;
+  }
+
+  Operation *convOp =
+      buildDataTiledConvOp(builder, loc, packedInput, packedFilter,
+                           packedOutput, cDims->strides, cDims->dilations);
+
+  // [1, OC/k0, OH, OW, k0] -> [OC/k0, OH, OW, k0]
+  if (batchDimFolded) {
+    SmallVector<ReassociationIndices> ri = {{0, 1}, {2}, {3}, {4}};
+    return tensor::CollapseShapeOp::create(builder, loc, packedOutputType,
+                                           convOp->getResult(0), ri);
+  }
+  return convOp;
+}
+
 //===----------------------------------------------------------------------===//
 // Interface methods implementation for iree_cpu.cpu_encoding_resolver.
 //===----------------------------------------------------------------------===//
@@ -1328,6 +1461,57 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   return {};
 }
 
+// Enumerate (OC, IC) conv inner tile sizes to choose from on arm64.
+static SmallVector<TileOCxIC> enumerateConvTileArm64(TypeRange elementTypes,
+                                                     DictionaryAttr config) {
+  assert(elementTypes.size() == 3 && "expected input, filter, output types");
+  Type inputElem = elementTypes[0];
+  Type filterElem = elementTypes[1];
+  Type outputElem = elementTypes[2];
+  // Only fp32 is currently supported; the tile shape and
+  // the ukernel are specific to 32-bit float lanes.
+  if (inputElem.isF32() && filterElem.isF32() && outputElem.isF32()) {
+    return {TileOCxIC{8, 8}}; // Aim to use FMLA (neon).
+  }
+
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
+// Enumerate (OC, IC) conv inner tile sizes to choose from on x86-64.
+static SmallVector<TileOCxIC> enumerateConvTileX86_64(TypeRange elementTypes,
+                                                      DictionaryAttr config) {
+  assert(elementTypes.size() == 3 && "expected input, filter, output types");
+  Type inputElem = elementTypes[0];
+  Type filterElem = elementTypes[1];
+  Type outputElem = elementTypes[2];
+  // Only fp32 is currently supported; the tile shape and
+  // the ukernel are specific to 32-bit float lanes.
+  if (inputElem.isF32() && filterElem.isF32() && outputElem.isF32()) {
+    if (hasFeature(config, "+avx512f")) {
+      return {TileOCxIC{16, 16}}; // Aim to use VFMADD* (zmm).
+    }
+  }
+
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
+static SmallVector<TileOCxIC>
+enumerateCPUConvTiles(IREE::Encoding::EncodingAttr encoding,
+                      DictionaryAttr config) {
+  SmallVector<Type> elementTypes = encoding.getElementTypesArray();
+  if (isAArch64(config)) {
+    return enumerateConvTileArm64(elementTypes, config);
+  }
+  if (isX86_64(config)) {
+    return enumerateConvTileX86_64(elementTypes, config);
+  }
+
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
 struct CPUEncodingPackedLayoutMaterializerAttr
     : PackedLayoutMaterializerAttrExternalModelBase<
           CPUEncodingPackedLayoutMaterializerAttr, CPUEncodingResolverAttr> {
@@ -1346,6 +1530,30 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     MaterializeEncodingInfo info;
     if (!encoding) {
       return info;
+    }
+
+    // Handle convolution encodings.
+    if (encoding.getOpType().getValue() ==
+        IREE::Encoding::EncodingOpType::conv) {
+      FailureOr<linalg::ConvolutionDimensions> cDims =
+          linalg::inferConvolutionDims(encoding.getRootMaps());
+      if (failed(cDims) || !cDims->depth.empty() ||
+          cDims->outputImage.size() != 2 ||
+          llvm::any_of(cDims->dilations, [](int64_t d) { return d != 1; })) {
+        return info; // identity layout
+      }
+      SmallVector<TileOCxIC> tiles =
+          enumerateCPUConvTiles(encoding, layoutAttr.getConfiguration());
+      if (tiles.empty()) {
+        return info;
+      }
+      TileOCxIC tile = tiles[0];
+      FailureOr<MaterializeEncodingInfo> maybeInfo =
+          IREE::Codegen::getEncodingInfoForConv(encoding, tile);
+      if (failed(maybeInfo)) {
+        return info;
+      }
+      return maybeInfo.value();
     }
 
     // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
@@ -1478,6 +1686,11 @@ struct CPUEncodingResolverMaterializerAttr final
       return dropEncodingAndCloneOp(b, linalgOp,
                                     convertedOperands.take_front(numInputs),
                                     convertedOperands.drop_front(numInputs));
+    }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      return lowerConvolutionOpWithEncoding(
+          b, linalgOp, convertedOperands,
+          cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       DictionaryAttr config = layoutAttr.getConfiguration();
