@@ -7,7 +7,7 @@
 //
 // The ROCm target backend must set the target triple of the module, because
 // the LLVM backend expects it to be set.
-// See llvm-project@00a6186128d3 ("AMDGPU: Prefer getting the triple from the
+// See llvm-project@00a6186128d3: ("AMDGPU: Prefer getting the triple from the
 // module over the TargetMachine").
 // Therefore, the ROCMTargetBackend validation checks for the target triple to
 // be set and emits an explicit error if that is not the case.
