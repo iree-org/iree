@@ -90,6 +90,9 @@ class TargetConverter:
                 "@llvm-project//mlir:TargetSMTLIB": ["MLIRExportSMTLIB"],
                 "@llvm-project//mlir:VectorOps": ["MLIRVector"],
                 # StableHLO.
+                "@stablehlo//:base": [
+                    "StablehloBase",
+                ],
                 "@stablehlo//:chlo_ops": [
                     "ChloOps",
                 ],

@@ -78,6 +78,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
+    StablehloBase
     StablehloOps
   PUBLIC
 )
