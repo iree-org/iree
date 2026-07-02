@@ -655,6 +655,20 @@ public:
   LogicalResult
   validateFinalizedModule(IREE::HAL::ExecutableVariantOp variantOp,
                           llvm::Module &module, bool allowExternalDecls) {
+    // The LLVM backend reads the target triple from the module itself (not just
+    // from the TargetMachine) to decide how to emit the code object and HSA
+    // metadata. If it is left unset, code generation crashes deep inside the
+    // AMDGPU AsmPrinter with an opaque signal (a null HSAMetadataStream
+    // dereference; see llvm-project@00a6186128d3). Fail early here with an
+    // actionable message instead. The triple is set in serializeExecutable
+    // right after the data layout.
+    if (module.getTargetTriple().str().empty()) {
+      return variantOp.emitError()
+             << "the finalized LLVM module has no target triple set; it must "
+                "be set before serialization (see ROCMTargetBackend::"
+                "serializeExecutable). Without it the LLVM AMDGPU backend "
+                "crashes while emitting the object file.";
+    }
     for (llvm::Function &func : module.functions()) {
       if (func.isDeclaration() && !func.isIntrinsic() && !func.use_empty()) {
         // In SPIR-V mode, external declarations (e.g. __ocml_*, __ockl_*,
