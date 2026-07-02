@@ -376,6 +376,37 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
 
 // -----
 
+// Checks that mixed bf16/f32 convolutions preserve the required lhs widening convert.
+// CHECK-LABEL: @convolution_mixed_precision
+// CHECK-SAME:     (%[[ARG0:.+]]: tensor<1x6144x13xbf16>, %[[ARG1:.+]]: tensor<6144x1x4xf32>)
+func.func @convolution_mixed_precision(%arg0: tensor<1x6144x13xbf16>, %arg1: tensor<6144x1x4xf32>) -> tensor<1x6144x16xf32> {
+  // A convolution requires compatible lhs/rhs element types. If only the lhs
+  // has a widening convert, preprocessing must preserve it instead of creating
+  // an invalid bf16/f32 convolution.
+  // CHECK: %[[CAST:.+]] = stablehlo.convert %[[ARG0]]
+  // CHECK-SAME: (tensor<1x6144x13xbf16>) -> tensor<1x6144x13xf32>
+  %cast0 = stablehlo.convert %arg0 : (tensor<1x6144x13xbf16>) -> tensor<1x6144x13xf32>
+  // CHECK: %[[LHS:.+]] = stablehlo.transpose %[[CAST]]
+  // CHECK: %[[RHS:.+]] = stablehlo.transpose %[[ARG1]]
+  // CHECK: %[[CONV:.+]] = stablehlo.convolution(%[[LHS]], %[[RHS]])
+  // CHECK-SAME: : (tensor<1x13x6144xf32>, tensor<4x1x6144xf32>) -> tensor<1x16x6144xf32>
+  %0 = "stablehlo.convolution"(%cast0, %arg1) {
+     batch_group_count = 1 : i64,
+     dimension_numbers = #stablehlo.conv<[b, f, 0]x[o, i, 0]->[b, f, 0]>,
+     feature_group_count = 6144 : i64,
+     lhs_dilation = array<i64: 1>,
+     padding = dense<3> : tensor<1x2xi64>,
+     precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
+     rhs_dilation = array<i64: 1>,
+     window_strides = array<i64: 1>
+   } : (tensor<1x6144x13xf32>, tensor<6144x1x4xf32>) -> tensor<1x6144x16xf32>
+  // CHECK: %[[RESULT:.+]] = stablehlo.transpose %[[CONV]]
+  // CHECK: return %[[RESULT]]
+  func.return %0 : tensor<1x6144x16xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @dynamic_dot_general
 // This verifies non-crashing, the lowering to linalg happens elsewhere.
 func.func @dynamic_dot_general(%arg1: tensor<?x1024x16x64xf32>, %arg2: tensor<?x1024x16x64xf32>) -> tensor<?x16x1024x1024xf32> {
