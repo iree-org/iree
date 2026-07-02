@@ -538,6 +538,24 @@ EXPORTS
   mlirGreedyRewriteDriverConfigSetRegionSimplificationLevel
   mlirGreedyRewriteDriverConfigSetStrictness
   mlirGreedyRewriteDriverConfigSetUseTopDownTraversal
+  mlirIRMappingClear
+  mlirIRMappingContainsBlock
+  mlirIRMappingContainsOperation
+  mlirIRMappingContainsValue
+  mlirIRMappingCreate
+  mlirIRMappingDestroy
+  mlirIRMappingEraseBlock
+  mlirIRMappingEraseOperation
+  mlirIRMappingEraseValue
+  mlirIRMappingLookupOrDefaultBlock
+  mlirIRMappingLookupOrDefaultOperation
+  mlirIRMappingLookupOrDefaultValue
+  mlirIRMappingLookupOrNullBlock
+  mlirIRMappingLookupOrNullOperation
+  mlirIRMappingLookupOrNullValue
+  mlirIRMappingMapBlock
+  mlirIRMappingMapOperation
+  mlirIRMappingMapValue
   mlirIRRewriterCreate
   mlirIRRewriterCreateFromOp
   mlirIRRewriterDestroy
@@ -803,6 +821,7 @@ EXPORTS
   mlirOpaqueTypeGetName
   mlirOpaqueTypeGetTypeID
   mlirOperationClone
+  mlirOperationCloneWithMapping
   mlirOperationCreate
   mlirOperationCreateParse
   mlirOperationDestroy
@@ -935,6 +954,7 @@ EXPORTS
   mlirRewriterBaseClearInsertionPoint
   mlirRewriterBaseClone
   mlirRewriterBaseCloneRegionBefore
+  mlirRewriterBaseCloneWithMapping
   mlirRewriterBaseCloneWithoutRegions
   mlirRewriterBaseCreateBlockBefore
   mlirRewriterBaseEraseBlock

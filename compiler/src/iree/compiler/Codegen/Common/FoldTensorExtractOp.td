@@ -17,6 +17,6 @@ include "mlir/IR/PatternBase.td"
 def : Pat<(Tensor_ExtractOp(Bufferization_ToTensorOp $value, $restrict,
                             $writable),
            $indices),
-          (LoadOp $value, $indices, ConstBoolAttrFalse, (NativeCodeCall<"::mlir::Attribute()">))>;
+          (LoadOp $value, $indices, ConstBoolAttrFalse, (NativeCodeCall<"::mlir::Attribute()">), ConstBoolAttrFalse)>;
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_FOLDTENSOREXTRACTOP

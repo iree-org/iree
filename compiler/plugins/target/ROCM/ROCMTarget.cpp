@@ -856,6 +856,11 @@ public:
       // on the MLIR module and propagated through MLIR->LLVM IR translation.
       if (!useSPIRV) {
         llvmModule->setDataLayout(targetMachine->createDataLayout());
+        // The AMDGPU AsmPrinter now reads the target triple from the module
+        // (not the TargetMachine) to decide whether to set up HSA metadata
+        // streaming; without this the module triple is empty and the printer
+        // null-derefs HSAMetadataStream. See llvm-project@00a6186128d3.
+        llvmModule->setTargetTriple(targetMachine->getTargetTriple());
 
         // Let the backend know what code object version we're compiling for.
         // This insulates us from changes to the default code object version
