@@ -1041,9 +1041,63 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+namespace {
+
+// Folds consecutive flow.tensor.slice ops by composing their offsets.
+//
+// Example:
+//   %src -> slice[1,1] -> slice[0,1]
+//      becomes
+//   %src -> slice[1,2]
+//
+// fused_start = inner_start + outer_start
+// fused_length = outer_length
+struct FoldTensorSliceOfSlice : OpRewritePattern<TensorSliceOp> {
+  using OpRewritePattern<TensorSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorSliceOp consumerSlice,
+                                PatternRewriter &rewriter) const override {
+    // Check whether the source of the current slice is produced by
+    // another TensorSliceOp.
+    auto producerSlice =
+        consumerSlice.getSource().getDefiningOp<TensorSliceOp>();
+    if (!producerSlice) {
+      return failure();
+    }
+
+    auto loc =
+        rewriter.getFusedLoc({producerSlice.getLoc(), consumerSlice.getLoc()});
+
+    // Compute the start indices for the fused slice:
+    // fused_start = producer_start + consumer_start
+    SmallVector<Value> fusedStartIndices;
+    for (auto [producerStart, consumerStart] :
+         llvm::zip(producerSlice.getStartIndices(),
+                   consumerSlice.getStartIndices())) {
+      fusedStartIndices.push_back(rewriter.createOrFold<arith::AddIOp>(
+          loc, producerStart, consumerStart));
+    }
+
+    // Replace:
+    //   consumerSlice(producerSlice(%src))
+    //
+    // with:
+    //   fusedSlice(%src)
+    rewriter.replaceOpWithNewOp<TensorSliceOp>(
+        consumerSlice, consumerSlice.getResult().getType(),
+        producerSlice.getSource(), producerSlice.getSourceDims(),
+        fusedStartIndices, consumerSlice.getLengths(),
+        consumerSlice.getResultDims());
+
+    return success();
+  }
+};
+
+} // namespace
+
 void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                 MLIRContext *context) {
-  // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
+  results.insert<FoldTensorSliceOfSlice>(context);
   results.insert<ReplaceOpIfTensorOperandZeroElements<TensorSliceOp, 0>>(
       context);
   results.insert<ReplaceOpIfTensorResultZeroElements<TensorSliceOp, 0>>(
