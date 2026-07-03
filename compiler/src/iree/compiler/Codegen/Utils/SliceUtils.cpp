@@ -119,6 +119,9 @@ void IterationDimTracker::propagateOnPackUnpackOp(
     }
     int64_t rank = cast<ShapedType>(value.getType()).getRank();
     int64_t outDimSize = std::min(rank, numLoops);
+    if (valueToGlobalDimMaps[value].size() < outDimSize) {
+      continue;
+    }
     for (int64_t i = 0; i < outDimSize; ++i) {
       indicesEquivalence.unionSets(valueToGlobalDimMaps[value][i],
                                    operationToGlobalDimMaps[op][i]);
@@ -139,7 +142,8 @@ void IterationDimTracker::propagateOnUnknownOp(
   for (OpOperand &operand : op->getOpOperands()) {
     Value value = operand.get();
     if (!valueToGlobalDimMaps.contains(value) ||
-        numLoops != cast<ShapedType>(value.getType()).getRank()) {
+        numLoops != cast<ShapedType>(value.getType()).getRank() ||
+        valueToGlobalDimMaps[value].size() < numLoops) {
       continue;
     }
     for (int64_t i = 0; i < numLoops; ++i) {
