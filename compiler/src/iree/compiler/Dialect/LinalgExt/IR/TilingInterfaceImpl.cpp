@@ -4005,10 +4005,9 @@ LogicalResult CustomOp::getResultTilePosition(
 // tensor::ConcatOp
 //===---------------------------------------------------------------------===//
 
-// InnerTileAlignment hint-bearing TilingInterface overloads. These ops do not
-// consult the hint (only linalg.pack/unpack do); the overloads exist so that
-// the ops -- which list the hint-less method in DeclareOpInterfaceMethods --
-// also define the defaulted hint-bearing arity and avoid C++ name hiding.
+// TilingInterface overloads with InnerTileAlignment parameter.
+// Only `linalg.pack/unpack` operations utilize this parameter, therefore,
+// these forward to the overloads without the parameter.
 FailureOr<TilingResult> ArgCompareOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
@@ -4123,8 +4122,6 @@ FailureOr<TilingResult> MapLoadOp::generateResultTileValue(
   return generateResultTileValue(builder, resultNumber, offsets, sizes);
 }
 
-// Additional hint-bearing TilingInterface overloads (ops added/extended since
-// the base of the InnerTileAlignment work). These ops ignore the hint.
 FailureOr<TilingResult> Im2colOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {

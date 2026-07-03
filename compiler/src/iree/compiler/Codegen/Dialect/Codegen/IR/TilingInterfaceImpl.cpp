@@ -161,8 +161,7 @@ LogicalResult InnerTiledOp::getResultTilePosition(
   return success();
 }
 
-// Hint-bearing TilingInterface overload; InnerTiledOp does not consult the
-// hint (only linalg.pack/unpack do).
+// Only `linalg.pack/unpack` ops utilize the InnerTileAlignment parameter. We forward to the overload without the parameter.
 FailureOr<TilingResult> InnerTiledOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
