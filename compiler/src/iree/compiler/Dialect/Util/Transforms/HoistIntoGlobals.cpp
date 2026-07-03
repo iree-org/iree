@@ -37,6 +37,36 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
+// Returns true if |op| is nested within a region that is later outlined into
+// an isolated module (a flow dispatch region/workgroups op). Hoisting a value
+// defined inside such a region would place a `util.global.load` within the
+// region; once the region is outlined into an executable the global is no
+// longer visible from there, producing an "undefined global" verification
+// error. We therefore must not hoist these values. Note that hoisting the
+// dispatch op *itself* (whose result lives in the enclosing function body) is
+// still fine and handled normally - this only guards against hoisting ops that
+// are strictly nested inside a dispatch.
+//
+// The dialect/op names are checked by string to avoid a layering dependency
+// from the Util dialect onto the Flow dialect.
+static bool isNestedWithinDispatch(Operation *op) {
+  for (Operation *parent = op->getParentOp(); parent;
+       parent = parent->getParentOp()) {
+    // Stop once we reach the enclosing function/initializer: anything found
+    // along the way that is not a dispatch is a benign nesting (e.g. scf).
+    if (isa<FunctionOpInterface>(parent) ||
+        isa<IREE::Util::InitializerOpInterface>(parent)) {
+      return false;
+    }
+    StringRef opName = parent->getName().getStringRef();
+    if (opName == "flow.dispatch.region" ||
+        opName == "flow.dispatch.workgroups") {
+      return true;
+    }
+  }
+  return false;
+}
+
 static std::string getHoistedName(Type type) {
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -122,6 +152,14 @@ public:
         // have interesting escapes. Early exit here for efficiency.
         auto *iterInfo = constExprs.lookup(iterOp);
         if (!iterInfo) {
+          return WalkResult::advance();
+        }
+
+        // Never hoist values defined inside a dispatch region: the resulting
+        // global load would be placed inside a region that is subsequently
+        // outlined into an isolated executable where the global is not
+        // visible. See isNestedWithinDispatch for details.
+        if (isNestedWithinDispatch(iterOp)) {
           return WalkResult::advance();
         }
 
