@@ -161,4 +161,12 @@ LogicalResult InnerTiledOp::getResultTilePosition(
   return success();
 }
 
+// Only `linalg.pack/unpack` ops utilize the InnerTileAlignment parameter. We
+// forward to the overload without the parameter.
+FailureOr<TilingResult> InnerTiledOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen
