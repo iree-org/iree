@@ -690,6 +690,71 @@ util.func public @sliceDenseResourceAttr() -> tensor<1x1x3xf32> {
 
 // -----
 
+// CHECK-LABEL: @sliceOfSliceStatic2D
+util.func public @sliceOfSliceStatic2D(%src: tensor<3x3xf32>) -> tensor<1x1xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  // CHECK-NOT: flow.tensor.slice %{{.*}}[%c1, %c1
+  %inner = flow.tensor.slice %src[%c1, %c1 for %c2, %c2] : tensor<3x3xf32> -> tensor<2x2xf32>
+  // CHECK: flow.tensor.slice %{{.*}}[%c1, %c2 for %c1, %c1] : tensor<3x3xf32> -> tensor<1x1xf32>
+  %outer = flow.tensor.slice %inner[%c0, %c1 for %c1, %c1] : tensor<2x2xf32> -> tensor<1x1xf32>
+  util.return %outer : tensor<1x1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @sliceOfSliceDynamic1D
+// CHECK-SAME: (%{{.*}}, %[[DIM:arg[0-9]+]]: index, %[[S0:arg[0-9]+]]: index, %{{.*}}, %[[S1:arg[0-9]+]]: index, %[[L1:arg[0-9]+]]: index)
+// Chained slices with dynamic offsets: fused start emits arith.addi at runtime.
+util.func public @sliceOfSliceDynamic1D(%src: tensor<?xf32>, %dim: index,
+                                        %s0: index, %l0: index,
+                                        %s1: index, %l1: index) -> tensor<?xf32> {
+  // CHECK-NOT: flow.tensor.slice %{{.*}}[%[[S0]]
+  %inner = flow.tensor.slice %src[%s0 for %l0] : tensor<?xf32>{%dim} -> tensor<?xf32>{%l0}
+  // CHECK: %[[ADD:.+]] = arith.addi %[[S0]], %[[S1]]
+  // CHECK: flow.tensor.slice %{{.*}}[%[[ADD]] for %[[L1]]] : tensor<?xf32>{%[[DIM]]} -> tensor<?xf32>{%[[L1]]}
+  %outer = flow.tensor.slice %inner[%s1 for %l1] : tensor<?xf32>{%l0} -> tensor<?xf32>{%l1}
+  util.return %outer : tensor<?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @sliceOfSliceMultiUseProducerNoFold
+util.func public @sliceOfSliceMultiUseProducerNoFold(%src: tensor<3x3xf32>) -> (tensor<1x1xf32>, tensor<2x2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  // CHECK: %[[INNER:.+]] = flow.tensor.slice %{{.*}}[%c1, %c1 for %c2, %c2]
+  %inner = flow.tensor.slice %src[%c1, %c1 for %c2, %c2] : tensor<3x3xf32> -> tensor<2x2xf32>
+  // CHECK: flow.tensor.slice %[[INNER]][%c0, %c1 for %c1, %c1]
+  %outer = flow.tensor.slice %inner[%c0, %c1 for %c1, %c1] : tensor<2x2xf32> -> tensor<1x1xf32>
+  util.return %outer, %inner : tensor<1x1xf32>, tensor<2x2xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @sliceOfSliceTripleChain
+// Three consecutive slices fully fold into one via fixed-point iteration.
+// slice1: [1 for 5], slice2: [1 for 3], slice3: [1 for 1]
+// pass1 fuses slice3+slice2: start=1+1=2, length=1
+// pass2 fuses that + slice1: start=1+2=3, length=1 -> final [3 for 1] on %src
+util.func public @sliceOfSliceTripleChain(%src: tensor<8xf32>) -> tensor<1xf32> {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c5 = arith.constant 5 : index
+  // CHECK-NOT: flow.tensor.slice %{{.*}}[%c1 for %c5
+  %s1 = flow.tensor.slice %src[%c1 for %c5] : tensor<8xf32> -> tensor<5xf32>
+  // CHECK-NOT: flow.tensor.slice %{{.*}}[%c1 for %c3
+  %s2 = flow.tensor.slice %s1[%c1 for %c3]  : tensor<5xf32> -> tensor<3xf32>
+  // CHECK: %[[C3:.+]] = arith.constant 3 : index
+  // CHECK: flow.tensor.slice %{{.*}}[%[[C3]] for %c1] : tensor<8xf32> -> tensor<1xf32>
+  %s3 = flow.tensor.slice %s2[%c1 for %c1]  : tensor<3xf32> -> tensor<1xf32>
+  util.return %s3 : tensor<1xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @updateConst0D
 util.func public @updateConst0D() -> tensor<i32> {
   %0 = arith.constant dense<0> : tensor<i32>
