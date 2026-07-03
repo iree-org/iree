@@ -109,6 +109,12 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
     }
 
     Type elType = outType.getElementType();
+    // Builder::getZeroAttr only supports int/index/float element types. For
+    // other element types (e.g. complex) we cannot synthesize a zero constant,
+    // so leave the op untouched rather than crashing.
+    if (!elType.isIntOrIndexOrFloat()) {
+      continue;
+    }
     // Build a constant 0 of the type.
     builder.setInsertionPoint(linalgOp);
     Value zero = arith::ConstantOp::create(builder, linalgOp.getLoc(),
