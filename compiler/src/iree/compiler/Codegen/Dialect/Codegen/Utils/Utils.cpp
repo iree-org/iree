@@ -10,6 +10,8 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -688,6 +690,61 @@ getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
       utils::IteratorType::reduction, // d8 = ic_inner (c0)
   };
   return space;
+}
+
+/// Recognize the data-tiled convolution generic emitted by encoding
+/// materialization, identified by its iterator types [P,P,P,P, R,R,R, P,R],
+/// operand ranks (input 5, filter 6, output 5), indexing maps, and
+/// multiply-accumulate body.
+bool isDataTiledConvGeneric(linalg::GenericOp genericOp) {
+  using IT = utils::IteratorType;
+  SmallVector<IT> iterTypes = genericOp.getIteratorTypesArray();
+  SmallVector<IT> expected = {IT::parallel,  IT::parallel,  IT::parallel,
+                              IT::parallel,  IT::reduction, IT::reduction,
+                              IT::reduction, IT::parallel,  IT::reduction};
+  if (iterTypes.size() != 9 || !llvm::equal(iterTypes, expected)) {
+    return false;
+  }
+
+  if (genericOp.getNumDpsInputs() != 2 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+  auto inputType = dyn_cast<RankedTensorType>(
+      genericOp.getDpsInputOperand(0)->get().getType());
+  auto filterType = dyn_cast<RankedTensorType>(
+      genericOp.getDpsInputOperand(1)->get().getType());
+  auto outputType = dyn_cast<RankedTensorType>(
+      genericOp.getDpsInitOperand(0)->get().getType());
+  if (!inputType || !filterType || !outputType) {
+    return false;
+  }
+  if (inputType.getRank() != 5 || filterType.getRank() != 6 ||
+      outputType.getRank() != 5) {
+    return false;
+  }
+
+  FailureOr<linalg::ConvolutionDimensions> cDims =
+      linalg::inferConvolutionDims(genericOp);
+  if (failed(cDims) || cDims->strides.size() != 2 ||
+      cDims->dilations.size() != 2) {
+    return false;
+  }
+
+  // Require the maps and iterator types to be exactly what the encoding
+  // materialization emits for this op's strides/dilations.
+  DataTiledConvIterationSpace space = getDataTiledConvIterationSpace(
+      genericOp.getContext(), cDims->strides, cDims->dilations);
+  if (genericOp.getIndexingMapsArray() != space.indexingMaps ||
+      genericOp.getIteratorTypesArray() != space.iteratorTypes) {
+    return false;
+  }
+
+  return linalg::detail::isContractionBody(
+      *genericOp.getBlock(),
+      [](Operation *mul, Operation *add) {
+        return isa<arith::MulFOp>(mul) && isa<arith::AddFOp>(add);
+      },
+      llvm::nulls());
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen

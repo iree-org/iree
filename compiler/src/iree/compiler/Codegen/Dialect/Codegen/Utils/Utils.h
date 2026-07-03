@@ -17,6 +17,10 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
 
+namespace mlir::linalg {
+class GenericOp;
+} // namespace mlir::linalg
+
 namespace mlir::iree_compiler::IREE::Codegen {
 
 //===----------------------------------------------------------------------===//
@@ -164,6 +168,11 @@ struct DataTiledConvIterationSpace {
 DataTiledConvIterationSpace
 getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
                                ArrayRef<int64_t> dilations);
+
+/// Returns true if `genericOp` is a 9D data-tiled convolution generic
+/// emitted by encoding materialization (matched by iterator types,
+/// operand ranks, indexing maps, and multiply-accumulate body).
+bool isDataTiledConvGeneric(linalg::GenericOp genericOp);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 
