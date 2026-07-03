@@ -42,6 +42,7 @@ X86_64_AVX512_BF16_COPTS = [
 
 X86_64_AVX512_VNNI_COPTS = [
     "-mavx512f",
+    "-mavx512bw",
     "-mavx512vnni",
 ]
 
