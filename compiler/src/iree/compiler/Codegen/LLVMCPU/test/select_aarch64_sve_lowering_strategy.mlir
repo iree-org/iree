@@ -1,7 +1,5 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' \
-// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s --check-prefixes=CHECK,WITH-SME
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' \
-// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file --iree-llvmcpu-disable-arm-sme-tiling %s | FileCheck %s --check-prefixes=CHECK,DISABLE-ARM-SME
+// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s
 
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @matmul_tensors(%7: tensor<?x?xf32>, %8: tensor<?x?xf32>, %9: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
@@ -75,61 +73,17 @@ func.func @static_tensors_1x1(%3: tensor<1x1xf32>, %4: tensor<1x1xf32>, %5: tens
 
 // -----
 
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
-func.func @matmul_tensors(%7: tensor<?x?xf32>, %8: tensor<?x?xf32>, %9: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %10 = linalg.matmul ins(%7, %8 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %10 : tensor<?x?xf32>
-}
-//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, [8], 0], vector_reduction = [0, 0, 4]>
-//  DISABLE-ARM-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
-//      DISABLE-ARM-SME: func.func @matmul_tensors(
-//  DISABLE-ARM-SME-SAME:     translation_info = #[[TRANSLATION]]
-//       DISABLE-ARM-SME: linalg.matmul
-//  DISABLE-ARM-SME-SAME:     lowering_config = #[[CONFIG]]
-
-//   WITH-SME-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = {{\[}}[8], [8], 0], vector_reduction = [0, 0, 1]>
-//   WITH-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
-//       WITH-SME: func.func @matmul_tensors(
-//  WITH-SME-SAME:     translation_info = #[[TRANSLATION]]
-//       WITH-SME: linalg.matmul
-//  WITH-SME-SAME:     lowering_config = #[[CONFIG]]
-
-// -----
-
-// f64 matmul uses different SME tile sizes than f32: [4]x[8] instead of [8]x[8]
-// (each SME tile only holds half as many f64 elements per row as f32 ones).
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+// f64 matmul on an SVE-only target (no SME) should use the regular SVE
+// tiling heuristic. See select_aarch64_sme_lowering_strategy.mlir for the
+// SME-specific f64 tile sizes.
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @matmul_tensors_f64(%7: tensor<?x?xf64>, %8: tensor<?x?xf64>, %9: tensor<?x?xf64>) -> tensor<?x?xf64> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
   %10 = linalg.matmul ins(%7, %8 : tensor<?x?xf64>, tensor<?x?xf64>) outs(%9 : tensor<?x?xf64>) -> tensor<?x?xf64>
   return %10 : tensor<?x?xf64>
 }
-//  DISABLE-ARM-SME-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, [4], 0], vector_reduction = [0, 0, 2]>
-//  DISABLE-ARM-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
-//      DISABLE-ARM-SME: func.func @matmul_tensors_f64(
-//  DISABLE-ARM-SME-SAME:     translation_info = #[[TRANSLATION]]
-//       DISABLE-ARM-SME: linalg.matmul
-//  DISABLE-ARM-SME-SAME:     lowering_config = #[[CONFIG]]
-
-//   WITH-SME-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = {{\[}}[4], [8], 0], vector_reduction = [0, 0, 1]>
-//   WITH-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
-//       WITH-SME: func.func @matmul_tensors_f64(
-//  WITH-SME-SAME:     translation_info = #[[TRANSLATION]]
-//       WITH-SME: linalg.matmul
-//  WITH-SME-SAME:     lowering_config = #[[CONFIG]]
-
-// -----
-
-// SME tiling only supports f32 and f64 matmuls, so an i8 matmul should fall
-// back to the regular SVE tiling heuristic regardless of whether SME tiling
-// is enabled or disabled.
-#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve,+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
-func.func @matmul_tensors_i8i8_i32_with_sme(%7: tensor<?x?xi8>, %8: tensor<?x?xi8>, %9: tensor<?x?xi32>) -> tensor<?x?xi32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
-  %10 = linalg.matmul ins(%7, %8 : tensor<?x?xi8>, tensor<?x?xi8>) outs(%9 : tensor<?x?xi32>) -> tensor<?x?xi32>
-  return %10 : tensor<?x?xi32>
-}
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, [8], 0], vector_reduction = [0, 0, 4]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0], vector_common_parallel = [8, [4], 0], vector_reduction = [0, 0, 2]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
-//       CHECK: func.func @matmul_tensors_i8i8_i32_with_sme(
+//       CHECK: func.func @matmul_tensors_f64(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
