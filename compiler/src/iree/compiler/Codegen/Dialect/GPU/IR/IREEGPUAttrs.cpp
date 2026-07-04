@@ -1262,14 +1262,17 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (isNvMmaSync(intrinsic)) {
-    // Transpose the two outer dimensions to model the column-major register
-    // ordering expected by mma.sync. The input shape differs between pipelines:
-    // VectorDistribute produces 2x2x1x2, TileAndFuse produces 2x1x2x2.
-    // Remove the unit dimension to simplify the transpose.
-    // Preserve the operand element type so BF16 fragments are not reshaped as
-    // f16.
+    // Transpose the two outer dims to model mma.sync's column-major register
+    // order: reshape to {outer_M, outer_K, element_K}, swap outer_M/outer_K.
+    // Shape is derived from the LHS layout (not hardcoded {2, 2, 2}) since
+    // element[K] varies by intrinsic (e.g. FP8 packs 4 vs. F16/BF16's 2).
     Type elementType = cast<VectorType>(lhs.getType()).getElementType();
-    auto nonUnitVecType = VectorType::get({2, 2, 2}, elementType);
+    auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
+    int64_t outerM = lhsLayout.outer[0];
+    int64_t outerK = lhsLayout.outer[1];
+    int64_t elemSize = lhsLayout.element[0] * lhsLayout.element[1];
+    auto nonUnitVecType =
+        VectorType::get({outerM, outerK, elemSize}, elementType);
     auto reshaped =
         vector::ShapeCastOp::create(builder, loc, nonUnitVecType, lhs);
     auto permAttr = builder.getDenseI64ArrayAttr({1, 0, 2});
