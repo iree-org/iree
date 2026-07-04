@@ -163,7 +163,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
 
   // SME does not require classic (non-streaming) SVE: some targets
-  // (e.g., Apple Silicon) implement SME without it. See #24660.
+  // (e.g., Apple Silicon) implement SME without it.
   pipelineOpts.enableAArch64SME =
       isAArch64(targetConfig) && hasSMEFeature(targetConfig);
   pipelineOpts.enableAArch64I8mm =
