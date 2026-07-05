@@ -386,6 +386,26 @@ TEST(StringViewTest, Substr) {
   EXPECT_EQ(substr("abc", 0, IREE_STRING_VIEW_NPOS), "abc");
 }
 
+TEST(StringViewTest, AtoiInt32Base) {
+  auto atoi = [](const char* value, int base) -> int32_t {
+    int32_t result = 0;
+    EXPECT_TRUE(iree_string_view_atoi_int32_base(iree_make_cstring_view(value),
+                                                 base, &result));
+    return result;
+  };
+  // The base argument must be honored (it was previously ignored and the value
+  // was always parsed with base 0 / C auto-detection).
+  EXPECT_EQ(atoi("10", 10), 10);
+  EXPECT_EQ(atoi("10", 16), 16);
+  EXPECT_EQ(atoi("10", 2), 2);
+  EXPECT_EQ(atoi("ff", 16), 255);
+  EXPECT_EQ(atoi("-20", 8), -16);
+  // base 0 keeps C auto-detection: "0x" -> hex, leading "0" -> octal.
+  EXPECT_EQ(atoi("0x1a", 0), 26);
+  EXPECT_EQ(atoi("010", 0), 8);
+  EXPECT_EQ(atoi("10", 0), 10);
+}
+
 TEST(StringViewTest, Split) {
   auto split =
       [](const char* value,

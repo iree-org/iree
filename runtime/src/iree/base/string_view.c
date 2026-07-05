@@ -384,7 +384,7 @@ IREE_API_EXPORT bool iree_string_view_atoi_int32_base(iree_string_view_t value,
   // Attempt to parse.
   errno = 0;
   char* end = NULL;
-  long parsed_value = strtol(temp, &end, 0);
+  long parsed_value = strtol(temp, &end, base);
   if (temp == end) return false;
   if ((parsed_value == LONG_MIN || parsed_value == LONG_MAX) &&
       errno == ERANGE) {
