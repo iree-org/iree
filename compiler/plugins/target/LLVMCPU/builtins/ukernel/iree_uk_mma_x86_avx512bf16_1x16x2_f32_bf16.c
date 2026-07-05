@@ -13,39 +13,97 @@
 // intrinsic name verbatim (lowercased, with the `iree_uk_` prefix), in line
 // with the AMDGPU C ukernel convention.
 //
-// The "inner K loop" the ukernel owns is the loop over the K *tiles* that
-// sits *inside* the outer M/N loops; those outer M/N loops are tiled away by
-// ordinary IREE tiling before this ukernel runs. The ukernel handles
-// arbitrary positive `intrinsics_{m,n,k}` (passed as arguments and looped
-// over); the loops fully unroll after the ukernel is inlined into its
-// constant-`intrinsics_*` caller -- the bitcode-LTO equivalent of a C++
-// template.
+// Adapted from the AMDGPU C ukernel
+// `iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8`: same shape — accumulators
+// held in registers, an outer loop over the K dimension, and inside it the
+// `(intrinsics_m, intrinsics_n, intrinsics_k)` unrolling — minus the
+// GPU-specific shared-memory / subgroup machinery.
+//
+// The "inner K loop" the ukernel owns is the loop over the K *tiles*
+// (`k_outer` below) that sits *inside* the outer M/N loops; those outer M/N
+// loops are tiled away by ordinary IREE tiling before this ukernel runs.
+// This is NOT a restriction to `intrinsics_{m,n,k} = 1`: the ukernel handles
+// arbitrary positive `intrinsics_{m,n,k}` via the `for` loops below.
+//
+// `intrinsics_{m,n,k}` are passed as function arguments and so look like
+// runtime values inside this translation unit, but the ukernel is always
+// inlined into its caller (a bug otherwise) and the caller always passes the
+// matching `DataTiledMMAAttr` constants. Together with post-inline IR
+// optimization on the linked bitcode, the `for` loops fully unroll and the
+// `acc_regs` VLA becomes a fixed register array specialized to each call
+// site's `intrinsics_{m,n,k}` — the bitcode-LTO equivalent of C++ templates.
 //
 // ABI: each shaped operand is passed as (base pointer, element offset) so the
-// caller doesn't need a GEP before the call. No strides are passed: the ACC
-// tile is contiguous, so the ukernel addresses each intrinsic's fragment from
-// `intrinsics_{m,n}` and its own fixed fragment size.
+// caller doesn't need a GEP before the call (the offset is added here). No
+// strides are passed: the ACC tile is contiguous, so the ukernel addresses
+// each fragment from `intrinsics_{m,n}` and its fixed fragment size. Offsets
+// are in units of the operand element type (bf16 for LHS/RHS, f32 for ACC).
 //
-// NOTE (seed scaffolding): this initial seed has a stub body. It exists so
-// that the surrounding *framework* -- bitcode build, embedding,
-// `hal.executable_object` injection, IR rewrite to `ukernel.generic` -- can
-// be landed and lit-tested. A follow-up commit replaces the body with the
-// `_mm512_dpbf16_ps`-based inner loop and adds an e2e matmul test for it.
+// Data-tiled operand layout (matching the `DataTiledMMAAttr` swizzle, same as
+// the AMDGPU ukernel):
+//   - ACC: one `__m512` (= M0=1 x N0=16 f32) per (m, n) intrinsic, tightly
+//     packed row-major over the (m, n) grid, so fragment (m, n) is at
+//     `acc + (m * intrinsics_n + n) * 16`.
+//   - LHS: per outer-K step, `intrinsics_m * intrinsics_k` units of 2 bf16
+//     (= one M0=1 x K0=2 fragment = a 4-byte `vdpbf16ps` m_bcst unit),
+//     ordered [m][k]; consecutive outer-K steps are contiguous.
+//   - RHS: per outer-K step, `intrinsics_n * intrinsics_k` panels of 32 bf16
+//     (= one N0=16 x K0=2 fragment = one `__m512`), ordered [n][k];
+//     consecutive outer-K steps are contiguous.
 IREE_UK_ALWAYS_INLINE
 void iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16(
     const uint16_t *lhs_base, int64_t lhs_offset, const uint16_t *rhs_base,
     int64_t rhs_offset, float *acc_base, int64_t acc_offset, int32_t k_outer,
     int32_t intrinsics_m, int32_t intrinsics_n, int32_t intrinsics_k) {
-  (void)lhs_base;
-  (void)lhs_offset;
-  (void)rhs_base;
-  (void)rhs_offset;
-  (void)acc_base;
-  (void)acc_offset;
-  (void)k_outer;
-  (void)intrinsics_m;
-  (void)intrinsics_n;
-  (void)intrinsics_k;
-  // TODO(ukernels): real inner K loop using `_mm512_dpbf16_ps`, looping over
-  // intrinsics_{m,n,k}.
+  const uint16_t *lhs = lhs_base + lhs_offset;
+  const float *rhs = (const float *)(rhs_base + rhs_offset);
+  float *acc = acc_base + acc_offset;
+
+  // The ACC tile is contiguous: each intrinsic's fragment is one __m512
+  // (M0*N0 = 1*16 f32), so fragment (m, n) sits
+  // `(m * intrinsics_n + n) * kAccFragElems` elements into `acc`.
+  enum { kAccFragElems = 16 };
+
+  // One accumulator register (1x16 f32) per (m, n) intrinsic. The VLA
+  // dimensions are compile-time constants at the inlined call site, so this
+  // lowers to a fixed register array.
+  __m512 acc_regs[intrinsics_m][intrinsics_n];
+  for (int32_t m = 0; m < intrinsics_m; ++m) {
+    for (int32_t n = 0; n < intrinsics_n; ++n) {
+      acc_regs[m][n] =
+          _mm512_loadu_ps(acc + (m * intrinsics_n + n) * kAccFragElems);
+    }
+  }
+
+  for (int32_t ko = 0; ko < k_outer; ++ko) {
+    const uint16_t *lhs_block =
+        lhs + (int64_t)ko * intrinsics_m * intrinsics_k * 2;
+    const float *rhs_block =
+        rhs + (int64_t)ko * intrinsics_n * intrinsics_k * 16;
+    for (int32_t m = 0; m < intrinsics_m; ++m) {
+      for (int32_t n = 0; n < intrinsics_n; ++n) {
+        for (int32_t k = 0; k < intrinsics_k; ++k) {
+          // LHS fragment: 2 bf16 (one M-row's K-pair) broadcast across the
+          // 16 SIMD lanes via `set1_ps` (the splat shape `vdpbf16ps`'s
+          // m_bcst variant pattern-matches). The bitcast to `__m512bh` is a
+          // width-preserving no-op LLVM elides.
+          __m512 lhs_bcast = _mm512_set1_ps(
+              *(const float *)(lhs_block + (m * intrinsics_k + k) * 2));
+          // RHS fragment: one (N=16 x K=2) bf16 panel = 16 f32.
+          __m512 rhs_panel =
+              _mm512_loadu_ps(rhs_block + (n * intrinsics_k + k) * 16);
+          acc_regs[m][n] =
+              _mm512_dpbf16_ps(acc_regs[m][n], *(const __m512bh *)&lhs_bcast,
+                               *(const __m512bh *)&rhs_panel);
+        }
+      }
+    }
+  }
+
+  for (int32_t m = 0; m < intrinsics_m; ++m) {
+    for (int32_t n = 0; n < intrinsics_n; ++n) {
+      _mm512_storeu_ps(acc + (m * intrinsics_n + n) * kAccFragElems,
+                       acc_regs[m][n]);
+    }
+  }
 }

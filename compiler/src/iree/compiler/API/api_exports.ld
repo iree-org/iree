@@ -332,12 +332,16 @@ VER_0 {
     mlirConversionPatternGetTypeConverter;
     mlirConversionPatternRewriterAsPatternRewriter;
     mlirConversionPatternRewriterConvertRegionTypes;
+    mlirConversionTargetAddDynamicallyLegalDialect;
+    mlirConversionTargetAddDynamicallyLegalOp;
     mlirConversionTargetAddIllegalDialect;
     mlirConversionTargetAddIllegalOp;
     mlirConversionTargetAddLegalDialect;
     mlirConversionTargetAddLegalOp;
     mlirConversionTargetCreate;
     mlirConversionTargetDestroy;
+    mlirConversionTargetMarkOpRecursivelyLegal;
+    mlirConversionTargetMarkUnknownOpDynamicallyLegal;
     mlirCreateExternalPass;
     mlirDenseArrayAttrGetTypeID;
     mlirDenseArrayGetNumElements;

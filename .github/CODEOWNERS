@@ -49,7 +49,6 @@
 
 # Tests
 /tests/external/iree-test-suites @Groverkss @MaheshRavishankar @kuhar
-/tests/e2e @bjacob
 
 # Compiler
 /compiler/src/iree/compiler/ @benvanik
@@ -68,7 +67,7 @@
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @qedawkins @kuhar @Groverkss @nirvedhmeshram @krzysz00 @Max191
 /compiler/src/iree/compiler/Codegen/SPIRV/ @kuhar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/Encoding/ @bjacob @hanhanW @Max191 @jtuyls
+/compiler/src/iree/compiler/Dialect/Encoding/ @hanhanW @Max191 @jtuyls
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1 @bangtianliu
 /compiler/src/iree/compiler/Dialect/Stream/ @benvanik @hanhanW @MaheshRavishankar
