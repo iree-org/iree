@@ -98,7 +98,7 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     ],
     # SME does not require classic (non-streaming) SVE: some targets
     # (e.g., Apple Silicon) implement SME without it. See #24660.
-    target_cpu_features_variants = ["arm_64:sme:+sme,+sme2"],
+    target_cpu_features_variants = ["arm_64:sme:+sme"],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
 ) for dtype in [
