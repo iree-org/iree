@@ -1695,7 +1695,7 @@ LogicalResult WinogradInputTransformOp::verify() {
     }
     if ((!inputType.isDynamicDim(0) &&
          inputType.getDimSize(0) > getInputTileSize()) ||
-        (inputType.isDynamicDim(1) &&
+        (!inputType.isDynamicDim(1) &&
          inputType.getDimSize(1) > getInputTileSize())) {
       return op->emitOpError("expected input dims not greater than input tile "
                              "size if input is of rank 2");
