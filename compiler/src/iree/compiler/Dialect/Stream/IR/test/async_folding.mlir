@@ -723,3 +723,19 @@ util.func private @PropagateSplatAwaitThroughSlice(%await: !stream.timepoint) ->
   // CHECK: util.return %[[RESULT]]
   util.return %1 : !stream.resource<*>
 }
+
+// -----
+
+// CHECK-LABEL: @ConvertSplatConstantsIntoSplats_dense_resource
+util.func private @ConvertSplatConstantsIntoSplats_dense_resource(%arg0: index) -> !stream.resource<transient> {
+  // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense_resource<resource_i64> : tensor<1xi64>
+  %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense_resource<resource_i64> : tensor<1xi64>
+  util.return %0 : !stream.resource<transient>
+}
+{-#
+  dialect_resources: {
+    builtin: {
+      resource_i64: "0x080000000100000000000000"
+    }
+  }
+#-}
