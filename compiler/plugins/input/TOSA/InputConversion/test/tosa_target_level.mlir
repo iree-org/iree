@@ -16,8 +16,6 @@ func.func @dynamic_shape(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
 // -----
 
 // Genuine profile/data type violations, unrelated to shape, must be rejected.
-
-// CHECK-LABEL: @out_of_profile
 func.func @out_of_profile(%arg0: tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN> {
   // expected-error@+1 {{operand/result data types did not align with any profile or extension}}
   %0 = tosa.abs %arg0 : (tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
