@@ -52,10 +52,15 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
   TosaToLinalgNamedOptions tosaToLinalgNamedOptions;
   tosaToLinalgNamedOptions.preferConv2DKernelLayoutHWCF = true;
-  tosa::TosaValidationOptions tosaValidationOptions;
   tosa::TosaAttachTargetOptions tosaTargetOptions;
   tosaTargetOptions.extensions = {"dynamic", "doubleround"};
   tosaTargetOptions.profiles = {"pro_int", "pro_fp"};
+  // TOSA's default level ("8k") rejects any operation with a dynamic shape.
+  // Models commonly have dynamic dimensions (e.g. a dynamic batch size),
+  // so target the unrestricted level while still running full profile and
+  // data type validation.
+  tosaTargetOptions.level = tosa::Level::none;
+  tosa::TosaValidationOptions tosaValidationOptions;
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
                               tosaToLinalgNamedOptions, tosaValidationOptions,
                               tosaTargetOptions);
