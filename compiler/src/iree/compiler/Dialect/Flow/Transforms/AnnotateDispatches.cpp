@@ -133,14 +133,9 @@ static std::string loopRangesToString(ArrayRef<int64_t> loopRanges) {
 }
 
 static std::string operandTypeToString(Value operandValue) {
-  auto operandType = operandValue.getType();
   std::string outputString;
   llvm::raw_string_ostream sstream(outputString);
-  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
-    shapedType.getElementType().print(sstream);
-  } else {
-    operandType.print(sstream);
-  }
+  getElementTypeOrSelf(operandValue).print(sstream);
   return outputString;
 }
 
@@ -152,11 +147,12 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
   SmallVector<std::string> datatypeTokens;
 
   for (Value operandValue : op->getOperands()) {
-    datatypeTokens.push_back(operandTypeToString(operandValue));
+    std::string typeStr = operandTypeToString(operandValue);
+    datatypeTokens.push_back(typeStr);
     if (firstToken.empty()) {
-      firstToken = operandTypeToString(operandValue);
+      firstToken = typeStr;
     } else if (allTokensSame) {
-      allTokensSame = firstToken == operandTypeToString(operandValue);
+      allTokensSame = firstToken == typeStr;
     }
   }
 
