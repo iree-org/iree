@@ -47,13 +47,16 @@ IREE_DEVICE_EXPORT void __arm_za_disable(void) {
 // Unlike the stubs above, this one must return a real value: it's called
 // from the prologue, *before* `smstart`, to save the pre-streaming VG for
 // unwind info on targets lacking classic SVE, where `cntd` is illegal outside
-// Streaming SVE mode (e.g., Apple Silicon). A normal host link gets this for
-// free from compiler-rt's sme-abi.S. IREE's embedded linking is freestanding
-// and has none, hence the local copy.
+// Streaming SVE mode (e.g., Apple Silicon). LLVM only generates calls to this
+// function on platforms that lack SVE, i.e. for `!hasSVE && hasSME`
+// (otherwise it inlines `cntd` directly, which is always legal when SVE is
+// present). A normal host link gets this for free from compiler-rt's
+// sme-abi.S. IREE's embedded linking is freestanding and has none, hence the
+// local copy.
 // See https://github.com/llvm/llvm-project/issues/204853.
 //
-// **Assumption**: In IREE we only use `arm_locally_streaming` functions.
-// That means we can assume `__arm_get_current_vg` will be called
-// outside of streaming mode. So by assuming `!hasSVE && hasSME` is
-// safe just returning 0.
+// ASSUMPTION: In IREE we only use `arm_locally_streaming` functions. That
+// means we can assume `__arm_get_current_vg` will be called outside of
+// streaming mode. So by assuming `!hasSVE && hasSME` is safe just returning
+// 0.
 IREE_DEVICE_EXPORT int64_t __arm_get_current_vg(void) { return 0; }

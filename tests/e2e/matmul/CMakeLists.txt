@@ -35,8 +35,7 @@ iree_generated_e2e_runner_test(
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
-    "arm_64:sme:+sve,+sme"
-    "arm_64:sme_only:+sme,+sme2"
+    "arm_64:sme:+sme,+sme2"
 )
 
 iree_generated_e2e_runner_test(
@@ -63,8 +62,7 @@ iree_generated_e2e_runner_test(
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
-    "arm_64:sme:+sve,+sme"
-    "arm_64:sme_only:+sme,+sme2"
+    "arm_64:sme:+sme,+sme2"
 )
 
 iree_generated_e2e_runner_test(
@@ -91,8 +89,7 @@ iree_generated_e2e_runner_test(
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
-    "arm_64:sme:+sve,+sme"
-    "arm_64:sme_only:+sme,+sme2"
+    "arm_64:sme:+sme,+sme2"
 )
 
 iree_generated_e2e_runner_test(
@@ -118,8 +115,7 @@ iree_generated_e2e_runner_test(
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
-    "arm_64:sme:+sve,+sme"
-    "arm_64:sme_only:+sme,+sme2"
+    "arm_64:sme:+sme,+sme2"
 )
 
 iree_generated_e2e_runner_test(
