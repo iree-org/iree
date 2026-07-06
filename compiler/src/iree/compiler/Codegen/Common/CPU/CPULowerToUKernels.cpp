@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -18,6 +19,7 @@
 #include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -263,6 +265,122 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*num_strided_outer_dims=*/1);
+  return cast<IREE::Codegen::UKernelOpInterface>(
+      genericMicroKernelOp.getOperation());
+}
+
+/// Matches a 9D data-tiled conv generic op and rewrites it to a call to
+/// iree_uk_conv_nchwc, that is later lowered into a call to the
+/// microkernel.
+static FailureOr<IREE::Codegen::UKernelOpInterface>
+matchDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op,
+                   bool /*skipIntermediateRoundings*/) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  const char ukernelName[] = "conv_nchwc";
+  if (!targetAttr || !hasUkernel(targetAttr.getConfiguration(), ukernelName)) {
+    return failure();
+  }
+  if (!IREE::Codegen::isDataTiledConvGeneric(op)) {
+    return rewriter.notifyMatchFailure(op, "not a data-tiled conv generic");
+  }
+  Value input = op.getDpsInputOperand(0)->get();
+  Value filter = op.getDpsInputOperand(1)->get();
+  Value output = op.getDpsInitOperand(0)->get();
+  auto inputType = cast<RankedTensorType>(input.getType());
+  auto filterType = cast<RankedTensorType>(filter.getType());
+  auto outputType = cast<RankedTensorType>(output.getType());
+
+  Type inElem = inputType.getElementType();
+  Type filterElem = filterType.getElementType();
+  Type outElem = outputType.getElementType();
+  uint32_t flags = 0;
+  if (inElem.isF32() && filterElem.isF32() && outElem.isF32()) {
+    flags = IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32;
+  } else {
+    return rewriter.notifyMatchFailure(op,
+                                       "unsupported conv_nchwc element types");
+  }
+
+  auto cDims = linalg::inferConvolutionDims(op);
+  if (failed(cDims) || cDims->strides.size() != 2 ||
+      cDims->dilations.size() != 2) {
+    return rewriter.notifyMatchFailure(op, "failed to infer conv dims");
+  }
+  // TODO(phemashekar): plumb dilation_h/w as ukernel operands and honor them
+  // in the ukernels (window expression currently assumes unit dilation).
+  if (cDims->dilations[0] != 1 || cDims->dilations[1] != 1) {
+    return rewriter.notifyMatchFailure(op, "only dilation=1 supported for now");
+  }
+  int64_t strideH = cDims->strides[0];
+  int64_t strideW = cDims->strides[1];
+
+  if (isInitializedToZero(output)) {
+    // Not setting flags |= IREE_UK_FLAG_CONV_NCHWC_ACCUMULATE, so the conv op
+    // won't read the existing accumulator, so its defining op can be discarded.
+    if (auto fillOp = output.getDefiningOp<linalg::FillOp>()) {
+      output = fillOp.getDpsInitOperand(0)->get();
+    }
+  } else {
+    // Tell the conv op to read the existing accumulator.
+    flags |= IREE_UK_FLAG_CONV_NCHWC_ACCUMULATE;
+  }
+
+  flags |= IREE_UK_FLAG_CONV_NCHWC_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
+
+  Location loc = op.getLoc();
+
+  auto dimAsIndex = [&](Value v, int64_t d) -> Value {
+    return tensor::DimOp::create(rewriter, loc, v, d);
+  };
+
+  Value n = dimAsIndex(input, 0);
+  Value icOuter = dimAsIndex(input, 1);
+  Value ocOuter = dimAsIndex(filter, 0);
+  Value fh = dimAsIndex(filter, 2);
+  Value fw = dimAsIndex(filter, 3);
+  Value k0 = arith::IndexCastOp::create(rewriter, loc, rewriter.getI32Type(),
+                                        dimAsIndex(filter, 5));
+  Value c0 = arith::IndexCastOp::create(rewriter, loc, rewriter.getI32Type(),
+                                        dimAsIndex(filter, 4));
+  Value oh = dimAsIndex(output, 2);
+  Value ow = dimAsIndex(output, 3);
+
+  Value strideHVal = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getI32IntegerAttr(strideH));
+  Value strideWVal = arith::ConstantOp::create(
+      rewriter, loc, rewriter.getI32IntegerAttr(strideW));
+  Value flagsVal = arith::ConstantOp::create(rewriter, loc,
+                                             rewriter.getI32IntegerAttr(flags));
+
+  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outputType);
+
+  // Ukernel signature order: (N, OC_outer, OH, OW, IC_outer, FH, FW, k0, c0,
+  // stride_h, stride_w, flags).
+  SmallVector<Value> otherOperands{n,       ocOuter,    oh,         ow,
+                                   icOuter, fh,         fw,         k0,
+                                   c0,      strideHVal, strideWVal, flagsVal};
+  // Per operand, the strides of the outer dims are passed to the ukernel. These
+  // operands are views of large packed tensors (via tensor.extract_slice), so
+  // each outer dim's stride comes from the parent layout and can't be assumed
+  // from the slice shape. We only block input/output channels, so the inner
+  // block dims (c0, k0) are contiguous and walked with compile-time strides and
+  // they don't require runtime strides; the remaining iterated dims need one.
+  //   input  [N, IC/c0, H, W, c0]:                 strides of dims 0, 1, 2 ->
+  //     (input_stride_n, input_stride_ic_outer, input_stride_h)
+  //   filter [OC/k0, IC/c0, FH, FW, c0, k0]:       strides of dims 0, 1, 2, 3
+  //   ->
+  //     (filter_stride_oc_outer, filter_stride_ic_outer, filter_stride_fh,
+  //      filter_stride_fw)
+  //   output [N, OC/k0, OH, OW, k0]:               strides of dims 0, 1, 2 ->
+  //     (output_stride_n, output_stride_oc_outer, output_stride_oh)
+  SmallVector<SmallVector<int64_t>> stridedDims = {
+      {0, 1, 2}, {0, 1, 2, 3}, {0, 1, 2}};
+  auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
+      rewriter, loc, returnTypes, fn.name, ValueRange{input, filter}, output,
+      otherOperands,
+      /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs), stridedDims);
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -653,7 +771,8 @@ void CPULowerToUKernelsPass::runOnOperation() {
   auto allTargets = [](auto target) { return true; };
   patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
                   LowerToUKernelPattern<linalg::PackOp>,
-                  LowerToUKernelPattern<linalg::UnPackOp>>(
+                  LowerToUKernelPattern<linalg::UnPackOp>,
+                  LowerToUKernelPattern<linalg::GenericOp>>(
       context, allTargets, skipIntermediateRoundings);
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(

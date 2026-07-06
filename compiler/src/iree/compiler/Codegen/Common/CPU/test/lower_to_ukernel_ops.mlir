@@ -597,3 +597,124 @@ func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<10x10x1x8xi16>, %arg1: 
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 //      CHECK:   return %[[MICRO_KERNEL]]#0
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @conv_nchwc_f32f32f32(%input: tensor<1x1x16x16x16xf32>, %filter: tensor<1x1x3x3x16x16xf32>, %output: tensor<1x1x14x14x16xf32>) -> tensor<1x1x14x14x16xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f"}>
+} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%input, %filter : tensor<1x1x16x16x16xf32>, tensor<1x1x3x3x16x16xf32>) outs(%output : tensor<1x1x14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x16xf32>
+  return %0 : tensor<1x1x14x14x16xf32>
+}
+// CHECK-LABEL: func @conv_nchwc_f32f32f32(
+// CHECK-SAME:     %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x1x16x16x16xf32>
+// CHECK-SAME:     %[[FILTER:[a-zA-Z0-9]+]]: tensor<1x1x3x3x16x16xf32>
+// CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9]+]]: tensor<1x1x14x14x16xf32>
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
+//  CHECK-DAG:   %[[C14:.+]] = arith.constant 14 : index
+//  CHECK-DAG:   %[[C16_I32:.+]] = arith.constant 16 : i32
+//  CHECK-DAG:   %[[C1_I32:.+]] = arith.constant 1 : i32
+// Flag constant: 769 = 0x301 = ACCUMULATE (0x100) | ALLOW_GENERIC_FALLBACK_TILE_FUNCTION (0x200) | TYPE_F32F32F32 (0x1)
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 769 : i32
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_conv_nchwc"
+// CHECK-SAME:       ins(%[[INPUT]], %[[FILTER]] :
+// CHECK-SAME:       outs(%[[OUTPUT]] :
+// CHECK-SAME:       (%[[C1]], %[[C1]], %[[C14]], %[[C14]], %[[C1]], %[[C3]], %[[C3]], %[[C16_I32]], %[[C16_I32]], %[[C1_I32]], %[[C1_I32]], %[[FLAGS]] :
+// CHECK-SAME:       strided_dims({{\[}}[0, 1, 2], [0, 1, 2, 3], [0, 1, 2]])
+//      CHECK:   return %[[MICRO_KERNEL]]#0
+
+// -----
+
+// Zero-initialized accumulator: the linalg.fill is folded away and the ukernel
+// writes a fresh buffer.
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @conv_nchwc_zero_fill(%input: tensor<1x1x16x16x16xf32>, %filter: tensor<1x1x3x3x16x16xf32>) -> tensor<1x1x14x14x16xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f"}>
+} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<1x1x14x14x16xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x1x14x14x16xf32>) -> tensor<1x1x14x14x16xf32>
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%input, %filter : tensor<1x1x16x16x16xf32>, tensor<1x1x3x3x16x16xf32>) outs(%fill : tensor<1x1x14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x16xf32>
+  return %0 : tensor<1x1x14x14x16xf32>
+}
+// CHECK-LABEL: func @conv_nchwc_zero_fill(
+// Flag constant: 513 = 0x201 = ALLOW_GENERIC_FALLBACK_TILE_FUNCTION (0x200) | TYPE_F32F32F32 (0x1); no ACCUMULATE since the fill zeroes the accumulator
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 513 : i32
+//  CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x1x14x14x16xf32>
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_conv_nchwc"
+// CHECK-SAME:       outs(%[[EMPTY]] :
+// CHECK-SAME:       %[[FLAGS]] :
+//      CHECK:   return %[[MICRO_KERNEL]]#0
+
+// -----
+
+// Dynamic inner tiles (e.g. scalable c0/k0) flow to the ukernel as runtime
+// tensor.dim/index_cast k0/c0 operands instead of baked constants.
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @conv_nchwc_dynamic_tiles(%input: tensor<1x1x16x16x?xf32>, %filter: tensor<1x1x3x3x?x?xf32>, %output: tensor<1x1x14x14x?xf32>) -> tensor<1x1x14x14x?xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f"}>
+} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%input, %filter : tensor<1x1x16x16x?xf32>, tensor<1x1x3x3x?x?xf32>) outs(%output : tensor<1x1x14x14x?xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x?xf32>
+  return %0 : tensor<1x1x14x14x?xf32>
+}
+// CHECK-LABEL: func @conv_nchwc_dynamic_tiles(
+// CHECK-SAME:     %[[INPUT:[a-zA-Z0-9]+]]: tensor<1x1x16x16x?xf32>
+// CHECK-SAME:     %[[FILTER:[a-zA-Z0-9]+]]: tensor<1x1x3x3x?x?xf32>
+// CHECK-SAME:     %[[OUTPUT:[a-zA-Z0-9]+]]: tensor<1x1x14x14x?xf32>
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
+//      CHECK:   %[[K0_DIM:.+]] = tensor.dim %[[FILTER]], %[[C5]]
+//      CHECK:   %[[K0:.+]] = arith.index_cast %[[K0_DIM]] : index to i32
+//      CHECK:   %[[C0_DIM:.+]] = tensor.dim %[[FILTER]], %[[C4]]
+//      CHECK:   %[[C0:.+]] = arith.index_cast %[[C0_DIM]] : index to i32
+//      CHECK:   iree_codegen.ukernel.generic "iree_uk_conv_nchwc"
+// CHECK-SAME:       ins(%[[INPUT]], %[[FILTER]] :
+// CHECK-SAME:       outs(%[[OUTPUT]] :
+// CHECK-SAME:       %[[K0]], %[[C0]],
+
+// -----
+
+// Without a ukernel target attribute the conv generic is left untouched.
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @negative_conv_ukernel(%input: tensor<1x1x16x16x16xf32>, %filter: tensor<1x1x3x3x16x16xf32>, %output: tensor<1x1x14x14x16xf32>) -> tensor<1x1x14x14x16xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz", cpu_features = "+avx512f"}>
+} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%input, %filter : tensor<1x1x16x16x16xf32>, tensor<1x1x3x3x16x16xf32>) outs(%output : tensor<1x1x14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x16xf32>
+  return %0 : tensor<1x1x14x14x16xf32>
+}
+// CHECK-LABEL: func @negative_conv_ukernel(
+//  CHECK-NOT:   iree_uk_conv_nchwc
+//      CHECK:   linalg.generic

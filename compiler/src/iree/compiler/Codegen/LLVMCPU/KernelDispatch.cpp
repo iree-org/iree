@@ -3115,11 +3115,15 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
 }
 
-/// Assigns CPUDoubleTilingExpert pipeline config to the data-tiled
-/// convolution generic.
+/// Assigns lowering config to the data-tiled convolution generic.
 static LogicalResult
 setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
                                   linalg::GenericOp convOp) {
+  IREE::HAL::ExecutableTargetAttr targetAttr =
+      IREE::HAL::ExecutableTargetAttr::lookup(convOp);
+  bool useUkernel =
+      targetAttr && hasUkernel(targetAttr.getConfiguration(), "conv_nchwc");
+
   // Loop ranges:
   //  (d0, d1,    d2, d3, d4,    d5, d6, d7, d8)
   //  (n,  OC/k0, OH, OW, IC/c0, FH, FW, k0, c0)
@@ -3164,8 +3168,20 @@ setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
 
-  // Enable loop peeling so the OW vectorization tile produces static-sized
-  // main loop iterations (vectorizable) with a scalar peeled tail.
+  // When the conv ukernel is enabled we route through `Mmt4dTilingExpert`
+  // rather than a dedicated conv pipeline, because it already runs the modern
+  // lowerings a data-tiled conv dispatch needs: it invokes
+  // `CPULowerToUKernelsPass`, which matches the data-tiled conv
+  // `linalg.generic` and rewrites it to `iree_codegen.ukernel.generic` op,
+  // alongside tile-and-fuse and the generic vectorization passes.
+  // TODO(phemashekar): factor out a data-tiled pipeline that can be shared
+  // between mmt4d/inner_tiled/conv.
+  if (useUkernel) {
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, convOp, loweringConfig,
+        getCPUTranslationInfo(convOp.getContext(),
+                              CPUPipeline::Mmt4dTilingExpert));
+  }
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(convOp.getContext());
   return setOpConfigAndEntryPointFnTranslation(
