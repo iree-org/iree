@@ -479,6 +479,28 @@ func.func @conv_2d_nchwc_data_tiled(%arg0: tensor<1x1x16x16x16xf32>, %arg1: tens
 
 // -----
 
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu", ukernels = "conv_nchwc"}>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @conv_2d_nchwc_data_tiled_ukernel_enable(%arg0: tensor<1x1x16x16x16xf32>, %arg1: tensor<1x1x3x3x16x16xf32>, %arg2: tensor<1x1x14x14x16xf32>) -> tensor<1x1x14x14x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<1x1x16x16x16xf32>, tensor<1x1x3x3x16x16xf32>) outs(%arg2 : tensor<1x1x14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x16xf32>
+  return %0 : tensor<1x1x14x14x16xf32>
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 1, 0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 16, 0, 0, 0, 16, 0], vector_reduction = [0, 0, 0, 0, 1, 1, 1, 0, 16]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>
+//      CHECK: func.func @conv_2d_nchwc_data_tiled_ukernel_enable(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vnni,+adx,+clflushopt,+clwb,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+pku,+prfchw,+rdrnd,+rdseed,+sahf,+x87,+xsave,+xsavec,+xsaveopt,+xsaves", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-none-elf", ukernels = false}>
 func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
   %cst = arith.constant -3.40282347E+38 : f32
