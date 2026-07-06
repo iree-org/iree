@@ -446,6 +446,10 @@ LogicalResult CastToRaggedShapeOp::verify() {
   // Check that the ragged row dimensions `raggedRowDim` < rank(`result`) - 1.
   int64_t raggedDim = getRaggedDim().getSExtValue();
   ShapedType sourceType = getSourceType();
+  if (raggedDim < 0) {
+    return emitOpError("expected `ragged_dim` to be non-negative, but got ")
+           << raggedDim;
+  }
   if (raggedDim >= sourceType.getRank()) {
     return emitOpError("expected `ragged_dim` to be less than ")
            << sourceType.getRank() << ", i.e the rank of source";
