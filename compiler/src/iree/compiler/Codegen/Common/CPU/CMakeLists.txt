@@ -59,6 +59,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
