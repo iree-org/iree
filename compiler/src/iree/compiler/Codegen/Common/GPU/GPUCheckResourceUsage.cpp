@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -24,32 +25,6 @@ static unsigned getDatalayoutIndexBitwidth(mlir::FunctionOpInterface func) {
   return options.getIndexBitwidth();
 }
 
-static int shapedTypeStaticSize(
-    memref::AllocOp allocOp, ShapedType shapedType,
-    std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
-  int allocSize = 1;
-  for (auto dimSize : shapedType.getShape()) {
-    if (ShapedType::isDynamic(dimSize)) {
-      continue;
-    }
-    allocSize *= dimSize;
-  }
-  if (auto elementType = dyn_cast<ShapedType>(shapedType.getElementType())) {
-    allocSize *= shapedTypeStaticSize(allocOp, elementType, getIndexBitwidth);
-  } else {
-    auto eltTy = shapedType.getElementType();
-    if (eltTy.isIndex()) {
-      auto func = allocOp->getParentOfType<mlir::FunctionOpInterface>();
-      assert(getIndexBitwidth &&
-             "getIndexBitwidth should have been set earlier");
-      allocSize *= getIndexBitwidth(func);
-    } else {
-      allocSize *= IREE::Util::getTypeBitWidth(shapedType.getElementType());
-    }
-  }
-  return allocSize;
-}
-
 /// Returns success if the total shared memory allocation size is less than the
 /// limit.
 static LogicalResult checkGPUAllocationSize(
@@ -65,7 +40,7 @@ static LogicalResult checkGPUAllocationSize(
     return success();
   }
 
-  int cumSize = 0;
+  int64_t cumSize = 0;
   for (auto allocOp : allocOps) {
     auto allocType = cast<MemRefType>(allocOp.getType());
     if (!hasSharedMemoryAddressSpace(allocType)) {
@@ -77,7 +52,24 @@ static LogicalResult checkGPUAllocationSize(
           "has unsupported dynamic shared memory allocations");
     }
 
-    int allocSize = shapedTypeStaticSize(allocOp, allocType, getIndexBitwidth);
+    auto func = allocOp->getParentOfType<mlir::FunctionOpInterface>();
+    FailureOr<int64_t> allocSizeBits = getStaticShapeSizeInBits(
+        allocType, [&](Type elementType) -> int64_t {
+          if (elementType.isIndex()) {
+            assert(getIndexBitwidth &&
+                   "getIndexBitwidth should have been set earlier");
+            return getIndexBitwidth(func);
+          }
+          return IREE::Util::getTypeBitWidth(elementType);
+        });
+    if (failed(allocSizeBits)) {
+      return emitError(funcOp->getLoc())
+             << "function '" << funcOp.getName()
+             << "' shared memory allocation size overflows the size "
+                "computation; exceeded the limit of "
+             << limit << " bytes";
+    }
+    int64_t allocSize = *allocSizeBits;
     if (allocOp.getAlignment()) {
       int64_t alignmentInBits = *allocOp.getAlignment() * 8;
       allocSize =
