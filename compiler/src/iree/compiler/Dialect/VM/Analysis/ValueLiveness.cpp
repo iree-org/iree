@@ -7,10 +7,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 
 #include <algorithm>
-#include <cstring>
 
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -35,12 +32,19 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   // Build mapping of Operations to values live during them.
   // This is not needed normally so we calculate it only in this debugging case.
   DenseMap<Operation *, llvm::SmallSetVector<Value, 8>> livePerOp;
-  for (auto &liveRange : liveness.liveRanges_) {
-    auto value = liveRange.getFirst();
-    auto &bitVector = liveRange.getSecond();
-    for (int opIndex : bitVector.set_bits()) {
-      auto *op = liveness.opsInOrder_[opIndex];
+  auto addLiveRange = [&](Value value) {
+    for (Operation *op : liveness.liveness_->resolveLiveness(value)) {
       livePerOp[op].insert(value);
+    }
+  };
+  for (auto &block : funcOp.getBlocks()) {
+    for (auto blockArg : block.getArguments()) {
+      addLiveRange(blockArg);
+    }
+    for (auto &op : block.getOperations()) {
+      for (auto result : op.getResults()) {
+        addLiveRange(result);
+      }
     }
   }
 
@@ -103,12 +107,34 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   };
 
   for (auto &block : funcOp.getBlocks()) {
-    auto &blockLiveness = liveness.blockLiveness_[&block];
+    const auto *blockInfo = liveness.liveness_->getLiveness(&block);
 
-    addValuesAttr(block.front(), "block_live_in", blockLiveness.liveIn);
-    addValuesAttr(block.front(), "block_live", blockLiveness.live);
-    addValuesAttr(block.front(), "block_live_out", blockLiveness.liveOut);
-    addValuesAttr(block.front(), "block_defined", blockLiveness.defined);
+    // Values live on block entry/exit come from the upstream analysis.
+    llvm::SmallSetVector<Value, 8> liveIn(blockInfo->in().begin(),
+                                          blockInfo->in().end());
+    llvm::SmallSetVector<Value, 8> liveOut(blockInfo->out().begin(),
+                                           blockInfo->out().end());
+
+    // Local sets: all values defined within the block (block args and op
+    // results) and all values used by ops within the block.
+    llvm::SmallSetVector<Value, 8> defined;
+    llvm::SmallSetVector<Value, 8> live;
+    for (auto blockArg : block.getArguments()) {
+      defined.insert(blockArg);
+    }
+    for (auto &op : block.getOperations()) {
+      for (auto operand : op.getOperands()) {
+        live.insert(operand);
+      }
+      for (auto result : op.getResults()) {
+        defined.insert(result);
+      }
+    }
+
+    addValuesAttr(block.front(), "block_live_in", liveIn);
+    addValuesAttr(block.front(), "block_live", live);
+    addValuesAttr(block.front(), "block_live_out", liveOut);
+    addValuesAttr(block.front(), "block_defined", defined);
 
     // Add per-op live values.
     for (auto &op : block.getOperations()) {
@@ -127,205 +153,20 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
 }
 
 LogicalResult ValueLiveness::recalculate(IREE::VM::FuncOp funcOp) {
-  opsInOrder_.clear();
-  opOrdering_.clear();
-  blockLiveness_.clear();
-  liveRanges_.clear();
-
-  calculateOpOrdering(funcOp);
-  if (failed(computeLivenessSets(funcOp))) {
-    return funcOp.emitError() << "failed to compute liveness sets";
-  }
-  if (failed(computeLiveIntervals(funcOp))) {
-    return funcOp.emitError() << "failed to compute live intervals";
-  }
-
+  liveness_.emplace(funcOp.getOperation());
   return success();
 }
 
-void ValueLiveness::calculateOpOrdering(IREE::VM::FuncOp funcOp) {
-  int nextOrdinal = 0;
-  for (auto &block : funcOp.getBlocks()) {
-    for (auto &op : block.getOperations()) {
-      opOrdering_[&op] = nextOrdinal++;
-      opsInOrder_.push_back(&op);
-    }
-  }
+bool ValueLiveness::isLiveIn(Block *block, Value value) {
+  return liveness_->getLiveness(block)->isLiveIn(value);
 }
 
-LogicalResult
-ValueLiveness::computeInitialLivenessSets(IREE::VM::FuncOp funcOp) {
-  for (auto &block : funcOp.getBlocks()) {
-    auto &blockSets = blockLiveness_[&block];
-
-    // Block arguments are defined within the block, technically.
-    for (auto blockArg : block.getArguments()) {
-      blockSets.defined.insert(blockArg);
-    }
-
-    // Add all operands as live uses and all results as definitions.
-    for (auto &op : block.getOperations()) {
-      for (auto &operand : op.getOpOperands()) {
-        blockSets.live.insert(operand.get());
-      }
-      for (auto result : op.getResults()) {
-        blockSets.defined.insert(result);
-        for (auto &use : result.getUses()) {
-          if (use.getOwner()->getBlock() != &block) {
-            // Value escapes this block.
-            blockSets.liveOut.insert(result);
-          }
-        }
-      }
-    }
-  }
-  return success();
-}
-
-LogicalResult ValueLiveness::computeLivenessSets(IREE::VM::FuncOp funcOp) {
-  if (failed(computeInitialLivenessSets(funcOp))) {
-    return failure();
-  }
-
-  llvm::SmallSetVector<Block *, 32> worklist;
-  worklist.insert(&funcOp.getBlocks().front());
-
-  // Compute live-in set for each block.
-  for (auto &block : funcOp.getBlocks()) {
-    auto &blockSets = blockLiveness_[&block];
-    blockSets.liveIn = blockSets.live;
-    blockSets.liveIn.set_union(blockSets.liveOut);
-    blockSets.liveIn.set_subtract(blockSets.defined);
-
-    // If there are live-ins they may need to be propagated to predecessors.
-    if (!blockSets.liveIn.empty()) {
-      worklist.insert(block.getPredecessors().begin(),
-                      block.getPredecessors().end());
-    }
-  }
-
-  // Propagate liveness until a fixed point is reached.
-  while (!worklist.empty()) {
-    Block *block = worklist.pop_back_val();
-    auto &blockSets = blockLiveness_[block];
-
-    // Compute a new live-out set for the block.
-    auto liveOut = blockSets.liveOut;
-    for (Block *successor : block->getSuccessors()) {
-      liveOut.set_union(blockLiveness_[successor].liveIn);
-    }
-    blockSets.liveOut = liveOut;
-
-    // Compute the live-in set for the block.
-    auto liveIn = liveOut;
-    liveIn.set_union(blockSets.live);
-    liveIn.set_subtract(blockSets.defined);
-
-    // Propagate the liveness to predecessors if the live-in set changed.
-    if (blockSets.liveIn.size() != liveIn.size()) {
-      blockSets.liveIn = liveIn;
-      worklist.insert(block->getPredecessors().begin(),
-                      block->getPredecessors().end());
-    }
-  }
-
-  return success();
-}
-
-LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
-  // Adds a live range for |value| from |start| to |end|.
-  // Both |start| and |end| must be within the same Block.
-  auto addLiveRange = [this](Value value, Operation *start, Operation *end) {
-    assert(start->getBlock() == end->getBlock());
-    auto &bitVector = liveRanges_[value];
-    bitVector.resize(opOrdering_.size());
-    bitVector.set(opOrdering_[start], opOrdering_[end] + 1);
-  };
-
-  for (auto &block : funcOp.getBlocks()) {
-    auto &blockSets = blockLiveness_[&block];
-
-    // Handle values that escape the block.
-    for (auto value : blockSets.liveOut) {
-      if (blockSets.liveIn.count(value)) {
-        // Live in and live out covers the entire block.
-        addLiveRange(value, &block.front(), &block.back());
-      } else {
-        // Live out but not live in implies defined in the block.
-        Operation *firstUse =
-            value.getDefiningOp() ? value.getDefiningOp() : &block.front();
-        addLiveRange(value, firstUse, &block.back());
-      }
-    }
-
-    // Handle values entering the block and dying within.
-    for (auto value : blockSets.liveIn) {
-      if (blockSets.liveOut.contains(value)) {
-        continue;
-      }
-      Operation *lastUse = &block.front();
-      for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block) {
-          continue;
-        }
-        if (lastUse == use.getOwner()) {
-          continue;
-        }
-        if (lastUse->isBeforeInBlock(use.getOwner())) {
-          lastUse = use.getOwner();
-        }
-      }
-      addLiveRange(value, &block.front(), lastUse);
-    }
-
-    // Handle values defined within the block and not escaping.
-    for (auto value : blockSets.defined) {
-      if (blockSets.liveOut.contains(value)) {
-        continue;
-      }
-      Operation *firstUse =
-          value.getDefiningOp() ? value.getDefiningOp() : &block.front();
-      Operation *lastUse = firstUse;
-      for (auto &use : value.getUses()) {
-        if (use.getOwner()->getBlock() != &block) {
-          continue;
-        }
-        if (lastUse->isBeforeInBlock(use.getOwner())) {
-          lastUse = use.getOwner();
-        }
-      }
-      addLiveRange(value, firstUse, lastUse);
-    }
-  }
-
-  return success();
-}
-
-ArrayRef<Value> ValueLiveness::getBlockLiveIns(Block *block) {
-  auto &blockSets = blockLiveness_[block];
-  return blockSets.liveIn.getArrayRef();
-}
-
-ArrayRef<Value> ValueLiveness::getBlockLiveOuts(Block *block) {
-  auto &blockSets = blockLiveness_[block];
-  return blockSets.liveOut.getArrayRef();
+bool ValueLiveness::isLiveOut(Block *block, Value value) {
+  return liveness_->getLiveness(block)->isLiveOut(value);
 }
 
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
-  auto &blockSets = blockLiveness_[useOp->getBlock()];
-  if (blockSets.liveOut.contains(value)) {
-    // Value is escapes the block the useOp is in so it is definitely not the
-    // last use.
-    return false;
-  }
-  int opOrdinal = opOrdering_[useOp];
-  auto &liveRange = liveRanges_[value];
-  if (!useOp->hasTrait<OpTrait::IsTerminator>() &&
-      liveRange.test(opOrdinal + 1)) {
-    // The value is still live within the block after the useOp.
-    return false;
-  }
-  return true;
+  return liveness_->isDeadAfter(value, useOp);
 }
 
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
@@ -369,8 +210,7 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
   }
 
   // Check if value escapes block.
-  auto &blockSets = blockLiveness_[useOp->getBlock()];
-  if (blockSets.liveOut.contains(value)) {
+  if (isLiveOut(useOp->getBlock(), value)) {
     // Value is in liveOut. For non-terminators, this means the value has uses
     // after this block, so it's not at last use.
     if (!useOp->hasTrait<OpTrait::IsTerminator>()) {
@@ -410,8 +250,7 @@ bool ValueLiveness::isLastRealValueUse(Value value, Operation *useOp,
       // invariants: MaterializeRefDiscards places exactly one discard per
       // path at value death points, so liveIn && liveOut implies real
       // (non-discard) uses downstream.
-      BlockSets &succSets = blockLiveness_[succBlock];
-      if (succSets.liveIn.contains(value) && succSets.liveOut.contains(value)) {
+      if (isLiveIn(succBlock, value) && isLiveOut(succBlock, value)) {
         return false;
       }
     }

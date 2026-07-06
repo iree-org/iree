@@ -277,9 +277,6 @@ class MaterializeRefDiscardsPass
     for (Block &block : funcOp.getBlocks()) {
       Operation *terminator = block.getTerminator();
       for (Block *succ : block.getSuccessors()) {
-        auto succLiveIns = liveness.getBlockLiveIns(succ);
-        auto liveOuts = liveness.getBlockLiveOuts(&block);
-
         SmallVector<Value> dyingRefs;
         for (Value ref : allRefs) {
           if (escapingRefs.contains(ref)) {
@@ -287,7 +284,7 @@ class MaterializeRefDiscardsPass
           }
 
           // Check if ref should be discarded on this edge.
-          bool isInLiveOuts = llvm::is_contained(liveOuts, ref);
+          bool isInLiveOuts = liveness.isLiveOut(&block, ref);
           bool isForwardedOnAny = false;
           if (auto branchOp = dyn_cast<BranchOpInterface>(terminator)) {
             for (unsigned i = 0; i < terminator->getNumSuccessors(); ++i) {
@@ -304,7 +301,7 @@ class MaterializeRefDiscardsPass
           }
 
           // Skip if ref is live-in to successor.
-          if (llvm::is_contained(succLiveIns, ref)) {
+          if (liveness.isLiveIn(succ, ref)) {
             continue;
           }
 
@@ -364,8 +361,7 @@ class MaterializeRefDiscardsPass
           // Check if this is the last use and value doesn't escape via
           // live-outs.
           if (liveness.isLastValueUse(value, &op, operand.getOperandNumber())) {
-            auto liveOuts = liveness.getBlockLiveOuts(&block);
-            if (!llvm::is_contained(liveOuts, value)) {
+            if (!liveness.isLiveOut(&block, value)) {
               // For terminators, don't insert mid-block discards for their
               // operands. Terminator ref operands fall into three categories:
               // 1. Forwarded (branch args) → successor block takes ownership
