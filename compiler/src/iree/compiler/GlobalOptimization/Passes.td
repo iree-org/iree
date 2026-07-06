@@ -14,9 +14,9 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
-def ConvertBroadcastBatchMatmulToMatmulPass :
-    Pass<"iree-global-opt-convert-broadcast-batch-matmul-to-matmul", ""> {
-  let summary = "Converts broadcast + batch_matmul to reshape + matmul + reshape.";
+def ConvertBatchMatmulToMatmulPass :
+    Pass<"iree-global-opt-convert-batch-matmul-to-matmul", ""> {
+  let summary = "Converts batch_matmul to reshape + matmul + reshape.";
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "mlir::linalg::LinalgDialect",

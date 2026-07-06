@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope -iree-global-opt-convert-broadcast-batch-matmul-to-matmul %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope -iree-global-opt-convert-batch-matmul-to-matmul %s | FileCheck %s
 
-// Test 1: Static shapes with named broadcast
+// Static shapes with named broadcast
 // CHECK-LABEL: util.func public @static_broadcast_batch_matmul
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<4x10x10xf32>, %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x10xf32>
 // CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f32
@@ -25,7 +25,7 @@ util.func public @static_broadcast_batch_matmul(%act: tensor<4x10x10xf32>, %weig
 
 // -----
 
-// Test 2: Dynamic batch dimension (M is static)
+// Dynamic batch dimension (M is static)
 // CHECK-LABEL: util.func public @dynamic_batch_broadcast_batch_matmul
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x10x10xf32>, %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x10xf32>
 // CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f32
@@ -55,7 +55,7 @@ util.func public @dynamic_batch_broadcast_batch_matmul(%act: tensor<?x10x10xf32>
 
 // -----
 
-// Test 3: Generic broadcast form (after generalization)
+// Generic broadcast form (after generalization)
 // CHECK-LABEL: util.func public @generic_broadcast_batch_matmul
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x10x10xf32>, %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x10xf32>
 // CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f32
@@ -92,7 +92,7 @@ util.func public @generic_broadcast_batch_matmul(%act: tensor<?x10x10xf32>, %wei
 
 // -----
 
-// Test 4: Negative test - broadcast on LHS (should NOT transform)
+// Negative test - broadcast on LHS (should NOT transform)
 // CHECK-LABEL: util.func public @broadcast_on_lhs
 // CHECK:         linalg.broadcast
 // CHECK:         linalg.batch_matmul
@@ -111,7 +111,7 @@ util.func public @broadcast_on_lhs(%lhs: tensor<10x10xf32>, %rhs: tensor<4x10x10
 
 // -----
 
-// Test 5: Both batch and M are dynamic (should transform with explicit output_shape)
+// Both batch and M are dynamic (should transform with explicit output_shape)
 // CHECK-LABEL: util.func public @both_batch_and_m_dynamic
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x10xf32>, %[[ARG1:[a-zA-Z0-9]+]]: tensor<10x10xf32>
 // CHECK-DAG:     %[[CST:.*]] = arith.constant 0.000000e+00 : f32
@@ -146,7 +146,7 @@ util.func public @both_batch_and_m_dynamic(%act: tensor<?x?x10xf32>, %weight: te
 
 // -----
 
-// Test 6: Negative test - broadcast adds dimension other than batch (should NOT transform)
+// Negative test - broadcast adds dimension other than batch (should NOT transform)
 // CHECK-LABEL: util.func public @broadcast_non_batch_dim
 // CHECK:         linalg.broadcast
 // CHECK:         linalg.batch_matmul
@@ -166,7 +166,7 @@ util.func public @broadcast_non_batch_dim(%act: tensor<4x10x10xf32>, %weight: te
 
 // -----
 
-// Test 7: Transpose B variant (RHS weight is [N, K] instead of [K, N])
+// Transpose B variant (RHS weight is [N, K] instead of [K, N])
 // batch_matmul with indexing_maps specifying transpose_b: RHS accesses (batch, n, k)
 // Activation: [4, 8, 10] = [batch, M, K]
 // Weight: [6, 10] = [N, K] (transposed)
@@ -201,7 +201,7 @@ util.func public @broadcast_batch_matmul_transpose_b(%act: tensor<4x8x10xf32>, %
 
 // -----
 
-// Test 8: Negative test - fused broadcast + transpose in generic (should NOT transform)
+// Negative test - fused broadcast + transpose in generic (should NOT transform)
 // When transpose propagation folds a transpose into the broadcast generic, the
 // input map becomes (d0,d1,d2) -> (d2,d1) instead of (d0,d1,d2) -> (d1,d2).
 // The pass must not treat this as a pure broadcast.
@@ -230,7 +230,7 @@ util.func public @fused_broadcast_transpose_generic(%act: tensor<4x10x8xf32>, %w
 
 // -----
 
-// Test 9: Transpose A variant (LHS activation is [batch, K, M] instead of [batch, M, K])
+// Transpose A variant (LHS activation is [batch, K, M] instead of [batch, M, K])
 // This should NOT transform because the collapse would produce mismatched shapes:
 // - LHS [batch, K, M] collapses to [batch*K, M]
 // - Out [batch, M, N] collapses to [batch*M, N]
@@ -252,6 +252,39 @@ util.func public @broadcast_batch_matmul_transpose_a(%act: tensor<4x10x8xf32>, %
                        affine_map<(b, m, n, k) -> (b, k, n)>,
                        affine_map<(b, m, n, k) -> (b, m, n)>]
       ins(%act, %broadcast : tensor<4x10x8xf32>, tensor<4x10x6xf32>)
+      outs(%fill : tensor<4x8x6xf32>) -> tensor<4x8x6xf32>
+  util.return %result : tensor<4x8x6xf32>
+}
+
+// -----
+
+// Negative test - combined transpose_a and transpose_b (should NOT transform).
+// The LHS activation is [batch, K, M] and the RHS weight is [N, K]. For the
+// same reason as the transpose_a variant, because the LHS is transposed the
+// collapse would produce mismatched shapes:
+// - LHS [batch, K, M] collapses to [batch*K, M]
+// - Out [batch, M, N] collapses to [batch*M, N]
+// These don't match, so transformation is invalid. The combined form must be
+// rejected even though it is neither a pure transpose_a nor a pure transpose_b.
+// CHECK-LABEL: util.func public @broadcast_batch_matmul_transpose_a_and_b
+// CHECK:         linalg.broadcast
+// CHECK:         linalg.batch_matmul
+// CHECK-NOT:     tensor.collapse_shape
+// CHECK-NOT:     linalg.matmul
+util.func public @broadcast_batch_matmul_transpose_a_and_b(%act: tensor<4x10x8xf32>, %weight: tensor<6x10xf32>) -> tensor<4x8x6xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x6x10xf32>
+  %broadcast = linalg.broadcast ins(%weight : tensor<6x10xf32>)
+                                outs(%init_broadcast : tensor<4x6x10xf32>) dimensions = [0]
+  %init_out = tensor.empty() : tensor<4x8x6xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x6xf32>) -> tensor<4x8x6xf32>
+  // batch_matmul with transpose_a and transpose_b indexing: LHS is (b, k, m) and
+  // RHS is (b, n, k) instead of (b, m, k) and (b, k, n)
+  %result = linalg.batch_matmul
+      indexing_maps = [affine_map<(b, m, n, k) -> (b, k, m)>,
+                       affine_map<(b, m, n, k) -> (b, n, k)>,
+                       affine_map<(b, m, n, k) -> (b, m, n)>]
+      ins(%act, %broadcast : tensor<4x10x8xf32>, tensor<4x6x10xf32>)
       outs(%fill : tensor<4x8x6xf32>) -> tensor<4x8x6xf32>
   util.return %result : tensor<4x8x6xf32>
 }
