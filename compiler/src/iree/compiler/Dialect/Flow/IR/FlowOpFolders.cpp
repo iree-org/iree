@@ -1121,6 +1121,15 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
   auto startIndex = llvm::map_to_vector(startIndicesAttrs, [](Attribute value) {
     return cast<IntegerAttr>(value).getValue().getZExtValue();
   });
+  // The op verifier does not check that the update region fits within the
+  // target at the start offsets. If it does not, the row-major writes below
+  // would run past `targetValues`; decline to fold in that case.
+  for (int64_t j = 0; j < rank; ++j) {
+    if (static_cast<int64_t>(startIndex[j]) + updateType.getDimSize(j) >
+        targetType.getDimSize(j)) {
+      return {};
+    }
+  }
   auto targetValues = llvm::to_vector(target.getValues<Attribute>());
   // target indices start from startIndicesAttrs and update indices start from
   // all zeros.
