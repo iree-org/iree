@@ -244,6 +244,9 @@ func.func @mask_dynamic_generic_add() attributes {hal.executable.target = #execu
 ]>
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
+// This is @mask_dynamic_generic_add above, verbatim, with cpu_features
+// "+sve" swapped for "+sme": see the comment below for why it must still
+// mask.
 func.func @mask_dynamic_generic_add_sme() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
@@ -268,7 +271,7 @@ func.func @mask_dynamic_generic_add_sme() attributes {hal.executable.target = #e
   return
 }
 
-// SME does not require classic (non-streaming) SVE (see #24660): masking must
+// SME does not require classic (non-streaming) SVE: masking must
 // still be enabled for SME-only targets (e.g. Apple Silicon), same as for SVE.
 // The vectorizer picks the peeling strategy here (SME's own 2D-tiling
 // heuristics are matmul-specific and don't apply to this elementwise op), so
