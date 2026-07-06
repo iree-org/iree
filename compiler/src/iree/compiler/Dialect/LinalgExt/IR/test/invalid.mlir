@@ -1713,6 +1713,18 @@ func.func @illegal_winograd_input_image_dimensions(%arg0: tensor<1x1280x10x10xf3
 
 // -----
 
+func.func @illegal_winograd_input_rank2_dims(%arg0: tensor<8x100xf32>) -> tensor<8x8xf32> {
+  %0 = tensor.empty() : tensor<8x8xf32>
+  // input tile size = output_tile_size(6) + kernel_size(3) - 1 = 8; dim 1 (100)
+  // exceeds it, which must be rejected for a rank-2 input.
+  // expected-error @+1 {{expected input dims not greater than input tile size if input is of rank 2}}
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
+    ins(%arg0 : tensor<8x100xf32>) outs(%0 : tensor<8x8xf32>) -> tensor<8x8xf32>
+  return %1 : tensor<8x8xf32>
+}
+
+// -----
+
 func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<1x32x12x12xf32> {
   %0 = tensor.empty() : tensor<1x32x12x12xf32>
   // expected-error @+1 {{expect image dimensions to be either [1, 2] or [2, 3]}}
