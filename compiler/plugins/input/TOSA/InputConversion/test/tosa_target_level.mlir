@@ -2,10 +2,9 @@
 // RUN:   --pass-pipeline="builtin.module(iree-tosa-input-transformation-pipeline)" \
 // RUN:   --verify-diagnostics %s | FileCheck %s
 
-// TOSA's default level ("8k") rejects any operation with a dynamic shape.
-// IREE targets level=none so that models with dynamic dimensions (e.g.
-// a dynamic batch size) can still compile, while profile and data type
-// validation continue to run.
+// IREE targets TOSA level=none so that models with dynamic dimensions
+// (e.g. a dynamic batch size) compile, but we're still able to run profile and
+// data type validation.
 
 // CHECK-LABEL: @dynamic_shape
 func.func @dynamic_shape(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
