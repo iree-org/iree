@@ -15,8 +15,7 @@ func.func @dynamic_shape(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
 
 // -----
 
-// Genuine profile/data type violations, unrelated to shape, must still be
-// rejected.
+// Genuine profile/data type violations, unrelated to shape, must be rejected.
 
 // CHECK-LABEL: @out_of_profile
 func.func @out_of_profile(%arg0: tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN> {
