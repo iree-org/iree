@@ -86,6 +86,15 @@ static LogicalResult verifyTiedOperandEncodings(Operation *op,
       continue;
     }
     auto operandIndex = tiedOperand.value() - tiedOperandBase;
+    // The tied operand index comes straight from the tied_operands attribute
+    // and is not otherwise range-checked for this op, so guard the encoding
+    // lookup (an out-of-range index reaches here via generic-form IR).
+    if (operandIndex >= operandEncodings.size()) {
+      return op->emitOpError()
+             << "tied operand index " << operandIndex
+             << " is out of range of the " << operandEncodings.size()
+             << " operand encoding(s)";
+    }
     if (operandEncodings[operandIndex] != resultEncoding) {
       return op->emitError()
              << "the " << operandIndex << "-th operandEncoding ("
