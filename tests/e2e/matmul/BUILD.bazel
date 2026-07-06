@@ -96,8 +96,6 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    # SME does not require classic (non-streaming) SVE: some targets
-    # (e.g., Apple Silicon) implement SME without it. See #24660.
     target_cpu_features_variants = ["arm_64:sme:+sme"],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
