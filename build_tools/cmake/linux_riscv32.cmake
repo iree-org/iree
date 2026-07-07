@@ -45,7 +45,6 @@ set(RISCV32_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=riscv32"
   "--iree-llvmcpu-target-abi=ilp32d"
   "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
-  "--riscv-v-fixed-length-vector-lmul-max=8"
   CACHE INTERNAL "Default llvm codegen flags for testing purposes")
 
 set(CMAKE_C_FLAGS             "${RISCV_COMPILER_FLAGS} ${CMAKE_C_FLAGS}")
