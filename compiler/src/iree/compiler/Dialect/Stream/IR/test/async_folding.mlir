@@ -726,7 +726,7 @@ util.func private @PropagateSplatAwaitThroughSlice(%await: !stream.timepoint) ->
 
 // -----
 
-// Verifies that dense_resource is not a true DenseElementsAttr splat, so this pattern must leave it unchanged.
+// Since dense_resource is not a true DenseElementsAttr splat, the pattern under test must leave it unchanged.
   
 // CHECK-LABEL: @NoConvertSplatConstantsIntoSplats_dense_resource
 util.func private @NoConvertSplatConstantsIntoSplats_dense_resource(%arg0: index) -> !stream.resource<transient> {
