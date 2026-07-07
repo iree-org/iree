@@ -158,14 +158,23 @@ LogicalResult ValueLiveness::recalculate(IREE::VM::FuncOp funcOp) {
 }
 
 bool ValueLiveness::isLiveIn(Block *block, Value value) {
-  return liveness_->getLiveness(block)->isLiveIn(value);
+  const auto *blockInfo = liveness_->getLiveness(block);
+  assert(blockInfo && "block not covered by the liveness analysis (was the "
+                      "IR modified after recalculate?)");
+  return blockInfo->isLiveIn(value);
 }
 
 bool ValueLiveness::isLiveOut(Block *block, Value value) {
-  return liveness_->getLiveness(block)->isLiveOut(value);
+  const auto *blockInfo = liveness_->getLiveness(block);
+  assert(blockInfo && "block not covered by the liveness analysis (was the "
+                      "IR modified after recalculate?)");
+  return blockInfo->isLiveOut(value);
 }
 
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
+  assert(liveness_->getLiveness(useOp->getBlock()) &&
+         "block not covered by the liveness analysis (was the IR modified "
+         "after recalculate?)");
   return liveness_->isDeadAfter(value, useOp);
 }
 

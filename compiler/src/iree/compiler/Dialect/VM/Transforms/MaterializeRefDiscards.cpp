@@ -327,6 +327,16 @@ class MaterializeRefDiscardsPass
       }
     }
 
+    // Snapshot the blocks before inserting edge discards: splitting a
+    // critical edge creates new blocks that the liveness analysis computed
+    // above does not cover, and phase 2 must not query liveness on them.
+    // They only contain the discards inserted here and a branch forwarding
+    // the split edge's operands, so they need no mid-block discards either.
+    SmallVector<Block *> originalBlocks;
+    for (Block &block : funcOp.getBlocks()) {
+      originalBlocks.push_back(&block);
+    }
+
     // Insert batched discards for each edge.
     for (auto &[pred, succ, refs] : edgeDiscards) {
       Location loc = pred->getTerminator()->getLoc();
@@ -336,7 +346,8 @@ class MaterializeRefDiscardsPass
     // Phase 2: Mid-block discards.
     // Collect refs dying mid-block (last use is not at block end and ref is not
     // live-out), grouped by insertion point for batching.
-    for (Block &block : funcOp.getBlocks()) {
+    for (Block *blockPtr : originalBlocks) {
+      Block &block = *blockPtr;
       // Group refs by their insertion point (the op after which to insert).
       // Key is the op, value is the list of refs dying after that op.
       SmallVector<std::pair<Operation *, SmallVector<Value>>> midBlockDiscards;
