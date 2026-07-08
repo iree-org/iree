@@ -98,10 +98,11 @@ private:
 };
 
 struct VulkanSPIRVTargetOptions {
-  // Use vp_android_baseline_2022 profile as the default target--it's a good
-  // lowest common denominator to guarantee the generated SPIR-V is widely
-  // accepted for now. Eventually we want to use a list for multi-targeting.
-  std::string target = "vp_android_baseline_2022";
+  // No default target: Vulkan devices vary widely in supported features
+  // (subgroup size, fp16/int8/int64 support, etc.), so silently falling back
+  // to a generic profile can produce incorrect results or poor performance.
+  // Users must specify a target explicitly.
+  std::string target;
   std::string targetFeatures;
   VulkanDispatchAbi dispatchAbi = VulkanDispatchAbi::Descriptors;
 
@@ -110,10 +111,11 @@ struct VulkanSPIRVTargetOptions {
     binder.opt<std::string>(
         "iree-vulkan-target", target,
         llvm::cl::desc(
-            "Vulkan target controlling the SPIR-V environment. Given the wide "
-            "support of Vulkan, this option supports a few schemes: 1) LLVM "
-            "CodeGen backend style: e.g., 'gfx*' for AMD GPUs and 'sm_*' for "
-            "NVIDIA GPUs; 2) architecture code name style: e.g., "
+            "Vulkan target controlling the SPIR-V environment. This option "
+            "is required; there is no default. Given the wide support of "
+            "Vulkan, this option supports a few schemes: 1) LLVM CodeGen "
+            "backend style: e.g., 'gfx*' for AMD GPUs and 'sm_*' for NVIDIA "
+            "GPUs; 2) architecture code name style: e.g., "
             "'rdna3'/'valhall4'/'ampere'/'adreno' for AMD/ARM/NVIDIA/Qualcomm "
             "GPUs; 3) product name style: 'rx7900xtx'/'rtx4090' for AMD/NVIDIA "
             "GPUs. See "
@@ -314,16 +316,21 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const final {
+    auto addTargetIfValid = [&](bool useBdaRootAbi) {
+      if (auto target = getExecutableTarget(context, useBdaRootAbi)) {
+        executableTargetAttrs.push_back(target);
+      }
+    };
     switch (options_.dispatchAbi) {
     case VulkanDispatchAbi::Descriptors:
-      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      addTargetIfValid(false);
       break;
     case VulkanDispatchAbi::Bda:
-      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      addTargetIfValid(true);
       break;
     case VulkanDispatchAbi::All:
-      executableTargetAttrs.push_back(getExecutableTarget(context, true));
-      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      addTargetIfValid(true);
+      addTargetIfValid(false);
       break;
     }
   }
@@ -332,6 +339,20 @@ public:
   getExecutableTarget(MLIRContext *context, bool useBdaRootAbi) const {
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
+    if (options_.target.empty()) {
+      emitError(b.getUnknownLoc(),
+                "Vulkan target not specified; pass '--iree-vulkan-target=' "
+                "with an explicit target (e.g. an architecture code name "
+                "such as 'rdna3'/'valhall4'/'ampere'/'adreno', or a product "
+                "name such as 'rx7900xtx'/'rtx4090'). See "
+                "https://iree.dev/guides/deployment-configurations/"
+                "gpu-vulkan/ for more details. There is no default target "
+                "because Vulkan devices vary widely in supported features "
+                "(subgroup size, fp16/int8/int64 support, etc.) and picking "
+                "one implicitly can silently produce incorrect results or "
+                "poor performance.");
+      return nullptr;
+    }
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
       if (!options_.targetFeatures.empty()) {
         target = IREE::GPU::TargetAttr::get(context, target.getArch(),
