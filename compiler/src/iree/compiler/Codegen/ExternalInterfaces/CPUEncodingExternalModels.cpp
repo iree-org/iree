@@ -88,14 +88,10 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   }
 
   // Check if target supports scalable vectors.
-  bool isAArch64Target = isAArch64(config);
-  bool isRISCV64Target = isRISCV64(config);
   bool hasAArch64ScalableSupport =
-      isAArch64Target &&
+      isAArch64(config) &&
       (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
-  // RISC-V V extension uses scalable vectors when not using static VLEN-based
-  // tile sizes. vscale = VLEN/64 by convention.
-  bool hasRISCVScalableSupport = isRISCV64Target && hasFeature(config, "+v");
+  bool hasRISCVScalableSupport = isAArch64(config) && hasFeature(config, "+v");
 
   if (!hasAArch64ScalableSupport && !hasRISCVScalableSupport) {
     LDBG() << "Target does not support scalable vectors!";
@@ -1024,9 +1020,8 @@ size_t getRISCVVVlenFromCPUFeatures(DictionaryAttr config) {
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 //
-// When using static VLEN-based tile sizes
-// (iree-llvmcpu-enable-scalable-vectorization=false), the N dimension is
-// computed from the VLEN using zvl* features.
+// When using static VLEN-based tile sizes, the N dimension is computed from the
+// VLEN using zvl* features.
 //
 // When using scalable vectors
 // (iree-llvmcpu-enable-scalable-vectorization=true), we use smaller base tile
@@ -1051,9 +1046,10 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
   Type out = elementTypes[2];
 
   // RVV has both static and scalable vector modes.
-  // Static mode: use VLEN-based tile sizes from zvl* features. This targets
-  // existing ukernels. Scalable mode: use base VLEN=64 bits. The scalable flag
-  // will be added accordingly.
+  // Static mode: use VLEN-based tile sizes from zvl* features.
+  // Scalable mode: use base VLEN=64 bits as the base size, the vscale
+  // multiplier and the correct scalable data-tiled layout will be emitted
+  // accordingly in `getScalableTileFlags`.
   constexpr size_t kBaseVlen = 64;
   size_t vlen = isScalableVectorizationEnabled()
                     ? kBaseVlen
@@ -1079,7 +1075,7 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfh")) {
       return {
-          TileMxNxK{7, N0, 1},
+          TileMxNxK{7, N0, 1}, // Aim to use vfmacc.
           TileMxNxK{4, N0, 1}, // Truncation of the above.
           TileMxNxK{2, N0, 1}, // Truncation of the above.
           TileMxNxK{1, N0, 1}, // Truncation of the above.
@@ -1087,7 +1083,7 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     }
     if (hasFeature(config, "+zvfhmin")) {
       return {
-          TileMxNxK{6, N0, 1},
+          TileMxNxK{6, N0, 1}, // Aim to use vfmacc.
           TileMxNxK{4, N0, 1}, // Truncation of the above.
           TileMxNxK{2, N0, 1}, // Truncation of the above.
           TileMxNxK{1, N0, 1}, // Truncation of the above.
@@ -1383,11 +1379,15 @@ private:
     }
     auto narrowDim = IREE::Encoding::getPo2MatmulNarrowDim(encoding);
     // In case of scalable vectors, we explicitly use the narrow M dimension
-    // config to use the M dimension as to calculate padding penalties while we
+    // config to use the M dimension for calculating padding penalties while we
     // choose the layout.
     // TODO(egebeysel): reconcile this with the static case. Currently,
-    // downstream legalization patterns for non-trailing scalable vectors fail
-    // compilation if we have the transpose.
+    // this results in vector types with non-trailing scalable dimensions, e.g.
+    // vector<[8]x8xf32>, which cannot be legalized or lowered to LLVM properly.
+    // LLVM only handles vector types with only-trailing scalable dimensions
+    // properly, e.g. vector<8x[8]xf32> is lowered to !llvm.array<8 x
+    // vector<[8]xf32>>. The former have to be legalized, so that they can be
+    // lowered to an array of scalable vectors, but the patterns are missing.
     if (isScalableVectorizationEnabled() && narrowDim.isN() &&
         !cDims.m.empty()) {
       int64_t m = getEncodingContractionLikeSizes(encoding).value().M;
