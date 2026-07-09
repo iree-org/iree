@@ -881,6 +881,12 @@ public:
         // that our CI or users may not be prepared for.
         llvmModule->addModuleFlag(llvm::Module::Error,
                                   "amdhsa_code_object_version", abiVersion);
+
+        // Set the buffer OOB mode to "relaxed", since IREE does its own, more
+        // precise, mitigations for partially OOB buffer reads of underalligned
+        // vectors.
+        llvmModule->addModuleFlag(llvm::Module::Max, "amdgpu.buffer.oob.mode",
+                                  1);
       }
 
       for (llvm::Function &f : llvmModule->functions()) {
