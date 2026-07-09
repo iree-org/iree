@@ -181,6 +181,7 @@ if(IREE_INPUT_TORCH)
     ADD_TO_PARENT IREEPythonSources
     ROOT_DIR "${TORCH_MLIR_ROOT_DIR}/python/torch_mlir"
     SOURCES
+      extras/fx_as_strided.py
       extras/fx_importer.py
       extras/onnx_importer.py
   )

@@ -330,7 +330,6 @@
     "onnx/node/generated/test_castlike_FLOAT_to_DOUBLE_expanded",
     "onnx/node/generated/test_castlike_FLOAT_to_FLOAT16",
     "onnx/node/generated/test_castlike_FLOAT_to_FLOAT16_expanded",
-    "onnx/node/generated/test_convtranspose_output_shape",
     "onnx/node/generated/test_det_2d",
     "onnx/node/generated/test_dynamicquantizelinear",
     "onnx/node/generated/test_dynamicquantizelinear_expanded",
