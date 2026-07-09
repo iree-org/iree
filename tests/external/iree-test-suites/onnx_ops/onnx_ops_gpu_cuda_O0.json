@@ -112,7 +112,6 @@
     "onnx/node/generated/test_compress_negative_axis",
     "onnx/node/generated/test_convtranspose_autopad_same",
     "onnx/node/generated/test_convtranspose_kernel_shape",
-    "onnx/node/generated/test_convtranspose_output_shape",
     "onnx/node/generated/test_cumsum_1d",
     "onnx/node/generated/test_cumsum_1d_exclusive",
     "onnx/node/generated/test_cumsum_1d_reverse",
