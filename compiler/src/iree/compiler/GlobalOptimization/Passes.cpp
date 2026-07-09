@@ -173,6 +173,12 @@ void buildGlobalOptimizationPassPipeline(
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
+      // Convert broadcast + batch_matmul before transpose propagation so we
+      // can match the pure broadcast patterns before they get fused with
+      // transposes.
+      .addPass(GlobalOptimization::createConvertBatchMatmulToMatmulPass);
+
+  FunctionLikeNest(mainPassManager)
       // Propagate transposes immediately before set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
       // layout of various operations. This simplifies local propagation
