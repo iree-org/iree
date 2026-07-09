@@ -172,8 +172,8 @@ struct DispatchTensorStoreOpInterface
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    if (failed(options.createMemCpy(rewriter, storeOp->getLoc(), srcMemref,
-                                    target))) {
+    if (failed(
+            options.memCpyFn(rewriter, storeOp->getLoc(), srcMemref, target))) {
       return failure();
     }
 
@@ -245,8 +245,8 @@ struct StoreToBufferOpInterface
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    if (failed(options.createMemCpy(rewriter, storeOp.getLoc(), srcMemref,
-                                    storeOp.getBuffer()))) {
+    if (failed(options.memCpyFn(rewriter, storeOp.getLoc(), srcMemref,
+                                storeOp.getBuffer()))) {
       return failure();
     }
 
