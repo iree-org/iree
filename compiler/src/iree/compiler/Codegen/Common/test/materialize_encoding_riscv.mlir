@@ -130,7 +130,7 @@ func.func @matmul_unset_encoding_RESULT_f32_riscv64(%arg0: tensor<?x?xf32, #enco
 // STATIC-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<?x?x7x16xf32>
 // SCALABLE-SAME:  %[[INPUT:[a-zA-Z0-9]+]]: tensor<?x?x7x?xf32>
 
-// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty {{.*}} : tensor<?x?xf32>
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty{{.*}} : tensor<?x?xf32>
 
 // SCALABLE-DAG:  %[[C8:.+]] = arith.constant 8 : index
 // SCALABLE:      %[[VSCALE:.+]] = vector.vscale
@@ -318,7 +318,7 @@ func.func @full_matmul_lowering_f16f16f16_riscv64(
 /// For the static case: M=7, N=16 (vlen=128), K=1
 /// For the scalable case: M=7, N=8*vscale (vlen=64*vscale), K=1
 
-// CHECK-LABEL: func @matmul_lowering_f16f16f16_riscv64(
+// CHECK-LABEL: func @full_matmul_lowering_f16f16f16_riscv64(
 // CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?xf16>
 // CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xf16>
 // CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?xf16>
