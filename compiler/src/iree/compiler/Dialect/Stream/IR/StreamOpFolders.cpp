@@ -1515,12 +1515,11 @@ struct ConvertSplatConstantsIntoSplats : OpRewritePattern<AsyncConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
-    auto value = dyn_cast<ElementsAttr>(constantOp.getValue());
+    auto value = dyn_cast<DenseElementsAttr>(constantOp.getValue());
     if (!value || !value.isSplat()) {
       return failure();
     }
-    auto splatElementAttr =
-        dyn_cast<SplatElementsAttr>(value).getSplatValue<TypedAttr>();
+    auto splatElementAttr = value.getSplatValue<TypedAttr>();
     auto splatValue =
         arith::ConstantOp::create(rewriter, constantOp.getLoc(),
                                   splatElementAttr.getType(), splatElementAttr);

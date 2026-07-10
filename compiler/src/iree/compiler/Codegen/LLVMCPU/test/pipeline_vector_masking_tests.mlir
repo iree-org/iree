@@ -234,3 +234,53 @@ func.func @mask_dynamic_generic_add() attributes {hal.executable.target = #execu
 //         CHECK: scf.for
 // CHECK-COUNT-2:   vector.maskedload
 //         CHECK:   vector.maskedstore
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<constants = 2, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// This is @mask_dynamic_generic_add above, verbatim, with cpu_features
+// "+sve" swapped for "+sme": see the comment below for why it must still
+// mask.
+func.func @mask_dynamic_generic_add_sme() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32
+  %1 = hal.interface.constant.load layout(#pipeline_layout) ordinal(1) : i32
+  %2 = arith.index_cast %0 : i32 to index
+  %3 = arith.index_cast %1 : i32 to index
+  %dim0 = iree_tensor_ext.dispatch.workload.ordinal %2, 0 : index
+  %dim1 = iree_tensor_ext.dispatch.workload.ordinal %3, 1 : index
+  %4 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim1}
+  %5 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim1}
+  %6 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim0, %dim1}
+  %7 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim1} -> tensor<?x?xf32>
+  %8 = iree_tensor_ext.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim1} -> tensor<?x?xf32>
+  %9 = tensor.empty(%dim0, %dim1) : tensor<?x?xf32>
+  %10 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %11 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%7, %8 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%10 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %12 = arith.addf %in, %in_0 : f32
+    linalg.yield %12 : f32
+  } -> tensor<?x?xf32>
+  iree_tensor_ext.dispatch.tensor.store %11, %6, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : tensor<?x?xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?xf32>>{%dim0, %dim1}
+  return
+}
+
+// SME does not require classic (non-streaming) SVE: masking must
+// still be enabled for SME-only targets (e.g. Apple Silicon), same as for SVE.
+// The vectorizer picks the peeling strategy here (SME's own 2D-tiling
+// heuristics are matmul-specific and don't apply to this elementwise op), so
+// masking shows up on the peeled tail loop, same shape as the SVE case above.
+
+// CHECK-LABEL: func.func @mask_dynamic_generic_add_sme
+// Main loop
+//         CHECK: scf.for
+// Peeled loop:
+//         CHECK: scf.for
+// CHECK-COUNT-2:   vector.maskedload
+//         CHECK:   vector.maskedstore

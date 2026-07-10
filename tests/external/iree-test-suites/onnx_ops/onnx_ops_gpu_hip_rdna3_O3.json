@@ -308,7 +308,7 @@
     "onnx/node/generated/test_bernoulli_double",
     "onnx/node/generated/test_bernoulli_double_expanded",
     "onnx/node/generated/test_bernoulli_expanded",
-    "onnx/node/generated/test_convtranspose_output_shape",
+    "onnx/node/generated/",
     "onnx/node/generated/test_det_2d",
     "onnx/node/generated/test_gridsample_nearest",
     "onnx/node/generated/test_gridsample_nearest_align_corners_0_additional_1",
