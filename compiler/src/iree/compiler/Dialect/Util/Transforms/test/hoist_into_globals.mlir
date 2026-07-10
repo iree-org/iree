@@ -436,6 +436,48 @@ module @do_not_hoist_const_expr_nested_in_dispatch {
 
 // -----
 
+// A whole flow.dispatch.region that is itself a const-expr (all of its captured
+// operands are constant) is still hoisted as a unit: the entire region moves
+// into the initializer and a single util.global.load replaces it in the
+// function body. The hoisting walk performs this hoist *before* it stops
+// descending into the region body, so whole-region hoisting keeps working; and
+// because the body is then skipped, no extra util.global.load is stranded
+// inside the region for the nested const-expr (which would become an undefined
+// global once the region is outlined). This complements
+// @do_not_hoist_const_expr_nested_in_dispatch above.
+
+// CHECK-LABEL: @hoist_whole_dispatch_region_skips_body
+module @hoist_whole_dispatch_region_skips_body {
+  // CHECK: util.global private @[[SYM:.+]] : tensor<2x2xi32>
+  // CHECK: util.initializer {
+  // CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x2xi32>) {
+  // CHECK:     linalg.generic
+  // CHECK-NOT: util.global.load
+  // CHECK:     flow.return
+  // CHECK:   }
+  // CHECK:   util.global.store %[[DISPATCH]], @[[SYM]] : tensor<2x2xi32>
+  // CHECK:   util.return
+  // CHECK: }
+  // CHECK: util.func public @main
+  util.func public @main() -> tensor<2x2xi32> {
+    %cst = arith.constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
+    %empty = tensor.empty() : tensor<2x2xi32>
+    // CHECK: %[[VAL:.+]] = util.global.load immutable @[[SYM]] : tensor<2x2xi32>
+    // CHECK: util.return %[[VAL]]
+    %0 = flow.dispatch.region -> (tensor<2x2xi32>) {
+      %g = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst : tensor<2x2xi32>) outs(%empty : tensor<2x2xi32>) {
+      ^bb0(%a: i32, %o: i32):
+        %m = arith.addi %a, %a : i32
+        linalg.yield %m : i32
+      } -> tensor<2x2xi32>
+      flow.return %g : tensor<2x2xi32>
+    }
+    util.return %0 : tensor<2x2xi32>
+  }
+}
+
+// -----
+
 // The --iree-util-const-expr-max-size-increase-threshold flag controls the
 // maximum size increase (vs sum of size of it's roots) allowed for hoisting a
 // constant expression. The threshold is set to 64 bytes in this test suite.
