@@ -1265,11 +1265,7 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     } else {
       // For AVX2 / non-AVX512 x86, register-block the matmul by vectorizing
       // both parallel dims (M unroll, N vector) in addition to the reduction
-      // dim. Using {1, 1, vectorSize} here only vectorizes the reduction (K)
-      // dim, which forces a horizontal reduction per output element and leaves
-      // the parallel/output dimension scalar -- this is dramatically slower for
-      // contraction ops whose output dimension is the contiguous one. Mirror
-      // the AArch64/RISC-V defaults that vectorize the parallel dims.
+      // dim.
       sizes.append({8, vectorSize, vectorSize});
     }
     return;
