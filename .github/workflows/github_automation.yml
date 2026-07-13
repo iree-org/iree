@@ -10,8 +10,6 @@ on:
   issues:
     types:
       - opened
-  # It is safe to use pull_request_target here because this workflow checks out
-  # and runs automation code from the base repository, not from the PR branch.
   pull_request_target:
     types:
       - opened
