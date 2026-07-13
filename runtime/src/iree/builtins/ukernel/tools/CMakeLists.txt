@@ -117,6 +117,36 @@ iree_cc_test(
     iree::builtins::ukernel::internal_headers
 )
 
+iree_cc_test(
+  NAME
+    conv_nchwc_test
+  SRCS
+    "conv_nchwc_test.c"
+  DEPS
+    ::test
+    ::util
+    iree::base
+    iree::base::internal
+    iree::builtins::ukernel
+    iree::builtins::ukernel::internal_headers
+)
+
+iree_cc_binary_benchmark(
+  NAME
+    conv_nchwc_benchmark
+  SRCS
+    "conv_nchwc_benchmark.c"
+  DEPS
+    ::benchmark
+    ::util
+    iree::base
+    iree::base::tooling::flags
+    iree::builtins::ukernel
+    iree::builtins::ukernel::internal_headers
+    iree::testing::benchmark
+  TESTONLY
+)
+
 iree_cc_binary_benchmark(
   NAME
     pack_benchmark

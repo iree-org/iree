@@ -27,6 +27,7 @@ iree_bitcode_library(
     "pack_arm_64_internal.h"
     "unpack_arm_64_internal.h"
   SRCS
+    "conv_nchwc_arm_64_entry_point.c"
     "mmt4d_arm_64_entry_point.c"
     "pack_arm_64_entry_point.c"
     "unpack_arm_64_entry_point.c"
@@ -288,6 +289,7 @@ iree_cc_library(
   NAME
     arm_64
   SRCS
+    "conv_nchwc_arm_64_entry_point.c"
     "mmt4d_arm_64_entry_point.c"
     "mmt4d_arm_64_base.c"
     "pack_arm_64_entry_point.c"

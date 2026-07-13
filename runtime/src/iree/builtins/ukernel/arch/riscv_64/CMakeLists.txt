@@ -27,6 +27,7 @@ iree_bitcode_library(
     "pack_riscv_64_internal.h"
     "unpack_riscv_64_internal.h"
   SRCS
+    "conv_nchwc_riscv_64_entry_point.c"
     "mmt4d_riscv_64_entry_point.c"
     "pack_riscv_64_entry_point.c"
     "unpack_riscv_64_entry_point.c"
@@ -219,6 +220,7 @@ iree_cc_library(
   NAME
     riscv_64
   SRCS
+    "conv_nchwc_riscv_64_entry_point.c"
     "mmt4d_riscv_64_entry_point.c"
     "pack_riscv_64_entry_point.c"
     "unpack_riscv_64_entry_point.c"
