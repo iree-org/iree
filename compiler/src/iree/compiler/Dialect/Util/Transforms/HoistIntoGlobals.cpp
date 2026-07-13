@@ -133,7 +133,8 @@ public:
         // we still fall through to the dispatch check below so that we stop
         // descending into dispatch bodies even when the dispatch op itself is
         // not a const-expr.
-        if (auto *iterInfo = constExprs.lookup(iterOp)) {
+        auto *iterInfo = constExprs.lookup(iterOp);
+        if (iterInfo) {
           // Record operation order for deterministic sorting. Since we walk in
           // PreOrder, producers are visited before their users.
           opOrder[iterOp] = orderIdx++;
