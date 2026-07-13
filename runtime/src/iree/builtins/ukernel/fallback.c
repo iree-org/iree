@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/builtins/ukernel/conv_nchwc_internal.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/pack_internal.h"
 #include "iree/builtins/ukernel/query_tile_sizes_internal.h"
@@ -28,4 +29,10 @@ bool iree_uk_query_matmul_tile_sizes_arch(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_matmul_tile_sizes_t* out_matmul_tile_sizes) {
   return false;
+}
+
+iree_uk_conv_nchwc_tile_selection_t iree_uk_conv_nchwc_select_tile_func_arch(
+    const iree_uk_conv_nchwc_params_t* params) {
+  iree_uk_conv_nchwc_tile_selection_t selection = {0};
+  return selection;
 }
