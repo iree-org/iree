@@ -63,7 +63,6 @@ Please also note that all contributions to IREE must follow our [IREE AI Tool Us
 - Contributors must fully understand, and vouch for, **all** submitted changes and the intent behind them.
 - Contributors should write PR descriptions themselves.
 - Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
-- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. We discourage AI tool usage for resolutions to those issues, and substantial use (e.g. fully prompting the fix and/or the tests) is forbidden.
 
 We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
 
