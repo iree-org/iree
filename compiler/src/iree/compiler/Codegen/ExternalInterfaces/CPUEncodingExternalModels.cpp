@@ -91,7 +91,7 @@ getScalableTileFlags(linalg::ContractionDimensions cDims,
   bool hasAArch64ScalableSupport =
       isAArch64(config) &&
       (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
-  bool hasRISCVScalableSupport = isAArch64(config) && hasFeature(config, "+v");
+  bool hasRISCVScalableSupport = isRISCV64(config) && hasFeature(config, "+v");
 
   if (!hasAArch64ScalableSupport && !hasRISCVScalableSupport) {
     LDBG() << "Target does not support scalable vectors!";
