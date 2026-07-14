@@ -4,13 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: GitHub Automation
+name: Issue Greeter
 
 on:
   issues:
-    types:
-      - opened
-  pull_request_target:
     types:
       - opened
 
@@ -18,41 +15,6 @@ permissions:
   contents: read
 
 jobs:
-  pr-greeter:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pull-requests: write
-    # Only comment on PRs opened by someone new to IREE or to GitHub as a whole.
-    if: >-
-      github.repository == 'iree-org/iree' &&
-      github.event_name == 'pull_request_target' &&
-      github.event.pull_request.author_association != 'COLLABORATOR' &&
-      github.event.pull_request.author_association != 'CONTRIBUTOR' &&
-      github.event.pull_request.author_association != 'MANNEQUIN' &&
-      github.event.pull_request.author_association != 'MEMBER' &&
-      github.event.pull_request.author_association != 'OWNER'
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - name: Setting up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-      - name: Installing dependencies
-        run: python -m pip install --disable-pip-version-check PyGithub==2.4.0
-      - name: Greet first-time contributor
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.pull_request.number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          python ./build_tools/github_actions/github_automation.py \
-            --token "$GH_TOKEN" \
-            pr-greeter \
-            --issue-number "$ISSUE_NUMBER" \
-            --author "$PR_AUTHOR"
-
   issue-greeter:
     runs-on: ubuntu-24.04
     permissions:
@@ -61,7 +23,6 @@ jobs:
     # Only comment on issues opened by someone new to IREE or to GitHub as a whole.
     if: >-
       github.repository == 'iree-org/iree' &&
-      github.event_name == 'issues' &&
       github.event.issue.author_association != 'COLLABORATOR' &&
       github.event.issue.author_association != 'CONTRIBUTOR' &&
       github.event.issue.author_association != 'MANNEQUIN' &&
