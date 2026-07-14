@@ -15,6 +15,7 @@
 #define IREE_UK_BUILD_RISCV_64_V
 #define IREE_UK_BUILD_RISCV_64_ZVFHMIN
 #define IREE_UK_BUILD_RISCV_64_ZVFH
+#define IREE_UK_BUILD_RISCV_64_XSMTVDOT
 #else
 // Compiling with the system toolchain. Include the configured header.
 #include "iree/builtins/ukernel/arch/riscv_64/config_riscv_64.h"
@@ -36,6 +37,11 @@ static inline bool iree_uk_cpu_riscv_64_zvfhmin(
 
 static inline bool iree_uk_cpu_riscv_64_zvfh(const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVFH);
+}
+
+static inline bool iree_uk_cpu_riscv_64_xsmtvdot(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_XSMTVDOT);
 }
 
 #endif  // IREE_BUILTINS_UKERNEL_ARCH_RISCV_64_COMMON_RISCV_64_H_

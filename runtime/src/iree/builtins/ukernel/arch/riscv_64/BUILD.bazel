@@ -78,6 +78,16 @@ iree_bitcode_library(
     internal_hdrs = UKERNEL_RISCV_64_INTERNAL_HEADERS,
 )
 
+iree_bitcode_library(
+    name = "ukernel_bitcode_arch_riscv_64_xsmtvdot",
+    srcs = [
+        "mmt4d_riscv_64_xsmtvdot.c",
+    ],
+    arch = "riscv_64",
+    copts = ["-march=rv64gc_xsmtvdot"],
+    internal_hdrs = UKERNEL_RISCV_64_INTERNAL_HEADERS,
+)
+
 iree_link_bitcode(
     name = "ukernel_bitcode_arch_riscv_64",
     bitcode_files = [
@@ -85,6 +95,7 @@ iree_link_bitcode(
         "ukernel_bitcode_arch_riscv_64_v.bc",
         "ukernel_bitcode_arch_riscv_64_zvfhmin.bc",
         "ukernel_bitcode_arch_riscv_64_zvfh.bc",
+        "ukernel_bitcode_arch_riscv_64_xsmtvdot.bc",
     ],
 )
 
