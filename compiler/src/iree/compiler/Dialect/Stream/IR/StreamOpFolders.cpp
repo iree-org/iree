@@ -21,6 +21,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
@@ -1109,19 +1110,6 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-static bool isEquivalent(TensorImportOp previous, TensorImportOp current) {
-  if (previous.getConsume()) {
-    return false;
-  }
-
-  return previous.getSource() == current.getSource() &&
-         previous.getResult().getType() == current.getResult().getType() &&
-         previous.getResultEncoding() == current.getResultEncoding() &&
-         previous.getResultEncodingDims() == current.getResultEncodingDims() &&
-         previous.getResultSize() == current.getResultSize() &&
-         previous.getAffinity() == current.getAffinity();
-}
-
 //===----------------------------------------------------------------------===//
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
@@ -1140,19 +1128,12 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-static bool isEquivalent(TensorExportOp previous, TensorExportOp current) {
-  return previous.getSource() == current.getSource() &&
-         previous.getResult().getType() == current.getResult().getType() &&
-         previous.getSourceEncoding() == current.getSourceEncoding() &&
-         previous.getSourceEncodingDims() == current.getSourceEncodingDims() &&
-         previous.getSourceSize() == current.getSourceSize() &&
-         previous.getAffinity() == current.getAffinity();
-}
-
 //===----------------------------------------------------------------------===//
-// Generic deduplication pattern for tream.tensor.import and
+// Generic deduplication pattern for stream.tensor.import and
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 template <typename OpTy>
 struct DeduplicateTensorOp : OpRewritePattern<OpTy> {
@@ -1160,20 +1141,16 @@ struct DeduplicateTensorOp : OpRewritePattern<OpTy> {
 
   LogicalResult matchAndRewrite(OpTy currentOp,
                                 PatternRewriter &rewriter) const override {
-    // Ownership-transferring imports must not be deduplicated.
-    if constexpr (std::is_same_v<OpTy, TensorImportOp>) {
-      if (currentOp.getConsume()) {
-        return failure();
-      }
-    }
-    // Search for an equivalent operation
+    // Search for an equivalent operation.
     for (Operation *previousOp = currentOp->getPrevNode();
          previousOp != nullptr; previousOp = previousOp->getPrevNode()) {
       auto previous = dyn_cast<OpTy>(previousOp);
       if (!previous) {
         continue;
       }
-      if (!isEquivalent(previous, currentOp)) {
+      if (!OperationEquivalence::isEquivalentTo(
+              previous.getOperation(), currentOp.getOperation(),
+              OperationEquivalence::IgnoreLocations)) {
         continue;
       }
       rewriter.replaceOp(currentOp, previous.getResult());
@@ -1183,6 +1160,8 @@ struct DeduplicateTensorOp : OpRewritePattern<OpTy> {
     return failure();
   }
 };
+
+} // namespace
 
 void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
