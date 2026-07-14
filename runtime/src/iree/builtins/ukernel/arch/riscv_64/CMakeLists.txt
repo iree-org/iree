@@ -93,6 +93,25 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
+    ukernel_bitcode_arch_riscv_64_xsmtvdot
+  ARCH
+    riscv_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_riscv_64.h"
+    "mmt4d_riscv_64_internal.h"
+    "mmt4d_riscv_64_tiles.inl"
+    "pack_riscv_64_internal.h"
+    "unpack_riscv_64_internal.h"
+  SRCS
+    "mmt4d_riscv_64_xsmtvdot.c"
+  COPTS
+    "-march=rv64gc_xsmtvdot"
+)
+
+iree_bitcode_library(
+  NAME
     ukernel_bitcode_arch_riscv_64_zvfbfwma
   ARCH
     riscv_64
@@ -116,6 +135,7 @@ iree_link_bitcode(
   SRCS
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
     "ukernel_bitcode_arch_riscv_64_v.bc"
+    "ukernel_bitcode_arch_riscv_64_xsmtvdot.bc"
     "ukernel_bitcode_arch_riscv_64_zvfbfwma.bc"
     "ukernel_bitcode_arch_riscv_64_zvfh.bc"
     "ukernel_bitcode_arch_riscv_64_zvfhmin.bc"
@@ -147,6 +167,11 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFH
     "-march=rv64gc_zvfh"
 )
 
+iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_XSMTVDOT
+  CLANG_OR_GCC
+    "-march=rv64gc_xsmtvdot"
+)
+
 iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFBFWMA
   CLANG_OR_GCC
     "-march=rv64gcv_zvfbfwma"
@@ -154,6 +179,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFBFWMA
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFH}" IREE_UK_BUILD_RISCV_64_ZVFH)
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_XSMTVDOT}" IREE_UK_BUILD_RISCV_64_XSMTVDOT)
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFBFWMA}" IREE_UK_BUILD_RISCV_64_ZVFBFWMA)
 
 # CPU features that we will try checking compiler support for, unless
@@ -241,6 +267,20 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_zvfh")
 endif()  # IREE_UK_BUILD_RISCV_64_ZVFH
+
+if(IREE_UK_BUILD_RISCV_64_XSMTVDOT)
+iree_cc_library(
+  NAME
+    riscv_64_xsmtvdot
+  SRCS
+    "mmt4d_riscv_64_xsmtvdot.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_XSMTVDOT}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_xsmtvdot")
+endif()  # IREE_UK_BUILD_RISCV_64_XSMTVDOT
 
 if(IREE_UK_BUILD_RISCV_64_ZVFBFWMA)
 iree_cc_library(
