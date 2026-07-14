@@ -86,9 +86,11 @@ static LogicalResult verifyTiedOperandEncodings(Operation *op,
       continue;
     }
     auto operandIndex = tiedOperand.value() - tiedOperandBase;
-    // The tied operand index comes straight from the tied_operands attribute
-    // and is not otherwise range-checked for this op, so guard the encoding
-    // lookup (an out-of-range index reaches here via generic-form IR).
+    // The tied operand index comes from the tied_operands attribute and is not
+    // otherwise range-checked for this op. An out-of-range value can be written
+    // using the generic assembly form (e.g. `"stream.tensor.dispatch"(...)
+    // {tied_operands = array<i64: 5>}`), which bypasses the custom-format
+    // checks, so guard the encoding lookup below.
     if (operandIndex >= operandEncodings.size()) {
       return op->emitOpError()
              << "tied operand index " << operandIndex
