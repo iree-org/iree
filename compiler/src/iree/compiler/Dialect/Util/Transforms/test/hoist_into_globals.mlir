@@ -391,6 +391,93 @@ module @hoist_dispatch_regions {
 
 // -----
 
+// A const-expr that is nested *inside* a dispatch region must not be hoisted:
+// doing so would place a `util.global.load` inside the dispatch region, which
+// later gets outlined into an isolated executable where the global is not
+// visible (producing an "undefined global" error). Here the constants are
+// defined inside the dispatch and the region result is captured into a second
+// dispatch, so the inner const-expr (not the whole region) would otherwise be
+// the hoisting candidate.
+
+// CHECK-LABEL: @do_not_hoist_const_expr_nested_in_dispatch
+module @do_not_hoist_const_expr_nested_in_dispatch {
+  // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
+  util.func public @main(%arg0: tensor<2x2xf32>) -> tensor<2x2xf32> {
+    // CHECK: flow.dispatch.region
+    // The inner const-expr stays inside the dispatch; no global load is placed
+    // inside the region.
+    // CHECK-NOT: util.global.load
+    // CHECK: linalg.generic
+    // CHECK: arith.mulf
+    %0 = flow.dispatch.region -> (tensor<2x2xf32>) {
+      %cst0 = arith.constant dense<[[1.0, 2.0], [3.0, 4.0]]> : tensor<2x2xf32>
+      %cst1 = arith.constant dense<[[5.0, 6.0], [7.0, 8.0]]> : tensor<2x2xf32>
+      %empty = tensor.empty() : tensor<2x2xf32>
+      %g = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst0, %cst1 : tensor<2x2xf32>, tensor<2x2xf32>) outs(%empty : tensor<2x2xf32>) {
+      ^bb0(%a: f32, %b: f32, %o: f32):
+        %m = arith.mulf %a, %b : f32
+        linalg.yield %m : f32
+      } -> tensor<2x2xf32>
+      flow.return %g : tensor<2x2xf32>
+    }
+    %1 = flow.dispatch.region -> (tensor<2x2xf32>) {
+      %empty = tensor.empty() : tensor<2x2xf32>
+      %r = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0, %arg0 : tensor<2x2xf32>, tensor<2x2xf32>) outs(%empty : tensor<2x2xf32>) {
+      ^bb0(%a: f32, %b: f32, %o: f32):
+        %s = arith.addf %a, %b : f32
+        linalg.yield %s : f32
+      } -> tensor<2x2xf32>
+      flow.return %r : tensor<2x2xf32>
+    }
+    util.return %1 : tensor<2x2xf32>
+  }
+}
+
+// -----
+
+// A whole flow.dispatch.region that is itself a const-expr (all of its captured
+// operands are constant) is still hoisted as a unit: the entire region moves
+// into the initializer and a single util.global.load replaces it in the
+// function body. The hoisting walk performs this hoist *before* it stops
+// descending into the region body, so whole-region hoisting keeps working; and
+// because the body is then skipped, no extra util.global.load is stranded
+// inside the region for the nested const-expr (which would become an undefined
+// global once the region is outlined). This complements
+// @do_not_hoist_const_expr_nested_in_dispatch above.
+
+// CHECK-LABEL: @hoist_whole_dispatch_region_skips_body
+module @hoist_whole_dispatch_region_skips_body {
+  // CHECK: util.global private @[[SYM:.+]] : tensor<2x2xi32>
+  // CHECK: util.initializer {
+  // CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region -> (tensor<2x2xi32>) {
+  // CHECK:     linalg.generic
+  // CHECK-NOT: util.global.load
+  // CHECK:     flow.return
+  // CHECK:   }
+  // CHECK:   util.global.store %[[DISPATCH]], @[[SYM]] : tensor<2x2xi32>
+  // CHECK:   util.return
+  // CHECK: }
+  // CHECK: util.func public @main
+  util.func public @main() -> tensor<2x2xi32> {
+    %cst = arith.constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
+    %empty = tensor.empty() : tensor<2x2xi32>
+    // CHECK: %[[VAL:.+]] = util.global.load immutable @[[SYM]] : tensor<2x2xi32>
+    // CHECK: util.return %[[VAL]]
+    %0 = flow.dispatch.region -> (tensor<2x2xi32>) {
+      %g = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%cst : tensor<2x2xi32>) outs(%empty : tensor<2x2xi32>) {
+      ^bb0(%a: i32, %o: i32):
+        %m = arith.addi %a, %a : i32
+        linalg.yield %m : i32
+      } -> tensor<2x2xi32>
+      flow.return %g : tensor<2x2xi32>
+    }
+    util.return %0 : tensor<2x2xi32>
+  }
+}
+
+// -----
+
 // The --iree-util-const-expr-max-size-increase-threshold flag controls the
 // maximum size increase (vs sum of size of it's roots) allowed for hoisting a
 // constant expression. The threshold is set to 64 bytes in this test suite.
