@@ -397,7 +397,6 @@ class MaterializeRefDiscardsPass
           }
         }
       }
-
     }
 
     // Apply all insertions, now that every liveness query has run. Edge
