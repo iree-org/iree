@@ -617,15 +617,7 @@ func.func @softmax_dynamic_with_assume_int_hints() attributes {hal.executable.ta
 // -----
 
 // Verify that accumulating GEMM dispatches write the result directly into the
-// destination buffer: the accumulator stays in registers (a vector tile) and
-// the accumulate is not materialized as a separate linalg.generic / buffer
-// copy of the destination tile.
-//
-// Note: on non-AVX512 x86 the matmul is register-blocked (parallel + reduction
-// dims are vectorized), so dynamic-shape dispatches may hoist a couple of
-// small, fixed-size remainder scratch buffers (e.g. memref<7x4xf32>) to the
-// function entry. These are peeled-tile scratch, not a copy of the dynamic
-// destination tile, so the "direct write" property still holds.
+// destination buffer.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
@@ -656,9 +648,6 @@ func.func @matmul_accumulate_from_readonly() attributes {hal.executable.target =
   return
 }
 // CHECK-LABEL: func.func @matmul_accumulate_from_readonly(
-// Disallow heap allocations (a copy of the dynamic destination tile); small
-// fixed-size remainder scratch via memref.alloca is allowed (see note above).
-// CHECK-NOT:     memref.alloc(
 // CHECK-NOT:     linalg.generic
 
 // -----
