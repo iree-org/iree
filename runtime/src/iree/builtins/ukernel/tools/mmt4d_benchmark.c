@@ -114,7 +114,7 @@ static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
   if (strcmp(cpu_features, "xsmtvdot") != 0) {
     for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
       iree_uk_benchmark_register_mmt4d_impl(flags, narrowM0, N0, K0,
-                                           cpu_features, "");
+                                            cpu_features, "");
     }
   }
   iree_uk_benchmark_register_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");

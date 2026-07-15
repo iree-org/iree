@@ -115,9 +115,9 @@ iree_link_bitcode(
   SRCS
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
     "ukernel_bitcode_arch_riscv_64_v.bc"
+    "ukernel_bitcode_arch_riscv_64_xsmtvdot.bc"
     "ukernel_bitcode_arch_riscv_64_zvfh.bc"
     "ukernel_bitcode_arch_riscv_64_zvfhmin.bc"
-    "ukernel_bitcode_arch_riscv_64_xsmtvdot.bc"
 
 )
 
