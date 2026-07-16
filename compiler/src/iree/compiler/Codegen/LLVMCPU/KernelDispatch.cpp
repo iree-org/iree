@@ -3246,6 +3246,40 @@ undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
   }
 }
 
+/// Transforms the tile sizes from the outer dimensions of the source domain to
+/// the destination domain by scaling with inner tile sizes. Steps:
+///   1. Apply outer_dims_perm to the tile sizes,
+///   2. Scales each tiled destination dim by the op's own inner tile and
+///   scalable flag.
+static void
+scaleAndPermutateTilingForUnpackOp(linalg::UnPackOp unpackOp,
+                                   SmallVector<int64_t> &tileSizes,
+                                   SmallVector<bool> &scalableFlags) {
+  std::optional<SizesAndScalableFlags> innerTiles =
+      getScalableTileSizesAndFlags(unpackOp.getMixedTiles());
+  // Bail if we don't have static or scalable, i.e. fully-dynamic inner tile
+  // sizes.
+  if (!innerTiles) {
+    return;
+  }
+  ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = unpackOp.getOuterDimsPerm();
+  // Apply the outer_dims_perm if it exists.
+  if (!outerDimsPerm.empty()) {
+    SmallVector<int64_t> invertedPerm = invertPermutationVector(outerDimsPerm);
+    applyPermutationToVector(tileSizes, invertedPerm);
+    applyPermutationToVector(scalableFlags, invertedPerm);
+  }
+  assert(llvm::none_of(scalableFlags, [](bool scalable) { return scalable; }) &&
+         "Tile sizes for outer dims should not be scalable!");
+  // Scale each tiled destination dim by the op's inner tile.
+  auto [innerTileSizes, innerScalableFlags] = *innerTiles;
+  for (auto [k, destDim] : llvm::enumerate(innerDimsPos)) {
+    tileSizes[destDim] *= innerTileSizes[k];
+    scalableFlags[destDim] = scalableFlags[destDim] || innerScalableFlags[k];
+  }
+}
+
 /// A helper class that propagates and sets lowering configurations for multiple
 /// compute operations.
 ///
@@ -3725,6 +3759,16 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // `scaleAndPermutateTilingForPackOp` to translate the tiling
         // information from the unpacked to the packed dimensions.
         scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
+      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op);
+                 unpackOp &&
+                 level == IREE::CPU::TilingLevel::VectorCommonParallelTiles &&
+                 unpackOp.getSource().getDefiningOp<linalg::LinalgOp>()) {
+        // The `IterationDimTracker` ties an unpack's destination loops only to
+        // the *outer* dims of its packed source operand, so `tileSizes`
+        // holds the source's outer tiling for consumer unpack operations. Map
+        // these onto the destination unpacked domain by scaling and permuting
+        // with the inner tile sizes.
+        scaleAndPermutateTilingForUnpackOp(unpackOp, tileSizes, scalableFlags);
       }
 
       // Append tiling info.
