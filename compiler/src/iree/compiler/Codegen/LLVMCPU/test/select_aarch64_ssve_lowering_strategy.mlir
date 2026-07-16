@@ -4,18 +4,8 @@
 // A target with +sme but not +sve (i.e. no non-streaming SVE) still picks
 // scalable SME tile sizes when SME tiling is enabled: matmul lowering does
 // not itself require +sve. Note this goes through a different
-// pre-processing strategy than the +sve,+sme case (Peeling, with an extra
-// `cache_parallel` tiling level) because `hasAnySVEFeature` does not count
-// +sme - see getVectorPreProcStrategy() in KernelDispatch.cpp.
-//
-// TODO: When SME tiling is disabled here there is no scalable
-// fallback available (below), since the regular SVE tiling heuristic
-// requires +sve. To target SSVE (streaming SVE) on a target that only has
-// +sme, that fallback heuristic needs to learn to treat +sme as implying
-// streaming-SVE support. Note --iree-llvmcpu-force-arm-streaming does not
-// change this: it's consumed by a later pass in the full lowering-to-LLVM
-// pipeline (addLowerToLLVMPasses), not by iree-llvmcpu-select-lowering-
-// strategy, so it has no effect on the tile sizes selected here.
+// pre-processing strategy than the +sve,+sme case: peeling, with an extra
+// `cache_parallel` tiling level.
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @matmul_tensors_sme_no_sve(%7: tensor<?x?xf32>, %8: tensor<?x?xf32>, %9: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
   %10 = linalg.matmul ins(%7, %8 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
