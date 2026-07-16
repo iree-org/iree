@@ -21,6 +21,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
@@ -1109,11 +1110,6 @@ OpFoldResult TensorImportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                 MLIRContext *context) {
-  // TODO(benvanik): check operand and dedupe imports.
-}
-
 //===----------------------------------------------------------------------===//
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
@@ -1132,9 +1128,49 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   return {};
 }
 
+//===----------------------------------------------------------------------===//
+// Generic deduplication pattern for stream.tensor.import and
+// stream.tensor.export
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+template <typename OpTy>
+struct DeduplicateTensorOp : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpTy currentOp,
+                                PatternRewriter &rewriter) const override {
+    // Search for an equivalent operation.
+    for (Operation *previousOp = currentOp->getPrevNode();
+         previousOp != nullptr; previousOp = previousOp->getPrevNode()) {
+      auto previous = dyn_cast<OpTy>(previousOp);
+      if (!previous) {
+        continue;
+      }
+      if (!OperationEquivalence::isEquivalentTo(
+              previous.getOperation(), currentOp.getOperation(),
+              OperationEquivalence::IgnoreLocations)) {
+        continue;
+      }
+      rewriter.replaceOp(currentOp, previous.getResult());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
+} // namespace
+
+void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.insert<DeduplicateTensorOp<TensorImportOp>>(context);
+}
+
 void TensorExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  // TODO(benvanik): check operand and dedupe exports.
+  results.insert<DeduplicateTensorOp<TensorExportOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
