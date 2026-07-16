@@ -648,6 +648,13 @@ func.func @matmul_accumulate_from_readonly() attributes {hal.executable.target =
   return
 }
 // CHECK-LABEL: func.func @matmul_accumulate_from_readonly(
+// Register-blocked peeling emits small fixed-size stack buffers.
+// The memref.alloc and linalg.generic guards are repeated on both
+// sides of the alloca check so they cover the whole function.
+// CHECK-NOT:     memref.alloc(
+// CHECK-NOT:     linalg.generic
+// CHECK:         memref.alloca(
+// CHECK-NOT:     memref.alloc(
 // CHECK-NOT:     linalg.generic
 
 // -----
