@@ -24,6 +24,7 @@
 #   FUNCTION_INPUTS: Module input in the format of mxnxcx<datatype>.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=local-sync" are added automatically.
+#   WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
 #
@@ -60,7 +61,7 @@ function(iree_static_linker_test)
   cmake_parse_arguments(
     _RULE
     "EMITC"
-    "NAME;SRC;DRIVER;STATIC_LIB_PREFIX;ENTRY_FUNCTION;INPUT_TYPE;HAL_TYPE"
+    "NAME;SRC;DRIVER;STATIC_LIB_PREFIX;ENTRY_FUNCTION;INPUT_TYPE;HAL_TYPE;WILL_FAIL"
     "COMPILER_FLAGS;LABELS;TARGET_CPU_FEATURES;FUNCTION_INPUTS"
     ${ARGN}
   )
@@ -270,5 +271,7 @@ function(iree_static_linker_test)
     LABELS
       ${_RULE_LABELS}
       ${_RULE_TARGET_CPU_FEATURES}
+    WILL_FAIL
+      ${_RULE_WILL_FAIL}
   )
 endfunction()

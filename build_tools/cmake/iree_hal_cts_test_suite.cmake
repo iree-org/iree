@@ -158,11 +158,12 @@ endfunction()
 #   LABELS: Test labels for filtering.
 #   RESOURCE_GROUP: Optional shared resource group. Tests sharing the same
 #     resource group do not run concurrently under CTest.
+#   WILL_FAIL: The tests will run, but their pass/fail status will be inverted.
 function(iree_hal_cts_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "BACKENDS_LIB;NAME;RESOURCE_GROUP"
+    "BACKENDS_LIB;NAME;RESOURCE_GROUP;WILL_FAIL"
     "TESTDATA_LIBS;ARGS;LABELS"
     ${ARGN}
   )
@@ -208,6 +209,11 @@ function(iree_hal_cts_test_suite)
     set(_RESOURCE_GROUP_BLOCK RESOURCE_GROUP "${_RULE_RESOURCE_GROUP}")
   endif()
 
+  set(_WILL_FAIL_BLOCK "")
+  if(_RULE_WILL_FAIL)
+    set(_WILL_FAIL_BLOCK WILL_FAIL "${_RULE_WILL_FAIL}")
+  endif()
+
   # Non-executable test categories.
   foreach(_CATEGORY buffer command_buffer core file queue)
     iree_cc_test(
@@ -219,6 +225,7 @@ function(iree_hal_cts_test_suite)
       ${_ARGS_BLOCK}
       ${_LABELS_BLOCK}
       ${_RESOURCE_GROUP_BLOCK}
+      ${_WILL_FAIL_BLOCK}
     )
   endforeach()
 
@@ -257,6 +264,7 @@ function(iree_hal_cts_test_suite)
         ${_ARGS_BLOCK}
         ${_LABELS_BLOCK}
         ${_RESOURCE_GROUP_BLOCK}
+        ${_WILL_FAIL_BLOCK}
       )
     endforeach()
   endif()
