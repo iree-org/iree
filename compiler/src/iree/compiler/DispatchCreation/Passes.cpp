@@ -68,6 +68,16 @@ static llvm::cl::list<mlir::iree_compiler::IREE::Encoding::EncodingOpType>
         llvm::cl::desc("Op families eligible for data-tiling annotation. "
                        "Defaults to {matmul, scaled_matmul}, add convolution "
                        "to enable experimental data tiling support."),
+        llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
+                "matmul", "Matmul-like operations."),
+            clEnumValN(mlir::iree_compiler::IREE::Encoding::EncodingOpType::
+                           scaled_matmul,
+                       "scaled_matmul", "Scaled matmul-like operations."),
+            clEnumValN(
+                mlir::iree_compiler::IREE::Encoding::EncodingOpType::conv,
+                "convolution", "Convolutions.")),
         llvm::cl::list_init<
             mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
             {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
