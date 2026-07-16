@@ -300,8 +300,12 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
+    // SME implies streaming SVE, which supports masking just like classic
+    // SVE, even without +sve (see `enableAArch64SME` in
+    // LLVMCPULowerExecutableTarget.cpp).
     if (isScalableVectorizationEnabled() &&
-        hasAnySVEFeature(targetAttr.getConfiguration())) {
+        (hasAnySVEFeature(targetAttr.getConfiguration()) ||
+         hasSMEFeature(targetAttr.getConfiguration()))) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -1364,11 +1368,15 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   // vector register.
   sizes.append({m, n * outNumElements, k * outNumElements});
 
-  // Mark N dimension as scalable, if doing scalable vectorization.
+  // Mark N dimension as scalable, if doing scalable vectorization. SME
+  // implies streaming SVE, so it supports scalable vectorization too, even
+  // without +sve (e.g. on SME-only targets, or when SME tiling itself is
+  // disabled via --iree-llvmcpu-disable-arm-sme-tiling).
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   scalableSizeFlags.resize(3, false);
   if (isScalableVectorizationEnabled() &&
-      hasAnySVEFeature(targetAttr.getConfiguration())) {
+      (hasAnySVEFeature(targetAttr.getConfiguration()) ||
+       hasSMEFeature(targetAttr.getConfiguration()))) {
     scalableSizeFlags[1] = true;
   }
 }

@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
     "smoketest_embedded.mlir"
+    "smoketest_sme_only.mlir"
     "smoketest_system.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

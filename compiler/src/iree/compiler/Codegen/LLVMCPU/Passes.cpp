@@ -496,6 +496,7 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
 
 static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                                  bool enableAArch64SME,
+                                 bool requiresArmStreamingForScalableVectors,
                                  const CPUCodegenOptions &cpuOpts) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
@@ -548,11 +549,15 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
     modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
     FunctionLikeNest(modulePassManager)
         .addPredicatedPass(
-            clForceArmStreaming,
+            clForceArmStreaming || requiresArmStreamingForScalableVectors,
             [] {
               // 1. Enable Armv9-A streaming mode without ZA (i.e., SSVE) for
               // dispatch regions that contain scalable vectors when forced via
-              // the --iree-llvmcpu-force-arm-streaming flag.
+              // the --iree-llvmcpu-force-arm-streaming flag, or unconditionally
+              // on targets that have +sme but not +sve: such targets have no
+              // non-streaming SVE to fall back on, so streaming mode is the
+              // only legal way to execute scalable vector code, not just an
+              // optional perf trade-off.
               return mlir::arm_sme::createEnableArmStreamingPass(
                   mlir::arm_sme::ArmStreamingMode::StreamingLocally,
                   mlir::arm_sme::ArmZaMode::Disabled,
@@ -696,6 +701,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &cpuOpts,
                                      bool enableAArch64SME,
+                                     bool requiresArmStreamingForScalableVectors,
                                      bool includeLLVMLowering) {
   modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
   FunctionLikeNest(modulePassManager)
@@ -714,7 +720,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   if (includeLLVMLowering) {
-    addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
+    addLowerToLLVMPasses(modulePassManager, enableAArch64SME,
+                         requiresArmStreamingForScalableVectors, cpuOpts);
   }
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
@@ -869,6 +876,11 @@ void registerCodegenLLVMCPUPasses() {
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+    Option<bool> requiresArmStreamingForScalableVectors{
+        *this, "requires-arm-streaming-for-scalable-vectors",
+        llvm::cl::desc(
+            "Whether the target has +sme but not +sve, and thus requires "
+            "streaming mode to legally execute scalable vector code.")};
     Option<bool> includeLLVMLowering{
         *this, "include-llvm-lowering",
         llvm::cl::desc("Include the lowering to LLVM dialect."),
@@ -883,9 +895,10 @@ void registerCodegenLLVMCPUPasses() {
              LLVMCPULoweringPipelineOptions const &options) {
             CPUCodegenOptions cpuOpts =
                 getCPUCodegenOptionsForTextualPipeline(options);
-            buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
-                                            options.enableArmSME,
-                                            options.includeLLVMLowering);
+            buildLLVMCPUCodegenPassPipeline(
+                modulePassManager, cpuOpts, options.enableArmSME,
+                options.requiresArmStreamingForScalableVectors,
+                options.includeLLVMLowering);
           });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
