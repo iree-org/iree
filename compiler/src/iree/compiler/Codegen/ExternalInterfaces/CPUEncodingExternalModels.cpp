@@ -1090,11 +1090,17 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
       };
     }
   }
+  // BF16 path: RVV bf16 widening multiply-accumulate via Zvfbfwma.
+  // Same formula as the f32 path: N0 = VLEN/8, so the bf16 operands are LMUL=2
+  // (m2) and the f32 accumulators EMUL=4 (m4). vfwmaccbf16 fuses the bf16 ->
+  // f32 widening into the MAC, so the accumulator is f32 and there is no
+  // bf16-accumulator variant.
+  // M0=7 with EMUL=4 accumulators: 7*4 + 2(rhs) = 30 regs.
   if (lhs.isBF16() && rhs.isBF16() && out.isF32()) {
     int N0 = vlen / 8;
     if (hasFeature(config, "+zvfbfwma")) {
       return {
-          TileMxNxK{7, N0, 1},
+          TileMxNxK{7, N0, 1}, // Aim to use VFWMACCBF16.VF.
           TileMxNxK{4, N0, 1}, // Truncation of the above.
           TileMxNxK{2, N0, 1}, // Truncation of the above.
           TileMxNxK{1, N0, 1}, // Truncation of the above.

@@ -106,7 +106,7 @@ iree_bitcode_library(
   SRCS
     "mmt4d_riscv_64_zvfbfwma.c"
   COPTS
-    "-march=rv64gcv_zfbfmin_zvfbfwma"
+    "-march=rv64gcv_zvfbfwma"
 )
 
 iree_link_bitcode(
@@ -148,7 +148,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFH
 
 iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFBFWMA
   CLANG_OR_GCC
-    "-march=rv64gcv_zfbfmin_zvfbfwma"
+    "-march=rv64gcv_zvfbfwma"
 )
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)

@@ -361,3 +361,82 @@ func.func @full_matmul_lowering_f16f16f16_riscv64(
 // SCALABLE-SAME:   inner_tiles = [7, %[[C8_VSCALE]]]
 
 // CHECK:         return %[[UNPACK]]
+
+// -----
+
+// RISC-V64 with V extension and zvfbfwma - full matmul lowering (bf16 -> f32)
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @full_matmul_lowering_bf16bf16f32_riscv64(
+    %lhs: tensor<?x?xbf16>,
+    %rhs: tensor<?x?xbf16>,
+    %acc: tensor<?x?xf32>,
+    %m : index, %n : index, %k : index
+) -> tensor<?x?xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvfbfwma", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %0 = iree_encoding.set_encoding %lhs encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #encoding_lhs>
+  %1 = iree_encoding.set_encoding %rhs encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #encoding_rhs>
+  %2 = iree_encoding.set_encoding %acc encoding_dims{%m, %n, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #encoding_result>
+  %3 = linalg.matmul
+      ins(%0, %1 : tensor<?x?xbf16, #encoding_lhs>,
+                   tensor<?x?xbf16, #encoding_rhs>)
+      outs(%2 : tensor<?x?xf32, #encoding_result>)
+      -> tensor<?x?xf32, #encoding_result>
+  %4 = iree_encoding.unset_encoding %3 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #encoding_result> -> tensor<?x?xf32>{%m, %n}
+  return %4 : tensor<?x?xf32>
+}
+
+/// BF16 -> F32 on RISC-V64 with V+zvfbfwma extension:
+/// For the static case: M=7, N=16 (vlen=128), K=1
+/// For the scalable case: M=7, N=8*vscale (vlen=64*vscale), K=1
+/// The bf16 operands are LMUL=2 and the f32 accumulators EMUL=4.
+
+// CHECK-LABEL: func @full_matmul_lowering_bf16bf16f32_riscv64(
+// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?xbf16>
+// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xbf16>
+// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+
+// SCALABLE:      %[[C8:.+]] = arith.constant 8
+
+/// Pack LHS: [M, K] -> [?, ?, 7, 1] (this happens before vscale computation)
+// CHECK:         %[[PACK_LHS:.+]] = linalg.pack %[[LHS]]
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [7, 1]
+
+// SCALABLE:      %[[VSCALE:.+]] = vector.vscale
+// SCALABLE:      %[[C8_VSCALE:.+]] = arith.muli %[[VSCALE]], %[[C8]]
+
+/// Pack RHS: [K, N] -> [?, ?, N_tile, 1] with outer_dims_perm = [1, 0]
+// CHECK:         %[[PACK_RHS:.+]] = linalg.pack %[[RHS]]
+// CHECK-SAME:      outer_dims_perm = [1, 0]
+// CHECK-SAME:      inner_dims_pos = [1, 0]
+// STATIC-SAME:     inner_tiles = [16, 1]
+// SCALABLE-SAME:   inner_tiles = [%[[C8_VSCALE]], 1]
+
+/// Pack ACC: [M, N] -> [?, ?, 7, N_tile]
+// CHECK:         %[[PACK_ACC:.+]] = linalg.pack %[[ACC]]
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// STATIC-SAME:     inner_tiles = [7, 16]
+// SCALABLE-SAME:   inner_tiles = [7, %[[C8_VSCALE]]]
+
+/// The mmt4d operation
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[PACK_LHS]], %[[PACK_RHS]] :
+// CHECK-SAME:      outs(%[[PACK_ACC]] :
+
+/// Unpack result: [?, ?, 7, N_tile] -> [M, N]
+// CHECK:         %[[UNPACK:.+]] = linalg.unpack %[[MMT4D]]
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// STATIC-SAME:     inner_tiles = [7, 16]
+// SCALABLE-SAME:   inner_tiles = [7, %[[C8_VSCALE]]]
+
+// CHECK:         return %[[UNPACK]]
