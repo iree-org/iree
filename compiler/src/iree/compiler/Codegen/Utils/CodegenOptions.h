@@ -11,8 +11,9 @@
 
 namespace mlir::iree_compiler {
 
-// Bridge type for MLIR pass/pipeline options, which cannot store
-// llvm::OptimizationLevel directly because it is a final class.
+// Bridge type for MLIR pass/pipeline options.
+// TODO: llvm::OptimizationLevel is an enum; this bridge type could be
+// potentially removed.
 enum class CodegenPipelineOptLevel {
   O0 = 0,
   O1 = 1,

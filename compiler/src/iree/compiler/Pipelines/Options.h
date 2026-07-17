@@ -265,7 +265,7 @@ struct SchedulingOptions {
 };
 
 struct DispatchCreationOptions {
-  llvm::OptimizationLevel optLevel;
+  llvm::OptimizationLevel optLevel = llvm::OptimizationLevel::O2;
 
   bool enableAggressiveFusion = false;
   bool enableFuseMultiUse = true;
