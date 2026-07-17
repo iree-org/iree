@@ -1570,8 +1570,7 @@ util.func private @scf_while_capture_producer_body() -> tensor<1xi32> {
 // Tests an scf.while that carries more values through its "before" region than
 // the op has results: the "after" region yield feeds back two values (matching
 // the two init operands) while scf.condition only forwards one to the single
-// result. Affinity analysis must not naively map yield operand N to result N as
-// that would be an out-of-bounds getResult (previously crashed here).
+// result.
 
 // CHECK-LABEL: @scf_while_extra_loop_carried
 util.func private @scf_while_extra_loop_carried() -> tensor<1xi32> {
