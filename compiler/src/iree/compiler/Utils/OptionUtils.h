@@ -19,7 +19,7 @@
 namespace llvm {
 inline raw_ostream &operator<<(raw_ostream &os,
                                const llvm::OptimizationLevel &opt) {
-  return os << 'O' << opt.getSpeedupLevel();
+  return os << 'O' << static_cast<unsigned>(opt);
 }
 } // namespace llvm
 
@@ -35,7 +35,7 @@ struct opt_initializer {
                   const Ty &val)
       : parentName(parentName), init(val), optLevel(opt) {}
   void apply(const llvm::OptimizationLevel inLevel, Ty &val) const {
-    if (inLevel.getSpeedupLevel() >= optLevel.getSpeedupLevel()) {
+    if (inLevel >= optLevel) {
       val = init;
     }
   }
@@ -162,7 +162,7 @@ public:
                                                       inits.end());
     llvm::sort(initsSorted, [](opt_initializer<T> &lhs,
                                opt_initializer<T> &rhs) {
-      return lhs.optLevel.getSpeedupLevel() < rhs.optLevel.getSpeedupLevel();
+      return lhs.optLevel < rhs.optLevel;
     });
 
     llvm::cl::desc &desc = filterDescription(Ms...);

@@ -231,13 +231,13 @@ void llvm::cl::parser<llvm::OptimizationLevel>::printOptionDiff(
   std::string Str;
   {
     llvm::raw_string_ostream SS(Str);
-    SS << V.getSpeedupLevel();
+    SS << static_cast<unsigned>(V);
   }
   outs() << "= " << Str;
   outs().indent(2) << " (default: ";
   if (Default.hasValue()) {
     auto defaultVal = Default.getValue();
-    outs() << defaultVal.getSpeedupLevel();
+    outs() << static_cast<unsigned>(defaultVal);
   } else {
     outs() << "*no default*";
   }
