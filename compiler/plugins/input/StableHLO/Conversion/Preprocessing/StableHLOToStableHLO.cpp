@@ -454,6 +454,267 @@ struct TransposeReshapeGenericDotGeneral final
   }
 };
 
+// The following helpers and the ScatterBatchingDimsExpander pattern below are
+// ported from upstream StableHLO's `ScatterWithBatchingDimsExpander` and its
+// supporting helpers in
+// third_party/stablehlo/stablehlo/transforms/StablehloCompatibilityExpander.cpp
+// (mergeSortedDims / fitsInIntegralType / promoteTypeForSize /
+// getUpdatedIndicesAreSorted / createConcatIndices). They are copied rather
+// than reused because the upstream pattern lives in an anonymous namespace, and
+// its only public entry point (populateStablehloCompatibilityExpanderPatterns)
+// is a version-gated bundle that would also pull in unrelated compatibility
+// expanders.
+//
+// Merges two sorted lists of dimensions into a single sorted list.
+SmallVector<int64_t> mergeSortedDims(ArrayRef<int64_t> dims1,
+                                     ArrayRef<int64_t> dims2) {
+  SmallVector<int64_t> result;
+  result.reserve(dims1.size() + dims2.size());
+  std::merge(dims1.begin(), dims1.end(), dims2.begin(), dims2.end(),
+             std::back_inserter(result));
+  return result;
+}
+
+bool fitsInIntegralType(int64_t size, IntegerType type) {
+  if (type.isUnsigned()) {
+    return llvm::isUIntN(type.getWidth(), size);
+  }
+  return llvm::isIntN(type.getWidth(), size);
+}
+
+// If `type` is an integer type in which `size` doesn't fit, promote it to i32
+// or i64 (depending on `size`).
+Type promoteTypeForSize(Type type, int64_t size, OpBuilder &builder) {
+  // Gather/Scatter should have an integer type, but we check just in case.
+  auto intType = dyn_cast<IntegerType>(type);
+  if (!intType || fitsInIntegralType(size, intType)) {
+    return type;
+  }
+  if (fitsInIntegralType(size, builder.getI32Type())) {
+    return builder.getI32Type();
+  }
+  return builder.getI64Type();
+}
+
+// If `indicesBatchingDims` and `updatedIndexMap` are both sorted, then the
+// `indices_are_sorted` property is preserved: each concatenated iota is
+// monotonically increasing.
+bool getUpdatedIndicesAreSorted(bool indicesAreSorted,
+                                ArrayRef<int64_t> indicesBatchingDims,
+                                ArrayRef<int64_t> updatedIndexMap) {
+  return indicesAreSorted && llvm::is_sorted(indicesBatchingDims) &&
+         llvm::is_sorted(updatedIndexMap);
+}
+
+// Returns an updated indices tensor such that an `IotaOp` is prepended for each
+// dim in `indicesBatchingDims` with a `ConcatenateOp`.
+//
+// If `indexVectorDim` is equal to the rank of `indices`, it is reshaped to have
+// a trailing dimension of size 1 so it can be concatenated with the `IotaOp`s.
+Value createConcatIndices(Value indices, int64_t indexVectorDim,
+                          ArrayRef<int64_t> indicesBatchingDims,
+                          PatternRewriter &rewriter) {
+  Location loc = indices.getLoc();
+  auto indicesType = cast<RankedTensorType>(indices.getType());
+  Type elementType = indicesType.getElementType();
+
+  // The batching dim sizes might not fit in the existing element type, in which
+  // case we need to promote it.
+  for (int64_t batchingDim : indicesBatchingDims) {
+    elementType = promoteTypeForSize(
+        elementType, indicesType.getDimSize(batchingDim), rewriter);
+  }
+  if (elementType != indicesType.getElementType()) {
+    indicesType = RankedTensorType::get(indicesType.getShape(), elementType);
+    indices = mlir::stablehlo::ConvertOp::create(rewriter, loc, indicesType,
+                                                 indices);
+  }
+
+  bool indexVectorDimOnLastDim = indexVectorDim == indicesType.getRank();
+  SmallVector<int64_t> iotaShape(indicesType.getShape());
+  if (indexVectorDimOnLastDim) {
+    iotaShape.push_back(1);
+  } else {
+    iotaShape[indexVectorDim] = 1;
+  }
+  auto iotaType = RankedTensorType::get(iotaShape, elementType);
+
+  if (indexVectorDimOnLastDim) {
+    indices = mlir::stablehlo::ReshapeOp::create(rewriter, loc, iotaType,
+                                                 indices);
+  }
+
+  SmallVector<Value> indicesToConcat;
+  indicesToConcat.reserve(indicesBatchingDims.size() + 1);
+  for (int64_t batchingDim : indicesBatchingDims) {
+    indicesToConcat.push_back(
+        mlir::stablehlo::IotaOp::create(rewriter, loc, iotaType, batchingDim));
+  }
+  indicesToConcat.push_back(indices);
+  return mlir::stablehlo::ConcatenateOp::create(rewriter, loc, indicesToConcat,
+                                                indexVectorDim);
+}
+
+// Converts a `stablehlo.scatter` with batching dims to one without batching
+// dims, such that each batching dim becomes an inserted window dim with a
+// corresponding `IotaOp` concatenated to the scatter indices. This mirrors
+// upstream StableHLO's `ScatterWithBatchingDimsExpander` and must run before the
+// other scatter canonicalization patterns, which do not understand batching
+// dims and would otherwise miscompile them.
+struct ScatterBatchingDimsExpander final
+    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    ArrayRef<int64_t> inputBatchingDims = dimNumbers.getInputBatchingDims();
+    ArrayRef<int64_t> scatterIndicesBatchingDims =
+        dimNumbers.getScatterIndicesBatchingDims();
+    if (inputBatchingDims.empty()) {
+      return rewriter.notifyMatchFailure(op, "scatter op has no batching dims");
+    }
+
+    if (!cast<ShapedType>(op.getScatterIndices().getType()).hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          op, "scatter indices have dynamic shape, can't expand");
+    }
+
+    SmallVector<int64_t> newInsertedWindowDims =
+        mergeSortedDims(inputBatchingDims, dimNumbers.getInsertedWindowDims());
+    SmallVector<int64_t> newScatterDimsToOperandDims =
+        llvm::to_vector(llvm::concat<const int64_t>(
+            inputBatchingDims, dimNumbers.getScatterDimsToOperandDims()));
+    Value newIndices = createConcatIndices(
+        op.getScatterIndices(), dimNumbers.getIndexVectorDim(),
+        scatterIndicesBatchingDims, rewriter);
+
+    auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), dimNumbers.getUpdateWindowDims(), newInsertedWindowDims,
+        /*inputBatchingDims=*/{}, /*scatterIndicesBatchingDims=*/{},
+        newScatterDimsToOperandDims, dimNumbers.getIndexVectorDim());
+
+    auto newScatter = mlir::stablehlo::ScatterOp::create(
+        rewriter, op.getLoc(), op->getResultTypes(), op.getInputs(), newIndices,
+        op.getUpdates(), newDimNumbers,
+        getUpdatedIndicesAreSorted(op.getIndicesAreSorted(),
+                                   scatterIndicesBatchingDims,
+                                   newScatterDimsToOperandDims),
+        op.getUniqueIndices());
+    newScatter.getUpdateComputation().takeBody(op.getUpdateComputation());
+    rewriter.replaceOp(op, newScatter.getResults());
+    return success();
+  }
+};
+
+// Converts a `stablehlo.scatter` that writes a single, full-rank contiguous
+// slice with an overwrite computation into a `stablehlo.dynamic_update_slice`.
+//
+// Such scatters (a scalar index selecting an offset into an operand dim that is
+// *not* collapsed, i.e. a partial slice) are dynamic-update-slice semantics and
+// cannot be represented as an `iree_linalg_ext.scatter`, which requires the
+// index depth to map to fully-inserted leading operand dims.
+struct ScatterToDynamicUpdateSlice final
+    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getInputs().size() != 1 || op.getUpdates().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "variadic scatter");
+    }
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    if (!dimNumbers.getInputBatchingDims().empty() ||
+        !dimNumbers.getInsertedWindowDims().empty()) {
+      return rewriter.notifyMatchFailure(op, "has batching/inserted dims");
+    }
+
+    Value operand = op.getInputs().front();
+    Value update = op.getUpdates().front();
+    Value indices = op.getScatterIndices();
+    auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
+    auto updateTy = dyn_cast<RankedTensorType>(update.getType());
+    auto indicesTy = dyn_cast<RankedTensorType>(indices.getType());
+    if (!operandTy || !updateTy || !indicesTy || !operandTy.hasStaticShape() ||
+        !updateTy.hasStaticShape() || !indicesTy.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "dynamic/unranked shapes");
+    }
+
+    int64_t rank = operandTy.getRank();
+
+    // The update must be a single full-rank contiguous slice: no batch dims and
+    // an identity window mapping over all operand dims.
+    ArrayRef<int64_t> updateWindowDims = dimNumbers.getUpdateWindowDims();
+    if (updateTy.getRank() != rank ||
+        static_cast<int64_t>(updateWindowDims.size()) != rank) {
+      return rewriter.notifyMatchFailure(op, "update is not a full-rank slice");
+    }
+    for (auto [idx, dim] : llvm::enumerate(updateWindowDims)) {
+      if (static_cast<int64_t>(idx) != dim) {
+        return rewriter.notifyMatchFailure(op, "non-identity window dims");
+      }
+    }
+
+    // There must be exactly one scatter index vector.
+    int64_t indexVectorDim = dimNumbers.getIndexVectorDim();
+    int64_t numUpdates = 1;
+    for (int64_t d = 0, s = indicesTy.getRank(); d < s; ++d) {
+      if (d != indexVectorDim) {
+        numUpdates *= indicesTy.getDimSize(d);
+      }
+    }
+    if (numUpdates != 1) {
+      return rewriter.notifyMatchFailure(op, "more than one scatter index");
+    }
+
+    // The update computation must be a plain overwrite: return the update value
+    // (block argument #1) unchanged.
+    Region &region = op.getUpdateComputation();
+    if (!region.hasOneBlock() || region.front().getNumArguments() != 2) {
+      return rewriter.notifyMatchFailure(op, "unexpected update computation");
+    }
+    Block &block = region.front();
+    auto retOp =
+        dyn_cast<mlir::stablehlo::ReturnOp>(block.getTerminator());
+    if (!retOp || retOp.getNumOperands() != 1 ||
+        retOp.getOperand(0) != block.getArgument(1)) {
+      return rewriter.notifyMatchFailure(op, "not an overwrite computation");
+    }
+
+    ArrayRef<int64_t> scatterDims = dimNumbers.getScatterDimsToOperandDims();
+    int64_t indexDepth = scatterDims.size();
+
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+    Type indexElemTy = indicesTy.getElementType();
+    auto scalarTy = RankedTensorType::get({}, indexElemTy);
+
+    // Flatten indices to `indexDepth` scalar components (numUpdates == 1).
+    auto flatTy = RankedTensorType::get({indexDepth}, indexElemTy);
+    Value flatIndices = mlir::stablehlo::ReshapeOp::create(b, flatTy, indices);
+
+    auto zeroAttr = cast<DenseElementsAttr>(rewriter.getZeroAttr(scalarTy));
+    Value zero = mlir::stablehlo::ConstantOp::create(b, zeroAttr);
+
+    // Map each operand dim to a start offset: the scatter index component if the
+    // dim is indexed, otherwise zero. dynamic_update_slice clamps offsets.
+    llvm::SmallVector<Value> startIndices(rank, zero);
+    for (auto [j, operandDim] : llvm::enumerate(scatterDims)) {
+      auto sliceTy = RankedTensorType::get({1}, indexElemTy);
+      Value comp = mlir::stablehlo::SliceOp::create(
+          b, sliceTy, flatIndices,
+          b.getDenseI64ArrayAttr({static_cast<int64_t>(j)}),
+          b.getDenseI64ArrayAttr({static_cast<int64_t>(j) + 1}),
+          b.getDenseI64ArrayAttr({1}));
+      startIndices[operandDim] =
+          mlir::stablehlo::ReshapeOp::create(b, scalarTy, comp);
+    }
+
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicUpdateSliceOp>(
+        op, operandTy, operand, update, startIndices);
+    return success();
+  }
+};
+
 struct ScatterInt64Indices final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
@@ -2176,6 +2437,8 @@ struct StableHLOToStableHLOPreprocessing final
     patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
+    patterns.insert<ScatterToDynamicUpdateSlice>(context, /*benefit=*/3);
+    patterns.insert<ScatterBatchingDimsExpander>(context, /*benefit=*/2);
     patterns
         .insert<ScatterInt64Indices, ScatterImplicitIndex, ScatterImplicitBatch,
                 ScatterMaterializeInsertedDim, ScatterCollapseBatch,
