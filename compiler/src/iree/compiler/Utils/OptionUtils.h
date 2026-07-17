@@ -160,10 +160,10 @@ public:
            std::initializer_list<opt_initializer<T>> inits, Mods... Ms) {
     llvm::SmallVector<opt_initializer<T>> initsSorted(inits.begin(),
                                                       inits.end());
-    llvm::sort(initsSorted, [](opt_initializer<T> &lhs,
-                               opt_initializer<T> &rhs) {
-      return lhs.optLevel < rhs.optLevel;
-    });
+    llvm::sort(initsSorted,
+               [](opt_initializer<T> &lhs, opt_initializer<T> &rhs) {
+                 return lhs.optLevel < rhs.optLevel;
+               });
 
     llvm::cl::desc &desc = filterDescription(Ms...);
     auto descStr = std::make_unique<std::string>(desc.Desc);
