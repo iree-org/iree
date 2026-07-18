@@ -44,6 +44,14 @@ void createTorchToIREEPipeline(
     // now be simplified.
     pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   }
+  // Convert `torch.operator "quantized_decomposed.*"` custom ops (emitted by
+  // torch pt2e / torchao quantization) into first-class torch quantized ops
+  // (Aten_MakePerChannelQuantizedTensorOp + AtenDequantizeSelfOp), which the
+  // downstream torch->linalg path can lower. Must run before
+  // RecomposeComplexOps/DecomposeComplexOps and the torch->linalg conversions,
+  // otherwise the unmatched custom ops fail to legalize.
+  pm.addNestedPass<func::FuncOp>(
+      torch::Torch::createMatchQuantizedCustomOpsPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createRecomposeComplexOpsPass());
   pm.addNestedPass<func::FuncOp>(createBitCastTensorPass());
   pm.addNestedPass<func::FuncOp>(
