@@ -185,3 +185,35 @@ util.func private @linearize_workgroup_ids(%d0: index, %d1: index, %d2: index, %
 //  CHECK-SAME:     by (1, %workgroup_count_z, %workgroup_count_y, %workgroup_count_x)
 //       CHECK:   scf.forall ({{.*}}) = (%c1, %c1, %c1, %[[LINEARIZE]])
 //  CHECK-SAME:     to (%[[ARG3]], %[[ARG2]], %[[ARG1]], %[[ARG0]]) step (%c1, %c1, %c1, %[[MUL1]])
+
+// -----
+
+// Test that an explicit pcf.barrier with subgroup scope lowers to gpu.barrier.
+util.func private @barrier_subgroup_scope() {
+  pcf.generic scope(#iree_gpu.subgroup_scope)
+    execute[%id: index, %n: index] {
+    pcf.barrier(#iree_gpu.subgroup_scope)
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @barrier_subgroup_scope
+//       CHECK:   scf.execute_region
+//       CHECK:     gpu.barrier
+//       CHECK:     scf.yield
+
+// -----
+
+// Test that pcf.generic with sync=true and subgroup scope inserts a
+// gpu.barrier after the execute region.
+util.func private @generic_sync_subgroup_scope() {
+  pcf.generic sync true scope(#iree_gpu.subgroup_scope)
+    execute[%id: index, %n: index] {
+    pcf.return
+  }
+  util.return
+}
+
+// CHECK-LABEL: @generic_sync_subgroup_scope
+//       CHECK:   gpu.barrier
