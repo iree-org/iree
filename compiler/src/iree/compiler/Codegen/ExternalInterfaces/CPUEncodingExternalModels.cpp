@@ -1042,10 +1042,21 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
       out.isSignlessInteger(32)) {
     int N0 = vlen / 8;
-    // SpaceMiT IME (vmadot): fixed tile shape derived from the 4×4×8 atom.
-    // M0=12 (3×4 atom grid) matches the registered runtime ukernel tile.
+    // SpaceMiT IME (vmadot): only for VLEN ∈ {256, 1024, 4096}. Tile is a
+    // 3×4 grid of the SEW=8 MAC atom (4×4×8 / 8×8×16 / 16×16×32). Other
+    // VLENs fall through to standard RVV tiles.
     if (hasFeature(config, "+xsmtvdot")) {
-      return {TileMxNxK{12, 16, 8}};
+      int atom = 0;
+      if (vlen == 256) {
+        atom = 4;
+      } else if (vlen == 1024) {
+        atom = 8;
+      } else if (vlen == 4096) {
+        atom = 16;
+      }
+      if (atom != 0) {
+        return {TileMxNxK{3 * atom, 4 * atom, 2 * atom}};
+      }
     }
     // Standard RVV widening multiply-accumulate.
     // Widening chain: i8(m1) -> i16(m2) -> i32(m4).

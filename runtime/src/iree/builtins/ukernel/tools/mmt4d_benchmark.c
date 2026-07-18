@@ -203,6 +203,10 @@ int main(int argc, char** argv) {
       7, 16, 1, "zvfh");
   iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 12, 16, 8,
                                    "xsmtvdot");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 24, 32, 16,
+                                   "xsmtvdot");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 48, 64, 32,
+                                   "xsmtvdot");
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.

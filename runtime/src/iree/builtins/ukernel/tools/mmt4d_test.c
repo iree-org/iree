@@ -618,6 +618,8 @@ int main(int argc, char** argv) {
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      7, 16, 1, "zvfh");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 12, 16, 8, "xsmtvdot");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 24, 32, 16, "xsmtvdot");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 48, 64, 32, "xsmtvdot");
 
 #endif  // defined(IREE_ARCH_ARM_64)
 
