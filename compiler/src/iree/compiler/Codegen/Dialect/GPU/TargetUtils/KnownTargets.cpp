@@ -1028,7 +1028,6 @@ const WgpDetails *getAdaWgpDetails() {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2,
-      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
@@ -1085,7 +1084,6 @@ const WgpDetails *getSM120WgpDetails() {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2,
-      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };

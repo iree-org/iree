@@ -345,8 +345,6 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
     return {f8E4M3FN, f8E4M3FN, f32};
   case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2:
     return {f8E5M2, f8E5M2, f32};
-  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2:
-    return {f8E4M3FN, f8E5M2, f32};
   case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
   case MMAIntrinsic::WMMA_BF16_16x16x32_BF16:
@@ -882,11 +880,10 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
   // FP8 mma.sync (m16n8k32, sm_89+). Same thread arrangement as the f16
   // m16n8k16 variants; K doubles so element[K] doubles from 2 to 4 (4 FP8
   // values packed per 32-bit register vs 2 FP16). The accumulator shape is
-  // unchanged (same M×N output). All three FP8 type combinations share the
-  // same register layout.
+  // unchanged (same M×N output). Both supported FP8 types share the same
+  // register layout.
   case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN:
   case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2:
-  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2:
     switch (operandIndex) {
     case kMMAOperandLhs: // A [M=16, K=32]: 16 elements/thread
       return {/*outer=*/{2, 2}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
