@@ -202,3 +202,33 @@ func.func @vectorize_scan_masked_configured(
 // CHECK:         vector.scan <add>, {{.*}} {inclusive = true, reduction_dim = 1 : i64}
 // CHECK:         vector.transfer_write {{.*}} : vector<8x16xf32>, tensor<?x?xf32>
 // CHECK:         vector.transfer_write {{.*}} : vector<8xf32>, tensor<?xf32>
+
+// -----
+
+#flex_score_mod_config = #iree_cpu.lowering_config<vector_common_parallel = [1, 64, 1]>
+#flex_score_mod_map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+func.func @flex_attention_score_mod_post_qk_vectorizes(
+    %score: tensor<1x64x1xf32>,
+    %output: tensor<1x64x1xf32>) -> tensor<1x64x1xf32> {
+  %bias = arith.constant 1.000000e+00 : f32
+  %result = linalg.generic {
+      indexing_maps = [#flex_score_mod_map, #flex_score_mod_map],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      {lowering_config = #flex_score_mod_config}
+      ins(%score : tensor<1x64x1xf32>)
+      outs(%output : tensor<1x64x1xf32>) {
+  ^bb0(%score_element: f32, %out: f32):
+    %biased = arith.addf %score_element, %bias : f32
+    %modified = math.tanh %biased : f32
+    linalg.yield %modified : f32
+  } -> tensor<1x64x1xf32>
+  return %result : tensor<1x64x1xf32>
+}
+
+// CHECK-LABEL: func.func @flex_attention_score_mod_post_qk_vectorizes
+// CHECK-NOT:   linalg.generic
+// CHECK:       arith.addf {{.*}} : vector<1x64x1xf32>
+// CHECK:       math.tanh {{.*}} : vector<1x64x1xf32>
+// CHECK-NOT:   linalg.generic
+// CHECK:       return
