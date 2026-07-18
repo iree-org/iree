@@ -528,6 +528,7 @@ iree_generated_e2e_runner_test(
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-global-opt-enable-early-materialization=false",
+        "--iree-vulkan-target=vp_android_baseline_2022",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

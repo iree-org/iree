@@ -217,6 +217,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_check_single_backend_test_suite(

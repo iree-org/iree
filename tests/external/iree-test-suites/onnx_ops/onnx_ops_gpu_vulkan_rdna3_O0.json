@@ -2,6 +2,7 @@
   "config_name": "gpu_vulkan_rdna3",
   "iree_compile_flags": [
     "--iree-hal-target-device=vulkan",
+    "--iree-vulkan-target=rdna3",
     "--iree-input-demote-f64-to-f32",
     "--iree-opt-level=O0"
   ],

@@ -33,6 +33,7 @@ iree_check_test_suite(
     "success.mlir"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32=false"
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_check_test_suite(
@@ -42,6 +43,7 @@ iree_check_test_suite(
     "failure.mlir"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32=false"
+    "--iree-vulkan-target=vp_android_baseline_2022"
   RUNNER_ARGS
     "--expect_failure"
 )

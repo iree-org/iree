@@ -65,6 +65,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = CPU_SPECIFIC_TESTS + NON_CHECK_TESTS,
     ),
+    compiler_flags = ["--iree-vulkan-target=vp_android_baseline_2022"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
