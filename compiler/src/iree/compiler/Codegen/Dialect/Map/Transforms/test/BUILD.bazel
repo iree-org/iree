@@ -15,6 +15,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = [
         "map_distribute_generic_ops.mlir",
+        "map_distribute_memory_ops.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
     tools = [
