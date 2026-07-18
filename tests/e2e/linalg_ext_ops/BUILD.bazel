@@ -17,6 +17,7 @@ ALL_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
+        "attention_f16_mask.mlir",
         "attention_i1_mask.mlir",
         "dynamic_attention.mlir",
         "gather.mlir",
@@ -68,6 +69,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "attention_f16_mask.mlir",
         "attention_i1_mask.mlir",
         "scan_configured.mlir",
     ],
@@ -97,6 +99,7 @@ LLVM_GPU_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "attention.mlir",
+        "attention_f16_mask.mlir",
         "attention_i1_mask.mlir",
         "dynamic_attention.mlir",
         "map_load.mlir",
@@ -125,6 +128,7 @@ ROCM_HIP_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
+        "attention_f16_mask.mlir",
         "gather.mlir",
         "map_load.mlir",
         "map_store.mlir",
@@ -168,6 +172,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "attention.mlir",
+            "attention_f16_mask.mlir",
             "attention_i1_mask.mlir",
             "dynamic_attention.mlir",
             "map_load.mlir",
@@ -200,6 +205,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "attention.mlir",
+            "attention_f16_mask.mlir",
             "attention_i1_mask.mlir",
             "dynamic_attention.mlir",
             "scan_configured.mlir",
