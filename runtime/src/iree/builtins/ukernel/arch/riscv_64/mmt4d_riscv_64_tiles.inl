@@ -44,3 +44,5 @@ IREE_UK_MMT4D_TILE(riscv_64, bf16, bf16, f32, 4, 1, _zvfbfwma)
 IREE_UK_MMT4D_TILE(riscv_64, bf16, bf16, f32, 7, 1, _zvfbfwma)
 
 IREE_UK_MMT4D_TILE(riscv_64, s8, s8, s32, 12, 8, _xsmtvdot)
+IREE_UK_MMT4D_TILE(riscv_64, s8, s8, s32, 24, 16, _xsmtvdot)
+IREE_UK_MMT4D_TILE(riscv_64, s8, s8, s32, 48, 32, _xsmtvdot)
