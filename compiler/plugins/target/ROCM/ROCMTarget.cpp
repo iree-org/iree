@@ -701,9 +701,11 @@ public:
     }
     StringRef targetArch = targetOptions.target;
     StringRef targetFeatures = targetOptions.targetFeatures;
+    uint32_t preferredSubgroupSize = 64;
     if (auto attr = getGPUTargetAttr(variantOp.getContext(), targetAttr)) {
       targetArch = attr.getArch();
       targetFeatures = attr.getFeatures();
+      preferredSubgroupSize = attr.getPreferredSubgroupSize();
     }
 
     // We name our files after the executable name so that they are easy to
@@ -828,7 +830,7 @@ public:
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
         if (chipset.majorVersion >= 10 && chipset.majorVersion <= 12) {
-          switch (subgroupSize.value_or(64)) {
+          switch (subgroupSize.value_or(preferredSubgroupSize)) {
           case 32:
             isWave64 = false;
             features.emplace_back("+wavefrontsize32");

@@ -37,9 +37,42 @@ jobs:
         run: |
           source ./build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        env:
+          # Build the first rocjitsu target's test deps along with everything else.
+          IREE_ROCM_TEST_TARGET_CHIP: gfx942
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
         env:
           CTEST_PARALLEL_LEVEL: 32
+
+      - name: Install TheRock SDK with rocjitsu
+        run: |
+          sdk_venv="${BUILD_DIR}/rocjitsu/therock-venv"
+          python3 -m venv "${sdk_venv}"
+          "${sdk_venv}/bin/python" -m pip install --pre \
+            --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
+            "rocm[libraries,devel]==10.1.0a20260909"
+          "${sdk_venv}/bin/rocm-sdk" init
+          "${sdk_venv}/bin/rocm-sdk" version
+          rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
+          echo "ROCM_ROOT=${rocm_root}" >> "${GITHUB_ENV}"
+          echo "ROCJITSU_BIN=${rocm_root}/bin/mirage" >> "${GITHUB_ENV}"
+
+      - name: Run ROCm e2e tests under rocjitsu
+        timeout-minutes: 120
+        run: |
+          ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
+            "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1201 gfx1250
+        env:
+          IREE_ROCJITSU_RUN_ID: ci
+          CTEST_PARALLEL_LEVEL: 8
+
+      - name: Upload rocjitsu test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rocjitsu-linux-x64-clang
+          path: ${{ env.BUILD_DIR }}/rocjitsu/logs/ci/
+          if-no-files-found: ignore
 
       # Alerting on failure is the responsibility of the calling job.

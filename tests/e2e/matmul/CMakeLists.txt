@@ -3648,6 +3648,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-rdna4"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -3806,6 +3808,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-rdna4"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -4366,4 +4370,84 @@ iree_generated_e2e_runner_test(
     120
 )
 
+endif()
+
+# These complete quickly on hardware but take at least 20 seconds per test (or
+# time out) when every GPU instruction is simulated. The RocJITsu CPU-only
+# suite excludes this label; hardware suites continue to run them.
+if(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx94")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_2k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_4k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_8k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f8E4M3FNUZ_tensor_ukernel_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_f8E4M3FNUZ_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f64_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_pad_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_pad_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_f16f16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_tensor_ukernel_f16f16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_bf16bf16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_bf16bf16f32_large_expanded_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+elseif(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_2k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_4k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_8k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_tileandfusemfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_f8E4M3FN_tensor_ukernel_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_f8E4M3FN_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_f64_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_pad_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_pad_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_f16f16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_tensor_ukernel_f16f16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_bf16bf16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_bf16bf16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_0_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_1_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_2_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_3_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+elseif(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1250")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f16_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f16_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f8E4M3FN_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f8E4M3FN_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_i8_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_i8_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_i8_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
 endif()

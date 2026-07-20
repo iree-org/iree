@@ -76,6 +76,12 @@ declare -a CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
 )
 
+# Include the first simulator target's test modules in the initial build.
+# Leave existing cache settings unchanged when no target is requested.
+if [[ -n "${IREE_ROCM_TEST_TARGET_CHIP:-}" ]]; then
+  CMAKE_ARGS+=("-DIREE_ROCM_TEST_TARGET_CHIP=${IREE_ROCM_TEST_TARGET_CHIP}")
+fi
+
 # Force /Z7 (embedded per-.obj debug info) instead of /Zi (shared per-target
 # .pdb serialized through mspdbsrv.exe via /FS) on Windows.
 #

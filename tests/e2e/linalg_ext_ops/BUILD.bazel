@@ -129,10 +129,8 @@ ROCM_HIP_SRCS = enforce_glob(
         "map_load.mlir",
         "map_store.mlir",
         "scan.mlir",
-        "scan_configured.mlir",
         "scatter.mlir",
         "sort.mlir",
-        "topk_v2.mlir",
         "winograd_input.mlir",
         "winograd_output.mlir",
     ],
@@ -141,6 +139,10 @@ ROCM_HIP_SRCS = enforce_glob(
         "top-k.mlir",
         "attention_i1_mask.mlir",
         "dynamic_attention.mlir",
+        "scan_configured.mlir",
+        # The Distribute pipeline skips TopK v2 thread distribution, causing
+        # overlapping output writes on all ROCm targets even if the test passes.
+        "topk_v2.mlir",
     ],
 )
 
@@ -148,6 +150,14 @@ iree_check_single_backend_test_suite(
     name = "check_rocm_hip",
     srcs = ROCM_HIP_SRCS,
     driver = "hip",
+    target_backend = "rocm",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip_wave64",
+    srcs = ["scan_configured.mlir"],
+    driver = "hip",
+    tags = ["requires-gpu-wave64"],
     target_backend = "rocm",
 )
 
