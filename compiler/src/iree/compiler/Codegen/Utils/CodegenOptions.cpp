@@ -57,22 +57,6 @@ bool CodegenOptions::setTunerAttributes = false;
 bool CodegenOptions::verifyPipelineConstraints = false;
 bool CodegenOptions::emitPipelineConstraints = false;
 
-llvm::OptimizationLevel
-mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel) {
-  switch (optLevel) {
-  case CodegenPipelineOptLevel::O0:
-    return llvm::OptimizationLevel::O0;
-  case CodegenPipelineOptLevel::O1:
-    return llvm::OptimizationLevel::O1;
-  case CodegenPipelineOptLevel::O2:
-    return llvm::OptimizationLevel::O2;
-  case CodegenPipelineOptLevel::O3:
-    return llvm::OptimizationLevel::O3;
-  }
-  assert(false && "unhandled codegen pipeline optimization level");
-  return llvm::OptimizationLevel::O0;
-}
-
 void CodegenOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category("IREE Codegen Options");
 
