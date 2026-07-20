@@ -556,7 +556,7 @@ func.func @matmul_i8_i8_i32_static(%3: tensor<128x384xi8>, %4: tensor<384x1536xi
   %7 = linalg.matmul ins(%3, %4 : tensor<128x384xi8>, tensor<384x1536xi8>) outs(%6 : tensor<128x1536xi32>) -> tensor<128x1536xi32>
   return %7 : tensor<128x1536xi32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, 4, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_i8_i8_i32_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1036,7 +1036,7 @@ func.func @quant_model(%4: tensor<2304x24xi8>, %5: tensor<24x144xi8>, %6: tensor
   } -> tensor<2304x144xi8>
   return %11 : tensor<2304x144xi8>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 48, 0], distribution = [64, 48, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 48, 0], distribution = [64, 48, 0], vector_common_parallel = [8, 4, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @quant_model(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

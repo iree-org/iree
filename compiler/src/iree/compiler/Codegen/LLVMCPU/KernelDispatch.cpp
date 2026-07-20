@@ -1263,7 +1263,10 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     if (hasAVX512fFeature(targetAttr.getConfiguration())) {
       sizes.append({8, 32, 16});
     } else {
-      sizes.append({1, 1, vectorSize});
+      // For non-AVX512 x86, register-block the matmul by vectorizing
+      // both parallel dims (M unroll, N vector) in addition to the reduction
+      // dim.
+      sizes.append({8, vectorSize, vectorSize});
     }
     return;
   }
