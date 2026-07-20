@@ -22,7 +22,6 @@
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
-#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
@@ -262,15 +261,8 @@ public:
                                     OpPassManager &passManager) final {
     bool enableAArch64SME = isAArch64(targetAttr.getConfiguration()) &&
                             hasSMEFeature(targetAttr.getConfiguration());
-    // A target with +sme but not +sve has no non-streaming SVE to fall back
-    // on, so streaming mode must be forced to legally execute any scalable
-    // vector code (not just genuine ArmSME tile ops).
-    bool requiresArmStreamingForScalableVectors =
-        enableAArch64SME &&
-        !hasAnySVEFeature(targetAttr.getConfiguration());
     buildLLVMCPUCodegenPassPipeline(passManager.nest<ModuleOp>(),
-                                    codegenOptions_, enableAArch64SME,
-                                    requiresArmStreamingForScalableVectors);
+                                    codegenOptions_, enableAArch64SME);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 

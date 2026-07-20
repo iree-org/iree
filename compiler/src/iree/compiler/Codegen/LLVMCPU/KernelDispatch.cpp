@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUSelectUKernels.h"
+#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
@@ -300,12 +301,11 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
-    // SME implies streaming SVE, which supports masking just like classic
-    // SVE, even without +sve (see `enableAArch64SME` in
-    // LLVMCPULowerExecutableTarget.cpp).
+    // Masking requires either SVE or SME with streaming mode forced.
     if (isScalableVectorizationEnabled() &&
         (hasAnySVEFeature(targetAttr.getConfiguration()) ||
-         hasSMEFeature(targetAttr.getConfiguration()))) {
+         (hasSMEFeature(targetAttr.getConfiguration()) &&
+          isArmStreamingForced()))) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -1368,15 +1368,13 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   // vector register.
   sizes.append({m, n * outNumElements, k * outNumElements});
 
-  // Mark N dimension as scalable, if doing scalable vectorization. SME
-  // implies streaming SVE, so it supports scalable vectorization too, even
-  // without +sve (e.g. on SME-only targets, or when SME tiling itself is
-  // disabled via --iree-llvmcpu-disable-arm-sme-tiling).
+  // Mark N dimension as scalable, if doing scalable vectorization.
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   scalableSizeFlags.resize(3, false);
   if (isScalableVectorizationEnabled() &&
       (hasAnySVEFeature(targetAttr.getConfiguration()) ||
-       hasSMEFeature(targetAttr.getConfiguration()))) {
+       (hasSMEFeature(targetAttr.getConfiguration()) &&
+        isArmStreamingForced()))) {
     scalableSizeFlags[1] = true;
   }
 }
