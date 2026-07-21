@@ -179,7 +179,7 @@ public:
         "/out:" + artifacts.libraryFile.path,
     };
 
-    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() >= 2) {
+    if (targetOptions.target.optimizerOptLevel >= llvm::OptimizationLevel::O2) {
       // https://docs.microsoft.com/en-us/cpp/build/reference/opt-optimizations?view=vs-2019
       // Enable all the fancy optimizations.
       flags.push_back("/opt:ref,icf,lbr");
@@ -233,7 +233,7 @@ public:
     // We need to link against different libraries based on our configuration
     // matrix (dynamic/static and debug/release).
     int libIndex = 0;
-    if (targetOptions.target.optimizerOptLevel.getSpeedupLevel() == 0) {
+    if (targetOptions.target.optimizerOptLevel == llvm::OptimizationLevel::O0) {
       libIndex += 0; // debug
     } else {
       libIndex += 2; // release

@@ -1263,7 +1263,10 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     if (hasAVX512fFeature(targetAttr.getConfiguration())) {
       sizes.append({8, 32, 16});
     } else {
-      sizes.append({1, 1, vectorSize});
+      // For non-AVX512 x86, register-block the matmul by vectorizing
+      // both parallel dims (M unroll, N vector) in addition to the reduction
+      // dim.
+      sizes.append({8, vectorSize, vectorSize});
     }
     return;
   }
@@ -1768,11 +1771,12 @@ static bool adjustVectorSizesForScalableVectorization(
     LDBG() << "SME is not supported yet!";
     return false;
   }
-  if (hasAnySVEFeature(targetConfig) && ShapedType::isDynamic(n0)) {
+  if ((hasAnySVEFeature(targetConfig) || hasAnyVFeature(targetConfig)) &&
+      ShapedType::isDynamic(n0)) {
     // Set the corresponding scalable tile size and flag for the inner N
-    // dimension, i.e. N0 from the iteration domain ([b,] M1, N1, K1, M0, N0,
-    // K0). The inner M dimension is not considered here, because SVE currently
-    // only makes the N dimension scalable.
+    // dimension, i.e. n1 from the iteration domain ([b, ], m0, n0, k0, m1, n1,
+    // k1). The inner M dimension is not considered here, because SVE/RVV
+    // currently only make the N dimension scalable.
     vecTileSizes[mmt4dDimBase + 4] =
         scalableInnerTilesAndFlags.value().first[1];
     vecScalableTileFlags[mmt4dDimBase + 4] =
@@ -3159,17 +3163,18 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 }
 
 /// Transforms tiling sizes from the unpacked domain to the packed domain
-/// for a `PackOp` by scaling inner dimensions and applying outer dimension
-/// permutations.
+/// for a `PackOp` by undoing the scaling for inner dimensions and applying
+/// outer dimension permutations.
 ///
 /// Steps:
 /// 1. Divide the tile sizes of inner dimensions by the corresponding inner
 ///    tile factors. Handles static and scalable sizes but ignores dynamic
 ///    sizes.
 /// 2. Apply the outer dimension permutation, if present.
-static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
-                                             SmallVector<int64_t> &tileSizes,
-                                             SmallVector<bool> &scalableFlags) {
+static void
+undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
+                                     SmallVector<int64_t> &tileSizes,
+                                     SmallVector<bool> &scalableFlags) {
   SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
   SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
   // Infer scalable tile sizes and flags if present.
@@ -3200,36 +3205,35 @@ static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
   }
 }
 
-/// Transforms tiling sizes from the packed domain back to the unpacked
-/// domain for a `PackOp` by undoing the scaling of inner dimensions and
-/// reversing outer dimension permutations.
-///
-/// Steps:
+/// Helper function to map `linalg.pack/unpack` operation tile sizes from the
+/// packed dimension to the unpacked dimension.
 /// 1. Undo the outer dimension permutation, if present, by applying the
 ///    inverted permutation.
 /// 2. Multiply the inner dimension tile sizes by the corresponding inner
 ///    tile factors. Handles static and scalable tile sizes but ignores dynamic
 ///    sizes.
-static void
-undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
-                                     SmallVector<int64_t> &tileSizes,
-                                     SmallVector<bool> &scalableFlags) {
-  SmallVector<int64_t> innerTiles(packOp.getStaticInnerTiles());
+template <typename PackUnpackType>
+static void undoPermutationAndScaleTileSizes(PackUnpackType op,
+                                             SmallVector<int64_t> &tileSizes,
+                                             SmallVector<bool> &scalableFlags) {
+  SmallVector<int64_t> innerTiles(op.getStaticInnerTiles());
   SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
   // Infer scalable tile sizes and flags if present.
   if (auto sizesAndScalableFlags =
-          getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
+          getScalableTileSizesAndFlags(op.getMixedTiles())) {
     innerTiles = sizesAndScalableFlags->first;
     innerTileScalableFlags = sizesAndScalableFlags->second;
   }
-  ArrayRef<int64_t> innerDimPos = packOp.getInnerDimsPos();
-  ArrayRef<int64_t> outerDimsPerm = packOp.getOuterDimsPerm();
+  ArrayRef<int64_t> innerDimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
   // First undo dimension permutation if present.
   if (!outerDimsPerm.empty()) {
     auto invertedPerm = invertPermutationVector(outerDimsPerm);
     applyPermutationToVector(tileSizes, invertedPerm);
     applyPermutationToVector(scalableFlags, invertedPerm);
   }
+  assert(llvm::none_of(scalableFlags, [](bool scalable) { return scalable; }) &&
+         "Tile sizes for outer dims should not be scalable!");
   // Then unscale tile sizes by multiplying the inner tile sizes and setting the
   // corresponding scalable flags to true.
   for (auto [pos, size, scalable] :
@@ -3241,6 +3245,27 @@ undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
     tileSizes[pos] *= size;
     scalableFlags[pos] = scalableFlags[pos] || scalable;
   }
+}
+
+/// Transforms tiling sizes from the packed domain back to the unpacked
+/// domain for a `PackOp` by scaling the inner dimensions and
+/// reversing outer dimension permutations.
+static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
+                                             SmallVector<int64_t> &tileSizes,
+                                             SmallVector<bool> &scalableFlags) {
+  undoPermutationAndScaleTileSizes<linalg::PackOp>(packOp, tileSizes,
+                                                   scalableFlags);
+}
+
+/// Transforms tiling sizes from the packed domain back to the unpacked
+/// domain for a `UnPackOp` by scaling the inner dimensions and
+/// reversing outer dimension permutations.
+static void
+undoScaleAndPermutateTilingForUnpackOp(linalg::UnPackOp unpackOp,
+                                       SmallVector<int64_t> &tileSizes,
+                                       SmallVector<bool> &scalableFlags) {
+  undoPermutationAndScaleTileSizes<linalg::UnPackOp>(unpackOp, tileSizes,
+                                                     scalableFlags);
 }
 
 /// A helper class that propagates and sets lowering configurations for multiple
@@ -3320,7 +3345,7 @@ private:
   /// For a Matmul RHS Pack op with `outer_dims_perm = [1, 0]` and `inner_tiles
   /// = [16, 1]`, `getPackVectorTileSize` initially returns `[1, 1]`. Since the
   /// `MultiLoweringConfigGenerator` propagates tiling of the outer (unpacked)
-  /// dimensions, `undoScaleAndPermutateTilingForPackOp` translates the
+  /// dimensions, `scaleAndPermutateTilingForPackOp` translates the
   /// tile sizes from `[1, 1]` to `[1, 16]`.
   ///
   /// As a result, the Pack op expects its producer (potentially the root op) to
@@ -3423,11 +3448,11 @@ void MultiLoweringConfigGenerator::loadRootLoweringConfig() {
     // `MultiLoweringConfigGenerator` propagates tiling on the unpacked
     // dimensions, while `rootLoweringConfig` defines tiling on the packed
     // inner dimensions. Therefore, use
-    // `undoScaleAndPermutateTilingForPackOp` to translate tiling information
+    // `scaleAndPermutateTilingForPackOp` to translate tiling information
     // from the packed back to the unpacked dimensions.
     if (auto packOp = dyn_cast<linalg::PackOp>(rootOperation);
         packOp && !sizes.empty()) {
-      undoScaleAndPermutateTilingForPackOp(packOp, sizes, flags);
+      scaleAndPermutateTilingForPackOp(packOp, sizes, flags);
     }
 
     // Map the tiling information from the op-level local dimension indices
@@ -3719,9 +3744,20 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // `MultiLoweringConfigGenerator` propagates tiling on the
         // unpacked dimensions, while for a pack operation, `LoweringConfig`
         // defines tiling on the packed inner dimensions. Therefore, use
-        // `scaleAndPermutateTilingForPackOp` to translate the tiling
+        // `undoScaleAndPermutateTilingForPackOp` to translate the tiling
         // information from the unpacked to the packed dimensions.
-        scaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
+        undoScaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
+      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op);
+                 unpackOp &&
+                 level == IREE::CPU::TilingLevel::VectorCommonParallelTiles &&
+                 unpackOp.getSource().getDefiningOp<linalg::LinalgOp>()) {
+        // The `IterationDimTracker` ties an unpack's destination loops only to
+        // the *outer* dims of its packed source operand, so `tileSizes`
+        // holds the source's outer tiling for consumer unpack operations. Map
+        // these onto the destination unpacked domain by scaling and permuting
+        // with the inner tile sizes.
+        undoScaleAndPermutateTilingForUnpackOp(unpackOp, tileSizes,
+                                               scalableFlags);
       }
 
       // Append tiling info.
@@ -3744,7 +3780,7 @@ MultiLoweringConfigGenerator::getVecTileSizesForNonRootPackOp(
   // Invert the Pack op's `outer_dims_perm` on `vecTileSizes` and
   // `scalableFlags`, then multiply `vecTileSizes` by the Pack op's
   // `inner_tiles` and set the corresponding `scalableFlags`.
-  undoScaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags);
+  scaleAndPermutateTilingForPackOp(packOp, vecTileSizes, scalableFlags);
   return {vecTileSizes, scalableFlags};
 }
 

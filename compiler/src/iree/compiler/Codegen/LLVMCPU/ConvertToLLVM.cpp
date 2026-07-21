@@ -827,10 +827,14 @@ struct RewriteFuncOpABI : OpRewritePattern<LLVM::LLVMFuncOp> {
         return cast<DictionaryAttr>(attr);
       });
     }
+    std::optional<uint64_t> functionEntryCount;
+    if (auto attr = funcOp.getFunctionEntryCountAttr()) {
+      functionEntryCount = attr.getEntryCount();
+    }
     LLVM::LLVMFuncOp::create(
         rewriter, funcOp.getLoc(), funcOp.getName(), expectedType.value(),
         funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(),
-        /*comdat=*/nullptr, attrs, argAttrs, funcOp.getFunctionEntryCount());
+        /*comdat=*/nullptr, attrs, argAttrs, functionEntryCount);
     rewriter.eraseOp(funcOp);
     return success();
   }

@@ -28,6 +28,7 @@
 #   cross-compiling
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 #
 # )
 
@@ -36,7 +37,7 @@ function(iree_cc_binary_benchmark)
   cmake_parse_arguments(
     _RULE
     "HOSTONLY;TESTONLY"
-    "NAME"
+    "NAME;WILL_FAIL"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
     ${ARGN}
   )
@@ -78,5 +79,7 @@ function(iree_cc_binary_benchmark)
       ::${_RULE_NAME}
     LABELS
       ${_RULE_LABELS}
+    WILL_FAIL
+      ${_RULE_WILL_FAIL}
   )
 endfunction()

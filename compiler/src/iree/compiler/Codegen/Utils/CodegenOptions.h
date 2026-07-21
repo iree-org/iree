@@ -11,19 +11,6 @@
 
 namespace mlir::iree_compiler {
 
-// Bridge type for MLIR pass/pipeline options, which cannot store
-// llvm::OptimizationLevel directly because it is a final class.
-enum class CodegenPipelineOptLevel {
-  O0 = 0,
-  O1 = 1,
-  O2 = 2,
-  O3 = 3,
-};
-
-// Maps the pass/pipeline bridge enum to llvm::OptimizationLevel.
-llvm::OptimizationLevel
-mapCodegenPipelineOptLevel(CodegenPipelineOptLevel optLevel);
-
 // A base class that defines common codegen options that are shared across
 // different backends (e.g., CPU and GPU). Derived classes can add
 // backend-specific options as needed.

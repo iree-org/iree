@@ -399,18 +399,32 @@ endfunction()
 # Same as iree_wasm_cc_binary, plus a ctest test that runs the bundle via
 # Node.js. The test passes if the .mjs entry point exits with code 0.
 #
-# Parameters: same as iree_wasm_cc_binary.
+# Parameters: same as iree_wasm_cc_binary, plus:
+#   WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 function(iree_wasm_cc_test)
   cmake_parse_arguments(
     _RULE
     "TESTONLY"
-    "PACKAGE;NAME;MAIN"
+    "PACKAGE;NAME;MAIN;WILL_FAIL"
     "SRCS;DEPS;COPTS;DEFINES"
     ${ARGN}
   )
 
-  # Build the bundle using iree_wasm_cc_binary.
-  iree_wasm_cc_binary(${ARGN})
+  # Build the bundle using iree_wasm_cc_binary without test-only arguments.
+  set(_TESTONLY_ARG "")
+  if(_RULE_TESTONLY)
+    set(_TESTONLY_ARG TESTONLY)
+  endif()
+  iree_wasm_cc_binary(
+    PACKAGE ${_RULE_PACKAGE}
+    NAME ${_RULE_NAME}
+    MAIN ${_RULE_MAIN}
+    SRCS ${_RULE_SRCS}
+    DEPS ${_RULE_DEPS}
+    COPTS ${_RULE_COPTS}
+    DEFINES ${_RULE_DEFINES}
+    ${_TESTONLY_ARG}
+  )
 
   # Derive the output .mjs path (must match iree_wasm_cc_binary's output).
   set(_OUTPUT_MJS "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.mjs")
@@ -430,4 +444,7 @@ function(iree_wasm_cc_test)
     NAME "${_TEST_NAME}"
     COMMAND "${_NODE_EXECUTABLE}" "${_OUTPUT_MJS}"
   )
+  if(_RULE_WILL_FAIL)
+    set_property(TEST ${_TEST_NAME} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
+  endif()
 endfunction()

@@ -752,7 +752,7 @@ static CPUCodegenOptions
 getCPUCodegenOptionsForTextualPipeline(const PipelineOptionsT &options) {
   CPUCodegenOptions cpuOpts = CPUCodegenOptions::FromFlags::get();
   if (options.optLevel.hasValue()) {
-    cpuOpts.setWithOptLevel(mapCodegenPipelineOptLevel(options.optLevel));
+    cpuOpts.setWithOptLevel(options.optLevel);
   }
   return cpuOpts;
 }
@@ -813,16 +813,11 @@ void registerCodegenLLVMCPUPasses() {
 
   struct LLVMCPUConfigurationPipelineOptions final
       : PassPipelineOptions<LLVMCPUConfigurationPipelineOptions> {
-    Option<CodegenPipelineOptLevel> optLevel{
+    Option<llvm::OptimizationLevel> optLevel{
         *this, "opt-level",
         llvm::cl::desc(
             "Optimization level used to derive CPU codegen defaults."),
-        llvm::cl::values(
-            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
-        llvm::cl::init(CodegenPipelineOptLevel::O0)};
+        llvm::cl::init(llvm::OptimizationLevel::O0)};
   };
 
   static PassPipelineRegistration<LLVMCPUConfigurationPipelineOptions>
@@ -856,16 +851,11 @@ void registerCodegenLLVMCPUPasses() {
 
   struct LLVMCPULoweringPipelineOptions
       : PassPipelineOptions<LLVMCPULoweringPipelineOptions> {
-    Option<CodegenPipelineOptLevel> optLevel{
+    Option<llvm::OptimizationLevel> optLevel{
         *this, "opt-level",
         llvm::cl::desc(
             "Optimization level used to derive CPU codegen defaults."),
-        llvm::cl::values(
-            clEnumValN(CodegenPipelineOptLevel::O0, "O0", "Use O0 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O1, "O1", "Use O1 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O2, "O2", "Use O2 defaults."),
-            clEnumValN(CodegenPipelineOptLevel::O3, "O3", "Use O3 defaults.")),
-        llvm::cl::init(CodegenPipelineOptLevel::O0)};
+        llvm::cl::init(llvm::OptimizationLevel::O0)};
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};

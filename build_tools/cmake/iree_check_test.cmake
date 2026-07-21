@@ -37,6 +37,7 @@ endfunction()
 #       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
+#   WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 #   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
 #       to use for the generated IREE module (.vmfb).
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
@@ -50,7 +51,7 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;INPUT_TYPE"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME;INPUT_TYPE;WILL_FAIL"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;DEPENDS;TIMEOUT"
     ${ARGN}
   )
@@ -213,6 +214,8 @@ function(iree_check_test)
         ${_RULE_LABELS}
       TIMEOUT
         ${_RULE_TIMEOUT}
+      WILL_FAIL
+        ${_RULE_WILL_FAIL}
       DISABLED
         ${_TEST_DISABLED}
     )
@@ -240,6 +243,8 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path
 #       is added automatically.
+#   WILL_FAIL: The generated tests will run, but their pass/fail status will be
+#       inverted.
 #   DEPENDS: Optional. Additional dependencies beyond SRC and the tools.
 #   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
 #       if no compiled support for that configuration.
@@ -251,7 +256,7 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER;INPUT_TYPE"
+    "NAME;TARGET_BACKEND;DRIVER;INPUT_TYPE;WILL_FAIL"
     "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;DEPENDS;TIMEOUT"
     ${ARGN}
   )
@@ -282,6 +287,7 @@ function(iree_check_single_backend_test_suite)
         LABELS ${_RULE_LABELS}
         DEPENDS ${_RULE_DEPENDS}
         TIMEOUT ${_RULE_TIMEOUT}
+        WILL_FAIL ${_RULE_WILL_FAIL}
       )
     endif()
 
@@ -306,6 +312,7 @@ function(iree_check_single_backend_test_suite)
           LABELS ${_RULE_LABELS}
           DEPENDS ${_RULE_DEPENDS}
           TIMEOUT ${_RULE_TIMEOUT}
+          WILL_FAIL ${_RULE_WILL_FAIL}
         )
       endif()
 
@@ -324,6 +331,7 @@ function(iree_check_single_backend_test_suite)
           LABELS ${_RULE_LABELS}
           DEPENDS ${_RULE_DEPENDS}
           TIMEOUT ${_RULE_TIMEOUT}
+          WILL_FAIL ${_RULE_WILL_FAIL}
         )
       endif()
     endif()
@@ -408,6 +416,8 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
+#   WILL_FAIL: The generated tests will run, but their pass/fail status will be
+#       inverted.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
 #       entry is either "generic" for the architecture defaults, or "host" for
 #       the host CPU, or a colon-separated triple "arch:name:cpu_features" where "arch" filters
@@ -426,7 +436,7 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;INPUT_TYPE"
+    "NAME;INPUT_TYPE;WILL_FAIL"
     "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
     ${ARGN}
   )
@@ -493,6 +503,8 @@ function(iree_check_test_suite)
           ${_LABELS}
         TIMEOUT
           ${_RULE_TIMEOUT}
+        WILL_FAIL
+          ${_RULE_WILL_FAIL}
         INPUT_TYPE
           ${_RULE_INPUT_TYPE}
       )

@@ -556,7 +556,7 @@ func.func @matmul_i8_i8_i32_static(%3: tensor<128x384xi8>, %4: tensor<384x1536xi
   %7 = linalg.matmul ins(%3, %4 : tensor<128x384xi8>, tensor<384x1536xi8>) outs(%6 : tensor<128x1536xi32>) -> tensor<128x1536xi32>
   return %7 : tensor<128x1536xi32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 64, 0], distribution = [64, 64, 0], vector_common_parallel = [8, 4, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_i8_i8_i32_static(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1036,7 +1036,7 @@ func.func @quant_model(%4: tensor<2304x24xi8>, %5: tensor<24x144xi8>, %6: tensor
   } -> tensor<2304x144xi8>
   return %11 : tensor<2304x144xi8>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 48, 0], distribution = [64, 48, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<cache_parallel = [64, 48, 0], distribution = [64, 48, 0], vector_common_parallel = [8, 4, 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @quant_model(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1744,7 +1744,7 @@ func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf3
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 //      CHECK: #[[MMT_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, 16]>
 //      CHECK: #[[MMT_MMT4D_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 16, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
-//      CHECK: #[[MMT_UNPACK_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+//      CHECK: #[[MMT_UNPACK_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [16, 16]>
 func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<640x4096x16x1xf16>) -> tensor<5x10240x16x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 0.000000e+00 : f32

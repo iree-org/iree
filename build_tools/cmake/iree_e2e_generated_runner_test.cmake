@@ -30,6 +30,7 @@
 #   TEST_DEFINED: Whether to define a test target.
 #   TEST_DISABLED: The test target will be skipped and its status will be
 #       'Not Run'.
+#   WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 #   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
 function(iree_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
@@ -44,7 +45,7 @@ function(iree_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED;TIMEOUT"
+    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED;TIMEOUT;WILL_FAIL"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -127,6 +128,8 @@ function(iree_e2e_runner_test)
         ${_RULE_LABELS}
       DISABLED
         ${_RULE_TEST_DISABLED}
+      WILL_FAIL
+        ${_RULE_WILL_FAIL}
       TIMEOUT
         ${_RULE_TIMEOUT}
     )
@@ -155,6 +158,8 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
+#   WILL_FAIL: The generated tests will run, but their pass/fail status will be
+#       inverted.
 #   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
 function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
@@ -168,7 +173,7 @@ function(iree_single_backend_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER;TIMEOUT"
+    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER;TIMEOUT;WILL_FAIL"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
@@ -317,6 +322,7 @@ function(iree_single_backend_e2e_runner_test)
       LABELS ${_RULE_LABELS}
       TEST_DEFINED ${_TEST_DEFINED}
       TEST_DISABLED ${_TEST_DISABLED}
+      WILL_FAIL ${_RULE_WILL_FAIL}
       TIMEOUT ${_RULE_TIMEOUT}
     )
     # Note we are relying on the fact that the target created by
@@ -351,6 +357,7 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        WILL_FAIL ${_RULE_WILL_FAIL}
         TIMEOUT ${_RULE_TIMEOUT}
       )
       # Note we are relying on the fact that the target created by
@@ -378,6 +385,7 @@ function(iree_single_backend_e2e_runner_test)
         LABELS ${_RULE_LABELS}
         TEST_DEFINED ${_TEST_DEFINED}
         TEST_DISABLED ${_TEST_DISABLED}
+        WILL_FAIL ${_RULE_WILL_FAIL}
         TIMEOUT ${_RULE_TIMEOUT}
       )
       # Note we are relying on the fact that the target created by
@@ -421,6 +429,8 @@ endfunction()
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 #   TEST_RUNNER: trace-runner program to run.
+#   WILL_FAIL: The generated tests will run, but their pass/fail status will be
+#       inverted.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Each
 #       entry is either "generic" for the architecture defaults, or "host" for
 #       the host CPU, or a colon-separated triple "arch:name:cpu_features" where "arch" filters
@@ -438,7 +448,7 @@ function(iree_generated_e2e_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER;TIMEOUT"
+    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER;TIMEOUT;WILL_FAIL"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -511,6 +521,8 @@ function(iree_generated_e2e_runner_test)
           ${_LABELS}
         TIMEOUT
           ${_RULE_TIMEOUT}
+        WILL_FAIL
+          ${_RULE_WILL_FAIL}
       )
     endforeach()
   endforeach()

@@ -71,3 +71,13 @@ util.func public @assume.int.multi_operand(%arg0 : index, %arg1 : i64) -> index,
   %0 = "arith.constant"() <{value = 0 : i32}> : () -> i32
   "util.return"(%0) : (i32) -> ()
 }) : () -> ()
+
+// -----
+
+util.func public @string_format_index_overflow() -> !util.buffer {
+  // A near-UINT_MAX explicit placeholder index must not wrap the argument-count
+  // check and slip past verification with too few operands.
+  // expected-error @+1 {{format string placeholder count does not match the 0 provided argument(s)}}
+  %0 = util.string.format "{4294967295}"() : () -> !util.buffer
+  util.return %0 : !util.buffer
+}

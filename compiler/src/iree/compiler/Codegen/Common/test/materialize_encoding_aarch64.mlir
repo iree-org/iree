@@ -153,7 +153,7 @@ func.func @matvec_shaped_matmul_lowering_f32f32f32_aarch64(
     %arg1: tensor<16x1xf32, #encoding_rhs>,
     %arg2: tensor<16x1xf32, #encoding_result>
 ) -> tensor<16x1xf32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features="+sve", target_triple="aarch64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<16x16xf32, #encoding_lhs>, tensor<16x1xf32, #encoding_rhs>)
                     outs(%arg2 : tensor<16x1xf32, #encoding_result>) -> tensor<16x1xf32, #encoding_result>
@@ -161,11 +161,17 @@ func.func @matvec_shaped_matmul_lowering_f32f32f32_aarch64(
 }
 
 // CHECK-LABEL: func @matvec_shaped_matmul_lowering_f32f32f32_aarch64
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<1x16x1x1xf32>
-// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x2x1x8xf32>
+// NO-SVE-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
+// NO-SVE-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<1x16x1x1xf32>
+// NO-SVE-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x2x1x8xf32>
+
+// WITH-SVE-SAME:  %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
+// WITH-SVE-SAME:  %[[RHS:[a-zA-Z0-9]+]]: tensor<?x16x?x1xf32>
+// WITH-SVE-SAME:  %[[OUT:[a-zA-Z0-9]+]]: tensor<2x?x8x?xf32>
+
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
-// CHECK-SAME:       ins(%[[RHS]], %[[LHS]]
+// NO-SVE-SAME:       ins(%[[RHS]], %[[LHS]]
+// WITH-SVE-SAME:       ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:       outs(%[[OUT]]
 // CHECK:         return %[[MMT4D]]
 
@@ -221,7 +227,7 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
 }
 //     CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //  WITH-SVE-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1] -> (s0 ceildiv s1)>
-//   CHECK-LABEL: func @matmul_lowering_f32f32f32_aarch64()
+//         CHECK: func @matmul_lowering_f32f32f32_aarch64()
 //  WITH-SVE-DAG:   %[[C8:.+]] = arith.constant 8 : index
 //     CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(0)
 //     CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load layout({{.+}}) ordinal(1)
@@ -310,7 +316,7 @@ func.func @matvec_lowering_f32f32f32_aarch64(
     %rhs: tensor<16x1xf32, #encoding_rhs>,
     %result: tensor<16x1xf32, #encoding_result>
 ) -> tensor<16x1xf32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="aarch64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features="+sve", target_triple="aarch64-xyz-xyz", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %matmul = linalg.matmul
     ins(%lhs, %rhs : tensor<16x16xf32, #encoding_lhs>, tensor<16x1xf32, #encoding_rhs>)
@@ -319,13 +325,20 @@ func.func @matvec_lowering_f32f32f32_aarch64(
   return %matmul : tensor<16x1xf32, #encoding_result>
 }
 // CHECK-LABEL: func @matvec_lowering_f32f32f32_aarch64(
-//  CHECK-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
-//  CHECK-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<1x16x1x1xf32>
-//  CHECK-SAME:     %[[OUTS:[a-zA-Z0-9]+]]: tensor<1x2x1x8xf32>
-//       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
-//  CHECK-SAME:       ins(%[[RHS]], %[[LHS]] :
-//  CHECK-SAME:       outs(%[[OUTS]] :
-//       CHECK:   return %[[MMT4D]]
+//   NO-SVE-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
+//   NO-SVE-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<1x16x1x1xf32>
+//   NO-SVE-SAME:     %[[OUT:[a-zA-Z0-9]+]]: tensor<1x2x1x8xf32>
+
+
+// WITH-SVE-SAME:     %[[LHS:[a-zA-Z0-9]+]]: tensor<2x16x8x1xf32>
+// WITH-SVE-SAME:     %[[RHS:[a-zA-Z0-9]+]]: tensor<?x16x?x1xf32>
+// WITH-SVE-SAME:     %[[OUT:[a-zA-Z0-9]+]]: tensor<2x?x8x?xf32>
+
+//          CHECK:   %[[MMT4D:.+]] = linalg.mmt4d
+//    NO-SVE-SAME:       ins(%[[RHS]], %[[LHS]] :
+//  WITH-SVE-SAME:       ins(%[[LHS]], %[[RHS]] :
+//     CHECK-SAME:       outs(%[[OUT]] :
+//          CHECK:   return %[[MMT4D]]
 
 // -----
 

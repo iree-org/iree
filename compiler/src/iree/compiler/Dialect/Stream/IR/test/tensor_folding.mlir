@@ -277,3 +277,85 @@ util.func public @NofoldTensorEncodingOpWithUnknownResultEncoding(%arg0: !stream
     -> tensor<?x?xf32, #encoding>{%arg2, %arg3} in !stream.resource<*>{%arg1}
   util.return %0 : !stream.resource<*>
 }
+
+// -----
+
+// CHECK-LABEL: @DeduplicateTensorImportSameOperand
+util.func private @DeduplicateTensorImportSameOperand(%arg0: !util.buffer, %arg1: index) -> (!stream.resource<external>, !stream.resource<external>) {
+  %c20 = arith.constant 20 : index
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK-NOT: stream.tensor.import
+  // CHECK: util.return %[[IMPORT]], %[[IMPORT]]
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  util.return %0, %1 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @NofoldTensorImportDifferentEncoding
+// Different result encoding — must keep both imports.
+util.func private @NofoldTensorImportDifferentEncoding(%arg0: !util.buffer, %arg1: index) -> (!stream.resource<external>, !stream.resource<external>) {
+  %c20 = arith.constant 20 : index
+  // CHECK: stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1}
+  // CHECK: stream.tensor.import %arg0 : !util.buffer -> tensor<1x?x5xf32>{%arg1}
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.import %arg0 : !util.buffer -> tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  util.return %0, %1 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @DeduplicateTensorImportConsume
+util.func private @DeduplicateTensorImportConsume(%arg0: !util.buffer, %arg1: index) -> (!stream.resource<external>, !stream.resource<external>) {
+  %c20 = arith.constant 20 : index
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import consume %arg0
+  // CHECK-NOT: stream.tensor.import
+  // CHECK: util.return %[[IMPORT]], %[[IMPORT]]
+  %0 = stream.tensor.import consume %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.import consume %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  util.return %0, %1 : !stream.resource<external>, !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @DeduplicateTensorExportSameOperand
+util.func private @DeduplicateTensorExportSameOperand(%arg0: !stream.resource<external>, %arg1: index) -> (!util.buffer, !util.buffer) {
+  %c20 = arith.constant 20 : index
+  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  // CHECK-NOT: stream.tensor.export
+  // CHECK: util.return %[[EXPORT]], %[[EXPORT]]
+  %0 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  %1 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !util.buffer
+  util.return %0, %1 : !util.buffer, !util.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @NofoldTensorExportDifferentSize
+// Different source size value — must keep both exports.
+util.func private @NofoldTensorExportDifferentSize(%arg0: !stream.resource<external>, %arg1: index, %arg2: index) -> (!util.buffer, !util.buffer) {
+  // CHECK-COUNT-2: stream.tensor.export
+  %0 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%arg1} -> !util.buffer
+  %1 = stream.tensor.export %arg0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%arg2} -> !util.buffer
+  util.return %0, %1 : !util.buffer, !util.buffer
+}
+
+// -----
+// CHECK-LABEL: @DeduplicateTensorImportWithIntermediateOp
+// Intermediate operations should not prevent deduplication.
+util.func private @DeduplicateTensorImportWithIntermediateOp(%arg0: !util.buffer, %arg1: index)-> (!stream.resource<external>, !stream.resource<external>, index) {
+
+  %c20 = arith.constant 20 : index
+  %c0 = arith.constant 10 : index
+
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0
+  // CHECK: %[[SUM:.+]] = arith.addi
+  // CHECK-NOT: stream.tensor.import
+  // CHECK: util.return %[[IMPORT]], %[[IMPORT]], %[[SUM]]
+
+  %0 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = arith.addi %c0, %arg1 : index
+  %3 = stream.tensor.import %arg0 : !util.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  util.return %0, %3, %1 : !stream.resource<external>, !stream.resource<external>, index
+}

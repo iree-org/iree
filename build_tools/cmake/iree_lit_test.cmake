@@ -18,6 +18,7 @@
 #   called in the RUN line)
 # LABELS: Additional labels to apply to the test. Package path and
 #     "test-type=lit-test" labels are added automatically.
+# WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 function(iree_lit_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -25,7 +26,7 @@ function(iree_lit_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_FILE"
+    "NAME;TEST_FILE;WILL_FAIL"
     "DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
@@ -80,6 +81,9 @@ function(iree_lit_test)
     "LIT_OPTS=string_prepend:-v "
     "FILECHECK_OPTS=string_prepend:--enable-var-scope ")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  if(_RULE_WILL_FAIL)
+    set_property(TEST ${_NAME_PATH} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
+  endif()
   iree_configure_test(${_NAME_PATH})
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
@@ -99,6 +103,8 @@ endfunction()
 # DATA: Additional data dependencies used by the test
 # LABELS: Additional labels to apply to the generated tests. The package path is
 #     added automatically.
+# WILL_FAIL: The generated tests will run, but their pass/fail status will be
+#     inverted.
 function(iree_lit_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -111,7 +117,7 @@ function(iree_lit_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "NAME;WILL_FAIL"
     "SRCS;DATA;TOOLS;LABELS;TIMEOUT"
     ${ARGN}
   )
@@ -133,6 +139,8 @@ function(iree_lit_test_suite)
         "${_RULE_TOOLS}"
       LABELS
         "${_RULE_LABELS}"
+      WILL_FAIL
+        ${_RULE_WILL_FAIL}
       TIMEOUT
         ${_RULE_TIMEOUT}
     )

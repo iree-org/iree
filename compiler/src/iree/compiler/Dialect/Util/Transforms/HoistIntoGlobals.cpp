@@ -37,6 +37,16 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
+// Returns true if |op| is a flow dispatch region/workgroups op, i.e. a region
+// that is later outlined into an isolated executable module.
+// The dialect/op names are checked by string since Flow depends on Util
+// and we don't want to create a circular dependency.
+static bool isDispatchContainer(Operation *op) {
+  StringRef opName = op->getName().getStringRef();
+  return opName == "flow.dispatch.region" ||
+         opName == "flow.dispatch.workgroups";
+}
+
 static std::string getHoistedName(Type type) {
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -119,26 +129,33 @@ public:
 
       auto walkRes = funcOp.walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
         // We only want to look at const-expr ops (non roots) since they may
-        // have interesting escapes. Early exit here for efficiency.
+        // have interesting escapes. Non const-expr ops are ignored here, but
+        // we still fall through to the dispatch check below so that we stop
+        // descending into dispatch bodies even when the dispatch op itself is
+        // not a const-expr.
         auto *iterInfo = constExprs.lookup(iterOp);
-        if (!iterInfo) {
-          return WalkResult::advance();
+        if (iterInfo) {
+          // Record operation order for deterministic sorting. Since we walk in
+          // PreOrder, producers are visited before their users.
+          opOrder[iterOp] = orderIdx++;
+          for (Value constExprResult : iterOp->getResults()) {
+            auto *resultInfo = constExprs.lookup(constExprResult);
+            assert(resultInfo && "must have const-expr info");
+            if (policy.getDecision(resultInfo)->getOutcome() !=
+                ConstExprHoistingPolicy::ENABLE_HOIST) {
+              continue;
+            }
+            if (failed(hoistConstExpr(constExprResult, hoistedMap,
+                                      moduleSymbols, constExprs, opOrder))) {
+              return WalkResult::interrupt();
+            }
+          }
         }
 
-        // Record operation order for deterministic sorting. Since we walk in
-        // PreOrder, producers are visited before their users.
-        opOrder[iterOp] = orderIdx++;
-        for (Value constExprResult : iterOp->getResults()) {
-          auto *resultInfo = constExprs.lookup(constExprResult);
-          assert(resultInfo && "must have const-expr info");
-          if (policy.getDecision(resultInfo)->getOutcome() !=
-              ConstExprHoistingPolicy::ENABLE_HOIST) {
-            continue;
-          }
-          if (failed(hoistConstExpr(constExprResult, hoistedMap, moduleSymbols,
-                                    constExprs, opOrder))) {
-            return WalkResult::interrupt();
-          }
+        // FIXME: this is a temporary workaround for issue #24671
+        // Never hoist values defined inside a dispatch region
+        if (isDispatchContainer(iterOp)) {
+          return WalkResult::skip();
         }
         return WalkResult::advance();
       });

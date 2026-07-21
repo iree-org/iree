@@ -616,8 +616,8 @@ func.func @softmax_dynamic_with_assume_int_hints() attributes {hal.executable.ta
 
 // -----
 
-// Verify that stack buffer is not created in accumulating GEMMs dispatches;
-// it direct writes the result into the destination buffer.
+// Verify that accumulating GEMM dispatches write the result directly into the
+// destination buffer.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
@@ -648,7 +648,13 @@ func.func @matmul_accumulate_from_readonly() attributes {hal.executable.target =
   return
 }
 // CHECK-LABEL: func.func @matmul_accumulate_from_readonly(
-// CHECK-NOT:     memref.alloc
+// Register-blocked peeling emits small fixed-size stack buffers.
+// The memref.alloc and linalg.generic guards are repeated on both
+// sides of the alloca check so they cover the whole function.
+// CHECK-NOT:     memref.alloc(
+// CHECK-NOT:     linalg.generic
+// CHECK:         memref.alloca(
+// CHECK-NOT:     memref.alloc(
 // CHECK-NOT:     linalg.generic
 
 // -----

@@ -24,6 +24,7 @@
 # GROUP: Optional test group to add the target to.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 # RESOURCE_GROUP: If set, tests sharing the same RESOURCE_GROUP name will not
 #     run concurrently under CTest. Maps to CTest's RESOURCE_LOCK property.
 #     Use for tests that compete for shared system resources (e.g.,
@@ -62,7 +63,7 @@ function(iree_cc_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;RESOURCE_GROUP"
+    "NAME;RESOURCE_GROUP;WILL_FAIL"
     "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS;GROUP;TIMEOUT"
     ${ARGN}
   )
@@ -247,6 +248,9 @@ function(iree_cc_test)
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  if(_RULE_WILL_FAIL)
+    set_property(TEST ${_NAME_PATH} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
+  endif()
 
   if(_RULE_RESOURCE_GROUP)
     set_property(TEST ${_NAME_PATH} PROPERTY RESOURCE_LOCK "${_RULE_RESOURCE_GROUP}")

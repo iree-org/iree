@@ -2918,8 +2918,13 @@ parseFormatString(StringRef format, unsigned argCount) {
     return failure();
   }
 
-  unsigned expectedArgCount =
-      hasAnyArg ? (hasExplicit ? (maxArgIndex + 1) : nextSequentialIndex) : 0;
+  // Compute in 64-bit: an explicit placeholder can be as large as UINT_MAX, so
+  // `maxArgIndex + 1` would wrap to 0 in 32-bit and spuriously match an empty
+  // argument list, wrongly accepting an out-of-range placeholder.
+  uint64_t expectedArgCount =
+      hasAnyArg ? (hasExplicit ? (static_cast<uint64_t>(maxArgIndex) + 1)
+                               : nextSequentialIndex)
+                : 0;
   if (expectedArgCount != argCount) {
     return failure();
   }
