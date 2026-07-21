@@ -746,3 +746,61 @@ func.func @conv3d_unsupported_identity(
 // CHECK-SAME:      outs(%[[OUT]] : tensor<1x14x14x14x8xf32>)
 // CHECK-NOT:     linalg.unpack
 // CHECK:         return %[[CONV]]
+
+// -----
+
+// Dilated 2D conv
+
+#map_d_in  = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4 * 2, d2 + d5 * 2, d6)>
+#map_d_flt = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map_d_out = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+#encoding_d_in = #iree_encoding.encoding<operand_index = 0, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_d_in, #map_d_flt, #map_d_out],
+  iteration_sizes = [1, 12, 12, 8, 3, 3, 4]>
+#encoding_d_flt = #iree_encoding.encoding<operand_index = 1, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_d_in, #map_d_flt, #map_d_out],
+  iteration_sizes = [1, 12, 12, 8, 3, 3, 4]>
+#encoding_d_out = #iree_encoding.encoding<operand_index = 2, op_type = conv,
+  element_types = [f32, f32, f32],
+  user_indexing_maps = [#map_d_in, #map_d_flt, #map_d_out],
+  iteration_sizes = [1, 12, 12, 8, 3, 3, 4]>
+func.func @conv2d_dilated_unsupported_identity(
+    %in  : tensor<1x16x16x4xf32>,
+    %flt : tensor<3x3x4x8xf32>,
+    %out : tensor<1x12x12x8xf32>)
+    -> tensor<1x12x12x8xf32>
+    attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz",
+      {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f",
+       iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %e_in  = iree_encoding.set_encoding %in
+      : tensor<1x16x16x4xf32> -> tensor<1x16x16x4xf32, #encoding_d_in>
+  %e_flt = iree_encoding.set_encoding %flt
+      : tensor<3x3x4x8xf32> -> tensor<3x3x4x8xf32, #encoding_d_flt>
+  %e_out = iree_encoding.set_encoding %out
+      : tensor<1x12x12x8xf32> -> tensor<1x12x12x8xf32, #encoding_d_out>
+  %0 = linalg.conv_2d_nhwc_hwcf
+         {dilations = dense<2> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+         ins(%e_in, %e_flt
+           : tensor<1x16x16x4xf32, #encoding_d_in>, tensor<3x3x4x8xf32, #encoding_d_flt>)
+         outs(%e_out : tensor<1x12x12x8xf32, #encoding_d_out>)
+         -> tensor<1x12x12x8xf32, #encoding_d_out>
+  %1 = iree_encoding.unset_encoding %0
+      : tensor<1x12x12x8xf32, #encoding_d_out> -> tensor<1x12x12x8xf32>
+  return %1 : tensor<1x12x12x8xf32>
+}
+// CHECK-LABEL: func.func @conv2d_dilated_unsupported_identity
+// CHECK-SAME:    %[[IN:[a-zA-Z0-9]+]]: tensor<1x16x16x4xf32>
+// CHECK-SAME:    %[[FLT:[a-zA-Z0-9]+]]: tensor<3x3x4x8xf32>
+// CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]: tensor<1x12x12x8xf32>
+// CHECK-NOT:     linalg.pack
+// CHECK-NOT:     iree_encoding
+// CHECK:         %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:      {dilations = dense<2> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+// CHECK-SAME:      ins(%[[IN]], %[[FLT]] : tensor<1x16x16x4xf32>, tensor<3x3x4x8xf32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<1x12x12x8xf32>)
+// CHECK-NOT:     linalg.unpack
+// CHECK:         return %[[CONV]]
