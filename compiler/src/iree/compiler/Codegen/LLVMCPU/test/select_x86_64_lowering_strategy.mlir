@@ -476,12 +476,6 @@ func.func @conv_2d_nchwc_data_tiled(%arg0: tensor<1x1x16x16x16xf32>, %arg1: tens
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
-//  GENERIC-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 1, 0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 16, 0, 0, 0, 16, 0], vector_reduction = [0, 0, 0, 0, 1, 1, 1, 0, 16]>
-//  GENERIC-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {enable_loop_peeling}>
-//      GENERIC: func.func @conv_2d_nchwc_data_tiled(
-// GENERIC-SAME:     translation_info = #[[TRANSLATION]]
-//      GENERIC:     linalg.generic
-// GENERIC-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 

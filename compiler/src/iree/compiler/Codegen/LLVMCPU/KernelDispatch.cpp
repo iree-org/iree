@@ -3207,10 +3207,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
         is2DPoolingOp(linalgOp)) {
       return setConvInterfaceRootConfig(entryPointFn, linalgOp);
     }
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-      if (IREE::Codegen::isDataTiledConvGeneric(genericOp)) {
-        return setConvDataTiledGenericRootConfig(entryPointFn, genericOp);
-      }
+    if (IREE::Codegen::isDataTiledConvGeneric(op)) {
+      return setConvDataTiledGenericRootConfig(entryPointFn,
+                                               cast<linalg::GenericOp>(op));
     }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {

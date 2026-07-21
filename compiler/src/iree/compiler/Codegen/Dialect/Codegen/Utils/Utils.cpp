@@ -696,7 +696,11 @@ getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
 /// materialization, identified by its iterator types [P,P,P,P, R,R,R, P,R],
 /// operand ranks (input 5, filter 6, output 5), indexing maps, and
 /// multiply-accumulate body.
-bool isDataTiledConvGeneric(linalg::GenericOp genericOp) {
+bool isDataTiledConvGeneric(Operation *op) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) {
+    return false;
+  }
   using IT = utils::IteratorType;
   SmallVector<IT> iterTypes = genericOp.getIteratorTypesArray();
   SmallVector<IT> expected = {IT::parallel,  IT::parallel,  IT::parallel,
