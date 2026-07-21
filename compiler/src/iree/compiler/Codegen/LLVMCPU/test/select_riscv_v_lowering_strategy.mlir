@@ -181,7 +181,7 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x7x1xf16>, %arg1: tenso
 }
 // CHECK-DAG:   #[[$CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 7, [8]]>
 // CHECK-DAG:   #[[$CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [5, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 7, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
-// CHECK-DAG:   #[[$CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+// CHECK-DAG:   #[[$CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [7, [8]]>
 // CHECK-LABEL: func.func @mmt4d_generic_unpack_pack(
 // CHECK:         linalg.fill
 // CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
