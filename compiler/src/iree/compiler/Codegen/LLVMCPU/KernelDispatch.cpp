@@ -3213,8 +3213,8 @@ undoScaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
 ///    sizes.
 template <typename PackUnpackType>
 static void undoPermutationAndScaleTileSizes(PackUnpackType op,
-                                        SmallVector<int64_t> &tileSizes,
-                                        SmallVector<bool> &scalableFlags) {
+                                             SmallVector<int64_t> &tileSizes,
+                                             SmallVector<bool> &scalableFlags) {
   SmallVector<int64_t> innerTiles(op.getStaticInnerTiles());
   SmallVector<bool> innerTileScalableFlags(innerTiles.size(), false);
   // Infer scalable tile sizes and flags if present.
@@ -3252,7 +3252,8 @@ static void undoPermutationAndScaleTileSizes(PackUnpackType op,
 static void scaleAndPermutateTilingForPackOp(linalg::PackOp packOp,
                                              SmallVector<int64_t> &tileSizes,
                                              SmallVector<bool> &scalableFlags) {
-  undoPermutationAndScaleTileSizes<linalg::PackOp>(packOp, tileSizes, scalableFlags);
+  undoPermutationAndScaleTileSizes<linalg::PackOp>(packOp, tileSizes,
+                                                   scalableFlags);
 }
 
 /// Transforms tiling sizes from the packed domain back to the unpacked
@@ -3263,7 +3264,7 @@ undoScaleAndPermutateTilingForUnpackOp(linalg::UnPackOp unpackOp,
                                        SmallVector<int64_t> &tileSizes,
                                        SmallVector<bool> &scalableFlags) {
   undoPermutationAndScaleTileSizes<linalg::UnPackOp>(unpackOp, tileSizes,
-                                                scalableFlags);
+                                                     scalableFlags);
 }
 
 /// A helper class that propagates and sets lowering configurations for multiple
