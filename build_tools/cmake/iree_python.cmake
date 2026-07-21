@@ -72,6 +72,7 @@ endfunction()
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
 # PACKAGE_DIRS: Python package paths to be added to PYTHONPATH.
@@ -83,7 +84,7 @@ function(iree_local_py_test)
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME;SRC"
+    "NAME;SRC;WILL_FAIL"
     "ARGS;LABELS;PACKAGE_DIRS;TIMEOUT"
     ${ARGN}
   )
@@ -115,6 +116,9 @@ function(iree_local_py_test)
 
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_TIMEOUT})
+  if(_RULE_WILL_FAIL)
+    set_property(TEST ${_NAME_PATH} PROPERTY WILL_FAIL ${_RULE_WILL_FAIL})
+  endif()
 
   # Extend the PYTHONPATH environment variable with _RULE_PACKAGE_DIRS.
   list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
@@ -145,13 +149,14 @@ endfunction()
 # ARGS: Command line arguments to the Python source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
+# WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
 function(iree_py_test)
   cmake_parse_arguments(
     _RULE
     "GENERATED_IN_BINARY_DIR"
-    "NAME;SRCS"
+    "NAME;SRCS;WILL_FAIL"
     "ARGS;LABELS;TIMEOUT"
     ${ARGN}
   )
@@ -168,6 +173,8 @@ function(iree_py_test)
       ${_RULE_ARGS}
     LABELS
       ${_RULE_LABELS}
+    WILL_FAIL
+      ${_RULE_WILL_FAIL}
     PACKAGE_DIRS
       "${IREE_BINARY_DIR}/compiler/bindings/python"
       "${IREE_BINARY_DIR}/runtime/bindings/python"
