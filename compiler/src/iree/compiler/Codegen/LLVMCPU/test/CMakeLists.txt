@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "select_aarch64_sve_lowering_strategy.mlir"
     "select_aarch64_sve_lowering_strategy_peeling.mlir"
     "select_riscv_lowering_strategy.mlir"
+    "select_riscv_v_lowering_strategy.mlir"
     "select_x86_64_lowering_strategy.mlir"
     "split_reduction.mlir"
     "synchronize_symbol_visibility.mlir"
