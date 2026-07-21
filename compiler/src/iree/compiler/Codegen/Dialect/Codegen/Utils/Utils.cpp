@@ -542,7 +542,6 @@ getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
   }
 
   // Data tiling requires both input and output channel dimensions.
-  // Returning failure causes the caller to select identity layout.
   if (cDims->inputChannel.empty() || cDims->outputChannel.empty()) {
     return failure();
   }
