@@ -206,6 +206,24 @@ util.func private @NofoldTensorCloneOp(%arg0: !stream.resource<external>, %arg1:
 
 // -----
 
+// CHECK-LABEL: @FoldTensorCloneIntoLoad
+util.func private @FoldTensorCloneIntoLoad(%arg0: !stream.resource<external>, %arg1: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: stream.tensor.clone
+  %0 = stream.tensor.clone %arg0 : tensor<4x4xf32> in !stream.resource<external>{%arg1} -> tensor<4x4xf32> in !stream.resource<*>{%arg1}
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%arg1} -> !stream.resource<staging>{%arg1}
+  // CHECK: %[[SLICE:.+]] = stream.tensor.slice %arg0[%c0, %c1 for %c1, %c1] : tensor<4x4xf32> in !stream.resource<external>{%arg1} -> tensor<1x1xf32> in !stream.resource<external>{%c4}
+  // CHECK: %[[STAGED:.+]] = stream.async.transfer %[[SLICE]] : !stream.resource<external>{%c4} -> !stream.resource<staging>{%c4}
+  // CHECK: %[[VALUE:.+]] = stream.tensor.load %[[STAGED]][%c0, %c0] : tensor<1x1xf32> in !stream.resource<staging>{%c4} -> f32
+  %2 = stream.tensor.load %1[%c0, %c1] : tensor<4x4xf32> in !stream.resource<staging>{%arg1} -> f32
+  // CHECK: util.return %[[VALUE]]
+  util.return %2 : f32
+}
+
+
+// -----
+
 // CHECK-LABEL: @ElideUnneededTensorClones
 util.func private @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index

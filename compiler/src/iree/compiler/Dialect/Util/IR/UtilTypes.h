@@ -337,6 +337,13 @@ static inline unsigned getTypeBitWidth(Type type) {
   return type.getIntOrFloatBitWidth();
 }
 
+// Returns the number of bytes required to hold a scalar or vector type when
+// addressed as a contiguous raw byte range. Bit widths that are not divisible
+// by eight are rounded up to the next byte.
+static inline int64_t getTypeByteSize(Type type) {
+  return align(getTypeBitWidth(type), 8u) / 8;
+}
+
 // HACK: we currently have no way to specify packing on types and as such have
 // to guess (poorly) what physical storage for each type looks like. The
 // heuristic for non-power-of-two bit width types is to take the next
