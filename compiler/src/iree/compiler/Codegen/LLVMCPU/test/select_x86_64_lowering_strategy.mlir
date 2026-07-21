@@ -1744,7 +1744,7 @@ func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf3
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 //      CHECK: #[[MMT_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, 16]>
 //      CHECK: #[[MMT_MMT4D_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 16, 16, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
-//      CHECK: #[[MMT_UNPACK_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+//      CHECK: #[[MMT_UNPACK_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [16, 16]>
 func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<640x4096x16x1xf16>) -> tensor<5x10240x16x1xf16> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64} {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 0.000000e+00 : f32
