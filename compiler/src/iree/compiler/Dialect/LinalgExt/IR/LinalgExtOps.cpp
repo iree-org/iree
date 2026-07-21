@@ -3311,6 +3311,39 @@ SmallVector<AffineMap> CustomOp::getIndexingMapsForResults() {
       [](Attribute attr) { return cast<AffineMapAttr>(attr).getValue(); });
 }
 
+SmallVector<int64_t> CustomOp::getStaticLoopRanges() {
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  SmallVector<int64_t> loopRanges(getNumLoops(), ShapedType::kDynamic);
+  SmallVector<bool> conflictingRanges(getNumLoops(), false);
+
+  for (auto [operand, map] :
+       llvm::zip_equal(getOperation()->getOpOperands(), maps)) {
+    if (map.isEmpty()) {
+      continue;
+    }
+
+    for (auto [size, expr] :
+         llvm::zip_equal(getShape(&operand), map.getResults())) {
+      auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+      if (!dimExpr || ShapedType::isDynamic(size)) {
+        continue;
+      }
+
+      unsigned position = dimExpr.getPosition();
+      if (conflictingRanges[position]) {
+        continue;
+      }
+      if (ShapedType::isDynamic(loopRanges[position])) {
+        loopRanges[position] = size;
+      } else if (loopRanges[position] != size) {
+        loopRanges[position] = ShapedType::kDynamic;
+        conflictingRanges[position] = true;
+      }
+    }
+  }
+  return loopRanges;
+}
+
 /// End `LinalgFusionInterface` implementation
 
 /// Start `ReifyRankedShapedTypeOpInterface` implementation

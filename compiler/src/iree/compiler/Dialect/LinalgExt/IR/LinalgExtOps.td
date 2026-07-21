@@ -1994,7 +1994,7 @@ def IREELinalgExt_CustomOp : IREELinalgExt_Op<"custom_op", [
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<AggregatedOpInterface, [
     "decomposeOperation"]>,
-  DeclareOpInterfaceMethods<LinalgFusionInterface>,
+  DeclareOpInterfaceMethods<LinalgFusionInterface, ["getStaticLoopRanges"]>,
   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
   DeclareOpInterfaceMethods<TilingInterface,
     ["getIterationDomain",
