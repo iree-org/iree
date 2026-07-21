@@ -301,11 +301,8 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (targetAttr && isAArch64(targetAttr.getConfiguration())) {
-    // Masking requires either SVE or SME with streaming mode forced.
     if (isScalableVectorizationEnabled() &&
-        (hasAnySVEFeature(targetAttr.getConfiguration()) ||
-         (hasSMEFeature(targetAttr.getConfiguration()) &&
-          isArmStreamingForced()))) {
+        hasAnySVEFeature(targetAttr.getConfiguration())) {
       return VectorPreProcStrategy::Masking;
     }
 
