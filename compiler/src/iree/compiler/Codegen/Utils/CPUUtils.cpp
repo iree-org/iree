@@ -27,6 +27,19 @@ static llvm::cl::opt<bool> clEnableScalableVectorization(
                    "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
     llvm::cl::init(false));
 
+// By default, IREE does not enable the Armv9-A streaming SVE mode in the
+// presence of scalable vectors (even when using `+sme`), as currently there's
+// no cost model of when it could be beneficial. This flag will effectively make
+// IREE/LLVM switch from SVE to SSVE in dispatch regions with supported
+// scalable vector operations.
+static llvm::cl::opt<bool> clForceArmStreaming(
+    "iree-llvmcpu-force-arm-streaming",
+    llvm::cl::desc(
+        "Enables Armv9-A streaming SVE mode for any dispatch region that "
+        "contains supported scalable vector operations (i.e., use SSVE rather "
+        "than SVE). Requires the +sme feature flag."),
+    llvm::cl::init(false), llvm::cl::Hidden);
+
 static llvm::cl::opt<int> clVscaleFromUser(
     "iree-experimental-vscale-value",
     llvm::cl::desc(
@@ -111,6 +124,8 @@ bool isOptEnabled(FunctionOpInterface funcOp, StringRef label) {
 }
 
 bool isScalableVectorizationEnabled() { return clEnableScalableVectorization; }
+
+bool isArmStreamingForced() { return clForceArmStreaming; }
 
 unsigned getUserVscaleValue() {
   assert(clVscaleFromUser >= 1 && "Currently, vscale needs to be specified by "

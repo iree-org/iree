@@ -150,11 +150,6 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      bool enableAArch64SME = false,
                                      bool includeLLVMLowering = true);
 
-/// Returns whether Armv9-A streaming SVE mode is forced for dispatch regions
-/// containing scalable vector operations, via
-/// `--iree-llvmcpu-force-arm-streaming`.
-bool isArmStreamingForced();
-
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines
 //----------------------------------------------------------------------------//

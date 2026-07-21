@@ -14,7 +14,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUSelectUKernels.h"
-#include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
