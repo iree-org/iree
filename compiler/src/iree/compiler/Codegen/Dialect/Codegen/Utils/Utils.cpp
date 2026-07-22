@@ -10,7 +10,11 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -524,6 +528,166 @@ getEncodingInfoForMatmul(Encoding::EncodingAttr encoding,
     encodingInfo.innerTileSizes.push_back(tileMxNxKxKb.KB);
   }
   return encodingInfo;
+}
+
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile) {
+  int64_t operandIdx = encoding.getOperandIndex().getInt();
+  SmallVector<AffineMap> maps = encoding.getRootMaps();
+
+  FailureOr<linalg::ConvolutionDimensions> cDims =
+      linalg::inferConvolutionDims(maps);
+  if (failed(cDims)) {
+    return failure();
+  }
+
+  // Data tiling requires both input and output channel dimensions.
+  if (cDims->inputChannel.empty() || cDims->outputChannel.empty()) {
+    return failure();
+  }
+
+  // Grouped/depthwise convolutions are not supported. A depth dimension
+  // appears as a bare dim in the input map and would be misclassified as
+  // an output image dimension by the position inference below.
+  if (!cDims->depth.empty()) {
+    return failure();
+  }
+
+  // Map classified loop dims to tensor positions for this operand.
+  //
+  // A loop dimension can be mapped to a tensor position only if it appears
+  // as a bare dimension in the operand's indexing map. Dimensions that occur
+  // only inside a compound affine expression have no single tensor position
+  // and cannot be recovered this way.
+  //
+  // For example: linalg.conv_2d_nhwc_hwcf has input indexing map
+  //   (n, oh + fh, ow + fw, ic)
+  // where the loop dimensions are
+  //   (n, oh, ow, oc, fh, fw, ic) = (0, 1, 2, 3, 4, 5, 6).
+  // Only n and ic appear as bare dimensions, at tensor positions 0 and 3.
+  // The outputImage dimensions (oh, ow) appear only in compound expressions, so
+  // they cannot be recovered here.
+  auto collectBarePositions =
+      [&encoding](ArrayRef<unsigned> loopDims) -> SmallVector<int64_t> {
+    SmallVector<int64_t> positions;
+    for (unsigned d : loopDims) {
+      if (auto pos = encoding.mapDimToOperandIndex(d)) {
+        positions.push_back(static_cast<int64_t>(*pos));
+      }
+    }
+    return positions;
+  };
+
+  // For the input operand, recover the outputImage tensor positions.
+  //
+  // From the example above, the known positions are {0, 3}, so the remaining
+  // tensor positions {1, 2} correspond to the outputImage dimensions.
+  auto collectRemainingPositions =
+      [](int64_t rank,
+         ArrayRef<int64_t> knownPositions) -> SmallVector<int64_t> {
+    llvm::SmallDenseSet<int64_t> known(knownPositions.begin(),
+                                       knownPositions.end());
+    SmallVector<int64_t> remaining;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (!known.contains(i)) {
+        remaining.push_back(i);
+      }
+    }
+    return remaining;
+  };
+
+  SmallVector<int64_t> batchPos = collectBarePositions(cDims->batch);
+  SmallVector<int64_t> ocPos = collectBarePositions(cDims->outputChannel);
+  SmallVector<int64_t> flPos = collectBarePositions(cDims->filterLoop);
+  SmallVector<int64_t> icPos = collectBarePositions(cDims->inputChannel);
+
+  MaterializeEncodingInfo info;
+
+  if (operandIdx == Encoding::CONV_IN) {
+    if (icPos.empty()) {
+      return failure();
+    }
+    int64_t rank = maps[operandIdx].getNumResults();
+    SmallVector<int64_t> knownInputPos;
+    knownInputPos.append(batchPos);
+    knownInputPos.append(icPos);
+    SmallVector<int64_t> outputImagePosInInput =
+        collectRemainingPositions(rank, knownInputPos);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(icPos);
+    canonicalOrder.append(outputImagePosInInput);
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {icPos[0]};
+    info.innerTileSizes = {tile.IC};
+  } else if (operandIdx == Encoding::CONV_FILTER) {
+    if (ocPos.empty() || icPos.empty()) {
+      return failure();
+    }
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(ocPos);
+    canonicalOrder.append(icPos);
+    canonicalOrder.append(flPos);
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {icPos[0], ocPos[0]};
+    info.innerTileSizes = {tile.IC, tile.OC};
+  } else if (operandIdx == Encoding::CONV_OUT) {
+    if (ocPos.empty()) {
+      return failure();
+    }
+    SmallVector<int64_t> outputImagePosInOutput =
+        collectBarePositions(cDims->outputImage);
+
+    SmallVector<int64_t> canonicalOrder;
+    canonicalOrder.append(batchPos);
+    canonicalOrder.append(ocPos);
+    canonicalOrder.append(outputImagePosInOutput);
+
+    info.outerDimsPerm = canonicalOrder;
+    info.innerDimsPos = {ocPos[0]};
+    info.innerTileSizes = {tile.OC};
+  } else {
+    return failure();
+  }
+
+  return info;
+}
+
+DataTiledConvIterationSpace
+getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
+                               ArrayRef<int64_t> dilations) {
+  assert(strides.size() == 2 && dilations.size() == 2 &&
+         "expected 2D convolution strides/dilations");
+  AffineExpr e0, e1, e2, e3, e4, e5, e6, e7, e8;
+  bindDims(ctx, e0, e1, e2, e3, e4, e5, e6, e7, e8);
+
+  DataTiledConvIterationSpace space;
+  space.indexingMaps = {
+      // input: [N, IC/c0, H, W, c0]
+      AffineMap::get(9, 0,
+                     {e0, e4, e2 * strides[0] + e5 * dilations[0],
+                      e3 * strides[1] + e6 * dilations[1], e8},
+                     ctx),
+      // filter: [OC/k0, IC/c0, FH, FW, c0, k0]
+      AffineMap::get(9, 0, {e1, e4, e5, e6, e8, e7}, ctx),
+      // output: [N, OC/k0, OH, OW, k0]
+      AffineMap::get(9, 0, {e0, e1, e2, e3, e7}, ctx),
+  };
+  space.iteratorTypes = {
+      utils::IteratorType::parallel,  // d0 = n
+      utils::IteratorType::parallel,  // d1 = oc_outer
+      utils::IteratorType::parallel,  // d2 = oh
+      utils::IteratorType::parallel,  // d3 = ow
+      utils::IteratorType::reduction, // d4 = ic_outer
+      utils::IteratorType::reduction, // d5 = fh
+      utils::IteratorType::reduction, // d6 = fw
+      utils::IteratorType::parallel,  // d7 = oc_inner (k0)
+      utils::IteratorType::reduction, // d8 = ic_inner (c0)
+  };
+  return space;
 }
 
 } // namespace mlir::iree_compiler::IREE::Codegen
