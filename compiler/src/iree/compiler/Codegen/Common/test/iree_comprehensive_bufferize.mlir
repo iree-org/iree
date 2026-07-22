@@ -3154,3 +3154,116 @@ module attributes {hal.executable.target = #executable_target_rocm} {
 // CHECK-LABEL: func.func @constant_to_buffer_rocm
 // CHECK:         %[[CST:.+]] = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
 // CHECK:         bufferization.to_buffer %[[CST]] {{.*}} : tensor<4xi32> to memref<4xi32, #gpu.address_space<constant>>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @cast_to_ragged_shape_static() -> tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>> {
+  %c0 = arith.constant 0 : index
+  %source_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x20x30xf32>>
+  %column_lengths_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xindex>>
+  %source = iree_tensor_ext.dispatch.tensor.load %source_binding, offsets=[0, 0, 0], sizes=[10, 20, 30], strides=[1, 1, 1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<10x20x30xf32>> -> tensor<10x20x30xf32>
+  %column_lengths = iree_tensor_ext.dispatch.tensor.load %column_lengths_binding, offsets=[0], sizes=[4], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xindex>> -> tensor<4xindex>
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%column_lengths)
+      : (tensor<10x20x30xf32>, tensor<4xindex>)
+      -> tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>
+  return %0 : tensor<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>
+}
+
+// CHECK-LABEL: func.func @cast_to_ragged_shape_static()
+//       CHECK:   %[[SOURCE:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+//  CHECK-SAME:       : memref<10x20x30xf32, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[COLUMN_LENGTHS:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+//  CHECK-SAME:       : memref<4xindex, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[RAGGED:.+]] = iree_tensor_ext.cast_to_ragged_shape %[[SOURCE]]
+//  CHECK-SAME:       ragged_dim(1) column_lengths(%[[COLUMN_LENGTHS]])
+//  CHECK-SAME:       -> memref<10x3x?x30xf32, #iree_tensor_ext.ragged_shape<1>>
+//       CHECK:   %[[RAGGED_TENSOR:.+]] = bufferization.to_tensor %[[RAGGED]]
+//       CHECK:   return %[[RAGGED_TENSOR]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @cast_to_ragged_shape_dynamic(%num_ragged_rows : index, %d0 : index, %d1 : index, %d2 : index)
+    -> tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_shape<1>> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %source_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%d0, %d1, %d2}
+  %num_ragged_rows_p1 = arith.addi %num_ragged_rows, %c1 : index
+  %column_lengths_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xindex>>{%num_ragged_rows_p1}
+  %source = iree_tensor_ext.dispatch.tensor.load %source_binding, offsets=[0, 0, 0], sizes=[%d0, %d1, %d2], strides=[1, 1, 1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%d0, %d1, %d2} -> tensor<?x?x?xf32>
+  %column_lengths = iree_tensor_ext.dispatch.tensor.load %column_lengths_binding, offsets=[0], sizes=[%num_ragged_rows_p1], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xindex>>{%num_ragged_rows_p1} -> tensor<?xindex>
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%column_lengths)
+      num_ragged_rows(%num_ragged_rows)
+      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<?xindex>)
+      -> tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+  return %0 : tensor<?x?x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+}
+
+// CHECK-LABEL: func.func @cast_to_ragged_shape_dynamic(
+//  CHECK-SAME:     %[[NUM_RAGGED_ROWS:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:     %[[D0:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:     %[[D1:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:     %[[D2:[A-Za-z0-9]+]]: index
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[SOURCE:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+//  CHECK-SAME:       : memref<?x?x?xf32, #hal.descriptor_type<storage_buffer>>{%[[D0]], %[[D1]], %[[D2]]}
+//       CHECK:   %[[NUM_RAGGED_ROWS_P1:.+]] = arith.addi %[[NUM_RAGGED_ROWS]], %[[C1]] : index
+//       CHECK:   %[[COLUMN_LENGTHS:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+//  CHECK-SAME:       : memref<?xindex, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   %[[RAGGED:.+]] = iree_tensor_ext.cast_to_ragged_shape %[[SOURCE]]
+//  CHECK-SAME:       ragged_dim(1) column_lengths(%[[COLUMN_LENGTHS]])
+//  CHECK-SAME:       -> memref<?x?x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+//       CHECK:   %[[RAGGED_TENSOR:.+]] = bufferization.to_tensor %[[RAGGED]]
+//       CHECK:   return %[[RAGGED_TENSOR]]
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @cast_to_ragged_shape_bufferize(
+    %d0 : index, %d1 : index, %d2 : index) -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %source_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%d0, %d1, %d2}
+  %column_lengths_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0)
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xindex>>
+  %source = iree_tensor_ext.dispatch.tensor.load %source_binding, offsets=[0, 0, 0], sizes=[%d0, %d1, %d2], strides=[1, 1, 1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>{%d0, %d1, %d2} -> tensor<?x?x?xf32>
+  %column_lengths = iree_tensor_ext.dispatch.tensor.load %column_lengths_binding, offsets=[0], sizes=[4], strides=[1]
+    : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xindex>> -> tensor<4xindex>
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(1) column_lengths(%column_lengths)
+      : (tensor<?x?x?xf32>{%d0, %d1, %d2}, tensor<4xindex>)
+      -> tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+  return %0 : tensor<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+}
+
+// CHECK-LABEL: func.func @cast_to_ragged_shape_bufferize(
+//  CHECK-SAME:     %[[D0:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:     %[[D1:[A-Za-z0-9]+]]: index
+//  CHECK-SAME:     %[[D2:[A-Za-z0-9]+]]: index
+//       CHECK:     %[[SOURCE:.+]] = hal.interface.binding.subspan {{.+}} binding(0)
+//  CHECK-SAME:         : memref<?x?x?xf32, #hal.descriptor_type<storage_buffer>>{%[[D0]], %[[D1]], %[[D2]]}
+//   CHECK-DAG:     %[[COLUMN_LENGTHS:.+]] = hal.interface.binding.subspan {{.+}} binding(1)
+//  CHECK-SAME:         : memref<4xindex, #hal.descriptor_type<storage_buffer>>
+//       CHECK:     %[[RAGGED:.+]] = iree_tensor_ext.cast_to_ragged_shape %[[SOURCE]] ragged_dim(1) column_lengths(%[[COLUMN_LENGTHS]])
+//  CHECK-SAME:       : (memref<?x?x?xf32, #hal.descriptor_type<storage_buffer>>{%[[D0]], %[[D1]], %[[D2]]}, memref<4xindex, #hal.descriptor_type<storage_buffer>>)
+//  CHECK-SAME:       -> memref<?x3x?x?xf32, #iree_tensor_ext.ragged_shape<1>>
+//       CHECK:     %[[RAGGED_TENSOR:.+]] = bufferization.to_tensor %[[RAGGED]]
+//       CHECK:     return %[[RAGGED_TENSOR]]
