@@ -805,3 +805,146 @@ util.func public @fuse_transpose_with_index_flip(%arg0: tensor<64x3x3x64xbf16>) 
 //       CHECK:       %[[EXTRACT:.+]] = tensor.extract %[[ARG0]][%[[IDX0]], %[[SUB0]], %[[SUB1]], %[[IDX1]]] : tensor<64x3x3x64xbf16>
 //       CHECK:       linalg.yield %[[EXTRACT]] : bf16
 //       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @fuse_elementwise_into_gather(
+    %q: tensor<32x8x2x64xf16>, %cos: tensor<32x8x2x64xf16>,
+    %out: tensor<32x8x2x64xf16>) -> tensor<32x8x2x64xf16> {
+  %c1 = arith.constant 1 : index
+  %empty = tensor.empty() : tensor<32x8x2x64xf16>
+  %prod = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%q, %cos : tensor<32x8x2x64xf16>, tensor<32x8x2x64xf16>)
+      outs(%empty : tensor<32x8x2x64xf16>) {
+  ^bb0(%a: f16, %b: f16, %_: f16):
+    %add = arith.addf %a, %b : f16
+    %mul = arith.mulf %a, %add : f16
+    linalg.yield %mul : f16
+  } -> tensor<32x8x2x64xf16>
+  %cons = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      outs(%out : tensor<32x8x2x64xf16>) {
+  ^bb0(%_: f16):
+    %i0 = linalg.index 0 : index
+    %i1 = linalg.index 1 : index
+    %i2 = linalg.index 2 : index
+    %i3 = linalg.index 3 : index
+    %swapped = arith.subi %c1, %i2 : index
+    %ext = tensor.extract %prod[%i0, %i1, %swapped, %i3] : tensor<32x8x2x64xf16>
+    linalg.yield %ext : f16
+  } -> tensor<32x8x2x64xf16>
+  util.return %cons : tensor<32x8x2x64xf16>
+}
+// CHECK-LABEL: @fuse_elementwise_into_gather(
+//  CHECK-SAME:   %[[A1:[A-Za-z0-9]+]]: tensor<32x8x2x64xf16>
+//  CHECK-SAME:   %[[A2:[A-Za-z0-9]+]]: tensor<32x8x2x64xf16>
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[RESULT:.+]] = linalg.generic
+//       CHECK:     ^bb0(%{{.+}}: f16):
+//   CHECK-DAG:       %[[I0:.+]] = linalg.index 0 : index
+//   CHECK-DAG:       %[[I1:.+]] = linalg.index 1 : index
+//   CHECK-DAG:       %[[I2:.+]] = linalg.index 2 : index
+//   CHECK-DAG:       %[[I3:.+]] = linalg.index 3 : index
+//       CHECK:       %[[SWAP:.+]] = arith.subi %[[C1]], %[[I2]] : index
+//   CHECK-DAG:       %[[EQ:.+]] = tensor.extract %[[A1]][%[[I0]], %[[I1]], %[[SWAP]], %[[I3]]]
+//   CHECK-DAG:       %[[EC:.+]] = tensor.extract %[[A2]][%[[I0]], %[[I1]], %[[SWAP]], %[[I3]]]
+//       CHECK:       %[[ADD:.+]] = arith.addf %[[EQ]], %[[EC]] : f16
+//       CHECK:       %[[MUL:.+]] = arith.mulf %[[EQ]], %[[ADD]] : f16
+//       CHECK:       linalg.yield %[[MUL]] : f16
+//       CHECK:   util.return %[[RESULT]]
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// A non-bit-extend / non-transpose elementwise producer is structurally
+// rematerialisable, but rematerialising it at every gather site would
+// duplicate the body and grow the consumer's operand set linearly in
+// the number of sites. This test therefore checks that we don't rematerialise
+// in such case where the number of tensor.extract sites are beyond the
+// default count 4.
+util.func public @dont_fuse_many_site_elementwise_into_gather(
+    %arg0: tensor<256x256xf32>, %arg1: tensor<256x256xf32>,
+    %out: tensor<256xf32>) -> tensor<256xf32> {
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %empty = tensor.empty() : tensor<256x256xf32>
+  %prod = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<256x256xf32>, tensor<256x256xf32>)
+      outs(%empty : tensor<256x256xf32>) {
+  ^bb0(%a: f32, %b: f32, %_: f32):
+    %m = arith.mulf %a, %b : f32
+    linalg.yield %m : f32
+  } -> tensor<256x256xf32>
+  %cons = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      outs(%out : tensor<256xf32>) {
+  ^bb0(%_: f32):
+    %i0 = linalg.index 0 : index
+    %e0 = tensor.extract %prod[%i0, %i0] : tensor<256x256xf32>
+    %e1 = tensor.extract %prod[%i0, %c1] : tensor<256x256xf32>
+    %e2 = tensor.extract %prod[%i0, %c2] : tensor<256x256xf32>
+    %e3 = tensor.extract %prod[%i0, %c3] : tensor<256x256xf32>
+    %e4 = tensor.extract %prod[%i0, %c4] : tensor<256x256xf32>
+    %s01 = arith.addf %e0, %e1 : f32
+    %s23 = arith.addf %e2, %e3 : f32
+    %s0123 = arith.addf %s01, %s23 : f32
+    %r = arith.addf %s0123, %e4 : f32
+    linalg.yield %r : f32
+  } -> tensor<256xf32>
+  util.return %cons : tensor<256xf32>
+}
+// CHECK-LABEL: @dont_fuse_many_site_elementwise_into_gather(
+//       CHECK:   %[[PROD:.+]] = linalg.generic
+//       CHECK:   linalg.generic
+//   CHECK-COUNT-5:     tensor.extract %[[PROD]]
+
+// -----
+
+util.func public @dont_fuse_mixed_user_elementwise_into_gather(
+    %a: tensor<256x256xf32>, %b: tensor<256x256xf32>,
+    %gather_out: tensor<256xf32>)
+    -> (tensor<256x256xf32>, tensor<256xf32>) {
+  %empty = tensor.empty() : tensor<256x256xf32>
+  %prod = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%a, %b : tensor<256x256xf32>, tensor<256x256xf32>)
+      outs(%empty : tensor<256x256xf32>) {
+  ^bb0(%x: f32, %y: f32, %_: f32):
+    %m = arith.mulf %x, %y : f32
+    linalg.yield %m : f32
+  } -> tensor<256x256xf32>
+  %gather_cons = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      outs(%gather_out : tensor<256xf32>) {
+  ^bb0(%_: f32):
+    %i0 = linalg.index 0 : index
+    %e = tensor.extract %prod[%i0, %i0] : tensor<256x256xf32>
+    linalg.yield %e : f32
+  } -> tensor<256xf32>
+  util.return %prod, %gather_cons
+      : tensor<256x256xf32>, tensor<256xf32>
+}
+// CHECK-LABEL: @dont_fuse_mixed_user_elementwise_into_gather(
+// `%prod` stays as its own generic; the gather consumer still extracts
+// from it rather than inlining its body since `%prod` is used by a
+// non-extract gather.
+//       CHECK:   %[[PROD:.+]] = linalg.generic
+//       CHECK:     arith.mulf
+//       CHECK:   linalg.generic
+//       CHECK:     tensor.extract %[[PROD]]
