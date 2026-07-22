@@ -469,3 +469,34 @@ func.func @matmul_f16() attributes {hal.executable.target = #executable_target_c
 // SM80-COUNT-64: nvvm.mma.sync{{.*}}shape = #nvvm.shape<m = 16, n = 8, k = 16>
 //     SM80-NOT:     nvvm.mma.sync
 //         SM80:     llvm.return
+
+// -----
+
+#executable_target_cuda = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @scatter_update_only_indexed_dim() attributes {hal.executable.target = #executable_target_cuda} {
+  %c0 = arith.constant 0 : index
+  %original = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1xf32>>
+  %updates = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x1xf32>>
+  %indices = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>>
+  %output = hal.interface.binding.subspan layout(#pipeline_layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x1xf32>>
+  %original_t = iree_tensor_ext.dispatch.tensor.load %original, offsets = [0, 0, 0], sizes = [32, 1, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<32x1x1xf32>> -> tensor<32x1x1xf32>
+  %updates_t = iree_tensor_ext.dispatch.tensor.load %updates, offsets = [0, 0, 0], sizes = [11, 1, 1], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11x1x1xf32>> -> tensor<11x1x1xf32>
+  %indices_t = iree_tensor_ext.dispatch.tensor.load %indices, offsets = [0], sizes = [11], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<11xi32>> -> tensor<11xi32>
+  %scatter = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true) ins(%updates_t, %indices_t : tensor<11x1x1xf32>, tensor<11xi32>) outs(%original_t : tensor<32x1x1xf32>) {
+  ^bb0(%update: f32, %old: f32):
+    iree_linalg_ext.yield %update : f32
+  } -> tensor<32x1x1xf32>
+  iree_tensor_ext.dispatch.tensor.store %scatter, %output, offsets = [0, 0, 0], sizes = [32, 1, 1], strides = [1, 1, 1] : tensor<32x1x1xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<32x1x1xf32>>
+  return
+}
+
+//       CHECK-LABEL: llvm.func @scatter_update_only_indexed_dim
+//             CHECK:   llvm.store
+//        SM80-LABEL: llvm.func @scatter_update_only_indexed_dim
+//              SM80:   llvm.store
