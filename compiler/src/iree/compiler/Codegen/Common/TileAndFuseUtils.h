@@ -32,10 +32,9 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
 void collectTiledAndFusedOps(Operation *rootOp,
                              llvm::SmallDenseSet<Operation *> &result);
 
-/// Returns an inner tile alignment control function that asserts
-/// `Multiple` or `Equal` for scalable inner tiles of a tiled/fused
-/// linalg.pack/linalg.unpack op, computed in that op's own iteration domain;
-/// every other op gets no hint. The kind of the hint is decided by checking the inner tile
+/// Returns an inner tile alignment control function for scalable tiling at
+/// `tilingLevel`. It forwards the per-dimension `InnerTileAlignment` hints that
+/// tile-size selection recorded on `linalg.pack`/`linalg.unpack` ops.
 scf::InnerTileAlignmentFnTy
 makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel);
 

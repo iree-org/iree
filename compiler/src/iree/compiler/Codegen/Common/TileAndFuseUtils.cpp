@@ -8,9 +8,9 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -21,6 +21,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
@@ -30,66 +31,24 @@
 
 namespace mlir::iree_compiler {
 
-// Helper method that checks the tile sizes and scalable flags passed against
-// the inner tiles of pack/unpack operations and sets the corresponding inner
-// tile alignment hints on tile sizes corresponding to scalable inner tiles.
-static SmallVector<mlir::InnerTileAlignment>
-setAlignmentHints(ArrayRef<int64_t> innerDimsPos, ArrayRef<OpFoldResult> innerTiles,
-             int64_t rank, SizesAndScalableFlags sizesAndFlags) {
-  SmallVector<mlir::InnerTileAlignment> alignments(
-      rank, mlir::InnerTileAlignment::Unknown);
-  for (auto [pos, innerTile, tile, scalable] :
-       llvm::zip_equal(innerDimsPos, innerTiles, sizesAndFlags.first,
-                       sizesAndFlags.second)) {
-    // TODO: implement and check vscale ranges to decide if static tile
-    // sizes are multiples of scalable inner tile sizes.
-    if (!scalable) {
-      continue;
-    }
-    auto innerTileVal = dyn_cast<Value>(innerTile);
-    std::optional<int64_t> innerTileCst =
-        vector::getConstantVscaleMultiplier(innerTileVal);
-    // If we have a static or a non-scalable dynamic inner tile size, skip.
-    if (!innerTileCst) {
-      continue;
-    }
-    auto kind = mlir::InnerTileAlignment::Unknown;
-    if (tile == *innerTileCst) {
-      kind = mlir::InnerTileAlignment::Equal;
-    } else if (tile % *innerTileCst == 0) {
-      kind = mlir::InnerTileAlignment::Multiple;
-    }
-    alignments[pos] = kind;
-  }
-  return alignments;
-}
-
 scf::InnerTileAlignmentFnTy
 makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel) {
   return [tilingLevel](
              TilingInterface op, ArrayRef<OpFoldResult>,
              ArrayRef<Operation *>) -> SmallVector<mlir::InnerTileAlignment> {
-    if (!isa<linalg::UnPackOp, linalg::PackOp>(op)) {
+    // Tile-size selection already recorded this op's per-dimension inner-tile
+    // alignments, keyed by tiling level. Read back this level's entry; an op
+    // without one (or without any hint) gets no alignment.
+    auto hint =
+        IREE::CPU::InnerTileAlignmentsAttr::getFromOp(op.getOperation());
+    if (!hint) {
       return {};
     }
-    auto tileSizesAttr = dyn_cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
-        getLoweringConfig(op).getTilingLevelAttr(
-            static_cast<unsigned>(tilingLevel)));
-    SizesAndScalableFlags sizesAndScalableFlags{
-        tileSizesAttr.getSizes(), tileSizesAttr.getScalableFlags()};
-    if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op.getOperation())) {
-      return setAlignmentHints(
-          unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles(),
-          cast<ShapedType>(unpackOp.getDest().getType()).getRank(),
-          sizesAndScalableFlags);
-    }
-    if (auto packOp = dyn_cast<linalg::PackOp>(op.getOperation())) {
-      return setAlignmentHints(
-          packOp.getInnerDimsPos(), packOp.getMixedTiles(),
-          cast<ShapedType>(packOp.getSource().getType()).getRank(),
-          sizesAndScalableFlags);
-    }
-    return {};
+    auto alignments = hint.getAlignments().getAs<DenseI64ArrayAttr>(
+        IREE::CPU::getTilingLevelName(tilingLevel));
+    return alignments
+               ? mlir::convertInnerTileAlignments(alignments.asArrayRef())
+               : SmallVector<mlir::InnerTileAlignment>{};
   };
 }
 

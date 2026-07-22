@@ -420,7 +420,7 @@ func.func @infusible_pack(%arg0 : tensor<30xf32>) -> tensor<5x6xf32> {
 // -----
 
 // Scalable linalg.pack with an elementwise-add producer.
-// This test exercises the inner tile alignment hint `Equal` being passed.
+// The `Equal` hint folds the scalable inner tile's outer dim to a static 1.
 
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [[8], 1]>
 #config1 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
@@ -438,7 +438,7 @@ func.func @scalable_pack_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor
   } -> tensor<384x512xf32>
   %mouter = affine.apply affine_map<()[s0] -> (384 ceildiv s0)>()[%c8_vscale]
   %2 = tensor.empty(%mouter, %c8_vscale) : tensor<?x512x?x1xf32>
-  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%c8_vscale, 1] into %2 {lowering_config = #config1} : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%c8_vscale, 1] into %2 {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Equal, Unknown]>, lowering_config = #config1} : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
   return %pack : tensor<?x512x?x1xf32>
 }
 // CHECK-LABEL: func.func @scalable_pack_with_producer
@@ -454,7 +454,7 @@ func.func @scalable_pack_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor
 // -----
 
 // Scalable linalg.unpack fused as the producer of an elementwise-add consumer.
-// This test exercises the inner tile alignment hint `Equal` being passed.
+// The `Equal` hint folds the scalable inner tile's outer dim to a static 1.
 
 #config = #iree_cpu.lowering_config<vector_common_parallel = [7, [8]]>
 #config1 = #iree_cpu.lowering_config<distribution = [84, 64], vector_common_parallel = [7, [8]]>
@@ -464,7 +464,7 @@ func.func @scalable_unpack_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: ten
   %vscale = vector.vscale
   %c8_vscale = arith.muli %vscale, %c8 : index
   %0 = tensor.empty() : tensor<80x320xf32>
-  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %0 {lowering_config = #config} : tensor<12x?x7x?xf32> -> tensor<80x320xf32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %0 {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>, lowering_config = #config} : tensor<12x?x7x?xf32> -> tensor<80x320xf32>
   %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1, %unpack : tensor<80x320xf32>, tensor<80x320xf32>) outs(%0 : tensor<80x320xf32>) attrs = {lowering_config = #config1} {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %2 = arith.addf %in, %in_0 : f32
@@ -486,7 +486,7 @@ func.func @scalable_unpack_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: ten
 // -----
 
 // Scalable linalg.mmt4d (N0 = 8*vscale) with a linalg.unpack consumer fused into
-// the mmt4d's tiling. This test exercises the inner tile alignment hint `Equal` being passed.
+// the mmt4d's tiling. The `Equal` hint folds the scalable inner tile's outer dim to a static 1.
 
 #config = #iree_cpu.lowering_config<distribution = [5, 8, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 7, [8], 0]>
 #config1 = #iree_cpu.lowering_config<vector_common_parallel = [7, [8]]>
@@ -502,7 +502,7 @@ func.func @scalable_mmt4d_with_unpack_consumer(%lhs: tensor<55x512x7x1xf32>, %rh
   %mmt4d = linalg.mmt4d {lowering_config = #config} ins(%lhs, %rhs : tensor<55x512x7x1xf32>, tensor<?x512x?x1xf32>) outs(%fill : tensor<55x?x7x?xf32>) -> tensor<55x?x7x?xf32>
   %n = arith.muli %nouter, %c8_vscale : index
   %out = tensor.empty(%n) : tensor<385x?xf32>
-  %unpack = linalg.unpack %mmt4d outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %out {lowering_config = #config1} : tensor<55x?x7x?xf32> -> tensor<385x?xf32>
+  %unpack = linalg.unpack %mmt4d outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %out {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>, lowering_config = #config1} : tensor<55x?x7x?xf32> -> tensor<385x?xf32>
   return %unpack : tensor<385x?xf32>
 }
 // CHECK-LABEL: func.func @scalable_mmt4d_with_unpack_consumer
