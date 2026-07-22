@@ -187,8 +187,9 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   tileSizes.resize(numLoops, 0);
   tileScalableFlags.resize(numLoops, false);
 
-  // Get the caller-asserted alignment function of a tiled/fused
-  // linalg.pack/unpack op's inner tiles to the loop tile sizes.
+  // Lets a scalable pack/unpack's tiled outer dims fold to a static single
+  // inner tile, using the alignment hints tile-size selection recorded on the
+  // op.
   scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
       makeInnerTileAlignmentFn(tilingLevel);
 
