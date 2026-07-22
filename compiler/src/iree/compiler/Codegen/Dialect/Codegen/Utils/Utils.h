@@ -11,6 +11,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LLVM.h"
@@ -123,6 +125,50 @@ struct TileMxNxK {
 
 FailureOr<MaterializeEncodingInfo>
 getEncodingInfoForMatmul(Encoding::EncodingAttr encoding, TileMxNxK tileMxNxK);
+
+/// Tile sizes for convolution encoding.
+struct TileOCxIC {
+  int64_t OC = 1; // k0: output channel tile
+  int64_t IC = 1; // c0: input channel tile
+};
+
+/// Returns MaterializeEncodingInfo for a convolution operand.
+FailureOr<MaterializeEncodingInfo>
+getEncodingInfoForConv(Encoding::EncodingAttr encoding, TileOCxIC tile);
+
+//===---------------------------------------------------------------------===//
+// Data-tiled convolution utilities.
+//===---------------------------------------------------------------------===//
+
+/// Iteration space of the data-tiled convolution generic. This is the
+/// canonical definition: the materialization builder and any code that
+/// inspects the resulting op both derive from it.
+///
+///   Loop dims: (n, oc_outer, oh, ow, ic_outer, fh, fw, oc_inner, ic_inner)
+///               d0  d1        d2  d3  d4        d5  d6  d7        d8
+///   input:  -> (d0, d4, d2*sH + d5*dH, d3*sW + d6*dW, d8)
+///   filter: -> (d1, d4, d5, d6, d8, d7)
+///   output: -> (d0, d1, d2, d3, d7)
+///
+/// corresponding to packed operand layouts:
+///   input:  [N, IC/c0, H, W, c0]
+///   filter: [OC/k0, IC/c0, FH, FW, c0, k0]
+///   output: [N, OC/k0, OH, OW, k0]
+struct DataTiledConvIterationSpace {
+  SmallVector<AffineMap> indexingMaps;
+  SmallVector<utils::IteratorType> iteratorTypes;
+};
+
+/// Returns the indexing maps and iterator types for a data-tiled 2D
+/// convolution with the given strides and dilations.
+DataTiledConvIterationSpace
+getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
+                               ArrayRef<int64_t> dilations);
+
+/// Returns true if `op` is a 9D data-tiled convolution generic emitted by
+/// encoding materialization (matched by iterator types, operand ranks,
+/// indexing maps, and multiply-accumulate body).
+bool isDataTiledConvGeneric(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

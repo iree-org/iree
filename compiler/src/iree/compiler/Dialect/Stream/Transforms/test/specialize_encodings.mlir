@@ -40,6 +40,39 @@ util.func public @tensor_sizeof(%d0: index, %d1: index) -> (index, index, index)
 
 // -----
 
+// Encoding layout specialization for an nhwc_hwcf convolution.
+
+#conv_in  = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh + fh, ow + fw, ic)>
+#conv_filter = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (fh, fw, ic, oc)>
+#conv_out = affine_map<(n, oh, ow, oc, fh, fw, ic) -> (n, oh, ow, oc)>
+#executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
+#executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple="aarch64-xyz-xyz", cpu_features="+neon"}>
+#device_target_local_0_ = #hal.device.target<"local", {ordinal = 0 : index}, [#executable_target_x86_64]> : !hal.device
+#device_target_local_1_ = #hal.device.target<"local", {ordinal = 1 : index}, [#executable_target_aarch64]> : !hal.device
+#conv_encoding_input  = #iree_encoding.encoding<operand_index = 0 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#conv_in, #conv_filter, #conv_out], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+#conv_encoding_filter = #iree_encoding.encoding<operand_index = 1 : index, op_type = conv, element_types = [f32, f32, f32], user_indexing_maps = [#conv_in, #conv_filter, #conv_out], iteration_sizes = [1, 14, 14, 8, 3, 3, 4]>
+
+util.global private @device_a = #device_target_local_0_
+util.global private @device_b = #device_target_local_1_
+util.func public @conv_tensor_sizeof() -> (index, index, index, index) {
+  %size0 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<1x16x16x4xf32, #conv_encoding_input>  : index
+  %size1 = stream.tensor.sizeof on(#hal.device.affinity<@device_a>) tensor<3x3x4x8xf32, #conv_encoding_filter> : index
+  %size2 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<1x16x16x4xf32, #conv_encoding_input>  : index
+  %size3 = stream.tensor.sizeof on(#hal.device.affinity<@device_b>) tensor<3x3x4x8xf32, #conv_encoding_filter> : index
+  util.return %size0, %size1, %size2, %size3 : index, index, index, index
+}
+// CHECK-DAG:   #[[$IN_X86:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [3], innerTileSizes = [16], outerDimsPerm = [0, 3, 1, 2]}
+// CHECK-DAG:   #[[$FLT_X86:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [2, 3], innerTileSizes = [16, 16], outerDimsPerm = [3, 2, 0, 1]}
+// CHECK-DAG:   #[[$IN_ARM:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [3], innerTileSizes = [8], outerDimsPerm = [0, 3, 1, 2]}
+// CHECK-DAG:   #[[$FLT_ARM:.+]] = #iree_encoding.layout<[#iree_cpu.cpu_encoding_resolver{{.+}}encoding_info = {innerDimsPos = [2, 3], innerTileSizes = [8, 8], outerDimsPerm = [3, 2, 0, 1]}
+// CHECK-LABEL: util.func public @conv_tensor_sizeof
+// CHECK:         stream.tensor.sizeof {{.+}} tensor<1x16x16x4xf32, #[[$IN_X86]]>
+// CHECK:         stream.tensor.sizeof {{.+}} tensor<3x3x4x8xf32, #[[$FLT_X86]]>
+// CHECK:         stream.tensor.sizeof {{.+}} tensor<1x16x16x4xf32, #[[$IN_ARM]]>
+// CHECK:         stream.tensor.sizeof {{.+}} tensor<3x3x4x8xf32, #[[$FLT_ARM]]>
+
+// -----
+
 //------------------------------------------------------------------------------
 // #iree_gpu.gpu_encoding_resolver specialization tests.
 // These get serialized to the layout attributes.

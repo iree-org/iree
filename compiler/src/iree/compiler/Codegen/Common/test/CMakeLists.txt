@@ -83,6 +83,8 @@ iree_lit_test_suite(
     "lower_ukernel_to_calls.mlir"
     "lowering_config_interpreter.mlir"
     "materialize_encoding_aarch64.mlir"
+    "materialize_encoding_conv_aarch64.mlir"
+    "materialize_encoding_conv_x86_64.mlir"
     "materialize_encoding_for_iree_ops.mlir"
     "materialize_encoding_gfx1100.mlir"
     "materialize_encoding_gfx908.mlir"
