@@ -93,6 +93,7 @@ iree_bitcode_library(
 iree_bitcode_library(
   NAME
     ukernel_bitcode_arch_riscv_64_xsmtvdot
+    ukernel_bitcode_arch_riscv_64_zvfbfwma
   ARCH
     riscv_64
   INTERNAL_HDRS
@@ -107,6 +108,9 @@ iree_bitcode_library(
     "mmt4d_riscv_64_xsmtvdot.c"
   COPTS
     "-march=rv64gc_xsmtvdot"
+    "mmt4d_riscv_64_zvfbfwma.c"
+  COPTS
+    "-march=rv64gcv_zvfbfwma"
 )
 
 iree_link_bitcode(
@@ -116,6 +120,7 @@ iree_link_bitcode(
     "ukernel_bitcode_arch_riscv_64_entry_points.bc"
     "ukernel_bitcode_arch_riscv_64_v.bc"
     "ukernel_bitcode_arch_riscv_64_xsmtvdot.bc"
+    "ukernel_bitcode_arch_riscv_64_zvfbfwma.bc"
     "ukernel_bitcode_arch_riscv_64_zvfh.bc"
     "ukernel_bitcode_arch_riscv_64_zvfhmin.bc"
 
@@ -149,11 +154,15 @@ iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFH
 iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_XSMTVDOT
   CLANG_OR_GCC
     "-march=rv64gc_xsmtvdot"
+iree_select_compiler_opts(IREE_UK_COPTS_RISCV_64_ZVFBFWMA
+  CLANG_OR_GCC
+    "-march=rv64gcv_zvfbfwma"
 )
 
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_V}" IREE_UK_BUILD_RISCV_64_V)
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFH}" IREE_UK_BUILD_RISCV_64_ZVFH)
 check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_XSMTVDOT}" IREE_UK_BUILD_RISCV_64_XSMTVDOT)
+check_cxx_compiler_flag("${IREE_UK_COPTS_RISCV_64_ZVFBFWMA}" IREE_UK_BUILD_RISCV_64_ZVFBFWMA)
 
 # CPU features that we will try checking compiler support for, unless
 # we set them to OFF below.
@@ -254,6 +263,19 @@ iree_cc_library(
 )
 list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_xsmtvdot")
 endif()  # IREE_UK_BUILD_RISCV_64_XSMTVDOT
+if(IREE_UK_BUILD_RISCV_64_ZVFBFWMA)
+iree_cc_library(
+  NAME
+    riscv_64_zvfbfwma
+  SRCS
+    "mmt4d_riscv_64_zvfbfwma.c"
+  COPTS
+    "${IREE_UK_COPTS_RISCV_64_ZVFBFWMA}"
+  DEPS
+    iree::builtins::ukernel::internal_headers
+)
+list(APPEND IREE_UK_RISCV_64_DEPS "::riscv_64_zvfbfwma")
+endif()  # IREE_UK_BUILD_RISCV_64_ZVFBFWMA
 
 iree_cc_library(
   NAME
