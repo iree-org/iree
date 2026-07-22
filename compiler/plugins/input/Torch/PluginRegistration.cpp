@@ -73,6 +73,15 @@ struct TorchSession : PluginSession<TorchSession, TorchOptions,
     TorchInput::registerTMTensorConversionPasses();
   }
 
+  LogicalResult onActivate() override {
+    if (options.externalizeTransients && !options.emitAsyncEntryPoints) {
+      return emitError(UnknownLoc::get(context))
+             << "iree-torch-externalize-transients requires async entry "
+                "points";
+    }
+    return success();
+  }
+
   void onRegisterDialects(DialectRegistry &registry) override {
     registry.insert<torch::Torch::TorchDialect>();
     registry.insert<torch::TorchConversion::TorchConversionDialect>();
