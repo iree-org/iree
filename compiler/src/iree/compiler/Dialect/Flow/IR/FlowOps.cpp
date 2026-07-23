@@ -604,6 +604,70 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   return success();
 }
 
+// Returns true when an unused dispatch result still provides writable storage
+// required inside the region. A tied value may be consumed in the region or
+// serve as working state for another live result of the same operation.
+static bool isTiedResultRequiredInRegion(Flow::DispatchRegionOp regionOp,
+                                         Flow::ReturnOp returnOp,
+                                         unsigned resultIndex) {
+  Value yieldedValue = returnOp->getOperand(resultIndex);
+  auto opResult = dyn_cast<OpResult>(yieldedValue);
+  if (!opResult) {
+    return false;
+  }
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(opResult.getOwner());
+  Value tiedOperand =
+      tiedOp ? tiedOp.getTiedResultOperand(yieldedValue) : nullptr;
+  if (!tiedOperand) {
+    return false;
+  }
+  Value tiedBase = IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
+
+  Block *dispatchBlock = regionOp->getBlock();
+  // Tied results created before the dispatch alias the same storage, so their
+  // later uses also block reuse.
+  llvm::SetVector<Value> tiedValues;
+  tiedValues.insert(tiedBase);
+  for (unsigned i = 0; i < tiedValues.size(); ++i) {
+    for (OpOperand &use : tiedValues[i].getUses()) {
+      Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+      if (!user || (user != regionOp && regionOp->isBeforeInBlock(user))) {
+        return false;
+      }
+      if (user == regionOp) {
+        continue;
+      }
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+        for (Value result :
+             tiedOp.getOperandTiedResults(use.getOperandNumber())) {
+          tiedValues.insert(result);
+        }
+      }
+    }
+  }
+
+  if (llvm::any_of(yieldedValue.getUses(), [&](OpOperand &use) {
+        return use.getOwner() != returnOp;
+      })) {
+    return true;
+  }
+
+  for (OpResult sibling : opResult.getOwner()->getResults()) {
+    if (sibling == yieldedValue) {
+      continue;
+    }
+    for (OpOperand &use : sibling.getUses()) {
+      if (use.getOwner() != returnOp) {
+        return true;
+      }
+      if (!regionOp->getResult(use.getOperandNumber()).use_empty()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
 /// if the IR was modified.
 bool dropUnusedAndRedundantDispatchRegionResults(
@@ -631,7 +695,8 @@ bool dropUnusedAndRedundantDispatchRegionResults(
     Type type = value.getType();
     auto shapedType = dyn_cast<ShapedType>(type);
     OpOperand &yieldedVal = returnOp->getOpOperand(index);
-    if (value.use_empty()) {
+    if (value.use_empty() &&
+        !isTiedResultRequiredInRegion(regionOp, returnOp, index)) {
       droppedResultValues[value] = std::nullopt;
     } else if (yieldedResultsSet.contains(yieldedVal.get())) {
       droppedResultValues[value] = yieldedVal.getOperandNumber();

@@ -370,28 +370,81 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
   // New values that are yielded from dispatch.
   SmallVector<Value> yieldedResults;
+
+  // Positions in `yieldedResults` corresponding to values with external uses.
+  // Some tied results must be yielded only to preserve writable dispatch
+  // storage for another live result of the same operation.
+  SmallVector<unsigned> replacedResultPositions;
   llvm::SetVector<Operation *> targetSet;
   targetSet.insert(targets.begin(), targets.end());
   Block &body = regionOp.getBody().front();
+  Block *dispatchBlock = regionOp->getBlock();
+  auto hasUseAfterDispatch = [&](Value value) {
+    // Tied results created before the dispatch alias the same storage, so their
+    // later uses also block reuse.
+    llvm::SetVector<Value> tiedValues;
+    tiedValues.insert(value);
+    for (unsigned i = 0; i < tiedValues.size(); ++i) {
+      for (OpOperand &use : tiedValues[i].getUses()) {
+        Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+        if (!user) {
+          return true;
+        }
+        if (user == regionOp || targetSet.contains(user)) {
+          continue;
+        }
+        if (regionOp->isBeforeInBlock(user)) {
+          return true;
+        }
+        if (auto tiedOp =
+                dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+          for (Value result :
+               tiedOp.getOperandTiedResults(use.getOperandNumber())) {
+            tiedValues.insert(result);
+          }
+        }
+      }
+    }
+    return false;
+  };
   for (Operation *target : llvm::reverse(targets)) {
     // Clone op into dispatch region.
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(&body);
     Operation *clonedTarget = rewriter.clone(*target);
 
-    // Gather all uses of `target`.
-    for (auto [index, result] : llvm::enumerate(target->getResults())) {
-      bool hasUsesOutsideOfRegion =
+    SmallVector<bool> hasUsesOutsideOfRegion;
+    bool hasAnyResultUses = false;
+    for (Value result : target->getResults()) {
+      bool hasExternalUses =
           llvm::any_of(result.getUses(), [&](OpOperand &use) {
             Operation *user = use.getOwner();
-            // The use is not in
-            // 1. the current dispatch
-            // 2. Not in one of the targets.
+            // The use is not in the current dispatch or one of the targets.
             return !regionOp->isProperAncestor(user) &&
                    !targetSet.contains(user);
           });
-      if (hasUsesOutsideOfRegion) {
-        replacedValues.push_back(result);
+      hasUsesOutsideOfRegion.push_back(hasExternalUses);
+      hasAnyResultUses |= !result.use_empty();
+    }
+
+    // Gather all uses of `target`.
+    for (auto [index, result] : llvm::enumerate(target->getResults())) {
+      bool preserveTiedResult = false;
+      if (!hasUsesOutsideOfRegion[index] && hasAnyResultUses) {
+        if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(target)) {
+          Value tiedOperand = tiedOp.getTiedResultOperand(result);
+          if (tiedOperand) {
+            Value tiedBase =
+                IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
+            preserveTiedResult = !hasUseAfterDispatch(tiedBase);
+          }
+        }
+      }
+      if (hasUsesOutsideOfRegion[index] || preserveTiedResult) {
+        if (hasUsesOutsideOfRegion[index]) {
+          replacedValues.push_back(result);
+          replacedResultPositions.push_back(yieldedResults.size());
+        }
         yieldedResults.push_back(clonedTarget->getResult(index));
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPoint(target);
@@ -413,7 +466,6 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   // users of replaced values and transitively include ops that use their
   // results, normalizing nested uses to ancestors in the dispatch block so that
   // "uses from above" are handled correctly.
-  Block *dispatchBlock = regionOp->getBlock();
   auto isInTargetSet = [&](Operation *op) { return targetSet.contains(op); };
   llvm::SetVector<Operation *> opsToMove;
   auto addUser = [&](Value val) {
@@ -444,10 +496,11 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   }
 
   // External users now consume the yielded dispatch values.
-  ValueRange replacements =
-      newRegionOp->getResults().take_back(replacedValues.size());
+  ValueRange appendedResults =
+      newRegionOp->getResults().take_back(yieldedResults.size());
   for (auto [index, replacedVal] : llvm::enumerate(replacedValues)) {
-    rewriter.replaceAllUsesWith(replacedVal, replacements[index]);
+    rewriter.replaceAllUsesWith(
+        replacedVal, appendedResults[replacedResultPositions[index]]);
   }
 
   // Keep rewritten users after the dispatch so the new values dominate them.

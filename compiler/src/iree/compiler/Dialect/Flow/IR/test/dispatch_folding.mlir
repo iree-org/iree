@@ -172,6 +172,52 @@ util.func public @drop_unused_dispatch_region_result(
 
 // -----
 
+// CHECK-LABEL: util.func public @drop_unused_tied_alias_result_when_base_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<2x2xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_unused_tied_alias_result_when_base_live(
+    %keys: tensor<2x2xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %key_view = flow.tensor.reshape %keys : tensor<2x2xi64> -> tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%key_view, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %[[KEYS]]
+  util.return %result#1, %keys : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_unused_tied_result_when_alias_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<4xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_unused_tied_result_when_alias_live(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %{{.+}}
+  util.return %result#1, %key_view : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @remove_redundant_results
 //  CHECK-SAME: (%[[ARG0:.+]]: tensor<?xf32>)
 util.func @remove_redundant_results(%arg0 : tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {
