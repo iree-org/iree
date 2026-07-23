@@ -43,6 +43,38 @@ module {
 
 // -----
 
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+dotprod", target_triple = "aarch64-none-elf"}>
+module {
+  func.func private @default_cconv_with_extra_fields_in_loop(memref<f32>, i32, f64) -> (f32) attributes {
+      hal.import.bitcode = true,
+      hal.import.cconv = 0 : i32,
+      hal.import.fields = ["processor_data", "processor_id"],
+      llvm.bareptr = true
+  }
+  func.func @loop_caller() attributes {hal.executable.target = #executable_target} {
+    %lb = arith.constant 0 : index
+    %ub = arith.constant 1024 : index
+    %step = arith.constant 1 : index
+    %c0 = arith.constant 42 : i32
+    %c1 = arith.constant 42.0 : f64
+    %0 = memref.alloca() : memref<f32>
+    scf.for %i = %lb to %ub step %step {
+      %1 = func.call @default_cconv_with_extra_fields_in_loop(%0, %c0, %c1) : (memref<f32>, i32, f64) -> (f32)
+    }
+    return
+  }
+}
+//      CHECK: llvm.func @loop_caller
+//  CHECK-NOT:   ^{{.+}}:
+//      CHECK:   %[[PATCHED_DATA:.+]] = llvm.alloca %{{.+}} x i64
+//      CHECK:   llvm.br ^[[LOOP:.+]](
+//      CHECK: ^[[LOOP]]
+//  CHECK-NOT:   llvm.alloca
+//      CHECK:   llvm.call @default_cconv_with_extra_fields_in_loop
+// CHECK-SAME:       %[[PATCHED_DATA]]
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
