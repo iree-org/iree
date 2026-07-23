@@ -998,6 +998,9 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
   // on every loop iteration with nothing to ever pop it back off, overflowing
   // the stack for large iteration counts (#24744). Build them in the
   // enclosing function's entry block instead, where they only run once.
+  // The computation only depends on the function's `environment`
+  // argument and static target attributes, so it can safely move to the
+  // enclosing function's entry block instead, where it only runs once.
   auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
   assert(funcOp && "usage requires an enclosing LLVMFuncOp");
   OpBuilder::InsertionGuard guard(builder);
