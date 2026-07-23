@@ -165,6 +165,11 @@ DataTiledConvIterationSpace
 getDataTiledConvIterationSpace(MLIRContext *ctx, ArrayRef<int64_t> strides,
                                ArrayRef<int64_t> dilations);
 
+/// Returns true if `op` is a 9D data-tiled convolution generic emitted by
+/// encoding materialization (matched by iterator types, operand ranks,
+/// indexing maps, and multiply-accumulate body).
+bool isDataTiledConvGeneric(Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::Codegen
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_CODEGEN_UTILS_H_

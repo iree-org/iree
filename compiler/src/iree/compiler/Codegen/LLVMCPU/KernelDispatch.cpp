@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenTypes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/LLVMCPUSelectUKernels.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
@@ -3114,6 +3115,65 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
 }
 
+/// Assigns CPUDoubleTilingExpert pipeline config to the data-tiled
+/// convolution generic.
+static LogicalResult
+setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                  linalg::GenericOp convOp) {
+  // Loop ranges:
+  //  (d0, d1,    d2, d3, d4,    d5, d6, d7, d8)
+  //  (n,  OC/k0, OH, OW, IC/c0, FH, FW, k0, c0)
+  SmallVector<int64_t, 9> loopRanges =
+      cast<linalg::LinalgOp>(convOp.getOperation()).getStaticLoopRanges();
+  int64_t k0 = loopRanges[7];
+  int64_t c0 = loopRanges[8];
+
+  // Vectorization strategy:
+  // - Vectorize across OW, the register-blocking dimension: the kernel
+  //   carries one accumulator vector per OW element to hide FMA latency.
+  //   Use k0 as the OW tile size for now; it matches the desired
+  //   accumulator count on current targets (16 for AVX-512, 8 for NEON).
+  //   TODO(phemashekar): Derive this directly from the target register budget
+  //   instead.
+  // - Vectorize across the data-tiling inner dims oc_inner (k0) and
+  //   ic_inner (c0).
+  SmallVector<int64_t> vecTileSizes(9, 1);
+  vecTileSizes[3] = k0;
+  vecTileSizes[7] = k0;
+  vecTileSizes[8] = c0;
+  setAlwaysVectorizeSizes(convOp, vecTileSizes);
+
+  // Distribute over N, OC/k0, and OH. N is limited to unit tiles: batch
+  // tile sizes are constrained by the generated temporary buffer sizes,
+  // and larger batch tiles can lead to stack allocation errors.
+  DistributionHeuristicConfig distConfig;
+  distConfig.maxTileSizes.assign(9, 0);
+  distConfig.maxTileSizes[0] = 1;
+  distConfig.maxTileSizes[1] = clDefaultDistTileSize / 2;
+  distConfig.maxTileSizes[2] = clDefaultDistTileSize / 2;
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(convOp, distConfig);
+
+  LDBG() << "Data tiled convolution:";
+  LDBG() << "  Dist tile sizes: " << distTileSizes;
+  LDBG() << "  Vector tile sizes: " << vecTileSizes;
+
+  LoweringConfigGenerator generator(convOp);
+  generator.setDistributionTileSizes(distTileSizes);
+  generator.setVectorTileSizes(vecTileSizes);
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      generator.generateCPULoweringConfig();
+
+  // Enable loop peeling so the OW vectorization tile produces static-sized
+  // main loop iterations (vectorizable) with a scalar peeled tail.
+  DictionaryAttr pipelineConfig =
+      getPipelineConfWithPeelingAttr(convOp.getContext());
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, convOp, loweringConfig,
+      getCPUTranslationInfo(convOp.getContext(),
+                            CPUPipeline::DoubleTilingExpert, pipelineConfig));
+}
+
 /// Redirects to methods that set the configuration based on operation type.
 static LogicalResult
 setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
@@ -3146,6 +3206,10 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
     if (is2DConvOp(linalgOp) || is2DDepthConvOp(linalgOp) ||
         is2DPoolingOp(linalgOp)) {
       return setConvInterfaceRootConfig(entryPointFn, linalgOp);
+    }
+    if (IREE::Codegen::isDataTiledConvGeneric(op)) {
+      return setConvDataTiledGenericRootConfig(entryPointFn,
+                                               cast<linalg::GenericOp>(op));
     }
     if (linalg::isaContractionOpInterface(linalgOp) &&
         meetLegacyContractionOpInterface(linalgOp)) {

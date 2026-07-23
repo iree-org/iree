@@ -104,6 +104,28 @@ func.func @conv_static(%3: tensor<1x51x41x512xf32>, %4: tensor<3x3x512x512xf32>)
 
 // -----
 
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d4, d2 + d5, d3 + d6, d8)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d4, d5, d6, d8, d7)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d7)>
+func.func @conv_2d_nchwc_data_tiled(%arg0: tensor<1x1x16x16x16xf32>, %arg1: tensor<1x1x3x3x16x16xf32>, %arg2: tensor<1x1x14x14x16xf32>) -> tensor<1x1x14x14x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor<1x1x16x16x16xf32>, tensor<1x1x3x3x16x16xf32>) outs(%arg2 : tensor<1x1x14x14x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %1 = arith.mulf %in, %in_0 : f32
+    %2 = arith.addf %1, %out : f32
+    linalg.yield %2 : f32
+  } -> tensor<1x1x14x14x16xf32>
+  return %0 : tensor<1x1x14x14x16xf32>
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 0, 1, 0, 0, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 16, 0, 0, 0, 16, 0], vector_reduction = [0, 0, 0, 0, 1, 1, 1, 0, 16]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {enable_loop_peeling}>
+//      CHECK: func.func @conv_2d_nchwc_data_tiled(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:     linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
 func.func @restrict_num_workgroups(%3: tensor<1x11x11x576xf32>, %4: tensor<5x5x576xf32>) -> tensor<1x7x7x576xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %cst = arith.constant 0.000000e+00 : f32
