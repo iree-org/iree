@@ -449,7 +449,7 @@ IREE_API_EXPORT iree_status_t iree_vm_context_fork(
   for (iree_host_size_t i = 0; i < parent_context->list.count; ++i) {
     iree_vm_module_t* module = parent_context->list.modules[i];
     status =
-        module->fork_state(module, parent_context->list.module_states[i],
+        module->fork_state(module->self, parent_context->list.module_states[i],
                            allocator, &child_context->list.module_states[i]);
     if (!iree_status_is_ok(status)) break;
   }
