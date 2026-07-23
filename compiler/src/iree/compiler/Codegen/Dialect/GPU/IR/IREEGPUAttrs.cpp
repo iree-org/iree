@@ -340,6 +340,13 @@ static std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *context,
   case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16:
   case MMAIntrinsic::WMMA_F32_16x16x32_BF16:
     return {bf16, bf16, f32};
+  // NVIDIA FP8 mma.sync (m16n8k32, sm_89+).
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN:
+    return {f8E4M3FN, f8E4M3FN, f32};
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2:
+    return {f8E5M2, f8E5M2, f32};
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2:
+    return {f8E4M3FN, f8E5M2, f32};
   case MMAIntrinsic::WMMAR3_BF16_16x16x16_BF16:
   case MMAIntrinsic::WMMAR4_BF16_16x16x16_BF16:
   case MMAIntrinsic::WMMA_BF16_16x16x32_BF16:
@@ -872,6 +879,27 @@ MMASingleSubgroupLayout getSingleSubgroupLayout(MMAIntrinsic intrinsic,
     default:
       return {};
     }
+  // FP8 mma.sync (m16n8k32, sm_89+). Same thread arrangement as the f16
+  // m16n8k16 variants; K doubles so element[K] doubles from 2 to 4 (4 FP8
+  // values packed per 32-bit register vs 2 FP16). The accumulator shape is
+  // unchanged (same M×N output). All three FP8 type combinations share the
+  // same register layout.
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN:
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2:
+  case MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN_F8E5M2:
+    switch (operandIndex) {
+    case kMMAOperandLhs: // A [M=16, K=32]: 16 elements/thread
+      return {/*outer=*/{2, 2}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
+              /*element=*/{1, 4}};
+    case kMMAOperandRhs: // B [K=32, N=8]: 8 elements/thread
+      return {/*outer=*/{2, 1}, /*thread=*/{4, 8}, /*strides=*/{1, 4},
+              /*element=*/{4, 1}};
+    case kMMAOperandAcc: // C [M=16, N=8]: 4 elements/thread (same as f16)
+      return {/*outer=*/{2, 1}, /*thread=*/{8, 4}, /*strides=*/{4, 1},
+              /*element=*/{1, 2}};
+    default:
+      return {};
+    }
   case MMAIntrinsic::NV_WMMA_F32_16x16x16_F16:
   case MMAIntrinsic::NV_WMMA_F16_16x16x16_F16:
     return {};
@@ -1234,14 +1262,17 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (isNvMmaSync(intrinsic)) {
-    // Transpose the two outer dimensions to model the column-major register
-    // ordering expected by mma.sync. The input shape differs between pipelines:
-    // VectorDistribute produces 2x2x1x2, TileAndFuse produces 2x1x2x2.
-    // Remove the unit dimension to simplify the transpose.
-    // Preserve the operand element type so BF16 fragments are not reshaped as
-    // f16.
+    // Transpose the two outer dims to model mma.sync's column-major register
+    // order: reshape to {outer_M, outer_K, element_K}, swap outer_M/outer_K.
+    // Shape is derived from the LHS layout (not hardcoded {2, 2, 2}) since
+    // element[K] varies by intrinsic (e.g. FP8 packs 4 vs. F16/BF16's 2).
     Type elementType = cast<VectorType>(lhs.getType()).getElementType();
-    auto nonUnitVecType = VectorType::get({2, 2, 2}, elementType);
+    auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
+    int64_t outerM = lhsLayout.outer[0];
+    int64_t outerK = lhsLayout.outer[1];
+    int64_t elemSize = lhsLayout.element[0] * lhsLayout.element[1];
+    auto nonUnitVecType =
+        VectorType::get({outerM, outerK, elemSize}, elementType);
     auto reshaped =
         vector::ShapeCastOp::create(builder, loc, nonUnitVecType, lhs);
     auto permAttr = builder.getDenseI64ArrayAttr({1, 0, 2});
