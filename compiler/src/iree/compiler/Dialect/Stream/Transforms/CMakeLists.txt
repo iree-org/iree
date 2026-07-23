@@ -39,6 +39,7 @@ iree_cc_library(
     "MaterializeTransientSizeQueries.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
+    "PlaceTransferExecutions.cpp"
     "Passes.cpp"
     "Passes.h.inc"
     "PropagateTimepoints.cpp"

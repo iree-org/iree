@@ -2968,10 +2968,33 @@ LogicalResult AsyncTransferOp::verify() {
       failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
+  auto executionAffinityAttr = op.getExecutionAffinityAttr();
+  auto sourceAffinityAttr = op.getSourceAffinityAttr();
+  auto targetAffinityAttr = op.getTargetAffinityAttr();
+  bool isSourceCompatible =
+      sourceAffinityAttr && IREE::Stream::AffinityAttr::canExecuteTogether(
+                                executionAffinityAttr, sourceAffinityAttr);
+  bool isTargetCompatible =
+      targetAffinityAttr && IREE::Stream::AffinityAttr::canExecuteTogether(
+                                executionAffinityAttr, targetAffinityAttr);
+  if (executionAffinityAttr && (sourceAffinityAttr || targetAffinityAttr) &&
+      !isSourceCompatible && !isTargetCompatible) {
+    return op.emitOpError() << "execution affinity " << executionAffinityAttr
+                            << " is incompatible with both source affinity "
+                            << sourceAffinityAttr << " and target affinity "
+                            << targetAffinityAttr;
+  }
   return success();
 }
 
 IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
+  if (auto executionAffinityAttr = getExecutionAffinityAttr()) {
+    return executionAffinityAttr;
+  }
+  return getDefaultExecutionAffinityAttr();
+}
+
+IREE::Stream::AffinityAttr AsyncTransferOp::getDefaultExecutionAffinityAttr() {
   auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
   auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
   if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
@@ -2993,37 +3016,10 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
 }
 
 void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
-  auto sourceType = cast<IREE::Stream::ResourceType>(getSource().getType());
-  auto resultType = cast<IREE::Stream::ResourceType>(getResult().getType());
-  if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging &&
-      resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
-    // TODO(multi-device): figure out how to model staging->staging transfers.
-    if (value) {
-      setSourceAffinityAttr(value);
-    } else {
-      removeSourceAffinityAttr();
-    }
-  } else if (sourceType.getLifetime() == IREE::Stream::Lifetime::Staging) {
-    // If source is staging then the op should execute on the consumer.
-    if (value) {
-      setTargetAffinityAttr(value);
-    } else {
-      removeTargetAffinityAttr();
-    }
-  } else if (resultType.getLifetime() == IREE::Stream::Lifetime::Staging) {
-    // If result is staging then the op should execute on the producer.
-    if (value) {
-      setSourceAffinityAttr(value);
-    } else {
-      removeSourceAffinityAttr();
-    }
+  if (value) {
+    setExecutionAffinityAttr(value);
   } else {
-    // Default to result affinity.
-    if (value) {
-      setTargetAffinityAttr(value);
-    } else {
-      removeTargetAffinityAttr();
-    }
+    removeExecutionAffinityAttr();
   }
 }
 
@@ -3034,6 +3030,24 @@ IREE::Stream::AffinityAttr AsyncTransferOp::getResultAffinityAttr() {
 void AsyncTransferOp::removeAffinityAttrs() {
   removeSourceAffinityAttr();
   removeTargetAffinityAttr();
+  removeExecutionAffinityAttr();
+}
+
+AsyncTransferOp AsyncTransferOp::create(OpBuilder &builder, Location location,
+                                        Type type, Value source,
+                                        Value sourceSize, Value resultSize,
+                                        AffinityAttr sourceAffinity,
+                                        AffinityAttr targetAffinity) {
+  return create(builder, location, type, source, sourceSize, resultSize,
+                sourceAffinity, targetAffinity, nullptr);
+}
+
+void AsyncTransferOp::build(OpBuilder &builder, OperationState &state,
+                            Type type, Value source, Value sourceSize,
+                            Value resultSize, AffinityAttr sourceAffinity,
+                            AffinityAttr targetAffinity) {
+  build(builder, state, type, source, sourceSize, resultSize, sourceAffinity,
+        targetAffinity, nullptr);
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(
