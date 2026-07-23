@@ -332,6 +332,7 @@ VER_0 {
     mlirConversionPatternGetTypeConverter;
     mlirConversionPatternRewriterAsPatternRewriter;
     mlirConversionPatternRewriterConvertRegionTypes;
+    mlirConversionPatternRewriterReplaceOpWithMultiple;
     mlirConversionTargetAddDynamicallyLegalDialect;
     mlirConversionTargetAddDynamicallyLegalOp;
     mlirConversionTargetAddIllegalDialect;
@@ -1088,7 +1089,12 @@ VER_0 {
     mlirTypeAttrGetName;
     mlirTypeAttrGetTypeID;
     mlirTypeAttrGetValue;
+    mlirTypeConverterAdd1ToNConversion;
+    mlirTypeConverterAdd1ToNTargetMaterialization;
     mlirTypeConverterAddConversion;
+    mlirTypeConverterAddSourceMaterialization;
+    mlirTypeConverterAddTargetMaterialization;
+    mlirTypeConverterConversionResultsAppend;
     mlirTypeConverterConvertType;
     mlirTypeConverterCreate;
     mlirTypeConverterDestroy;
