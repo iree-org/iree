@@ -66,7 +66,10 @@ module {
 }
 //      CHECK: llvm.func @loop_caller
 //  CHECK-NOT:   ^{{.+}}:
+//      CHECK:   %[[ENV_DATA:.+]] = llvm.getelementptr inbounds %arg0[4]
+//  CHECK-NOT:   ^{{.+}}:
 //      CHECK:   %[[PATCHED_DATA:.+]] = llvm.alloca %{{.+}} x i64
+//  CHECK-NOT:   ^{{.+}}:
 //      CHECK:   llvm.br ^[[LOOP:.+]](
 //      CHECK: ^[[LOOP]]
 //  CHECK-NOT:   llvm.alloca
