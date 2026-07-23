@@ -331,6 +331,7 @@ EXPORTS
   mlirConversionPatternGetTypeConverter
   mlirConversionPatternRewriterAsPatternRewriter
   mlirConversionPatternRewriterConvertRegionTypes
+  mlirConversionPatternRewriterReplaceOpWithMultiple
   mlirConversionTargetAddDynamicallyLegalDialect
   mlirConversionTargetAddDynamicallyLegalOp
   mlirConversionTargetAddIllegalDialect
@@ -1087,7 +1088,12 @@ EXPORTS
   mlirTypeAttrGetName
   mlirTypeAttrGetTypeID
   mlirTypeAttrGetValue
+  mlirTypeConverterAdd1ToNConversion
+  mlirTypeConverterAdd1ToNTargetMaterialization
   mlirTypeConverterAddConversion
+  mlirTypeConverterAddSourceMaterialization
+  mlirTypeConverterAddTargetMaterialization
+  mlirTypeConverterConversionResultsAppend
   mlirTypeConverterConvertType
   mlirTypeConverterCreate
   mlirTypeConverterDestroy
