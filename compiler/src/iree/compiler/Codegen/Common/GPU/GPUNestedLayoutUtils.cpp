@@ -6,8 +6,12 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 
+#include <functional>
+
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 
 namespace mlir::iree_compiler {
@@ -96,6 +100,137 @@ SmallVector<int64_t> getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
     tileShape[i] = 1;
   }
   return tileShape;
+}
+
+/// Distribute |total| across |shape| from the innermost dimension.
+/// |shape| is updated in place to reflect the remaining shape after
+/// distribution. Returns failure if any dimension doesn't divide evenly.
+static FailureOr<SmallVector<int64_t>>
+distributeFromInnermost(int64_t total, MutableArrayRef<int64_t> shape) {
+  int64_t rank = shape.size();
+  SmallVector<int64_t> result(rank, 1);
+  int64_t remaining = total;
+  for (int64_t i = rank - 1; i >= 0 && remaining > 1; --i) {
+    int64_t take = std::min(remaining, shape[i]);
+    if (shape[i] % take != 0) {
+      return failure();
+    }
+    result[i] = take;
+    shape[i] /= take;
+    remaining /= take;
+  }
+  if (remaining != 1) {
+    return failure();
+  }
+  return result;
+}
+
+/// Distribute |total| across |shape| from the outermost dimension.
+/// |shape| is updated in place to reflect the remaining shape after
+/// distribution. Returns failure if any dimension doesn't divide evenly.
+static FailureOr<SmallVector<int64_t>>
+distributeFromOutermost(int64_t total, MutableArrayRef<int64_t> shape) {
+  int64_t rank = shape.size();
+  SmallVector<int64_t> result(rank, 1);
+  int64_t remaining = total;
+  for (int64_t i = 0; i < rank && remaining > 1; ++i) {
+    int64_t take = std::min(remaining, shape[i]);
+    if (shape[i] % take != 0) {
+      return failure();
+    }
+    result[i] = take;
+    shape[i] /= take;
+    remaining /= take;
+  }
+  if (remaining != 1) {
+    return failure();
+  }
+  return result;
+}
+
+/// Try to compute a DMA-optimized NestedLayoutAttr for a single DMA size.
+/// Returns failure if the layout is not compatible.
+static FailureOr<NestedLayoutAttr>
+getGlobalLoadDMALayoutForSize(MLIRContext *context, ArrayRef<int64_t> shape,
+                              int64_t numThreads, int64_t subgroupSize,
+                              int64_t elementBitWidth, int64_t dmaSize) {
+  int64_t rank = shape.size();
+  if (elementBitWidth <= 0) {
+    return failure();
+  }
+  int64_t elementsPerDMA = dmaSize / elementBitWidth;
+  if (elementsPerDMA == 0 || dmaSize % elementBitWidth != 0) {
+    return failure();
+  }
+
+  int64_t totalElements = ShapedType::getNumElements(shape);
+  int64_t elementsPerSubgroup = subgroupSize * elementsPerDMA;
+  if (totalElements % elementsPerSubgroup != 0) {
+    return failure();
+  }
+
+  SmallVector<int64_t> remainingShape(shape);
+
+  auto elementResult = distributeFromInnermost(elementsPerDMA, remainingShape);
+  if (failed(elementResult)) {
+    return failure();
+  }
+  SmallVector<int64_t> elementTile = *elementResult;
+
+  auto threadResult = distributeFromInnermost(subgroupSize, remainingShape);
+  if (failed(threadResult)) {
+    return failure();
+  }
+  SmallVector<int64_t> threadTile = *threadResult;
+
+  int64_t numSubgroups = numThreads / subgroupSize;
+  auto subgroupResult = distributeFromOutermost(numSubgroups, remainingShape);
+  if (failed(subgroupResult)) {
+    return failure();
+  }
+  SmallVector<int64_t> subgroupTile = *subgroupResult;
+
+  SmallVector<int64_t> batchTile(remainingShape);
+  SmallVector<int64_t> outerTile(rank, 1);
+  SmallVector<int64_t> subgroupStrides = computeStrides(subgroupTile);
+  SmallVector<int64_t> threadStrides = computeStrides(threadTile);
+
+  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
+                               threadTile, elementTile, subgroupStrides,
+                               threadStrides);
+}
+
+FailureOr<NestedLayoutAttr>
+getGlobalLoadDMALayout(MLIRContext *context, ArrayRef<int64_t> shape,
+                       int64_t numThreads, int64_t subgroupSize,
+                       int64_t elementBitWidth, ArrayRef<int64_t> dmaSizes,
+                       std::optional<int64_t> swizzleAccessElems) {
+  if (subgroupSize <= 0 || numThreads % subgroupSize != 0) {
+    return failure();
+  }
+
+  SmallVector<int64_t> sorted(dmaSizes);
+  llvm::sort(sorted, std::greater<>());
+  if (swizzleAccessElems) {
+    llvm::erase_if(sorted, [&](int64_t dmaSize) {
+      if (dmaSize % elementBitWidth != 0) {
+        return true;
+      }
+      int64_t elemsPerDMA = dmaSize / elementBitWidth;
+      if (elemsPerDMA == 0) {
+        return true;
+      }
+      return *swizzleAccessElems % elemsPerDMA != 0;
+    });
+  }
+  for (int64_t dmaSize : sorted) {
+    FailureOr<NestedLayoutAttr> layout = getGlobalLoadDMALayoutForSize(
+        context, shape, numThreads, subgroupSize, elementBitWidth, dmaSize);
+    if (succeeded(layout)) {
+      return layout;
+    }
+  }
+  return failure();
 }
 
 FailureOr<NestedLayoutAttr>
