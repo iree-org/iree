@@ -589,6 +589,14 @@ def FoldAffineMinInDistributedLoopsPass :
   let summary = "Fold `affine.min` ops in distributed loops";
 }
 
+def FoldMemRefCopyIntoDPSOpsPass :
+    InterfacePass<"iree-codegen-fold-memref-copy-into-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Fold temporary output copies into destination-style memref ops";
+  let dependentDialects = [
+    "memref::MemRefDialect"
+  ];
+}
+
 def FoldReshapeIntoInterfaceTensorPass :
     Pass<"iree-codegen-fold-reshape-into-interface-tensor", ""> {
   let summary = "Folds reshape operations into the interface bindings.";
