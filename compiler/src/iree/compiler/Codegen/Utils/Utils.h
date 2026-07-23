@@ -46,6 +46,17 @@ bool isEntryPoint(mlir::FunctionOpInterface func);
 std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
 
+/// Returns the static size in bits of `shapedType` -- the product of its static
+/// extents and the element size -- accumulated with 64-bit overflow checking.
+/// Dynamic dimensions are skipped; callers apply their own policy for those.
+/// `getElementBitWidth` returns the bit width of a leaf (non-shaped) element
+/// type, letting callers control e.g. the target's index-type width. Returns
+/// failure on integer overflow: such an allocation necessarily exceeds any real
+/// resource limit, so callers should treat failure as "over the limit".
+FailureOr<int64_t>
+getStaticShapeSizeInBits(ShapedType shapedType,
+                         std::function<int64_t(Type)> getElementBitWidth);
+
 /// Returns the dispatch_config op for the `funcOp` by looking up the parent
 /// module for a matching function_ref. Returns nullptr if not found.
 IREE::Codegen::DispatchConfigOp
