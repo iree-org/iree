@@ -1315,6 +1315,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-global-opt-enable-early-materialization=false"
+    "--iree-vulkan-target=vp_android_baseline_2022"
   LABELS
 
 )

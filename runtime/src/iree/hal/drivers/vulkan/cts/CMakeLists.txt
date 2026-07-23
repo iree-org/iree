@@ -66,6 +66,8 @@ iree_hal_cts_testdata(
     [=["vulkan-spirv-fb"]=]
   TESTDATA_DIR
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
+  FLAGS
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_hal_cts_testdata(
@@ -83,6 +85,7 @@ iree_hal_cts_testdata(
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/testdata"
   FLAGS
     "--iree-vulkan-dispatch-abi=bda"
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_cc_test(

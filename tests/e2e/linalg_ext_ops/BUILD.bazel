@@ -205,6 +205,7 @@ iree_check_single_backend_test_suite(
             "scan_configured.mlir",
         ],
     ),
+    compiler_flags = ["--iree-vulkan-target=vp_android_baseline_2022"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
