@@ -13,9 +13,11 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>) -> (tensor<128xi32>)
   return %0 : tensor<128xi32>
 }
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<128xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs(%[[ARG0]] : tensor<128xi32>)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<128xi32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG1]], %[[ARG2]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]
@@ -35,9 +37,11 @@ func.func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
   return %0 : tensor<128xui32>
 }
 // CHECK:         %[[CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<128xui32> to tensor<128xi32>
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<128xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs(%[[CAST]] : tensor<128xi32>)
+// CHECK-SAME:      ins(%[[CAST]] : tensor<128xi32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi ugt, %[[ARG1]], %[[ARG2]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]
@@ -60,7 +64,11 @@ func.func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
 }
 
 // CHECK:         %[[SCALAR:.+]] = arith.constant 0 : i32
-// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<1x10xi32>
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x10xi32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<1x10xi32>)
 // CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
 // CHECK:           iree_linalg_ext.yield %[[RES]] : i1
@@ -83,7 +91,11 @@ func.func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -
 }
 
 // CHECK:         %[[SCALAR:.+]] = tensor.extract %[[ARG1]][] : tensor<i32>
-// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<1x10xi32>
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
+// CHECK-SAME:      dimension(1)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x10xi32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<1x10xi32>)
 // CHECK:         ^bb0(%[[ARG2:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG2]], %[[SCALAR]] : i32
 // CHECK:           iree_linalg_ext.yield %[[RES]] : i1
@@ -103,9 +115,11 @@ func.func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
   }) {dimension = 0 : i64, is_stable = false} : (tensor<16x32xi32>) -> (tensor<16x32xi32>)
   return %0 : tensor<16x32xi32>
 }
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<16x32xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs(%[[ARG0]] : tensor<16x32xi32>)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<16x32xi32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<16x32xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG1]], %[[ARG2]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]
@@ -127,9 +141,11 @@ func.func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   return %1 : tensor<1x5xf32>
 }
 
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<1x5xf32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(1)
-// CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CAST2:.+]] = arith.bitcast %[[ARG2]] : f32 to i32
@@ -156,9 +172,11 @@ func.func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> 
 // CHECK:         %[[UI32:.+]] = stablehlo.constant dense<2> : tensor<ui32>
 // CHECK:         %[[CONVERSION_CAST_CST:.+]] = builtin.unrealized_conversion_cast %[[UI32]] : tensor<ui32> to tensor<i32>
 // CHECK:         %[[EXTRACT_CST:.+]] = tensor.extract %[[CONVERSION_CAST_CST]][] : tensor<i32>
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<1x5xf32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(1)
-// CHECK-SAME:      outs(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<1x5xf32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[EXTRACT_CST]] : i32
@@ -187,9 +205,11 @@ func.func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) ->
   return %1 : tensor<1x5xf32>
 }
 
+// CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<1x5xf32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:    dimension(1)
-// CHECK-SAME:    outs(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:    ins(%[[ARG0]] : tensor<1x5xf32>)
+// CHECK-SAME:    outs(%[[OUT]] : tensor<1x5xf32>)
 // CHECK:         ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK-NOT:       stablehlo.complex
 // CHECK:           %[[CMP:.+]] = arith.cmpf olt, %{{.+}}, %{{.+}} : f32
@@ -198,7 +218,9 @@ func.func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) ->
 
 // -----
 
-// CHECK-LABEL: func.func @topk
+// CHECK-LABEL: func.func @topk(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<128xi32>
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]: tensor<128xi32>
 func.func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi32>) {
   %0:2 = "stablehlo.sort"(%arg0, %arg1) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>, %arg4: tensor<i32>, %arg5: tensor<i32>):
@@ -207,11 +229,12 @@ func.func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>, tensor<128xi32>) -> (tensor<128xi32>, tensor<128xi32>)
   return %0#0 : tensor<128xi32>
 }
-// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
-// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK:         %[[OUT0:.+]] = tensor.empty() : tensor<128xi32>
+// CHECK:         %[[OUT1:.+]] = tensor.empty() : tensor<128xi32>
 // CHECK:         %[[SORT:.+]]:2 = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]] : tensor<128xi32>, tensor<128xi32>)
+// CHECK-SAME:      ins(%[[ARG0]], %[[ARG1]] : tensor<128xi32>, tensor<128xi32>)
+// CHECK-SAME:      outs(%[[OUT0]], %[[OUT1]] : tensor<128xi32>, tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG2:.+]]: i32, %[[ARG3:.+]]: i32, %{{.*}}: i32, %{{.*}}: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG2]], %[[ARG3]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]

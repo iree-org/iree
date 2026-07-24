@@ -68,7 +68,7 @@ func.func @sort_3d_multi_result_distribute(
   -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
   %0, %1 = iree_linalg_ext.sort
       dimension(2)
-      outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
+      ins(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %2 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %2 : i1
@@ -126,7 +126,7 @@ func.func @sort_3d_multi_result_distribute_memref(
   %arg0: memref<?x?x?xi32>, %arg1 : memref<?x?x?xf32>) {
   iree_linalg_ext.sort
       dimension(2)
-      outs(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) {
+      ins(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) outs(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %0 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %0 : i1
