@@ -133,7 +133,8 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the static loop ranges.
+        Return one range per logical loop. Returns `ShapedType::kDynamic` for
+        ranges that cannot be statically recovered.
       }],
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getStaticLoopRanges",

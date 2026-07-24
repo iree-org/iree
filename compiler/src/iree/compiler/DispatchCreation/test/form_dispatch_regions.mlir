@@ -807,6 +807,147 @@ util.func @custom_op_consumer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf
 //  CHECK-SAME:         ins(%[[CUSTOM_OP]] :
 //       CHECK:     flow.return %[[GENERIC]]
 //       CHECK:   util.return %[[DISPATCH]]
+// DEFAULT-LABEL: func public @custom_op_consumer_fusion
+//       DEFAULT:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       DEFAULT:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       DEFAULT:       linalg.generic
+//       DEFAULT:     %[[GENERIC:.+]] = linalg.generic
+//  DEFAULT-SAME:         ins(%[[CUSTOM_OP]] :
+//       DEFAULT:     flow.return %[[GENERIC]]
+//   DEFAULT-NOT:   flow.dispatch.region
+//       DEFAULT:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @custom_op_static_consumer_fusion(%arg0 : tensor<4xf32>,
+    %arg1 : tensor<4xf32>, %arg2 : tensor<4xf32>) -> tensor<4xf32> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<4xf32>) outs(%arg1 : tensor<4xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      %1 = linalg.generic {
+          indexing_maps = [affine_map<(d0) -> (d0)>,
+                           affine_map<(d0) -> (d0)>],
+          iterator_types = ["parallel"]}
+          ins(%b0 : tensor<?xf32>) outs(%b1 : tensor<?xf32>) {
+        ^bb1(%bb0 : f32, %bb1 : f32):
+          %2 = arith.addf %bb0, %bb1 : f32
+          linalg.yield %2 : f32
+      } -> tensor<?xf32>
+      iree_linalg_ext.yield %1 : tensor<?xf32>
+  } -> tensor<4xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%0 : tensor<4xf32>) outs(%arg2 : tensor<4xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %4 = arith.mulf %b0, %b0 : f32
+      linalg.yield %4 : f32
+  } -> tensor<4xf32>
+  util.return %3 : tensor<4xf32>
+}
+// CHECK-LABEL: func public @custom_op_static_consumer_fusion
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       CHECK:       linalg.generic
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[CUSTOM_OP]] :
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]
+// DEFAULT-LABEL: func public @custom_op_static_consumer_fusion
+//       DEFAULT:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       DEFAULT:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       DEFAULT:       linalg.generic
+//       DEFAULT:     %[[GENERIC:.+]] = linalg.generic
+//  DEFAULT-SAME:         ins(%[[CUSTOM_OP]] :
+//       DEFAULT:     flow.return %[[GENERIC]]
+//   DEFAULT-NOT:   flow.dispatch.region
+//       DEFAULT:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @custom_op_non_invertible_consumer_fusion(
+    %arg0 : tensor<7xf32>, %arg1 : tensor<4xf32>,
+    %arg2 : tensor<4xf32>) -> tensor<4xf32> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0, d1) -> (d0 + d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>,
+                        #iree_linalg_ext.iterator_type<reduction>]}
+      ins(%arg0 : tensor<7xf32>) outs(%arg1 : tensor<4xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b1 : tensor<?xf32>
+  } -> tensor<4xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%0 : tensor<4xf32>) outs(%arg2 : tensor<4xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %2 = arith.mulf %b0, %b0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<4xf32>
+  util.return %1 : tensor<4xf32>
+}
+// CHECK-LABEL: func public @custom_op_non_invertible_consumer_fusion
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[CUSTOM_OP]] :
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]
+// DEFAULT-LABEL: func public @custom_op_non_invertible_consumer_fusion
+//       DEFAULT:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       DEFAULT:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       DEFAULT:     %[[GENERIC:.+]] = linalg.generic
+//  DEFAULT-SAME:         ins(%[[CUSTOM_OP]] :
+//       DEFAULT:     flow.return %[[GENERIC]]
+//   DEFAULT-NOT:   flow.dispatch.region
+//       DEFAULT:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @custom_op_consumer_not_fused_by_default(
+    %arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>,
+    %arg2 : tensor<4x1xf32>) -> tensor<4x1xf32> {
+  %0 = iree_linalg_ext.custom_op {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = [#iree_linalg_ext.iterator_type<parallel>]}
+      ins(%arg0 : tensor<4xf32>) outs(%arg1 : tensor<4xf32>) {
+    ^bb0(%b0 : tensor<?xf32>, %b1 : tensor<?xf32>):
+      iree_linalg_ext.yield %b1 : tensor<?xf32>
+  } -> tensor<4xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%0 : tensor<4xf32>) outs(%arg2 : tensor<4x1xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      %2 = arith.mulf %b0, %b0 : f32
+      linalg.yield %2 : f32
+  } -> tensor<4x1xf32>
+  util.return %1 : tensor<4x1xf32>
+}
+// CHECK-LABEL: func public @custom_op_consumer_not_fused_by_default
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[CUSTOM_OP]] :
+//       CHECK:     flow.return %[[GENERIC]]
+//   CHECK-NOT:   flow.dispatch.region
+//       CHECK:   util.return %[[DISPATCH]]
+// DEFAULT-LABEL: func public @custom_op_consumer_not_fused_by_default
+//       DEFAULT:   %[[CUSTOM_DISPATCH:.+]] = flow.dispatch.region
+//       DEFAULT:     %[[CUSTOM_OP:.+]] = iree_linalg_ext.custom_op
+//       DEFAULT:     flow.return %[[CUSTOM_OP]]
+//       DEFAULT:   %[[GENERIC_DISPATCH:.+]] = flow.dispatch.region
+//       DEFAULT:     %[[GENERIC:.+]] = linalg.generic
+//  DEFAULT-SAME:         ins(%[[CUSTOM_DISPATCH]] :
+//       DEFAULT:     flow.return %[[GENERIC]]
+//       DEFAULT:   util.return %[[GENERIC_DISPATCH]]
 
 // -----
 
