@@ -28,6 +28,54 @@
 
 namespace mlir::iree_compiler {
 
+scf::InnerTileAlignmentFnTy
+makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel) {
+  mlir::InnerTileAlignment kind;
+  switch (tilingLevel) {
+  default:
+    kind = mlir::InnerTileAlignment::Unknown;
+    break;
+  case IREE::CPU::TilingLevel::DistributionTiles:
+    kind = mlir::InnerTileAlignment::Multiple;
+    break;
+  case IREE::CPU::TilingLevel::VectorCommonParallelTiles:
+  case IREE::CPU::TilingLevel::VectorReductionTiles:
+  case IREE::CPU::TilingLevel::VectorInnerParallelTiles:
+    kind = mlir::InnerTileAlignment::Equal;
+    break;
+  }
+  return
+      [kind](TilingInterface op, ArrayRef<OpFoldResult>,
+             ArrayRef<Operation *>) -> SmallVector<mlir::InnerTileAlignment> {
+        // Assert `kind` at each scalable (dynamic) inner tile, indexed in the
+        // pack/unpack op's own iteration domain; a static inner tile is left
+        // `Unknown` and handled by the existing static path.
+        auto markScalable = [kind](ArrayRef<int64_t> innerDimsPos,
+                                   ArrayRef<OpFoldResult> mixedTiles,
+                                   int64_t rank) {
+          SmallVector<mlir::InnerTileAlignment> alignments(
+              rank, mlir::InnerTileAlignment::Unknown);
+          for (auto [pos, tile] : llvm::zip_equal(innerDimsPos, mixedTiles)) {
+            if (!getConstantIntValue(tile)) {
+              alignments[pos] = kind;
+            }
+          }
+          return alignments;
+        };
+        if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op.getOperation())) {
+          return markScalable(
+              unpackOp.getInnerDimsPos(), unpackOp.getMixedTiles(),
+              cast<ShapedType>(unpackOp.getDest().getType()).getRank());
+        }
+        if (auto packOp = dyn_cast<linalg::PackOp>(op.getOperation())) {
+          return markScalable(
+              packOp.getInnerDimsPos(), packOp.getMixedTiles(),
+              cast<ShapedType>(packOp.getSource().getType()).getRank());
+        }
+        return {};
+      };
+}
+
 void fuseProducersOfSlices(RewriterBase &rewriter,
                            std::queue<Operation *> &worklist,
                            scf::SCFTileAndFuseOptions &options,
@@ -54,7 +102,9 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedResult =
-        scf::tileAndFuseProducerOfSlice(rewriter, candidateSlice, loops);
+        scf::tileAndFuseProducerOfSlice(
+            rewriter, candidateSlice, loops,
+            options.tilingOptions.innerTileAlignmentFn);
     if (!fusedResult) {
       continue;
     }
@@ -109,10 +159,11 @@ struct ConsumerFusionQueueEntry {
 };
 } // namespace
 
-FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        std::function<bool(Operation *)> filterFn) {
+FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
+    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
+    MutableArrayRef<LoopLikeOpInterface> loops,
+    std::function<bool(Operation *)> filterFn,
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn) {
   // Collect the candidate slices which can be potential consumers that can be
   // fused. Keep them in a vector reverse-sorted by dominance: the candidate
   // dominating others comes last (so it can be cheaply popped from the vector).
@@ -213,7 +264,8 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     ConsumerFusionQueueEntry entry = candidates.pop_back_val();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops);
+        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops,
+                                       innerTileAlignmentFn);
     if (failed(fusedResult)) {
       return failure();
     }
