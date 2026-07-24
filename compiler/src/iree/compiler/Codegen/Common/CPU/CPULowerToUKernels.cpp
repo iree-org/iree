@@ -306,7 +306,7 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op,
       cDims->dilations.size() != 2) {
     return rewriter.notifyMatchFailure(op, "failed to infer conv dims");
   }
-  // TODO(phemashekar): plumb dilation_h/w as ukernel operands and honor them
+  // TODO(#24760): plumb dilation_h/w as ukernel operands and honor them
   // in the ukernels (window expression currently assumes unit dilation).
   if (cDims->dilations[0] != 1 || cDims->dilations[1] != 1) {
     return rewriter.notifyMatchFailure(op, "only dilation=1 supported for now");
