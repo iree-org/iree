@@ -27,6 +27,12 @@ macro(iree_llvm_configure_bundled)
   # Disable LLVM's warnings.
   set(LLVM_ENABLE_WARNINGS OFF)
 
+  # ccache can't cache PCH compilations, so disable LLVM's default PCH under ccache.
+  if(NOT DEFINED CMAKE_DISABLE_PRECOMPILE_HEADERS AND
+     CMAKE_CXX_COMPILER_LAUNCHER MATCHES "ccache")
+    set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)
+  endif()
+
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 
