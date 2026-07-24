@@ -402,13 +402,31 @@ struct riscv_hwprobe {
 
 // NOTE: not all kernel versions have all of the constants we need defined so as
 // a practice we always define the feature bits we need locally.
+#define IREE_RISCV_HWPROBE_KEY_MVENDORID 0
+#define IREE_RISCV_HWPROBE_KEY_MARCHID 1
 #define IREE_RISCV_HWPROBE_KEY_IMA_EXT_0 4
 #define IREE_RISCV_HWPROBE_IMA_V (1 << 2)
 #define IREE_RISCV_HWPROBE_EXT_ZVFH (1 << 30)
 #define IREE_RISCV_HWPROBE_EXT_ZVFHMIN (1ULL << 31)
 
+// SpaceMiT K1 machine identity, used to enable the vendor IME (XSMTVDot /
+// `vmadot`) matrix extension.
+#define IREE_RISCV_MVENDORID_SPACEMIT 0x710ULL
+#define IREE_RISCV_MARCHID_SPACEMIT_X60 0x8000000058000001ULL
+
+// Indices into `kv_pairs` below. hwprobe fills each pair's `value` in place, so
+// these must match the array element order.
+enum {
+  IREE_RISCV_HWPROBE_PAIR_IMA_EXT_0 = 0,
+  IREE_RISCV_HWPROBE_PAIR_MVENDORID,
+  IREE_RISCV_HWPROBE_PAIR_MARCHID,
+};
+
 static struct riscv_hwprobe kv_pairs[] = {
-    {IREE_RISCV_HWPROBE_KEY_IMA_EXT_0, 0}};
+    {IREE_RISCV_HWPROBE_KEY_IMA_EXT_0, 0},
+    {IREE_RISCV_HWPROBE_KEY_MVENDORID, 0},
+    {IREE_RISCV_HWPROBE_KEY_MARCHID, 0},
+};
 
 long riscv_hwprobe(struct riscv_hwprobe* pairs, size_t pair_count,
                    size_t cpusetsize, cpu_set_t* cpus, unsigned int flags) {
@@ -417,18 +435,29 @@ long riscv_hwprobe(struct riscv_hwprobe* pairs, size_t pair_count,
 }
 
 static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
-  long rc = riscv_hwprobe(&kv_pairs[0], 1, 0, NULL, 0);
+  long rc = riscv_hwprobe(&kv_pairs[0], IREE_ARRAYSIZE(kv_pairs), 0, NULL, 0);
   if (rc != 0) {
     fprintf(stderr, "riscv_hwprobe syscall failed");
     exit(1);
   }
-  unsigned long long hwprobe = kv_pairs[0].value;
+  unsigned long long hwprobe =
+      kv_pairs[IREE_RISCV_HWPROBE_PAIR_IMA_EXT_0].value;
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_V, hwprobe,
                  IREE_RISCV_HWPROBE_IMA_V);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFHMIN, hwprobe,
                  IREE_RISCV_HWPROBE_EXT_ZVFHMIN);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFH, hwprobe,
                  IREE_RISCV_HWPROBE_EXT_ZVFH);
+
+  // XSMTVDot (SpaceMiT IME): vendor CUSTOM_1 extension, absent from
+  // hwprobe IMA_EXT_0. Detecting via SpaceMiT X60 `mvendorid`/`marchid`.
+  unsigned long long mvendorid =
+      kv_pairs[IREE_RISCV_HWPROBE_PAIR_MVENDORID].value;
+  unsigned long long marchid = kv_pairs[IREE_RISCV_HWPROBE_PAIR_MARCHID].value;
+  if (mvendorid == IREE_RISCV_MVENDORID_SPACEMIT &&
+      marchid == IREE_RISCV_MARCHID_SPACEMIT_X60) {
+    out_fields[0] |= IREE_CPU_DATA0_RISCV_64_XSMTVDOT;
+  }
 }
 
 #else

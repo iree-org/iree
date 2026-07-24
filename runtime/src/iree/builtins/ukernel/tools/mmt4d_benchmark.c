@@ -110,10 +110,12 @@ static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
                                              int N0, int K0,
                                              const char* cpu_features) {
   // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
-  // narrow variants for handling these cases.
-  for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
-    iree_uk_benchmark_register_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features,
-                                          "");
+  // narrow variants for handling these cases. xsmtvdot has no narrow variants.
+  if (strcmp(cpu_features, "xsmtvdot") != 0) {
+    for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
+      iree_uk_benchmark_register_mmt4d_impl(flags, narrowM0, N0, K0,
+                                            cpu_features, "");
+    }
   }
   iree_uk_benchmark_register_mmt4d_impl(flags, M0, N0, K0, cpu_features, "");
 }
@@ -199,6 +201,12 @@ int main(int argc, char** argv) {
       IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
           IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
       7, 16, 1, "zvfh");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 12, 16, 8,
+                                   "xsmtvdot");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 24, 32, 16,
+                                   "xsmtvdot");
+  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 48, 64, 32,
+                                   "xsmtvdot");
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
