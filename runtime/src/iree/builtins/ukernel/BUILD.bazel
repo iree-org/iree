@@ -21,6 +21,8 @@ iree_runtime_cc_library(
 
 internal_headers = [
     "common.h",
+    "conv_nchwc.h",
+    "conv_nchwc_internal.h",
     "exported_bits.h",
     "mmt4d.h",
     "mmt4d_internal.h",
@@ -58,6 +60,8 @@ iree_runtime_cc_library(
 iree_runtime_cc_library(
     name = "ukernel",
     srcs = [
+        "conv_nchwc.c",
+        "conv_nchwc_tile_generic.c",
         "mmt4d.c",
         "mmt4d_tile_generic.c",
         "pack.c",
@@ -112,6 +116,8 @@ bitcode_specific_archs = [
 [iree_bitcode_library(
     name = "ukernel_bitcode_generic_%s" % arch,
     srcs = [
+        "conv_nchwc.c",
+        "conv_nchwc_tile_generic.c",
         "mmt4d.c",
         "mmt4d_tile_generic.c",
         "pack.c",
