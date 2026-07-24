@@ -370,14 +370,12 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op,
   // they don't require runtime strides; the remaining iterated dims need one.
   //   input  [N, IC/c0, H, W, c0]:                 strides of dims 0, 1, 2 ->
   //     (input_stride_n, input_stride_ic_outer, input_stride_h)
-  //   filter [OC/k0, IC/c0, FH, FW, c0, k0]:       strides of dims 0, 1, 2, 3
-  //   ->
-  //     (filter_stride_oc_outer, filter_stride_ic_outer, filter_stride_fh,
-  //      filter_stride_fw)
+  //   filter [OC/k0, IC/c0, FH, FW, c0, k0]:       strides of dims 0, 1, 2 ->
+  //     (filter_stride_oc_outer, filter_stride_ic_outer, filter_stride_fh)
   //   output [N, OC/k0, OH, OW, k0]:               strides of dims 0, 1, 2 ->
   //     (output_stride_n, output_stride_oc_outer, output_stride_oh)
   SmallVector<SmallVector<int64_t>> stridedDims = {
-      {0, 1, 2}, {0, 1, 2, 3}, {0, 1, 2}};
+      {0, 1, 2}, {0, 1, 2}, {0, 1, 2}};
   auto genericMicroKernelOp = IREE::Codegen::UKernelGenericOp::create(
       rewriter, loc, returnTypes, fn.name, ValueRange{input, filter}, output,
       otherOperands,

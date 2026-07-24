@@ -629,7 +629,7 @@ func.func @conv_nchwc_f32f32f32(%input: tensor<1x1x16x16x16xf32>, %filter: tenso
 // CHECK-SAME:       ins(%[[INPUT]], %[[FILTER]] :
 // CHECK-SAME:       outs(%[[OUTPUT]] :
 // CHECK-SAME:       (%[[C1]], %[[C1]], %[[C14]], %[[C14]], %[[C1]], %[[C3]], %[[C3]], %[[C16_I32]], %[[C16_I32]], %[[C1_I32]], %[[C1_I32]], %[[FLAGS]] :
-// CHECK-SAME:       strided_dims({{\[}}[0, 1, 2], [0, 1, 2, 3], [0, 1, 2]])
+// CHECK-SAME:       strided_dims({{\[}}[0, 1, 2], [0, 1, 2], [0, 1, 2]])
 //      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
