@@ -17,10 +17,6 @@ the RISC-V Vector extension (RVV), hand-written microkernels, and data-tiling.
 This post walks through the full flow for a model: importing it from PyTorch,
 compiling it for a RISC-V target, running it, and benchmarking the result.
 
-Building the tools and importing models are already covered in the documentation,
-so this post links to those and concentrates on the parts that are specific to
-RISC-V: the compilation flags, and how to benchmark what comes out.
-
 All commands below run under `qemu-riscv64`. The flow on real hardware is
 identical — the QEMU invocation is simply replaced by running the tools natively
 on the target.
@@ -46,10 +42,9 @@ The result is an `iree-compile` on the host and `iree-run-module` /
 
 ## Importing a model
 
-This post uses a few PyTorch models as a running example, but PyTorch is not
-special here: IREE's compiler ingests MLIR, and models from other frameworks such
-as LiteRT (TensorFlow Lite) and ONNX can be compiled just as well once they have
-been exported and imported to MLIR. See the
+This post uses a few PyTorch models as a running example, but IREE supports
+models from other frameworks such as LiteRT (TensorFlow Lite) and ONNX just as well,
+once they have been imported to MLIR. See the
 [ML frameworks guides](https://iree.dev/guides/ml-frameworks/) for the
 per-framework export/import steps — for example
 [PyTorch](https://iree.dev/guides/ml-frameworks/pytorch/),
@@ -95,8 +90,7 @@ The weights are supplied at run time with `--parameters=` (see below).
 
 ## Compiling for RISC-V
 
-The compilation step is where the RISC-V-specific configuration lives. The base
-command to produce RISC-V vector code is:
+The base command to produce RISC-V vector code is:
 
 ```shell
 iree-compile mobilenet.mlir -o mobilenet_rv64.vmfb \
@@ -127,8 +121,7 @@ base command.
 layout that maps cleanly onto the vector unit. It is off by default; most models,
 especially matmul-heavy models, benefit from this. On RISC-V the tile shape
 depends on
-VLEN, so the `+zvl*b` value chosen above also determines the layout that is
-produced. The
+VLEN, so the `+zvl*b` value chosen above also determines the produced layout. The
 [data-tiling walkthrough](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
 and [mmt4d blogpost](https://iree.dev/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/)
 cover the mechanism in detail.
@@ -255,12 +248,12 @@ To control threading, pin workers to specific cores with
 (worker/group counts, NUMA nodes, performance level).
 
 Note that under QEMU these are functional results rather than representative
-performance numbers. Representative timings require real hardware.
+performance numbers. Representative timings require real hardware (or cycle-accurate
+simulators, which are hardly feasible to use for large programs that ML/AI
+models are).
 
 ## Summary
 
-The overall flow is import, compile, run, and benchmark. The RISC-V-specific
-considerations reduce to the target-features string — in particular matching the
-VLEN to the target — and enabling data-tiling together with microkernels. The
-remainder is IREE's standard
-[CPU flow](https://iree.dev/guides/deployment-configurations/cpu/).
+This post walks through building IREE, then importing, compiling, running, and
+benchmarking a model on RISC-V. For more on the general flow and other CPU
+targets, see IREE's [CPU deployment guide](https://iree.dev/guides/deployment-configurations/cpu/).
