@@ -161,6 +161,105 @@ TEST_F(VMNativeModuleTest, Fork) {
 }
 
 //===----------------------------------------------------------------------===//
+// Fork tests for C++ native modules
+//===----------------------------------------------------------------------===//
+// A C++ NativeModule<State> holds its iree_vm_module_t as a non-first member
+// and points interface_.self at the NativeModule instance, so `module` and
+// `module->self` are different addresses. Forking a context containing one
+// therefore covers the module dispatch passing `self` rather than the
+// interface pointer; module_b above cannot, as its interface sits at offset 0
+// and the two pointers are numerically equal.
+
+class VMNativeModuleCppForkTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                          iree_allocator_system(), &instance_));
+  }
+
+  virtual void TearDown() { iree_vm_instance_release(instance_); }
+
+  iree_vm_context_t* CreateCppContext() {
+    iree_vm_module_t* module = nullptr;
+    IREE_CHECK_OK(
+        module_cpp_create(instance_, iree_allocator_system(), &module));
+
+    iree_vm_context_t* context = NULL;
+    std::vector<iree_vm_module_t*> modules = {module};
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
+        instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
+        iree_allocator_system(), &context));
+
+    iree_vm_module_release(module);
+    return context;
+  }
+
+  // Invokes module_cpp.entry, which mutates the per-context counter state.
+  StatusOr<int32_t> RunEntry(iree_vm_context_t* context, int32_t arg0) {
+    iree_vm_function_t function;
+    IREE_RETURN_IF_ERROR(
+        iree_vm_context_resolve_function(
+            context, iree_make_cstring_view("module_cpp.entry"), &function),
+        "unable to resolve entry point");
+
+    vm::ref<iree_vm_list_t> input_list;
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             1, iree_allocator_system(),
+                                             &input_list));
+    auto arg0_value = iree_vm_value_make_i32(arg0);
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_push_value(input_list.get(), &arg0_value));
+    vm::ref<iree_vm_list_t> output_list;
+    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             1, iree_allocator_system(),
+                                             &output_list));
+
+    IREE_RETURN_IF_ERROR(
+        iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                       /*policy=*/nullptr, input_list.get(), output_list.get(),
+                       iree_allocator_system()));
+
+    iree_vm_value_t ret0_value;
+    IREE_RETURN_IF_ERROR(
+        iree_vm_list_get_value(output_list.get(), 0, &ret0_value));
+    return ret0_value.i32;
+  }
+
+ private:
+  iree_vm_instance_t* instance_ = nullptr;
+};
+
+TEST_F(VMNativeModuleCppForkTest, Fork) {
+  iree_vm_context_t* parent_context = CreateCppContext();
+
+  // Run one tick of the parent context to mutate state.
+  IREE_ASSERT_OK_AND_ASSIGN(int32_t parent_v0, RunEntry(parent_context, 1));
+  ASSERT_EQ(parent_v0, 1);
+
+  // Fork the parent context, preserving its state.
+  iree_vm_context_t* child_context = NULL;
+  IREE_ASSERT_OK(iree_vm_context_fork(parent_context, iree_allocator_system(),
+                                      &child_context));
+
+  // Run a tick in both contexts; the values should match as they started from
+  // the same forked state but operate independently.
+  IREE_ASSERT_OK_AND_ASSIGN(int32_t parent_v1, RunEntry(parent_context, 2));
+  ASSERT_EQ(parent_v1, 4);
+  IREE_ASSERT_OK_AND_ASSIGN(int32_t child_v1, RunEntry(child_context, 2));
+  ASSERT_EQ(child_v1, 4);
+
+  // Drop the parent context; the forked one should be independent.
+  iree_vm_context_release(parent_context);
+
+  // Run another step in the child context to ensure it isn't relying on the
+  // parent.
+  IREE_ASSERT_OK_AND_ASSIGN(int32_t child_v2, RunEntry(child_context, 3));
+  ASSERT_EQ(child_v2, 8);
+
+  iree_vm_context_release(child_context);
+}
+
+//===----------------------------------------------------------------------===//
 // Parameterized alignment tests for C and C++ native modules
 //===----------------------------------------------------------------------===//
 // Tests alignment-sensitive parameter unpacking and result packing patterns.
