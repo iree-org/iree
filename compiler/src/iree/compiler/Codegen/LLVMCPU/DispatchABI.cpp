@@ -992,6 +992,20 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
   // To get a pointer to the processor data we need to track pointers all the
   // way from the environment argument. This is redundant with loadFieldValue
   // but that returns values instead.
+  //
+  // `forOp` here is the call itself, which may sit inside a loop, so if we
+  // built these ops at its insertion point we'd re-run the stack allocation
+  // on every loop iteration with nothing to ever pop it back off, overflowing
+  // the stack for large iteration counts (#24744). Build them in the
+  // enclosing function's entry block instead, where they only run once.
+  // The computation only depends on the function's `environment`
+  // argument and static target attributes, so it can safely move to the
+  // enclosing function's entry block instead, where it only runs once.
+  auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
+  assert(funcOp && "usage requires an enclosing LLVMFuncOp");
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+
   auto loc = forOp->getLoc();
   auto environmentPtrValue =
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
