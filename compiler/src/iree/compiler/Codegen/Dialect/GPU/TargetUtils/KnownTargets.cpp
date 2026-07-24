@@ -1020,12 +1020,14 @@ const WgpDetails *getSM121WgpDetails() {
 }
 
 const WgpDetails *getAdaWgpDetails() {
-  // Ada (sm_89) exposes the same tensor-core instructions as Ampere-class
-  // hardware.
+  // Ada (sm_89) adds FP8 mma.sync on top of Ampere-class tensor-core
+  // instructions.
   static const MMAIntrinsic mmaOps[] = {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
@@ -1080,6 +1082,8 @@ const WgpDetails *getSM120WgpDetails() {
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F16_16x8x16_F16,
       MMAIntrinsic::NV_MMA_SYNC_F32_16x8x16_BF16,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E4M3FN,
+      MMAIntrinsic::NV_MMA_SYNC_F32_16x8x32_F8E5M2,
       MMAIntrinsic::NV_WMMA_F32_16x16x16_F16,
       MMAIntrinsic::NV_WMMA_F16_16x16x16_F16,
   };
