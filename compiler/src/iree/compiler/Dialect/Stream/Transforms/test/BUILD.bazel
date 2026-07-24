@@ -58,6 +58,7 @@ iree_lit_test_suite(
             "pack_constants.mlir",
             "pack_constants_parameters.mlir",
             "pack_dispatch_operands.mlir",
+            "place_transfer_executions.mlir",
             "propagate_subviews.mlir",
             "propagate_timepoints.mlir",
             "propagate_timepoints_scf.mlir",
