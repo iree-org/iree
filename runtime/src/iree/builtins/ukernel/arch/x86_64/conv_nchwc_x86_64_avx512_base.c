@@ -40,7 +40,7 @@ iree_uk_conv_nchwc_tile_f32f32f32_16x16x16_x86_64_avx512_base_impl(
   const iree_uk_index_t in_pos_stride = (iree_uk_index_t)params->stride_w * C0;
   const iree_uk_index_t in_stride_h = params->input_stride_h;
   const iree_uk_index_t in_stride_ic_outer = params->input_stride_ic_outer;
-  const iree_uk_index_t f_stride_fw = params->filter_stride_fw;
+  const iree_uk_index_t f_stride_fw = (iree_uk_index_t)C0 * K0;
   const iree_uk_index_t f_stride_fh = params->filter_stride_fh;
   const iree_uk_index_t f_stride_ic_outer = params->filter_stride_ic_outer;
 

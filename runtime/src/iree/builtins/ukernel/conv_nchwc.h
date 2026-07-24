@@ -16,13 +16,13 @@ IREE_UK_EXPORT void iree_uk_conv_nchwc(
     iree_uk_index_t input_stride_h, const void* filter_buffer,
     iree_uk_index_t filter_offset, iree_uk_index_t filter_stride_oc_outer,
     iree_uk_index_t filter_stride_ic_outer, iree_uk_index_t filter_stride_fh,
-    iree_uk_index_t filter_stride_fw, void* output_buffer,
-    iree_uk_index_t output_offset, iree_uk_index_t output_stride_n,
-    iree_uk_index_t output_stride_oc_outer, iree_uk_index_t output_stride_oh,
-    iree_uk_index_t N, iree_uk_index_t OC_outer, iree_uk_index_t OH,
-    iree_uk_index_t OW, iree_uk_index_t IC_outer, iree_uk_index_t FH,
-    iree_uk_index_t FW, iree_uk_int32_t k0, iree_uk_int32_t c0,
-    iree_uk_int32_t stride_h, iree_uk_int32_t stride_w, iree_uk_uint32_t flags,
+    void* output_buffer, iree_uk_index_t output_offset,
+    iree_uk_index_t output_stride_n, iree_uk_index_t output_stride_oc_outer,
+    iree_uk_index_t output_stride_oh, iree_uk_index_t N,
+    iree_uk_index_t OC_outer, iree_uk_index_t OH, iree_uk_index_t OW,
+    iree_uk_index_t IC_outer, iree_uk_index_t FH, iree_uk_index_t FW,
+    iree_uk_int32_t k0, iree_uk_int32_t c0, iree_uk_int32_t stride_h,
+    iree_uk_int32_t stride_w, iree_uk_uint32_t flags,
     const iree_uk_uint64_t* cpu_data);
 
 // Returns a bit-field of information about how a conv_nchwc with the given

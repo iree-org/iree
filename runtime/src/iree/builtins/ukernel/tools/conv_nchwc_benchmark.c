@@ -49,8 +49,8 @@ static iree_status_t iree_uk_benchmark_conv_nchwc(
   params.input_stride_h = W * params.c0;
   params.input_stride_ic_outer = H * params.input_stride_h;
   params.input_stride_n = params.IC_outer * params.input_stride_ic_outer;
-  params.filter_stride_fw = (iree_uk_index_t)params.c0 * params.k0;
-  params.filter_stride_fh = params.FW * params.filter_stride_fw;
+  iree_uk_index_t filter_stride_fw = (iree_uk_index_t)params.c0 * params.k0;
+  params.filter_stride_fh = params.FW * filter_stride_fw;
   params.filter_stride_ic_outer = params.FH * params.filter_stride_fh;
   params.filter_stride_oc_outer =
       params.IC_outer * params.filter_stride_ic_outer;

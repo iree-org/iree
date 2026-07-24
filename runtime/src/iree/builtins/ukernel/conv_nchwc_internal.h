@@ -21,7 +21,6 @@ typedef struct iree_uk_conv_nchwc_params_t {
   iree_uk_index_t filter_stride_oc_outer;
   iree_uk_index_t filter_stride_ic_outer;
   iree_uk_index_t filter_stride_fh;
-  iree_uk_index_t filter_stride_fw;
   void* output_buffer;
   iree_uk_index_t output_offset;
   iree_uk_index_t output_stride_n;

@@ -28,7 +28,7 @@ static void iree_uk_conv_nchwc_reference_innerloop_f32f32f32(
       const float* in_fh = in_ic + fh * params->input_stride_h;
       const float* f_fh = f_ic + fh * params->filter_stride_fh;
       for (iree_uk_index_t fw = 0; fw < params->FW; ++fw) {
-        const float* f_fw = f_fh + fw * params->filter_stride_fw;
+        const float* f_fw = f_fh + fw * (c0 * k0);
         for (iree_uk_index_t ci = 0; ci < c0; ++ci) {
           acc += in_fh[fw * c0 + ci] * f_fw[ci * k0];
         }
@@ -127,7 +127,7 @@ static void iree_uk_test_conv_nchwc_for_shape_params(
   iree_uk_index_t H = (params.OH - 1) * params.stride_h + params.FH;
   iree_uk_index_t W = (params.OW - 1) * params.stride_w + params.FW;
 
-  // Populate the outer strides; innermost dims (W, OW, c0, k0) stay
+  // Populate the outer strides; innermost dims (W, OW, FW, c0, k0) stay
   // pack-contiguous. We need these before sizing buffers below.
   params.input_stride_h =
       iree_uk_test_random_stride(W * params.c0, in_type, engine);
@@ -136,10 +136,9 @@ static void iree_uk_test_conv_nchwc_for_shape_params(
   params.input_stride_n = iree_uk_test_random_stride(
       params.IC_outer * params.input_stride_ic_outer, in_type, engine);
 
-  params.filter_stride_fw = iree_uk_test_random_stride(
-      (iree_uk_index_t)params.c0 * params.k0, f_type, engine);
-  params.filter_stride_fh = iree_uk_test_random_stride(
-      params.FW * params.filter_stride_fw, f_type, engine);
+  iree_uk_index_t filter_stride_fw = (iree_uk_index_t)params.c0 * params.k0;
+  params.filter_stride_fh =
+      iree_uk_test_random_stride(params.FW * filter_stride_fw, f_type, engine);
   params.filter_stride_ic_outer = iree_uk_test_random_stride(
       params.FH * params.filter_stride_fh, f_type, engine);
   params.filter_stride_oc_outer = iree_uk_test_random_stride(
