@@ -54,7 +54,10 @@ been exported and imported to MLIR. See the
 per-framework export/import steps — for example
 [PyTorch](https://iree.dev/guides/ml-frameworks/pytorch/),
 [LiteRT / TensorFlow Lite](https://iree.dev/guides/ml-frameworks/tflite/), and
-[ONNX](https://iree.dev/guides/ml-frameworks/onnx/). Also check out the IREE community meeting [presentation](https://youtu.be/UvH9rVe9_KA?si=Z6aYmsspb1SLs0ik) by Artem Gindinson from Roofline.
+[ONNX](https://iree.dev/guides/ml-frameworks/onnx/). Also check out the
+IREE community meeting
+[presentation](https://youtu.be/UvH9rVe9_KA?si=Z6aYmsspb1SLs0ik) by Artem
+Gindinson from Roofline.
 
 For PyTorch, [iree-turbine](https://iree.dev/guides/ml-frameworks/pytorch/)'s
 `aot.export` produces the MLIR. The following script exports two torchvision
@@ -74,10 +77,12 @@ dump("mobilenet", tv.models.mobilenet_v2(weights="DEFAULT"), torch.randn(1, 3, 2
 dump("resnet18",  tv.models.resnet18(weights="DEFAULT"),     torch.randn(1, 3, 224, 224))
 ```
 
-The exported entry point is `@main`, see the `--function=main` flag for the `iree-*-module` invocations below.
+The exported entry point is `@main`, see the `--function=main` flag for the
+`iree-*-module` invocations below.
 
 Alternatively, you can check the models in the [IREE test suites](https://github.com/iree-org/iree-test-suites/tree/main/torch_models).
-We have some ready-to-compile `.mlir` files whose weights are kept in a separate `.irpa`
+We have some ready-to-compile `.mlir` files whose weights are kept in a
+separate `.irpa`
 (IREE parameter archive) — which keeps the `.mlir` small and lets you swap weights
 without recompiling. For example, [Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B):
 
@@ -104,7 +109,8 @@ iree-compile mobilenet.mlir -o mobilenet_rv64.vmfb \
 
 The flag that matters most on RISC-V is **`--iree-llvmcpu-target-cpu-features`**,
 which specifies the ISA. `+m,+a,+f,+d,+c` is `rv64gc`, `+v` enables RVV 1.0, and
-`+zvl512b` declares the minimum vector register width (VLEN) — 512 bits here. The `zvl`
+`+zvl512b` declares the minimum vector register width (VLEN) — 512 bits here.
+The `zvl`
 value should match the target hardware's actual VLEN — 512 for the QEMU
 configuration used below, 256 on a device such as a SpaceMiT X60 — since a
 mismatch leaves the vector units underutilized. VLEN is the key RISC-V knob: it
@@ -119,7 +125,8 @@ base command.
 
 `--iree-opt-data-tiling` repacks matmul-shaped operations into a tiled `mmt4d`
 layout that maps cleanly onto the vector unit. It is off by default; most models,
-especially matmul-heavy models, benefit from this. On RISC-V the tile shape depends on
+especially matmul-heavy models, benefit from this. On RISC-V the tile shape
+depends on
 VLEN, so the `+zvl*b` value chosen above also determines the layout that is
 produced. The
 [data-tiling walkthrough](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
@@ -148,7 +155,9 @@ Data-tiling together with the `mmt4d` microkernel is the recommended combination
 on RISC-V. Enabling data-tiling while disabling microkernels makes the packed
 `mmt4d` fall back to generic vectorization; although this also generally produces
 efficient code, the microkernel path is currently the most stable one.
-For background, see the [microkernels](https://iree.dev/community/blog/2024-01-22-microkernels/) and [mmt4d](https://iree.dev/community/blog/2021-10-13-mmt4d/) posts.
+For background, see the
+[microkernels](https://iree.dev/community/blog/2024-01-22-microkernels/) and
+[mmt4d](https://iree.dev/community/blog/2021-10-13-mmt4d/) posts.
 
 ### Static vs. scalable RVV
 
@@ -156,11 +165,15 @@ At present, IREE's RISC-V vector path is **static / fixed-length**: the VLEN is
 fixed at compile time through `+zvl*b`, and both LLVM's vectorizer and IREE's
 tile-size selection specialize to that width. IREE derives its `mmt4d` tile shapes
 from the target's fixed-width vector register width, and the microkernels are compiled
-for that same `+zvl*b` target, so the VLEN is the single value everything keys off of.
+for that same `+zvl*b` target, so the VLEN is the single value everything keys
+off of.
 
 There is also preliminary support for **scalable, vector-length-agnostic** RVV
 codegen — the `vscale`-style path that runs on any VLEN without recompiling, but
-it is still a work in progress. The scalable vectorization pipeline can be activated with `--iree-llvmcpu-enable-scalable-vectorization=true` (which currently has to be combined with `--iree-experimental-vscale-value=VLEN/64` flag due to some ongoing work on the host compiler).
+it is still a work in progress. The scalable vectorization pipeline can be
+activated with `--iree-llvmcpu-enable-scalable-vectorization=true` (which
+currently has to be combined with `--iree-experimental-vscale-value=VLEN/64`
+flag due to some ongoing work on the host compiler).
 
 Combined, a performance-oriented compilation for the mobilenet example is:
 
@@ -237,7 +250,9 @@ BM_main/real_time_stddev    0.2 ms          0.7 ms           10
 
 To control threading, pin workers to specific cores with
 `--task_topology_cpu_ids=0,1,2,3`, or run single-threaded with `--device=local-sync`
-(preferrably compiled with `--iree-llvmcpu-disable-distribution=true`). See `iree-run-module --help` for the other `--task_topology_*` options (worker/group counts, NUMA nodes, performance level).
+(preferably compiled with `--iree-llvmcpu-disable-distribution=true`). See
+`iree-run-module --help` for the other `--task_topology_*` options
+(worker/group counts, NUMA nodes, performance level).
 
 Note that under QEMU these are functional results rather than representative
 performance numbers. Representative timings require real hardware.
