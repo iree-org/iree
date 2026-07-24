@@ -37,6 +37,8 @@ jobs:
           CMAKE_BUILD_TYPE: Release
           IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
           IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
+          # Prevent OOM, cap build parallelism to fit the standard 4-vCPU/16-GB hosted runner.
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure
