@@ -3182,6 +3182,9 @@ setConvDataTiledGenericRootConfig(mlir::FunctionOpInterface entryPointFn,
         getCPUTranslationInfo(convOp.getContext(),
                               CPUPipeline::Mmt4dTilingExpert));
   }
+
+  // Enable loop peeling so the OW tile yields a static-shaped main loop that
+  // vectorizes cleanly, leaving the remainder to a scalar epilogue.
   DictionaryAttr pipelineConfig =
       getPipelineConfWithPeelingAttr(convOp.getContext());
   return setOpConfigAndEntryPointFnTranslation(
