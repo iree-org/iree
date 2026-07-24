@@ -1379,7 +1379,6 @@ void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(benvanik): splat->slice -> splat.
   // TODO(benvanik): clone->slice -> slice.
 }
-
 //===----------------------------------------------------------------------===//
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
@@ -1410,14 +1409,76 @@ void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 // stream.tensor.load
 //===----------------------------------------------------------------------===//
+namespace {
+
+// Replaces a load from a transferred clone with a load from a
+// transferred single-element slice of the original source.
+struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(TensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    // Match: stream.tensor.load <- stream.async.transfer
+    auto transferOp = loadOp.getSource().getDefiningOp<AsyncTransferOp>();
+    if (!transferOp) {
+      return failure();
+    }
+
+    // Match: stream.async.transfer <- stream.tensor.clone
+    auto cloneOp = transferOp.getSource().getDefiningOp<TensorCloneOp>();
+    if (!cloneOp) {
+      return failure();
+    }
+
+    auto loc = loadOp.getLoc();
+    auto sourceType = cast<RankedTensorType>(loadOp.getSourceEncoding());
+    int64_t rank = sourceType.getRank();
+
+    // Create a single-element slice (length 1 in every dimension).
+    auto one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    SmallVector<Value> lengths(rank, one);
+    SmallVector<Value> zeroIndices(rank, zero);
+
+    SmallVector<int64_t> unitShape(rank, 1);
+    auto sliceType =
+        RankedTensorType::get(unitShape, sourceType.getElementType());
+
+    int64_t byteSize =
+        IREE::Util::getTypeByteSize(loadOp.getResult().getType());
+    auto sliceSize = arith::ConstantIndexOp::create(rewriter, loc, byteSize);
+
+    // Slice the original tensor instead of the cloned tensor.
+    auto sliceOp = TensorSliceOp::create(
+        rewriter, loc, cloneOp.getSource().getType(), cloneOp.getSource(),
+        cloneOp.getSourceEncoding(), cloneOp.getSourceEncodingDims(),
+        cloneOp.getSourceSize(), loadOp.getIndices(), lengths, sliceType,
+        ValueRange{}, sliceSize, cloneOp.getAffinityAttr());
+
+    // Transfer the sliced tensor to staging.
+    auto stagedSliceOp = AsyncTransferOp::create(
+        rewriter, loc, transferOp.getResult().getType(), sliceOp.getResult(),
+        sliceSize, sliceSize, transferOp.getSourceAffinityAttr(),
+        transferOp.getResultAffinityAttr());
+
+    // Load from the staged slice at zero indices.
+    rewriter.replaceOpWithNewOp<TensorLoadOp>(
+        loadOp, loadOp.getResult().getType(), stagedSliceOp.getResult(),
+        sliceType, ValueRange{}, sliceSize, zeroIndices);
+
+    return success();
+  }
+};
+
+} // namespace
 
 void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
-  // TODO(benvanik): clone + ex load -> slice (ranged) + load.
   // TODO(benvanik): slice + ex load -> slice (ranged) + load.
   // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
   // TODO(benvanik): combine multiple loads from the same target if contiguous.
+  results.insert<FoldTensorCloneIntoLoad>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2250,16 +2311,68 @@ struct FoldAsyncLoadBitcast : OpRewritePattern<AsyncLoadOp> {
   }
 };
 
+// Replaces a load from a transferred clone with a load from a
+// transferred byte-ranged slice of the original source.
+struct FoldAsyncCloneIntoLoad : OpRewritePattern<AsyncLoadOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(AsyncLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    // Match: stream.async.load <- stream.async.transfer
+    auto transferOp = loadOp.getSource().getDefiningOp<AsyncTransferOp>();
+    if (!transferOp) {
+      return failure();
+    }
+
+    // Match: stream.async.transfer <- stream.async.clone
+    auto cloneOp = transferOp.getSource().getDefiningOp<AsyncCloneOp>();
+    if (!cloneOp) {
+      return failure();
+    }
+
+    auto loc = loadOp.getLoc();
+    int64_t byteSize =
+        IREE::Util::getTypeByteSize(loadOp.getResult().getType());
+
+    auto byteSizeValue =
+        arith::ConstantIndexOp::create(rewriter, loc, byteSize);
+    auto zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+
+    // Compute the end of the byte range to slice.
+    auto sourceEnd = rewriter.createOrFold<arith::AddIOp>(
+        loc, loadOp.getSourceOffset(), byteSizeValue);
+
+    // Slice the original resource instead of the cloned resource.
+    auto sliceOp = AsyncSliceOp::create(
+        rewriter, loc, cloneOp.getSource().getType(), cloneOp.getSource(),
+        cloneOp.getSourceSize(), loadOp.getSourceOffset(), sourceEnd,
+        byteSizeValue, cloneOp.getAffinityAttr());
+
+    // Transfer the sliced resource to staging.
+    auto stagedSliceOp = AsyncTransferOp::create(
+        rewriter, loc, transferOp.getResult().getType(), sliceOp.getResult(),
+        byteSizeValue, byteSizeValue, transferOp.getSourceAffinityAttr(),
+        transferOp.getResultAffinityAttr());
+
+    // Load from the staged slice at offset 0.
+    rewriter.replaceOpWithNewOp<AsyncLoadOp>(
+        loadOp, loadOp.getResult().getType(), stagedSliceOp.getResult(),
+        byteSizeValue, zero);
+
+    return success();
+  }
+};
+
 } // namespace
 
 void AsyncLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
-  // TODO(benvanik): clone + ex load -> slice (ranged) + load.
   // TODO(benvanik): slice + ex load -> slice (ranged) + load.
   // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
   // TODO(benvanik): combine multiple loads from the same target if contiguous.
   results.insert<FoldAsyncLoadBitcast>(context);
+  results.insert<FoldAsyncCloneIntoLoad>(context);
 }
 
 //===----------------------------------------------------------------------===//
