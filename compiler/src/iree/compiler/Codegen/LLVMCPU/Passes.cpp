@@ -496,6 +496,7 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager,
 
 static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                                  bool enableAArch64SME,
+                                 bool enableNativeBf16Converts,
                                  const CPUCodegenOptions &cpuOpts) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
@@ -514,12 +515,13 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                          createLLVMCPUEmitVectorizationRemarksPass)
       .addPass(createConvertLinalgToLoopsPass)
       .addPass(createConvertBf16ArithToF32Pass)
-      .addPass([]() {
-        // Convert bf16 buffers to i16. LLVM IR supports fp8 types
-        // natively, so we don't need to convert them here.
+      .addPass([&]() {
+        // Convert bf16 buffers to i16, unless the target has native bf16
+        // converts. LLVM IR supports fp8 types natively, so we don't need
+        // to convert them here.
         return createConvertUnsupportedFloatToIntBuffersPass(
             ConvertUnsupportedFloatToIntBuffersPassOptions{
-                /*includeBf16=*/true,
+                /*includeBf16=*/!enableNativeBf16Converts,
                 /*includeF8E5M2=*/false,
                 /*includeF8E4M3FN=*/false,
                 /*includeF8E5M2FNUZ=*/false,
@@ -610,7 +612,9 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createIREEAffineExpandIndexOpsPass)
       .addPass([&]() {
         arith::ArithExpandOpsPassOptions options;
-        options.includeBf16 = true;
+        // Keep bf16 extf/truncf intact when the target lowers them to native
+        // conversion instructions.
+        options.includeBf16 = !enableNativeBf16Converts;
         options.includeF8E8M0 = true;
         return arith::createArithExpandOpsPass(options);
       })
@@ -696,6 +700,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &cpuOpts,
                                      bool enableAArch64SME,
+                                     bool enableNativeBf16Converts,
                                      bool includeLLVMLowering) {
   modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
   FunctionLikeNest(modulePassManager)
@@ -714,7 +719,8 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
   modulePassManager.addPass(IREE::Util::createDropCompilerHintsPass());
 
   if (includeLLVMLowering) {
-    addLowerToLLVMPasses(modulePassManager, enableAArch64SME, cpuOpts);
+    addLowerToLLVMPasses(modulePassManager, enableAArch64SME,
+                         enableNativeBf16Converts, cpuOpts);
   }
   LLVM_DEBUG({
     llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
@@ -859,6 +865,11 @@ void registerCodegenLLVMCPUPasses() {
     Option<bool> enableArmSME{
         *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+    Option<bool> enableNativeBf16Converts{
+        *this, "enable-native-bf16-converts",
+        llvm::cl::desc("Assume the target has hardware bf16 <-> f32 converts "
+                       "and keep bf16 in the IR instead of emulating it."),
+        llvm::cl::init(false)};
     Option<bool> includeLLVMLowering{
         *this, "include-llvm-lowering",
         llvm::cl::desc("Include the lowering to LLVM dialect."),
@@ -873,9 +884,9 @@ void registerCodegenLLVMCPUPasses() {
              LLVMCPULoweringPipelineOptions const &options) {
             CPUCodegenOptions cpuOpts =
                 getCPUCodegenOptionsForTextualPipeline(options);
-            buildLLVMCPUCodegenPassPipeline(modulePassManager, cpuOpts,
-                                            options.enableArmSME,
-                                            options.includeLLVMLowering);
+            buildLLVMCPUCodegenPassPipeline(
+                modulePassManager, cpuOpts, options.enableArmSME,
+                options.enableNativeBf16Converts, options.includeLLVMLowering);
           });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(

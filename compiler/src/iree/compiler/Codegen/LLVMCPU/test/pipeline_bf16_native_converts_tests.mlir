@@ -1,0 +1,84 @@
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='enable-native-bf16-converts=true' --split-input-file %s | FileCheck %s --check-prefix=NATIVE
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline --split-input-file %s | FileCheck %s --check-prefix=EMULATED
+
+// Verifies the enable-native-bf16-converts pipeline option. The target backend
+// derives this option from the target's cpu features (Zfbfmin + Zvfbfmin on
+// RISC-V). Arithmetic is promoted to f32 either way (no CPU has native bf16
+// arithmetic yet), what the option controls is the conversions around it.
+// When it's set, bf16 storage is kept and the promotion's extf/truncf survive
+// to the LLVM dialect as fpext/fptrunc, which select as native conversion
+// instructions, otherwise bf16 storage becomes i16 and the conversions are
+// expanded into shift/round-bias integer sequences.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zfbfmin,+zvfbfmin", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+builtin.module {
+  func.func @bf16_add() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>>
+    %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xbf16>>
+    %lhs = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [1024], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>> -> tensor<1024xbf16>
+    %rhs = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [1024], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>> -> tensor<1024xbf16>
+    %init = tensor.empty() : tensor<1024xbf16>
+    %add = linalg.add ins(%lhs, %rhs : tensor<1024xbf16>, tensor<1024xbf16>) outs(%init : tensor<1024xbf16>) -> tensor<1024xbf16>
+    iree_tensor_ext.dispatch.tensor.store %add, %2, offsets = [0], sizes = [1024], strides = [1] : tensor<1024xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xbf16>>
+    return
+  }
+}
+// The bf16 operands are extended, added in f32, and truncated back with
+// plain fpext/fptrunc - no integer emulation.
+// NATIVE-LABEL: llvm.func @bf16_add
+//       NATIVE:   llvm.fpext {{.*}} : bf16 to f32
+//       NATIVE:   llvm.fadd {{.*}} : f32
+//       NATIVE:   llvm.fptrunc {{.*}} : f32 to bf16
+//   NATIVE-NOT:   llvm.lshr
+//   NATIVE-NOT:   llvm.shl
+
+// Emulated: the add is performed in f32 on values reconstructed from i16
+// storage, and the result is rounded back with the shift/bias sequence.
+// EMULATED-LABEL: llvm.func @bf16_add
+//       EMULATED:   llvm.shl
+//       EMULATED:   llvm.fadd {{.*}} : f32
+//       EMULATED:   llvm.lshr
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+
+#executable_target_embedded_elf_riscv_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zfbfmin,+zvfbfmin", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+builtin.module {
+  func.func @bf16_truncf() attributes {hal.executable.target = #executable_target_embedded_elf_riscv_64_} {
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xbf16>>
+    %in = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [1024], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xf32>> -> tensor<1024xf32>
+    %init = tensor.empty() : tensor<1024xbf16>
+    %trunc = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%in : tensor<1024xf32>) outs(%init : tensor<1024xbf16>) {
+      ^bb0(%a: f32, %out: bf16):
+        %t = arith.truncf %a : f32 to bf16
+        linalg.yield %t : bf16
+    } -> tensor<1024xbf16>
+    iree_tensor_ext.dispatch.tensor.store %trunc, %1, offsets = [0], sizes = [1024], strides = [1] : tensor<1024xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xbf16>>
+    return
+  }
+}
+// The f32 to bf16 cast stays an fptrunc, which is selectable as a single
+// native narrowing convert.
+// NATIVE-LABEL: llvm.func @bf16_truncf
+//       NATIVE:   llvm.fptrunc {{.*}} : vector<{{[0-9]+}}xf32> to vector<{{[0-9]+}}xbf16>
+//   NATIVE-NOT:   llvm.lshr
+
+// Emulated: the round-to-nearest-even bias sequence, and no bf16 fptrunc.
+// EMULATED-LABEL: llvm.func @bf16_truncf
+//   EMULATED-NOT:   llvm.fptrunc {{.*}} to vector<{{[0-9]+}}xbf16>
+//       EMULATED:   llvm.lshr
