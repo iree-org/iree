@@ -29,3 +29,13 @@ module {
     return
   }
 }
+
+// -----
+
+module {
+  // expected-error @+1 {{shared memory allocation size overflows the size computation}}
+  func.func @shared_mem_alloc_size_overflow() {
+    memref.alloc() : memref<9007199254740991x1024x14x14xf32, #gpu.address_space<workgroup>>
+    return
+  }
+}

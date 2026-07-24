@@ -22,6 +22,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -92,6 +93,31 @@ getDispatchConfigOp(mlir::FunctionOpInterface funcOp) {
 
 bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && getEntryPoint(func);
+}
+
+FailureOr<int64_t>
+getStaticShapeSizeInBits(ShapedType shapedType,
+                         llvm::function_ref<int64_t(Type)> getElementBitWidth) {
+  int64_t size = 1;
+  for (int64_t dimSize : shapedType.getShape()) {
+    if (ShapedType::isDynamic(dimSize)) {
+      continue;
+    }
+    if (llvm::MulOverflow(size, dimSize, size)) {
+      return failure();
+    }
+  }
+  Type elementType = shapedType.getElementType();
+  if (auto shapedElementType = dyn_cast<ShapedType>(elementType)) {
+    FailureOr<int64_t> elementBits =
+        getStaticShapeSizeInBits(shapedElementType, getElementBitWidth);
+    if (failed(elementBits) || llvm::MulOverflow(size, *elementBits, size)) {
+      return failure();
+    }
+  } else if (llvm::MulOverflow(size, getElementBitWidth(elementType), size)) {
+    return failure();
+  }
+  return size;
 }
 
 std::optional<StringRef> getConfigCpuFeatures(DictionaryAttr targetConfig) {

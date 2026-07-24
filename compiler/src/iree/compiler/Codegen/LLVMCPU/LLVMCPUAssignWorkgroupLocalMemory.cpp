@@ -49,32 +49,6 @@ static bool hasWorkgroupLocalMemorySpace(Type type) {
                            memRefType.getMemorySpace());
 }
 
-static LogicalResult checkedAdd(int64_t lhs, int64_t rhs, int64_t &result) {
-  if (llvm::AddOverflow(lhs, rhs, result)) {
-    return failure();
-  }
-  return success();
-}
-
-static LogicalResult checkedMul(int64_t lhs, int64_t rhs, int64_t &result) {
-  if (llvm::MulOverflow(lhs, rhs, result)) {
-    return failure();
-  }
-  return success();
-}
-
-static LogicalResult checkedAlignTo(int64_t value, int64_t alignment,
-                                    int64_t &result) {
-  assert(value >= 0);
-  assert(alignment > 0);
-  int64_t remainder = value % alignment;
-  if (remainder == 0) {
-    result = value;
-    return success();
-  }
-  return checkedAdd(value, alignment - remainder, result);
-}
-
 static bool hasZeroElementShape(MemRefType type) {
   return llvm::is_contained(type.getShape(), 0);
 }
@@ -115,15 +89,15 @@ computeStaticElementFootprint(memref::AllocOp allocOp) {
   int64_t maxElementOffset = offset;
   for (auto [dim, stride] : llvm::zip_equal(type.getShape(), strides)) {
     int64_t contribution = 0;
-    if (failed(checkedMul(dim - 1, stride, contribution)) ||
-        failed(checkedAdd(maxElementOffset, contribution, maxElementOffset))) {
+    if (llvm::MulOverflow(dim - 1, stride, contribution) ||
+        llvm::AddOverflow(maxElementOffset, contribution, maxElementOffset)) {
       allocOp.emitOpError("workgroup local memory allocation size overflow");
       return failure();
     }
   }
 
   int64_t footprint = 0;
-  if (failed(checkedAdd(maxElementOffset, 1, footprint))) {
+  if (llvm::AddOverflow(maxElementOffset, int64_t(1), footprint)) {
     allocOp.emitOpError("workgroup local memory allocation size overflow");
     return failure();
   }
@@ -154,7 +128,7 @@ computeAllocationSize(memref::AllocOp allocOp) {
   int64_t elementBytes = static_cast<int64_t>(elementByteSize.getFixedValue());
 
   int64_t totalBytes = 0;
-  if (failed(checkedMul(*elementFootprint, elementBytes, totalBytes))) {
+  if (llvm::MulOverflow(*elementFootprint, elementBytes, totalBytes)) {
     allocOp.emitOpError("workgroup local memory allocation size overflow");
     return failure();
   }
@@ -281,7 +255,11 @@ void LLVMCPUAssignWorkgroupLocalMemoryPass::runOnOperation() {
     if (failed(alignment)) {
       return signalPassFailure();
     }
-    if (failed(checkedAlignTo(currentOffset, *alignment, currentOffset))) {
+    assert(currentOffset >= 0 && *alignment > 0);
+    int64_t misalignment = currentOffset % *alignment;
+    if (misalignment != 0 &&
+        llvm::AddOverflow(currentOffset, *alignment - misalignment,
+                          currentOffset)) {
       allocOp.emitOpError("workgroup local memory allocation size overflow");
       return signalPassFailure();
     }
@@ -291,8 +269,8 @@ void LLVMCPUAssignWorkgroupLocalMemoryPass::runOnOperation() {
         /*elementFootprint=*/allocationSize->elementFootprint,
     });
 
-    if (failed(checkedAdd(currentOffset, allocationSize->byteSize,
-                          currentOffset))) {
+    if (llvm::AddOverflow(currentOffset, allocationSize->byteSize,
+                          currentOffset)) {
       allocOp.emitOpError("workgroup local memory allocation size overflow");
       return signalPassFailure();
     }
