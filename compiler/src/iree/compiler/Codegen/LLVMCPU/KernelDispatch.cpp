@@ -1372,7 +1372,9 @@ static void getMatmulVectorSizesUsingFillRegisterFileHeuristic(
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   scalableSizeFlags.resize(3, false);
   if (isScalableVectorizationEnabled() &&
-      hasAnySVEFeature(targetAttr.getConfiguration())) {
+      (hasAnySVEFeature(targetAttr.getConfiguration()) ||
+       (hasSMEFeature(targetAttr.getConfiguration()) &&
+        isArmStreamingForced()))) {
     scalableSizeFlags[1] = true;
   }
 }

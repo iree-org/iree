@@ -39,6 +39,11 @@ bool isOptEnabled(FunctionOpInterface funcOp, StringRef label);
 /// Returns if scalable vectorization is enabled or not.
 bool isScalableVectorizationEnabled();
 
+/// Returns whether Armv9-A streaming SVE mode is forced for dispatch regions
+/// containing scalable vector operations, via
+/// `--iree-llvmcpu-force-arm-streaming`.
+bool isArmStreamingForced();
+
 /// Returns the runtime value of vscale specified by the user. This is not meant
 /// to be used for codegen and is meant to circumvent the current limitation on
 /// host-side querying of this value at runtime. This is temporary until #21317

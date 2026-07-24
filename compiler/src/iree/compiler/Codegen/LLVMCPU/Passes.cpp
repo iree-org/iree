@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/CodegenOptions.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -58,19 +59,6 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
     "iree-llvmcpu-enable-vector-contract-custom-kernels",
     llvm::cl::desc("Enables vector contract custom kernels for "
                    "LLVMCPUMmt4dVectorLowering pass."),
-    llvm::cl::init(false), llvm::cl::Hidden);
-
-// By default, IREE does not enable the Armv9-A streaming SVE mode in the
-// presence of scalable vectors (even when using `+sme`), as currently there's
-// no cost model of when it could be beneficial. This flag will effectively make
-// IREE/LLVM switch from SVE to SSVE in dispatch regions with supported
-// scalable vector operations.
-static llvm::cl::opt<bool> clForceArmStreaming(
-    "iree-llvmcpu-force-arm-streaming",
-    llvm::cl::desc(
-        "Enables Armv9-A streaming SVE mode for any dispatch region that "
-        "contains supported scalable vector operations (i.e., use SSVE rather "
-        "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false), llvm::cl::Hidden);
 
 static llvm::cl::opt<bool> clPatchFuncOps(
@@ -548,7 +536,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
     modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
     FunctionLikeNest(modulePassManager)
         .addPredicatedPass(
-            clForceArmStreaming,
+            isArmStreamingForced(),
             [] {
               // 1. Enable Armv9-A streaming mode without ZA (i.e., SSVE) for
               // dispatch regions that contain scalable vectors when forced via
