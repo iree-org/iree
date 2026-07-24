@@ -31,6 +31,7 @@ struct TorchOptions {
   bool decompose = true;
   bool externalizeTransients = false;
   bool enableShapeRefinement = false;
+  bool emitAsyncEntryPoints = true;
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("Torch Input");
     binder.opt<bool>(
@@ -50,6 +51,13 @@ struct TorchOptions {
     binder.opt<bool>("iree-torch-enable-shape-refinement",
                      enableShapeRefinement, llvm::cl::cat(category),
                      llvm::cl::desc("Enable shape refinement"));
+    binder.opt<bool>(
+        "iree-torch-emit-async-entry-points", emitAsyncEntryPoints,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Generate async functions with coarse-fences ABI and sync wrapper. "
+            "When false, generates only lightweight sync functions without "
+            "mutable tensor support."));
   }
 };
 
@@ -63,6 +71,15 @@ struct TorchSession : PluginSession<TorchSession, TorchOptions,
     mlir::torch::registerConversionPasses();
     mlir::torch::onnx_c::registerTorchOnnxToTorchPasses();
     TorchInput::registerTMTensorConversionPasses();
+  }
+
+  LogicalResult onActivate() override {
+    if (options.externalizeTransients && !options.emitAsyncEntryPoints) {
+      return emitError(UnknownLoc::get(context))
+             << "iree-torch-externalize-transients requires async entry "
+                "points";
+    }
+    return success();
   }
 
   void onRegisterDialects(DialectRegistry &registry) override {
@@ -100,6 +117,7 @@ struct TorchSession : PluginSession<TorchSession, TorchOptions,
       torchOptions.decompose = options.decompose;
       torchOptions.externalizeTransients = options.externalizeTransients;
       torchOptions.enableShapeRefinement = options.enableShapeRefinement;
+      torchOptions.emitAsyncEntryPoints = options.emitAsyncEntryPoints;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
       return true;
     }

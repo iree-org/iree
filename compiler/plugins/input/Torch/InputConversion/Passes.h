@@ -52,6 +52,13 @@ struct TorchToIREELoweringPipelineOptions
   Option<bool> enableShapeRefinement{*this, "enable-shape-refinement",
                                      llvm::cl::desc("Enable shape refinement"),
                                      llvm::cl::init(false)};
+  Option<bool> emitAsyncEntryPoints{
+      *this, "emit-async-entry-points",
+      llvm::cl::desc(
+          "Generate async functions with coarse-fences ABI and sync wrapper. "
+          "When false, generates only lightweight sync functions without "
+          "mutable tensor support."),
+      llvm::cl::init(true)};
 };
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.
