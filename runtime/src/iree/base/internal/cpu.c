@@ -452,14 +452,26 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFBFWMA, hwprobe,
                  IREE_RISCV_HWPROBE_EXT_ZVFBFWMA);
 
-  // XSMTVDot (SpaceMiT IME): vendor CUSTOM_1 extension, absent from
-  // hwprobe IMA_EXT_0. Detecting via SpaceMiT X60 `mvendorid`/`marchid`.
+  // XSMTVDot (SpaceMiT IME): absent from hwprobe / cpuinfo. Approximating via
+  // X60 mvendorid/marchid until a vendor hwprobe key exists. this host bit
+  // mainly unblocks ukernel tests/benchmarks.
   unsigned long long mvendorid =
       kv_pairs[IREE_RISCV_HWPROBE_PAIR_MVENDORID].value;
   unsigned long long marchid = kv_pairs[IREE_RISCV_HWPROBE_PAIR_MARCHID].value;
   if (mvendorid == IREE_RISCV_MVENDORID_SPACEMIT &&
       marchid == IREE_RISCV_MARCHID_SPACEMIT_X60) {
     out_fields[0] |= IREE_CPU_DATA0_RISCV_64_XSMTVDOT;
+  }
+
+  // No stable hwprobe VLEN key yet; reading vlenb (CSR 0xc22) when V is
+  // present. Sets only the three IME-relevant zvl*b bits (inclusive).
+  if (out_fields[0] & IREE_CPU_DATA0_RISCV_64_V) {
+    uint64_t vlenb = 0;
+    __asm__ volatile("csrr %0, 0xc22" : "=r"(vlenb));
+    uint64_t vlen_bits = vlenb * 8;
+    if (vlen_bits >= 256) out_fields[0] |= IREE_CPU_DATA0_RISCV_64_ZVL256B;
+    if (vlen_bits >= 1024) out_fields[0] |= IREE_CPU_DATA0_RISCV_64_ZVL1024B;
+    if (vlen_bits >= 4096) out_fields[0] |= IREE_CPU_DATA0_RISCV_64_ZVL4096B;
   }
 }
 

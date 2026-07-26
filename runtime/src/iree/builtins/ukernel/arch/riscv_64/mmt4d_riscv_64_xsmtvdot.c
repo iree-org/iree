@@ -145,10 +145,10 @@ iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot(
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot,
-    iree_uk_mmt4d_tile_s8s8s32_12xXXx8_riscv_64_xsmtvdot, 12)
+    iree_uk_mmt4d_tile_s8s8s32_12xXXx8_riscv_64_xsmtvdot_zvl256b, 12)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot,
-    iree_uk_mmt4d_tile_s8s8s32_24xXXx16_riscv_64_xsmtvdot, 24)
+    iree_uk_mmt4d_tile_s8s8s32_24xXXx16_riscv_64_xsmtvdot_zvl1024b, 24)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot,
-    iree_uk_mmt4d_tile_s8s8s32_48xXXx32_riscv_64_xsmtvdot, 48)
+    iree_uk_mmt4d_tile_s8s8s32_48xXXx32_riscv_64_xsmtvdot_zvl4096b, 48)

@@ -376,8 +376,8 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
 // -----
 
 // RISC-V 64 + xsmtvdot + zvl512b: VLEN not in {256, 1024, 4096}, so fall
-// through to standard RVV i8 tiles (N0=vlen/8=64, K0=1). IME vmadot is not
-// selected.
+// through to standard RVV i8 tiles. IME vmadot is not selected.
+// Static: N0=vlen/8=64. Scalable: N is vscale-based (base VLEN=64).
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -399,9 +399,14 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl512b_fallback(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl512b_fallback(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x1xi8>
-// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x64xi32>
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x1xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x64xi32>
+
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:      outs(%[[ACC]]
