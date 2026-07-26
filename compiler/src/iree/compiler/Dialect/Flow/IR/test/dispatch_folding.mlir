@@ -304,7 +304,7 @@ util.func public @drop_dynamic_shape_changing_tied_result(
       iree_linalg_ext.yield %take_lhs : i1
     } -> tensor<?x?xi64>, tensor<?x?xi64>
     // CHECK: flow.return %{{.+}}#1 : tensor<?x?xi64>
-    flow.return %key_view, %sorted#1 : tensor<?x?xi64>, tensor<?x?xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<?x?xi64>, tensor<?x?xi64>
   }
   // CHECK: util.return %[[RESULT]] : tensor<?x?xi64>
   util.return %result#1 : tensor<?x?xi64>
