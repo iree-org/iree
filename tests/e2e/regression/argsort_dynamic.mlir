@@ -1,4 +1,4 @@
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-cpu=generic -o %t.vmfb
+// RUN: iree-run-mlir --Xcompiler,iree-hal-target-device=local --Xcompiler,iree-hal-local-target-device-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --input="3xi64=[3 1 2]" | FileCheck %s
 
 // Regression test for https://github.com/iree-org/iree/issues/24735. The key
 // result is unused, but sort still needs writable storage for the keys while it
@@ -28,3 +28,5 @@ func.func @argsort(%input: tensor<?xi64>) -> tensor<?xi64> {
 
   return %sorted#1 : tensor<?xi64>
 }
+
+// CHECK: 3xi64=[1 2 0]

@@ -33,6 +33,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -436,7 +437,14 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
           if (tiedOperand) {
             Value tiedBase =
                 IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
-            preserveTiedResult = !hasUseAfterDispatch(tiedBase);
+            // Region-to-workgroups reuses the tied input's type and dimensions
+            // as the whole-result store target. Destination-style results
+            // preserve their init shape; requiring a direct, type-identical tie
+            // avoids reconstructing shape identity through other tied ops.
+            preserveTiedResult = isa<DestinationStyleOpInterface>(target) &&
+                                 tiedOperand == tiedBase &&
+                                 result.getType() == tiedBase.getType() &&
+                                 !hasUseAfterDispatch(tiedBase);
           }
         }
       }

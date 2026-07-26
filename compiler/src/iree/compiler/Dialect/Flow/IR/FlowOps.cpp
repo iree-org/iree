@@ -32,6 +32,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -622,6 +623,14 @@ static bool isTiedResultRequiredInRegion(Flow::DispatchRegionOp regionOp,
     return false;
   }
   Value tiedBase = IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
+  // Region-to-workgroups reuses the tied input's type and dimensions as the
+  // whole-result store target. Destination-style results preserve their init
+  // shape; requiring a direct, type-identical tie avoids reconstructing shape
+  // identity through other tied ops.
+  if (!isa<DestinationStyleOpInterface>(opResult.getOwner()) ||
+      tiedOperand != tiedBase || yieldedValue.getType() != tiedBase.getType()) {
+    return false;
+  }
 
   Block *dispatchBlock = regionOp->getBlock();
   // Tied results created before the dispatch alias the same storage, so their
