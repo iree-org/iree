@@ -104,6 +104,33 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "conv_nchwc_test",
+    srcs = ["conv_nchwc_test.c"],
+    deps = [
+        ":test",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
+    ],
+)
+
+cc_binary_benchmark(
+    name = "conv_nchwc_benchmark",
+    srcs = ["conv_nchwc_benchmark.c"],
+    deps = [
+        ":benchmark",
+        ":util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/builtins/ukernel",
+        "//runtime/src/iree/builtins/ukernel:internal_headers",
+        "//runtime/src/iree/testing:benchmark",
+    ],
+)
+
 cc_binary_benchmark(
     name = "pack_benchmark",
     srcs = ["pack_benchmark.c"],

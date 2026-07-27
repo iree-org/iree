@@ -28,6 +28,8 @@ if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 # All headers transitively included by code in this directory. Bazel-only.
 UKERNEL_X86_64_INTERNAL_HEADERS = [
     "common_x86_64.h",
+    "conv_nchwc_x86_64_internal.h",
+    "conv_nchwc_x86_64_tiles.inl",
     "mmt4d_x86_64_internal.h",
     "mmt4d_x86_64_tiles.inl",
     "pack_x86_64_internal.h",
@@ -39,6 +41,7 @@ UKERNEL_X86_64_INTERNAL_HEADERS = [
 iree_bitcode_library(
     name = "ukernel_bitcode_arch_x86_64_entry_points",
     srcs = [
+        "conv_nchwc_x86_64_entry_point.c",
         "mmt4d_x86_64_entry_point.c",
         "pack_x86_64_entry_point.c",
         "unpack_x86_64_entry_point.c",
@@ -77,6 +80,7 @@ UKERNEL_X86_64_AVX512_BASE_COPTS = UKERNEL_X86_64_AVX2_FMA_COPTS + [
 iree_bitcode_library(
     name = "ukernel_bitcode_arch_x86_64_avx512_base",
     srcs = [
+        "conv_nchwc_x86_64_avx512_base.c",
         "mmt4d_x86_64_avx512_base.c",
         "pack_x86_64_avx512_base.c",
         "unpack_x86_64_avx512_base.c",

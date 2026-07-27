@@ -105,4 +105,22 @@
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32 0x0500
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16 0x0600
 
+//===----------------------------------------------------------------------===//
+// conv_nchwc
+//===----------------------------------------------------------------------===//
+
+// type enum (lhs = input, rhs = filter, out = output)
+#define IREE_UK_FLAG_CONV_NCHWC_TYPE_MASK 0xFF
+#define IREE_UK_FLAG_CONV_NCHWC_TYPE_NONE 0x00
+#define IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32 0x01
+#define IREE_UK_FLAG_CONV_NCHWC_TYPE_END 0x02
+
+// bit flags
+#define IREE_UK_FLAG_CONV_NCHWC_ACCUMULATE 0x100
+#define IREE_UK_FLAG_CONV_NCHWC_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION 0x200
+
+// info bit flags returned by iree_uk_conv_nchwc_info.
+#define IREE_UK_FLAG_CONV_NCHWC_INFO_HAVE_ARCHITECTURE_SPECIFIC_TILE_FUNCTION \
+  0x1
+
 #endif  // IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_

@@ -22,11 +22,14 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
+    "conv_nchwc_x86_64_internal.h"
+    "conv_nchwc_x86_64_tiles.inl"
     "mmt4d_x86_64_internal.h"
     "mmt4d_x86_64_tiles.inl"
     "pack_x86_64_internal.h"
     "unpack_x86_64_internal.h"
   SRCS
+    "conv_nchwc_x86_64_entry_point.c"
     "mmt4d_x86_64_entry_point.c"
     "pack_x86_64_entry_point.c"
     "unpack_x86_64_entry_point.c"
@@ -41,6 +44,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
+    "conv_nchwc_x86_64_internal.h"
+    "conv_nchwc_x86_64_tiles.inl"
     "mmt4d_x86_64_internal.h"
     "mmt4d_x86_64_tiles.inl"
     "pack_x86_64_internal.h"
@@ -65,11 +70,14 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
+    "conv_nchwc_x86_64_internal.h"
+    "conv_nchwc_x86_64_tiles.inl"
     "mmt4d_x86_64_internal.h"
     "mmt4d_x86_64_tiles.inl"
     "pack_x86_64_internal.h"
     "unpack_x86_64_internal.h"
   SRCS
+    "conv_nchwc_x86_64_avx512_base.c"
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
     "unpack_x86_64_avx512_base.c"
@@ -94,6 +102,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
+    "conv_nchwc_x86_64_internal.h"
+    "conv_nchwc_x86_64_tiles.inl"
     "mmt4d_x86_64_internal.h"
     "mmt4d_x86_64_tiles.inl"
     "pack_x86_64_internal.h"
@@ -122,6 +132,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
+    "conv_nchwc_x86_64_internal.h"
+    "conv_nchwc_x86_64_tiles.inl"
     "mmt4d_x86_64_internal.h"
     "mmt4d_x86_64_tiles.inl"
     "pack_x86_64_internal.h"
@@ -367,6 +379,7 @@ iree_cc_library(
   NAME
     x86_64_avx512_base
   SRCS
+    "conv_nchwc_x86_64_avx512_base.c"
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
     "unpack_x86_64_avx512_base.c"
@@ -410,6 +423,7 @@ iree_cc_library(
   NAME
     x86_64
   SRCS
+    "conv_nchwc_x86_64_entry_point.c"
     "mmt4d_x86_64_entry_point.c"
     "pack_x86_64_entry_point.c"
     "query_tile_sizes_x86_64_entry_point.c"
