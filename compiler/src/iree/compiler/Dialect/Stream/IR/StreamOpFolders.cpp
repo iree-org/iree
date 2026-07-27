@@ -1343,6 +1343,7 @@ void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
   // TODO(benvanik): splat->slice -> splat.
   // TODO(benvanik): clone->slice -> slice.
 }
+
 //===----------------------------------------------------------------------===//
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
@@ -1388,15 +1389,30 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
       return failure();
     }
 
+    if (!transferOp.getResult().hasOneUse()) {
+      return failure();
+    }
+
     // Match: stream.async.transfer <- stream.tensor.clone
     auto cloneOp = transferOp.getSource().getDefiningOp<TensorCloneOp>();
     if (!cloneOp) {
       return failure();
     }
 
-    auto loc = loadOp.getLoc();
-    auto sourceType = cast<RankedTensorType>(loadOp.getSourceEncoding());
+    // Clones are allowed to change shape and element type ,Only fold when the
+    // clone is a pure copy so slicing the original source is equivalent to
+    // slicing the clone result.
+    if (cloneOp.getSourceEncoding() != cloneOp.getResultEncoding() ||
+        cloneOp.getResultEncoding() != loadOp.getSourceEncoding()) {
+      return failure();
+    }
+    auto sourceType = dyn_cast<RankedTensorType>(loadOp.getSourceEncoding());
+    if (!sourceType) {
+      return failure();
+    }
     int64_t rank = sourceType.getRank();
+
+    auto loc = loadOp.getLoc();
 
     // Create a single-element slice (length 1 in every dimension).
     auto one = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -1405,12 +1421,12 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
     SmallVector<Value> zeroIndices(rank, zero);
 
     SmallVector<int64_t> unitShape(rank, 1);
-    auto sliceType =
-        RankedTensorType::get(unitShape, sourceType.getElementType());
+    auto sliceType = RankedTensorType::get(
+        unitShape, sourceType.getElementType(), sourceType.getEncoding());
 
-    int64_t byteSize =
-        IREE::Util::getTypeByteSize(loadOp.getResult().getType());
-    auto sliceSize = arith::ConstantIndexOp::create(rewriter, loc, byteSize);
+    Value sliceSize = TensorSizeOfOp::create(
+        rewriter, loc, rewriter.getIndexType(), TypeAttr::get(sliceType),
+        ValueRange{}, cloneOp.getAffinityAttr());
 
     // Slice the original tensor instead of the cloned tensor.
     auto sliceOp = TensorSliceOp::create(
@@ -1439,7 +1455,6 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
 void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
-  // TODO(benvanik): slice + ex load -> slice (ranged) + load.
   // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
   // TODO(benvanik): combine multiple loads from the same target if contiguous.
   results.insert<FoldTensorCloneIntoLoad>(context);
@@ -2287,6 +2302,12 @@ struct FoldAsyncCloneIntoLoad : OpRewritePattern<AsyncLoadOp> {
     if (!transferOp) {
       return failure();
     }
+    // Only fold if the transfer is not used by anything else: otherwise the
+    // original clone+transfer will still be required and we'd just be adding
+    // an additional slice+transfer alongside it.
+    if (!transferOp.getResult().hasOneUse()) {
+      return failure();
+    }
 
     // Match: stream.async.transfer <- stream.async.clone
     auto cloneOp = transferOp.getSource().getDefiningOp<AsyncCloneOp>();
@@ -2296,7 +2317,7 @@ struct FoldAsyncCloneIntoLoad : OpRewritePattern<AsyncLoadOp> {
 
     auto loc = loadOp.getLoc();
     int64_t byteSize =
-        IREE::Util::getTypeByteSize(loadOp.getResult().getType());
+        IREE::Util::getRoundedElementByteWidth(loadOp.getResult().getType());
 
     auto byteSizeValue =
         arith::ConstantIndexOp::create(rewriter, loc, byteSize);
