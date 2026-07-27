@@ -6050,6 +6050,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#running-models-on-risc-v-with-iree" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running models on RISC-V with IREE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6142,6 +6153,61 @@
 <p>Updates from the IREE team</p>
 <hr />
       </header>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/egebeysel.png" alt="Ege Beysel">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2026-07-23 00:00:00+00:00">July 23, 2026</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="category/performance/" class="md-meta__link">Performance</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              8 min read
+            
+          </li>
+        
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="running-models-on-risc-v-with-iree"><a class="toclink" href="2026-07-23-running-models-on-risc-v-with-iree/">Running models on RISC-V with IREE</a></h2>
+<p>IREE compiles machine learning models to native RISC-V CPU code, with support for
+the RISC-V Vector extension (RVV), hand-written microkernels, and data-tiling.
+This post walks through the full flow for a model: importing it from PyTorch,
+compiling it for a RISC-V target, running it, and benchmarking the result.</p>
+<p>All commands below run under <code>qemu-riscv64</code>. The flow on real hardware is
+identical — the QEMU invocation is simply replaced by running the tools natively
+on the target.</p>
+
+    
+      <nav class="md-post__action">
+        <a href="2026-07-23-running-models-on-risc-v-with-iree/">
+          Continue reading
+        </a>
+      </nav>
+    
+    
+  </div>
+</article>
       
         <article class="md-post md-post--excerpt">
   <header class="md-post__header">

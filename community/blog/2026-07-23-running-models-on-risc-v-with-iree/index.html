@@ -8,31 +8,29 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/community/blog/archive/2026/">
+        <link rel="canonical" href="https://iree.dev/community/blog/2026-07-23-running-models-on-risc-v-with-iree/">
       
       
-        <link rel="prev" href="../../category/platforms/">
+        <link rel="prev" href="../2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">
       
-      
-        <link rel="next" href="../2025/">
       
       
         
       
       
-      <link rel="icon" href="../../../../assets/images/IREE_Logo_Icon_Color.svg">
+      <link rel="icon" href="../../../assets/images/IREE_Logo_Icon_Color.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
-        <title>2026 - IREE</title>
+        <title>Running models on RISC-V with IREE - IREE</title>
       
     
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,11 +49,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/extra.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/extra.css">
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/iree.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/iree.css">
     
-    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#2026" class="md-skip">
+        <a href="#running-models-on-risc-v-with-iree" class="md-skip">
           Skip to content
         </a>
       
@@ -98,7 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://iree.dev/" title="IREE" class="md-header__button md-logo" aria-label="IREE" data-md-component="logo">
       
-  <img src="../../../../assets/images/IREE_Logo_Icon_Color.svg" alt="logo">
+  <img src="../../../assets/images/IREE_Logo_Icon_Color.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -115,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              2026
+              Running models on RISC-V with IREE
             
           </span>
         </div>
@@ -220,7 +218,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../.." class="md-tabs__link">
+      <a href="../../.." class="md-tabs__link">
         
   
   
@@ -241,7 +239,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../../building-from-source/" class="md-tabs__link">
+        <a href="../../../building-from-source/" class="md-tabs__link">
           
   
   
@@ -263,7 +261,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../../guides/" class="md-tabs__link">
+        <a href="../../../guides/" class="md-tabs__link">
           
   
   
@@ -285,7 +283,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../../reference/" class="md-tabs__link">
+        <a href="../../../reference/" class="md-tabs__link">
           
   
   
@@ -307,7 +305,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../../developers/" class="md-tabs__link">
+        <a href="../../../developers/" class="md-tabs__link">
           
   
   
@@ -331,7 +329,7 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../../" class="md-tabs__link">
+        <a href="../../" class="md-tabs__link">
           
   
   
@@ -362,7 +360,9 @@
           
             
               
-              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" hidden>
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
                     
@@ -375,7 +375,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://iree.dev/" title="IREE" class="md-nav__button md-logo" aria-label="IREE" data-md-component="logo">
       
-  <img src="../../../../assets/images/IREE_Logo_Icon_Color.svg" alt="logo">
+  <img src="../../../assets/images/IREE_Logo_Icon_Color.svg" alt="logo">
 
     </a>
     IREE
@@ -402,7 +402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../.." class="md-nav__link">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -462,7 +462,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../building-from-source/" class="md-nav__link ">
+            <a href="../../../building-from-source/" class="md-nav__link ">
               
   
   
@@ -506,7 +506,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../building-from-source/getting-started/" class="md-nav__link">
+      <a href="../../../building-from-source/getting-started/" class="md-nav__link">
         
   
   
@@ -536,7 +536,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../building-from-source/android/" class="md-nav__link">
+      <a href="../../../building-from-source/android/" class="md-nav__link">
         
   
   
@@ -566,7 +566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../building-from-source/ios/" class="md-nav__link">
+      <a href="../../../building-from-source/ios/" class="md-nav__link">
         
   
   
@@ -596,7 +596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../building-from-source/riscv/" class="md-nav__link">
+      <a href="../../../building-from-source/riscv/" class="md-nav__link">
         
   
   
@@ -664,7 +664,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../guides/" class="md-nav__link ">
+            <a href="../../../guides/" class="md-nav__link ">
               
   
   
@@ -743,7 +743,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../guides/ml-frameworks/" class="md-nav__link ">
+            <a href="../../../guides/ml-frameworks/" class="md-nav__link ">
               
   
   
@@ -787,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/ml-frameworks/jax/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/jax/" class="md-nav__link">
         
   
   
@@ -817,7 +817,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/ml-frameworks/onnx/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/onnx/" class="md-nav__link">
         
   
   
@@ -847,7 +847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/pytorch/" class="md-nav__link">
         
   
   
@@ -877,7 +877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tensorflow/" class="md-nav__link">
         
   
   
@@ -907,7 +907,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/ml-frameworks/tflite/" class="md-nav__link">
+      <a href="../../../guides/ml-frameworks/tflite/" class="md-nav__link">
         
   
   
@@ -982,7 +982,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../guides/deployment-configurations/" class="md-nav__link ">
+            <a href="../../../guides/deployment-configurations/" class="md-nav__link ">
               
   
   
@@ -1026,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/cpu/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/cpu/" class="md-nav__link">
         
   
   
@@ -1056,7 +1056,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/bare-metal/" class="md-nav__link">
         
   
   
@@ -1086,7 +1086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-vulkan/" class="md-nav__link">
         
   
   
@@ -1116,7 +1116,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-rocm/" class="md-nav__link">
         
   
   
@@ -1146,7 +1146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-cuda/" class="md-nav__link">
         
   
   
@@ -1176,7 +1176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
+      <a href="../../../guides/deployment-configurations/gpu-metal/" class="md-nav__link">
         
   
   
@@ -1272,7 +1272,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../guides/parameters/" class="md-nav__link">
+      <a href="../../../guides/parameters/" class="md-nav__link">
         
   
   
@@ -1350,7 +1350,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../reference/" class="md-nav__link ">
+            <a href="../../../reference/" class="md-nav__link ">
               
   
   
@@ -1458,7 +1458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/glossary/" class="md-nav__link">
+      <a href="../../../reference/glossary/" class="md-nav__link">
         
   
   
@@ -1488,7 +1488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/optimization-options/" class="md-nav__link">
+      <a href="../../../reference/optimization-options/" class="md-nav__link">
         
   
   
@@ -1518,7 +1518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/tuning/" class="md-nav__link">
+      <a href="../../../reference/tuning/" class="md-nav__link">
         
   
   
@@ -1556,7 +1556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/extensions/" class="md-nav__link">
+      <a href="../../../reference/extensions/" class="md-nav__link">
         
   
   
@@ -1623,7 +1623,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../reference/bindings/" class="md-nav__link ">
+            <a href="../../../reference/bindings/" class="md-nav__link ">
               
   
   
@@ -1667,7 +1667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/bindings/c-api/" class="md-nav__link">
+      <a href="../../../reference/bindings/c-api/" class="md-nav__link">
         
   
   
@@ -1697,7 +1697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/bindings/python/" class="md-nav__link">
+      <a href="../../../reference/bindings/python/" class="md-nav__link">
         
   
   
@@ -1768,7 +1768,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../reference/mlir-dialects/" class="md-nav__link ">
+            <a href="../../../reference/mlir-dialects/" class="md-nav__link ">
               
   
   
@@ -1880,7 +1880,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Flow/" class="md-nav__link">
         
   
   
@@ -1908,7 +1908,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HAL/" class="md-nav__link">
         
   
   
@@ -1936,7 +1936,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Stream/" class="md-nav__link">
         
   
   
@@ -1964,7 +1964,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Util/" class="md-nav__link">
         
   
   
@@ -1992,7 +1992,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VM/" class="md-nav__link">
         
   
   
@@ -2090,7 +2090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/Encoding/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Encoding/" class="md-nav__link">
         
   
   
@@ -2118,7 +2118,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/LinalgExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/LinalgExt/" class="md-nav__link">
         
   
   
@@ -2146,7 +2146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/TensorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/TensorExt/" class="md-nav__link">
         
   
   
@@ -2250,7 +2250,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/IREECodegen/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREECodegen/" class="md-nav__link">
         
   
   
@@ -2278,7 +2278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/IREECPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREECPU/" class="md-nav__link">
         
   
   
@@ -2306,7 +2306,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/IREEGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEGPU/" class="md-nav__link">
         
   
   
@@ -2334,7 +2334,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/IREEVectorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IREEVectorExt/" class="md-nav__link">
         
   
   
@@ -2362,7 +2362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/PCF/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/PCF/" class="md-nav__link">
         
   
   
@@ -2390,7 +2390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/VMVX/" class="md-nav__link">
         
   
   
@@ -2488,7 +2488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/Check/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/Check/" class="md-nav__link">
         
   
   
@@ -2576,7 +2576,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALInline/" class="md-nav__link">
         
   
   
@@ -2604,7 +2604,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/HALLoader/" class="md-nav__link">
         
   
   
@@ -2698,7 +2698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-dialects/IOParameters/" class="md-nav__link">
+      <a href="../../../reference/mlir-dialects/IOParameters/" class="md-nav__link">
         
   
   
@@ -2781,7 +2781,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../reference/mlir-passes/" class="md-nav__link ">
+            <a href="../../../reference/mlir-passes/" class="md-nav__link ">
               
   
   
@@ -2893,7 +2893,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/Flow/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Flow/" class="md-nav__link">
         
   
   
@@ -2921,7 +2921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/HAL/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/HAL/" class="md-nav__link">
         
   
   
@@ -2949,7 +2949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/Stream/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Stream/" class="md-nav__link">
         
   
   
@@ -2977,7 +2977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/Util/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Util/" class="md-nav__link">
         
   
   
@@ -3005,7 +3005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/VM/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/VM/" class="md-nav__link">
         
   
   
@@ -3107,7 +3107,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/ConstEval/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/ConstEval/" class="md-nav__link">
         
   
   
@@ -3135,7 +3135,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/DispatchCreation/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/DispatchCreation/" class="md-nav__link">
         
   
   
@@ -3163,7 +3163,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/GlobalOptimization/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/GlobalOptimization/" class="md-nav__link">
         
   
   
@@ -3191,7 +3191,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/InputConversion/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/InputConversion/" class="md-nav__link">
         
   
   
@@ -3219,7 +3219,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/Preprocessing/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/Preprocessing/" class="md-nav__link">
         
   
   
@@ -3331,7 +3331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenCommon/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommon/" class="md-nav__link">
         
   
   
@@ -3359,7 +3359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenCommonCPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommonCPU/" class="md-nav__link">
         
   
   
@@ -3387,7 +3387,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenCommonGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenCommonGPU/" class="md-nav__link">
         
   
   
@@ -3415,7 +3415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenDialectGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenDialectGPU/" class="md-nav__link">
         
   
   
@@ -3443,7 +3443,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenDialectPCF/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenDialectPCF/" class="md-nav__link">
         
   
   
@@ -3471,7 +3471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenDialectVectorExt/" class="md-nav__link">
         
   
   
@@ -3499,7 +3499,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenLLVMCPU/" class="md-nav__link">
         
   
   
@@ -3527,7 +3527,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenLLVMGPU/" class="md-nav__link">
         
   
   
@@ -3555,7 +3555,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenSPIRV/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenSPIRV/" class="md-nav__link">
         
   
   
@@ -3583,7 +3583,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../reference/mlir-passes/CodegenVMVX/" class="md-nav__link">
+      <a href="../../../reference/mlir-passes/CodegenVMVX/" class="md-nav__link">
         
   
   
@@ -3671,7 +3671,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../developers/" class="md-nav__link ">
+            <a href="../../../developers/" class="md-nav__link ">
               
   
   
@@ -3785,7 +3785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/contributing/" class="md-nav__link">
+      <a href="../../../developers/general/contributing/" class="md-nav__link">
         
   
   
@@ -3815,7 +3815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/developer-overview/" class="md-nav__link">
+      <a href="../../../developers/general/developer-overview/" class="md-nav__link">
         
   
   
@@ -3845,7 +3845,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/developer-tips/" class="md-nav__link">
+      <a href="../../../developers/general/developer-tips/" class="md-nav__link">
         
   
   
@@ -3875,7 +3875,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/testing-guide/" class="md-nav__link">
+      <a href="../../../developers/general/testing-guide/" class="md-nav__link">
         
   
   
@@ -3905,7 +3905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/github-actions/" class="md-nav__link">
+      <a href="../../../developers/general/github-actions/" class="md-nav__link">
         
   
   
@@ -3935,7 +3935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/release-management/" class="md-nav__link">
+      <a href="../../../developers/general/release-management/" class="md-nav__link">
         
   
   
@@ -3965,7 +3965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/general/versioning-scheme/" class="md-nav__link">
+      <a href="../../../developers/general/versioning-scheme/" class="md-nav__link">
         
   
   
@@ -4067,7 +4067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/building/bazel/" class="md-nav__link">
+      <a href="../../../developers/building/bazel/" class="md-nav__link">
         
   
   
@@ -4097,7 +4097,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/building/emscripten/" class="md-nav__link">
+      <a href="../../../developers/building/emscripten/" class="md-nav__link">
         
   
   
@@ -4127,7 +4127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/building/cmake-options/" class="md-nav__link">
+      <a href="../../../developers/building/cmake-options/" class="md-nav__link">
         
   
   
@@ -4157,7 +4157,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/building/cmake-with-ccache/" class="md-nav__link">
+      <a href="../../../developers/building/cmake-with-ccache/" class="md-nav__link">
         
   
   
@@ -4269,7 +4269,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/android-with-lldb/" class="md-nav__link">
+      <a href="../../../developers/debugging/android-with-lldb/" class="md-nav__link">
         
   
   
@@ -4299,7 +4299,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/compile-time-regressions/" class="md-nav__link">
+      <a href="../../../developers/debugging/compile-time-regressions/" class="md-nav__link">
         
   
   
@@ -4329,7 +4329,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/gpu/" class="md-nav__link">
+      <a href="../../../developers/debugging/gpu/" class="md-nav__link">
         
   
   
@@ -4359,7 +4359,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/llvm/" class="md-nav__link">
+      <a href="../../../developers/debugging/llvm/" class="md-nav__link">
         
   
   
@@ -4389,7 +4389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/integration-tests/" class="md-nav__link">
+      <a href="../../../developers/debugging/integration-tests/" class="md-nav__link">
         
   
   
@@ -4419,7 +4419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/model-development/" class="md-nav__link">
+      <a href="../../../developers/debugging/model-development/" class="md-nav__link">
         
   
   
@@ -4449,7 +4449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/releases/" class="md-nav__link">
+      <a href="../../../developers/debugging/releases/" class="md-nav__link">
         
   
   
@@ -4479,7 +4479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/sanitizers/" class="md-nav__link">
+      <a href="../../../developers/debugging/sanitizers/" class="md-nav__link">
         
   
   
@@ -4509,7 +4509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/debugging/fuzzing/" class="md-nav__link">
+      <a href="../../../developers/debugging/fuzzing/" class="md-nav__link">
         
   
   
@@ -4617,7 +4617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/benchmarking/" class="md-nav__link">
+      <a href="../../../developers/performance/benchmarking/" class="md-nav__link">
         
   
   
@@ -4647,7 +4647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/profiling/" class="md-nav__link">
+      <a href="../../../developers/performance/profiling/" class="md-nav__link">
         
   
   
@@ -4677,7 +4677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/device-profiling/" class="md-nav__link">
+      <a href="../../../developers/performance/device-profiling/" class="md-nav__link">
         
   
   
@@ -4707,7 +4707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/device-replay/" class="md-nav__link">
+      <a href="../../../developers/performance/device-replay/" class="md-nav__link">
         
   
   
@@ -4737,7 +4737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/profiling-cpu-events/" class="md-nav__link">
+      <a href="../../../developers/performance/profiling-cpu-events/" class="md-nav__link">
         
   
   
@@ -4767,7 +4767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../../developers/performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
   
@@ -4797,7 +4797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/performance/profiling-with-tracy/" class="md-nav__link">
+      <a href="../../../developers/performance/profiling-with-tracy/" class="md-nav__link">
         
   
   
@@ -4907,7 +4907,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../../../developers/design-docs/design-roadmap/" class="md-nav__link">
         
   
   
@@ -4935,7 +4935,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/function-abi/" class="md-nav__link">
+      <a href="../../../developers/design-docs/function-abi/" class="md-nav__link">
         
   
   
@@ -4963,7 +4963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../../../developers/design-docs/invocation-execution-model/" class="md-nav__link">
         
   
   
@@ -4991,7 +4991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/cuda-hal-driver/" class="md-nav__link">
+      <a href="../../../developers/design-docs/cuda-hal-driver/" class="md-nav__link">
         
   
   
@@ -5019,7 +5019,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/hip-hal-driver/" class="md-nav__link">
+      <a href="../../../developers/design-docs/hip-hal-driver/" class="md-nav__link">
         
   
   
@@ -5047,7 +5047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/metal-hal-driver/" class="md-nav__link">
+      <a href="../../../developers/design-docs/metal-hal-driver/" class="md-nav__link">
         
   
   
@@ -5075,7 +5075,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/vm/" class="md-nav__link">
+      <a href="../../../developers/design-docs/vm/" class="md-nav__link">
         
   
   
@@ -5132,7 +5132,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../developers/design-docs/async-scheduling/" class="md-nav__link ">
+            <a href="../../../developers/design-docs/async-scheduling/" class="md-nav__link ">
               
   
   
@@ -5176,7 +5176,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/async-scheduling/comparisons/" class="md-nav__link">
+      <a href="../../../developers/design-docs/async-scheduling/comparisons/" class="md-nav__link">
         
   
   
@@ -5204,7 +5204,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/design-docs/async-scheduling/scenarios/" class="md-nav__link">
+      <a href="../../../developers/design-docs/async-scheduling/scenarios/" class="md-nav__link">
         
   
   
@@ -5314,7 +5314,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/usage-best-practices/" class="md-nav__link">
+      <a href="../../../developers/usage-best-practices/" class="md-nav__link">
         
   
   
@@ -5344,7 +5344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/integrating-llvm/" class="md-nav__link">
+      <a href="../../../developers/integrating-llvm/" class="md-nav__link">
         
   
   
@@ -5374,7 +5374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/update-sdxl-golden-outputs/" class="md-nav__link">
+      <a href="../../../developers/update-sdxl-golden-outputs/" class="md-nav__link">
         
   
   
@@ -5404,7 +5404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/vulkan-environment-setup/" class="md-nav__link">
+      <a href="../../../developers/vulkan-environment-setup/" class="md-nav__link">
         
   
   
@@ -5434,7 +5434,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../developers/lowering-config/" class="md-nav__link">
+      <a href="../../../developers/lowering-config/" class="md-nav__link">
         
   
   
@@ -5511,7 +5511,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -5587,7 +5587,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -5630,10 +5630,8 @@
                 
   
   
-    
   
   
-  
     
     
       
@@ -5654,11 +5652,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_2_2" >
         
           
           <label class="md-nav__link" for="__nav_6_2_2" id="__nav_6_2_2_label" tabindex="0">
@@ -5679,7 +5679,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -5694,41 +5694,12 @@
                 
   
   
-    
-  
   
     
-      
-    
   
   
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    2026
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../archive/2026/" class="md-nav__link">
         
   
   
@@ -5744,48 +5715,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#running-models-on-risc-v-with-iree" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Running models on RISC-V with IREE
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Virtual Dense MFMAs for Skinny GEMM
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -5800,7 +5729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../2025/" class="md-nav__link">
+      <a href="../archive/2025/" class="md-nav__link">
         
   
   
@@ -5830,7 +5759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../2024/" class="md-nav__link">
+      <a href="../archive/2024/" class="md-nav__link">
         
   
   
@@ -5860,7 +5789,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../2021/" class="md-nav__link">
+      <a href="../archive/2021/" class="md-nav__link">
         
   
   
@@ -5960,7 +5889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../category/frontends/" class="md-nav__link">
+      <a href="../category/frontends/" class="md-nav__link">
         
   
   
@@ -5990,7 +5919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../category/performance/" class="md-nav__link">
+      <a href="../category/performance/" class="md-nav__link">
         
   
   
@@ -6020,7 +5949,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../category/platforms/" class="md-nav__link">
+      <a href="../category/platforms/" class="md-nav__link">
         
   
   
@@ -6064,7 +5993,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../tags/" class="md-nav__link">
+      <a href="../../tags/" class="md-nav__link">
         
   
   
@@ -6102,6 +6031,8 @@
             
             
               
+                
+              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -6121,10 +6052,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#running-models-on-risc-v-with-iree" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Running models on RISC-V with IREE
+        Setup
       
     </span>
   </a>
@@ -6132,10 +6063,104 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#virtual-dense-mfmas-for-skinny-gemm" class="md-nav__link">
+  <a href="#importing-a-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Virtual Dense MFMAs for Skinny GEMM
+        Importing a model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compiling-for-risc-v" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compiling for RISC-V
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Compiling for RISC-V">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#data-tiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data-tiling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#im2col-for-convolutions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        im2col for convolutions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#microkernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Microkernels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#static-vs-scalable-rvv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static vs. scalable RVV
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-the-module" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the module
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmarking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmarking
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary
       
     </span>
   </a>
@@ -6151,48 +6176,126 @@
             
           
           
-  <div class="md-content" data-md-component="content">
-    <div class="md-content__inner">
-      <header class="md-typeset">
-        <h1 id="2026">2026<a class="headerlink" href="#2026" title="Permanent link">link</a></h1>
-      </header>
-      
-        <article class="md-post md-post--excerpt">
-  <header class="md-post__header">
-    
-      <nav class="md-post__authors md-typeset">
-        
-          <span class="md-author">
-            <img src="https://github.com/egebeysel.png" alt="Ege Beysel">
-          </span>
-        
-      </nav>
-    
-    <div class="md-post__meta md-meta">
-      <ul class="md-meta__list">
-        <li class="md-meta__item">
-          <time datetime="2026-07-23 00:00:00+00:00">July 23, 2026</time></li>
-        
-          <li class="md-meta__item">
-            in
+  <div class="md-content md-content--post" data-md-component="content">
+    <div class="md-sidebar md-sidebar--post" data-md-component="sidebar" data-md-type="navigation">
+      <div class="md-sidebar__scrollwrap">
+        <div class="md-sidebar__inner md-post">
+          <nav class="md-nav md-nav--primary">
+            <div class="md-post__back">
+              <div class="md-nav__title md-nav__container">
+                <a href="../" class="md-nav__link">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+                  <span class="md-ellipsis">
+                    Back to index
+                  </span>
+                </a>
+              </div>
+            </div>
             
-              <a href="../../category/performance/" class="md-meta__link">Performance</a></li>
-        
-        
+              <div class="md-post__authors md-typeset">
+                
+                  <div class="md-profile md-post__profile">
+                    <span class="md-author md-author--long">
+                      <img src="https://github.com/egebeysel.png" alt="Ege Beysel">
+                    </span>
+                    <span class="md-profile__description">
+                      <strong>
+                        
+                          <a href="https://github.com/egebeysel">Ege Beysel</a>
+                        
+                      </strong>
+                      <br>
+                      Software Engineer
+                    </span>
+                  </div>
+                
+              </div>
+            
+            <ul class="md-post__meta md-nav__list">
+              <li class="md-nav__item md-nav__item--section">
+                <div class="md-post__title">
+                  <span class="md-ellipsis">
+                    Metadata
+                  </span>
+                </div>
+                <nav class="md-nav">
+                  <ul class="md-nav__list">
+                    <li class="md-nav__item">
+                      <div class="md-nav__link">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 19H5V8h14m-3-7v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-1V1m-1 11h-5v5h5z"/></svg>
+                        <time datetime="2026-07-23 00:00:00+00:00" class="md-ellipsis">July 23, 2026</time>
+                      </div>
+                    </li>
+                    
+                    
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9 3v15h3V3zm3 2 4 13 3-1-4-13zM5 5v13h3V5zM3 19v2h18v-2z"/></svg>
+                          <span class="md-ellipsis">
+                            in
+                            
+                              <a href="../category/performance/">Performance</a></span>
+                        </div>
+                      </li>
+                    
+                    
+                      
+                      <li class="md-nav__item">
+                        <div class="md-nav__link">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7z"/></svg>
+                          <span class="md-ellipsis">
+                            
+                              8 min read
+                            
+                          </span>
+                        </div>
+                      </li>
+                    
+                  </ul>
+                </nav>
+              </li>
+            </ul>
+            
+          </nav>
           
-          <li class="md-meta__item">
-            
-              8 min read
-            
-          </li>
-        
-        
-      </ul>
-      
+        </div>
+      </div>
     </div>
-  </header>
-  <div class="md-post__content md-typeset">
-    <h2 id="running-models-on-risc-v-with-iree"><a class="toclink" href="../../2026-07-23-running-models-on-risc-v-with-iree/">Running models on RISC-V with IREE</a></h2>
+    <article class="md-content__inner md-typeset">
+      
+        
+  
+
+
+  <nav class="md-tags" >
+    
+      
+      
+      
+      
+        <a href="../../tags/#tag:cpu" class="md-tag">CPU</a>
+      
+    
+      
+      
+      
+      
+        <a href="../../tags/#tag:risc-v" class="md-tag">RISC-V</a>
+      
+    
+  </nav>
+
+
+  
+    <a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/community/blog/posts/rvv-pipeline-usage.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="running-models-on-risc-v-with-iree">Running models on RISC-V with IREE<a class="headerlink" href="#running-models-on-risc-v-with-iree" title="Permanent link">link</a></h1>
 <p>IREE compiles machine learning models to native RISC-V CPU code, with support for
 the RISC-V Vector extension (RVV), hand-written microkernels, and data-tiling.
 This post walks through the full flow for a model: importing it from PyTorch,
@@ -6200,93 +6303,214 @@ compiling it for a RISC-V target, running it, and benchmarking the result.</p>
 <p>All commands below run under <code>qemu-riscv64</code>. The flow on real hardware is
 identical — the QEMU invocation is simply replaced by running the tools natively
 on the target.</p>
+<!-- more -->
 
-    
-      <nav class="md-post__action">
-        <a href="../../2026-07-23-running-models-on-risc-v-with-iree/">
-          Continue reading
-        </a>
-      </nav>
-    
-    
-  </div>
-</article>
-      
-        <article class="md-post md-post--excerpt">
-  <header class="md-post__header">
-    
-      <nav class="md-post__authors md-typeset">
-        
-          <span class="md-author">
-            <img src="https://github.com/efric.png" alt="Eric Feng">
-          </span>
-        
-      </nav>
-    
-    <div class="md-post__meta md-meta">
-      <ul class="md-meta__list">
-        <li class="md-meta__item">
-          <time datetime="2026-05-28 00:00:00+00:00">May 28, 2026</time></li>
-        
-          <li class="md-meta__item">
-            in
-            
-              <a href="../../category/performance/" class="md-meta__link">Performance</a></li>
-        
-        
-          
-          <li class="md-meta__item">
-            
-              10 min read
-            
-          </li>
-        
-        
-      </ul>
-      
-    </div>
-  </header>
-  <div class="md-post__content md-typeset">
-    <h2 id="virtual-dense-mfmas-for-skinny-gemm"><a class="toclink" href="../../2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">Virtual Dense MFMAs for Skinny GEMM</a></h2>
-<p>When we have a GEMM <code>A * B = C</code>, and it is the situation that <code>A</code> has a
-small number of rows and many columns, we classify this problem as a skinny
-GEMM. The decode phase of LLM inference is a common sight of this problem: a
-small batch of tokens multiplies against a large weight matrix. Skinny GEMMs are
-less convenient for modern GPU architectures than their non-skinny cousins. One
-reason is because modern GPUs take advantage of matrix core units which offer
-instructions that are specifically designed for matrix multiplication and
-operate on fixed tile sizes, and skinny GEMMs are too small to utilize them to
-their intended size.</p>
-<p>On AMDGPUs and in particular on the MI3XX Instinct (CDNA) series, these
-instructions are known as MFMA instructions; for example,
-<code>V_MFMA_F32_16x16x16_F16</code>. One useful part of the name is the <code>MxNxK</code>
-tile shape consumed, where <code>M</code> is the number of rows of the left hand matrix,
-<code>N</code> is the number of columns of the right hand matrix, and <code>K</code> is the shared
-dimension of both.</p>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">link</a></h2>
+<p>IREE is a cross-compiler: the compiler is built on the host, the runtime is
+cross-compiled for the target, and the runtime is then copied to the target (or
+run under QEMU). The
+<a href="https://iree.dev/building-from-source/riscv/">RISC-V cross-compilation guide</a>
+covers this in full. In brief:</p>
+<ul>
+<li><code>./build_tools/riscv/riscv_bootstrap.sh</code> downloads a prebuilt clang toolchain
+  and QEMU into <code>~/riscv</code>.</li>
+<li>Build and install the host compiler, then cross-build the runtime with the
+  <code>build_tools/cmake/linux_riscv64.cmake</code> toolchain file.</li>
+<li>Point <code>QEMU_BIN</code> at <code>qemu-riscv64</code> and <code>RISCV_TOOLCHAIN_ROOT</code> at the toolchain.</li>
+</ul>
+<p>The result is an <code>iree-compile</code> on the host and <code>iree-run-module</code> /
+<code>iree-benchmark-module</code> built for RISC-V.</p>
+<h2 id="importing-a-model">Importing a model<a class="headerlink" href="#importing-a-model" title="Permanent link">link</a></h2>
+<p>This post uses a few PyTorch models as a running example, but IREE supports
+models from other frameworks such as LiteRT (TensorFlow Lite) and ONNX just as well,
+once they have been imported to MLIR. See the
+<a href="https://iree.dev/guides/ml-frameworks/">ML frameworks guides</a> for the
+per-framework export/import steps — for example
+<a href="https://iree.dev/guides/ml-frameworks/pytorch/">PyTorch</a>,
+<a href="https://iree.dev/guides/ml-frameworks/tflite/">LiteRT / TensorFlow Lite</a>, and
+<a href="https://iree.dev/guides/ml-frameworks/onnx/">ONNX</a>. Also check out the
+IREE community meeting
+<a href="https://youtu.be/UvH9rVe9_KA?si=Z6aYmsspb1SLs0ik">presentation</a> by Artem
+Gindinson from Roofline.</p>
+<p>For PyTorch, <a href="https://iree.dev/guides/ml-frameworks/pytorch/">iree-turbine</a>'s
+<code>aot.export</code> produces the MLIR. The following script exports two torchvision
+models, saving an input for each to feed later:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># export.py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span><span class="o">,</span><span class="w"> </span><span class="nn">torch</span><span class="o">,</span><span class="w"> </span><span class="nn">torchvision</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">tv</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">iree.turbine.aot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">aot</span>
 
-    
-      <nav class="md-post__action">
-        <a href="../../2026-05-28-virtual-dense-mfmas-for-skinny-gemm/">
-          Continue reading
-        </a>
-      </nav>
-    
-    
-  </div>
-</article>
-      
-      
-        
-          
+<span class="k">def</span><span class="w"> </span><span class="nf">dump</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">example</span><span class="p">):</span>
+    <span class="n">aot</span><span class="o">.</span><span class="n">export</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">(),</span> <span class="n">example</span><span class="p">)</span><span class="o">.</span><span class="n">save_mlir</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">.mlir&quot;</span><span class="p">)</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_input.npy&quot;</span><span class="p">,</span> <span class="n">example</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
+
+<span class="c1"># Vision models (torchvision), NCHW float input.</span>
+<span class="n">dump</span><span class="p">(</span><span class="s2">&quot;mobilenet&quot;</span><span class="p">,</span> <span class="n">tv</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">mobilenet_v2</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="s2">&quot;DEFAULT&quot;</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span>
+<span class="n">dump</span><span class="p">(</span><span class="s2">&quot;resnet18&quot;</span><span class="p">,</span>  <span class="n">tv</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">resnet18</span><span class="p">(</span><span class="n">weights</span><span class="o">=</span><span class="s2">&quot;DEFAULT&quot;</span><span class="p">),</span>     <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span>
+</code></pre></div>
+<p>The exported entry point is <code>@main</code>, see the <code>--function=main</code> flag for the
+<code>iree-*-module</code> invocations below.</p>
+<p>Alternatively, you can check the models in the <a href="https://github.com/iree-org/iree-test-suites/tree/main/torch_models">IREE test suites</a>.
+We have some ready-to-compile <code>.mlir</code> files whose weights are kept in a
+separate <code>.irpa</code>
+(IREE parameter archive) — which keeps the <code>.mlir</code> small and lets you swap weights
+without recompiling. For example, <a href="https://huggingface.co/Qwen/Qwen3-0.6B">Qwen3-0.6B</a>:</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-L<span class="w"> </span>-o<span class="w"> </span>qwen3.mlir<span class="w"> </span>https://raw.githubusercontent.com/iree-org/iree-test-suites/main/torch_models/qwen3-600m/model.mlir
+curl<span class="w"> </span>-L<span class="w"> </span>-o<span class="w"> </span>qwen3.irpa<span class="w"> </span>https://huggingface.co/roofline/iree-regression-models/resolve/main/qwen3-600m/real_weights.irpa
+</code></pre></div>
+<p>The weights are supplied at run time with <code>--parameters=</code> (see below).</p>
+<h2 id="compiling-for-risc-v">Compiling for RISC-V<a class="headerlink" href="#compiling-for-risc-v" title="Permanent link">link</a></h2>
+<p>The base command to produce RISC-V vector code is:</p>
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>mobilenet.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rv64.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-triple<span class="o">=</span>riscv64<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span>+m,+a,+f,+d,+c,+zvl512b,+v
+</code></pre></div>
+<p>The flag that matters most on RISC-V is <strong><code>--iree-llvmcpu-target-cpu-features</code></strong>,
+which specifies the ISA. <code>+m,+a,+f,+d,+c</code> is <code>rv64gc</code>, <code>+v</code> enables RVV 1.0, and
+<code>+zvl512b</code> declares the minimum vector register width (VLEN) — 512 bits here.
+The <code>zvl</code>
+value should match the target hardware's actual VLEN — 512 for the QEMU
+configuration used below, 256 on a device such as a SpaceMiT X60 — since a
+mismatch leaves the vector units underutilized. VLEN is the key RISC-V knob: it
+drives LLVM's vector codegen <em>and</em> the tile sizes IREE selects for data-tiling
+(more on that below).</p>
+<p>The remaining flags are the optimization knobs. None of them are RISC-V-specific,
+but they are where the performance comes from, so they are layered on top of the
+base command.</p>
+<h3 id="data-tiling">Data-tiling<a class="headerlink" href="#data-tiling" title="Permanent link">link</a></h3>
+<p><code>--iree-opt-data-tiling</code> repacks matmul-shaped operations into a tiled <code>mmt4d</code>
+layout that maps cleanly onto the vector unit. It is off by default; most models,
+especially matmul-heavy models, benefit from this. On RISC-V the tile shape
+depends on
+VLEN, so the <code>+zvl*b</code> value chosen above also determines the produced layout. The
+<a href="https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/">data-tiling walkthrough</a>
+and <a href="https://iree.dev/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/">mmt4d blogpost</a>
+cover the mechanism in detail.</p>
+<h3 id="im2col-for-convolutions">im2col for convolutions<a class="headerlink" href="#im2col-for-convolutions" title="Permanent link">link</a></h3>
+<p><code>--iree-global-opt-use-im2col-for-convs=true</code> rewrites convolutions as im2col plus
+matmul, so that convolutions use the same optimized matmul, data-tiling, and
+microkernel path as everything else. It is also off by default, and is beneficial
+for most of the convolution models above. Native data-tiling support for convolutions
+is still work-in-progress.</p>
+<h3 id="microkernels">Microkernels<a class="headerlink" href="#microkernels" title="Permanent link">link</a></h3>
+<p><code>--iree-llvmcpu-enable-ukernels=...</code> selects IREE's hand-written microkernels
+instead of relying solely on the generic vectorizer:</p>
+<ul>
+<li><code>mmt4d</code>, <code>pack</code>, <code>unpack</code> — enable specific microkernels (comma-separated)</li>
+<li><code>all</code> — all of them</li>
+<li><code>none</code> — none</li>
+<li><code>default</code> — IREE's per-target default</li>
+</ul>
+<p>Data-tiling together with the <code>mmt4d</code> microkernel is the recommended combination
+on RISC-V. Enabling data-tiling while disabling microkernels makes the packed
+<code>mmt4d</code> fall back to generic vectorization; although this also generally produces
+efficient code, the microkernel path is currently the most stable one.
+For background, see the
+<a href="https://iree.dev/community/blog/2024-01-22-microkernels/">microkernels</a> and
+<a href="https://iree.dev/community/blog/2021-10-13-mmt4d/">mmt4d</a> posts.</p>
+<h3 id="static-vs-scalable-rvv">Static vs. scalable RVV<a class="headerlink" href="#static-vs-scalable-rvv" title="Permanent link">link</a></h3>
+<p>At present, IREE's RISC-V vector path is <strong>static / fixed-length</strong>: the VLEN is
+fixed at compile time through <code>+zvl*b</code>, and both LLVM's vectorizer and IREE's
+tile-size selection specialize to that width. IREE derives its <code>mmt4d</code> tile shapes
+from the target's fixed-width vector register width, and the microkernels are compiled
+for that same <code>+zvl*b</code> target, so the VLEN is the single value everything keys
+off of.</p>
+<p>There is also preliminary support for <strong>scalable, vector-length-agnostic</strong> RVV
+codegen — the <code>vscale</code>-style path that runs on any VLEN without recompiling, but
+it is still a work in progress. The scalable vectorization pipeline can be
+activated with <code>--iree-llvmcpu-enable-scalable-vectorization=true</code> (which
+currently has to be combined with <code>--iree-experimental-vscale-value=VLEN/64</code>
+flag due to some ongoing work on the host compiler).</p>
+<p>Combined, a performance-oriented compilation for the mobilenet example is:</p>
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>mobilenet.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rv64.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-device<span class="o">=</span><span class="nb">local</span><span class="w"> </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-triple<span class="o">=</span>riscv64<span class="w"> </span>--iree-llvmcpu-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span>+m,+a,+f,+d,+c,+zvl512b,+v<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-opt-data-tiling<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-global-opt-use-im2col-for-convs<span class="o">=</span><span class="nb">true</span>
+</code></pre></div>
+<h2 id="running-the-module">Running the module<a class="headerlink" href="#running-the-module" title="Permanent link">link</a></h2>
+<p>Copy the <code>.vmfb</code> and the cross-built <code>iree-run-module</code> to the target, or run under
+QEMU. Vector QEMU requires its <code>vlen</code> to match the <code>+zvl512b</code> used at compile time:</p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span>-cpu<span class="w"> </span>rv64,Zve64d<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>../iree-build-riscv/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>mobilenet_rv64.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span>@mobilenet_input.npy
+</code></pre></div>
+<p><code>--device=local-task</code> selects the multithreaded runtime; <code>--device=local-sync</code>
+runs single-threaded and inline. Passing <code>--expected_output=@ref.npy</code> compares the
+result against a saved reference output as a correctness check. See
+<code>iree-run-module --help</code> for the <code>--input</code> / <code>--output</code> formats - inline literals,
+splats such as <code>=0</code>, or <code>@file.npy</code>.</p>
+<p>For a model whose weights live in a separate <code>.irpa</code> (like the Qwen3 above), pass
+them with <code>--parameters=&lt;scope&gt;=&lt;file&gt;</code>; the scope is baked into the <code>.mlir</code> (here
+<code>model</code>):</p>
+<div class="highlight"><pre><span></span><code>iree-run-module<span class="w"> </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>qwen3_rv64.vmfb<span class="w"> </span>--parameters<span class="o">=</span><span class="nv">model</span><span class="o">=</span>qwen3.irpa<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span>--input<span class="o">=</span><span class="nv">1x5xi64</span><span class="o">=</span><span class="m">1</span>
+</code></pre></div>
+<h2 id="benchmarking">Benchmarking<a class="headerlink" href="#benchmarking" title="Permanent link">link</a></h2>
+<p><code>iree-benchmark-module</code> accepts the same module, device, and input flags, and adds
+the <a href="https://github.com/google/benchmark">Google Benchmark</a> options on top:</p>
+<div class="highlight"><pre><span></span><code><span class="si">${</span><span class="nv">QEMU_BIN</span><span class="si">}</span><span class="w"> </span>-cpu<span class="w"> </span>rv64,Zve64d<span class="o">=</span>true,vlen<span class="o">=</span><span class="m">512</span>,elen<span class="o">=</span><span class="m">64</span>,vext_spec<span class="o">=</span>v1.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-L<span class="w"> </span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span>/sysroot/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>../iree-build-riscv/tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>mobilenet_rv64.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span>@mobilenet_input.npy<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark_repetitions<span class="o">=</span><span class="m">10</span>
+</code></pre></div>
+<p>The output looks like:</p>
+<div class="highlight"><pre><span></span><code>Benchmark                     Time             CPU   Iterations
+BM_main/real_time          12.3 ms         41.0 ms           57
+BM_main/real_time_mean     12.4 ms         41.2 ms           10
+BM_main/real_time_median   12.3 ms         41.0 ms           10
+BM_main/real_time_stddev    0.2 ms          0.7 ms           10
+</code></pre></div>
+<ul>
+<li><strong><code>--benchmark_repetitions</code></strong> greater than 1 produces the mean, median, and
+  standard-deviation rows.</li>
+<li>Other useful options: <code>--benchmark_min_time=1s</code> (or <code>100x</code> for a fixed iteration
+  count) and <code>--benchmark_format=json</code>.</li>
+</ul>
+<p>To control threading, pin workers to specific cores with
+<code>--task_topology_cpu_ids=0,1,2,3</code>, or run single-threaded with <code>--device=local-sync</code>
+(preferably compiled with <code>--iree-llvmcpu-disable-distribution=true</code>). See
+<code>iree-run-module --help</code> for the other <code>--task_topology_*</code> options
+(worker/group counts, NUMA nodes, performance level).</p>
+<p>Note that under QEMU these are functional results rather than representative
+performance numbers. Representative timings require real hardware (or cycle-accurate
+simulators, which are hardly feasible to use for large programs that ML/AI
+models are).</p>
+<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">link</a></h2>
+<p>This post walks through building IREE, then importing, compiling, running, and
+benchmarking a model on RISC-V. For more on the general flow and other CPU
+targets, see IREE's <a href="https://iree.dev/guides/deployment-configurations/cpu/">CPU deployment guide</a>.</p>
 
 
 
-<nav class="md-pagination">
+
+
+
+
   
-</nav>
-        
+  
+
+
+
+
+  
+
+
+
       
-    </div>
+    </article>
   </div>
 
           
@@ -6374,10 +6598,10 @@ see <a href="https://lfprojects.org">https://lfprojects.org</a>.
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.action.edit", "content.code.annotate", "content.code.copy", "content.tabs.link", "navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.indexes", "toc.follow"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
