@@ -971,6 +971,36 @@ util.func public @sort_with_unused_key_result(
 
 // -----
 
+util.func public @sort_with_unused_index_result(
+    %keys: tensor<?xi64>, %indices: tensor<?xi64>) -> tensor<?xi64> {
+  %sorted:2 = iree_linalg_ext.sort dimension(0)
+      outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+  ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+    %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+    iree_linalg_ext.yield %take_lhs : i1
+  } -> tensor<?xi64>, tensor<?xi64>
+  util.return %sorted#0 : tensor<?xi64>
+}
+//      CHECK: util.func public @sort_with_unused_index_result(
+// CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<?xi64>
+// CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?xi64>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[KEYS_DIM:.+]] = tensor.dim %[[KEYS]], %[[C0]]
+//  CHECK-DAG:   %[[INDICES_DIM:.+]] = tensor.dim %[[INDICES]], %[[C0]]
+//      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[KEYS]], %[[INDICES]], %[[KEYS_DIM]], %[[INDICES_DIM]])
+// CHECK-NEXT:       (%[[KEYS_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
+// CHECK-SAME:        %[[INDICES_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>)
+//  CHECK-DAG:     %[[LOADED_KEYS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[KEYS_CAPTURE]]
+//  CHECK-DAG:     %[[LOADED_INDICES:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES_CAPTURE]]
+//      CHECK:     %[[SORTED:.+]]:2 = iree_linalg_ext.sort dimension(0)
+// CHECK-SAME:         outs(%[[LOADED_KEYS]], %[[LOADED_INDICES]] : tensor<?xi64>, tensor<?xi64>)
+//  CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#0, %[[KEYS_CAPTURE]]
+//  CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#1, %[[INDICES_CAPTURE]]
+//      CHECK:   util.return %[[RESULT]]#0 : tensor<?xi64>
+
+// -----
+
 util.func public @sort_preserves_live_key_base(
     %keys: tensor<2x2xi64>, %indices: tensor<4xi64>)
     -> (tensor<4xi64>, tensor<2x2xi64>) {
