@@ -668,11 +668,15 @@ iree_status_t iree_vm_bytecode_function_verify(
                                 verify_state->function_descriptors));       \
   }
 #define IREE_VM_ISA_VERIFY_RWDATA_OFFSET(name, access_length)               \
-  if (IREE_UNLIKELY(((name) + (access_length)) >                            \
-                    verify_state->rwdata_storage_size)) {                   \
+  /* Compare without adding so the check cannot overflow. */                \
+  if (IREE_UNLIKELY((iree_host_size_t)(access_length) >                     \
+                        verify_state->rwdata_storage_size ||                \
+                    (iree_host_size_t)(name) >                              \
+                        verify_state->rwdata_storage_size -                 \
+                            (iree_host_size_t)(access_length))) {           \
     return iree_make_status(                                                \
         IREE_STATUS_OUT_OF_RANGE,                                           \
-        "global byte_offset out of range: %d (rwdata=%" PRIhsz ")", (name), \
+        "global byte_offset out of range: %u (rwdata=%" PRIhsz ")", (name), \
         verify_state->rwdata_storage_size);                                 \
   }
 #define IREE_VM_ISA_VERIFY_GLOBAL_REF_ORDINAL(name)                        \
@@ -1960,13 +1964,13 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
 
     IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalLoadF64, {
       IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
-      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 8);
       IREE_VM_ISA_DECODE_RESULT_F64(value);
     });
 
     IREE_VM_ISA_VERIFY_OP(EXT_F64, GlobalStoreF64, {
       IREE_VM_ISA_DECODE_GLOBAL_ATTR(byte_offset);
-      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 4);
+      IREE_VM_ISA_VERIFY_RWDATA_OFFSET(byte_offset, 8);
       IREE_VM_ISA_DECODE_OPERAND_F64(value);
     });
 

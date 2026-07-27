@@ -16,6 +16,16 @@
 #include "iree/vm/bytecode/module_impl.h"
 #include "iree/vm/ops.h"
 
+// Returns true if [byte_offset, byte_offset + access_length) lies entirely
+// within a buffer of |data_length| bytes. Performs no addition so it cannot
+// overflow, regardless of the width of iree_host_size_t.
+static inline bool iree_vm_bytecode_rwdata_range_ok(
+    uint32_t byte_offset, iree_host_size_t access_length,
+    iree_host_size_t data_length) {
+  return access_length <= data_length &&
+         (iree_host_size_t)byte_offset <= data_length - access_length;
+}
+
 //===----------------------------------------------------------------------===//
 // Ref register debug checking
 //===----------------------------------------------------------------------===//
@@ -1205,11 +1215,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(value);
       const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-      if (IREE_UNLIKELY(byte_offset + 4 >
-                        module_state->rwdata_storage.data_length)) {
+      if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+              byte_offset, 4, module_state->rwdata_storage.data_length))) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+            "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
       const int32_t global_value =
@@ -1221,11 +1231,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(value);
       const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-      if (IREE_UNLIKELY(byte_offset + 4 >
-                        module_state->rwdata_storage.data_length)) {
+      if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+              byte_offset, 4, module_state->rwdata_storage.data_length))) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+            "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
       vm_global_store_i32(module_state->rwdata_storage.data, byte_offset,
@@ -1253,11 +1263,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(value);
       const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-      if (IREE_UNLIKELY(byte_offset + 8 >
-                        module_state->rwdata_storage.data_length)) {
+      if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+              byte_offset, 8, module_state->rwdata_storage.data_length))) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+            "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
       const int64_t global_value =
@@ -1269,11 +1279,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(value);
       const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-      if (IREE_UNLIKELY(byte_offset + 8 >
-                        module_state->rwdata_storage.data_length)) {
+      if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+              byte_offset, 8, module_state->rwdata_storage.data_length))) {
         return iree_make_status(
             IREE_STATUS_OUT_OF_RANGE,
-            "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+            "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
             byte_offset, module_state->rwdata_storage.data_length);
       }
       vm_global_store_i64(module_state->rwdata_storage.data, byte_offset,
@@ -2411,11 +2421,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
         IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(value);
         const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-        if (IREE_UNLIKELY(byte_offset + 4 >
-                          module_state->rwdata_storage.data_length)) {
+        if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+                byte_offset, 4, module_state->rwdata_storage.data_length))) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
         const float global_value =
@@ -2427,11 +2437,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(value);
         const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-        if (IREE_UNLIKELY(byte_offset + 4 >
-                          module_state->rwdata_storage.data_length)) {
+        if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+                byte_offset, 4, module_state->rwdata_storage.data_length))) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
         vm_global_store_f32(module_state->rwdata_storage.data, byte_offset,
@@ -2702,11 +2712,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
         IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(value);
         const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-        if (IREE_UNLIKELY(byte_offset + 4 >
-                          module_state->rwdata_storage.data_length)) {
+        if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+                byte_offset, 8, module_state->rwdata_storage.data_length))) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
         const double global_value =
@@ -2718,11 +2728,11 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(byte_offset_i32);
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(value);
         const uint32_t byte_offset = (uint32_t)byte_offset_i32;
-        if (IREE_UNLIKELY(byte_offset + 4 >
-                          module_state->rwdata_storage.data_length)) {
+        if (IREE_UNLIKELY(!iree_vm_bytecode_rwdata_range_ok(
+                byte_offset, 8, module_state->rwdata_storage.data_length))) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
-              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              "global byte_offset out of range: %u (rwdata=%" PRIhsz ")",
               byte_offset, module_state->rwdata_storage.data_length);
         }
         vm_global_store_f64(module_state->rwdata_storage.data, byte_offset,
