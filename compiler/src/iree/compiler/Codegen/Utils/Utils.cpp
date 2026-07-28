@@ -209,6 +209,9 @@ static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   if (isAArch64(targetConfig)) {
     return "mmt4d";
   }
+  if (isRISCV64(targetConfig)) {
+    return "mmt4d";
+  }
   return kNone;
 }
 
