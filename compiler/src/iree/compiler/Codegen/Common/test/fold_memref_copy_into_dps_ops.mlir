@@ -206,3 +206,64 @@ func.func @no_fold_same_hal_binding() {
 // CHECK: linalg.generic
 // CHECK-SAME: outs(%[[TEMP]] : memref<4xf32>)
 // CHECK: memref.copy %[[TEMP]], %[[TARGET]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+func.func @no_fold_dps_payload_reads_target() {
+  %c0 = arith.constant 0 : index
+  %source = memref.alloc() : memref<4xf32>
+  %target = memref.alloc() : memref<4xf32>
+  %temp = memref.alloc() : memref<4xf32>
+  memref.copy %source, %temp : memref<4xf32> to memref<4xf32>
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel"]
+  } outs(%temp : memref<4xf32>) {
+  ^bb0(%out: f32):
+    %value = memref.load %target[%c0] : memref<4xf32>
+    linalg.yield %value : f32
+  }
+  memref.copy %temp, %target : memref<4xf32> to memref<4xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @no_fold_dps_payload_reads_target(
+// CHECK-DAG: %[[SOURCE:.+]] = memref.alloc
+// CHECK-DAG: %[[TARGET:.+]] = memref.alloc
+// CHECK: %[[TEMP:.+]] = memref.alloc
+// CHECK: memref.copy %[[SOURCE]], %[[TEMP]]
+// CHECK: linalg.generic
+// CHECK-SAME: outs(%[[TEMP]] : memref<4xf32>)
+// CHECK: memref.load %[[TARGET]]
+// CHECK: memref.copy %[[TEMP]], %[[TARGET]]
+
+// -----
+
+#map = affine_map<(d0) -> (d0)>
+
+func.func @no_fold_target_does_not_dominate_copy_in() {
+  %source = memref.alloc() : memref<4xf32>
+  %temp = memref.alloc() : memref<4xf32>
+  memref.copy %source, %temp : memref<4xf32> to memref<4xf32>
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel"]
+  } outs(%temp : memref<4xf32>) {
+  ^bb0(%out: f32):
+    linalg.yield %out : f32
+  }
+  %target = memref.alloc() : memref<4xf32>
+  memref.copy %temp, %target : memref<4xf32> to memref<4xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @no_fold_target_does_not_dominate_copy_in(
+// CHECK-DAG: %[[SOURCE:.+]] = memref.alloc
+// CHECK-DAG: %[[TEMP:.+]] = memref.alloc
+// CHECK: memref.copy {{.+}}, %[[TEMP]]
+// CHECK: linalg.generic
+// CHECK-SAME: outs(%[[TEMP]] : memref<4xf32>)
+// CHECK: %[[TARGET:.+]] = memref.alloc
+// CHECK: memref.copy %[[TEMP]], %[[TARGET]]
