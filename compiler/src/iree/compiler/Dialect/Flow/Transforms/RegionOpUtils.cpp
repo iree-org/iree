@@ -376,6 +376,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   // Some tied results must be yielded only to preserve writable dispatch
   // storage for another live result of the same operation.
   SmallVector<unsigned> replacedResultPositions;
+  llvm::DenseSet<Value> yieldedTiedBases;
   llvm::SetVector<Operation *> targetSet;
   targetSet.insert(targets.begin(), targets.end());
   Block &body = regionOp.getBody().front();
@@ -430,23 +431,29 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
     // Gather all uses of `target`.
     for (auto [index, result] : llvm::enumerate(target->getResults())) {
-      bool preserveTiedResult = false;
-      if (!hasUsesOutsideOfRegion[index] && hasAnyResultUses) {
-        if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(target)) {
-          Value tiedOperand = tiedOp.getTiedResultOperand(result);
-          if (tiedOperand) {
-            Value tiedBase =
-                IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
-            // Region-to-workgroups reuses the tied input's type and dimensions
-            // as the whole-result store target. Destination-style results
-            // preserve their init shape; requiring a direct, type-identical tie
-            // avoids reconstructing shape identity through other tied ops.
-            preserveTiedResult = isa<DestinationStyleOpInterface>(target) &&
-                                 tiedOperand == tiedBase &&
-                                 result.getType() == tiedBase.getType() &&
-                                 !hasUseAfterDispatch(tiedBase);
+      Value reusableTiedBase;
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(target)) {
+        Value tiedOperand = tiedOp.getTiedResultOperand(result);
+        if (tiedOperand) {
+          Value tiedBase =
+              IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
+          // Region-to-workgroups reuses the tied input's type and dimensions
+          // as the whole-result store target. Destination-style results
+          // preserve their init shape; requiring a direct, type-identical tie
+          // avoids reconstructing shape identity through other tied ops.
+          if (isa<DestinationStyleOpInterface>(target) &&
+              tiedOperand == tiedBase &&
+              result.getType() == tiedBase.getType() &&
+              !hasUseAfterDispatch(tiedBase)) {
+            reusableTiedBase = tiedBase;
           }
         }
+      }
+
+      bool preserveTiedResult = false;
+      if (!hasUsesOutsideOfRegion[index] && hasAnyResultUses &&
+          reusableTiedBase && !yieldedTiedBases.contains(reusableTiedBase)) {
+        preserveTiedResult = true;
       }
       if (hasUsesOutsideOfRegion[index] || preserveTiedResult) {
         if (hasUsesOutsideOfRegion[index]) {
@@ -454,6 +461,9 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
           replacedResultPositions.push_back(yieldedResults.size());
         }
         yieldedResults.push_back(clonedTarget->getResult(index));
+        if (reusableTiedBase) {
+          yieldedTiedBases.insert(reusableTiedBase);
+        }
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPoint(target);
         SmallVector<Value> &dims =

@@ -29,4 +29,4 @@ func.func @argsort(%input: tensor<?xi64>) -> tensor<?xi64> {
   return %sorted#1 : tensor<?xi64>
 }
 
-// CHECK: 3xi64=[1 2 0]
+// CHECK: 3xi64=1 2 0

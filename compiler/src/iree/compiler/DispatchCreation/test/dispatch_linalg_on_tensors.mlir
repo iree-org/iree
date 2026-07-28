@@ -960,7 +960,7 @@ util.func public @sort_with_unused_key_result(
 //      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
 // CHECK-SAME:       (%[[KEYS]], %[[INDICES]], %[[KEYS_DIM]], %[[INDICES_DIM]])
 // CHECK-NEXT:       (%[[KEYS_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
-// CHECK-SAME:        %[[INDICES_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
+//      CHECK:        %[[INDICES_CAPTURE:.+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
 //  CHECK-DAG:     %[[LOADED_KEYS:.+]] = iree_tensor_ext.dispatch.tensor.load %[[KEYS_CAPTURE]]
 //  CHECK-DAG:     %[[LOADED_INDICES:.+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES_CAPTURE]]
 //      CHECK:     %[[SORTED:.+]]:2 = iree_linalg_ext.sort dimension(0)
