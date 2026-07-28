@@ -11,6 +11,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Utils/MemRefUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
@@ -137,14 +138,37 @@ static bool opMayAccessTarget(Operation *op, Value target,
   return false;
 }
 
+// The effects an operation declares for itself describe only its operands. A
+// payload region may additionally access values captured from the enclosing
+// scope, which never appear in those effects.
+static bool opRegionsMayAccessTarget(Operation *op, Value target,
+                                     AliasAnalysis &aliasAnalysis) {
+  for (Region &region : op->getRegions()) {
+    for (Block &block : region) {
+      for (Operation &nestedOp : block) {
+        if (opMayAccessTarget(&nestedOp, target, aliasAnalysis)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Nothing between the copy-in and the copy-out may access %target, because the
 // rewrite moves the update of %target above all of it.
 static bool hasInterveningTargetAccess(Operation *first, Operation *last,
-                                       Operation *allowedOp, Value target,
+                                       Operation *dpsOp, Value target,
                                        AliasAnalysis &aliasAnalysis) {
   for (Operation *op = first->getNextNode(); op && op != last;
        op = op->getNextNode()) {
-    if (op == allowedOp) {
+    // Recurse into the DPS op's region to check whether the payload accesses
+    // %target, but skip the DPS op itself: its write is supposed to access the
+    // target (that write is what the rewrite moves).
+    if (op == dpsOp) {
+      if (opRegionsMayAccessTarget(op, target, aliasAnalysis)) {
+        return true;
+      }
       continue;
     }
     if (opMayAccessTarget(op, target, aliasAnalysis)) {
@@ -190,8 +214,10 @@ static bool targetMayAliasDpsReads(DestinationStyleOpInterface dpsOp,
 }
 
 struct FoldTemporaryCopyIntoDpsOp final : OpRewritePattern<memref::CopyOp> {
-  FoldTemporaryCopyIntoDpsOp(MLIRContext *context, AliasAnalysis &aliasAnalysis)
-      : OpRewritePattern(context), aliasAnalysis(aliasAnalysis) {}
+  FoldTemporaryCopyIntoDpsOp(MLIRContext *context, AliasAnalysis &aliasAnalysis,
+                             DominanceInfo &dominanceInfo)
+      : OpRewritePattern(context), aliasAnalysis(aliasAnalysis),
+        dominanceInfo(dominanceInfo) {}
 
   LogicalResult matchAndRewrite(memref::CopyOp copyOut,
                                 PatternRewriter &rewriter) const override {
@@ -250,6 +276,11 @@ struct FoldTemporaryCopyIntoDpsOp final : OpRewritePattern<memref::CopyOp> {
     }
 
     Value finalTarget = copyOut.getTarget();
+    // The rewrite moves the write of the target up to the copy-in. A target
+    // defined after that point would not dominate its new use.
+    if (!dominanceInfo.dominates(finalTarget, copyIn)) {
+      return failure();
+    }
     // Nothing read while %target is being written may alias it.
     if (targetMayAliasDpsReads(dpsOp, forwardedInitOperand, copyIn.getSource(),
                                finalTarget, aliasAnalysis)) {
@@ -276,6 +307,7 @@ struct FoldTemporaryCopyIntoDpsOp final : OpRewritePattern<memref::CopyOp> {
 
 private:
   AliasAnalysis &aliasAnalysis;
+  DominanceInfo &dominanceInfo;
 };
 
 struct FoldMemRefCopyIntoDPSOpsPass final
@@ -285,7 +317,9 @@ struct FoldMemRefCopyIntoDPSOpsPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     AliasAnalysis &aliasAnalysis = getAnalysis<AliasAnalysis>();
-    patterns.add<FoldTemporaryCopyIntoDpsOp>(&getContext(), aliasAnalysis);
+    DominanceInfo &dominanceInfo = getAnalysis<DominanceInfo>();
+    patterns.add<FoldTemporaryCopyIntoDpsOp>(&getContext(), aliasAnalysis,
+                                             dominanceInfo);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();
     }
