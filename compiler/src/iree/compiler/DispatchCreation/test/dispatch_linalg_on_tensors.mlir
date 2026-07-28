@@ -1131,6 +1131,48 @@ util.func public @sort_does_not_tie_dynamic_shape_changing_key(
 
 // -----
 
+// The extract initially precedes the dispatch placeholder. Moving the first
+// generic into the dispatch replaces its result and moves the extract after
+// the dispatch, where it makes the shared storage live. Canonicalization must
+// then drop the unused carrier for the second generic.
+util.func public @drop_tied_carrier_after_moving_replaced_user(
+    %input: tensor<4xi64>, %storage: tensor<4xi64>, %output: tensor<4xi64>)
+    -> (i64, tensor<4xi64>) {
+  %c0 = arith.constant 0 : index
+  %first = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%input : tensor<4xi64>) outs(%storage : tensor<4xi64>) {
+    ^bb0(%in: i64, %out: i64):
+      linalg.yield %in : i64
+  } -> tensor<4xi64>
+  %first_element = tensor.extract %first[%c0] : tensor<4xi64>
+  %second = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%first : tensor<4xi64>) outs(%storage : tensor<4xi64>) {
+    ^bb0(%in: i64, %out: i64):
+      linalg.yield %in : i64
+  } -> tensor<4xi64>
+  %third = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>,
+                       affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%second : tensor<4xi64>) outs(%output : tensor<4xi64>) {
+    ^bb0(%in: i64, %out: i64):
+      linalg.yield %in : i64
+  } -> tensor<4xi64>
+  util.return %first_element, %third : i64, tensor<4xi64>
+}
+//      CHECK: util.func public @drop_tied_carrier_after_moving_replaced_user(
+//      CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+//      CHECK:   %[[FIRST_ELEMENT:.+]] = tensor.extract %[[DISPATCH]]#1
+//      CHECK:   util.return %[[FIRST_ELEMENT]], %[[DISPATCH]]#0 : i64, tensor<4xi64>
+
+// -----
+
 util.func public @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : tensor<8xi32>)
     -> tensor<8xi32>{
   %cst = arith.constant dense<[0, 9, 0, 10, 11, 0, 0, 12]> : tensor<8xi32>
