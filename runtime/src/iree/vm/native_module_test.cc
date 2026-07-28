@@ -67,8 +67,7 @@ class VMNativeModuleTest : public ::testing::Test {
     // multiple calls will be made.
     iree_vm_function_t function;
     IREE_RETURN_IF_ERROR(
-        iree_vm_context_resolve_function(
-            context, iree_make_cstring_view("module_b.entry"), &function),
+        iree_vm_context_resolve_function(context, function_name, &function),
         "unable to resolve entry point");
 
     // Setup I/O lists and pass in the argument. The result list will be
@@ -98,7 +97,7 @@ class VMNativeModuleTest : public ::testing::Test {
     return ret0_value.i32;
   }
 
- private:
+ protected:
   iree_vm_instance_t* instance_ = nullptr;
 };
 
@@ -163,22 +162,11 @@ TEST_F(VMNativeModuleTest, Fork) {
 //===----------------------------------------------------------------------===//
 // Fork tests for C++ native modules
 //===----------------------------------------------------------------------===//
-// A C++ NativeModule<State> holds its iree_vm_module_t as a non-first member
-// and points interface_.self at the NativeModule instance, so `module` and
-// `module->self` are different addresses. Forking a context containing one
-// therefore covers the module dispatch passing `self` rather than the
-// interface pointer; module_b above cannot, as its interface sits at offset 0
-// and the two pointers are numerically equal.
 
-class VMNativeModuleCppForkTest : public ::testing::Test {
+// Fork test using module_cpp, whose iree_vm_module_t is not at offset 0 (so
+// module != module->self), exercising fork_state on the impl self pointer.
+class VMNativeModuleCppForkTest : public VMNativeModuleTest {
  protected:
-  virtual void SetUp() {
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
-  }
-
-  virtual void TearDown() { iree_vm_instance_release(instance_); }
-
   iree_vm_context_t* CreateCppContext() {
     iree_vm_module_t* module = nullptr;
     IREE_CHECK_OK(
@@ -194,39 +182,10 @@ class VMNativeModuleCppForkTest : public ::testing::Test {
     return context;
   }
 
-  // Invokes module_cpp.entry, which mutates the per-context counter state.
   StatusOr<int32_t> RunEntry(iree_vm_context_t* context, int32_t arg0) {
-    iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(
-        iree_vm_context_resolve_function(
-            context, iree_make_cstring_view("module_cpp.entry"), &function),
-        "unable to resolve entry point");
-
-    vm::ref<iree_vm_list_t> input_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
-                                             &input_list));
-    auto arg0_value = iree_vm_value_make_i32(arg0);
-    IREE_RETURN_IF_ERROR(
-        iree_vm_list_push_value(input_list.get(), &arg0_value));
-    vm::ref<iree_vm_list_t> output_list;
-    IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             1, iree_allocator_system(),
-                                             &output_list));
-
-    IREE_RETURN_IF_ERROR(
-        iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
-                       /*policy=*/nullptr, input_list.get(), output_list.get(),
-                       iree_allocator_system()));
-
-    iree_vm_value_t ret0_value;
-    IREE_RETURN_IF_ERROR(
-        iree_vm_list_get_value(output_list.get(), 0, &ret0_value));
-    return ret0_value.i32;
+    return RunFunction(context, iree_make_cstring_view("module_cpp.entry"),
+                       arg0);
   }
-
- private:
-  iree_vm_instance_t* instance_ = nullptr;
 };
 
 TEST_F(VMNativeModuleCppForkTest, Fork) {
