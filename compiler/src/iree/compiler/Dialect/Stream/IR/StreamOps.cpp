@@ -2968,22 +2968,6 @@ LogicalResult AsyncTransferOp::verify() {
       failed(verifyOpValueSizes(op, op.getResult(), op.getResultSize()))) {
     return failure();
   }
-  auto executionAffinityAttr = op.getExecutionAffinityAttr();
-  auto sourceAffinityAttr = op.getSourceAffinityAttr();
-  auto targetAffinityAttr = op.getTargetAffinityAttr();
-  bool isSourceCompatible =
-      sourceAffinityAttr && IREE::Stream::AffinityAttr::canExecuteTogether(
-                                executionAffinityAttr, sourceAffinityAttr);
-  bool isTargetCompatible =
-      targetAffinityAttr && IREE::Stream::AffinityAttr::canExecuteTogether(
-                                executionAffinityAttr, targetAffinityAttr);
-  if (executionAffinityAttr && (sourceAffinityAttr || targetAffinityAttr) &&
-      !isSourceCompatible && !isTargetCompatible) {
-    return op.emitOpError() << "execution affinity " << executionAffinityAttr
-                            << " is incompatible with both source affinity "
-                            << sourceAffinityAttr << " and target affinity "
-                            << targetAffinityAttr;
-  }
   return success();
 }
 
