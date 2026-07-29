@@ -133,47 +133,53 @@ util.func @int32_unsigned_overflow_signed(%arg0 : i32) -> i1, i1 {
 
 // -----
 // CHECK-LABEL: @to_unsigned_ceildivsi
-util.func @to_unsigned_ceildivsi(%arg0 : i64, %arg1 : i64) -> i64, i64, i64 {
+util.func @to_unsigned_ceildivsi(%arg0 : i64, %arg1 : i64, %arg2 : i64) -> i64, i64, i64 {
   %0 = util.assume.int %arg0<umin=10, umax=100> : i64
   // One greater than the signed maximum.
   %1 = util.assume.int %arg1<umin=10, umax=9223372036854775808> : i64
+  // Same range as %arg0.
+  %2 = util.assume.int %arg2<umin=10, umax=100> : i64
   // CHECK: ceildivui
   // CHECK: ceildivsi
   // CHECK: ceildivsi
-  %2 = arith.ceildivsi %0, %0 : i64
-  %3 = arith.ceildivsi %0, %1 : i64
-  %4 = arith.ceildivsi %1, %0 : i64
-  util.return %2, %3, %4 : i64, i64, i64
+  %3 = arith.ceildivsi %0, %2 : i64
+  %4 = arith.ceildivsi %0, %1 : i64
+  %5 = arith.ceildivsi %1, %0 : i64
+  util.return %3, %4, %5 : i64, i64, i64
 }
 
 // -----
 // CHECK-LABEL: @to_unsigned_divsi
-util.func @to_unsigned_divsi(%arg0 : i64, %arg1 : i64) -> i64, i64, i64 {
+util.func @to_unsigned_divsi(%arg0 : i64, %arg1 : i64, %arg2 : i64) -> i64, i64, i64 {
   %0 = util.assume.int %arg0<umin=10, umax=100> : i64
   // One greater than the signed maximum.
   %1 = util.assume.int %arg1<umin=10, umax=9223372036854775808> : i64
+  // Same range as %arg0.
+  %2 = util.assume.int %arg2<umin=10, umax=100> : i64
   // CHECK: divui
   // CHECK: divsi
   // CHECK: divsi
-  %2 = arith.divsi %0, %0 : i64
-  %3 = arith.divsi %0, %1 : i64
-  %4 = arith.divsi %1, %0 : i64
-  util.return %2, %3, %4 : i64, i64, i64
+  %3 = arith.divsi %0, %2 : i64
+  %4 = arith.divsi %0, %1 : i64
+  %5 = arith.divsi %1, %0 : i64
+  util.return %3, %4, %5 : i64, i64, i64
 }
 
 // -----
 // CHECK-LABEL: @to_unsigned_floordivsi
-util.func @to_unsigned_floordivsi(%arg0 : i64, %arg1 : i64) -> i64, i64, i64 {
+util.func @to_unsigned_floordivsi(%arg0 : i64, %arg1 : i64, %arg2 : i64) -> i64, i64, i64 {
   %0 = util.assume.int %arg0<umin=10, umax=100> : i64
   // One greater than the signed maximum.
   %1 = util.assume.int %arg1<umin=10, umax=9223372036854775808> : i64
+  // Same range as %arg0.
+  %2 = util.assume.int %arg2<umin=10, umax=100> : i64
   // CHECK: divui
   // CHECK: divsi
   // CHECK: divsi
-  %2 = arith.floordivsi %0, %0 : i64
-  %3 = arith.floordivsi %0, %1 : i64
-  %4 = arith.floordivsi %1, %0 : i64
-  util.return %2, %3, %4 : i64, i64, i64
+  %3 = arith.floordivsi %0, %2 : i64
+  %4 = arith.floordivsi %0, %1 : i64
+  %5 = arith.floordivsi %1, %0 : i64
+  util.return %3, %4, %5 : i64, i64, i64
 }
 
 // -----
@@ -191,17 +197,19 @@ util.func @to_unsigned_index_cast(%arg0 : index, %arg1 : index) -> i64, i64 {
 
 // -----
 // CHECK-LABEL: @to_unsigned_remsi
-util.func @to_unsigned_remsi(%arg0 : i64, %arg1 : i64) -> i64, i64, i64 {
+util.func @to_unsigned_remsi(%arg0 : i64, %arg1 : i64, %arg2 : i64) -> i64, i64, i64 {
   %0 = util.assume.int %arg0<umin=10, umax=100> : i64
   // One greater than the signed maximum.
   %1 = util.assume.int %arg1<umin=10, umax=9223372036854775808> : i64
+  // Same range as %arg0.
+  %2 = util.assume.int %arg2<umin=10, umax=100> : i64
   // CHECK: remui
   // CHECK: remsi
   // CHECK: remsi
-  %2 = arith.remsi %0, %0 : i64
-  %3 = arith.remsi %0, %1 : i64
-  %4 = arith.remsi %1, %0 : i64
-  util.return %2, %3, %4 : i64, i64, i64
+  %3 = arith.remsi %0, %2 : i64
+  %4 = arith.remsi %0, %1 : i64
+  %5 = arith.remsi %1, %0 : i64
+  util.return %3, %4, %5 : i64, i64, i64
 }
 
 // -----
@@ -287,25 +295,31 @@ util.func @index_cast_i64_to_index_addi_multiuse(%arg0 : index, %arg1 : index) -
 // -----
 // CHECK-LABEL: @index_cast_i64_to_index_ceildivsi
 util.func @index_cast_i64_to_index_ceildivsi(%arg0 : index, %arg1 : index) -> index {
-  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  // CHECK: %[[ASSUME0:.*]] = util.assume.int %arg0
   %0 = util.assume.int %arg0<umin=10, umax=100> : index
-  %1 = arith.index_cast %0 : index to i64
-  // CHECK: arith.ceildivui %[[ASSUME]], %[[ASSUME]] : index
-  %2 = arith.ceildivsi %1, %1 : i64
-  %3 = arith.index_cast %2 : i64 to index
-  util.return %3 : index
+  // CHECK: %[[ASSUME1:.*]] = util.assume.int %arg1
+  %1 = util.assume.int %arg1<umin=10, umax=100> : index
+  %2 = arith.index_cast %0 : index to i64
+  %3 = arith.index_cast %1 : index to i64
+  // CHECK: arith.ceildivui %[[ASSUME0]], %[[ASSUME1]] : index
+  %4 = arith.ceildivsi %2, %3 : i64
+  %5 = arith.index_cast %4 : i64 to index
+  util.return %5 : index
 }
 
 // -----
 // CHECK-LABEL: @index_cast_i64_to_index_floordivsi
 util.func @index_cast_i64_to_index_floordivsi(%arg0 : index, %arg1 : index) -> index {
-  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  // CHECK: %[[ASSUME0:.*]] = util.assume.int %arg0
   %0 = util.assume.int %arg0<umin=10, umax=100> : index
-  %1 = arith.index_cast %0 : index to i64
-  // CHECK: arith.divui %[[ASSUME]], %[[ASSUME]] : index
-  %2 = arith.floordivsi %1, %1 : i64
-  %3 = arith.index_cast %2 : i64 to index
-  util.return %3 : index
+  // CHECK: %[[ASSUME1:.*]] = util.assume.int %arg1
+  %1 = util.assume.int %arg1<umin=10, umax=100> : index
+  %2 = arith.index_cast %0 : index to i64
+  %3 = arith.index_cast %1 : index to i64
+  // CHECK: arith.divui %[[ASSUME0]], %[[ASSUME1]] : index
+  %4 = arith.floordivsi %2, %3 : i64
+  %5 = arith.index_cast %4 : i64 to index
+  util.return %5 : index
 }
 
 // -----
@@ -349,13 +363,16 @@ util.func @index_cast_i64_to_index_muli(%arg0 : index, %arg1 : index) -> index {
 // -----
 // CHECK-LABEL: @index_cast_i64_to_index_remsi
 util.func @index_cast_i64_to_index_remsi(%arg0 : index, %arg1 : index) -> index {
-  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  // CHECK: %[[ASSUME0:.*]] = util.assume.int %arg0
   %0 = util.assume.int %arg0<umin=10, umax=100> : index
-  %1 = arith.index_cast %0 : index to i64
-  // CHECK: arith.remui %[[ASSUME]], %[[ASSUME]] : index
-  %2 = arith.remsi %1, %1 : i64
-  %3 = arith.index_cast %2 : i64 to index
-  util.return %3 : index
+  // CHECK: %[[ASSUME1:.*]] = util.assume.int %arg1
+  %1 = util.assume.int %arg1<umin=10, umax=100> : index
+  %2 = arith.index_cast %0 : index to i64
+  %3 = arith.index_cast %1 : index to i64
+  // CHECK: arith.remui %[[ASSUME0]], %[[ASSUME1]] : index
+  %4 = arith.remsi %2, %3 : i64
+  %5 = arith.index_cast %4 : i64 to index
+  util.return %5 : index
 }
 
 // -----
@@ -401,13 +418,16 @@ util.func @index_unsigned_overflow_signed(%arg0 : index) -> index {
 // -----
 // CHECK-LABEL: @index_cast_i64_to_index_remsi
 util.func @index_cast_i64_to_index_remsi(%arg0 : index, %arg1 : index) -> index {
-  // CHECK: %[[ASSUME:.*]] = util.assume.int
+  // CHECK: %[[ASSUME0:.*]] = util.assume.int %arg0
   %0 = util.assume.int %arg0<umin=10, umax=100> : index
-  %1 = arith.index_cast %0 : index to i64
-  // CHECK: arith.remui %[[ASSUME]], %[[ASSUME]] : index
-  %2 = arith.remsi %1, %1 : i64
-  %3 = arith.index_cast %2 : i64 to index
-  util.return %3 : index
+  // CHECK: %[[ASSUME1:.*]] = util.assume.int %arg1
+  %1 = util.assume.int %arg1<umin=10, umax=100> : index
+  %2 = arith.index_cast %0 : index to i64
+  %3 = arith.index_cast %1 : index to i64
+  // CHECK: arith.remui %[[ASSUME0]], %[[ASSUME1]] : index
+  %4 = arith.remsi %2, %3 : i64
+  %5 = arith.index_cast %4 : i64 to index
+  util.return %5 : index
 }
 
 // -----

@@ -313,6 +313,7 @@ VER_0 {
     mlirContextEnableMultithreading;
     mlirContextEqual;
     mlirContextGetAllowUnregisteredDialects;
+    mlirContextGetLoadedDialect;
     mlirContextGetNumLoadedDialects;
     mlirContextGetNumRegisteredDialects;
     mlirContextGetNumThreads;
@@ -777,8 +778,19 @@ VER_0 {
     mlirMemRefTypeGetName;
     mlirMemRefTypeGetStridesAndOffset;
     mlirMemRefTypeGetTypeID;
+    mlirMemoryEffectInstanceCreate;
+    mlirMemoryEffectInstanceCreateForBlockArgument;
+    mlirMemoryEffectInstanceCreateForOpOperand;
+    mlirMemoryEffectInstanceCreateForOpResult;
+    mlirMemoryEffectInstanceCreateForSymbol;
+    mlirMemoryEffectInstanceDestroy;
+    mlirMemoryEffectInstancesListAppend;
+    mlirMemoryEffectsAllocateGet;
+    mlirMemoryEffectsFreeGet;
     mlirMemoryEffectsOpInterfaceAttachFallbackModel;
     mlirMemoryEffectsOpInterfaceTypeID;
+    mlirMemoryEffectsReadGet;
+    mlirMemoryEffectsWriteGet;
     mlirMergeSymbolsIntoFromClone;
     mlirModuleCreateEmpty;
     mlirModuleCreateParse;
@@ -1006,6 +1018,7 @@ VER_0 {
     mlirShapedTypeIsStaticDim;
     mlirShapedTypeIsStaticSize;
     mlirShapedTypeIsStaticStrideOrOffset;
+    mlirSideEffectsDefaultResourceGet;
     mlirSimplifyAffineExpr;
     mlirSparseElementsAttrGetIndices;
     mlirSparseElementsAttrGetTypeID;
