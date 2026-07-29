@@ -50,4 +50,17 @@ def FuncConversionPass :
           "memory and must be provided by the user.">];
 }
 
+def SyncFuncConversionPass :
+    Pass<"torch-iree-sync-func-conversion", "ModuleOp"> {
+  let summary = "Finalizes conversion from torch to IREE with a sync-only ABI";
+  let description = [{
+    Synchronous-only alternative to torch-iree-func-conversion for targets
+    where the coarse-fences ABI is undesirable, such as programs compiled for
+    the inline HAL. Entry points keep their original name and a plain builtin
+    tensor ABI: no fences, no HAL imports/exports, and no $async variant.
+    Mutable tensor arguments require in-place aliasing through the HAL and are
+    not supported.
+  }];
+}
+
 #endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
