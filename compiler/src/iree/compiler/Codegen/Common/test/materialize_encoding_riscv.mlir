@@ -268,9 +268,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
-// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:      outs(%[[ACC]]
@@ -301,9 +304,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
-// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:      outs(%[[ACC]]
@@ -333,9 +339,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x24x16xi8>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x32x16xi8>
-// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x24x32xi32>
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x24x16xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x32x16xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x24x32xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:      outs(%[[ACC]]
@@ -365,9 +374,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
   return %out : tensor<?x?xi32, #encoding_result>
 }
 // CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
-// CHECK-SAME:    %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x48x32xi8>
-// CHECK-SAME:    %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
-// CHECK-SAME:    %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x48x64xi32>
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x48x32xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x48x64xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
 // CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
 // CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
 // CHECK-SAME:      outs(%[[ACC]]

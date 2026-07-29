@@ -1246,15 +1246,15 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     int N0 = vlen / 8;
     // SpaceMiT IME (vmadot): fixed hardware tiles for VLEN ∈ {256, 1024,
     // 4096}. Tile is a 3×4 grid of the SEW=8 MAC atom (4×4×8 / 8×8×16 /
-    // 16×16×32). Other VLENs fall through to standard RVV tiles.
-    if (hasFeature(config, "+xsmtvdot")) {
-      size_t imeVlen = getRISCVVVlenFromCPUFeatures(config);
+    // 16×16×32). Other VLENs / scalable mode fall through to standard RVV
+    // tiles.
+    if (hasFeature(config, "+xsmtvdot") && !isScalableVectorizationEnabled()) {
       int atom = 0;
-      if (imeVlen == 256) {
+      if (vlen == 256) {
         atom = 4;
-      } else if (imeVlen == 1024) {
+      } else if (vlen == 1024) {
         atom = 8;
-      } else if (imeVlen == 4096) {
+      } else if (vlen == 4096) {
         atom = 16;
       }
       if (atom != 0) {
@@ -1648,12 +1648,9 @@ private:
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
-    // SpaceMiT IME panels are fixed hardware shapes (K0>1).
-    // RVV scalable-N layout does not apply to them.
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
         getScalableTileFlags(cDims, encoding, config);
-    if (succeeded(scalableFlags) &&
-        !(hasFeature(config, "+xsmtvdot") && chosenTileMxNxK.K > 1)) {
+    if (succeeded(scalableFlags)) {
       info.scalableTiles = std::move(scalableFlags);
     }
     if (IREE::Encoding::isNarrowNResult(encoding) &&
