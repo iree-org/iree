@@ -312,6 +312,7 @@ EXPORTS
   mlirContextEnableMultithreading
   mlirContextEqual
   mlirContextGetAllowUnregisteredDialects
+  mlirContextGetLoadedDialect
   mlirContextGetNumLoadedDialects
   mlirContextGetNumRegisteredDialects
   mlirContextGetNumThreads
@@ -776,8 +777,19 @@ EXPORTS
   mlirMemRefTypeGetName
   mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
+  mlirMemoryEffectInstanceCreate
+  mlirMemoryEffectInstanceCreateForBlockArgument
+  mlirMemoryEffectInstanceCreateForOpOperand
+  mlirMemoryEffectInstanceCreateForOpResult
+  mlirMemoryEffectInstanceCreateForSymbol
+  mlirMemoryEffectInstanceDestroy
+  mlirMemoryEffectInstancesListAppend
+  mlirMemoryEffectsAllocateGet
+  mlirMemoryEffectsFreeGet
   mlirMemoryEffectsOpInterfaceAttachFallbackModel
   mlirMemoryEffectsOpInterfaceTypeID
+  mlirMemoryEffectsReadGet
+  mlirMemoryEffectsWriteGet
   mlirMergeSymbolsIntoFromClone
   mlirModuleCreateEmpty
   mlirModuleCreateParse
@@ -1005,6 +1017,7 @@ EXPORTS
   mlirShapedTypeIsStaticDim
   mlirShapedTypeIsStaticSize
   mlirShapedTypeIsStaticStrideOrOffset
+  mlirSideEffectsDefaultResourceGet
   mlirSimplifyAffineExpr
   mlirSparseElementsAttrGetIndices
   mlirSparseElementsAttrGetTypeID
