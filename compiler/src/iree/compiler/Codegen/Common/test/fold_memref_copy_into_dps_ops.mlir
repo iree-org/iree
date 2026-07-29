@@ -267,3 +267,38 @@ func.func @no_fold_target_does_not_dominate_copy_in() {
 // CHECK-SAME: outs(%[[TEMP]] : memref<4xf32>)
 // CHECK: %[[TARGET:.+]] = memref.alloc
 // CHECK: memref.copy %[[TEMP]], %[[TARGET]]
+
+// -----
+
+#pipeline_layout_a = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#pipeline_layout_b = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<uniform_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#map = affine_map<(d0) -> (d0)>
+
+func.func @no_fold_bindings_from_different_layouts() {
+  %source = hal.interface.binding.subspan layout(#pipeline_layout_a) binding(0) : memref<4xf32>
+  %target = hal.interface.binding.subspan layout(#pipeline_layout_b) binding(1) : memref<4xf32>
+  %temp = memref.alloc() : memref<4xf32>
+  memref.copy %source, %temp : memref<4xf32> to memref<4xf32>
+  linalg.generic {
+    indexing_maps = [#map],
+    iterator_types = ["parallel"]
+  } outs(%temp : memref<4xf32>) {
+  ^bb0(%out: f32):
+    linalg.yield %out : f32
+  }
+  memref.copy %temp, %target : memref<4xf32> to memref<4xf32>
+  return
+}
+
+// CHECK-LABEL: func.func @no_fold_bindings_from_different_layouts(
+// CHECK: %[[TEMP:.+]] = memref.alloc
+// CHECK: memref.copy {{.+}}, %[[TEMP]]
+// CHECK: linalg.generic
+// CHECK-SAME: outs(%[[TEMP]] : memref<4xf32>)
+// CHECK: memref.copy %[[TEMP]],

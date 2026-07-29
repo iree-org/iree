@@ -66,11 +66,15 @@ getInterfaceBindingRoot(Value value) {
 // all memref globals, so refine those roots before falling back to it:
 //
 //   lhs root       rhs root       result
-//   binding(0)     binding(1)     no alias
+//   binding(0)     binding(1)     no alias, when both name the same layout
 //   binding(0)     binding(0)     may alias (subspan offsets may overlap)
+//   binding(*)     binding(*)     may alias, when the layouts differ
 //   @global_a      @global_b      no alias
 //   binding/global local alloc    no alias
 //   unknown        unknown        MLIR AliasAnalysis
+//
+// A binding ordinal is an index into one pipeline layout, so ordinals are only
+// comparable within a layout.
 //
 // A "local alloc" includes its view-like derivatives. An unknown root is
 // conservatively assumed to may-alias, because it may be a function argument or
@@ -81,6 +85,9 @@ static bool mayAlias(Value lhs, Value rhs, AliasAnalysis &aliasAnalysis) {
   std::optional<IREE::HAL::InterfaceBindingSubspanOp> rhsSubspan =
       getInterfaceBindingRoot(rhs);
   if (lhsSubspan && rhsSubspan) {
+    if (lhsSubspan->getLayout() != rhsSubspan->getLayout()) {
+      return true;
+    }
     return lhsSubspan->getBinding() == rhsSubspan->getBinding();
   }
 
