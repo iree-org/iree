@@ -501,6 +501,22 @@ util.func private @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1:
 
 // -----
 
+// CHECK-LABEL: @FoldAsyncCloneIntoLoad
+util.func private @FoldAsyncCloneIntoLoad(%arg0: !stream.resource<external>, %arg1: index, %arg2: index) -> f32 {
+  // CHECK-NOT: stream.async.clone
+  %0 = stream.async.clone %arg0 : !stream.resource<external>{%arg1} -> !stream.resource<*>{%arg1}
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%arg1} -> !stream.resource<staging>{%arg1}
+  // CHECK: %[[END:.+]] = arith.addi %arg2, %c4 : index
+  // CHECK: %[[SLICE:.+]] = stream.async.slice %arg0[%arg2 to %[[END]]] : !stream.resource<external>{%arg1} -> !stream.resource<external>{%c4}
+  // CHECK: %[[STAGED:.+]] = stream.async.transfer %[[SLICE]] : !stream.resource<external>{%c4} -> !stream.resource<staging>{%c4}
+  // CHECK: %[[VALUE:.+]] = stream.async.load %[[STAGED]][%c0] : !stream.resource<staging>{%c4} -> f32
+  %2 = stream.async.load %1[%arg2] : !stream.resource<staging>{%arg1} -> f32
+  // CHECK: util.return %[[VALUE]]
+  util.return %2 : f32
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncStoreBitcast
 util.func private @FoldAsyncStoreBitcast(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
   %c0 = arith.constant 0 : index
