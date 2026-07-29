@@ -406,6 +406,7 @@ struct riscv_hwprobe {
 #define IREE_RISCV_HWPROBE_IMA_V (1 << 2)
 #define IREE_RISCV_HWPROBE_EXT_ZVFH (1 << 30)
 #define IREE_RISCV_HWPROBE_EXT_ZVFHMIN (1ULL << 31)
+#define IREE_RISCV_HWPROBE_EXT_ZVFBFWMA (1ULL << 54)
 
 static struct riscv_hwprobe kv_pairs[] = {
     {IREE_RISCV_HWPROBE_KEY_IMA_EXT_0, 0}};
@@ -429,6 +430,8 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
                  IREE_RISCV_HWPROBE_EXT_ZVFHMIN);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFH, hwprobe,
                  IREE_RISCV_HWPROBE_EXT_ZVFH);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_ZVFBFWMA, hwprobe,
+                 IREE_RISCV_HWPROBE_EXT_ZVFBFWMA);
 }
 
 #else
