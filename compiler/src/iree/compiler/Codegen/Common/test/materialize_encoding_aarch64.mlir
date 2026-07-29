@@ -685,3 +685,43 @@ func.func @matmul_fp6_f32_aarch64_generic(
 // CHECK-LABEL: func @matmul_fp6_f32_aarch64_generic(
 //       CHECK:   %[[INNER_FP6:.+]] = iree_codegen.inner_tiled
 //  CHECK-SAME:     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16, intrinsics_n = 2, intrinsics_k = 4, lhs_type = f6E3M2FN, rhs_type = f6E3M2FN, acc_type = f32>
+
+// -----
+
+#executable_target = #hal.executable.target<"llvm-cpu", "xyz", {iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>, target_triple = "aarch64-xyz-xyz"}>
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d1, d0)>
+#map4 = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, 32, 27]>
+#transposed_encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, [#map2, #map3]], iteration_sizes = [4, 32, 27]>
+func.func @generic_with_permuted_output_maps(
+    %arg0: tensor<4x32xf32, #encoding>
+) -> (tensor<32x4xf32, #transposed_encoding>, tensor<4x32xf32, #encoding>)
+    attributes {hal.executable.target = #executable_target} {
+  %0 = tensor.empty() : tensor<32x4xf32, #transposed_encoding>
+  %1 = tensor.empty() : tensor<4x32xf32, #encoding>
+  %2:2 = linalg.generic {
+      indexing_maps = [#map4, #map3, #map4],
+      iterator_types = ["parallel", "parallel"]
+  } ins(%arg0 : tensor<4x32xf32, #encoding>)
+    outs(%0, %1 : tensor<32x4xf32, #transposed_encoding>, tensor<4x32xf32, #encoding>) {
+  ^bb0(%in: f32, %out: f32, %out_0: f32):
+    linalg.yield %in, %in : f32, f32
+  } -> (tensor<32x4xf32, #transposed_encoding>, tensor<4x32xf32, #encoding>)
+  return %2#0, %2#1 : tensor<32x4xf32, #transposed_encoding>, tensor<4x32xf32, #encoding>
+}
+
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-LABEL: func.func @generic_with_permuted_output_maps(
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x4x4x8xf32>
+// CHECK-SAME:  ) -> (tensor<1x4x4x8xf32>, tensor<1x4x4x8xf32>)
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<1x4x4x8xf32>
+// CHECK:         %[[GENERIC:.+]]:2 = linalg.generic
+// CHECK-SAME:      indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]]
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+// CHECK-SAME:      ins(%[[ARG0]] : tensor<1x4x4x8xf32>)
+// CHECK-SAME:      outs(%[[EMPTY]], %[[EMPTY]] : tensor<1x4x4x8xf32>, tensor<1x4x4x8xf32>)
+// CHECK:           linalg.yield
+// CHECK:         return %[[GENERIC]]#0, %[[GENERIC]]#1

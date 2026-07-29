@@ -329,19 +329,20 @@ Operation *lowerGenericOpWithResolvedLayouts(
   if (genericOp.getNumResults() == 0) {
     return nullptr;
   }
-  OpOperand *outputOperand = genericOp.getDpsInitOperand(0);
-  AffineMap outputMap = genericOp.getMatchingIndexingMap(outputOperand);
+  // The first output and its iteration domain will be taken as the "anchor",
+  // based off which the packed shape will be determined. We only support cases
+  // where indexing maps of all other output operands are identity or
+  // permutatations.
+  OpOperand *firstOutputOperand = genericOp.getDpsInitOperand(0);
+  AffineMap outputMap = genericOp.getMatchingIndexingMap(firstOutputOperand);
   for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
-    if (genericOp.getMatchingIndexingMap(&initOperand) != outputMap) {
+    if (!genericOp.getMatchingIndexingMap(&initOperand).isPermutation()) {
       return nullptr;
     }
   }
-  // The pattern expects a generic op with an identity map for all outputs. If
-  // this is not the case, then interchange the generic op before converting.
+  // If the anchored output indexing map is not identity, interchange the
+  // generic op before converting.
   if (!outputMap.isIdentity()) {
-    if (!outputMap.isPermutation()) {
-      return nullptr;
-    }
     SmallVector<unsigned int> interchange = llvm::map_to_vector(
         outputMap.getResults(), [](AffineExpr expr) -> unsigned int {
           return cast<AffineDimExpr>(expr).getPosition();
@@ -354,8 +355,8 @@ Operation *lowerGenericOpWithResolvedLayouts(
       return nullptr;
     }
     genericOp = interchangedGenericOp.value();
-    outputOperand = genericOp.getDpsInitOperand(0);
-    outputMap = genericOp.getMatchingIndexingMap(outputOperand);
+    firstOutputOperand = genericOp.getDpsInitOperand(0);
+    outputMap = genericOp.getMatchingIndexingMap(firstOutputOperand);
   }
   // Step 1: Retrieve the output encoding materialization information and
   // compute the new indexing maps for the packed and potentially swizzled
@@ -387,11 +388,10 @@ Operation *lowerGenericOpWithResolvedLayouts(
   // invOutSwizzlePerm:       [0, 1, 2, 5, 3, 6, 7, 4]
   MaterializeEncodingInfo outMaterializeEncodingInfo =
       getEncodingInfoFromLayout(
-          cast<RankedTensorType>(outputOperand->get().getType()), layoutAttr);
+          cast<RankedTensorType>(firstOutputOperand->get().getType()),
+          layoutAttr);
   if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
-    return dropEncodingAndCloneOp(builder, genericOp.getOperation(),
-                                  convertedInputOperands,
-                                  convertedOutputOperands);
+    return clone(builder, genericOp, convertedResTypes, convertedOperands);
   }
   auto convertedResultType =
       cast<RankedTensorType>(convertedOutputOperands[0].getType());
@@ -405,7 +405,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
       llvm::to_vector(llvm::seq<int64_t>(0, convertedResultType.getRank()));
   if (outMaterializeEncodingInfo.swizzle.has_value()) {
     const int outRank =
-        cast<RankedTensorType>(outputOperand->get().getType()).getRank();
+        cast<RankedTensorType>(firstOutputOperand->get().getType()).getRank();
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, outRank));
     for (auto perm : outMaterializeEncodingInfo.swizzle->permutation()) {
@@ -437,18 +437,23 @@ Operation *lowerGenericOpWithResolvedLayouts(
   }
 
   SmallVector<AffineMap> packedIndexingMaps;
-  for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
-    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
+  SmallVector<OpOperand *> indexedOperands = genericOp.getDpsInputOperands();
+  for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
+    indexedOperands.push_back(&initOperand);
+  }
+  for (auto [operand, convertedOperand] :
+       llvm::zip_equal(indexedOperands, convertedOperands)) {
+    AffineMap operandMap = genericOp.getMatchingIndexingMap(operand);
     // Special case for 0D inputs. They will resolve to identity layout, so
     // skip the logic to compute the packed indexing map.
-    if (inputMap.getNumResults() == 0) {
-      auto packedInputMap = AffineMap::get(
+    if (operandMap.getNumResults() == 0) {
+      auto packedOperandMap = AffineMap::get(
           /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, {},
           builder.getContext());
-      packedIndexingMaps.push_back(packedInputMap);
+      packedIndexingMaps.push_back(packedOperandMap);
       continue;
     }
-    // Step 2: Retrieve the encoding for every input operand and perform the
+    // Step 2: Retrieve the encoding for every operand and perform the
     // outer dimension permutation, inner dimension expansion and permutation,
     // swizzle expansion and swizzle permutation.
     //
@@ -481,24 +486,25 @@ Operation *lowerGenericOpWithResolvedLayouts(
     //
     // packedResultDims: [0, 2, 7, 6]
     MaterializeEncodingInfo materializeEncodingInfo = getEncodingInfoFromLayout(
-        cast<RankedTensorType>(inputOperand->get().getType()), layoutAttr);
+        cast<RankedTensorType>(operand->get().getType()), layoutAttr);
     if (IREE::Codegen::isIdentityLayout(materializeEncodingInfo)) {
       return nullptr;
     }
     ArrayRef<int64_t> innerDimsPos = materializeEncodingInfo.innerDimsPos;
     ArrayRef<int64_t> outerDimsPerm = materializeEncodingInfo.outerDimsPerm;
-    // Permute result dims to the input packed domain, and map dims to the
-    // output packed domain.
+    // Permute result dims to the operand packed domain, and map dims to the
+    // anchor output's packed domain.
     SmallVector<int64_t> packedResultDims = llvm::map_to_vector(
-        applyPermutation(inputMap.getResults(), outerDimsPerm),
+        applyPermutation(operandMap.getResults(), outerDimsPerm),
         [&](AffineExpr expr) {
           auto dimExpr = cast<AffineDimExpr>(expr);
           return outInverseOuterDimsPerm[dimExpr.getPosition()];
         });
-    // Add new dims for the inner tiles, taking the dim position from the
-    // corresponding inner tile of the init operand.
+    // Add new dims for the inner tiles, mapping their dimension positions to
+    // the corresponding inner tiles of the anchor output.
     for (auto [idx, pos] : llvm::enumerate(innerDimsPos)) {
-      auto dimPos = cast<AffineDimExpr>(inputMap.getResult(pos)).getPosition();
+      auto dimPos =
+          cast<AffineDimExpr>(operandMap.getResult(pos)).getPosition();
       for (auto [tileIdx, outDim] : llvm::enumerate(outInnerDimsPos)) {
         if (dimPos != outDim) {
           continue;
@@ -529,8 +535,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
     // In case of a layout with swizzle, the packed result dimensions need
     // to be transposed according to the swizzle's permutation vector.
     if (materializeEncodingInfo.swizzle.has_value()) {
-      int inRank =
-          cast<RankedTensorType>(inputOperand->get().getType()).getRank();
+      int inRank = cast<RankedTensorType>(operand->get().getType()).getRank();
       SmallVector<int64_t> transposePerm =
           llvm::to_vector(llvm::seq<int64_t>(0, inRank));
       for (auto perm : materializeEncodingInfo.swizzle->permutation()) {
@@ -568,23 +573,13 @@ Operation *lowerGenericOpWithResolvedLayouts(
         llvm::map_to_vector(finalPackedResultDims, [&](int64_t dim) {
           return builder.getAffineDimExpr(dim);
         });
-    auto packedInputMap = AffineMap::get(
+    auto packedOperandMap = AffineMap::get(
         /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, packedResultExprs,
         builder.getContext());
-    packedIndexingMaps.push_back(packedInputMap);
+    packedIndexingMaps.push_back(packedOperandMap);
   }
-  // Create the new packed identity map for the output.
-  packedIndexingMaps.append(
-      genericOp.getNumDpsInits(),
-      builder.getMultiDimIdentityMap(convertedResultType.getRank()));
-  SmallVector<Type> convertedResultTypes =
-      llvm::map_to_vector(genericOp.getResultTypes(), [&](Type t) -> Type {
-        return RankedTensorType::get(
-            convertedResultType.getShape(),
-            cast<RankedTensorType>(t).getElementType());
-      });
   auto materializedGenericOp = linalg::GenericOp::create(
-      builder, genericOp.getLoc(), convertedResultTypes, convertedInputOperands,
+      builder, genericOp.getLoc(), convertedResTypes, convertedInputOperands,
       convertedOutputOperands, packedIndexingMaps, iteratorTypes,
       /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
 
@@ -593,7 +588,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
   // the packed dimensions.
   Block *origBlock = genericOp.getBlock();
   int64_t origRank =
-      cast<RankedTensorType>(outputOperand->get().getType()).getRank();
+      cast<RankedTensorType>(firstOutputOperand->get().getType()).getRank();
 
   // Create the entry block for the new generic op with matching argument types.
   Region &newRegion = materializedGenericOp.getRegion();
