@@ -1259,10 +1259,9 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
         .getResult();
   }
   if (isNvMmaSync(intrinsic)) {
-    // Transpose the two outer dims to model mma.sync's column-major register
-    // order: reshape to {outer_M, outer_K, element_K}, swap outer_M/outer_K.
-    // Shape is derived from the LHS layout (not hardcoded {2, 2, 2}) since
-    // element[K] varies by intrinsic (e.g. FP8 packs 4 vs. F16/BF16's 2).
+    // Transpose outer M/K dims for mma.sync's column-major register order.
+    // Derive the non-unit shape from the LHS layout because element[K] varies
+    // by intrinsic.
     Type elementType = cast<VectorType>(lhs.getType()).getElementType();
     auto lhsLayout = getSingleSubgroupLayout(intrinsic, kMMAOperandLhs);
     int64_t outerM = lhsLayout.outer[0];
