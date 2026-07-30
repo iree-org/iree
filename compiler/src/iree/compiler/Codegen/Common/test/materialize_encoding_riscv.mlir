@@ -243,53 +243,13 @@ func.func @matmul_lowering_i8i8i32_riscv32_ukernel(
 // -----
 
 // RISC-V 64 + xsmtvdot + zvl256b: IME 12x16x8 tile (3x4 of 4x4x8).
-// ukernels="all" is explicit here; D3 auto-enables mmt4d for +xsmtvdot targets
-// so this flag is not required in practice (see next test case).
-// LHS inner tile: [M0=12, K0=8], RHS inner tile: [N0=16, K0=8],
-// ACC inner tile: [M0=12, N0=16].
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot(
-    %lhs: tensor<?x?xi8, #encoding_lhs>,
-    %rhs: tensor<?x?xi8, #encoding_rhs>,
-    %result: tensor<?x?xi32, #encoding_result>
-) -> tensor<?x?xi32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl256b,+xsmtvdot", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
-} {
-  %out = linalg.matmul
-      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
-                       tensor<?x?xi8, #encoding_rhs>)
-      outs(%result : tensor<?x?xi32, #encoding_result>)
-      -> tensor<?x?xi32, #encoding_result>
-  return %out : tensor<?x?xi32, #encoding_result>
-}
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot(
-// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
-// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
-// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
-// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
-// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
-// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
-// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
-// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
-// CHECK-SAME:      outs(%[[ACC]]
-// CHECK:         return %[[MMT4D]]
-
-// -----
-
-// Same as above but without an explicit ukernels attribute, relying on D3's
-// auto-enable for +xsmtvdot targets (getDefaultEnabledUkernels returns "mmt4d").
-#map = affine_map<(d0, d1, d2) -> (d0, d2)>
-#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
-#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
+func.func @matmul_lowering_i8i8i32_riscv64_zvl256b(
     %lhs: tensor<?x?xi8, #encoding_lhs>,
     %rhs: tensor<?x?xi8, #encoding_rhs>,
     %result: tensor<?x?xi32, #encoding_result>
@@ -303,7 +263,7 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
       -> tensor<?x?xi32, #encoding_result>
   return %out : tensor<?x?xi32, #encoding_result>
 }
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl256b(
 // STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x12x8xi8>
 // STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
 // STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x12x16xi32>
@@ -324,12 +284,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_default_ukernels(
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
+func.func @matmul_lowering_i8i8i32_riscv64_zvl1024b(
     %lhs: tensor<?x?xi8, #encoding_lhs>,
     %rhs: tensor<?x?xi8, #encoding_rhs>,
     %result: tensor<?x?xi32, #encoding_result>
 ) -> tensor<?x?xi32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl1024b,+xsmtvdot", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl1024b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %out = linalg.matmul
       ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
@@ -338,7 +298,7 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
       -> tensor<?x?xi32, #encoding_result>
   return %out : tensor<?x?xi32, #encoding_result>
 }
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl1024b(
 // STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x24x16xi8>
 // STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x32x16xi8>
 // STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x24x32xi32>
@@ -359,12 +319,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl1024b(
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
+func.func @matmul_lowering_i8i8i32_riscv64_zvl4096b(
     %lhs: tensor<?x?xi8, #encoding_lhs>,
     %rhs: tensor<?x?xi8, #encoding_rhs>,
     %result: tensor<?x?xi32, #encoding_result>
 ) -> tensor<?x?xi32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl4096b,+xsmtvdot", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl4096b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %out = linalg.matmul
       ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
@@ -373,7 +333,7 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
       -> tensor<?x?xi32, #encoding_result>
   return %out : tensor<?x?xi32, #encoding_result>
 }
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl4096b(
 // STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x48x32xi8>
 // STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
 // STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x48x64xi32>
@@ -396,12 +356,12 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl4096b(
 #encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
-func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl512b_fallback(
+func.func @matmul_lowering_i8i8i32_riscv64_zvl512b_fallback(
     %lhs: tensor<?x?xi8, #encoding_lhs>,
     %rhs: tensor<?x?xi8, #encoding_rhs>,
     %result: tensor<?x?xi32, #encoding_result>
 ) -> tensor<?x?xi32, #encoding_result> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl512b,+xsmtvdot", ukernels = "all", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl512b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
 } {
   %out = linalg.matmul
       ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
@@ -410,7 +370,7 @@ func.func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl512b_fallback(
       -> tensor<?x?xi32, #encoding_result>
   return %out : tensor<?x?xi32, #encoding_result>
 }
-// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_xsmtvdot_zvl512b_fallback(
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl512b_fallback(
 // STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
 // STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x1xi8>
 // STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x64xi32>
