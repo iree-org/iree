@@ -709,14 +709,14 @@ struct ScatterToDynamicUpdateSlice final
     auto flatTy = RankedTensorType::get({indexDepth}, indexElemTy);
     Value flatIndices = mlir::stablehlo::ReshapeOp::create(b, flatTy, indices);
 
-    auto zeroAttr = cast<DenseElementsAttr>(rewriter.getZeroAttr(scalarTy));
-    Value zero = mlir::stablehlo::ConstantOp::create(b, zeroAttr);
+    Value zero =
+        mlir::stablehlo::ConstantOp::create(b, b.getZeroAttr(indexElemTy));
 
     // Map each operand dim to a start offset: the scatter index component if
     // the dim is indexed, otherwise zero. dynamic_update_slice clamps offsets.
+    auto sliceTy = RankedTensorType::get({1}, indexElemTy);
     llvm::SmallVector<Value> startIndices(rank, zero);
     for (auto [j, operandDim] : llvm::enumerate(scatterDims)) {
-      auto sliceTy = RankedTensorType::get({1}, indexElemTy);
       Value comp = mlir::stablehlo::SliceOp::create(
           b, sliceTy, flatIndices,
           b.getDenseI64ArrayAttr({static_cast<int64_t>(j)}),
