@@ -558,9 +558,9 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
 // Converts a `stablehlo.scatter` with batching dims to one without batching
 // dims, such that each batching dim becomes an inserted window dim with a
 // corresponding `IotaOp` concatenated to the scatter indices. This mirrors
-// upstream StableHLO's `ScatterWithBatchingDimsExpander` and must run before
-// the other scatter canonicalization patterns, which do not understand batching
-// dims and would otherwise miscompile them.
+// upstream StableHLO's `ScatterWithBatchingDimsExpander`. The other scatter
+// canonicalization patterns do not understand batching dims and bail while any
+// remain (see `failIfScatterHasBatchingDims`).
 struct ScatterBatchingDimsExpander final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
@@ -608,6 +608,21 @@ struct ScatterBatchingDimsExpander final
   }
 };
 
+// The scatter canonicalization patterns below assume a scatter with no batching
+// dims. This helper checks if there are any batching dims remaining so the
+// patterns can bail and let them be expanded by `ScatterBatchingDimsExpander`.
+static LogicalResult failIfScatterHasBatchingDims(mlir::stablehlo::ScatterOp op,
+                                                  PatternRewriter &rewriter) {
+  auto dimNumbers = op.getScatterDimensionNumbers();
+  if (!dimNumbers.getInputBatchingDims().empty() ||
+      !dimNumbers.getScatterIndicesBatchingDims().empty()) {
+    return rewriter.notifyMatchFailure(
+        op,
+        "scatter has batching dims; ScatterBatchingDimsExpander runs first");
+  }
+  return success();
+}
+
 // Converts a `stablehlo.scatter` that writes a single, full-rank contiguous
 // slice with an overwrite computation into a `stablehlo.dynamic_update_slice`.
 //
@@ -624,10 +639,12 @@ struct ScatterToDynamicUpdateSlice final
     if (op.getInputs().size() != 1 || op.getUpdates().size() != 1) {
       return rewriter.notifyMatchFailure(op, "variadic scatter");
     }
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto dimNumbers = op.getScatterDimensionNumbers();
-    if (!dimNumbers.getInputBatchingDims().empty() ||
-        !dimNumbers.getInsertedWindowDims().empty()) {
-      return rewriter.notifyMatchFailure(op, "has batching/inserted dims");
+    if (!dimNumbers.getInsertedWindowDims().empty()) {
+      return rewriter.notifyMatchFailure(op, "has inserted dims");
     }
 
     Value operand = op.getInputs().front();
@@ -721,6 +738,9 @@ struct ScatterInt64Indices final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto indices = op.getScatterIndices();
     auto indicesTy = indices.getType();
     auto indicesETy = indicesTy.getElementType();
@@ -765,6 +785,9 @@ struct ScatterImplicitIndex final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     Value indices = op.getScatterIndices();
@@ -833,6 +856,9 @@ struct ScatterImplicitBatch final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indices = cast<Value>(op.getScatterIndices());
@@ -923,6 +949,9 @@ struct ScatterCollapseBatch final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
     auto indices = cast<Value>(op.getScatterIndices());
@@ -997,6 +1026,9 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
     auto dimNumbers = op.getScatterDimensionNumbers();
 
@@ -1112,6 +1144,9 @@ struct ScatterIndexedDimsFirst final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     Location loc = op.getLoc();
     auto dimNumbers = op.getScatterDimensionNumbers();
     ArrayRef<int64_t> scatterDimsToOperandDims =
@@ -1335,6 +1370,9 @@ struct ScatterMaterializeInsertedDim final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
+      return failure();
+    }
     auto indices = op.getScatterIndices();
     Value operand = op.getInputs().front();
     auto indicesTy = cast<ShapedType>(indices.getType());
@@ -2437,12 +2475,11 @@ struct StableHLOToStableHLOPreprocessing final
     patterns.insert<RngBitcastFloat>(context);
 
     // scatter canonicalization patterns
-    patterns.insert<ScatterToDynamicUpdateSlice>(context, /*benefit=*/3);
-    patterns.insert<ScatterBatchingDimsExpander>(context, /*benefit=*/2);
-    patterns
-        .insert<ScatterInt64Indices, ScatterImplicitIndex, ScatterImplicitBatch,
-                ScatterMaterializeInsertedDim, ScatterCollapseBatch,
-                ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
+    patterns.insert<ScatterToDynamicUpdateSlice>(context, /*benefit=*/2);
+    patterns.insert<ScatterBatchingDimsExpander, ScatterInt64Indices,
+                    ScatterImplicitIndex, ScatterImplicitBatch,
+                    ScatterMaterializeInsertedDim, ScatterCollapseBatch,
+                    ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
