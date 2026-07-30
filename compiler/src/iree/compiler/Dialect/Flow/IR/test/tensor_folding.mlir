@@ -823,6 +823,21 @@ util.func public @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
 
 // -----
 
+// Regression: an out-of-bounds update (start offset + update extent exceeds the
+// target) must not be folded; folding it would index past the target constant.
+// CHECK-LABEL: @updateConst2DUpdateOutOfBounds
+util.func public @updateConst2DUpdateOutOfBounds() -> tensor<3x4xi32> {
+  %0 = arith.constant dense<[[12, 13], [14, 15]]> : tensor<2x2xi32>
+  %1 = arith.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  // CHECK: flow.tensor.update
+  %2 = flow.tensor.update %0, %1[%c2, %c3] : tensor<2x2xi32> -> tensor<3x4xi32>
+  util.return %2 : tensor<3x4xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @updateConst3DUpdate1x2x3
 util.func public @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
   %0 = arith.constant dense<[[[18, 19, 20], [21, 22, 23]]]> : tensor<1x2x3xi32>
