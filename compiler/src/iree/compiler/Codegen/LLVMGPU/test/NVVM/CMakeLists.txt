@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "pipeline_full_smoketests.mlir"
     "pipeline_tile_and_fuse_mma_sync.mlir"
     "pipeline_vector_distribute_mma_sync.mlir"
+    "pipeline_vector_distribute_paged_attention.mlir"
   TOOLS
     FileCheck
     iree-opt
