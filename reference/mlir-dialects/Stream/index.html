@@ -11203,8 +11203,7 @@ value.</p>
 <h4 id="streamasynctransfer-streamasynctransferop"><code>stream.async.transfer</code> (Stream::AsyncTransferOp)<a class="headerlink" href="#streamasynctransfer-streamasynctransferop" title="Permanent link">link</a></h4>
 <p><em>Transfers a resource from one location/state to another.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` (`on` `(` $execution_affinity^ `)`)?
-              $source `:` type($source)
+<div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` $source `:` type($source)
               `` `{` $source_size `}`
               (`from` `(` $source_affinity^ `)`)?
               `-&gt;`
@@ -11216,9 +11215,6 @@ value.</p>
 to a <code>local</code> lifetime) or different affinities. This is roughly equivalent
 to a cast but may have special semantics when later lowered to one or more
 devices with discrete memory spaces or pools.</p>
-<p>The optional execution affinity specifies where the transfer must execute
-independently of the source and target storage affinities. When omitted an
-execution affinity is derived from the resource lifetimes and endpoints.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>AffinityOpInterface</code>, <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_StreamableOp</code>, <code>Util_HoistableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -11227,7 +11223,6 @@ execution affinity is derived from the resource lifetimes and endpoints.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 <tr><td><code>target_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
-<tr><td><code>execution_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 </table>
 
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>

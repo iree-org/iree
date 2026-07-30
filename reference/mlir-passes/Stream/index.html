@@ -3307,17 +3307,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-stream-place-transfer-executions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-stream-place-transfer-executions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-stream-propagate-timepoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6900,17 +6889,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-stream-place-transfer-executions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-stream-place-transfer-executions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-stream-propagate-timepoints" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7383,11 +7361,6 @@ discrete memory).</p>
 required <code>i32</code> values on the dispatch ABI. May optimize multiple wider
 bit-width operands with known ranges or alignments into or across fewer
 operands to reduce the total operand count.</p>
-<h3 id="-iree-stream-place-transfer-executions"><code>-iree-stream-place-transfer-executions</code><a class="headerlink" href="#-iree-stream-place-transfer-executions" title="Permanent link">link</a></h3>
-<p><em>Materializes execution affinities for pinned transfers.</em></p>
-<p>Uses whole-program affinity analysis to place transfers producing pinned
-resources on the device that owns the result when producer-side execution
-would require the pinned allocation to be accessible from another device.</p>
 <h3 id="-iree-stream-propagate-timepoints"><code>-iree-stream-propagate-timepoints</code><a class="headerlink" href="#-iree-stream-propagate-timepoints" title="Permanent link">link</a></h3>
 <p><em>Materializes timepoints and sinks them to consumers throughout the whole program.</em></p>
 <p>Propagates <code>!stream.timepoint</code> values across the whole program in order to
