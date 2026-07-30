@@ -168,6 +168,9 @@ struct ExecutePartitionBuilder {
     // Note that some ops may have affinities that are more specific and we
     // want to preserve those as long as possible.
     if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(clonedOp)) {
+      if (transferOp.getExecutionAffinityAttr() == partition->affinity) {
+        transferOp.removeExecutionAffinityAttr();
+      }
       if (transferOp.getSourceAffinityAttr() == partition->affinity) {
         transferOp.setSourceAffinityAttr(nullptr);
       }

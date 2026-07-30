@@ -2163,7 +2163,9 @@ void AsyncBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
   if (auto sourceTransferOp = getSource().getDefiningOp<AsyncTransferOp>()) {
-    if (sourceTransferOp.getSource().getType() == getResult().getType() &&
+    if (!getExecutionAffinityAttr() &&
+        !sourceTransferOp.getExecutionAffinityAttr() &&
+        sourceTransferOp.getSource().getType() == getResult().getType() &&
         sourceTransferOp.getSourceAffinity() == getTargetAffinity()) {
       return sourceTransferOp.getSource();
     }
@@ -2234,7 +2236,8 @@ struct IntermediateTransferElision : OpRewritePattern<AsyncTransferOp> {
         transferOp, transferOp.getResult().getType(),
         originTransferOp.getSource(), originTransferOp.getSourceSize(),
         transferOp.getResultSize(), originTransferOp.getSourceAffinityAttr(),
-        transferOp.getResultAffinityAttr());
+        transferOp.getResultAffinityAttr(),
+        transferOp.getExecutionAffinityAttr());
     return success();
   }
 };

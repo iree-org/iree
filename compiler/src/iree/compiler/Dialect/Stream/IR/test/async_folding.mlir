@@ -450,6 +450,22 @@ util.func private @IntermediateTransferElision(%source: !stream.resource<constan
 
 // -----
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @PreserveTransferExecutionAffinity
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @PreserveTransferExecutionAffinity(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  %transfer0 = stream.async.transfer %source : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<staging>{%size}
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>) %[[SOURCE]]
+  // CHECK-SAME: from(#hal.device.affinity<@device_b>)
+  // CHECK-SAME: to(#hal.device.affinity<@device_a>)
+  %transfer1 = stream.async.transfer on(#hal.device.affinity<@device_a>) %transfer0 : !stream.resource<staging>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%size}
+  util.return %transfer1 : !stream.resource<external>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncCastSameType
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
 util.func private @FoldAsyncCastSameType(%source: !stream.resource<external>, %size: index) -> !stream.resource<external> {

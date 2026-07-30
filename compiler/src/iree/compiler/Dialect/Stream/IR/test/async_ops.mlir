@@ -182,6 +182,35 @@ util.func private @asyncTransferAffinities(%arg0: !stream.resource<constant>, %a
 
 // -----
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @asyncTransferExecutionAffinity
+util.func private @asyncTransferExecutionAffinity(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<external> {
+  // CHECK: = stream.async.transfer on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: from(#hal.device.affinity<@device_b>)
+  // CHECK-SAME: to(#hal.device.affinity<@device_a>)
+  %0 = stream.async.transfer on(#hal.device.affinity<@device_a>) %arg0 : !stream.resource<transient>{%arg1} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%arg1}
+  util.return %0 : !stream.resource<external>
+}
+
+// -----
+
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+util.global private @device_c : !hal.device
+
+// CHECK-LABEL: @asyncTransferThirdDeviceExecutionAffinity
+util.func private @asyncTransferThirdDeviceExecutionAffinity(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<external> {
+  // CHECK: = stream.async.transfer on(#hal.device.affinity<@device_c>)
+  // CHECK-SAME: from(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: to(#hal.device.affinity<@device_b>)
+  %0 = stream.async.transfer on(#hal.device.affinity<@device_c>) %arg0 : !stream.resource<transient>{%arg1} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<external>{%arg1}
+  util.return %0 : !stream.resource<external>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncCast
 util.func private @asyncCast(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<*> {
   // CHECK: = stream.async.cast %arg0 : !stream.resource<external>{%arg1} -> !stream.resource<*>{%arg1}

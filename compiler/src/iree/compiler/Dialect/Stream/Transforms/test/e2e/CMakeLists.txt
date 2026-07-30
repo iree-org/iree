@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "async_copies.mlir"
     "async_parameters.mlir"
+    "transfer_execution_placement.mlir"
   TOOLS
     FileCheck
     iree-opt
