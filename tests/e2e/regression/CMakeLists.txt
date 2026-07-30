@@ -22,12 +22,14 @@ iree_lit_test_suite(
     "trace_dispatch_tensors.mlir"
     "transients_test.mlir"
     "unused_args.mlir"
+    "vm_ref_branch_ownership.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
     iree-opt
     iree-run-mlir
+    iree-run-module
   LABELS
     "driver=local-task"
     "hostonly"
