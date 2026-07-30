@@ -142,10 +142,8 @@ func.func @matmul_tile_and_fuse_mma_sync_bf16()
 
 // -----
 
-// Test FP8 (E4M3FN) matmul lowering through TileAndFuse pipeline.
-// m16n8k32: K doubles vs F16/BF16, so reduction tile = 4 (4x32=128 K-per-iter).
-// LHS transpose reshapes to {outer_M, outer_K, element_K} = {2, 2, 4} for FP8
-// (vs {2, 2, 2} for FP16 m16n8k16).
+// Test FP8 E4M3FN m16n8k32 matmul lowering to nvgpu.mma.sync.
+// FP8 uses reduction = 4 and element[K] = 4.
 
 #executable_target_cuda_fp8 = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout_fp8 = #hal.pipeline.layout<bindings = [
@@ -182,11 +180,9 @@ func.func @matmul_tile_and_fuse_mma_sync_fp8e4m3fn()
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf8E4M3FN, #gpu.address_space<workgroup>>
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xf8E4M3FN, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for
-// Verify LHS transpose for mma.sync column-major ordering (FP8 element[K]=4)
-// TileAndFuse produces 2x1x2x4 -> reshape to 2x2x4 -> transpose [1,0,2] -> reshape to 4x4
+// Verify the FP8 LHS mma.sync transpose and m16n8k32 lowering.
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x1x2x4xf8E4M3FN> to vector<2x2x4xf8E4M3FN>
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x4xf8E4M3FN> to vector<2x2x4xf8E4M3FN>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x4xf8E4M3FN> to vector<4x4xf8E4M3FN>
-// Verify nvgpu.mma.sync is generated with m16n8k32 shape for FP8
 // CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 32]} : ({{.*}}) -> vector<2x2xf32>
 //       CHECK:   scf.yield
