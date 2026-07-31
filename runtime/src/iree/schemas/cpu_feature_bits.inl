@@ -126,3 +126,9 @@ IREE_CPU_FEATURE_BIT(RISCV_64, 0, 0, V, "v")
 IREE_CPU_FEATURE_BIT(RISCV_64, 0, 1, ZVFHMIN, "zvfhmin")
 IREE_CPU_FEATURE_BIT(RISCV_64, 0, 2, ZVFH, "zvfh")
 IREE_CPU_FEATURE_BIT(RISCV_64, 0, 3, ZVFBFWMA, "zvfbfwma")
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 4, XSMTVDOT, "xsmtvdot")
+// Minimum VLEN guarantees (LLVM zvl*b) used to gate SpaceMiT IME
+// tile shapes that require a full vmadot operand panel in one vector register.
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 5, ZVL256B, "zvl256b")
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 6, ZVL1024B, "zvl1024b")
+IREE_CPU_FEATURE_BIT(RISCV_64, 0, 7, ZVL4096B, "zvl4096b")

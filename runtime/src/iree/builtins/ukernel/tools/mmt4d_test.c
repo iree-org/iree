@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <string.h>
+
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/builtins/ukernel/api.h"
@@ -532,9 +534,11 @@ static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
   // currently an implementation detail within each arch/ subdirectory.
   flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
   // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
-  // narrow variants for handling these cases.
-  for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
-    iree_uk_test_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features);
+  // narrow variants for handling these cases. xsmtvdot has no narrow variants.
+  if (!strstr(cpu_features, "xsmtvdot")) {
+    for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
+      iree_uk_test_mmt4d_impl(flags, narrowM0, N0, K0, cpu_features);
+    }
   }
   iree_uk_test_mmt4d_impl(flags, M0, N0, K0, cpu_features);
 }
@@ -615,6 +619,12 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      7, 16, 1, "zvfh");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 12, 16, 8,
+                     "xsmtvdot,zvl256b");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 24, 32, 16,
+                     "xsmtvdot,zvl1024b");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 48, 64, 32,
+                     "xsmtvdot,zvl4096b");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 7, 16, 1, "zvfbfwma");
 
 #endif  // defined(IREE_ARCH_ARM_64)
