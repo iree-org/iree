@@ -580,11 +580,6 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
   if (!options.aggressiveFusion) {
-    // FIXME: Implement getStaticLoopRanges for LinalgExt::CustomOp.
-    if (isa<IREE::LinalgExt::CustomOp>(producer)) {
-      return false;
-    }
-
     SmallVector<int64_t> producerIterationSpace =
         producerFusionOp.getStaticLoopRanges();
     SmallVector<int64_t> consumerIterationSpace =
@@ -601,7 +596,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   Operation *rootOp = tracker.getFusionGroup(producer).getRoot();
   if (auto rootFusionOp =
           dyn_cast<IREE::LinalgExt::LinalgFusionOpInterface>(rootOp);
-      rootFusionOp && !isa<IREE::LinalgExt::CustomOp>(rootOp)) {
+      rootFusionOp) {
     SmallVector<int64_t> rootLoopRanges = rootFusionOp.getStaticLoopRanges();
     SmallVector<int64_t> consumerLoopRanges =
         consumerFusionOp.getStaticLoopRanges();
