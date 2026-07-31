@@ -69,6 +69,9 @@ static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
     bitcodeModule->setDataLayout(module->getDataLayout());
+    // FIXME: Force always inline to work by removing per function target
+    // attributes. See github issue #24755.
+    stripFunctionTargetAttrs(*bitcodeModule);
     if (linker.linkInModule(
             std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
             [](llvm::Module &M, const llvm::StringSet<> &GVS) {
@@ -89,6 +92,9 @@ static LogicalResult linkBitcodeFile(Location loc, llvm::Linker &linker,
                                      llvm::LLVMContext &context) {
   llvm::MemoryBufferRef bitcodeBufferRef(contents, filename);
   auto setAlwaysInline = [&](llvm::Module &module) {
+    // Force always inline to work by removing per function target attributes.
+    // See github issue #24755.
+    stripFunctionTargetAttrs(module);
     for (auto &func : module.getFunctionList()) {
       func.addFnAttr(llvm::Attribute::AlwaysInline);
     }

@@ -19,8 +19,10 @@ iree_lit_test_suite(
     "lower_inner_tiled_to_bitcode_ukernel.mlir"
     "lower_inner_tiled_to_bitcode_ukernel_i8_vnni.mlir"
     "select_ukernel.mlir"
+    "ukernel_inlining.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
 
