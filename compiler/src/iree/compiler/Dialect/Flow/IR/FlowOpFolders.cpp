@@ -1023,7 +1023,10 @@ OpFoldResult TensorSliceOp::fold(FoldAdaptor operands) {
       return {};
     }
     // Fully constant arguments so we can perform the slice here.
-    auto tensor = cast<ElementsAttr>(operands.getSource());
+    auto tensor = dyn_cast<ElementsAttr>(operands.getSource());
+    if (!tensor) {
+      return {};
+    }
     int64_t rank = cast<ShapedType>(getSource().getType()).getRank();
     auto start =
         llvm::map_to_vector(operands.getStartIndices(), [](Attribute value) {
@@ -1153,9 +1156,12 @@ OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
       llvm::count(operands.getStartIndices(), nullptr) == 0;
   if (operands.getUpdate() && operands.getTarget() && allIndicesConstant) {
     // Fully constant arguments so we can perform the update here.
-    return tensorUpdate(cast<ElementsAttr>(operands.getUpdate()),
-                        cast<ElementsAttr>(operands.getTarget()),
-                        operands.getStartIndices());
+    auto update = dyn_cast<ElementsAttr>(operands.getUpdate());
+    auto target = dyn_cast<ElementsAttr>(operands.getTarget());
+    if (!update || !target) {
+      return {};
+    }
+    return tensorUpdate(update, target, operands.getStartIndices());
   } else {
     // Replace the entire tensor when the sizes match.
     auto updateType = cast<ShapedType>(getUpdate().getType());
