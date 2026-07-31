@@ -40,6 +40,11 @@ if (( IREE_READ_REMOTE_CCACHE == 1 || IREE_READ_LOCAL_CCACHE == 1 )); then
   export IREE_USE_CCACHE=1
   export CMAKE_C_COMPILER_LAUNCHER="$(which ccache)"
   export CMAKE_CXX_COMPILER_LAUNCHER="$(which ccache)"
+
+  # LLVM builds with precompiled headers by default when using Clang >= 18.
+  # ccache refuses to cache any compilation that uses a PCH
+  export CCACHE_SLOPPINESS="${CCACHE_SLOPPINESS:+${CCACHE_SLOPPINESS},}pch_defines,time_macros"
+
   ccache --zero-stats
   ccache --show-stats
 else
