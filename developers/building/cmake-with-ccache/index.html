@@ -4252,6 +4252,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ccache-and-precompiled-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ccache and precompiled headers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ensuring-that-ccache-is-used-and-monitoring-cache-hits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6169,6 +6180,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ccache-and-precompiled-headers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ccache and precompiled headers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#ensuring-that-ccache-is-used-and-monitoring-cache-hits" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6247,7 +6269,8 @@ frequently it currently is updated, I'm finding that <code>20G</code> is enough 
 <p>Use the CMake
 <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_LAUNCHER.html">COMPILER_LAUNCHER functionality</a>
 by setting <code>CMAKE_C_COMPILER_LAUNCHER=ccache</code> and
-<code>CMAKE_CXX_COMPILER_LAUNCHER=ccache</code> in your</p>
+<code>CMAKE_CXX_COMPILER_LAUNCHER=ccache</code> in your CMake configure command or in your
+environment.</p>
 <p>Notes:</p>
 <ul>
 <li>This approach only works with the <code>Ninja</code> and <code>Makefile</code> generators
@@ -6255,6 +6278,15 @@ by setting <code>CMAKE_C_COMPILER_LAUNCHER=ccache</code> and
   based on wrapping the compiler in a script that prepends <code>ccache</code>. See this
   <a href="https://crascit.com/2016/04/09/using-ccache-with-cmake/">article</a>.</li>
 </ul>
+<h2 id="ccache-and-precompiled-headers"><code>ccache</code> and precompiled headers<a class="headerlink" href="#ccache-and-precompiled-headers" title="Permanent link">link</a></h2>
+<p><code>third_party/llvm-project</code> builds with precompiled headers by default when
+using Clang 18 or newer. <code>ccache</code> will not cache a compilation that uses a
+precompiled header unless it is configured to be sloppy about <code>#define</code>
+directives and time macros.</p>
+<p><code>build_tools/cmake/setup_ccache.sh</code> sets this for you. If you configure
+<code>ccache</code> yourself, set it once as persistent <code>ccache</code> configuration:</p>
+<div class="highlight"><pre><span></span><code>ccache<span class="w"> </span>--set-config<span class="o">=</span><span class="nv">sloppiness</span><span class="o">=</span>pch_defines,time_macros
+</code></pre></div>
 <h2 id="ensuring-that-ccache-is-used-and-monitoring-cache-hits">Ensuring that <code>ccache</code> is used and monitoring cache hits<a class="headerlink" href="#ensuring-that-ccache-is-used-and-monitoring-cache-hits" title="Permanent link">link</a></h2>
 <p>The <code>ccache -s</code> command dumps statistics, including a cache hit count and ratio.
 It's convenient to run periodically with <code>watch</code> in a separate terminal:</p>
