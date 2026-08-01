@@ -119,6 +119,46 @@ module {
 
 // -----
 
+// Quantized convolution (e.g. lowered from ONNX QLinearConv) carrying extra
+// zero-point scalar operands beyond the usual input/filter/output. The extra
+// operands must be forwarded untouched by both the plain transpose path and
+// the tiled/pack path.
+
+util.func @conv_nchw_fchw_q(%arg0: tensor<8x256x16x16xi8>, %arg1: tensor<16x256x3x3xi8>,
+                            %arg2: tensor<8x16x14x14xi32>) -> tensor<8x16x14x14xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.conv_2d_nchw_fchw_q
+    {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+    ins(%arg0, %arg1, %zp_input, %zp_filter
+        : tensor<8x256x16x16xi8>, tensor<16x256x3x3xi8>, i32, i32)
+    outs(%arg2 : tensor<8x16x14x14xi32>) -> tensor<8x16x14x14xi32>
+  util.return %0 : tensor<8x16x14x14xi32>
+}
+
+// CHECK-LABEL: util.func public @conv_nchw_fchw_q
+
+// CHECK:         %[[IMG:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x256x16x16xi8>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<8x16x16x256xi8>) permutation = [0, 2, 3, 1]
+// CHECK:         %[[FILTER:.+]] = linalg.transpose ins(%{{.*}} : tensor<16x256x3x3xi8>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<3x3x256x16xi8>) permutation = [2, 3, 1, 0]
+// CHECK:         %[[OUT:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x16x14x14xi32>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<8x14x14x16xi32>) permutation = [0, 2, 3, 1]
+
+// CHECK:         linalg.generic
+// CHECK-SAME:      ins(%[[IMG]], %[[FILTER]], %{{.*}}, %{{.*}} : tensor<8x16x16x256xi8>, tensor<3x3x256x16xi8>, i32, i32)
+// CHECK-SAME:      outs(%[[OUT]] : tensor<8x14x14x16xi32>)
+
+// TILE16-LABEL: util.func public @conv_nchw_fchw_q
+// TILE16:      %[[IMG:.+]] = linalg.pack {{.*}} inner_dims_pos = [1] inner_tiles = [16]
+// TILE16-SAME:   tensor<8x256x16x16xi8> -> tensor<8x16x16x16x16xi8>
+// TILE16:      %[[FILTER:.+]] = linalg.pack {{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 16]
+// TILE16-SAME:   tensor<16x256x3x3xi8> -> tensor<1x16x3x3x16x16xi8>
+// TILE16:      linalg.generic
+// TILE16-SAME:   ins(%[[IMG]], %[[FILTER]], %{{.*}}, %{{.*}} : tensor<8x16x16x16x16xi8>, tensor<1x16x3x3x16x16xi8>, i32, i32)
+
+// -----
+
 // Not a convolution, should not be transposed.
 
 util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x1280xf16>) -> tensor<2048x1280xf32> {
