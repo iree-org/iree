@@ -416,7 +416,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
     Operation *clonedTarget = rewriter.clone(*target);
 
     SmallVector<bool> hasUsesOutsideOfRegion;
-    bool hasAnyResultUses = false;
+    bool hasAnyExternalResultUses = false;
     for (Value result : target->getResults()) {
       bool hasExternalUses =
           llvm::any_of(result.getUses(), [&](OpOperand &use) {
@@ -426,7 +426,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                    !targetSet.contains(user);
           });
       hasUsesOutsideOfRegion.push_back(hasExternalUses);
-      hasAnyResultUses |= !result.use_empty();
+      hasAnyExternalResultUses |= hasExternalUses;
     }
 
     // Gather all uses of `target`.
@@ -451,7 +451,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       }
 
       bool preserveTiedResult = false;
-      if (!hasUsesOutsideOfRegion[index] && hasAnyResultUses &&
+      if (!hasUsesOutsideOfRegion[index] && hasAnyExternalResultUses &&
           reusableTiedBase && !yieldedTiedBases.contains(reusableTiedBase)) {
         preserveTiedResult = true;
       }
