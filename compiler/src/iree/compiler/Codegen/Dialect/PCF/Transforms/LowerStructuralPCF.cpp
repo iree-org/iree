@@ -211,6 +211,19 @@ static Block *getOrCreateReturnBlock(RewriterBase &rewriter, Location loc,
   return newBlock;
 }
 
+struct LowerBarrierOp final : OpRewritePattern<IREE::PCF::BarrierOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::PCF::BarrierOp barrierOp,
+                                PatternRewriter &rewriter) const override {
+    if (failed(barrierOp.getScope().addBarrier(rewriter))) {
+      barrierOp.emitOpError("failed to construct requested barrier");
+      return failure();
+    }
+    rewriter.eraseOp(barrierOp);
+    return success();
+  }
+};
+
 struct LowerBranchCondReturnOp final
     : OpRewritePattern<IREE::PCF::BranchCondReturnOp> {
   using Base::Base;
@@ -230,7 +243,8 @@ struct LowerBranchCondReturnOp final
 };
 
 WalkResult verifyOperationLegality(Operation *op) {
-  if (isa<PCF::GenericOp, PCF::LoopOp, PCF::BranchCondReturnOp>(op)) {
+  if (isa<PCF::GenericOp, PCF::LoopOp, PCF::BranchCondReturnOp, PCF::BarrierOp>(
+          op)) {
     return WalkResult::interrupt();
   }
   return WalkResult::advance();
@@ -238,8 +252,8 @@ WalkResult verifyOperationLegality(Operation *op) {
 
 void LowerStructuralPCFPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
-  patterns.add<LowerGenericOp, LowerLoopOp, LowerBranchCondReturnOp>(
-      &getContext());
+  patterns.add<LowerGenericOp, LowerLoopOp, LowerBranchCondReturnOp,
+               LowerBarrierOp>(&getContext());
 
   // WalkAndApplyPatterns walks post-order, meaning children can safely assume
   // parents have not yet been converted and pull context from them if needed.
