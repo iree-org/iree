@@ -544,11 +544,9 @@ TraversalResult ValueConsumerAffinityPVS::updateFromUse(Value value,
         } else if (auto whileOp =
                        dyn_cast<mlir::scf::WhileOp>(op->getParentOp())) {
           // The yield terminates the "after" region and forwards its operands
-          // back to the "before" region block arguments (matching the while's
-          // init operands). It does *not* map to the while results - those are
-          // produced by the scf.condition op and handled above. The operand
-          // count here can exceed the result count, so indexing getResult() by
-          // the operand number would be out of bounds.
+          // back to the "before" region block arguments, matching the while's
+          // init operands, *not* the while results - those are produced by the
+          // scf.condition op and handled in the dedicated case.
           auto value = Position::forValue(
               whileOp.getBefore().getArgument(operand.getOperandNumber()));
           auto &valueUsage = solver.getElementFor<ValueConsumerAffinityPVS>(
