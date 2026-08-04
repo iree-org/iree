@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "map_distribute_generic_ops.mlir"
+    "map_distribute_memory_ops.mlir"
   TOOLS
     FileCheck
     iree-opt
