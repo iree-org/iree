@@ -1277,21 +1277,10 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
         result |= traverseReturnOp(ownerOp, use.getOperandNumber());
       }
 
-      // Some return-like terminators map their operands 1:1 to the parent op's
-      // results. Region branch terminators (e.g. scf.yield) are already handled
-      // above by traverseRegionBranchOp using the proper successor mapping and
-      // must not be re-mapped here: their operand count need not equal the
-      // parent's result count (e.g. an scf.while "after" region yields back to
-      // the "before" region arguments, of which there may be more than there
-      // are while results), so a naive getResult() would be out of bounds.
-      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
-          !isa<CallableOpInterface>(ownerOp->getParentOp()) &&
-          !isa<RegionBranchTerminatorOpInterface>(ownerOp) &&
-          use.getOperandNumber() < ownerOp->getParentOp()->getNumResults()) {
-        auto parent = ownerOp->getParentOp();
-        auto result = parent->getResult(use.getOperandNumber());
-        worklist.insert(result);
-      }
+      // Note that we are not explicitly handling the case of a return op
+      // without a callable parent here since the above
+      // `traverseRegionBranchOp` already handled it (`ReturnLike` implies
+      // `RegionBranchTerminatorOpInterface`).
 
       // Step across global stores and into all of the loads across the program.
       if (auto storeOp =
