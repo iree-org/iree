@@ -1617,6 +1617,57 @@ util.func private @scf_while_extra_loop_carried() -> tensor<1xi32> {
 
 // -----
 
+// Companion to @scf_while_extra_loop_carried where the value forwarded to the
+// single result is the *second* loop-carried value (before-region argument
+// index 1), and its init constant is left unpinned. This checks that the while
+// consumer's affinity (dev_c) propagates back to the correct before-region
+// argument by index and reaches a value with no explicit affinity of its own.
+
+// CHECK-LABEL: @scf_while_return_second_loop_carried
+util.func private @scf_while_return_second_loop_carried() -> tensor<1xi32> {
+  %c0 = arith.constant 0 : index
+  %c2_i32 = arith.constant 2 : i32
+  // Pinned; drives the loop condition but is not returned.
+  // CHECK: flow.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  %cst_a = flow.tensor.constant {stream.affinity = #hal.device.promise<@dev_a>} dense<123> : tensor<1xi32>
+  // Not pinned: its affinity is derived from the while consumer (dev_c).
+  // CHECK: flow.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
+  %cst_b = flow.tensor.constant dense<456> : tensor<1xi32>
+  // CHECK: scf.while
+  %while = scf.while(%arg0 = %cst_a, %arg1 = %cst_b) : (tensor<1xi32>, tensor<1xi32>) -> tensor<1xi32> {
+    // CHECK: flow.tensor.load
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+    %cond_i32 = flow.tensor.load %arg0[%c0] : tensor<1xi32>
+    %cond = arith.cmpi slt, %cond_i32, %c2_i32 : i32
+    // Only %arg1 is forwarded to the single result.
+    // CHECK: scf.condition
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
+    scf.condition(%cond) %arg1 : tensor<1xi32>
+  } do {
+  ^bb0(%arg0: tensor<1xi32>):
+    // CHECK: flow.dispatch @dispatch
+    // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
+    %t = flow.dispatch @dispatch(%arg0) : (tensor<1xi32>) -> tensor<1xi32>
+    // Yields back into the "before" region: before-arg #0 <- %cst_a (dev_a),
+    // before-arg #1 <- %t (dev_c).
+    // CHECK: scf.yield
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_c>]]
+    scf.yield %cst_a, %t : tensor<1xi32>, tensor<1xi32>
+  // CHECK: } attributes {
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_c>]]
+  }
+  // CHECK: flow.tensor.transfer
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
+  %while_c = flow.tensor.transfer %while : tensor<1xi32> to #hal.device.promise<@dev_c>
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
+  util.return %while_c : tensor<1xi32>
+}
+
+// -----
+
 // Tests a realistic program with ABI ops.
 
 // CHECK-LABEL: @simple_program
