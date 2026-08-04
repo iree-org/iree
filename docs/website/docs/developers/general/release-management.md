@@ -69,18 +69,22 @@ graph TD
     iree-turbine
   end
 
-  iree-base-compiler --> iree-turbine
-  iree-base-runtime --> iree-turbine
-
   subgraph sharkai["nod-ai/shark-ai"]
+    sharktuner
     sharktank
     shortfin
     shark-ai
   end
 
   iree-base-compiler --> sharktank
+  iree-base-compiler --> iree-turbine
+  iree-base-runtime --> iree-turbine
   iree-turbine --> sharktank
+  iree-base-compiler --> sharktuner
+  iree-base-runtime --> sharktuner
+  iree-turbine --> sharktuner
   iree-base-runtime -. source dependency .-> shortfin
+  sharktuner --> shark-ai
   sharktank --> shark-ai
   shortfin --> shark-ai
 ```
@@ -176,6 +180,7 @@ Stable release history:
 | -- | -- | -- |
 | [nod-ai/amd-shark-ai](https://github.com/nod-ai/amd-shark-ai) | GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/nod-ai/amd-shark-ai)](https://github.com/nod-ai/amd-shark-ai/releases/latest) |
 | | `shark-ai` | [![PyPI version](https://badge.fury.io/py/shark-ai.svg)](https://pypi.org/project/shark-ai) |
+| | `sharktuner` | [![PyPI version](https://badge.fury.io/py/sharktuner.svg)](https://pypi.org/project/sharktuner) |
 | | `sharktank` | [![PyPI version](https://badge.fury.io/py/sharktank.svg)](https://pypi.org/project/sharktank) |
 | | `shortfin` | [![PyPI version](https://badge.fury.io/py/shortfin.svg)](https://pypi.org/project/shortfin) |
 
