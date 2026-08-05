@@ -355,6 +355,15 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
     return failure();
   }
 
+  // The operand indices below, and the builders this hands off to, assume the
+  // op has exactly two inputs (image and filter) and one init (output).
+  // Quantized convolutions such as linalg.conv_2d_nchw_fchw_q carry extra zero
+  // point scalars, so operand 2 is a scalar rather than the output tensor and
+  // the rebuilt op would fail verification.
+  if (convOp.getNumDpsInputs() != 2 || convOp.getNumDpsInits() != 1) {
+    return failure();
+  }
+
   Value input = convOp->getOperand(0);
   Value filter = convOp->getOperand(1);
   Value output = convOp->getOperand(2);

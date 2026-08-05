@@ -167,3 +167,26 @@ util.func @test_unit_dims_pack(%arg0: tensor<10x20x5xf32>) -> tensor<1x1x5x20x10
 // CHECK-SAME:    [0, 1, 2], [3], [4]
 // CHECK-SAME:    tensor<5x20x10xf32> into tensor<1x1x5x20x10xf32>
 // CHECK:       util.return %[[EXPANDED]] : tensor<1x1x5x20x10xf32>
+
+// -----
+
+// Quantized convolutions carry extra zero point scalars that the transpose
+// cannot rebuild, so the pattern has to leave them alone. Operand 2 is the
+// input zero point here, not the output tensor, and rebuilding the op around
+// it produced a linalg.generic that failed verification.
+
+util.func @conv_2d_nchw_fchw_q(%arg0: tensor<1x256x18x18xi8>, %arg1: tensor<128x256x3x3xi8>,
+    %arg2: tensor<1x128x16x16xi32>, %izp: i32, %kzp: i32) -> tensor<1x128x16x16xi32> {
+  %0 = linalg.conv_2d_nchw_fchw_q {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+    ins(%arg0, %arg1, %izp, %kzp : tensor<1x256x18x18xi8>, tensor<128x256x3x3xi8>, i32, i32)
+    outs(%arg2 : tensor<1x128x16x16xi32>) -> tensor<1x128x16x16xi32>
+  util.return %0 : tensor<1x128x16x16xi32>
+}
+
+// CHECK-LABEL: @conv_2d_nchw_fchw_q
+// CHECK-NOT:     linalg.generic
+// CHECK:         linalg.conv_2d_nchw_fchw_q
+
+// TILE16-LABEL: @conv_2d_nchw_fchw_q
+// TILE16-NOT:     linalg.generic
+// TILE16:         linalg.conv_2d_nchw_fchw_q
