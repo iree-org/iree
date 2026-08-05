@@ -224,7 +224,7 @@ void UKernelGenericOp::build(OpBuilder &builder, OperationState &result,
       });
   auto stridedDimsArrayAttr =
       ArrayAttr::get(builder.getContext(), stridedDimsAttrs);
-  build(builder, result, outputs.getTypes(), uKernelFnName, inputs, outputs,
+  build(builder, result, resultTypes, uKernelFnName, inputs, outputs,
         otherOperands, fnDefAttrs, stridedDimsArrayAttr);
 }
 
