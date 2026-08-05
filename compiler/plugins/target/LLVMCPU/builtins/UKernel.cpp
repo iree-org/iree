@@ -8,7 +8,6 @@
 
 #include "iree/builtins/ukernel/ukernel_bitcode.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
@@ -56,11 +55,8 @@ loadUKernelBitcode(llvm::TargetMachine *targetMachine,
   // combination of data types, a specific SIMD ISA variant, etc. Then all the
   // unused code paths can get DCE'd. That's why failure to inline a ukernel
   // can result in a large penalty in both performance and code size.
-  // Remove the function's target attribute to make inlining legal, so the
-  // inlining actually happens. See github issue #24755.
   for (auto &func : module.get()->functions()) {
     func.addFnAttr(llvm::Attribute::AlwaysInline);
-    stripFunctionTargetAttrs(func);
   }
   return module;
 }
