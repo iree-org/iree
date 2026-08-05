@@ -101,6 +101,7 @@ if(IREE_BUILD_BENCHMARKS)
       iree::tooling::context_util
       iree::tooling::device_util
       iree::tooling::function_io
+      iree::tooling::process_results
       iree::vm
     COVERAGE ${IREE_ENABLE_RUNTIME_COVERAGE}
     INSTALL_COMPONENT IREETools-Runtime

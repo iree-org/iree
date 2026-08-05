@@ -69,6 +69,7 @@
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/function_io.h"
+#include "iree/tooling/process_results.h"
 #include "iree/vm/api.h"
 
 constexpr char kNanosecondsUnitString[] = "ns";
@@ -157,6 +158,11 @@ IREE_FLAG_CALLBACK(
     parse_time_unit, print_time_unit, &FLAG_time_unit, time_unit,
     "The time unit to be printed in the results. Can be 'ms', 'us', or 'ns'.");
 
+IREE_FLAG(
+    bool, enable_output_processing, false,
+    "Enable keeping outputs of last benchmark iteration and processing "
+    "those. This needs to be enabled for --output* options to be effective.");
+
 static iree_hal_profiling_from_flags_t* g_profiling = nullptr;
 
 namespace iree {
@@ -233,24 +239,31 @@ static void BenchmarkGenericFunction(
     const std::string& benchmark_name, int32_t batch_size,
     iree_hal_replay_recorder_t* recorder, iree_hal_device_t* device,
     iree_vm_context_t* context, iree_vm_function_t function,
-    iree_vm_list_t* inputs, benchmark::State& state) {
+    iree_vm_list_t* inputs, iree_vm_list_t* outputs, benchmark::State& state) {
   IREE_TRACE_ZONE_BEGIN_NAMED_DYNAMIC(z0, benchmark_name.data(),
                                       benchmark_name.size());
   IREE_TRACE_FRAME_MARK();
 
-  vm::ref<iree_vm_list_t> outputs;
-  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
-                                    iree_allocator_system(), &outputs));
-
+  // Use output list passed by caller if available. Create local VM list
+  // otherwise.
+  vm::ref<iree_vm_list_t> local_outputs;
+  if (outputs) {
+    local_outputs = vm::retain_ref(outputs);
+  } else {
+    IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
+                                      iree_allocator_system(), &local_outputs));
+  }
   // Benchmarking loop.
   while (state.KeepRunningBatch(batch_size)) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
     BeginReplayExecuteScope(recorder);
+    // Clear the output list at the beginning of loop, so we can keep the
+    // outputs of the last loop iteration.
+    IREE_CHECK_OK(iree_vm_list_resize(local_outputs.get(), 0));
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
-        inputs, outputs.get(), iree_allocator_system()));
-    IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+        inputs, local_outputs.get(), iree_allocator_system()));
     EndReplayExecuteScope(recorder);
     IREE_TRACE_ZONE_END(z1);
     if (device) {
@@ -261,6 +274,12 @@ static void BenchmarkGenericFunction(
   }
   state.SetItemsProcessed(state.iterations());
 
+  // Clear the outputs if we used a local list. Keep the outputs in the list
+  // if the caller provided the outputs list.
+  if (!outputs) {
+    IREE_CHECK_OK(iree_vm_list_resize(local_outputs.get(), 0));
+  }
+
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -269,15 +288,15 @@ void RegisterGenericBenchmark(const std::string& function_name,
                               iree_hal_device_t* device,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
-                              iree_vm_list_t* inputs) {
+                              iree_vm_list_t* inputs, iree_vm_list_t* outputs) {
   auto benchmark_name = "BM_" + function_name;
   int32_t batch_size = FLAG_batch_size;
-  benchmark::RegisterBenchmark(benchmark_name.c_str(),
-                               [=](benchmark::State& state) -> void {
-                                 BenchmarkGenericFunction(
-                                     benchmark_name, batch_size, recorder,
-                                     device, context, function, inputs, state);
-                               })
+  benchmark::RegisterBenchmark(
+      benchmark_name.c_str(),
+      [=](benchmark::State& state) -> void {
+        BenchmarkGenericFunction(benchmark_name, batch_size, recorder, device,
+                                 context, function, inputs, outputs, state);
+      })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -525,6 +544,7 @@ class IREEBenchmark {
   iree_status_t Shutdown() {
     // Order matters. Tear down modules first to release resources.
     inputs_.reset();
+    outputs_.reset();
     context_.reset();
     iree_status_t status = CloseReplayCapture();
     iree_tooling_module_list_reset(&module_list_);
@@ -575,6 +595,38 @@ class IREEBenchmark {
     return iree_ok_status();
   }
 
+  // Turn on keeping results of last benchmark iteration by setting up
+  // persistent output list.
+  iree_status_t EnableKeepResults() {
+    return iree_vm_list_create(iree_vm_make_undefined_type_def(), 16,
+                               iree_allocator_system(), &outputs_);
+  }
+
+  // Handle printing/writing/checking the outputs kept from running the last
+  // iteration of the module/function.
+  iree_status_t ProcessResults() {
+    IREE_TRACE_SCOPE_NAMED("IREEBenchmark::ProcessResults");
+
+    if (!outputs_) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "no output list to process");
+    }
+
+    int exit_code = 0;
+    IREE_RETURN_IF_ERROR(iree_tooling_process_results_and_print(
+        device_,
+        iree_make_string_view(results_cconv_.data(), results_cconv_.size()),
+        outputs_.get(), iree_vm_instance_allocator(instance_.get()),
+        &exit_code));
+
+    if (exit_code != 0) {
+      return iree_make_status(IREE_STATUS_UNKNOWN, "non-zero exit code %d",
+                              exit_code);
+    }
+
+    return iree_ok_status();
+  }
+
  private:
   iree_status_t Init() {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::Init");
@@ -613,6 +665,7 @@ class IREEBenchmark {
     iree_string_view_t arguments_cconv, results_cconv;
     IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
         &signature, &arguments_cconv, &results_cconv));
+    results_cconv_.assign(results_cconv.data, results_cconv.size);
 
     IREE_CHECK_OK(iree_tooling_parse_variants(
         arguments_cconv, FLAG_input_list(), device_, device_allocator_.get(),
@@ -627,7 +680,8 @@ class IREEBenchmark {
     } else {
       // Synchronous invocation.
       iree::RegisterGenericBenchmark(function_name, replay_recorder_, device_,
-                                     context_.get(), function, inputs_.get());
+                                     context_.get(), function, inputs_.get(),
+                                     outputs_.get());
     }
     return iree_ok_status();
   }
@@ -656,7 +710,7 @@ class IREEBenchmark {
         iree::RegisterGenericBenchmark(
             std::string(function_name.data, function_name.size),
             replay_recorder_, device_, context_.get(), function,
-            /*inputs=*/nullptr);
+            /*inputs=*/nullptr, /*outputs=*/nullptr);
       } else {
         // Pick up generic () -> () functions.
         if (iree_string_view_starts_with(function_name,
@@ -695,7 +749,7 @@ class IREEBenchmark {
             iree::RegisterGenericBenchmark(
                 std::string(function_name.data, function_name.size),
                 replay_recorder_, device_, context_.get(), function,
-                /*inputs=*/nullptr);
+                /*inputs=*/nullptr, /*outputs=*/nullptr);
           }
         }
       }
@@ -711,6 +765,8 @@ class IREEBenchmark {
   iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
   iree_tooling_module_list_t module_list_;
   iree::vm::ref<iree_vm_list_t> inputs_;
+  iree::vm::ref<iree_vm_list_t> outputs_;
+  std::string results_cconv_;
 };
 }  // namespace
 }  // namespace iree
@@ -733,6 +789,10 @@ static int runMain(int argc, char** argv) {
   ::benchmark::Initialize(&argc, argv);
 
   iree::IREEBenchmark iree_benchmark;
+  if (FLAG_enable_output_processing) {
+    IREE_CHECK_OK(iree_benchmark.EnableKeepResults());
+  }
+
   iree_status_t status = iree_benchmark.Register();
   if (!iree_status_is_ok(status)) {
     status = iree_status_join(status, iree_benchmark.Shutdown());
@@ -743,9 +803,15 @@ static int runMain(int argc, char** argv) {
   }
   IREE_CHECK_OK(iree_hal_begin_profiling_from_flags(
       iree_benchmark.device(), iree_allocator_system(), &g_profiling));
+
   ::benchmark::RunSpecifiedBenchmarks();
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(g_profiling));
   g_profiling = nullptr;
+
+  if (FLAG_enable_output_processing) {
+    IREE_CHECK_OK(iree_benchmark.ProcessResults());
+  }
+
   IREE_CHECK_OK(iree_benchmark.Shutdown());
 
   IREE_TRACE_ZONE_END(z0);

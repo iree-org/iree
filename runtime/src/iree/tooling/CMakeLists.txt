@@ -249,23 +249,40 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    process_results
+  HDRS
+    "process_results.h"
+  SRCS
+    "process_results.c"
+  DEPS
+    ::comparison
+    ::function_io
+    iree::base
+    iree::base::tooling::flags
+    iree::hal
+    iree::io::stream
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     run_module
   HDRS
     "run_module.h"
   SRCS
     "run_module.c"
   DEPS
-    ::comparison
     ::context_util
     ::device_util
     ::function_io
     ::function_util
     ::instrument_util
+    ::process_results
     iree::base
     iree::base::tooling::flags
     iree::hal
     iree::hal::replay::recorder
-    iree::io::stream
     iree::modules::hal::types
     iree::vm
     iree::vm::bytecode::module
