@@ -11,6 +11,33 @@ func.func @simple_add_stablehlo(%arg0: tensor<2x2xi32>, %arg1: tensor<2x2xi32>) 
 
 // -----
 
+// Check that quantized StableHLO is lowered to primitive integer/float math.
+
+// CHECK-LABEL: util.func public @qdq_linear
+// CHECK-SAME: %{{.*}}: tensor<1x256xf32>
+// CHECK-SAME: %{{.*}}: tensor<256x512xi8>
+// CHECK: linalg.vecmat
+// CHECK-NOT: !quant.uniform
+// CHECK-NOT: stablehlo.uniform_quantize
+// CHECK-NOT: stablehlo.uniform_dequantize
+func.func @qdq_linear(
+    %input: tensor<1x256xf32>,
+    %weight: tensor<256x512x!quant.uniform<i8:f32, 0.01:0>>
+  ) -> tensor<1x512xf32> {
+  %quantized_input = stablehlo.uniform_quantize %input :
+      (tensor<1x256xf32>) -> tensor<1x256x!quant.uniform<i8:f32, 0.01:0>>
+  %matmul_result = stablehlo.dot_general %quantized_input, %weight,
+      contracting_dims = [1] x [0] :
+      (tensor<1x256x!quant.uniform<i8:f32, 0.01:0>>,
+       tensor<256x512x!quant.uniform<i8:f32, 0.01:0>>) ->
+      tensor<1x512x!quant.uniform<i32:f32, 0.0001:0>>
+  %output = stablehlo.uniform_dequantize %matmul_result :
+      (tensor<1x512x!quant.uniform<i32:f32, 0.0001:0>>) -> tensor<1x512xf32>
+  return %output : tensor<1x512xf32>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @vhlo_func
 vhlo.func_v1 @vhlo_func(%arg0: !vhlo.tensor_v1<!vhlo.i32_v1>) -> (!vhlo.tensor_v1<!vhlo.i32_v1>) {
   // CHECK: arith.constant

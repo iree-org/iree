@@ -46,6 +46,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // If the input is StableHLO, this pass is considered a NOP.
   passManager.addPass(stablehlo::createCheckVHLOStableHloMixUsage());
   ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloLegalizeQuantToMathPass());
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createChloLegalizeToStablehloPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
