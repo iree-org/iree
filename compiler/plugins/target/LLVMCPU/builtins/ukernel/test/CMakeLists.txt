@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "select_ukernel.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
 

@@ -11,6 +11,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "argmax_linking.mlir"
+    "ukernel_inlining.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck

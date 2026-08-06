@@ -22,6 +22,18 @@ static llvm::cl::opt<std::string> clBitcodeFiles(
         "and is only linked if `arch` matches the target triple."),
     llvm::cl::init(""));
 
+void stripFunctionTargetAttrs(llvm::Function &func) {
+  func.removeFnAttr("target-cpu");
+  func.removeFnAttr("tune-cpu");
+  func.removeFnAttr("target-features");
+}
+
+void stripFunctionTargetAttrs(llvm::Module &module) {
+  for (auto &func : module.functions()) {
+    stripFunctionTargetAttrs(func);
+  }
+}
+
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix) {
   for (const auto &function : module.functions()) {
     if (!function.isIntrinsic() && function.isDeclaration() &&
