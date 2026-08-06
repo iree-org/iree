@@ -179,6 +179,84 @@ func.func @attention1x4x4() {
   return
 }
 
+// Fully-masked attention rows must produce zeros, not NaNs (0/0 in the softmax
+// normalization). Matches PyTorch's scaled_dot_product_attention semantics.
+func.func @attention1x4x4_f32_mask_fully_masked() {
+  %init = tensor.empty() : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2],
+                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                          [0.5, 0.6, 0.7, 0.8],
+                                          [0.9, 1.0, 1.1, 1.2],
+                                          [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %value = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2],
+                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %mask = util.unfoldable_constant dense<0xFF800000> : tensor<1x4x4xf32>
+  %scale = arith.constant 0.5 : f32
+  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
+        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xf32>) outs(%init : tensor<1x4x4xf32>) {
+          ^bb0(%arg0: f32):
+          iree_linalg_ext.yield %arg0 : f32
+        } -> tensor<1x4x4xf32>
+  check.expect_almost_eq_const(
+      %1,
+      dense<0.0> : tensor<1x4x4xf32>
+  ) : tensor<1x4x4xf32>
+  return
+}
+
+// Per-row guard: row 0 is fully masked (-Inf) and must be zeroed; rows 1..3
+// have an all-zero mask (no effect) and must compute the unmasked result.
+func.func @attention1x4x4_f32_mask_partially_masked() {
+  %init = tensor.empty() : tensor<1x4x4xf32>
+  %query = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2],
+                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %key = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                          [0.5, 0.6, 0.7, 0.8],
+                                          [0.9, 1.0, 1.1, 1.2],
+                                          [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %value = util.unfoldable_constant dense<[[[0.1, 0.2, 0.3, 0.4],
+                                            [0.5, 0.6, 0.7, 0.8],
+                                            [0.9, 1.0, 1.1, 1.2],
+                                            [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
+  %mask = util.unfoldable_constant dense<[[[0xFF800000, 0xFF800000, 0xFF800000, 0xFF800000],
+                                           [0.0,        0.0,        0.0,        0.0       ],
+                                           [0.0,        0.0,        0.0,        0.0       ],
+                                           [0.0,        0.0,        0.0,        0.0       ]]]> : tensor<1x4x4xf32>
+  %scale = arith.constant 0.5 : f32
+  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
+        tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xf32>) outs(%init : tensor<1x4x4xf32>) {
+          ^bb0(%arg0: f32):
+          iree_linalg_ext.yield %arg0 : f32
+        } -> tensor<1x4x4xf32>
+  check.expect_almost_eq_const(
+      %1,
+      dense<[[[0.0,      0.0,      0.0,      0.0    ],
+              [0.941939, 1.04194,  1.14194,  1.24194],
+              [1.05371,  1.15371,  1.25371,  1.35371],
+              [1.13295,  1.23295,  1.33295,  1.43295]]]> : tensor<1x4x4xf32>
+  ) : tensor<1x4x4xf32>
+  return
+}
+
 func.func @attention3x3x4() {
   %init = tensor.empty() : tensor<3x3x4xf32>
   %query = util.unfoldable_constant dense<[[[-1.5256, -0.7502, -0.6540, -1.6095],
