@@ -73,10 +73,8 @@ static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
     // amdgpuX.YPY triples. Remove this once device libraries are updated to
     // handle this better.
     // Note: See also the "clang -mlink-buildin-bitcode" implementation
-    // addressing this issue by propagating function target attributes (more
-    // complex than just stripping like we do here) in
-    // CompileInvocation.cpp:2114 in ParseCodeGenArgs() at
-    // "getOption().matches(OPT_mlink_builtin_bitcode)".
+    // addressing this issue by propagating function target attributes, more
+    // complex than just stripping like we do here.
     stripFunctionTargetAttrs(*bitcodeModule);
     if (linker.linkInModule(
             std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
