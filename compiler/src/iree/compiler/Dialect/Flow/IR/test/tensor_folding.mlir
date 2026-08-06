@@ -690,6 +690,21 @@ util.func public @sliceDenseResourceAttr() -> tensor<1x1x3xf32> {
 
 // -----
 
+// CHECK-LABEL: @noFoldSliceParameterAttr
+util.func public @noFoldSliceParameterAttr() -> tensor<16xf32> {
+  // CHECK: %[[C:.+]] = flow.tensor.constant #flow.parameter.named<"m"::"w"> : tensor<20xf32>
+  %0 = flow.tensor.constant #flow.parameter.named<"m"::"w"> : tensor<20xf32>
+  %c0 = arith.constant 0 : index
+  %c16 = arith.constant 16 : index
+  // CHECK: %[[S:.+]] = flow.tensor.slice %[[C]]
+  // CHECK-SAME:             : tensor<20xf32> -> tensor<16xf32>
+  %1 = flow.tensor.slice %0[%c0 for %c16] : tensor<20xf32> -> tensor<16xf32>
+  // CHECK-NEXT: util.return %[[S]]
+  util.return %1 : tensor<16xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @sliceOfSliceStatic2D
 util.func public @sliceOfSliceStatic2D(%src: tensor<3x3xf32>) -> tensor<1x1xf32> {
   %c0 = arith.constant 0 : index
@@ -853,6 +868,21 @@ util.func public @updateConst3DUpdate2x3x2() -> tensor<2x3x3xi32> {
   %2 = flow.tensor.update %0, %1[%c0, %c1, %c0] : tensor<2x3x2xi32> -> tensor<2x3x3xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %2 : tensor<2x3x3xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @noFoldUpdateParameterAttr
+util.func public @noFoldUpdateParameterAttr() -> tensor<4xf32> {
+  // CHECK: %[[UPDATE:.+]] = flow.tensor.constant dense<1.000000e+00> : tensor<1xf32>
+  %0 = flow.tensor.constant dense<1.0> : tensor<1xf32>
+  // CHECK: %[[TARGET:.+]] = flow.tensor.constant #flow.parameter.named<"m"::"w"> : tensor<4xf32>
+  %1 = flow.tensor.constant #flow.parameter.named<"m"::"w"> : tensor<4xf32>
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = flow.tensor.update %[[UPDATE]], %[[TARGET]]
+  %2 = flow.tensor.update %0, %1[%c0] : tensor<1xf32> -> tensor<4xf32>
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %2 : tensor<4xf32>
 }
 
 // -----

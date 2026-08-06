@@ -39,15 +39,6 @@ jobs:
               - Linux
               - X64
 
-          # AMD GPU
-          - name: amdgpu_rocm_mi308_gfx942
-            rocm-chip: gfx942
-            backend: rocm
-            iree_test_files: /home/esaimana/iree_tests_cache
-            sku: mi308
-            target: target_hip
-            runs-on: nodai-amdgpu-mi308-x86-64
-
     env:
       VENV_DIR: ${{ github.workspace }}/venv
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages

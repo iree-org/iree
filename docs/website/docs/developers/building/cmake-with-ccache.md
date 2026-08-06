@@ -60,7 +60,8 @@ frequently it currently is updated, I'm finding that `20G` is enough to make the
 Use the CMake
 [COMPILER_LAUNCHER functionality](https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_LAUNCHER.html)
 by setting `CMAKE_C_COMPILER_LAUNCHER=ccache` and
-`CMAKE_CXX_COMPILER_LAUNCHER=ccache` in your
+`CMAKE_CXX_COMPILER_LAUNCHER=ccache` in your CMake configure command or in your
+environment.
 
 Notes:
 
@@ -68,6 +69,20 @@ Notes:
   (`cmake -G` flag). When using other generators, another approach is needed,
   based on wrapping the compiler in a script that prepends `ccache`. See this
   [article](https://crascit.com/2016/04/09/using-ccache-with-cmake/).
+
+## `ccache` and precompiled headers
+
+`third_party/llvm-project` builds with precompiled headers by default when
+using Clang 18 or newer. `ccache` will not cache a compilation that uses a
+precompiled header unless it is configured to be sloppy about `#define`
+directives and time macros.
+
+`build_tools/cmake/setup_ccache.sh` sets this for you. If you configure
+`ccache` yourself, set it once as persistent `ccache` configuration:
+
+```shell
+ccache --set-config=sloppiness=pch_defines,time_macros
+```
 
 ## Ensuring that `ccache` is used and monitoring cache hits
 
