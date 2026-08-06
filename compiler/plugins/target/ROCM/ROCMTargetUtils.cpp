@@ -96,8 +96,9 @@ static LogicalResult linkBitcodeFile(Location loc, llvm::Linker &linker,
                                      llvm::LLVMContext &context) {
   llvm::MemoryBufferRef bitcodeBufferRef(contents, filename);
   auto setAlwaysInline = [&](llvm::Module &module) {
-    // Force always inline to work by removing per function target attributes.
-    // See github issue #24755.
+    // Remove target-cpu attributes to ensure inlining works even under newer
+    // amdgpuX.YPY triples. Remove this once device libraries are updated to
+    // handle this better. See also note at the call of the same function above.
     stripFunctionTargetAttrs(module);
     for (auto &func : module.getFunctionList()) {
       func.addFnAttr(llvm::Attribute::AlwaysInline);

@@ -19,8 +19,8 @@ bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix);
 
 // Strips the per-function target attributes that clang embeds when compiling
 // a module. These make a function incompatible for inlining (even under
-// alwaysinline), so callers that force-inline bitcode should strip them first.
-// See github issue #24755.
+// alwaysinline), so callers that force-inline bitcode need to strip those
+// first.
 void stripFunctionTargetAttrs(llvm::Function &func);
 void stripFunctionTargetAttrs(llvm::Module &module);
 
