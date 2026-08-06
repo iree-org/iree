@@ -327,6 +327,14 @@ static inline iree_vm_type_def_t iree_vm_map_type(
     *result = op_func(lhs, rhs);                                     \
   });
 
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F32_MIXED_BINARY_F32(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                              \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(lhs);                          \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(rhs);                          \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);                        \
+    *result = op_func(lhs, rhs);                                           \
+  });
+
 #define IREE_VM_ISA_DISPATCH_OP_EXT_F32_TERNARY_F32(op_name, op_func) \
   IREE_VM_ISA_DISPATCH_OP(EXT_F32, op_name, {                         \
     IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(a);                       \
@@ -349,6 +357,14 @@ static inline iree_vm_type_def_t iree_vm_map_type(
     IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(rhs);                    \
     IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);                  \
     *result = op_func(lhs, rhs);                                     \
+  });
+
+#define IREE_VM_ISA_DISPATCH_OP_EXT_F64_MIXED_BINARY_F64(op_name, op_func) \
+  IREE_VM_ISA_DISPATCH_OP(EXT_F64, op_name, {                              \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(lhs);                          \
+    IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(rhs);                          \
+    IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);                        \
+    *result = op_func(lhs, rhs);                                           \
   });
 
 #define IREE_VM_ISA_DISPATCH_OP_EXT_F64_TERNARY_F64(op_name, op_func) \

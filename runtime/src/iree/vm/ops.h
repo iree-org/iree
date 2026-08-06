@@ -587,6 +587,9 @@ static inline float vm_log10_f32(float operand) { return log10f(operand); }
 static inline float vm_log1p_f32(float operand) { return log1pf(operand); }
 static inline float vm_log2_f32(float operand) { return log2f(operand); }
 static inline float vm_pow_f32(float b, float e) { return powf(b, e); }
+static inline float vm_fpowi_f32(float base, int64_t exp) {
+  return iree_math_float_powi_i64(base, exp);
+}
 static inline float vm_rsqrt_f32(float operand) {
   return 1.0f / sqrtf(operand);
 }
@@ -780,6 +783,9 @@ static inline double vm_log10_f64(double operand) { return log10(operand); }
 static inline double vm_log1p_f64(double operand) { return log1p(operand); }
 static inline double vm_log2_f64(double operand) { return log2(operand); }
 static inline double vm_pow_f64(double b, double e) { return pow(b, e); }
+static inline double vm_fpowi_f64(double base, int64_t exp) {
+  return iree_math_double_powi_i64(base, exp);
+}
 static inline double vm_rsqrt_f64(double operand) {
   return 1.0 / sqrt(operand);
 }
