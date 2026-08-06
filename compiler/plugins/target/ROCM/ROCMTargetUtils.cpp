@@ -69,8 +69,14 @@ static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
     bitcodeModule->setDataLayout(module->getDataLayout());
-    // FIXME: Force always inline to work by removing per function target
-    // attributes. See github issue #24755.
+    // Remove target-cpu attributes to ensure inlining works even under newer
+    // amdgpuX.YPY triples. Remove this once device libraries are updated to
+    // handle this better.
+    // Note: See also the "clang -mlink-buildin-bitcode" implementation
+    // addressing this issue by propagating function target attributes (more
+    // complex than just stripping like we do here) in
+    // CompileInvocation.cpp:2114 in ParseCodeGenArgs() at
+    // "getOption().matches(OPT_mlink_builtin_bitcode)".
     stripFunctionTargetAttrs(*bitcodeModule);
     if (linker.linkInModule(
             std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
