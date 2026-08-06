@@ -31,9 +31,9 @@ IREE_FLAG(bool, vulkan_tracing, true,
           "Requests Vulkan events in HAL profiling streams.");
 IREE_FLAG(bool, vulkan_robust_buffer_access, false,
           "Requests robust buffer access.");
-IREE_FLAG(bool, vulkan_sparse_binding, true,
+IREE_FLAG(bool, vulkan_sparse_binding, false,
           "Requests sparse binding for large virtual buffers.");
-IREE_FLAG(bool, vulkan_sparse_residency, true,
+IREE_FLAG(bool, vulkan_sparse_residency, false,
           "Requests sparse residency and aliased sparse buffer mappings.");
 IREE_FLAG(bool, vulkan_buffer_device_addresses, true,
           "Requests buffer device addresses for pointer-first executables.");
