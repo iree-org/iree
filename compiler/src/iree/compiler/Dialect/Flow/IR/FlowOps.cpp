@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -32,6 +33,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -604,6 +606,82 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   return success();
 }
 
+// Returns the storage base that can be reused by a tied dispatch result.
+static Value getReusableTiedResultBaseInRegion(Flow::DispatchRegionOp regionOp,
+                                               Value yieldedValue) {
+  auto opResult = dyn_cast<OpResult>(yieldedValue);
+  if (!opResult) {
+    return {};
+  }
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(opResult.getOwner());
+  Value tiedOperand =
+      tiedOp ? tiedOp.getTiedResultOperand(yieldedValue) : nullptr;
+  if (!tiedOperand) {
+    return {};
+  }
+  Value tiedBase = IREE::Util::TiedOpInterface::findTiedBaseValue(tiedOperand);
+  // Region-to-workgroups reuses the tied input's type and dimensions as the
+  // whole-result store target. Destination-style results preserve their init
+  // shape; requiring a direct, type-identical tie avoids reconstructing shape
+  // identity through other tied ops.
+  if (!isa<DestinationStyleOpInterface>(opResult.getOwner()) ||
+      tiedOperand != tiedBase || yieldedValue.getType() != tiedBase.getType()) {
+    return {};
+  }
+
+  Block *dispatchBlock = regionOp->getBlock();
+  // Tied results created before the dispatch alias the same storage, so their
+  // later uses also block reuse.
+  llvm::SetVector<Value> tiedValues;
+  tiedValues.insert(tiedBase);
+  for (unsigned i = 0; i < tiedValues.size(); ++i) {
+    for (OpOperand &use : tiedValues[i].getUses()) {
+      Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+      if (!user || (user != regionOp && regionOp->isBeforeInBlock(user))) {
+        return {};
+      }
+      if (user == regionOp) {
+        continue;
+      }
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+        for (Value result :
+             tiedOp.getOperandTiedResults(use.getOperandNumber())) {
+          tiedValues.insert(result);
+        }
+      }
+    }
+  }
+  return tiedBase;
+}
+
+// Returns true when an unused tied result must keep its storage writable.
+static bool hasRequiredTiedResultUse(Flow::DispatchRegionOp regionOp,
+                                     Flow::ReturnOp returnOp,
+                                     unsigned resultIndex) {
+  Value yieldedValue = returnOp->getOperand(resultIndex);
+  auto opResult = cast<OpResult>(yieldedValue);
+  if (llvm::any_of(yieldedValue.getUses(), [&](OpOperand &use) {
+        return use.getOwner() != returnOp;
+      })) {
+    return true;
+  }
+
+  for (OpResult sibling : opResult.getOwner()->getResults()) {
+    if (sibling == yieldedValue) {
+      continue;
+    }
+    for (OpOperand &use : sibling.getUses()) {
+      if (use.getOwner() != returnOp) {
+        return true;
+      }
+      if (!regionOp->getResult(use.getOperandNumber()).use_empty()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
 /// if the IR was modified.
 bool dropUnusedAndRedundantDispatchRegionResults(
@@ -627,11 +705,32 @@ bool dropUnusedAndRedundantDispatchRegionResults(
 
   auto returnOp =
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  llvm::DenseSet<Value> writableTiedBases;
+  for (auto [index, result] : llvm::enumerate(regionOp.getResults())) {
+    if (result.use_empty()) {
+      continue;
+    }
+    if (Value tiedBase = getReusableTiedResultBaseInRegion(
+            regionOp, returnOp->getOperand(index))) {
+      writableTiedBases.insert(tiedBase);
+    }
+  }
+
   for (const auto &[index, value] : llvm::enumerate(regionOp.getResults())) {
     Type type = value.getType();
     auto shapedType = dyn_cast<ShapedType>(type);
     OpOperand &yieldedVal = returnOp->getOpOperand(index);
+    bool preserveUnusedResult = false;
     if (value.use_empty()) {
+      if (Value tiedBase =
+              getReusableTiedResultBaseInRegion(regionOp, yieldedVal.get());
+          tiedBase && !writableTiedBases.contains(tiedBase) &&
+          hasRequiredTiedResultUse(regionOp, returnOp, index)) {
+        preserveUnusedResult = true;
+        writableTiedBases.insert(tiedBase);
+      }
+    }
+    if (value.use_empty() && !preserveUnusedResult) {
       droppedResultValues[value] = std::nullopt;
     } else if (yieldedResultsSet.contains(yieldedVal.get())) {
       droppedResultValues[value] = yieldedVal.getOperandNumber();
@@ -1115,6 +1214,14 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
+  SmallVector<unsigned> excludedResultArgumentIndices;
+  for (unsigned resultIndex : excludedResultIndices) {
+    if (!getTiedResultOperandIndex(resultIndex).has_value()) {
+      excludedResultArgumentIndices.push_back(
+          getOutputBlockArgument(resultIndex).getArgNumber());
+    }
+  }
+
   auto newOp = DispatchWorkgroupsOp::create(
       rewriter, getLoc(), getWorkload(), newResultTypes, newResultDims,
       newArguments, newArgumentDims, newTiedOperandIndices,
@@ -1133,16 +1240,11 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
-  unsigned baseResultIndex = getArguments().size(); // old index
   auto erasedArguments = llvm::to_vector(excludedOperandIndices);
-  for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
-       ++i) {
-    if (!is_contained(excludedResultIndices, i - baseResultIndex)) {
-      continue;
-    }
-    auto arg = newBody.front().getArgument(i);
+  for (unsigned argumentIndex : excludedResultArgumentIndices) {
+    auto arg = newBody.front().getArgument(argumentIndex);
     eraseArgUseTree(arg, rewriter);
-    erasedArguments.push_back(i);
+    erasedArguments.push_back(argumentIndex);
   }
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());

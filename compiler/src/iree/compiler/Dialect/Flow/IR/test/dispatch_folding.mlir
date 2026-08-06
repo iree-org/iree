@@ -148,6 +148,33 @@ util.func public @multiple_results_tied_to_same_input(%arg0: tensor<4x4xf32>)
 
 // -----
 
+// CHECK-LABEL: util.func public @drop_untied_result_after_tied_result
+util.func public @drop_untied_result_after_tied_result(
+    %arg0: tensor<4xf32>) -> tensor<4xf32> {
+  %c1 = arith.constant 1 : index
+  // CHECK: flow.dispatch.workgroups[%c1](%arg0) : (tensor<4xf32>) -> %arg0 =
+  // CHECK-NEXT: (%{{.+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>)
+  // CHECK-NOT: !iree_tensor_ext.dispatch.tensor<writeonly
+  %0:2 = flow.dispatch.workgroups[%c1](%arg0) :
+      (tensor<4xf32>) -> (%arg0, tensor<4xf32>) =
+      (%arg0_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>,
+       %unused_capture: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>) {
+    %loaded = iree_tensor_ext.dispatch.tensor.load %arg0_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>> -> tensor<4xf32>
+    iree_tensor_ext.dispatch.tensor.store %loaded, %arg0_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>
+    iree_tensor_ext.dispatch.tensor.store %loaded, %unused_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+    flow.return
+  }
+  util.return %0#0 : tensor<4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @drop_unused_dispatch_region_result
 util.func public @drop_unused_dispatch_region_result(
     %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
@@ -168,6 +195,176 @@ util.func public @drop_unused_dispatch_region_result(
   }
   // CHECK: util.return %[[r]]
   util.return %r#0 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_tied_result_with_live_same_storage_result
+util.func public @drop_tied_result_with_live_same_storage_result(
+    %input: tensor<4xf32>, %storage: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xf32>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xf32>, tensor<4xf32>) {
+    %first = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%input : tensor<4xf32>) outs(%storage : tensor<4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<4xf32>
+    %second = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%first : tensor<4xf32>) outs(%storage : tensor<4xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<4xf32>
+    // CHECK: flow.return %[[SECOND:.+]] : tensor<4xf32>
+    flow.return %first, %second : tensor<4xf32>, tensor<4xf32>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<4xf32>
+  util.return %result#1 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @keep_required_tied_sort_result
+util.func public @keep_required_tied_sort_result(
+    %keys: tensor<?xi64>, %indices: tensor<?xi64>) -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %keys, %c0 : tensor<?xi64>
+  // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region -> (tensor<?xi64>{{.*}}, tensor<?xi64>{{.*}}) {
+  %result:2 = flow.dispatch.region -> (tensor<?xi64>{%dim}, tensor<?xi64>{%dim}) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    // CHECK: flow.return %[[SORTED:.+]]#0, %[[SORTED]]#1 : tensor<?xi64>, tensor<?xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<?xi64>, tensor<?xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#1 : tensor<?xi64>
+  util.return %result#1 : tensor<?xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_unused_tied_alias_result_when_base_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<2x2xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_unused_tied_alias_result_when_base_live(
+    %keys: tensor<2x2xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %key_view = flow.tensor.reshape %keys : tensor<2x2xi64> -> tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%key_view, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %[[KEYS]]
+  util.return %result#1, %keys : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_unused_tied_result_when_alias_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<4xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_unused_tied_result_when_alias_live(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %{{.+}}
+  util.return %result#1, %key_view : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_shape_changing_tied_result
+util.func public @drop_shape_changing_tied_result(
+    %keys: tensor<2x2xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %key_view = flow.tensor.reshape %keys : tensor<2x2xi64> -> tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%key_view, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<4xi64>
+  util.return %result#1 : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_dynamic_rank_changing_tied_result
+util.func public @drop_dynamic_rank_changing_tied_result(
+    %keys: tensor<?x?xi64>, %indices: tensor<?xi64>) -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %keys, %c0 : tensor<?x?xi64>
+  %d1 = tensor.dim %keys, %c1 : tensor<?x?xi64>
+  %flat_size = arith.muli %d0, %d1 : index
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<?xi64>{%{{.+}}}) {
+  %result:2 = flow.dispatch.region -> (tensor<?xi64>{%flat_size}, tensor<?xi64>{%flat_size}) {
+    %key_view = flow.tensor.reshape %keys : tensor<?x?xi64>{%d0, %d1} -> tensor<?xi64>{%flat_size}
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%key_view, %indices : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<?xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<?xi64>, tensor<?xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<?xi64>
+  util.return %result#1 : tensor<?xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_dynamic_shape_changing_tied_result
+util.func public @drop_dynamic_shape_changing_tied_result(
+    %keys: tensor<?x?xi64>, %indices: tensor<?x?xi64>) -> tensor<?x?xi64> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %keys, %c0 : tensor<?x?xi64>
+  %d1 = tensor.dim %keys, %c1 : tensor<?x?xi64>
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<?x?xi64>{%{{.+}}, %{{.+}}}) {
+  %result:2 = flow.dispatch.region -> (tensor<?x?xi64>{%d1, %d0}, tensor<?x?xi64>{%d1, %d0}) {
+    %key_view = flow.tensor.reshape %keys : tensor<?x?xi64>{%d0, %d1} -> tensor<?x?xi64>{%d1, %d0}
+    %sorted:2 = iree_linalg_ext.sort dimension(1)
+        outs(%key_view, %indices : tensor<?x?xi64>, tensor<?x?xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<?x?xi64>, tensor<?x?xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<?x?xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<?x?xi64>, tensor<?x?xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<?x?xi64>
+  util.return %result#1 : tensor<?x?xi64>
 }
 
 // -----
