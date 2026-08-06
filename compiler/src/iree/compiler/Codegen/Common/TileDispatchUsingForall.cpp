@@ -9,17 +9,20 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/WalkResult.h"
@@ -225,6 +228,88 @@ static bool isUsedAsInit(Operation *producer, Operation *user) {
   });
 }
 
+/// When workgroup `scf.forall` contains `iree_linalg_ext.scatter`, the scatter
+/// init may be produced by `linalg.fill` over `tensor.empty`. Tile-and-fuse
+/// cannot pull that fill into the forall (DPS init fusion is skipped), so the
+/// fill stays in the sequential region and bufferizes to a global write before
+/// the workgroup loop, which fails
+/// `iree-codegen-verify-workgroup-distribution`. Move the fill to the start of
+/// the forall body and wire `shared_outs` to the `tensor.empty` instead of the
+/// filled tensor.
+static void moveInitFillIntoWorkgroupForallWithScatter(RewriterBase &rewriter,
+                                                       scf::ForallOp forallOp) {
+  std::optional<ArrayAttr> mapping = forallOp.getMapping();
+  if (!mapping || mapping.value().empty() ||
+      !llvm::isa<IREE::Codegen::WorkgroupMappingAttr>(
+          *mapping.value().begin())) {
+    return;
+  }
+
+  bool hasScatter = false;
+  forallOp.getBody()->walk([&](IREE::LinalgExt::ScatterOp) {
+    hasScatter = true;
+    return WalkResult::interrupt();
+  });
+  if (!hasScatter) {
+    return;
+  }
+
+  Block::BlockArgListType iterArgs = forallOp.getRegionIterArgs();
+  SmallVector<Value> originalOutputs(llvm::to_vector(forallOp.getOutputs()));
+  if (originalOutputs.size() != iterArgs.size()) {
+    return;
+  }
+
+  SmallVector<Value> newOutputs = originalOutputs;
+
+  Operation *lastInsertedFill = nullptr;
+  for (auto [idx, iterArg] : llvm::enumerate(iterArgs)) {
+    auto fillOp = newOutputs[idx].getDefiningOp<linalg::FillOp>();
+    if (!fillOp) {
+      continue;
+    }
+    Value emptyTensor = fillOp.getDpsInitOperand(0)->get();
+    if (!emptyTensor.getDefiningOp<tensor::EmptyOp>()) {
+      continue;
+    }
+    auto bbArg = cast<BlockArgument>(iterArg);
+
+    IRMapping mapper;
+    mapper.map(fillOp.getDpsInitOperand(0)->get(), bbArg);
+    if (lastInsertedFill) {
+      rewriter.setInsertionPointAfter(lastInsertedFill);
+    } else {
+      rewriter.setInsertionPointToStart(forallOp.getBody());
+    }
+    Operation *clonedFill = rewriter.clone(*fillOp, mapper);
+    lastInsertedFill = clonedFill;
+    Value filled = clonedFill->getResult(0);
+
+    rewriter.replaceUsesWithIf(bbArg, filled, [&](OpOperand &operand) {
+      if (operand.getOwner() == clonedFill) {
+        return false;
+      }
+      if (auto pis =
+              dyn_cast<tensor::ParallelInsertSliceOp>(operand.getOwner())) {
+        if (pis.getDest() == bbArg) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    newOutputs[idx] = emptyTensor;
+
+    if (fillOp->use_empty()) {
+      rewriter.eraseOp(fillOp);
+    }
+  }
+
+  if (newOutputs != originalOutputs) {
+    forallOp.getOutputsMutable().assign(newOutputs);
+  }
+}
+
 void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   auto *context = &getContext();
@@ -409,6 +494,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
         forallOp.setMappingAttr(ArrayAttr::get(context, mappingAttrs));
       }
     }
+    moveInitFillIntoWorkgroupForallWithScatter(rewriter, forallOp);
   }
 
   // Cleanup patterns for tile and distribute
