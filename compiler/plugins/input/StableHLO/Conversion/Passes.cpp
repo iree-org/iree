@@ -58,6 +58,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
       ::mlir::stablehlo::createStablehloLegalizeCompositeToCallPass(
           ::mlir::stablehlo::StablehloLegalizeCompositeToCallPassOptions{
               /*exceptListOption=*/{}}));
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloLegalizeQuantToMathPass());
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createChloLegalizeToStablehloPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
