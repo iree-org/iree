@@ -243,9 +243,13 @@ module attributes { transform.with_named_sequence } {
 
 
 func.func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%d0) : tensor<?xi32>
   %0 = iree_linalg_ext.sort
        dimension(0)
-       outs(%arg0 : tensor<?xi32>) {
+       ins(%arg0 : tensor<?xi32>)
+       outs(%empty : tensor<?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          iree_linalg_ext.yield %0 : i1
@@ -261,16 +265,26 @@ module attributes { transform.with_named_sequence } {
 }
 //      CHECK: func.func @sort_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<?xi32>
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]] : tensor<?xi32>
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]]) : tensor<?xi32>
 //      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.sort
-// CHECK-SAME:       outs(%[[OPERAND]] :
+//      CHECK:       dimension(0)
+//      CHECK:       ins(%[[OPERAND]] : tensor<?xi32>)
+//      CHECK:       outs(%[[EMPTY]] : tensor<?xi32>)
 //      CHECK:   return %[[RESULT]]
 
 // -----
 
 func.func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %0 = iree_linalg_ext.sort
        dimension(1)
-       outs(%arg0 : tensor<?x?xi32>) {
+       ins(%arg0 : tensor<?x?xi32>) outs(%empty : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          iree_linalg_ext.yield %0 : i1
@@ -292,24 +306,29 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND]], %[[C1]]
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
-//  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[OPERAND]])
+//       CHECK:       iter_args(%[[INIT:.+]] = %[[EMPTY]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
-//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort
-//  CHECK-SAME:         outs(%[[OPERAND_SLICE]]
-//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SORT_TILE]] into %[[INIT]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[OPERAND]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[INIT_SLICE:.+]] = tensor.extract_slice %[[INIT]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort dimension(1) ins(%[[OPERAND_SLICE]] : tensor<?x?xi32>) outs(%[[INIT_SLICE]] : tensor<?x?xi32>)
+//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SORT_TILE]] into %[[INIT]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     scf.yield %[[YIELD]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
 
 func.func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xi32>
   %0 = iree_linalg_ext.sort
        dimension(0)
-       outs(%arg0 : tensor<?x?xi32>) {
+       ins(%arg0 : tensor<?x?xi32>)
+       outs(%empty : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32
          iree_linalg_ext.yield %0 : i1
@@ -331,15 +350,14 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND]], %[[C1]]
+//   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZE]]
-//  CHECK-SAME:       iter_args(%[[INIT:.+]] = %[[OPERAND]])
+//       CHECK:       iter_args(%[[INIT:.+]] = %[[EMPTY]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D1]]]
-//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, %[[IV]]]
-//  CHECK-SAME:         [%[[D0]], %[[USED_TILESIZE]]]
-//       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort
-//  CHECK-SAME:         outs(%[[OPERAND_SLICE]]
-//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SORT_TILE]] into %[[INIT]][0, %[[IV]]]
-//  CHECK-SAME:         [%[[D0]], %[[USED_TILESIZE]]]
+//       CHECK:     %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[OPERAND]][0, %[[IV]]] [%[[D0]], %[[USED_TILESIZE]]]
+//       CHECK:     %[[INIT_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, %[[IV]]] [%[[D0]], %[[USED_TILESIZE]]]
+//       CHECK:     %[[SORT_TILE:.+]] = iree_linalg_ext.sort dimension(0) ins(%[[OPERAND_SLICE]] : tensor<?x?xi32>) outs(%[[INIT_SLICE]] : tensor<?x?xi32>)
+//       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SORT_TILE]] into %[[INIT]][0, %[[IV]]] [%[[D0]], %[[USED_TILESIZE]]]
 //       CHECK:     scf.yield %[[YIELD]]
 //       CHECK:   return %[[RESULT]]
 
@@ -348,9 +366,17 @@ module attributes { transform.with_named_sequence } {
 func.func @sort_2d_multi_result(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %d2 = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %d3 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty0 = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %empty1 = tensor.empty(%d2, %d3) : tensor<?x?xf32>
   %0:2 = iree_linalg_ext.sort
        dimension(1)
-       outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
+       ins(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) outs(%empty0, %empty1 : tensor<?x?xi32>, tensor<?x?xf32>) {
        ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
          %1 = arith.cmpf ogt, %arg4, %arg5 : f32
          iree_linalg_ext.yield %1 : i1
@@ -368,24 +394,25 @@ module attributes { transform.with_named_sequence } {
 //       CHECK: func.func @sort_2d_multi_result(
 //  CHECK-SAME:   %[[OPERAND1:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[OPERAND2:.+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 10 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[OPERAND1]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[OPERAND1]], %[[C1]]
+//   CHECK-DAG:   %[[DIM_1:.+]] = tensor.dim %[[OPERAND2]], %[[C0]]
+//   CHECK-DAG:   %[[DIM_2:.+]] = tensor.dim %[[OPERAND2]], %[[C1]]
+//   CHECK-DAG:   %[[EMPTY0:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
+//   CHECK-DAG:   %[[EMPTY1:.+]] = tensor.empty(%[[DIM_1]], %[[DIM_2]]) : tensor<?x?xf32>
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 10 : index
 //       CHECK:   %[[RESULT:.+]]:2 = scf.for %[[IV:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZE]]
-//  CHECK-SAME:       iter_args(%[[INIT1:.+]] = %[[OPERAND1]], %[[INIT2:.+]] = %[[OPERAND2]])
+//       CHECK:       iter_args(%[[INIT1:.+]] = %[[EMPTY0]], %[[INIT2:.+]] = %[[EMPTY1]])
 //   CHECK-DAG:     %[[USED_TILESIZE:.+]] = affine.min #[[MAP]](%[[IV]])[%[[D0]]]
-//       CHECK:     %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[INIT1]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[INIT2]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[SORT_TILE:.+]]:2 = iree_linalg_ext.sort
-//  CHECK-SAME:         outs(%[[OPERAND1_SLICE]], %[[OPERAND2_SLICE]]
-//       CHECK:     %[[YIELD1:.+]] = tensor.insert_slice %[[SORT_TILE]]#0 into %[[INIT1]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
-//       CHECK:     %[[YIELD2:.+]] = tensor.insert_slice %[[SORT_TILE]]#1 into %[[INIT2]][%[[IV]], 0]
-//  CHECK-SAME:         [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[OPERAND1_SLICE:.+]] = tensor.extract_slice %[[OPERAND1]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[OPERAND2_SLICE:.+]] = tensor.extract_slice %[[OPERAND2]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[INIT1_SLICE:.+]] = tensor.extract_slice %[[INIT1]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[INIT2_SLICE:.+]] = tensor.extract_slice %[[INIT2]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[SORT_TILE:.+]]:2 = iree_linalg_ext.sort dimension(1) ins(%[[OPERAND1_SLICE]], %[[OPERAND2_SLICE]] : tensor<?x?xi32>, tensor<?x?xf32>) outs(%[[INIT1_SLICE]], %[[INIT2_SLICE]] : tensor<?x?xi32>, tensor<?x?xf32>)
+//       CHECK:     %[[YIELD1:.+]] = tensor.insert_slice %[[SORT_TILE]]#0 into %[[INIT1]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
+//       CHECK:     %[[YIELD2:.+]] = tensor.insert_slice %[[SORT_TILE]]#1 into %[[INIT2]][%[[IV]], 0] [%[[USED_TILESIZE]], %[[D1]]]
 //       CHECK:     scf.yield %[[YIELD1]], %[[YIELD2]]
 //       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
 
@@ -395,6 +422,7 @@ func.func @sort_2d_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort
      dimension(0)
+     ins(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
        %0 = arith.cmpf ogt, %arg4, %arg5 : f32

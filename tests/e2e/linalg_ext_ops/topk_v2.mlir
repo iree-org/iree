@@ -196,8 +196,11 @@ func.func @unsorted() {
         iree_linalg_ext.yield %0 : i1
       } -> tensor<3xf32>, tensor<3xi32>
 
+  %sorted_values_empty = tensor.empty() : tensor<3xf32>
+  %sorted_indices_empty = tensor.empty() : tensor<3xi32>
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%0#0, %0#1 : tensor<3xf32>, tensor<3xi32>) {
+      ins(%0#0, %0#1 : tensor<3xf32>, tensor<3xi32>)
+      outs(%sorted_values_empty, %sorted_indices_empty : tensor<3xf32>, tensor<3xi32>) {
       ^bb0(%arg0 : f32, %arg1 : f32, %arg2 : i32, %arg3 : i32):
         %1 = arith.cmpf ogt, %arg0, %arg1 : f32
         iree_linalg_ext.yield %1 : i1

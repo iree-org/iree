@@ -2,7 +2,13 @@
 
 func.func @sort_drop_unused_results(%arg0 : tensor<?x10xf32>,
     %arg1 : tensor<?x10xi64>) -> tensor<?x10xf32> {
-  %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1: tensor<?x10xf32>,
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x10xf32>
+  %d1 = tensor.dim %arg1, %c0 : tensor<?x10xi64>
+  %empty0 = tensor.empty(%d0) : tensor<?x10xf32>
+  %empty1 = tensor.empty(%d1) : tensor<?x10xi64>
+  %0:2 = iree_linalg_ext.sort dimension(1) ins(%arg0, %arg1 : tensor<?x10xf32>,
+      tensor<?x10xi64>) outs(%empty0, %empty1 : tensor<?x10xf32>,
       tensor<?x10xi64>) {
   ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
     %42 = arith.cmpf oge, %arg2, %arg3 : f32
@@ -13,7 +19,13 @@ func.func @sort_drop_unused_results(%arg0 : tensor<?x10xf32>,
 // CHECK-LABEL: func.func @sort_drop_unused_results
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x10xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?x10xi64>
-//       CHECK:   %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<?x10xf32>)
+//       CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x10xf32>
+//       CHECK:   %[[EMPTY0:.+]] = tensor.empty(%[[D0]]) : tensor<?x10xf32>
+//       CHECK:   %[[SORT:.+]] = iree_linalg_ext.sort
+//       CHECK:       dimension(1)
+//       CHECK:       ins(%[[ARG0]] : tensor<?x10xf32>) outs(%[[EMPTY0]] : tensor<?x10xf32>)
+//       CHECK:   return %[[SORT]] : tensor<?x10xf32>
 
 // -----
 

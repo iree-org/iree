@@ -184,9 +184,17 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
                                                 resultTypes))) {
       return failure();
     };
+    SmallVector<Value> outputs;
+    for (auto [input, resultType] :
+         llvm::zip_equal(adaptor.getOperands(), resultTypes)) {
+      auto resultTensorType = cast<RankedTensorType>(resultType);
+      outputs.push_back(tensor::EmptyOp::create(
+          rewriter, loc, tensor::getMixedSizes(rewriter, loc, input),
+          resultTensorType.getElementType()));
+    }
     auto sortOp = IREE::LinalgExt::SortOp::create(
-        rewriter, loc, resultTypes,
-        /*inputs=*/ValueRange{}, adaptor.getOperands(), op.getDimensionAttr());
+        rewriter, loc, resultTypes, adaptor.getOperands(), outputs,
+        op.getDimensionAttr());
     rewriter.inlineRegionBefore(op.getComparator(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
     Region &region = sortOp.getRegion();
