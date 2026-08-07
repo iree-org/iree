@@ -45,9 +45,11 @@ the charter.
 
 ## Overall
 
-Questions of project direction or components without a listed
-maintainer are escalated to the
-[Technical Steering Committee](#technical-steering-committee).
+Escalate questions about project direction and questions about components
+without a listed maintainer to the [Technical Steering
+Committee](#technical-steering-committee). Post to the [IREE-TSC mailing
+list](mailto:iree-TSC@lists.lfaidata.foundation) (preferred), or contact one of
+the TSC members individually.
 
 ## Compiler Maintainers
 
