@@ -49,6 +49,12 @@ bool hasZve64xFeature(DictionaryAttr targetConfig);
 /// cpu features.
 bool hasAnyVFeature(DictionaryAttr targetConfig);
 
+/// Returns true if the 'targetAttr' contains '+zfbfmin' in its cpu features.
+bool hasZfbfminFeature(DictionaryAttr targetConfig);
+
+/// Returns true if the 'targetAttr' contains '+zvfbfmin' in its cpu features.
+bool hasZvfbfminFeature(DictionaryAttr targetConfig);
+
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(DictionaryAttr targetConfig);
 

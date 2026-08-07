@@ -148,6 +148,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
                                      const CPUCodegenOptions &codegenOptions,
                                      bool enableAArch64SME = false,
+                                     bool enableNativeBf16Converts = false,
                                      bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//
