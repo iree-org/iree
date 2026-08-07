@@ -497,6 +497,9 @@ VER_0 {
     mlirFloat8E5M2TypeGet;
     mlirFloat8E5M2TypeGetName;
     mlirFloat8E5M2TypeGetTypeID;
+    mlirFloat8E5M3FNUTypeGet;
+    mlirFloat8E5M3FNUTypeGetName;
+    mlirFloat8E5M3FNUTypeGetTypeID;
     mlirFloat8E8M0FNUTypeGet;
     mlirFloat8E8M0FNUTypeGetName;
     mlirFloat8E8M0FNUTypeGetTypeID;
@@ -624,7 +627,7 @@ VER_0 {
     mlirLLVMArrayTypeGetNumElements;
     mlirLLVMArrayTypeGetTypeID;
     mlirLLVMAttrIsAMDConstantAttr;
-    mlirLLVMAttrIsAMDFuncAttr;
+    mlirLLVMAttrIsAMDGlobalValueAttr;
     mlirLLVMAttrIsAMDNodeAttr;
     mlirLLVMAttrIsAMDStringAttr;
     mlirLLVMCConvAttrGet;
@@ -690,9 +693,9 @@ VER_0 {
     mlirLLVMMDConstantAttrGet;
     mlirLLVMMDConstantAttrGetTypeID;
     mlirLLVMMDConstantAttrGetValue;
-    mlirLLVMMDFuncAttrGet;
-    mlirLLVMMDFuncAttrGetName;
-    mlirLLVMMDFuncAttrGetTypeID;
+    mlirLLVMMDGlobalValueAttrGet;
+    mlirLLVMMDGlobalValueAttrGetName;
+    mlirLLVMMDGlobalValueAttrGetTypeID;
     mlirLLVMMDNodeAttrGet;
     mlirLLVMMDNodeAttrGetNumOperands;
     mlirLLVMMDNodeAttrGetOperand;
@@ -874,6 +877,7 @@ VER_0 {
     mlirOperationImplementsInterface;
     mlirOperationImplementsInterfaceStatic;
     mlirOperationIsBeforeInBlock;
+    mlirOperationIsStructurallyEquivalent;
     mlirOperationMoveAfter;
     mlirOperationMoveBefore;
     mlirOperationNameHasTrait;
@@ -898,6 +902,7 @@ VER_0 {
     mlirOperationStateAddSuccessors;
     mlirOperationStateEnableResultTypeInference;
     mlirOperationStateGet;
+    mlirOperationStructuralHashValue;
     mlirOperationVerify;
     mlirOperationWalk;
     mlirOperationWriteBytecode;
@@ -997,6 +1002,8 @@ VER_0 {
     mlirRewriterBaseReplaceOpUsesWithinBlock;
     mlirRewriterBaseReplaceOpWithOperation;
     mlirRewriterBaseReplaceOpWithValues;
+    mlirRewriterBaseRestoreInsertionPoint;
+    mlirRewriterBaseSaveInsertionPoint;
     mlirRewriterBaseSetInsertionPointAfter;
     mlirRewriterBaseSetInsertionPointAfterValue;
     mlirRewriterBaseSetInsertionPointBefore;
@@ -1138,6 +1145,7 @@ VER_0 {
     mlirTypeIsAFloat8E4M3FNUZ;
     mlirTypeIsAFloat8E5M2;
     mlirTypeIsAFloat8E5M2FNUZ;
+    mlirTypeIsAFloat8E5M3FNU;
     mlirTypeIsAFloat8E8M0FNU;
     mlirTypeIsAFunction;
     mlirTypeIsAGPUAsyncTokenType;
@@ -1207,6 +1215,7 @@ VER_0 {
     mlirValuePrintAsOperand;
     mlirValueReplaceAllUsesExcept;
     mlirValueReplaceAllUsesOfWith;
+    mlirValueReplaceUsesWithIf;
     mlirValueSetType;
     mlirVectorTypeGet;
     mlirVectorTypeGetChecked;
