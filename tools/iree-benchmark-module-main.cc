@@ -604,7 +604,7 @@ class IREEBenchmark {
 
   // Handle printing/writing/checking the outputs kept from running the last
   // iteration of the module/function.
-  iree_status_t ProcessResults() {
+  iree_status_t ProcessResults(int* out_exit_code) {
     IREE_TRACE_SCOPE_NAMED("IREEBenchmark::ProcessResults");
 
     if (!outputs_) {
@@ -612,17 +612,11 @@ class IREEBenchmark {
                               "no output list to process");
     }
 
-    int exit_code = 0;
     IREE_RETURN_IF_ERROR(iree_tooling_process_results_and_print(
         device_,
         iree_make_string_view(results_cconv_.data(), results_cconv_.size()),
         outputs_.get(), iree_vm_instance_allocator(instance_.get()),
-        &exit_code));
-
-    if (exit_code != 0) {
-      return iree_make_status(IREE_STATUS_UNKNOWN, "non-zero exit code %d",
-                              exit_code);
-    }
+        out_exit_code));
 
     return iree_ok_status();
   }
@@ -808,14 +802,15 @@ static int runMain(int argc, char** argv) {
   IREE_CHECK_OK(iree_hal_end_profiling_from_flags(g_profiling));
   g_profiling = nullptr;
 
+  int exit_code = EXIT_SUCCESS;
   if (FLAG_enable_output_processing) {
-    IREE_CHECK_OK(iree_benchmark.ProcessResults());
+    IREE_CHECK_OK(iree_benchmark.ProcessResults(&exit_code));
   }
 
   IREE_CHECK_OK(iree_benchmark.Shutdown());
 
   IREE_TRACE_ZONE_END(z0);
-  return EXIT_SUCCESS;
+  return exit_code;
 }
 
 int main(int argc, char** argv) {
