@@ -957,10 +957,29 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   MLIRContext *context = forOp->getContext();
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
-  Value arraySize = LLVM::ConstantOp::create(
-      builder, loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
-  Value alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
-                                        /*alignment=*/sizeof(uint64_t));
+  // Reserve the stack slot in the enclosing function's entry block. `forOp` is
+  // the ukernel call, which may sit inside a loop; building the `alloca` at its
+  // insertion point would re-run the stack allocation every iteration with
+  // nothing to pop it back off, overflowing the stack on large iteration counts
+  // (#24744). The `alloca` only depends on a static size, so it moves safely to
+  // the entry block where it runs once. The feature-bit patching below stays at
+  // `forOp` (the call site): storing the OR'd value adjacent to the call keeps
+  // the forced feature bits visible to store-to-load forwarding once the
+  // ukernel is inlined, which the tile-function devirtualization relies on to
+  // fold its runtime feature check. Hoisting the stores too (as a single entry-
+  // block insertion point would) separates them from the inlined load across
+  // the loop and defeats that fold, leaving the tile function out-of-line.
+  Value alloca;
+  {
+    auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
+    assert(funcOp && "usage requires an enclosing LLVMFuncOp");
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+    Value arraySize = LLVM::ConstantOp::create(
+        builder, loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
+    alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
+                                    /*alignment=*/sizeof(uint64_t));
+  }
   // Load the 0-th value.
   Value srcData0 =
       LLVM::LoadOp::create(builder, loc, i64Ty, processorDataPtrValue);
@@ -993,19 +1012,12 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
   // way from the environment argument. This is redundant with loadFieldValue
   // but that returns values instead.
   //
-  // `forOp` here is the call itself, which may sit inside a loop, so if we
-  // built these ops at its insertion point we'd re-run the stack allocation
-  // on every loop iteration with nothing to ever pop it back off, overflowing
-  // the stack for large iteration counts (#24744). Build them in the
-  // enclosing function's entry block instead, where they only run once.
-  // The computation only depends on the function's `environment`
-  // argument and static target attributes, so it can safely move to the
-  // enclosing function's entry block instead, where it only runs once.
-  auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
-  assert(funcOp && "usage requires an enclosing LLVMFuncOp");
-  OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-
+  // These ops are built at `forOp` (the ukernel call site), which may sit
+  // inside a loop. That is intentional: the only op that must not be replayed
+  // per iteration is the stack `alloca`, which `updateProcessorDataFromTargetAttr`
+  // reserves in the entry block itself (#24744). Keeping the pointer tracking and
+  // feature-bit stores at the call site preserves the store-to-load forwarding
+  // that the tile-function devirtualization depends on.
   auto loc = forOp->getLoc();
   auto environmentPtrValue =
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",
