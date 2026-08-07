@@ -489,7 +489,7 @@ runs.
 * Opt in to the MacOS build and test workflows:
 
     ``` text
-    ci-extra: macos_arm64_clang, macos_x64_clang
+    ci-extra: macos_arm64_clang
     ```
 
 * Other opt in builds:

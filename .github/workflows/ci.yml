@@ -325,12 +325,6 @@ jobs:
     uses: ./.github/workflows/ci_macos_arm64_clang.yml
     secrets: inherit
 
-  macos_x64_clang:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'macos_x64_clang')
-    uses: ./.github/workflows/ci_macos_x64_clang.yml
-    secrets: inherit
-
   windows_x64_msvc:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
@@ -362,7 +356,6 @@ jobs:
       - linux_x64_clang_tsan
       - linux_x64_clang_byollvm
       - macos_arm64_clang
-      - macos_x64_clang
       - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit
