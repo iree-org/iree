@@ -218,21 +218,35 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "process_results",
+    srcs = ["process_results.c"],
+    hdrs = ["process_results.h"],
+    deps = [
+        ":comparison",
+        ":function_io",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/tooling:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:stream",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "run_module",
     srcs = ["run_module.c"],
     hdrs = ["run_module.h"],
     deps = [
-        ":comparison",
         ":context_util",
         ":device_util",
         ":function_io",
         ":function_util",
         ":instrument_util",
+        ":process_results",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/replay:recorder",
-        "//runtime/src/iree/io:stream",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",

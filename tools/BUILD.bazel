@@ -70,6 +70,7 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
         "//runtime/src/iree/tooling:function_io",
+        "//runtime/src/iree/tooling:process_results",
         "//runtime/src/iree/vm",
         "@com_google_benchmark//:benchmark",
     ],
