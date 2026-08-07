@@ -658,6 +658,10 @@ TraversalResult Explorer::walkIncomingBranchOperands(
       fn(forOp->getBlock(), forOp.getInitArgs(), -1);
       fn(&forOp.getRegion().front(),
          forOp.getRegion().front().getTerminator()->getOperands(), -1);
+    } else if (isa<scf::ForallOp>(parentOp)) {
+      // scf.forall shared output mappings are handled one block argument at a
+      // time.
+      result |= TraversalResult::INCOMPLETE;
     } else if (auto regionOp = dyn_cast<RegionBranchOpInterface>(parentOp)) {
       SmallVector<RegionSuccessor, 2> entrySuccessors;
       regionOp.getSuccessorRegions(RegionBranchPoint::parent(),
@@ -668,9 +672,13 @@ TraversalResult Explorer::walkIncomingBranchOperands(
         if (entrySuccessor.isOperation()) {
           continue;
         }
-        if (fn(regionOp->getBlock(),
-               regionOp.getEntrySuccessorOperands(entrySuccessor), 0)
-                .wasInterrupted()) {
+        auto entryOperands = regionOp.getEntrySuccessorOperands(entrySuccessor);
+        // The interface may not expose operand mappings for some region
+        // successors.
+        if (entryOperands.empty()) {
+          continue;
+        }
+        if (fn(regionOp->getBlock(), entryOperands, 0).wasInterrupted()) {
           break;
         }
       }
@@ -712,6 +720,14 @@ TraversalResult Explorer::walkIncomingBranchOperands(
 TraversalResult Explorer::walkIncomingBlockArgument(
     BlockArgument blockArg,
     std::function<WalkResult(Block *sourceBlock, Value operand)> fn) {
+  if (auto forallOp =
+          dyn_cast<scf::ForallOp>(blockArg.getParentBlock()->getParentOp())) {
+    if (blockArg.getArgNumber() < forallOp.getRank()) {
+      return TraversalResult::COMPLETE;
+    }
+    fn(forallOp->getBlock(), forallOp.getTiedOpOperand(blockArg)->get());
+    return TraversalResult::COMPLETE;
+  }
   return walkIncomingBranchOperands(
       blockArg.getParentBlock(),
       [&](Block *sourceBlock, OperandRange operands, size_t offset) {
@@ -785,11 +801,8 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
 
   // Move from a block argument to all predecessors.
   auto traverseBlockArg = [&](BlockArgument arg) {
-    auto *targetBlock = arg.getParentBlock();
-    return walkIncomingBranchOperands(
-        targetBlock,
-        [&](Block *sourceBlock, OperandRange operands, size_t offset) {
-          auto branchOperand = operands[arg.getArgNumber() + offset];
+    return walkIncomingBlockArgument(
+        arg, [&](Block *sourceBlock, Value branchOperand) {
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";
             sourceBlock->printAsOperand(llvm::dbgs(), asmState);
@@ -880,6 +893,17 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn,
         TraversalAction::RECURSE) {
       LLVM_DEBUG(llvm::dbgs() << "  -- ignoring region op "
                               << regionOp->getName().getStringRef() << "\n");
+      return TraversalResult::COMPLETE;
+    }
+    if (auto forallOp = dyn_cast<scf::ForallOp>(regionOp.getOperation())) {
+      auto tiedArg = forallOp.getTiedBlockArgument(
+          cast<OpResult>(forallOp->getResult(idx)));
+      LLVM_DEBUG({
+        llvm::dbgs() << "   + queuing tied region argument ";
+        tiedArg.printAsOperand(llvm::dbgs(), asmState);
+        llvm::dbgs() << "\n";
+      });
+      worklist.insert(tiedArg);
       return TraversalResult::COMPLETE;
     }
     LLVM_DEBUG(llvm::dbgs() << "  -> traversing into region op "
@@ -1008,6 +1032,24 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
   // the region for a bit.
   auto traverseRegionOp = [&](RegionBranchOpInterface regionOp,
                               unsigned operandIdx) {
+    if (auto forallOp = dyn_cast<scf::ForallOp>(regionOp.getOperation())) {
+      if (operandIdx < forallOp.getNumDynamicControlOperands()) {
+        return TraversalResult::COMPLETE;
+      }
+      auto *tiedOperand = &forallOp->getOpOperand(operandIdx);
+      auto tiedArg = forallOp.getTiedBlockArgument(tiedOperand);
+      auto tiedResult = forallOp.getTiedOpResult(tiedOperand);
+      LLVM_DEBUG({
+        llvm::dbgs() << "   + queuing tied region argument ";
+        tiedArg.printAsOperand(llvm::dbgs(), asmState);
+        llvm::dbgs() << " and result ";
+        tiedResult.printAsOperand(llvm::dbgs(), asmState);
+        llvm::dbgs() << "\n";
+      });
+      worklist.insert(tiedArg);
+      worklist.insert(tiedResult);
+      return TraversalResult::COMPLETE;
+    }
     SmallVector<RegionSuccessor, 2> entrySuccessors;
     regionOp.getSuccessorRegions(RegionBranchPoint::parent(), entrySuccessors);
     for (auto &entrySuccessor : entrySuccessors) {
@@ -1023,6 +1065,11 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
       // This properly handles ops like scf.for where only a subset of operands
       // (the iter_args) map to block arguments.
       auto entryOperands = regionOp.getEntrySuccessorOperands(entrySuccessor);
+      // The interface may not expose operand mappings for some region
+      // successors.
+      if (entryOperands.empty()) {
+        continue;
+      }
       unsigned entryBegin = entryOperands.getBeginOperandIndex();
       unsigned entryEnd = entryBegin + entryOperands.size();
       if (operandIdx < entryBegin || operandIdx >= entryEnd) {
