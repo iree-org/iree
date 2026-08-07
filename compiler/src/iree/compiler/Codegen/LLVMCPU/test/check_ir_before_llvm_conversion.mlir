@@ -36,6 +36,14 @@ func.func @mix_static_and_dynamic_allocas(%arg0: index) {
 
 // -----
 
+func.func @overflowing_static_alloca() {
+  // expected-error @+1 {{stack allocation size overflows 64 bits}}
+  %0 = memref.alloca() {alignment = 64 : i64} : memref<9007199254740991x1024x14x14xf32>
+  return
+}
+
+// -----
+
 func.func @non_entry_bb_allocas() {
   cf.br ^bb1
  ^bb1() :

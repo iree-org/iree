@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -71,14 +72,20 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           "all stack allocations need to be hoisted to the entry block of the "
           "function");
     }
-    int64_t allocaSize = 1;
+    auto emitOverflowError = [&]() {
+      return allocaOp->emitOpError(
+          "stack allocation size overflows 64 bits; the allocation is "
+          "unbounded in practice and cannot live on the stack");
+    };
     auto allocaType = cast<ShapedType>(allocaOp.getType());
-    for (auto dimSize : allocaType.getShape()) {
-      if (ShapedType::isDynamic(dimSize)) {
-        continue;
-      }
-      allocaSize *= dimSize;
+    FailureOr<int64_t> staticSizeBits =
+        getStaticShapeSizeInBits(allocaType, [](Type elementType) -> int64_t {
+          return IREE::Util::getTypeBitWidth(elementType);
+        });
+    if (failed(staticSizeBits)) {
+      return emitOverflowError();
     }
+    int64_t allocaSize = *staticSizeBits;
     for (auto operand : allocaOp.getDynamicSizes()) {
       // Assume vscale is `clAssumedVscaleValue` for determining if the alloca
       // is within the stack limit. This should always resolve to a constant
@@ -90,18 +97,26 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           /*vscaleMin=*/assumedVscale,
           /*vscaleMax=*/assumedVscale, presburger::BoundType::UB);
       if (succeeded(ub)) {
-        allocaSize *= ub->getSize()->baseSize;
+        if (llvm::MulOverflow(allocaSize,
+                              static_cast<int64_t>(ub->getSize()->baseSize),
+                              allocaSize)) {
+          return emitOverflowError();
+        }
         continue;
       }
       return allocaOp.emitOpError("expected no unbounded stack allocations");
     }
-    allocaSize *= IREE::Util::getTypeBitWidth(allocaType.getElementType());
     if (allocaOp.getAlignment()) {
       int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
-      allocaSize =
-          (llvm::divideCeil(allocaSize, alignmentInBits) * alignmentInBits);
+      int64_t alignedUnits = llvm::divideCeil(allocaSize, alignmentInBits);
+      if (llvm::MulOverflow(alignedUnits, alignmentInBits, allocaSize)) {
+        return emitOverflowError();
+      }
     }
-    cumSize += allocaSize / 8;
+    if (llvm::AddOverflow(cumSize, allocaSize / 8, cumSize)) {
+      return allocaOp->emitOpError(
+          "cumulative stack allocation size overflows 64 bits");
+    }
   }
   if (cumSize > maxAllocationSizeInBytes) {
     return funcOp.emitOpError("exceeded stack allocation limit of ")
