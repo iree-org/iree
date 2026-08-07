@@ -130,7 +130,7 @@ util.func public @conv_2d_nhwgc_gchwf(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
-util.func public @conv_2d_nhwc_hwcf_no_transpose(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
+util.func public @conv_2d_nhwc_hwcf(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
   %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<1x16x16x4xf32>, tensor<3x3x4x16xf32>) outs(%arg2 : tensor<1x14x14x16xf32>) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %3 = arith.mulf %in, %in_0 : f32
@@ -140,8 +140,17 @@ util.func public @conv_2d_nhwc_hwcf_no_transpose(%arg0: tensor<1x16x16x4xf32>, %
   util.return %0 : tensor<1x14x14x16xf32>
 }
 
-// CHECK-FHWC-LABEL:  @conv_2d_nhwc_hwcf_no_transpose
-// CHECK-FHWC-NOT:    linalg.transpose
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwc_hwcf
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x4xf32>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<3x3x4x16xf32>) outs(%[[EMPTY]] : tensor<16x3x3x4xf32>)
+// CHECK-FHWC-SAME:   permutation = [3, 0, 1, 2]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
+// CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<1x16x16x4xf32>, tensor<16x3x3x4xf32>)
 
 // -----
 
@@ -250,3 +259,199 @@ util.func public @conv_2d_nhwgc_gcfhw(%arg0: tensor<2x10x10x7x4xf32>, %arg1: ten
 // CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
 // CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2],
 // CHECK-FHWC-SAME:   ins({{.*}}, %[[START]] : tensor<2x10x10x7x4xf32>, tensor<7x16x3x3x4xf32>)
+
+// -----
+
+// Quantized (multi-operand) NHWC/HWCF convolution generic (e.g. QLinearConv
+// with zero-point operands). Supported under fhwc layout, with the
+// zero-points forwarded untouched; unsupported under hwfc layout.
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @conv_2d_nhwc_hwcf_q(%arg0: tensor<8x16x16x256xi8>, %arg1: tensor<3x3x256x16xi8>, %arg2: tensor<8x14x14x16xi32>) -> tensor<8x14x14x16xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1, %zp_input, %zp_filter : tensor<8x16x16x256xi8>, tensor<3x3x256x16xi8>, i32, i32) outs(%arg2 : tensor<8x14x14x16xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %zi: i32, %zf: i32, %out: i32):
+    %1 = arith.extsi %in : i8 to i32
+    %2 = arith.subi %1, %zi : i32
+    %3 = arith.extsi %in_0 : i8 to i32
+    %4 = arith.subi %3, %zf : i32
+    %5 = arith.muli %2, %4 : i32
+    %6 = arith.addi %out, %5 : i32
+    linalg.yield %6 : i32
+  } -> tensor<8x14x14x16xi32>
+  util.return %0 : tensor<8x14x14x16xi32>
+}
+
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwc_hwcf_q
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x256xi8>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<3x3x256x16xi8>) outs(%[[EMPTY]] : tensor<16x3x3x256xi8>)
+// CHECK-FHWC-SAME:   permutation = [3, 0, 1, 2]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#map, #[[$MAP0]], #map2, #map2, #map3],
+// CHECK-FHWC-SAME:   ins(%arg0, %[[START]], %{{.*}}, %{{.*}} : tensor<8x16x16x256xi8>, tensor<16x3x3x256xi8>, i32, i32)
+
+// CHECK-HWFC-LABEL:  @conv_2d_nhwc_hwcf_q
+// CHECK-HWFC-NOT:    linalg.transpose
+
+// -----
+
+// Quantized (multi-operand) CHWF convolution generic.
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d5, d2 + d6, d4)>
+#map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>
+#map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>
+#map3 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @conv_2d_nhwc_chwf_q(%arg0: tensor<1x16x16x4xi8>, %arg1: tensor<4x3x3x16xi8>, %arg2: tensor<1x14x14x16xi32>) -> tensor<1x14x14x16xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2, #map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1, %zp_input, %zp_filter : tensor<1x16x16x4xi8>, tensor<4x3x3x16xi8>, i32, i32) outs(%arg2 : tensor<1x14x14x16xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %zi: i32, %zf: i32, %out: i32):
+    %1 = arith.extsi %in : i8 to i32
+    %2 = arith.subi %1, %zi : i32
+    %3 = arith.extsi %in_0 : i8 to i32
+    %4 = arith.subi %3, %zf : i32
+    %5 = arith.muli %2, %4 : i32
+    %6 = arith.addi %out, %5 : i32
+    linalg.yield %6 : i32
+  } -> tensor<1x14x14x16xi32>
+  util.return %0 : tensor<1x14x14x16xi32>
+}
+
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwc_chwf_q
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x4xi8>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<4x3x3x16xi8>) outs(%[[EMPTY]] : tensor<16x3x3x4xi8>)
+// CHECK-FHWC-SAME:   permutation = [3, 1, 2, 0]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2, #map2, #map3],
+// CHECK-FHWC-SAME:   ins(%arg0, %[[START]], %{{.*}}, %{{.*}} : tensor<1x16x16x4xi8>, tensor<16x3x3x4xi8>, i32, i32)
+
+// CHECK-HWFC-LABEL:  @conv_2d_nhwc_chwf_q
+// CHECK-HWFC-NOT:    linalg.transpose
+
+// -----
+
+// Quantized (multi-operand) grouped (5D, GCHWF) convolution generic.
+
+#map4 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
+#map5 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d7, d5, d6, d4)>
+#map6 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>
+#map7 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+util.func public @conv_2d_nhwgc_gchwf_q(%arg0: tensor<2x10x10x7x4xi8>, %arg1: tensor<7x4x3x3x16xi8>, %arg2: tensor<2x8x8x7x16xi32>) -> tensor<2x8x8x7x16xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.generic {indexing_maps = [#map4, #map5, #map6, #map6, #map7], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1, %zp_input, %zp_filter : tensor<2x10x10x7x4xi8>, tensor<7x4x3x3x16xi8>, i32, i32) outs(%arg2 : tensor<2x8x8x7x16xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %zi: i32, %zf: i32, %out: i32):
+    %1 = arith.extsi %in : i8 to i32
+    %2 = arith.subi %1, %zi : i32
+    %3 = arith.extsi %in_0 : i8 to i32
+    %4 = arith.subi %3, %zf : i32
+    %5 = arith.muli %2, %4 : i32
+    %6 = arith.addi %out, %5 : i32
+    linalg.yield %6 : i32
+  } -> tensor<2x8x8x7x16xi32>
+  util.return %0 : tensor<2x8x8x7x16xi32>
+}
+
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d4, d5, d6, d7)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwgc_gchwf_q
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<7x16x3x3x4xi8>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<7x4x3x3x16xi8>) outs(%[[EMPTY]] : tensor<7x16x3x3x4xi8>)
+// CHECK-FHWC-SAME:   permutation = [0, 4, 2, 3, 1]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2, #map2, #map3],
+// CHECK-FHWC-SAME:   ins(%arg0, %[[START]], %{{.*}}, %{{.*}} : tensor<2x10x10x7x4xi8>, tensor<7x16x3x3x4xi8>, i32, i32)
+
+// CHECK-HWFC-LABEL:  @conv_2d_nhwgc_gchwf_q
+// CHECK-HWFC-NOT:    linalg.transpose
+
+// -----
+
+// Quantized (multi-operand) CFHW convolution generic.
+
+#map8 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d5, d2 + d6, d4)>
+#map9 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d3, d5, d6)>
+#map10 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>
+#map11 = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+util.func public @conv_2d_nhwc_cfhw_q(%arg0: tensor<1x16x16x4xi8>, %arg1: tensor<4x16x3x3xi8>, %arg2: tensor<1x14x14x16xi32>) -> tensor<1x14x14x16xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.generic {indexing_maps = [#map8, #map9, #map10, #map10, #map11], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1, %zp_input, %zp_filter : tensor<1x16x16x4xi8>, tensor<4x16x3x3xi8>, i32, i32) outs(%arg2 : tensor<1x14x14x16xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %zi: i32, %zf: i32, %out: i32):
+    %1 = arith.extsi %in : i8 to i32
+    %2 = arith.subi %1, %zi : i32
+    %3 = arith.extsi %in_0 : i8 to i32
+    %4 = arith.subi %3, %zf : i32
+    %5 = arith.muli %2, %4 : i32
+    %6 = arith.addi %out, %5 : i32
+    linalg.yield %6 : i32
+  } -> tensor<1x14x14x16xi32>
+  util.return %0 : tensor<1x14x14x16xi32>
+}
+
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwc_cfhw_q
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<16x3x3x4xi8>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<4x16x3x3xi8>) outs(%[[EMPTY]] : tensor<16x3x3x4xi8>)
+// CHECK-FHWC-SAME:   permutation = [1, 2, 3, 0]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2, #map2, #map3],
+// CHECK-FHWC-SAME:   ins(%arg0, %[[START]], %{{.*}}, %{{.*}} : tensor<1x16x16x4xi8>, tensor<16x3x3x4xi8>, i32, i32)
+
+// CHECK-HWFC-LABEL:  @conv_2d_nhwc_cfhw_q
+// CHECK-HWFC-NOT:    linalg.transpose
+
+// -----
+
+// Quantized (multi-operand) grouped (5D, GCFHW) convolution generic.
+
+#map12 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
+#map13 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d7, d4, d5, d6)>
+#map14 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>
+#map15 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>
+util.func public @conv_2d_nhwgc_gcfhw_q(%arg0: tensor<2x10x10x7x4xi8>, %arg1: tensor<7x4x16x3x3xi8>, %arg2: tensor<2x8x8x7x16xi32>) -> tensor<2x8x8x7x16xi32> {
+  %zp_input = arith.constant 0 : i32
+  %zp_filter = arith.constant 0 : i32
+  %0 = linalg.generic {indexing_maps = [#map12, #map13, #map14, #map14, #map15], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1, %zp_input, %zp_filter : tensor<2x10x10x7x4xi8>, tensor<7x4x16x3x3xi8>, i32, i32) outs(%arg2 : tensor<2x8x8x7x16xi32>) {
+  ^bb0(%in: i8, %in_0: i8, %zi: i32, %zf: i32, %out: i32):
+    %1 = arith.extsi %in : i8 to i32
+    %2 = arith.subi %1, %zi : i32
+    %3 = arith.extsi %in_0 : i8 to i32
+    %4 = arith.subi %3, %zf : i32
+    %5 = arith.muli %2, %4 : i32
+    %6 = arith.addi %out, %5 : i32
+    linalg.yield %6 : i32
+  } -> tensor<2x8x8x7x16xi32>
+  util.return %0 : tensor<2x8x8x7x16xi32>
+}
+
+// CHECK-FHWC: #[[$MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1 + d5, d2 + d6, d3, d7)>
+// CHECK-FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d3, d4, d5, d6, d7)>
+
+// CHECK-FHWC-LABEL:  @conv_2d_nhwgc_gcfhw_q
+// CHECK-FHWC:        %[[EMPTY:.*]] = tensor.empty() : tensor<7x16x3x3x4xi8>
+// CHECK-FHWC:        %[[TRANSPOSE:.*]] = linalg.transpose ins({{.*}} : tensor<7x4x16x3x3xi8>) outs(%[[EMPTY]] : tensor<7x16x3x3x4xi8>)
+// CHECK-FHWC-SAME:   permutation = [0, 2, 3, 4, 1]
+// CHECK-FHWC:        %[[START:.*]] = iree_tensor_ext.compute_barrier.start %[[TRANSPOSE]]
+// CHECK-FHWC:        %[[GENERIC:.*]] = linalg.generic
+// CHECK-FHWC-SAME:   indexing_maps = [#[[$MAP0]], #[[$MAP1]], #map2, #map2, #map3],
+// CHECK-FHWC-SAME:   ins(%arg0, %[[START]], %{{.*}}, %{{.*}} : tensor<2x10x10x7x4xi8>, tensor<7x16x3x3x4xi8>, i32, i32)
+
+// CHECK-HWFC-LABEL:  @conv_2d_nhwgc_gcfhw_q
+// CHECK-HWFC-NOT:    linalg.transpose
