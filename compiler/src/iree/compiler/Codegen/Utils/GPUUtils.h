@@ -348,6 +348,22 @@ bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target);
 bool targetSupportsShuffleBitwidth(IREE::GPU::TargetAttr target,
                                    unsigned bitwidth);
 
+/// Returns the minimum number of elements needed (after padding) for DMA
+/// alignment, or std::nullopt if DMA is not supported for this element type.
+std::optional<int64_t> getMinDMAAlignedElements(FunctionOpInterface funcOp,
+                                                Type elementType);
+
+/// Returns the subgroup size if the available elements are aligned to DMA
+/// transfer sizes for a single subgroup, std::nullopt otherwise.
+std::optional<int64_t> getDMAAlignedSubgroupSize(FunctionOpInterface funcOp,
+                                                 Type elementType,
+                                                 int64_t availableElements);
+
+/// Derives XOR swizzle parameters for DMA-promoted LDS allocations.
+FailureOr<XorShuffleParams>
+getXorShuffleParamsForDMA(IREE::GPU::TargetAttr target, int64_t elementBitWidth,
+                          int64_t totalElements, int64_t computeAccessWidth);
+
 // Methods to retrieve information association with `configuration` field
 // of `hal.executable.target` attribute used commonly in GPU codegen pipelines.
 std::optional<int64_t> getConfigWavesPerEu(DictionaryAttr targetAttr);
