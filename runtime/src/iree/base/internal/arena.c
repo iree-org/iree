@@ -204,7 +204,14 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
 
   iree_arena_block_pool_t* block_pool = arena->block_pool;
 
-  if (byte_length > block_pool->usable_block_size) {
+  // Pad allocations so each subsequent allocation starts aligned.
+  iree_host_size_t aligned_length = 0;
+  if (!iree_host_size_checked_align(byte_length, iree_max_align_t,
+                                    &aligned_length)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "alignment overflow");
+  }
+
+  if (aligned_length > block_pool->usable_block_size) {
     // Oversized allocation that can't be handled by the block pool. We'll
     // allocate directly from the system allocator and track it ourselves for
     // freeing during reset.
@@ -228,14 +235,6 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     *out_ptr = (uint8_t*)allocation + sizeof(iree_arena_oversized_allocation_t);
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
-  }
-
-  // Pad length allocated so that each pointer bump is always ending at an
-  // aligned address and the next allocation will start aligned.
-  iree_host_size_t aligned_length = 0;
-  if (!iree_host_size_checked_align(byte_length, iree_max_align_t,
-                                    &aligned_length)) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "alignment overflow");
   }
 
   // Check to see if the current block (if any) has space - if not, get another.
