@@ -314,6 +314,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_check_single_backend_test_suite(
@@ -328,6 +329,7 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
     "--iree-vulkan-dispatch-abi=bda"
+    "--iree-vulkan-target=vp_android_baseline_2022"
   RUNNER_ARGS
     "--vulkan_dispatch_abi=bda"
   LABELS
