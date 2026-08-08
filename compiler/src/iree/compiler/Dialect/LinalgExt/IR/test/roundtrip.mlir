@@ -2742,3 +2742,273 @@ func.func @map_load_memref_static(
 // CHECK:   iree_linalg_ext.yield %[[IDX0]], %[[PAD]]
 // CHECK: } : memref<16xf32> into memref<16xf32>
 // CHECK: return
+
+// -----
+
+func.func @quantize_affine_per_tensor(%input: tensor<128x64xf32>, %scale: tensor<f32>,
+    %zp: tensor<i8>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  %0 = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128 : i64, quant_max = 127 : i64}
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<f32>, tensor<i8>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+//   CHECK-DAG: #[[$IDENTITY:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-LABEL: func.func @quantize_affine_per_tensor(
+//  CHECK-SAME:   %[[INPUT:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[SCALE:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[ZP:[a-zA-Z0-9_]+]]
+//  CHECK-SAME:   %[[INIT:[a-zA-Z0-9_]+]]
+//       CHECK:   iree_linalg_ext.quantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$QPARAM]], #[[$IDENTITY]]]
+//  CHECK-SAME:     quant_max = 127 : i64
+//  CHECK-SAME:     quant_min = -128 : i64
+//  CHECK-SAME:     ins(%[[INPUT]], %[[SCALE]], %[[ZP]] :
+//  CHECK-SAME:     outs(%[[INIT]] :
+
+// -----
+
+func.func @quantize_affine_per_channel_unsigned(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi32>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  %0 = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = 0 : i64, quant_max = 255 : i64,
+       storage_unsigned}
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+//   CHECK-DAG: #[[$IDENTITY:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @quantize_affine_per_channel_unsigned(
+//       CHECK:   iree_linalg_ext.quantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$QPARAM]], #[[$IDENTITY]]]
+//  CHECK-SAME:     storage_unsigned
+
+// -----
+
+// Narrow range symmetric weights: no zero point operand, and a range that is
+// deliberately smaller than the range of the storage type.
+func.func @quantize_affine_symmetric_narrow_range(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  %0 = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -127 : i64, quant_max = 127 : i64}
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+// CHECK-LABEL: func.func @quantize_affine_symmetric_narrow_range(
+//       CHECK:   iree_linalg_ext.quantize_affine
+//  CHECK-SAME:     quant_min = -127 : i64
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<128x64xf32>, tensor<128xf32>)
+
+// -----
+
+// An f32 scale over an f16 value, which is what PT2E emits for a half model.
+func.func @quantize_affine_wider_scale(%input: tensor<128x64xf16>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi8>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  %0 = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128 : i64, quant_max = 127 : i64}
+      ins(%input, %scale, %zp : tensor<128x64xf16>, tensor<128xf32>, tensor<128xi8>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+// CHECK-LABEL: func.func @quantize_affine_wider_scale(
+//       CHECK:   iree_linalg_ext.quantize_affine
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}}, %{{.+}} : tensor<128x64xf16>, tensor<128xf32>, tensor<128xi8>)
+//  CHECK-SAME:     outs(%{{.+}} : tensor<128x64xi8>)
+
+// -----
+
+func.func @dequantize_affine_per_tensor(%input: tensor<128x64xi8>, %scale: tensor<f32>,
+    %zp: tensor<i8>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>], input_unsigned, zp_unsigned}
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<f32>, tensor<i8>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+//   CHECK-DAG: #[[$IDENTITY:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1) -> ()>
+// CHECK-LABEL: func.func @dequantize_affine_per_tensor(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$QPARAM]], #[[$IDENTITY]]]
+//  CHECK-SAME:     input_unsigned
+//  CHECK-SAME:     zp_unsigned
+
+// -----
+
+func.func @dequantize_affine_independent_qparam_maps(
+    %input: tensor<128x64xi8>, %scale: tensor<128xf32>, %zp: tensor<64xi8>,
+    %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<64xi8>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_independent_qparam_maps(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [
+
+// -----
+
+func.func @dequantize_affine_mixed_signedness(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi32>,
+    %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>], input_unsigned,
+       quant_min = 0 : i64, quant_max = 255 : i64}
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi32>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_mixed_signedness(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     input_unsigned
+//  CHECK-SAME:     quant_max = 255 : i64
+//  CHECK-SAME:     quant_min = 0 : i64
+
+// -----
+
+// Blocked int4 weights, expressed on an expanded shape.
+func.func @dequantize_affine_blocked(%input: tensor<128x2x32xi4>,
+    %scale: tensor<128x2xf16>, %zp: tensor<128x2xi4>,
+    %init: tensor<128x2x32xf16>) -> tensor<128x2x32xf16> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]}
+      ins(%input, %scale, %zp : tensor<128x2x32xi4>, tensor<128x2xf16>, tensor<128x2xi4>)
+      outs(%init : tensor<128x2x32xf16>) -> tensor<128x2x32xf16>
+  return %0 : tensor<128x2x32xf16>
+}
+//   CHECK-DAG: #[[$IDENTITY:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @dequantize_affine_blocked(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$QPARAM]], #[[$IDENTITY]]]
+
+// -----
+
+func.func @dequantize_affine_dynamic(%input: tensor<?x?xi8>, %scale: tensor<?xf32>,
+    %init: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%input, %scale : tensor<?x?xi8>, tensor<?xf32>)
+      outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+//   CHECK-DAG: #[[$IDENTITY:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-LABEL: func.func @dequantize_affine_dynamic(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$IDENTITY]]]
+
+// -----
+
+func.func @dequantize_affine_memref(%input: memref<128x64xi8>, %scale: memref<128xf32>,
+    %output: memref<128x64xf32>) {
+  iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%input, %scale : memref<128x64xi8>, memref<128xf32>)
+      outs(%output : memref<128x64xf32>)
+  return
+}
+// CHECK-LABEL: func.func @dequantize_affine_memref(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     outs(%{{.+}} : memref<128x64xf32>)
+
+// -----
+
+// A transpose folded into the op: the output map is a non-identity permutation,
+// so the dequantized value comes out with its dimensions swapped and the scale
+// stays attached to the input dimension it was per-channel over.
+func.func @dequantize_affine_transposed(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %init: tensor<64x128xf32>) -> tensor<64x128xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d1, d0)>]}
+      ins(%input, %scale : tensor<128x64xi8>, tensor<128xf32>)
+      outs(%init : tensor<64x128xf32>) -> tensor<64x128xf32>
+  return %0 : tensor<64x128xf32>
+}
+//   CHECK-DAG: #[[$INPUT:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+//   CHECK-DAG: #[[$QPARAM:.+]] = affine_map<(d0, d1) -> (d0)>
+//   CHECK-DAG: #[[$OUTPUT:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK-LABEL: func.func @dequantize_affine_transposed(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$INPUT]], #[[$QPARAM]], #[[$OUTPUT]]]
+
+// -----
+
+// A constant i64 zero point whose values are on the storage type's grid, which
+// is what PT2E emits. The verifier checks constant zero points against the grid
+// because the lowering narrows them, so this guards against a false positive.
+func.func @dequantize_affine_constant_wide_zp(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  %zp = arith.constant dense<-128> : tensor<128xi64>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi64>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_constant_wide_zp(
+//       CHECK:   %[[ZP:.+]] = arith.constant dense<-128> : tensor<128xi64>
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}}, %[[ZP]] :
+
+// -----
+
+// The scale need not match the output: the multiply happens in f32 and the
+// product is narrowed to f16 afterwards.
+func.func @dequantize_affine_wider_scale(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xf16>) -> tensor<128x64xf16> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%input, %scale : tensor<128x64xi8>, tensor<128xf32>)
+      outs(%init : tensor<128x64xf16>) -> tensor<128x64xf16>
+  return %0 : tensor<128x64xf16>
+}
+// CHECK-LABEL: func.func @dequantize_affine_wider_scale(
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<128x64xi8>, tensor<128xf32>)
+//  CHECK-SAME:     outs(%{{.+}} : tensor<128x64xf16>)
