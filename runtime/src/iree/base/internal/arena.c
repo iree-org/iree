@@ -204,11 +204,9 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
 
   iree_arena_block_pool_t* block_pool = arena->block_pool;
 
-  // Pad pooled allocations so each subsequent allocation starts aligned. Large
-  // requests skip this as they are serviced directly by the system allocator.
-  iree_host_size_t aligned_length = byte_length;
-  if (byte_length <= block_pool->usable_block_size &&
-      !iree_host_size_checked_align(byte_length, iree_max_align_t,
+  // Pad allocations so each subsequent allocation starts aligned.
+  iree_host_size_t aligned_length = 0;
+  if (!iree_host_size_checked_align(byte_length, iree_max_align_t,
                                     &aligned_length)) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "alignment overflow");
   }
@@ -218,11 +216,9 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     // allocate directly from the system allocator and track it ourselves for
     // freeing during reset.
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_arena_allocate_oversize");
-    const iree_host_size_t allocation_header_size =
-        iree_sizeof_struct(iree_arena_oversized_allocation_t);
     iree_host_size_t allocation_size = 0;
-    if (!iree_host_size_checked_add(allocation_header_size, byte_length,
-                                    &allocation_size)) {
+    if (!iree_host_size_checked_add(sizeof(iree_arena_oversized_allocation_t),
+                                    byte_length, &allocation_size)) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "oversized allocation size overflow");
@@ -236,7 +232,7 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     arena->allocation_head = allocation;
     arena->total_allocation_size += allocation_size;
     arena->used_allocation_size += byte_length;
-    *out_ptr = (uint8_t*)allocation + allocation_header_size;
+    *out_ptr = (uint8_t*)allocation + sizeof(iree_arena_oversized_allocation_t);
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }

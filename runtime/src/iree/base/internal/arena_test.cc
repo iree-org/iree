@@ -167,19 +167,15 @@ TEST(Arena, OversizedAllocation) {
 
 TEST(Arena, RoundedSizeUsesOversizedAllocation) {
   iree_arena_block_pool_t pool;
-  iree_arena_block_pool_initialize(kBlockSize, iree_allocator_system(), &pool);
-  const iree_host_size_t remainder =
-      pool.usable_block_size % iree_max_align_t;
-  if (remainder == 0) {
-    iree_arena_block_pool_deinitialize(&pool);
-    GTEST_SKIP() << "the default block capacity is naturally aligned";
-  }
+  iree_arena_block_pool_initialize(kBlockSize + 1, iree_allocator_system(),
+                                   &pool);
+  const iree_host_size_t remainder = pool.usable_block_size % iree_max_align_t;
+  ASSERT_NE(remainder, 0);
   iree_arena_allocator_t arena;
   iree_arena_initialize(&pool, &arena);
 
   // A request that fits before rounding may not fit after natural alignment.
-  const iree_host_size_t request_size =
-      pool.usable_block_size - remainder + 1;
+  const iree_host_size_t request_size = pool.usable_block_size - remainder + 1;
   void* ptr = NULL;
   IREE_ASSERT_OK(iree_arena_allocate(&arena, request_size, &ptr));
   ASSERT_NE(ptr, nullptr);
