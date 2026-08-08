@@ -22,6 +22,7 @@
 
 // clang-format off
 
+
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.h.inc" // IWYU pragma: export
 

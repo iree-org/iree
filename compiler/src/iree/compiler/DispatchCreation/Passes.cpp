@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -120,6 +121,15 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 
 static void addDispatchRegionCreationPreprocessingPasses(
     OpPassManager &passManager, const TransformOptions &dispatchOptions) {
+  // Lower the affine quantization ops to elementwise generics before fusion
+  // runs. Nothing past this point matches them by name.
+  FunctionLikeNest(passManager).addPass([]() {
+    return IREE::LinalgExt::createDecomposeAggregatedOpPass(
+        IREE::LinalgExt::DecomposeAggregatedOpPassOptions{
+            /*filterOps=*/"iree_linalg_ext.quantize_affine,"
+                          "iree_linalg_ext.dequantize_affine"});
+  });
+
   // 1. Do some simple elementwise op fusion. This could be skipped,
   //    but could reduce the surface area of ops to handle later.
   FunctionLikeNest(passManager)
