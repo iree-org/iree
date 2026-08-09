@@ -209,10 +209,11 @@ static const char *getDefaultEnabledUkernels(DictionaryAttr targetConfig) {
   if (isAArch64(targetConfig)) {
     return "mmt4d";
   }
-  // Auto-enable mmt4d for IME-capable RISC-V targets so callers do not need
-  // --iree-llvmcpu-enable-ukernels=mmt4d explicitly. Plain +v targets are
-  // unaffected; they still require the explicit flag.
-  if (isRISCV64(targetConfig) && hasFeature(targetConfig, "+xsmtvdot")) {
+  // Auto-enable mmt4d on RISC-V 64 so callers do not need
+  // --iree-llvmcpu-enable-ukernels=mmt4d explicitly. This is not restricted to
+  // IME-capable targets: the generic s8s8s32 tiles are a large win on plain +v
+  // as well (measured 2.6x on rv64gcv, see commit message).
+  if (isRISCV64(targetConfig)) {
     return "mmt4d";
   }
   return kNone;
