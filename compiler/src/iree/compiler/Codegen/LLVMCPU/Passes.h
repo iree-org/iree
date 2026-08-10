@@ -85,6 +85,7 @@ struct LLVMCPUPipelineOptions {
   bool enableVectorMasking = false;
   bool enableAArch64SME = false;
   bool enableAArch64I8mm = false;
+  bool enableNativeBf16Converts = false;
   bool lowerToAVX2 = false;
 };
 
@@ -146,9 +147,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 /// to LLVM dialect via the structured ops path. The `modulePassManager`
 /// should operate on the module within the IREE::HAL::ExecutableOp.
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &modulePassManager,
-                                     const CPUCodegenOptions &codegenOptions,
-                                     bool enableAArch64SME = false,
-                                     bool enableNativeBf16Converts = false,
+                                     const LLVMCPUPipelineOptions &pipelineOpts,
                                      bool includeLLVMLowering = true);
 
 //----------------------------------------------------------------------------//

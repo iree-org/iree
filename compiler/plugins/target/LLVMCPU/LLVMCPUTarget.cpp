@@ -260,13 +260,13 @@ public:
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) final {
     DictionaryAttr config = targetAttr.getConfiguration();
-    bool enableAArch64SME = isAArch64(config) && hasSMEFeature(config);
-    bool enableNativeBf16Converts = isRISCV(config) &&
-                                    hasZfbfminFeature(config) &&
-                                    hasZvfbfminFeature(config);
-    buildLLVMCPUCodegenPassPipeline(passManager.nest<ModuleOp>(),
-                                    codegenOptions_, enableAArch64SME,
-                                    enableNativeBf16Converts);
+    LLVMCPUPipelineOptions pipelineOpts;
+    pipelineOpts.cpuOpts = codegenOptions_;
+    pipelineOpts.enableAArch64SME = isAArch64(config) && hasSMEFeature(config);
+    pipelineOpts.enableNativeBf16Converts = isRISCV(config) &&
+                                            hasZfbfminFeature(config) &&
+                                            hasZvfbfminFeature(config);
+    buildLLVMCPUCodegenPassPipeline(passManager.nest<ModuleOp>(), pipelineOpts);
     buildCodegenTranslationPostProcessingPassPipeline(passManager);
   }
 

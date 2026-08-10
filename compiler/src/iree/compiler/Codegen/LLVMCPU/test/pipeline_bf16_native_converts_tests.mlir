@@ -1,14 +1,15 @@
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='enable-native-bf16-converts=true' --split-input-file %s | FileCheck %s --check-prefix=NATIVE
-// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline --split-input-file %s | FileCheck %s --check-prefix=EMULATED
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline='enable-native-bf16-converts=true' --split-input-file %s | FileCheck %s --check-prefixes=COMMON,NATIVE
+// RUN: iree-opt --iree-codegen-llvmcpu-configuration-pipeline --iree-codegen-llvmcpu-lowering-pipeline --split-input-file %s | FileCheck %s --check-prefixes=COMMON,EMULATED
 
 // Verifies the enable-native-bf16-converts pipeline option. The target backend
 // derives this option from the target's cpu features (Zfbfmin + Zvfbfmin on
-// RISC-V). Arithmetic is promoted to f32 either way (no CPU has native bf16
-// arithmetic yet), what the option controls is the conversions around it.
-// When it's set, bf16 storage is kept and the promotion's extf/truncf survive
-// to the LLVM dialect as fpext/fptrunc, which select as native conversion
-// instructions, otherwise bf16 storage becomes i16 and the conversions are
-// expanded into shift/round-bias integer sequences.
+// RISC-V). Arithmetic is promoted to f32 either way, there is no non-widening
+// bf16 arithmetic (the only bf16-input arithmetic instruction, Zvfbfwma's
+// `vfwmaccbf16`, widens to f32). What the option controls is the conversions
+// around the promotion. When it's set, bf16 storage is kept and the promotion's
+// extf/truncf survive to the LLVM dialect as fpext/fptrunc, which select as
+// native conversion instructions, otherwise bf16 storage becomes i16 and the
+// conversions are expanded into shift/round-bias integer sequences.
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>,
@@ -30,21 +31,30 @@ builtin.module {
     return
   }
 }
-// The bf16 operands are extended, added in f32, and truncated back with
-// plain fpext/fptrunc - no integer emulation.
-// NATIVE-LABEL: llvm.func @bf16_add
-//       NATIVE:   llvm.fpext {{.*}} : bf16 to f32
-//       NATIVE:   llvm.fadd {{.*}} : f32
-//       NATIVE:   llvm.fptrunc {{.*}} : f32 to bf16
-//   NATIVE-NOT:   llvm.lshr
-//   NATIVE-NOT:   llvm.shl
-
+// Native bf16 add: bf16 loads, fpext/fptrunc around the add, then bf16 store.
 // Emulated: the add is performed in f32 on values reconstructed from i16
 // storage, and the result is rounded back with the shift/bias sequence.
-// EMULATED-LABEL: llvm.func @bf16_add
-//       EMULATED:   llvm.shl
-//       EMULATED:   llvm.fadd {{.*}} : f32
-//       EMULATED:   llvm.lshr
+// COMMON-LABEL: llvm.func @bf16_add
+//      NATIVE:    llvm.load {{.*}} -> bf16
+//      NATIVE:    llvm.fpext {{.*}} : bf16 to f32
+//      NATIVE:    llvm.load {{.*}} -> bf16
+//      NATIVE:    llvm.fpext {{.*}} : bf16 to f32
+//    EMULATED:    llvm.load {{.*}} -> i16
+//    EMULATED:    llvm.zext {{.*}} : i16 to i32
+//    EMULATED:    llvm.shl
+//    EMULATED:    llvm.bitcast {{.*}} : i32 to f32
+//    EMULATED:    llvm.load {{.*}} -> i16
+//    EMULATED:    llvm.zext {{.*}} : i16 to i32
+//    EMULATED:    llvm.shl
+//    EMULATED:    llvm.bitcast {{.*}} : i32 to f32
+//      COMMON:    llvm.fadd {{.*}} : f32
+//      NATIVE:    llvm.fptrunc {{.*}} : f32 to bf16
+//      NATIVE:    llvm.store {{.*}} bf16
+//  NATIVE-NOT:    llvm.lshr
+//  NATIVE-NOT:    llvm.shl
+//    EMULATED:    llvm.fcmp "une"
+//    EMULATED:    llvm.lshr
+//    EMULATED:    llvm.store {{.*}} i16
 
 // -----
 
@@ -72,13 +82,15 @@ builtin.module {
     return
   }
 }
-// The f32 to bf16 cast stays an fptrunc, which is selectable as a single
-// native narrowing convert.
-// NATIVE-LABEL: llvm.func @bf16_truncf
-//       NATIVE:   llvm.fptrunc {{.*}} : vector<{{[0-9]+}}xf32> to vector<{{[0-9]+}}xbf16>
-//   NATIVE-NOT:   llvm.lshr
-
-// Emulated: the round-to-nearest-even bias sequence, and no bf16 fptrunc.
-// EMULATED-LABEL: llvm.func @bf16_truncf
-//   EMULATED-NOT:   llvm.fptrunc {{.*}} to vector<{{[0-9]+}}xbf16>
-//       EMULATED:   llvm.lshr
+// Both paths load the f32 input the same way. Native: the cast stays a single
+// fptrunc (selectable as one narrowing convert) and stores bf16. Emulated: the
+// round-to-nearest-even shift/bias sequence, storing i16.
+// COMMON-LABEL: llvm.func @bf16_truncf
+//        COMMON:   llvm.load {{.*}} -> vector<{{[0-9]+}}xf32>
+//        NATIVE:   llvm.fptrunc {{.*}} : vector<{{[0-9]+}}xf32> to vector<{{[0-9]+}}xbf16>
+//        NATIVE:   llvm.store {{.*}} vector<{{[0-9]+}}xbf16>
+//    NATIVE-NOT:   llvm.lshr
+//  EMULATED-NOT:   llvm.fptrunc {{.*}} to vector<{{[0-9]+}}xbf16>
+//      EMULATED:   llvm.fcmp "une"
+//      EMULATED:   llvm.lshr
+//      EMULATED:   llvm.store {{.*}} vector<{{[0-9]+}}xi16>
