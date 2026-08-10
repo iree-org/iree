@@ -217,8 +217,9 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     // freeing during reset.
     IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_arena_allocate_oversize");
     iree_host_size_t allocation_size = 0;
-    if (!iree_host_size_checked_add(sizeof(iree_arena_oversized_allocation_t),
-                                    byte_length, &allocation_size)) {
+    if (!iree_host_size_checked_add(
+            iree_sizeof_struct(iree_arena_oversized_allocation_t), byte_length,
+            &allocation_size)) {
       IREE_TRACE_ZONE_END(z0);
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "oversized allocation size overflow");
@@ -232,7 +233,8 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     arena->allocation_head = allocation;
     arena->total_allocation_size += allocation_size;
     arena->used_allocation_size += byte_length;
-    *out_ptr = (uint8_t*)allocation + sizeof(iree_arena_oversized_allocation_t);
+    *out_ptr = (uint8_t*)allocation +
+               iree_sizeof_struct(iree_arena_oversized_allocation_t);
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }

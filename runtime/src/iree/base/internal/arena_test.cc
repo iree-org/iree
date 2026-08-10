@@ -158,6 +158,7 @@ TEST(Arena, OversizedAllocation) {
   void* ptr = NULL;
   IREE_ASSERT_OK(iree_arena_allocate(&arena, kBlockSize * 4, &ptr));
   ASSERT_NE(ptr, nullptr);
+  EXPECT_EQ(reinterpret_cast<uintptr_t>(ptr) % iree_max_align_t, 0u);
   memset(ptr, 0xEF, kBlockSize * 4);
 
   iree_arena_deinitialize(&arena);
