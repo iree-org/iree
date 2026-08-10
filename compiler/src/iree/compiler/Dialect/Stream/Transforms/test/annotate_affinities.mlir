@@ -1657,18 +1657,13 @@ util.func private @scf_while_return_second_loop_carried() -> tensor<1xi32> {
     scf.yield %cst_a, %t : tensor<1xi32>, tensor<1xi32>
   // CHECK: } attributes {
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>], [#hal.device.promise<@dev_c>]]
-  // The while result's producer affinity is currently over-approximated as the
-  // union of both loop-carried affinities ([dev_a, dev_c]) instead of just
-  // [dev_c] (the single result only forwards %arg1). Re-enable this check once
-  // that producer-side over-approximation is fixed (https://github.com/iree-org/iree/issues/24787).
-  // COM: CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
+  // The single result only forwards %arg1, so its producer affinity is @dev_c.
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
   }
   // CHECK: flow.tensor.transfer
+  // The transfer consumes the while result, so its operand affinity is @dev_c.
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
   // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_c>]]
-  // The transfer consumes the while result, so its operand affinity inherits
-  // the same over-approximated union. Re-enable this check once the
-  // producer-side over-approximation is fixed (https://github.com/iree-org/iree/issues/24787).
-  // COM: CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
   %while_c = flow.tensor.transfer %while : tensor<1xi32> to #hal.device.promise<@dev_c>
   // CHECK: util.return
   // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_c>]]
