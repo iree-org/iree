@@ -694,15 +694,51 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
     # llvm-target-triple is not specified.
-    list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+    set(_PLATFORM_DEFAULT_LLVM_FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
   elseif(IREE_ARCH STREQUAL "riscv_32" AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
          NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV32 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
     # llvm-target-triple is not specified.
-    list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+    set(_PLATFORM_DEFAULT_LLVM_FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
   endif()
+  # Append platform defaults whose option is unset. If cpu-features is
+  # already set, prepend missing G-extension letters (+m,+a,+f,+d,+c).
+  foreach(_FLAG IN LISTS _PLATFORM_DEFAULT_LLVM_FLAGS)
+    if(_FLAG MATCHES "^--iree-llvmcpu-target-cpu-features=(.*)$")
+      set(_DEFAULT_FEATURES "${CMAKE_MATCH_1}")
+      if(IN_FLAGS MATCHES "--iree-llvmcpu-target-cpu-features=([^;]+)")
+        set(_VARIANT_FEATURES "${CMAKE_MATCH_1}")
+        string(REPLACE "," ";" _DEFAULT_LIST "${_DEFAULT_FEATURES}")
+        string(REPLACE "," ";" _VARIANT_LIST "${_VARIANT_FEATURES}")
+        set(_MISSING_G "")
+        foreach(_F IN LISTS _DEFAULT_LIST)
+          if(_F MATCHES "^\\+[mafdc]$")
+            list(FIND _VARIANT_LIST "${_F}" _FOUND)
+            if(_FOUND EQUAL -1)
+              list(APPEND _MISSING_G "${_F}")
+            endif()
+          endif()
+        endforeach()
+        if(_MISSING_G)
+          list(INSERT _VARIANT_LIST 0 ${_MISSING_G})
+          list(JOIN _VARIANT_LIST "," _MERGED_FEATURES)
+          list(APPEND _FLAGS "--iree-llvmcpu-target-cpu-features=${_MERGED_FEATURES}")
+        endif()
+        continue()
+      endif()
+      list(APPEND _FLAGS "${_FLAG}")
+      continue()
+    endif()
+    if(_FLAG MATCHES "^--([^=]+)=")
+      set(_OPT "${CMAKE_MATCH_1}")
+      if(IN_FLAGS MATCHES "${_OPT}")
+        continue()
+      endif()
+    endif()
+    list(APPEND _FLAGS "${_FLAG}")
+  endforeach()
 
   if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     set(_EMSCRIPTEN_TEST_DEFAULT_FLAGS
