@@ -906,6 +906,7 @@ static bool iree_hal_vulkan_allocator_resolve_memory_placement(
 
   bool found = false;
   int best_score = 0;
+  int32_t best_priority = INT32_MIN;
   iree_hal_buffer_params_t best_params = *params;
   iree_hal_vulkan_allocator_memory_placement_t best_placement;
   memset(&best_placement, 0, sizeof(best_placement));
@@ -930,9 +931,17 @@ static bool iree_hal_vulkan_allocator_resolve_memory_placement(
 
     const int score = iree_hal_vulkan_allocator_score_memory_type(
         &candidate_params, memory_type);
-    if (!found || score > best_score) {
+    // Ties must be broken with the same heuristic used to select the default
+    // pool memory types: the resolved placement type is later matched against
+    // pool capabilities and a divergent winner may name a memory type that has
+    // no backing pool.
+    const int32_t priority =
+        iree_hal_vulkan_allocator_memory_type_priority(memory_type);
+    if (!found || score > best_score ||
+        (score == best_score && priority > best_priority)) {
       found = true;
       best_score = score;
+      best_priority = priority;
       best_params = candidate_params;
       best_params.type = memory_type;
       best_placement = (iree_hal_vulkan_allocator_memory_placement_t){
