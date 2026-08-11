@@ -89,6 +89,7 @@ iree_cc_library(
     LLVMGPU
   HDRS
     "ConvertToLLVM.h"
+    "FP8Lowering.h"
     "KernelConfig.h"
     "Passes.h"
     "ROCDLPasses.h"
@@ -96,6 +97,7 @@ iree_cc_library(
     "AMDGPUEmulateNarrowType.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
+    "FP8Lowering.cpp"
     "ConvertToROCDL.cpp"
     "KernelConfig.cpp"
     "LLVMGPU1DVectorCanonicalizations.cpp"

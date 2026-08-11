@@ -122,6 +122,7 @@ iree_compiler_cc_library(
         "AMDGPUEmulateNarrowType.cpp",
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
+        "FP8Lowering.cpp",
         "ConvertToROCDL.cpp",
         "KernelConfig.cpp",
         "LLVMGPU1DVectorCanonicalizations.cpp",
@@ -152,6 +153,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertToLLVM.h",
+        "FP8Lowering.h",
         "KernelConfig.h",
         "Passes.h",
         "ROCDLPasses.h",
