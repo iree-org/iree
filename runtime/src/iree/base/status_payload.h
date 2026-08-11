@@ -22,7 +22,13 @@ extern "C" {
 
 typedef struct iree_status_storage_t iree_status_storage_t;
 
-// Function that formats a payload into a human-readable string form for logs.
+// Formats a payload into a human-readable string with snprintf-style
+// semantics: |out_buffer_length| is always set to the total number of
+// characters required to format the entire payload excluding the NUL
+// terminator, even if |buffer_capacity| is insufficient. If |buffer| is
+// provided then as much of the payload as fits is written NUL-terminated;
+// implementations must never write at or beyond |buffer| + |buffer_capacity|.
+// If |buffer| is NULL then no characters are written (measurement pass).
 typedef void(IREE_API_PTR* iree_status_payload_formatter_t)(
     const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);
