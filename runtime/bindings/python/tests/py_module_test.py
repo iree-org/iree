@@ -163,15 +163,11 @@ class PyModuleInterfaceTest(unittest.TestCase):
         args = rt.VmVariantList(2)
         args.push_float(2.0)
         args.push_float(4.0)
-        # TODO: Python doesn't have 32bit floats, so we are populating f64 args.
-        # These are coming back as zeros, and I expected something to be
-        # doing a conversion? The same is being done with i64 above but is
-        # working there.
         context.invoke(m.lookup_function("do_it_f32"), args, results)
         context.invoke(m.lookup_function("do_it_f64"), args, results)
 
         print(values)
-        self.assertEqual(repr(values), "[(42, 43), (42, 43), (0.0, 0.0), (2.0, 4.0)]")
+        self.assertEqual(repr(values), "[(42, 43), (42, 43), (2.0, 4.0), (2.0, 4.0)]")
 
         # Make sure no circular refs and that everything frees.
         context = None

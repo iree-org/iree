@@ -348,6 +348,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    py_module_test
+  SRCS
+    "tests/py_module_test.py"
+)
+
+iree_py_test(
+  NAME
     system_setup_test
   SRCS
     "tests/system_setup_test.py"

@@ -430,6 +430,7 @@ class PyModuleInterface {
         case IREE_VM_CCONV_TYPE_F64: {
           double result = py::cast<double>(value);
           memcpy(packed_results, &result, sizeof(result));
+          packed_results += sizeof(result);
           break;
         }
         case IREE_VM_CCONV_TYPE_REF: {
