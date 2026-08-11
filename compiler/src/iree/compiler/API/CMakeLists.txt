@@ -252,6 +252,73 @@ install(
   COMPONENT Compiler
 )
 
+################################################################################
+# libIREECompilerUnshielded.so building
+# Dynamic plugins resolve compiler symbols from the host process at dlopen
+# time, which the shielded library deliberately prevents. Plugin-hosting
+# tools link this duplicate instead.
+################################################################################
+
+iree_cc_library(
+  SHARED
+  NAME
+    SharedUnshieldedImpl
+  SRCS
+    empty.c
+  DEPS
+    iree::compiler::bindings::c::headers
+)
+
+target_sources(iree_compiler_API_SharedUnshieldedImpl PRIVATE
+  ${_EXPORT_OBJECT_SRCS}
+)
+
+target_link_libraries(iree_compiler_API_SharedUnshieldedImpl PRIVATE
+  ${_EXPORT_OBJECT_DEPS}
+)
+
+target_link_libraries(iree_compiler_API_SharedUnshieldedImpl PRIVATE
+  MLIRExportSMTLIB
+  MLIRTargetLLVMIRImport
+)
+
+if(NOT IREE_ENABLE_ASAN
+    AND NOT IREE_ENABLE_MSAN
+    AND NOT IREE_ENABLE_TSAN
+    AND NOT IREE_ENABLE_UBSAN
+    AND NOT APPLE)
+  target_link_options(iree_compiler_API_SharedUnshieldedImpl PRIVATE
+    $<$<PLATFORM_ID:Linux>:-Wl,--no-undefined>
+    $<$<PLATFORM_ID:Darwin>:-Wl,-undefined,error>
+  )
+endif()
+
+set_target_properties(
+  iree_compiler_API_SharedUnshieldedImpl
+  PROPERTIES
+    OUTPUT_NAME "IREECompilerUnshielded"
+    VERSION "0"
+    SOVERSION "0"
+)
+
+iree_install_targets(
+  TARGETS
+    iree_compiler_API_SharedUnshieldedImpl
+  COMPONENT
+    IREERuntimeLibraries-Compiler
+  EXPORT_SET
+    Compiler
+)
+
+set(_unshielded_linker_file_name "${CMAKE_SHARED_LIBRARY_PREFIX}IREECompilerUnshielded${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set_property(GLOBAL APPEND PROPERTY
+  IREE_COMPILER_DYLIB_RELPATHS "${_unshielded_linker_file_name}")
+
+install(
+  TARGETS iree_compiler_API_SharedUnshieldedImpl
+  COMPONENT Compiler
+)
+
 # The bazel side uses a "Impl" library alias to generically represent
 # static or shared. Provide a corresponding one here.
 # When in BUILD_SHARED_LIBS mode, we do CMake level linking against the
@@ -270,6 +337,24 @@ else()
 iree_cc_library(
   NAME
     Impl
+  DEPS
+    ::StaticImpl
+)
+endif()
+
+# Same alias treatment as Impl: static-linking configurations fall back to
+# StaticImpl, where dynamic plugins cannot resolve compiler symbols.
+if(IREE_LINK_COMPILER_SHARED_LIBRARY AND NOT BUILD_SHARED_LIBS)
+iree_cc_library(
+  NAME
+    UnshieldedImpl
+  DEPS
+    ::SharedUnshieldedImpl
+)
+else()
+iree_cc_library(
+  NAME
+    UnshieldedImpl
   DEPS
     ::StaticImpl
 )

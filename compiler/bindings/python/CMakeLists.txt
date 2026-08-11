@@ -204,7 +204,6 @@ declare_mlir_python_extension(IREECompilerPythonExtensions.Registration
     iree_compiler_API_SharedImpl
   PRIVATE_LINK_LIBS
     LLVMSupport
-    iree::compiler::PluginAPI::PluginManager
 )
 
 declare_mlir_python_extension(IREECompilerPythonExtensions.CompilerDialects
@@ -324,9 +323,10 @@ function(add_iree_compiler_busybox_tool target)
     ${target}
     ${ARG_SRCS}
   )
+  # Unshielded so that dlopen'ed compiler plugins can resolve compiler symbols.
   target_link_libraries(${target}
     iree_compiler_bindings_c_headers
-    iree_compiler_API_Impl)
+    iree_compiler_API_UnshieldedImpl)
   set_target_properties(${target}
     PROPERTIES
       OUTPUT_NAME "${ARG_OUTPUT_NAME}"

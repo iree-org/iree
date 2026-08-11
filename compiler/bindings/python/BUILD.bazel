@@ -351,7 +351,6 @@ cc_binary(
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:SharedImpl",
-        "//compiler/src/iree/compiler/PluginAPI:PluginManager",
         "@llvm-project//mlir:CAPIIRHeaders",
         "@llvm-project//mlir:MLIRBindingsPythonNanobindHeaders",
         "@nanobind",

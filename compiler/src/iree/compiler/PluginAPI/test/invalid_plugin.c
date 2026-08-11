@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: mkdir -p %t
-// RUN: clang -fPIC -shared -o %t/libinvalid_plugin.so -resource-dir "$(dirname $(realpath $(which clang)))/staging" %s
+// RUN: clang -fPIC -shared -o %t/libinvalid_plugin.so %s
 // RUN: (iree-opt --iree-load-plugin=invalid_plugin=%t/libinvalid_plugin.so 2>&1 || true) | FileCheck %s --check-prefix=PLUGIN_LOAD_FAIL
 // clang-format on
 
