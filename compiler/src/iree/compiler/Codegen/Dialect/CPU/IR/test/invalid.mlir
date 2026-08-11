@@ -122,3 +122,23 @@ func.func @cpu_inner_tiled_sve_rhs_n_must_be_dynamic(
   } : tensor<1x1x1x1xf32>, tensor<1x1x4x1xf32> into tensor<1x1x1x?xf32>
   return %0 : tensor<1x1x1x?xf32>
 }
+
+// -----
+
+// The inner-tile alignment array only accepts InnerTileAlignment keywords
+// (Unknown, Multiple, Equal).
+// expected-error@+1 {{expected an InnerTileAlignment}}
+#invalid_inner_tile_alignment_name = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Bogus]>
+
+// -----
+
+// Each alignment must be encapsulated in an array, e.g. `[Multiple]`, not
+// given as a bare keyword.
+// expected-error@+1 {{}}
+#invalid_inner_tile_alignment_value = #iree_cpu.inner_tile_alignments<vector_common_parallel = Multiple>
+
+// -----
+
+// An empty hint (no tiling levels) is meaningless and is rejected.
+// expected-error@+1 {{expected at least one tiling level}}
+#invalid_inner_tile_alignment_empty = #iree_cpu.inner_tile_alignments<>

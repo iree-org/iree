@@ -82,3 +82,35 @@ func.func @test_ukernel_provider() attributes {
 }
 // CHECK-LABEL: @test_ukernel_provider()
 // CHECK-SAME:    iree_codegen.ukernel_provider = #iree_cpu.ukernel_provider
+
+// -----
+
+// Round-trip the inner-tile alignment hint attribute. It records, per tiling
+// level, the InnerTileAlignment (Unknown|Multiple|Equal) of each
+// iteration-domain dimension.
+func.func @test_inner_tile_alignments() attributes {
+    inner_tile_alignments =
+        #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>} {
+  return
+}
+// CHECK-LABEL: @test_inner_tile_alignments()
+// CHECK-SAME:    inner_tile_alignments = #iree_cpu.inner_tile_alignments<
+// CHECK-SAME:      vector_common_parallel = [Unknown, Equal]>
+
+// -----
+
+// Multiple levels and all three alignment kinds, each level carrying one entry
+// per iteration-domain dimension (here 2). Levels are printed sorted by name,
+// regardless of input order.
+func.func @test_inner_tile_alignments_multi_level() attributes {
+    inner_tile_alignments = #iree_cpu.inner_tile_alignments<
+      vector_inner_parallel = [Equal, Unknown],
+      vector_common_parallel = [Multiple, Unknown],
+      distribution = [Unknown, Equal]>} {
+  return
+}
+// CHECK-LABEL: @test_inner_tile_alignments_multi_level()
+// CHECK-SAME:    inner_tile_alignments = #iree_cpu.inner_tile_alignments<
+// CHECK-SAME:      distribution = [Unknown, Equal],
+// CHECK-SAME:      vector_common_parallel = [Multiple, Unknown],
+// CHECK-SAME:      vector_inner_parallel = [Equal, Unknown]>

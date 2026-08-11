@@ -28,6 +28,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/ValueRange.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 #include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -320,6 +321,110 @@ SmallVector<bool> LoweringConfigAttr::getVectorScalableFlags() const {
     }
   }
   return result;
+}
+
+//===----------------------------------------------------------------------===//
+// InnerTileAlignmentsAttr
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+InnerTileAlignmentsAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                                DictionaryAttr alignments) {
+  if (!alignments || alignments.empty()) {
+    return emitError() << "expected at least one tiling level";
+  }
+  for (NamedAttribute entry : alignments) {
+    auto arr = dyn_cast<DenseI64ArrayAttr>(entry.getValue());
+    if (!arr) {
+      return emitError()
+             << "expected a per-dimension InnerTileAlignment array for '"
+             << entry.getName().getValue() << "'";
+    }
+    for (int64_t value : arr.asArrayRef()) {
+      if (!mlir::isValidInnerTileAlignment(value)) {
+        return emitError() << "invalid InnerTileAlignment value: " << value;
+      }
+    }
+  }
+  return success();
+}
+
+Attribute InnerTileAlignmentsAttr::parse(AsmParser &parser, Type) {
+  MLIRContext *ctx = parser.getContext();
+  if (parser.parseLess()) {
+    return {};
+  }
+  SmallVector<NamedAttribute> items;
+  bool first = true;
+  while (failed(parser.parseOptionalGreater())) {
+    if (!first && parser.parseComma()) {
+      return {};
+    }
+    first = false;
+    // <level_name> = [Unknown, Equal, ...]
+    std::string keyStr;
+    if (parser.parseKeywordOrString(&keyStr) || parser.parseEqual()) {
+      return {};
+    }
+    SmallVector<int64_t> alignments;
+    if (parser.parseCommaSeparatedList(
+            AsmParser::Delimiter::Square, [&]() -> ParseResult {
+              StringRef keyword;
+              if (parser.parseKeyword(&keyword)) {
+                return failure();
+              }
+              std::optional<mlir::InnerTileAlignment> kind =
+                  mlir::symbolizeInnerTileAlignment(keyword);
+              if (!kind) {
+                return parser.emitError(parser.getCurrentLocation(),
+                                        "expected an InnerTileAlignment "
+                                        "(Unknown|Multiple|Equal), got: ")
+                       << keyword;
+              }
+              alignments.push_back(static_cast<int64_t>(*kind));
+              return success();
+            })) {
+      return {};
+    }
+    items.emplace_back(StringAttr::get(ctx, keyStr),
+                       DenseI64ArrayAttr::get(ctx, alignments));
+  }
+  return parser.getChecked<InnerTileAlignmentsAttr>(
+      ctx, DictionaryAttr::get(ctx, items));
+}
+
+void InnerTileAlignmentsAttr::print(AsmPrinter &printer) const {
+  printer << "<";
+  llvm::interleaveComma(getAlignments(), printer, [&](NamedAttribute entry) {
+    // `.str()` avoids wrapping the tiling-level key with `"`.
+    printer << entry.getName().str() << " = [";
+    ArrayRef<int64_t> alignments =
+        cast<DenseI64ArrayAttr>(entry.getValue()).asArrayRef();
+    llvm::interleaveComma(alignments, printer, [&](int64_t value) {
+      printer << mlir::stringifyInnerTileAlignment(
+          static_cast<mlir::InnerTileAlignment>(value));
+    });
+    printer << "]";
+  });
+  printer << ">";
+}
+
+void InnerTileAlignmentsAttr::setOnOp(
+    Operation *op,
+    ArrayRef<std::pair<TilingLevel, SmallVector<int64_t>>> perLevel) {
+  MLIRContext *ctx = op->getContext();
+  SmallVector<NamedAttribute> entries;
+  entries.reserve(perLevel.size());
+  for (auto &[level, alignments] : perLevel) {
+    entries.emplace_back(StringAttr::get(ctx, getTilingLevelName(level)),
+                         DenseI64ArrayAttr::get(ctx, alignments));
+  }
+  op->setAttr(getMnemonic(), InnerTileAlignmentsAttr::get(
+                                 ctx, DictionaryAttr::get(ctx, entries)));
+}
+
+InnerTileAlignmentsAttr InnerTileAlignmentsAttr::getFromOp(Operation *op) {
+  return op->getAttrOfType<InnerTileAlignmentsAttr>(getMnemonic());
 }
 
 //===----------------------------------------------------------------------===//
