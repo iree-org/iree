@@ -332,7 +332,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
   // The first output and its iteration domain will be taken as the "anchor",
   // based off which the packed shape will be determined. We only support cases
   // where indexing maps of all other output operands are identity or
-  // permutatations.
+  // permutations.
   OpOperand *firstOutputOperand = genericOp.getDpsInitOperand(0);
   AffineMap outputMap = genericOp.getMatchingIndexingMap(firstOutputOperand);
   for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
@@ -444,7 +444,7 @@ Operation *lowerGenericOpWithResolvedLayouts(
   for (auto [operand, convertedOperand] :
        llvm::zip_equal(indexedOperands, convertedOperands)) {
     AffineMap operandMap = genericOp.getMatchingIndexingMap(operand);
-    // Special case for 0D inputs. They will resolve to identity layout, so
+    // Special case for 0D operands. They will resolve to identity layout, so
     // skip the logic to compute the packed indexing map.
     if (operandMap.getNumResults() == 0) {
       auto packedOperandMap = AffineMap::get(
