@@ -105,41 +105,38 @@ struct ConvertHwcfToFhwc : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
   }
 };
 
-/// Transpose the generic form filter layout of `CHWF` or `CFHW` to `FHWC`.
+/// Transpose the generic form filter layout of `CHWF`, `CFHW`, or `HWCF` to
+/// `FHWC`. Also matches convolution-like generics with extra operands (e.g.
+/// quantization zero-points).
 struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
-    if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
-      return failure();
-    }
-
-    FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
-        mlir::linalg::inferConvolutionDims(linalgOp);
-    if (failed(convolutionDims)) {
+    linalg::ConvolutionDimensions convolutionDims;
+    StringRef errString = getMatchConvolutionMessage(
+        linalg::detail::isConvolutionInterfaceImpl(linalgOp, &convolutionDims));
+    if (!errString.empty()) {
       return failure();
     }
 
     // Require non-empty filter, input and output channel dimensions.
-    if (convolutionDims->outputChannel.empty() ||
-        convolutionDims->inputChannel.empty() ||
-        convolutionDims->filterLoop.empty()) {
+    if (convolutionDims.outputChannel.empty() ||
+        convolutionDims.inputChannel.empty() ||
+        convolutionDims.filterLoop.empty()) {
       return failure();
     }
 
-    OpOperand *input = linalgOp.getDpsInputOperand(0);
-    OpOperand *filter = linalgOp.getDpsInputOperand(1);
-    OpOperand *output = linalgOp.getDpsInitOperand(0);
+    SmallVector<Value> inputs = linalgOp.getDpsInputs();
+    Value inputVal = inputs[0];
+    Value filterVal = inputs[1];
+    Value outputVal = linalgOp.getDpsInits()[0];
 
-    AffineMap inputMap = linalgOp.getMatchingIndexingMap(input);
-    AffineMap filterMap = linalgOp.getMatchingIndexingMap(filter);
-    AffineMap outputMap = linalgOp.getMatchingIndexingMap(output);
-
-    Value inputVal = input->get();
-    Value filterVal = filter->get();
-    Value outputVal = output->get();
+    auto indexingMaps = linalgOp.getIndexingMapsArray();
+    AffineMap inputMap = indexingMaps[0];
+    AffineMap filterMap = indexingMaps[1];
+    AffineMap outputMap = indexingMaps.back();
 
     ArrayRef<int64_t> inputShape =
         cast<ShapedType>(inputVal.getType()).getShape();
@@ -170,34 +167,35 @@ struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
 
     // Don't transpose when the input is in not batch-first layout (e.g., CHWN).
     SmallVector<int64_t> batchInputPos =
-        getDimPositions(convolutionDims->batch, inputMap);
+        getDimPositions(convolutionDims.batch, inputMap);
     if (!batchInputPos.empty() && batchInputPos.front() != 0) {
       return failure();
     }
 
-    // Only transpose when the filter is CHWF or CFHW layout.
+    // Only transpose when the filter is CHWF, CFHW, or HWCF layout.
     SmallVector<int64_t> fFilterPos =
-        getDimPositions(convolutionDims->outputChannel, filterMap);
+        getDimPositions(convolutionDims.outputChannel, filterMap);
     SmallVector<int64_t> cFilterPos =
-        getDimPositions(convolutionDims->inputChannel, filterMap);
+        getDimPositions(convolutionDims.inputChannel, filterMap);
     SmallVector<int64_t> kFilterPos =
-        getDimPositions(convolutionDims->filterLoop, filterMap);
+        getDimPositions(convolutionDims.filterLoop, filterMap);
     int64_t fPos = fFilterPos.back();
     int64_t cPos = cFilterPos.back();
 
     bool isChwf =
         (cPos < kFilterPos.front()) && (fPos == filterShape.size() - 1);
     bool isCfhw = (cPos < fFilterPos.front()) && (fPos < kFilterPos.front());
-    if (!isChwf && !isCfhw) {
+    bool isHwcf = (kFilterPos.back() < cPos) && (cPos < fPos);
+    if (!isChwf && !isCfhw && !isHwcf) {
       return failure();
     }
 
     // Don't transpose if it is a matmul and the input shape is small.
     // TODO(vivian): Solve the fusion of transpose op and remove this check.
     SmallVector<int64_t> imagePos =
-        getDimPositions(convolutionDims->outputImage, outputMap);
+        getDimPositions(convolutionDims.outputImage, outputMap);
     SmallVector<int64_t> batchPos =
-        getDimPositions(convolutionDims->batch, outputMap);
+        getDimPositions(convolutionDims.batch, outputMap);
     SmallVector<int64_t> mPos = imagePos;
     mPos.append(batchPos.begin(), batchPos.end());
 
@@ -246,11 +244,14 @@ struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
     SmallVector<utils::IteratorType> iterators =
         linalgOp.getIteratorTypesArray();
 
-    auto genericOp = linalg::GenericOp::create(
-        rewriter, loc, outputVal.getType(),
-        ValueRange{inputVal, barrierStartOp.getResult()}, outputVal,
-        ArrayRef<AffineMap>{inputMap, transposedFilterMap, outputMap},
-        iterators);
+    SmallVector<Value> newInputs = inputs;
+    newInputs[1] = barrierStartOp.getResult();
+    SmallVector<AffineMap> newMaps = indexingMaps;
+    newMaps[1] = transposedFilterMap;
+
+    auto genericOp =
+        linalg::GenericOp::create(rewriter, loc, outputVal.getType(), newInputs,
+                                  outputVal, newMaps, iterators);
 
     // Reuse the same payload as the original convolution op.
     rewriter.inlineRegionBefore(linalgOp->getRegion(0), genericOp.getRegion(),
@@ -261,10 +262,10 @@ struct ConvertGenericFilterToFhwc : OpRewritePattern<linalg::GenericOp> {
     unsigned numParallelLoop = genericOp.getNumParallelLoops();
     SmallVector<unsigned> interchange =
         llvm::to_vector(llvm::seq<unsigned>(0, numParallelLoop));
-    interchange.append(convolutionDims->filterLoop.begin(),
-                       convolutionDims->filterLoop.end());
-    interchange.append(convolutionDims->inputChannel.begin(),
-                       convolutionDims->inputChannel.end());
+    interchange.append(convolutionDims.filterLoop.begin(),
+                       convolutionDims.filterLoop.end());
+    interchange.append(convolutionDims.inputChannel.begin(),
+                       convolutionDims.inputChannel.end());
 
     FailureOr<linalg::GenericOp> reorderOp =
         linalg::interchangeGenericOp(rewriter, genericOp, interchange);

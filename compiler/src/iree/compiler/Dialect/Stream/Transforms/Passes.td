@@ -299,6 +299,19 @@ def RefineUsagePass :
   ];
 }
 
+def PlaceTransferExecutionsPass :
+    Pass<"iree-stream-place-transfer-executions", "mlir::ModuleOp"> {
+  let summary = "Materializes execution affinities for pinned transfers.";
+  let description = [{
+    Uses whole-program affinity analysis to place transfers producing pinned
+    resources on the device that owns the result when producer-side execution
+    would require the pinned allocation to be accessible from another device.
+  }];
+  let dependentDialects = [
+    "IREE::Stream::StreamDialect",
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // Stream formation and scheduling
 //===----------------------------------------------------------------------===//

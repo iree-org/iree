@@ -41,6 +41,7 @@ iree_cc_library(
     "PackDispatchOperands.cpp"
     "Passes.cpp"
     "Passes.h.inc"
+    "PlaceTransferExecutions.cpp"
     "PropagateTimepoints.cpp"
     "RefineUsage.cpp"
     "ReuseAllocations.cpp"

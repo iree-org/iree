@@ -60,6 +60,9 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
         options.includeF8E8M0 = true;
+        // The VM dialect has no maxnumf/minnumf equivalent, so these have to be
+        // expanded to cmp+select here.
+        options.includeMinMaxF = true;
         return arith::createArithExpandOpsPass(options);
       })
       .addPass(createConvertUnsupportedFloatArithPass)

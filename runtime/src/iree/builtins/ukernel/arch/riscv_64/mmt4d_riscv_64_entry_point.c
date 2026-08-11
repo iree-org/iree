@@ -44,6 +44,19 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
 #define IREE_UK_MMT4D_TILE_riscv_64_zvfh(lhs, rhs, out, m0, k0)
 #endif
 
+#ifdef IREE_UK_BUILD_RISCV_64_XSMTVDOT
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl256b(lhs, rhs, out, m0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _xsmtvdot_zvl256b)
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl1024b(lhs, rhs, out, m0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _xsmtvdot_zvl1024b)
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl4096b(lhs, rhs, out, m0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _xsmtvdot_zvl4096b)
+#else
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl256b(lhs, rhs, out, m0, k0)
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl1024b(lhs, rhs, out, m0, k0)
+#define IREE_UK_MMT4D_TILE_riscv_64_xsmtvdot_zvl4096b(lhs, rhs, out, m0, k0)
+#endif
+
 #ifdef IREE_UK_BUILD_RISCV_64_ZVFBFWMA
 #define IREE_UK_MMT4D_TILE_riscv_64_zvfbfwma(lhs, rhs, out, m0, k0) \
   IREE_UK_MMT4D_TILE_IMPL_riscv_64(lhs, rhs, out, m0, k0, _zvfbfwma)

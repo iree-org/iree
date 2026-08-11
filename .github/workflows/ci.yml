@@ -76,8 +76,8 @@ jobs:
     env:
       BUILD_DIR: build-runtime
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
 
@@ -132,7 +132,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -169,7 +169,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
@@ -216,7 +216,7 @@ jobs:
     env:
       BUILD_DIR: build-tracing
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: (Linux) Install requirements
         if: contains(matrix.runs-on, 'ubuntu')
@@ -325,12 +325,6 @@ jobs:
     uses: ./.github/workflows/ci_macos_arm64_clang.yml
     secrets: inherit
 
-  macos_x64_clang:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'macos_x64_clang')
-    uses: ./.github/workflows/ci_macos_x64_clang.yml
-    secrets: inherit
-
   windows_x64_msvc:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
@@ -362,7 +356,6 @@ jobs:
       - linux_x64_clang_tsan
       - linux_x64_clang_byollvm
       - macos_arm64_clang
-      - macos_x64_clang
       - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
     secrets: inherit

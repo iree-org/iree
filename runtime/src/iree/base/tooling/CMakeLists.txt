@@ -43,6 +43,7 @@ iree_lit_test_suite(
   TOOLS
     ::flags_demo
     FileCheck
+    not
   LABELS
     "hostonly"
 )

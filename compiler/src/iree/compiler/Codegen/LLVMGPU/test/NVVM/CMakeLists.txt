@@ -16,10 +16,12 @@ iree_lit_test_suite(
   SRCS
     "config_tile_and_fuse_sm120.mlir"
     "config_tile_and_fuse_sm80.mlir"
+    "config_tile_and_fuse_sm89.mlir"
     "config_vector_distribute_sm80.mlir"
     "pipeline_full_smoketests.mlir"
     "pipeline_tile_and_fuse_mma_sync.mlir"
     "pipeline_vector_distribute_mma_sync.mlir"
+    "pipeline_vector_distribute_paged_attention.mlir"
   TOOLS
     FileCheck
     iree-opt

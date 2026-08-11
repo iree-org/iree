@@ -2524,6 +2524,10 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     to a `local` lifetime) or different affinities. This is roughly equivalent
     to a cast but may have special semantics when later lowered to one or more
     devices with discrete memory spaces or pools.
+
+    The optional execution affinity specifies where the transfer must execute
+    independently of the source and target storage affinities. When omitted an
+    execution affinity is derived from the resource lifetimes and endpoints.
   }];
 
   let arguments = (ins
@@ -2534,7 +2538,8 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     Stream_Size:$source_size,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$target_affinity
+    OptionalAttr<Stream_AffinityAttr>:$target_affinity,
+    OptionalAttr<Stream_AffinityAttr>:$execution_affinity
   );
   let results = (outs
     AnyTypeOf<[
@@ -2544,6 +2549,7 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   );
 
   let assemblyFormat = [{
+    (`on` `(` $execution_affinity^ `)`)?
     $source `:` type($source)
     `` `{` $source_size `}`
     (`from` `(` $source_affinity^ `)`)?
@@ -2554,6 +2560,15 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
   }];
 
   let extraClassDeclaration = [{
+    static AsyncTransferOp create(OpBuilder &builder, Location location,
+                                  Type type, Value source, Value sourceSize,
+                                  Value resultSize, AffinityAttr sourceAffinity,
+                                  AffinityAttr targetAffinity);
+    static void build(OpBuilder &builder, OperationState &state, Type type,
+                      Value source, Value sourceSize, Value resultSize,
+                      AffinityAttr sourceAffinity,
+                      AffinityAttr targetAffinity);
+    AffinityAttr getDefaultExecutionAffinityAttr();
     Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return getResultSize(); }
   }];

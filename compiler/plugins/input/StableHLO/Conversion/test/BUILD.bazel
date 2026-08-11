@@ -22,6 +22,7 @@ iree_lit_test_suite(
             "legalize_chlo_decomposition.mlir",
             "legalize_chlo_no_broadcast.mlir",
             "legalize_chlo_with_broadcast.mlir",
+            "legalize_composite.mlir",
             "legalize_control_flow.mlir",
             "legalize_shape_computations.mlir",
             "stablehlo_custom_calls.mlir",

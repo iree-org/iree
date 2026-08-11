@@ -17,6 +17,13 @@ namespace mlir::iree_compiler::IREE::HAL {
 // Returns true if there are any external symbols in |module| with |prefix|.
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix);
 
+// Strips the per-function target attributes that clang embeds when compiling
+// a module. These make a function incompatible for inlining (even under
+// alwaysinline), so callers that force-inline bitcode need to strip those
+// first.
+void stripFunctionTargetAttrs(llvm::Function &func);
+void stripFunctionTargetAttrs(llvm::Module &module);
+
 // User callback to inject custom global values or functions into |module| prior
 // to linking.
 using ModuleSpecializationCallback = std::function<void(llvm::Module &module)>;

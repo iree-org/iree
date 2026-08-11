@@ -127,7 +127,6 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 DEFAULT_SCHEDULE_ONLY_JOBS = frozenset(
     [
         "macos_arm64_clang",
-        "macos_x64_clang",
         "linux_arm64_clang",
         "linux_x64_clang_byollvm",
         "linux_x64_clang_tsan",
@@ -175,10 +174,6 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     (
         "macos_arm64_clang",
         [".github/workflows/ci_macos_arm64_clang.yml"],
-    ),
-    (
-        "macos_x64_clang",
-        [".github/workflows/ci_macos_x64_clang.yml"],
     ),
     (
         "windows_x64_msvc",
@@ -490,8 +485,7 @@ def get_enabled_jobs(
                 f" '{Trailer.SKIP_JOBS}'"
             )
         print(
-            f"Skipping all jobs because PR description has"
-            f" '{Trailer.SKIP_CI}' trailer."
+            f"Skipping all jobs because PR description has '{Trailer.SKIP_CI}' trailer."
         )
         return set()
 

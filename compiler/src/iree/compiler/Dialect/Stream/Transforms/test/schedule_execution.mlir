@@ -628,3 +628,28 @@ util.func public @partitionMultipleAwaits(%await0: !stream.timepoint, %await1: !
   // CHECK-NEXT: util.return %[[READY]]
   util.return %dispatch : !stream.resource<transient>
 }
+
+// -----
+
+// Tests that an explicitly placed transfer is scheduled on its execution
+// affinity instead of being bundled with its producer.
+
+// CHECK-LABEL: @placedTransfer
+util.func public @placedTransfer(%arg0: !stream.resource<external>, %size: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+
+  // CHECK: %[[PRODUCED:.+]], %[[PRODUCED_TIMEPOINT:.+]] = stream.async.execute on(#hal.device.affinity<@device_b>)
+  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch
+  // CHECK: stream.yield %[[DISPATCH]]
+  %produced = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_b[%c1](%arg0[%c0 to %size for %size]) : (!stream.resource<external>{%size}) -> !stream.resource<transient>{%size}
+
+  // CHECK: %[[TRANSFERRED:.+]], %[[TRANSFER_TIMEPOINT:.+]] = stream.async.execute on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: await(%[[PRODUCED_TIMEPOINT]])
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer
+  // CHECK-NEXT: stream.yield %[[TRANSFER]]
+  %transferred = stream.async.transfer on(#hal.device.affinity<@device_a>) %produced : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%size}
+
+  // CHECK: stream.timepoint.await %[[TRANSFER_TIMEPOINT]] => %[[TRANSFERRED]]
+  util.return %transferred : !stream.resource<external>
+}

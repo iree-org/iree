@@ -25,7 +25,7 @@ jobs:
       BUILD_DIR: build-gcc
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
       - name: Install Python requirements
@@ -37,6 +37,8 @@ jobs:
           CMAKE_BUILD_TYPE: Release
           IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
           IREE_BUILD_SETUP_PYTHON_VENV: ${{ env.BUILD_DIR }}/.venv
+          # Prevent OOM, cap build parallelism to fit the standard 4-vCPU/16-GB hosted runner.
+          CMAKE_BUILD_PARALLEL_LEVEL: 4
         run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
 
       - name: Post to Discord on Failure

@@ -15,6 +15,7 @@
 #define IREE_UK_BUILD_RISCV_64_V
 #define IREE_UK_BUILD_RISCV_64_ZVFHMIN
 #define IREE_UK_BUILD_RISCV_64_ZVFH
+#define IREE_UK_BUILD_RISCV_64_XSMTVDOT
 #define IREE_UK_BUILD_RISCV_64_ZVFBFWMA
 #else
 // Compiling with the system toolchain. Include the configured header.
@@ -37,6 +38,32 @@ static inline bool iree_uk_cpu_riscv_64_zvfhmin(
 
 static inline bool iree_uk_cpu_riscv_64_zvfh(const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVFH);
+}
+
+static inline bool iree_uk_cpu_riscv_64_xsmtvdot(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_XSMTVDOT);
+}
+
+// IME tile shapes require a full vmadot operand panel in one vector register:
+// 12x16x8 needs VLEN>=256, 24x32x16 needs VLEN>=1024, 48x64x32 needs
+// VLEN>=4096.
+static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl256b(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_cpu_riscv_64_xsmtvdot(cpu_data) &&
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL256B);
+}
+
+static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl1024b(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_cpu_riscv_64_xsmtvdot(cpu_data) &&
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL1024B);
+}
+
+static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl4096b(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_cpu_riscv_64_xsmtvdot(cpu_data) &&
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL4096B);
 }
 
 static inline bool iree_uk_cpu_riscv_64_zvfbfwma(

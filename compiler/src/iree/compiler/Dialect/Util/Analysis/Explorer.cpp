@@ -1277,12 +1277,10 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn,
         result |= traverseReturnOp(ownerOp, use.getOperandNumber());
       }
 
-      if (ownerOp->hasTrait<OpTrait::ReturnLike>() &&
-          !isa<CallableOpInterface>(ownerOp->getParentOp())) {
-        auto parent = ownerOp->getParentOp();
-        auto result = parent->getResult(use.getOperandNumber());
-        worklist.insert(result);
-      }
+      // Note that we are not explicitly handling the case of a return op
+      // without a callable parent here since the above
+      // `traverseRegionBranchOp` already handled it (`ReturnLike` implies
+      // `RegionBranchTerminatorOpInterface`).
 
       // Step across global stores and into all of the loads across the program.
       if (auto storeOp =

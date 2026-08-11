@@ -42,5 +42,6 @@ iree_lit_test_suite(
     tools = [
         ":flags_demo",
         "@llvm-project//llvm:FileCheck",
+        "@llvm-project//llvm:not",
     ],
 )

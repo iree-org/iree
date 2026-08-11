@@ -86,7 +86,13 @@ void createTorchToIREEPipeline(
   // differently and would not be subject to inlining.
   pm.addPass(mlir::createInlinerPass());
 
-  pm.addPass(createFuncConversionPass({options.externalizeTransients}));
+  if (options.emitAsyncEntryPoints) {
+    pm.addPass(createFuncConversionPass({options.externalizeTransients}));
+  } else {
+    // Sync-only entry points (e.g. for the inline HAL). Externalized
+    // transients require the coarse-fences ABI and do not apply here.
+    pm.addPass(createSyncFuncConversionPass());
+  }
   pm.addNestedPass<IREE::Util::FuncOp>(createCanonicalizerPass());
   pm.addPass(createSymbolDCEPass());
 

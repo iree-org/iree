@@ -32,6 +32,7 @@ iree_cc_library(
     iree::builtins::ukernel::embed_ukernel_bitcode
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
   PUBLIC
 )
 

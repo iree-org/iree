@@ -45,6 +45,7 @@ iree_cc_library(
     "FuncConversion.cpp"
     "Passes.cpp"
     "SetStrictSymbolicShapes.cpp"
+    "SyncFuncConversion.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

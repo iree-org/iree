@@ -450,6 +450,22 @@ util.func private @IntermediateTransferElision(%source: !stream.resource<constan
 
 // -----
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @PreserveTransferExecutionAffinity
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @PreserveTransferExecutionAffinity(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  %transfer0 = stream.async.transfer %source : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_a>) !stream.resource<staging>{%size}
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>) %[[SOURCE]]
+  // CHECK-SAME: from(#hal.device.affinity<@device_b>)
+  // CHECK-SAME: to(#hal.device.affinity<@device_a>)
+  %transfer1 = stream.async.transfer on(#hal.device.affinity<@device_a>) %transfer0 : !stream.resource<staging>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%size}
+  util.return %transfer1 : !stream.resource<external>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldAsyncCastSameType
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
 util.func private @FoldAsyncCastSameType(%source: !stream.resource<external>, %size: index) -> !stream.resource<external> {
@@ -497,6 +513,22 @@ util.func private @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1:
   %1 = arith.bitcast %0 : i32 to f32
   // CHECK: util.return %[[F32]]
   util.return %1 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncCloneIntoLoad
+util.func private @FoldAsyncCloneIntoLoad(%arg0: !stream.resource<external>, %arg1: index, %arg2: index) -> f32 {
+  // CHECK-NOT: stream.async.clone
+  %0 = stream.async.clone %arg0 : !stream.resource<external>{%arg1} -> !stream.resource<*>{%arg1}
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%arg1} -> !stream.resource<staging>{%arg1}
+  // CHECK: %[[END:.+]] = arith.addi %arg2, %c4 : index
+  // CHECK: %[[SLICE:.+]] = stream.async.slice %arg0[%arg2 to %[[END]]] : !stream.resource<external>{%arg1} -> !stream.resource<external>{%c4}
+  // CHECK: %[[STAGED:.+]] = stream.async.transfer %[[SLICE]] : !stream.resource<external>{%c4} -> !stream.resource<staging>{%c4}
+  // CHECK: %[[VALUE:.+]] = stream.async.load %[[STAGED]][%c0] : !stream.resource<staging>{%c4} -> f32
+  %2 = stream.async.load %1[%arg2] : !stream.resource<staging>{%arg1} -> f32
+  // CHECK: util.return %[[VALUE]]
+  util.return %2 : f32
 }
 
 // -----
