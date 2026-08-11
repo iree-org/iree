@@ -89,6 +89,14 @@ bool hasAnyVFeature(DictionaryAttr targetConfig) {
          hasFeature(targetConfig, "+zve64d");
 }
 
+bool hasZfbfminFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+zfbfmin");
+}
+
+bool hasZvfbfminFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+zvfbfmin");
+}
+
 bool hasSMEFeature(DictionaryAttr targetConfig) {
   return hasFeature(targetConfig, "+sme");
 }
