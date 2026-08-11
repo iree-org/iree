@@ -921,3 +921,117 @@ util.func public @no_sink_unset_encoding_through_broadcast(%arg0: tensor<2x2xf32
 // CHECK:           %[[BCAST:.+]] = linalg.generic
 // CHECK-SAME:        ins(%[[UNSET]]
 // CHECK:           flow.return %[[BCAST]]
+
+
+// -----
+
+// Bubble a set_encoding through a dequant generic whose OUTPUT indexing map
+// is a non-identity permutation (e.g. a transpose fused into the producer by
+// elementwise fusion), with a broadcast operand alongside the bit-extended
+// one. Each operand's own indexing map is composed with the inverse of the
+// output permutation before being appended to the encoding's map chain, so
+// the composed maps checked below reflect that inversion, not the raw
+// output map.
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map5 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map3, #map4, #map5]>
+util.func public @bubble_through_dequant_and_transpose(
+    %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>) -> tensor<11008x2x128xf32, #encoding> {
+  %6 = flow.dispatch.region -> (tensor<11008x2x128xf32, #encoding>) {
+    %8 = tensor.empty() : tensor<11008x2x128xf32>
+    %11 = linalg.generic
+        {indexing_maps = [#map, #map1, #map1, #map2],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%arg0, %arg1, %arg2 : tensor<2x11008x128xi8>, tensor<2x11008xf32>, tensor<2x11008xf32>)
+        outs(%8 : tensor<11008x2x128xf32>) {
+    ^bb0(%in: i8, %in_0: f32, %in_1: f32, %out: f32):
+      %18 = arith.extui %in : i8 to i32
+      %19 = arith.uitofp %18 : i32 to f32
+      %20 = arith.subf %19, %in_1 : f32
+      %21 = arith.mulf %20, %in_0 : f32
+      linalg.yield %21 : f32
+    } -> tensor<11008x2x128xf32>
+    %13 = iree_encoding.set_encoding %11 : tensor<11008x2x128xf32> -> tensor<11008x2x128xf32, #encoding>
+    flow.return %13 : tensor<11008x2x128xf32, #encoding>
+  }
+  util.return %6 : tensor<11008x2x128xf32, #encoding>
+}
+
+// CHECK-DAG:   #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+// CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1, d0)>
+// CHECK-DAG:   #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG:   #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]]>
+// CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]]>
+// CHECK-LABEL: @bubble_through_dequant_and_transpose
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xi8>,
+// CHECK-SAME:    %[[ARG1:.+]]: tensor<2x11008xf32>, %[[ARG2:.+]]: tensor<2x11008xf32>
+// CHECK-DAG:   %[[SET_ENCODING0:.+]] = iree_encoding.set_encoding %[[ARG0]] : tensor<2x11008x128xi8> -> tensor<2x11008x128xi8, #[[$ENCODING_IBMAP]]>
+// CHECK-DAG:   %[[SET_ENCODING1:.+]] = iree_encoding.set_encoding %[[ARG1]] : tensor<2x11008xf32> -> tensor<2x11008xf32, #[[$ENCODING_BMAP]]>
+// CHECK-DAG:   %[[SET_ENCODING2:.+]] = iree_encoding.set_encoding %[[ARG2]] : tensor<2x11008xf32> -> tensor<2x11008xf32, #[[$ENCODING_BMAP]]>
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<11008x2x128xf32, #[[$ENCODING]]>
+// CHECK:         %[[DEQUANT:.+]] = linalg.generic {{.*}} ins(%[[SET_ENCODING0]], %[[SET_ENCODING1]], %[[SET_ENCODING2]] : {{.*}} outs(%[[INIT]] :
+// CHECK:         flow.return %[[DEQUANT]]
+// CHECK:       }
+// CHECK:       util.return %[[DISPATCH]]
+
+// -----
+
+// Same bubbling as above, but with an output permutation that is NOT its
+// own inverse (a 3-cycle, rather than a 2-element transpose). A 2-element
+// transpose is an involution, so composing an operand's map with the output
+// map itself vs. with its inverse produces the identical result -- that
+// case alone can't distinguish "correctly inverted" from "not inverted at
+// all". This one can: the composed map below (#map2) must equal the
+// permutation's inverse, not the permutation itself.
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32], user_indexing_maps = [#map2, #map3, #map2]>
+util.func public @bubble_through_non_involutive_permutation(
+    %arg0: tensor<2x11008x128xf16>) -> tensor<11008x128x2xf32, #encoding> {
+  %6 = flow.dispatch.region -> (tensor<11008x128x2xf32, #encoding>) {
+    %8 = tensor.empty() : tensor<11008x128x2xf32>
+    %11 = linalg.generic
+        {indexing_maps = [#map, #map1],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%arg0 : tensor<2x11008x128xf16>)
+        outs(%8 : tensor<11008x128x2xf32>) {
+    ^bb0(%in: f16, %out: f32):
+      %18 = arith.extf %in : f16 to f32
+      linalg.yield %18 : f32
+    } -> tensor<11008x128x2xf32>
+    %13 = iree_encoding.set_encoding %11 : tensor<11008x128x2xf32> -> tensor<11008x128x2xf32, #encoding>
+    flow.return %13 : tensor<11008x128x2xf32, #encoding>
+  }
+  util.return %6 : tensor<11008x128x2xf32, #encoding>
+}
+
+// CHECK-DAG:   #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+// CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+// CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
+// CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP]]]>
+// CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP2]]], #[[MAP]]]>
+// CHECK-LABEL: @bubble_through_non_involutive_permutation
+// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x11008x128xf16>
+// CHECK:       %[[SET_ENCODING0:.+]] = iree_encoding.set_encoding %[[ARG0]] : tensor<2x11008x128xf16> -> tensor<2x11008x128xf16, #[[$ENCODING_IBMAP]]>
+// CHECK:       %[[DISPATCH:.+]] = flow.dispatch.region
+// CHECK:         %[[INIT:.+]] = tensor.empty() : tensor<11008x128x2xf32, #[[$ENCODING]]>
+// CHECK:         %[[DEQUANT:.+]] = linalg.generic {{.*}} ins(%[[SET_ENCODING0]] : {{.*}} outs(%[[INIT]] :
+// CHECK:         flow.return %[[DEQUANT]]
+// CHECK:       }
+// CHECK:       util.return %[[DISPATCH]]
