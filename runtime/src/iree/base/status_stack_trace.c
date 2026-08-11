@@ -57,13 +57,20 @@ static iree_string_view_t iree_status_trim_file_path(const char* file_name) {
   return iree_make_string_view(file_name, file_name_length);
 }
 
+// Appends to |buffer| at offset |buffer_length| with snprintf-style semantics:
+// the returned length is always advanced by the length required for the entire
+// string even if the write was truncated (or |buffer_length| already exceeds
+// |buffer_capacity| from a previous truncated append), keeping the total
+// required length accounting intact while never writing out of bounds.
 static iree_host_size_t iree_string_buffer_append_cstr(
     iree_host_size_t buffer_capacity, char* buffer,
     iree_host_size_t buffer_length, const char* str) {
-  iree_host_size_t n =
-      iree_snprintf(buffer ? buffer + buffer_length : NULL,
-                    buffer ? buffer_capacity - buffer_length : 0, "%s", str);
-  return IREE_UNLIKELY(n < 0) ? 0 : buffer_length + n;
+  iree_host_size_t remaining = buffer && buffer_length < buffer_capacity
+                                   ? buffer_capacity - buffer_length
+                                   : 0;
+  int n = iree_snprintf(remaining ? buffer + buffer_length : NULL, remaining,
+                        "%s", str);
+  return IREE_UNLIKELY(n < 0) ? buffer_length : buffer_length + n;
 }
 
 static iree_host_size_t IREE_PRINTF_ATTRIBUTE(4, 5)
@@ -71,13 +78,15 @@ static iree_host_size_t IREE_PRINTF_ATTRIBUTE(4, 5)
                                      char* buffer,
                                      iree_host_size_t buffer_length,
                                      const char* format, ...) {
+  iree_host_size_t remaining = buffer && buffer_length < buffer_capacity
+                                   ? buffer_capacity - buffer_length
+                                   : 0;
   va_list varargs;
   va_start(varargs, format);
-  iree_host_size_t n = iree_vsnprintf(
-      buffer ? buffer + buffer_length : NULL,
-      buffer ? buffer_capacity - buffer_length : 0, format, varargs);
+  int n = iree_vsnprintf(remaining ? buffer + buffer_length : NULL, remaining,
+                         format, varargs);
   va_end(varargs);
-  return IREE_UNLIKELY(n < 0) ? 0 : buffer_length + n;
+  return IREE_UNLIKELY(n < 0) ? buffer_length : buffer_length + n;
 }
 
 #if defined(IREE_USE_LIBBACKTRACE)
@@ -457,16 +466,18 @@ static void iree_status_payload_stack_trace_formatter(
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_status_payload_stack_trace_t* payload =
       (iree_status_payload_stack_trace_t*)base_payload;
-  if (payload->frame_count - payload->skip_frames == 0) return;
+  *out_buffer_length = 0;
+  if (payload->frame_count <= payload->skip_frames) return;
   iree_host_size_t buffer_length =
       iree_string_buffer_append_cstr(buffer_capacity, buffer, 0, "stack:\n");
   for (iree_host_size_t i = payload->skip_frames + 1; i < payload->frame_count;
        ++i) {
+    iree_host_size_t frame_capacity = buffer && buffer_length < buffer_capacity
+                                          ? buffer_capacity - buffer_length
+                                          : 0;
     buffer_length += iree_status_payload_stack_trace_format_frame(
-        (void*)payload->addresses[i],
-        buffer ? buffer_capacity - buffer_length : 0,
-        buffer ? buffer + buffer_length : NULL);
-    if (buffer_length > buffer_capacity) buffer = NULL;
+        (void*)payload->addresses[i], frame_capacity,
+        frame_capacity ? buffer + buffer_length : NULL);
   }
   *out_buffer_length = buffer_length;
 }

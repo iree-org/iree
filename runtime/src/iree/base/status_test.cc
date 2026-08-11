@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstring>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -166,6 +167,50 @@ TEST(StatusFormatTo, CodeOnly) {
   EXPECT_THAT(cb_result, HasSubstr("INTERNAL"));
 }
 
+// Helper: formats |status| into buffers of every capacity in
+// [0, full_length + 2] and verifies snprintf-style semantics at each boundary:
+//   - |out_buffer_length| always reports the full required length.
+//   - The buffer holds a NUL-terminated prefix of the full string.
+//   - No bytes are written at or beyond the provided capacity.
+// Regression test for https://github.com/iree-org/iree/issues/16874.
+static void CheckFormatBoundaries(iree_status_t status) {
+  // Measure the full length (NULL buffer) and format the reference string.
+  iree_host_size_t full_length = 0;
+  ASSERT_TRUE(iree_status_format(status, 0, NULL, &full_length));
+  std::string full(full_length + 1, '\0');
+  iree_host_size_t verify_length = 0;
+  ASSERT_TRUE(iree_status_format(
+      status, full.size(), const_cast<char*>(full.data()), &verify_length));
+  ASSERT_EQ(verify_length, full_length);
+  full.resize(full_length);
+
+  constexpr char kGuard = '\xAB';
+  constexpr iree_host_size_t kGuardBytes = 8;
+  for (iree_host_size_t capacity = 0; capacity <= full_length + 2; ++capacity) {
+    // Guard bytes trailing the usable capacity detect out-of-bounds writes.
+    std::string buffer(capacity + kGuardBytes, kGuard);
+    iree_host_size_t out_length = 0;
+    ASSERT_TRUE(iree_status_format(
+        status, capacity, const_cast<char*>(buffer.data()), &out_length));
+    ASSERT_EQ(out_length, full_length) << "capacity=" << capacity;
+    ASSERT_EQ(buffer.substr(capacity), std::string(kGuardBytes, kGuard))
+        << "out-of-bounds write at capacity=" << capacity;
+    if (capacity == 0) continue;
+    const void* nul = memchr(buffer.data(), '\0', capacity);
+    ASSERT_NE(nul, nullptr) << "missing NUL at capacity=" << capacity;
+    iree_host_size_t written = (const char*)nul - buffer.data();
+    ASSERT_EQ(std::string(buffer.data(), written), full.substr(0, written))
+        << "not a prefix at capacity=" << capacity;
+    if (capacity > full_length) {
+      ASSERT_EQ(written, full_length) << "capacity=" << capacity;
+    }
+  }
+}
+
+TEST(StatusFormatBoundary, CodeOnly) {
+  CheckFormatBoundaries(iree_status_from_code(IREE_STATUS_DATA_LOSS));
+}
+
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
 
 TEST(StatusFormatTo, WithMessage) {
@@ -217,6 +262,22 @@ TEST(StatusFormatTo, WithMultipleAnnotations) {
   EXPECT_THAT(cb_result, HasSubstr("root cause"));
   EXPECT_THAT(cb_result, HasSubstr("layer 1: retry failed"));
   EXPECT_THAT(cb_result, HasSubstr("layer 2: attempt 3 of 3"));
+  iree_status_free(status);
+}
+
+TEST(StatusFormatBoundary, WithMessage) {
+  iree_status_t status = iree_status_allocate_f(
+      IREE_STATUS_INVALID_ARGUMENT, NULL, 0, "some message here %d", 42);
+  CheckFormatBoundaries(status);
+  iree_status_free(status);
+}
+
+TEST(StatusFormatBoundary, WithAnnotations) {
+  iree_status_t status =
+      iree_status_allocate_f(IREE_STATUS_NOT_FOUND, NULL, 0, "base message");
+  status = iree_status_annotate_f(status, "annotation one %s", "abc");
+  status = iree_status_annotate_f(status, "annotation two");
+  CheckFormatBoundaries(status);
   iree_status_free(status);
 }
 
