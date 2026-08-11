@@ -35,24 +35,24 @@ builtin.module {
 // Emulated: the add is performed in f32 on values reconstructed from i16
 // storage, and the result is rounded back with the shift/bias sequence.
 // COMMON-LABEL: llvm.func @bf16_add
-//      NATIVE:    llvm.load {{.*}} -> bf16
-//      NATIVE:    llvm.fpext {{.*}} : bf16 to f32
-//      NATIVE:    llvm.load {{.*}} -> bf16
-//      NATIVE:    llvm.fpext {{.*}} : bf16 to f32
-//    EMULATED:    llvm.load {{.*}} -> i16
-//    EMULATED:    llvm.zext {{.*}} : i16 to i32
-//    EMULATED:    llvm.shl
-//    EMULATED:    llvm.bitcast {{.*}} : i32 to f32
-//    EMULATED:    llvm.load {{.*}} -> i16
-//    EMULATED:    llvm.zext {{.*}} : i16 to i32
-//    EMULATED:    llvm.shl
-//    EMULATED:    llvm.bitcast {{.*}} : i32 to f32
-//      COMMON:    llvm.fadd {{.*}} : f32
-//      NATIVE:    llvm.fptrunc {{.*}} : f32 to bf16
-//      NATIVE:    llvm.store {{.*}} bf16
+//      NATIVE:    %[[LHS:.+]] = llvm.load {{.*}} -> bf16
+//      NATIVE:    %[[LHSF:.+]] = llvm.fpext %[[LHS]] : bf16 to f32
+//      NATIVE:    %[[RHS:.+]] = llvm.load {{.*}} -> bf16
+//      NATIVE:    %[[RHSF:.+]] = llvm.fpext %[[RHS]] : bf16 to f32
+//    EMULATED:    %[[LHS:.+]] = llvm.load {{.*}} -> i16
+//    EMULATED:    %[[LHSZ:.+]] = llvm.zext %[[LHS]] : i16 to i32
+//    EMULATED:    %[[LHSS:.+]] = llvm.shl %[[LHSZ]], {{.*}} : i32
+//    EMULATED:    %[[LHSF:.+]] = llvm.bitcast %[[LHSS]] : i32 to f32
+//    EMULATED:    %[[RHS:.+]] = llvm.load {{.*}} -> i16
+//    EMULATED:    %[[RHSZ:.+]] = llvm.zext %[[RHS]] : i16 to i32
+//    EMULATED:    %[[RHSS:.+]] = llvm.shl %[[RHSZ]], {{.*}} : i32
+//    EMULATED:    %[[RHSF:.+]] = llvm.bitcast %[[RHSS]] : i32 to f32
+//      COMMON:    %[[SUM:.+]] = llvm.fadd %[[LHSF]], %[[RHSF]] {{.*}} : f32
+//      NATIVE:    %[[RES:.+]] = llvm.fptrunc %[[SUM]] : f32 to bf16
+//      NATIVE:    llvm.store %[[RES]], {{.*}} : bf16
 //  NATIVE-NOT:    llvm.lshr
 //  NATIVE-NOT:    llvm.shl
-//    EMULATED:    llvm.fcmp "une"
+//    EMULATED:    llvm.fcmp "une" %[[SUM]], %[[SUM]]
 //    EMULATED:    llvm.lshr
 //    EMULATED:    llvm.store {{.*}} i16
 
@@ -86,11 +86,11 @@ builtin.module {
 // fptrunc (selectable as one narrowing convert) and stores bf16. Emulated: the
 // round-to-nearest-even shift/bias sequence, storing i16.
 // COMMON-LABEL: llvm.func @bf16_truncf
-//        COMMON:   llvm.load {{.*}} -> vector<{{[0-9]+}}xf32>
-//        NATIVE:   llvm.fptrunc {{.*}} : vector<{{[0-9]+}}xf32> to vector<{{[0-9]+}}xbf16>
-//        NATIVE:   llvm.store {{.*}} vector<{{[0-9]+}}xbf16>
+//        COMMON:   %[[IN:.+]] = llvm.load {{.*}} -> vector<{{[0-9]+}}xf32>
+//        NATIVE:   %[[RES:.+]] = llvm.fptrunc %[[IN]] : vector<{{[0-9]+}}xf32> to vector<{{[0-9]+}}xbf16>
+//        NATIVE:   llvm.store %[[RES]], {{.*}} : vector<{{[0-9]+}}xbf16>
 //    NATIVE-NOT:   llvm.lshr
 //  EMULATED-NOT:   llvm.fptrunc {{.*}} to vector<{{[0-9]+}}xbf16>
-//      EMULATED:   llvm.fcmp "une"
+//      EMULATED:   llvm.fcmp "une" %[[IN]], %[[IN]]
 //      EMULATED:   llvm.lshr
 //      EMULATED:   llvm.store {{.*}} vector<{{[0-9]+}}xi16>
