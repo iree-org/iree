@@ -101,6 +101,33 @@ iree_status_t iree_hal_vulkan_allocator_select_queue_alloca_plan(
     iree_hal_buffer_params_t* params, iree_device_size_t* allocation_size,
     iree_hal_vulkan_queue_alloca_plan_t* out_plan);
 
+// Selects the Vulkan memory type index that best satisfies |params|.
+//
+// Only memory types present in |allowed_memory_type_bits| (as populated by
+// VkMemoryRequirements::memoryTypeBits) are considered. On success |params| is
+// updated to parameters compatible with the selection: unsupported optional
+// mapping usage is stripped and the memory type is rewritten to the full flag
+// set the winning memory type provides. Returns false when no memory type
+// satisfies the parameters.
+//
+// Score ties are broken with the same priority heuristic used to choose the
+// default pool memory types so resolved placements always name a memory type
+// that has a backing pool. Exposed for testing; production code allocates
+// through the iree_hal_allocator_t interface instead.
+bool iree_hal_vulkan_allocator_select_memory_type(
+    const VkPhysicalDeviceMemoryProperties* memory_properties,
+    uint32_t allowed_memory_type_bits, iree_hal_buffer_params_t* params,
+    uint32_t* out_memory_type_index);
+
+// Returns the memory type index the default device pool is created from or
+// UINT32_MAX when the device reports no compatible memory type.
+//
+// Exposed for testing: device-optimal allocations resolved by
+// iree_hal_vulkan_allocator_select_memory_type must agree with this selection
+// or default-pool queue allocations cannot be satisfied.
+uint32_t iree_hal_vulkan_allocator_select_default_device_memory_type(
+    const VkPhysicalDeviceMemoryProperties* memory_properties);
+
 // Allocates a sparse buffer and returns queue-owned binds for queue_alloca.
 //
 // The returned buffer owns its VkBuffer and VkDeviceMemory blocks but the

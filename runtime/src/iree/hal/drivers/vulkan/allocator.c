@@ -437,6 +437,27 @@ static int32_t iree_hal_vulkan_allocator_memory_type_priority(
   return priority;
 }
 
+uint32_t iree_hal_vulkan_allocator_select_default_device_memory_type(
+    const VkPhysicalDeviceMemoryProperties* memory_properties) {
+  uint32_t best_index = UINT32_MAX;
+  int32_t best_priority = INT32_MIN;
+  for (uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i) {
+    const iree_hal_memory_type_t memory_type =
+        iree_hal_vulkan_memory_type_from_vk(
+            memory_properties->memoryTypes[i].propertyFlags);
+    if (!iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+      continue;
+    }
+    const int32_t priority =
+        iree_hal_vulkan_allocator_memory_type_priority(memory_type);
+    if (priority > best_priority) {
+      best_priority = priority;
+      best_index = i;
+    }
+  }
+  return best_index;
+}
+
 // Heap queries feed first-match consumers such as the caching allocator. Prefer
 // private device-local memory for common dispatches, then UMA/BAR memory, then
 // host-local staging/readback classes.
@@ -678,8 +699,9 @@ static iree_status_t iree_hal_vulkan_allocator_initialize_default_pools(
       &allocator->memory_properties2.memoryProperties;
   uint32_t selected_indices[3] = {0};
   iree_host_size_t selected_count = 0;
-  uint32_t best_device_index = UINT32_MAX;
-  int32_t best_device_priority = INT32_MIN;
+  const uint32_t best_device_index =
+      iree_hal_vulkan_allocator_select_default_device_memory_type(
+          memory_properties);
   uint32_t best_host_write_index = UINT32_MAX;
   int32_t best_host_write_priority = INT32_MIN;
   uint32_t best_host_cached_index = UINT32_MAX;
@@ -688,14 +710,6 @@ static iree_status_t iree_hal_vulkan_allocator_initialize_default_pools(
     const iree_hal_memory_type_t memory_type =
         iree_hal_vulkan_memory_type_from_vk(
             memory_properties->memoryTypes[i].propertyFlags);
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-      const int32_t priority =
-          iree_hal_vulkan_allocator_memory_type_priority(memory_type);
-      if (priority > best_device_priority) {
-        best_device_priority = priority;
-        best_device_index = i;
-      }
-    }
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       const int32_t priority =
           iree_hal_vulkan_allocator_host_write_memory_priority(memory_type);
@@ -887,29 +901,18 @@ static int iree_hal_vulkan_allocator_score_memory_type(
   return score;
 }
 
-static bool iree_hal_vulkan_allocator_resolve_memory_placement(
-    const iree_hal_vulkan_allocator_t* allocator,
+bool iree_hal_vulkan_allocator_select_memory_type(
+    const VkPhysicalDeviceMemoryProperties* memory_properties,
     uint32_t allowed_memory_type_bits, iree_hal_buffer_params_t* params,
-    iree_hal_vulkan_allocator_memory_placement_t* out_placement) {
-  memset(out_placement, 0, sizeof(*out_placement));
-  if (!iree_hal_vulkan_allocator_normalize_queue_affinity(allocator, params)) {
-    return false;
-  }
-  if (!iree_device_size_is_valid_alignment(params->min_alignment)) {
-    return false;
-  }
-
+    uint32_t* out_memory_type_index) {
   const iree_hal_memory_type_t required_type =
       params->type & ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
-  const VkPhysicalDeviceMemoryProperties* memory_properties =
-      &allocator->memory_properties2.memoryProperties;
 
   bool found = false;
   int best_score = 0;
   int32_t best_priority = INT32_MIN;
+  uint32_t best_index = 0;
   iree_hal_buffer_params_t best_params = *params;
-  iree_hal_vulkan_allocator_memory_placement_t best_placement;
-  memset(&best_placement, 0, sizeof(best_placement));
 
   for (uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i) {
     if (!iree_all_bits_set(allowed_memory_type_bits, 1u << i)) continue;
@@ -942,19 +945,47 @@ static bool iree_hal_vulkan_allocator_resolve_memory_placement(
       found = true;
       best_score = score;
       best_priority = priority;
+      best_index = i;
       best_params = candidate_params;
       best_params.type = memory_type;
-      best_placement = (iree_hal_vulkan_allocator_memory_placement_t){
-          .memory_type_index = i,
-          .memory_property_flags = vk_memory_type->propertyFlags,
-          .memory_type = memory_type,
-      };
     }
   }
 
   if (!found) return false;
   *params = best_params;
-  *out_placement = best_placement;
+  *out_memory_type_index = best_index;
+  return true;
+}
+
+static bool iree_hal_vulkan_allocator_resolve_memory_placement(
+    const iree_hal_vulkan_allocator_t* allocator,
+    uint32_t allowed_memory_type_bits, iree_hal_buffer_params_t* params,
+    iree_hal_vulkan_allocator_memory_placement_t* out_placement) {
+  memset(out_placement, 0, sizeof(*out_placement));
+  if (!iree_hal_vulkan_allocator_normalize_queue_affinity(allocator, params)) {
+    return false;
+  }
+  if (!iree_device_size_is_valid_alignment(params->min_alignment)) {
+    return false;
+  }
+
+  const VkPhysicalDeviceMemoryProperties* memory_properties =
+      &allocator->memory_properties2.memoryProperties;
+  uint32_t memory_type_index = 0;
+  if (!iree_hal_vulkan_allocator_select_memory_type(
+          memory_properties, allowed_memory_type_bits, params,
+          &memory_type_index)) {
+    return false;
+  }
+
+  // select_memory_type rewrote params->type to the full flag set of the
+  // winning memory type.
+  *out_placement = (iree_hal_vulkan_allocator_memory_placement_t){
+      .memory_type_index = memory_type_index,
+      .memory_property_flags =
+          memory_properties->memoryTypes[memory_type_index].propertyFlags,
+      .memory_type = params->type,
+  };
   return true;
 }
 
