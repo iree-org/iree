@@ -49,15 +49,15 @@ static uint32_t getSubnormalF32Bits(uint32_t mantissa,
   }
 
   uint32_t leadingBit = 0;
-  for (uint32_t value = mantissa; value > 1; value >>= 1) {
+  for (uint32_t value = mantissa; value > 1; value >>= 1u) {
     ++leadingBit;
   }
   int32_t exponent = 1 - static_cast<int32_t>(format.exponentBias) -
                      static_cast<int32_t>(format.mantissaBits) +
                      static_cast<int32_t>(leadingBit);
   uint32_t fraction =
-      (mantissa - (1u << leadingBit)) << (23 - leadingBit);
-  return (static_cast<uint32_t>(exponent + 127) << 23) | fraction;
+      (mantissa - (1u << leadingBit)) << (23u - leadingBit);
+  return (static_cast<uint32_t>(exponent + 127) << 23u) | fraction;
 }
 
 static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
