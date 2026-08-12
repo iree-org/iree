@@ -172,6 +172,160 @@ util.func public @drop_unused_dispatch_region_result(
 
 // -----
 
+// CHECK-LABEL: util.func public @keep_required_sort_carrier
+util.func public @keep_required_sort_carrier(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    // CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %[[SORT]]#1, %[[SORT]]#0 : tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#1, %sorted#0 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0 : tensor<4xi64>
+  util.return %result#0 : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_required_sort_carrier_when_base_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<4xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_required_sort_carrier_when_base_live(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<4xi64>) {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %[[KEYS]]
+  util.return %result#1, %keys : tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_required_sort_carrier_when_alias_live
+//  CHECK-SAME: (%[[KEYS:.+]]: tensor<4xi64>, %[[INDICES:.+]]: tensor<4xi64>)
+util.func public @drop_required_sort_carrier_when_alias_live(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1 : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %[[KEY_VIEW:.+]]
+  util.return %result#1, %key_view : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_required_carriers_with_dead_owner
+util.func public @drop_required_carriers_with_dead_owner(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  // CHECK-NOT: iree_linalg_ext.sort
+  %result:3 = flow.dispatch.region ->
+      (tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}} : tensor<4xi64>
+    flow.return %sorted#0, %sorted#1, %indices
+        : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<4xi64>
+  util.return %result#2 : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_generic_dps_sibling
+util.func public @drop_generic_dps_sibling(
+    %first: tensor<4xi64>, %second: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %generic:2 = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        outs(%first, %second : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64):
+      %sum = arith.addi %lhs, %rhs : i64
+      %difference = arith.subi %sum, %rhs : i64
+      linalg.yield %sum, %difference : i64, i64
+    } -> (tensor<4xi64>, tensor<4xi64>)
+    // CHECK: flow.return %{{.+}} : tensor<4xi64>
+    flow.return %generic#0, %generic#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<4xi64>
+  util.return %result#1 : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @keep_required_sort_carrier_with_live_same_base
+util.func public @keep_required_sort_carrier_with_live_same_base(
+    %storage: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%storage, %storage : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_value: i64, %rhs_value: i64, %lhs_key: i64, %rhs_key: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %[[SORTED:.+]]#0, %[[SORTED]]#1 : tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0 : tensor<4xi64>
+  util.return %result#0 : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_external_sort_carrier
+util.func public @drop_external_sort_carrier(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<4xi64>) {
+  %sorted:2 = iree_linalg_ext.sort dimension(0)
+      outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+  ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+    %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+    iree_linalg_ext.yield %take_lhs : i1
+  } -> tensor<4xi64>, tensor<4xi64>
+  // CHECK: %[[FORWARDED:.+]] = flow.dispatch.region -> (tensor<4xi64>) {
+  %forwarded:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    // CHECK: flow.return %{{.+}} : tensor<4xi64>
+    flow.return %sorted#0, %indices : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %{{.+}}, %[[FORWARDED]] : tensor<4xi64>, tensor<4xi64>
+  util.return %sorted#0, %forwarded#1 : tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @remove_redundant_results
 //  CHECK-SAME: (%[[ARG0:.+]]: tensor<?xf32>)
 util.func @remove_redundant_results(%arg0 : tensor<?xf32>) -> (tensor<?xf32>, tensor<?xf32>) {

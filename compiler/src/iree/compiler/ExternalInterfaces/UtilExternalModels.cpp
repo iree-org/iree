@@ -643,6 +643,13 @@ struct LinalgOpTiedOpInterface
         linalgOp.getDpsInits()[resultIndex]);
   }
 
+  bool isTiedResultRequired(Operation *op, unsigned resultIndex) const {
+    if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(op)) {
+      return sortOp.isResultUsedInComparator(resultIndex);
+    }
+    return false;
+  }
+
   ::std::optional<unsigned>
   getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
