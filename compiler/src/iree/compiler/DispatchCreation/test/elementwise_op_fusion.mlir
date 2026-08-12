@@ -625,6 +625,42 @@ util.func public @gather_0d_producer(%arg0 : tensor<f16>, %arg1 : tensor<100xind
 
 // -----
 
+util.func public @gather_scalar_producer_operand(%arg0 : tensor<256xi8>, %arg1 : f32, %arg2 : tensor<100xindex>) -> (tensor<100xf32>) {
+  %empty0 = tensor.empty() : tensor<256xf32>
+  %0 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg0, %arg1 : tensor<256xi8>, f32) outs(%empty0 : tensor<256xf32>) {
+  ^bb0(%in: i8, %in0 : f32, %out: f32):
+    %0 = arith.extsi %in : i8 to i32
+    %1 = arith.sitofp %0 : i32 to f32
+    %2 = arith.mulf %1, %in0 : f32
+    linalg.yield %2 : f32
+  } -> tensor<256xf32>
+  %empty1 = tensor.empty() : tensor<100xf32>
+  %gather = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg2: tensor<100xindex>) outs(%empty1 : tensor<100xf32>) {
+  ^bb0(%in: index, %out: f32):
+    %1 = tensor.extract %0[%in] : tensor<256xf32>
+    linalg.yield %1 : f32
+  } -> tensor<100xf32>
+  util.return %gather : tensor<100xf32>
+}
+// A scalar operand is invariant over the iteration space, so it has no index to
+// permute and nothing to extract: the fused body reads the value itself. Bit
+// width classification ignores non-tensor inputs, so a producer that qualifies
+// for this fusion can have them.
+// CHECK-LABEL: util.func public @gather_scalar_producer_operand(
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<256xi8>
+//  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: f32
+//  CHECK-SAME:   %[[ARG2:[A-Za-z0-9]+]]: tensor<100xindex>
+//       CHECK:   %[[GATHER:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[ARG2]] : tensor<100xindex>
+//  CHECK-NEXT:     ^bb0(%[[IN:.+]]: index
+//       CHECK:     %[[EXTRACT:.+]] = tensor.extract %[[ARG0]][%[[IN]]]
+//       CHECK:     %[[EXT:.+]] = arith.extsi %[[EXTRACT]]
+//       CHECK:     %[[FP:.+]] = arith.sitofp %[[EXT]]
+//       CHECK:     arith.mulf %[[FP]], %[[ARG1]]
+//       CHECK:   return %[[GATHER]]
+
+// -----
+
 util.func public @gather_replace_linalg_index(%arg0 : tensor<256x256xf16>, %arg1 : tensor<100xindex>) -> (tensor<100xf32>) {
   %empty0 = tensor.empty() : tensor<256x256xf32>
   %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<256x256xf16>) outs(%empty0 : tensor<256x256xf32>) {
