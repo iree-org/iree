@@ -641,6 +641,7 @@ VER_0 {
     mlirLLVMDICompileUnitAttrGet;
     mlirLLVMDICompileUnitAttrGetName;
     mlirLLVMDICompileUnitAttrGetRecSelf;
+    mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect;
     mlirLLVMDICompositeTypeAttrGet;
     mlirLLVMDICompositeTypeAttrGetName;
     mlirLLVMDICompositeTypeAttrGetRecSelf;
