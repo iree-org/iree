@@ -604,6 +604,75 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   return success();
 }
 
+// Returns true if the value or one of its tied aliases is used after the
+// dispatch.
+static bool hasUseAfterDispatch(Flow::DispatchRegionOp regionOp, Value value) {
+  Block *dispatchBlock = regionOp->getBlock();
+  llvm::SetVector<Value> tiedValues;
+  tiedValues.insert(value);
+  for (unsigned i = 0; i < tiedValues.size(); ++i) {
+    for (OpOperand &use : tiedValues[i].getUses()) {
+      Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+      if (!user || (user != regionOp && regionOp->isBeforeInBlock(user))) {
+        return true;
+      }
+      if (user == regionOp) {
+        continue;
+      }
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+        for (Value result :
+             tiedOp.getOperandTiedResults(use.getOperandNumber())) {
+          tiedValues.insert(result);
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Returns the storage base for a required result when preserving the result can
+// form a direct, type-compatible tie to storage outside the dispatch and no
+// later use requires the original value.
+static Value getRequiredExternalTiedResultBase(Flow::DispatchRegionOp regionOp,
+                                               Value value) {
+  auto result = dyn_cast<OpResult>(value);
+  if (!result || !regionOp->isProperAncestor(result.getOwner())) {
+    return {};
+  }
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
+  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
+    return {};
+  }
+  Value tiedOperand = tiedOp.getTiedResultOperand(result);
+  Value tiedBase = tiedOp.getTiedResult(result.getResultNumber());
+  if (!tiedOperand || tiedOperand != tiedBase ||
+      tiedOperand.getType() != result.getType()) {
+    return {};
+  }
+  Region *baseRegion = tiedBase.getParentRegion();
+  Operation *baseParentOp = baseRegion ? baseRegion->getParentOp() : nullptr;
+  if (!baseParentOp || regionOp->isAncestor(baseParentOp) ||
+      hasUseAfterDispatch(regionOp, tiedBase)) {
+    return {};
+  }
+  return tiedBase;
+}
+
+// Returns true when an operation remains live without counting unused values
+// yielded solely to carry its required ties.
+static bool hasLiveOwnerResultUse(Flow::DispatchRegionOp regionOp,
+                                  Flow::ReturnOp returnOp, Operation *owner) {
+  for (Value result : owner->getResults()) {
+    for (OpOperand &use : result.getUses()) {
+      if (use.getOwner() != returnOp ||
+          !regionOp->getResult(use.getOperandNumber()).use_empty()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
 /// if the IR was modified.
 bool dropUnusedAndRedundantDispatchRegionResults(
@@ -627,11 +696,32 @@ bool dropUnusedAndRedundantDispatchRegionResults(
 
   auto returnOp =
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  llvm::SetVector<Value> preservedTiedBases;
+  llvm::SmallDenseMap<Operation *, bool> liveOwnerResultUses;
+
   for (const auto &[index, value] : llvm::enumerate(regionOp.getResults())) {
     Type type = value.getType();
     auto shapedType = dyn_cast<ShapedType>(type);
     OpOperand &yieldedVal = returnOp->getOpOperand(index);
+    bool preserveRequiredTie = false;
     if (value.use_empty()) {
+      Value tiedBase =
+          getRequiredExternalTiedResultBase(regionOp, yieldedVal.get());
+      // Required carriers model an operation result, so base liveness must not
+      // keep an otherwise dead owner alive.
+      if (tiedBase && !preservedTiedBases.contains(tiedBase)) {
+        Operation *owner = yieldedVal.get().getDefiningOp();
+        auto [it, inserted] = liveOwnerResultUses.try_emplace(owner, false);
+        if (inserted) {
+          it->second = hasLiveOwnerResultUse(regionOp, returnOp, owner);
+        }
+        preserveRequiredTie = it->second;
+      }
+      if (preserveRequiredTie) {
+        preservedTiedBases.insert(tiedBase);
+      }
+    }
+    if (value.use_empty() && !preserveRequiredTie) {
       droppedResultValues[value] = std::nullopt;
     } else if (yieldedResultsSet.contains(yieldedVal.get())) {
       droppedResultValues[value] = yieldedVal.getOperandNumber();
