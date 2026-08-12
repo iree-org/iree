@@ -1693,6 +1693,9 @@ class IREELinalgExt_AffineQuantizationOp<string mnemonic, list<Trait> traits = [
           ["reifyResultShapes"]>,
         DeclareOpInterfaceMethods<AggregatedOpInterface,
           ["decomposeOperation"]>])> {
+
+  let hasCanonicalizer = 1;
+
   code extraAffineQuantizationOpClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     // Disambiguates the `getIndexingMapsArray` provided by both
     // LinalgFusionInterface and IndexingMapOpInterface.
