@@ -385,7 +385,7 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+        "//compiler/src/iree/compiler/API:SharedImpl",
     ],
 )
 
@@ -396,7 +396,7 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+        "//compiler/src/iree/compiler/API:SharedImpl",
     ],
 )
 
@@ -407,6 +407,6 @@ cc_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:SharedUnshieldedImpl",
+        "//compiler/src/iree/compiler/API:SharedImpl",
     ],
 )

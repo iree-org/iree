@@ -140,6 +140,10 @@ set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
+option(IREE_COMPILER_DYNAMIC_PLUGINS "Builds libIREECompiler with a renamed, exported LLVM/MLIR ABI so dynamically loaded compiler plugins can resolve compiler symbols" OFF)
+if(IREE_COMPILER_DYNAMIC_PLUGINS AND WIN32)
+  message(FATAL_ERROR "IREE_COMPILER_DYNAMIC_PLUGINS is not supported on Windows")
+endif()
 
 #-------------------------------------------------------------------------------
 # Custom runtime allocator configuration

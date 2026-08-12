@@ -21,6 +21,14 @@ else()
   set(IREE_COMPILER_DYLIB_INSTALL_PREFIX "lib/")
 endif()
 
+# Dynamic plugins resolve compiler C++ symbols from libIREECompiler by name;
+# hidden visibility would strip those symbols before the linker ever sees
+# them, and no link-time option can bring them back. Scoped to this directory
+# so the runtime keeps hidden visibility.
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+  list(REMOVE_ITEM IREE_DEFAULT_COPTS "-fvisibility=hidden")
+endif()
+
 # Always build the C bindings, since the API is available apart from
 # actually building the compiler.
 add_subdirectory(bindings/c)

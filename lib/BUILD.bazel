@@ -5,6 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary")
+load(
+    "//build_tools/bazel:renamed_link.bzl",
+    "iree_renamed_compiler_abi",
+    "renamed_cc_info",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,104 +17,87 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Linker scripts that hide the bundled runtime's `iree_*` C-API from the
+# compiler shared library's exports (see IREECompiler below for why).
+exports_files([
+    "hide_iree_runtime_capi.ld",
+    "hide_iree_runtime_capi.macos.txt",
+])
+
+# The IREE compiler shared library. Bazel prefixes "lib" to
+# cc_binary(linkshared=1) outputs, so naming this "IREECompiler" produces
+# "libIREECompiler.{dylib,so}" as intended.
+#
+# It co-resides safely with another bundled LLVM/MLIR in the same process
+# (e.g. TensorFlow's) while exporting the renamed compiler internals used by
+# dynamic plugins. Every llvm/mlir C++ symbol in the StaticImpl closure is
+# renamed by inserting the Itanium component `6IREE18` (`_ZN4mlir...` ->
+# `_ZN6IREE184mlir...`, demangling as `IREE18::mlir::...`) before link, so the
+# names cannot collide with a foreign copy or weak-coalesce with it on macOS.
+#
+# The bundled runtime's `extern "C"` C-API (iree_hal_*, iree_vm_*, ...) is
+# hidden from the dynamic export table. The symbol rename only covers mangled
+# llvm/mlir C++ names; plain C exports keep their ABI spelling and are better
+# controlled with linker export lists. The compiler C-API (camelCase
+# ireeCompiler*/mlir*) and the renamed C++ internals (_ZN6IREE18*/_Z6IREE18*)
+# do not match `iree_*`, so plugins and embedders are unaffected.
 iree_compiler_cc_binary(
-    name = "libIREECompiler",
+    name = "IREECompiler",
     srcs = [
         "//compiler/src/iree/compiler/API:api_exports.c",
     ],
     additional_linker_inputs = select({
-        "//conditions:default": [
-            "//compiler/src/iree/compiler/API:api_exports.ld",
-        ],
-        "@platforms//os:macos": [
-            "//compiler/src/iree/compiler/API:api_exports.macos.lst",
-        ],
+        "//conditions:default": [":hide_iree_runtime_capi.ld"],
+        "@platforms//os:macos": [":hide_iree_runtime_capi.macos.txt"],
     }),
     linkopts = select({
         "//conditions:default": [
-            "-Wl,--version-script=$(location //compiler/src/iree/compiler/API:api_exports.ld)",
             "-Wl,--no-undefined",
+            "-Wl,--version-script=$(location :hide_iree_runtime_capi.ld)",
         ],
         "@platforms//os:macos": [
-            "-Wl,-exported_symbols_list,$(location //compiler/src/iree/compiler/API:api_exports.macos.lst)",
             "-Wl,-install_name,@rpath/libIREECompiler.dylib",
+            "-Wl,-unexported_symbols_list,$(location :hide_iree_runtime_capi.macos.txt)",
         ],
     }),
     linkshared = 1,
+    tags = ["skip-bazel_to_cmake"],
     deps = [
+        ":IREEStaticImplRenamed",
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:StaticImpl",
     ],
 )
 
-# We need to have a duplicate of the library without the symbols restricted to
-# enable the plugin mechanism to work (it needs to be able to look up symbols by
-# name). This is unfortunate but necessary since we can not expose all symbols
-# when loading the shared library into a python process as it conflicts
-# with other libraries also using LLVM (e.g. from tensorflow) which do not
-# have the symbols hidden.
-iree_compiler_cc_binary(
-    name = "libIREECompilerUnshielded",
-    srcs = [
-        "//compiler/src/iree/compiler/API:api_exports.c",
-    ],
-    linkopts = select({
-        "//conditions:default": [
-            "-Wl,--no-undefined",
-        ],
-        "@platforms//os:macos": [
-            "-Wl,-install_name,@rpath/libIREECompilerUnshielded.dylib",
-        ],
-    }),
-    linkshared = 1,
-    deps = [
-        "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:StaticImpl",
-    ],
+# Rename the StaticImpl CcInfo directly and let the final compiler dylib
+# consume the same linker-input shape a normal Bazel C++ link would see.
+renamed_cc_info(
+    name = "IREEStaticImplRenamed",
+    include_provided = True,
+    tags = ["skip-bazel_to_cmake"],
+    deps = ["//compiler/src/iree/compiler/API:StaticImpl"],
 )
 
-# Post-build genrule to add .dylib suffix on macOS
-genrule(
-    name = "libIREECompiler_dylib",
-    srcs = [":libIREECompiler"],
-    outs = ["libIREECompiler.dylib"],
-    cmd = "cp $< $@",
-    target_compatible_with = [
-        "@platforms//os:macos",
-    ],
-    visibility = ["//visibility:public"],
+# Entry point for out-of-tree plugin builds: carries the renamed shared
+# library plus the ABI prefix plugins must rename their own archives with.
+iree_renamed_compiler_abi(
+    name = "IREECompilerShared",
+    shared_library = ":IREECompiler",
+    symbol_prefix = "IREE18",
+    tags = ["skip-bazel_to_cmake"],
 )
 
-genrule(
-    name = "libIREECompilerUnshielded_dylib",
-    srcs = [":libIREECompilerUnshielded"],
-    outs = ["libIREECompilerUnshielded.dylib"],
-    cmd = "cp $< $@",
-    target_compatible_with = [
-        "@platforms//os:macos",
+# Enforces the export invariants the version script / unexported-symbols list
+# rely on. See exported_symbols_test.py for the invariants.
+py_test(
+    name = "exported_symbols_test",
+    srcs = ["exported_symbols_test.py"],
+    args = [
+        "--nm=$(location @llvm-project//llvm:llvm-nm)",
+        "--library=$(location :IREECompiler)",
     ],
-    visibility = ["//visibility:public"],
-)
-
-# Post-build genrule to add .so suffix on Linux
-genrule(
-    name = "libIREECompiler_so",
-    srcs = [":libIREECompiler"],
-    outs = ["libIREECompiler.so"],
-    cmd = "cp $< $@",
-    target_compatible_with = [
-        "@platforms//os:linux",
+    data = [
+        ":IREECompiler",
+        "@llvm-project//llvm:llvm-nm",
     ],
-    visibility = ["//visibility:public"],
-)
-
-genrule(
-    name = "libIREECompilerUnshielded_so",
-    srcs = [":libIREECompilerUnshielded"],
-    outs = ["libIREECompilerUnshielded.so"],
-    cmd = "cp $< $@",
-    target_compatible_with = [
-        "@platforms//os:linux",
-    ],
-    visibility = ["//visibility:public"],
+    tags = ["skip-bazel_to_cmake"],
 )

@@ -1,0 +1,13 @@
+# -unexported_symbols_list for libIREECompiler (macOS/Mach-O).
+#
+# See hide_iree_runtime_capi.ld for the full rationale: the compiler lib
+# bundles the IREE runtime C-API (iree_hal_*, iree_vm_*, ...) under its real
+# names (the rename only touches mangled llvm/mlir C++ symbols), and that
+# collides with a co-resident iree.runtime (_runtime.so) when both load in one
+# process.
+#
+# Mach-O C symbols carry a leading underscore, so the snake_case runtime C-API
+# is `_iree_*`. The compiler embedding C-API (_ireeCompiler*, _mlir*) and the
+# renamed C++ internals (__ZN6IREE18*, __Z6IREE18*) do not match and remain
+# exported. lib/exported_symbols_test.py enforces this split.
+_iree_*
