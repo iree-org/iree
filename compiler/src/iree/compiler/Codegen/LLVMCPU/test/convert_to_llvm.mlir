@@ -34,23 +34,24 @@ module {
 //      CHECK: llvm.func @bar
 //  CHECK-DAG:   %[[Ci32:.+]] = llvm.mlir.constant(42 : i32) : i32
 //  CHECK-DAG:   %[[Cf64:.+]] = llvm.mlir.constant(4.200000e+01 : f64) : f64
-//  CHECK-DAG:   %[[ALLOCA:.+]] = llvm.alloca
-//  CHECK-DAG:   %[[DATA:.+]] = llvm.getelementptr inbounds %arg0[4]
+//  CHECK-DAG:   %[[CPU_DATA:.+]] = llvm.alloca %{{.+}} x i64
+//  CHECK-DAG:   %[[ALLOCA:.+]] = llvm.alloca %{{.+}} x f32
 //  CHECK-DAG:   %[[PROCESSOR_INFO:.+]] = llvm.load %arg2
 //      CHECK:   %[[PROCESSOR_ID:.+]] = llvm.extractvalue %[[PROCESSOR_INFO]][4]
+// With no executable target the feature bitmask is zero; the ukernel receives a
+// cpu_data stack buffer (field 0 constant, fields 1..N from the runtime data).
 //      CHECK: %[[VAL:.+]] = llvm.call @default_cconv_with_extra_fields
-// CHECK-SAME: (%[[ALLOCA]], %[[Ci32]], %[[Cf64]], %[[DATA]], %[[PROCESSOR_ID]])
+// CHECK-SAME: (%[[ALLOCA]], %[[Ci32]], %[[Cf64]], %[[CPU_DATA]], %[[PROCESSOR_ID]])
 
 // -----
 
 // Regression test for #24744: a `hal.import.bitcode` call requesting
-// "processor_data" (e.g. a ukernel call) gets a local `i64` buffer allocated
-// to patch in statically-known CPU-feature bits. If that alloca were built at the call
-// site instead of the function entry block, it would re-execute on every
-// loop iteration without ever popping the stack back off, overflowing it for
-// large iteration counts. So the alloca must be in the entry block and must not
-// reappear in the loop body, the cpu feature patching itself should be in the loop body
-// next to the call.
+// "processor_data" (e.g. a ukernel call) receives a stack buffer holding
+// cpu_data. The buffer's alloca sits in the function entry block so a single
+// stack slot serves all iterations of an enclosing loop; an alloca at the call
+// site would grow the stack across iterations and overflow it for large trip
+// counts. The values are written in the loop body: field 0 is the compile-time
+// feature constant and fields 1..N are copied from the runtime processor data.
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+dotprod", target_triple = "aarch64-none-elf"}>
 module {
   func.func private @default_cconv_with_extra_fields_in_loop(memref<f32>, i32, f64) -> (f32) attributes {
@@ -72,26 +73,31 @@ module {
     return
   }
 }
-//       CHECK: llvm.func @loop_caller(%[[ARG0:.+]]: {{.*}}llvm.ptr{{.*}}, %[[ARG1:.+]]: {{.*}}llvm.ptr{{.*}}, %[[ARG2:.+]]: {{.*}}llvm.ptr{{.*}})
-// Entry block: only the patch buffer's stack slot is reserved here, once.
+//       CHECK: llvm.func @loop_caller(%[[ENV:[^:]+]]:
+// Entry block: field 0 is a compile-time constant (`+dotprod` == 4096) and the
+// cpu_data buffer's stack slot is reserved here, once.
 //   CHECK-NOT:   ^{{.+}}:
-//       CHECK:   %[[PATCHED_DATA:.+]] = llvm.alloca %{{.+}} x i64
+//       CHECK:   %[[FIELD0:.+]] = llvm.mlir.constant(4096 : i64)
+//   CHECK-NOT:   ^{{.+}}:
+//       CHECK:   %[[CPU_DATA:.+]] = llvm.alloca %{{.+}} x i64
 //   CHECK-NOT:   ^{{.+}}:
 //       CHECK:   llvm.br ^[[HEADER:.+]](
 // Loop header: just the trip-count check.
 //       CHECK: ^[[HEADER]]
 //       CHECK:   llvm.cond_br %{{.+}}, ^[[BODY:.+]], ^[[EXIT:.+]]
-// Loop body: no fresh alloca; the compile-time cpu features are patched onto the target
-// environment here in the loop body, storing into the entry-block buffer right before the call.
+// Loop body: no fresh alloca. Field 0 stores the constant bitmask; fields 1..N
+// are copied from the runtime processor data. No `or`.
 //       CHECK: ^[[BODY]]
 //   CHECK-NOT:   llvm.alloca
-//       CHECK:   %[[ENV_DATA:.+]] = llvm.getelementptr inbounds %[[ARG0]]
-//       CHECK:   %[[SRC0:.+]] = llvm.load %[[ENV_DATA]]
-//       CHECK:   %[[PATCHED0:.+]] = llvm.or %[[SRC0]], %{{.+}}
-//       CHECK:   llvm.store %[[PATCHED0]], %[[PATCHED_DATA]]
-//   CHECK-NOT:   llvm.alloca
+//   CHECK-NOT:   llvm.or
+//       CHECK:   %[[PROC:.+]] = llvm.getelementptr inbounds %[[ENV]][4]
+//       CHECK:   llvm.store %[[FIELD0]], %[[CPU_DATA]]
+//       CHECK:   %[[SRC1:.+]] = llvm.getelementptr inbounds %[[PROC]][1]
+//       CHECK:   %[[VAL1:.+]] = llvm.load %[[SRC1]]
+//       CHECK:   %[[DST1:.+]] = llvm.getelementptr inbounds %[[CPU_DATA]][1]
+//       CHECK:   llvm.store %[[VAL1]], %[[DST1]]
 //       CHECK:   llvm.call @default_cconv_with_extra_fields_in_loop
-//  CHECK-SAME:       %[[PATCHED_DATA]]
+//  CHECK-SAME:       %[[CPU_DATA]]
 //       CHECK:   llvm.br ^[[HEADER]]
 // Loop exit.
 //       CHECK: ^[[EXIT]]
