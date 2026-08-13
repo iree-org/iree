@@ -605,20 +605,48 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
 }
 
 // Returns true if the value or one of its tied aliases is used after the
-// dispatch.
-static bool hasUseAfterDispatch(Flow::DispatchRegionOp regionOp, Value value) {
+// dispatch. The owner of the required result is ignored: its result liveness
+// is handled separately by hasLiveOwnerResultUse.
+static bool hasUseAfterDispatch(
+    Flow::DispatchRegionOp regionOp, Value value, Operation *ignoredOwner,
+    llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>> &cache) {
+  auto &ownerCache = cache[value];
+  if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
+    return it->second;
+  }
+  auto cacheResult = [&](bool result) {
+    ownerCache[ignoredOwner] = result;
+    return result;
+  };
+
   Block *dispatchBlock = regionOp->getBlock();
   llvm::SetVector<Value> tiedValues;
   tiedValues.insert(value);
   for (unsigned i = 0; i < tiedValues.size(); ++i) {
     for (OpOperand &use : tiedValues[i].getUses()) {
       Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
-      if (!user || (user != regionOp && regionOp->isBeforeInBlock(user))) {
-        return true;
+      if (!user) {
+        return cacheResult(true);
       }
-      if (user == regionOp) {
+      if (user != regionOp && regionOp->isBeforeInBlock(user)) {
+        return cacheResult(true);
+      }
+
+      // The required operation itself is allowed to produce live results;
+      // those results are not independent aliases of its input storage.
+      if (use.getOwner() == ignoredOwner) {
         continue;
       }
+
+      // A tied value yielded from inside the dispatch aliases storage after
+      // the dispatch when the corresponding dispatch result is live.
+      if (user == regionOp) {
+        if (isa<Flow::ReturnOp>(use.getOwner()) &&
+            !regionOp->getResult(use.getOperandNumber()).use_empty()) {
+          return cacheResult(true);
+        }
+      }
+
       if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
         for (Value result :
              tiedOp.getOperandTiedResults(use.getOperandNumber())) {
@@ -627,14 +655,18 @@ static bool hasUseAfterDispatch(Flow::DispatchRegionOp regionOp, Value value) {
       }
     }
   }
-  return false;
+  return cacheResult(false);
 }
 
 // Returns the storage base for a required result when preserving the result can
 // form a direct, type-compatible tie to storage outside the dispatch and no
 // later use requires the original value.
 static Value getRequiredExternalTiedResultBase(Flow::DispatchRegionOp regionOp,
-                                               Value value) {
+                                               Value value,
+                                               llvm::SmallDenseMap<
+                                                   Value, llvm::SmallDenseMap<
+                                                              Operation *, bool>>
+                                                   &hasUseAfterDispatchCache) {
   auto result = dyn_cast<OpResult>(value);
   if (!result || !regionOp->isProperAncestor(result.getOwner())) {
     return {};
@@ -652,7 +684,8 @@ static Value getRequiredExternalTiedResultBase(Flow::DispatchRegionOp regionOp,
   Region *baseRegion = tiedBase.getParentRegion();
   Operation *baseParentOp = baseRegion ? baseRegion->getParentOp() : nullptr;
   if (!baseParentOp || regionOp->isAncestor(baseParentOp) ||
-      hasUseAfterDispatch(regionOp, tiedBase)) {
+      hasUseAfterDispatch(regionOp, tiedBase, result.getOwner(),
+                          hasUseAfterDispatchCache)) {
     return {};
   }
   return tiedBase;
@@ -698,6 +731,8 @@ bool dropUnusedAndRedundantDispatchRegionResults(
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   llvm::SetVector<Value> preservedTiedBases;
   llvm::SmallDenseMap<Operation *, bool> liveOwnerResultUses;
+  llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>>
+      hasUseAfterDispatchCache;
 
   for (const auto &[index, value] : llvm::enumerate(regionOp.getResults())) {
     Type type = value.getType();
@@ -706,7 +741,8 @@ bool dropUnusedAndRedundantDispatchRegionResults(
     bool preserveRequiredTie = false;
     if (value.use_empty()) {
       Value tiedBase =
-          getRequiredExternalTiedResultBase(regionOp, yieldedVal.get());
+          getRequiredExternalTiedResultBase(regionOp, yieldedVal.get(),
+                                             hasUseAfterDispatchCache);
       // Required carriers model an operation result, so base liveness must not
       // keep an otherwise dead owner alive.
       if (tiedBase && !preservedTiedBases.contains(tiedBase)) {

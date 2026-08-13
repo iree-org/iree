@@ -238,6 +238,30 @@ util.func public @drop_required_sort_carrier_when_alias_live(
 
 // -----
 
+// CHECK-LABEL: util.func public @drop_required_sort_carrier_when_in_dispatch_alias_live
+util.func public @drop_required_sort_carrier_when_in_dispatch_alias_live(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>, tensor<2x2xi64>) {
+  %result:3 = flow.dispatch.region ->
+      (tensor<4xi64>, tensor<4xi64>, tensor<2x2xi64>) {
+    %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %{{.+}}#1, %{{.+}} : tensor<4xi64>, tensor<2x2xi64>
+    flow.return %sorted#1, %sorted#0, %key_view
+        : tensor<4xi64>, tensor<4xi64>, tensor<2x2xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<4xi64>, tensor<2x2xi64>
+  util.return %result#0, %result#2 : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @drop_required_carriers_with_dead_owner
 util.func public @drop_required_carriers_with_dead_owner(
     %keys: tensor<4xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
