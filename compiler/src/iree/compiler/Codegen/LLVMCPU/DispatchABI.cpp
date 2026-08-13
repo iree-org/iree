@@ -957,10 +957,23 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   MLIRContext *context = forOp->getContext();
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
-  Value arraySize = LLVM::ConstantOp::create(
-      builder, loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
-  Value alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
-                                        /*alignment=*/sizeof(uint64_t));
+  // The stack allocation goes into the entry point of the block.
+  // The compile-time cpu features are patched onto `cpu_data` from the target
+  // environment. That should happen in the loop body, so that the compile-time
+  // cpu features are visible to the post-link LLVM optimizations that would
+  // fold the microkernel tile size selection logic that checks these, and the
+  // selection happens at compile-time.
+  Value alloca;
+  {
+    auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
+    assert(funcOp && "usage requires an enclosing LLVMFuncOp");
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+    Value arraySize = LLVM::ConstantOp::create(
+        builder, loc, i64Ty, builder.getI64IntegerAttr(ProcessorDataCapacity));
+    alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
+                                    /*alignment=*/sizeof(uint64_t));
+  }
   // Load the 0-th value.
   Value srcData0 =
       LLVM::LoadOp::create(builder, loc, i64Ty, processorDataPtrValue);
@@ -993,19 +1006,8 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
   // way from the environment argument. This is redundant with loadFieldValue
   // but that returns values instead.
   //
-  // `forOp` here is the call itself, which may sit inside a loop, so if we
-  // built these ops at its insertion point we'd re-run the stack allocation
-  // on every loop iteration with nothing to ever pop it back off, overflowing
-  // the stack for large iteration counts (#24744). Build them in the
-  // enclosing function's entry block instead, where they only run once.
-  // The computation only depends on the function's `environment`
-  // argument and static target attributes, so it can safely move to the
-  // enclosing function's entry block instead, where it only runs once.
-  auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
-  assert(funcOp && "usage requires an enclosing LLVMFuncOp");
-  OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-
+  // The feature-bit patching stays at the call-site to enable proper ukernel
+  // inlining.
   auto loc = forOp->getLoc();
   auto environmentPtrValue =
       buildArgDI(forOp, /*argNum=*/0, getLocalArgument(forOp, 0), "environment",

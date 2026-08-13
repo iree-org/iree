@@ -48,8 +48,9 @@ module {
 // to patch in statically-known CPU-feature bits. If that alloca were built at the call
 // site instead of the function entry block, it would re-execute on every
 // loop iteration without ever popping the stack back off, overflowing it for
-// large iteration counts. Checks each of the 4 blocks below: the alloca must
-// be in the entry block and must not reappear in the loop body.
+// large iteration counts. So the alloca must be in the entry block and must not
+// reappear in the loop body, the cpu feature patching itself should be in the loop body
+// next to the call.
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+dotprod", target_triple = "aarch64-none-elf"}>
 module {
   func.func private @default_cconv_with_extra_fields_in_loop(memref<f32>, i32, f64) -> (f32) attributes {
@@ -71,21 +72,23 @@ module {
     return
   }
 }
-//       CHECK: llvm.func @loop_caller
-// Entry block: the processor-data patch buffer is built once, here.
-//   CHECK-NOT:   ^{{.+}}:
-//       CHECK:   %[[ENV_DATA:.+]] = llvm.getelementptr inbounds %arg0[{{[0-9]+}}]
+//       CHECK: llvm.func @loop_caller(%[[ARG0:.+]]: {{.*}}llvm.ptr{{.*}}, %[[ARG1:.+]]: {{.*}}llvm.ptr{{.*}}, %[[ARG2:.+]]: {{.*}}llvm.ptr{{.*}})
+// Entry block: only the patch buffer's stack slot is reserved here, once.
 //   CHECK-NOT:   ^{{.+}}:
 //       CHECK:   %[[PATCHED_DATA:.+]] = llvm.alloca %{{.+}} x i64
-//   CHECK-NOT:   ^{{.+}}:
-//       CHECK:   llvm.load %[[ENV_DATA]]
 //   CHECK-NOT:   ^{{.+}}:
 //       CHECK:   llvm.br ^[[HEADER:.+]](
 // Loop header: just the trip-count check.
 //       CHECK: ^[[HEADER]]
 //       CHECK:   llvm.cond_br %{{.+}}, ^[[BODY:.+]], ^[[EXIT:.+]]
-// Loop body: reuses the entry-block buffer; no fresh alloca here.
+// Loop body: no fresh alloca; the compile-time cpu features are patched onto the target
+// environment here in the loop body, storing into the entry-block buffer right before the call.
 //       CHECK: ^[[BODY]]
+//   CHECK-NOT:   llvm.alloca
+//       CHECK:   %[[ENV_DATA:.+]] = llvm.getelementptr inbounds %[[ARG0]]
+//       CHECK:   %[[SRC0:.+]] = llvm.load %[[ENV_DATA]]
+//       CHECK:   %[[PATCHED0:.+]] = llvm.or %[[SRC0]], %{{.+}}
+//       CHECK:   llvm.store %[[PATCHED0]], %[[PATCHED_DATA]]
 //   CHECK-NOT:   llvm.alloca
 //       CHECK:   llvm.call @default_cconv_with_extra_fields_in_loop
 //  CHECK-SAME:       %[[PATCHED_DATA]]
