@@ -33,7 +33,7 @@ using IREE::Codegen::MaterializeEncodingInfo;
 /// For a dimension that is not tiled:
 ///   original_index = outer_dim
 ///
-/// The packed generic has identity output map, so dimensions are:
+/// The packed generic has permutation output maps, so dimensions are:
 ///   d0..d(outerRank-1): outer dimensions (permuted by outerDimsPerm)
 ///   d(outerRank)..d(outerRank+innerRank-1): inner dimensions
 ///
@@ -358,8 +358,8 @@ Operation *lowerGenericOpWithResolvedLayouts(
   }
   // The first output and its iteration domain will be taken as the "anchor",
   // based off which the packed shape will be determined. We only support cases
-  // where indexing maps of all other output operands are identity or
-  // permutations.
+  // where indexing maps of all other output operands are simple permutations
+  // (incl. identity).
   OpOperand *firstOutputOperand = genericOp.getDpsInitOperand(0);
   AffineMap outputMap = genericOp.getMatchingIndexingMap(firstOutputOperand);
   for (OpOperand &initOperand : genericOp.getDpsInitsMutable()) {
@@ -418,8 +418,8 @@ Operation *lowerGenericOpWithResolvedLayouts(
           cast<RankedTensorType>(firstOutputOperand->get().getType()),
           layoutAttr);
   if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
-    // The original indexing maps can only be reused if every operand remains
-    // in the iteration domain. Different packed iteration domains would require
+    // The original indexing maps can only be reused if every operand retains
+    // an identity layout. Different packed iteration domains would require
     // an explicit layout conversion, which is not supported. We do not expect
     // such instances to arise from dispatch creation / data tiling.
     for (OpOperand &operand : genericOp->getOpOperands()) {
