@@ -242,7 +242,7 @@ util.func public @drop_required_sort_carrier_when_alias_live(
 util.func public @drop_required_sort_carrier_when_in_dispatch_alias_live(
     %keys: tensor<4xi64>, %indices: tensor<4xi64>)
     -> (tensor<4xi64>, tensor<2x2xi64>) {
-  // CHECK: %[[RESULT:.+]] = flow.dispatch.region -> (tensor<4xi64>, tensor<2x2xi64>) {
+  // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<2x2xi64>) {
   %result:3 = flow.dispatch.region ->
       (tensor<4xi64>, tensor<4xi64>, tensor<2x2xi64>) {
     %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
