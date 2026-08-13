@@ -16,6 +16,7 @@
 #include "iree/compiler/Utils/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallDenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -416,21 +417,49 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         regionOp->getBlock()->findAncestorOpInBlock(*definingOp);
     return !ancestor || !targetSet.contains(ancestor);
   };
-  auto hasUseAfterDispatch = [&](Value value) {
+  llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>>
+      hasUseAfterDispatchCache;
+  auto hasUseAfterDispatch = [&](Value value, Operation *ignoredOwner) {
+    auto &ownerCache = hasUseAfterDispatchCache[value];
+    if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
+      return it->second;
+    }
+    auto cacheResult = [&](bool result) {
+      ownerCache[ignoredOwner] = result;
+      return result;
+    };
+
     llvm::SetVector<Value> tiedValues;
     tiedValues.insert(value);
     for (unsigned i = 0; i < tiedValues.size(); ++i) {
       for (OpOperand &use : tiedValues[i].getUses()) {
         Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
         if (!user) {
-          return true;
+          return cacheResult(true);
         }
-        if (user == regionOp || targetSet.contains(user)) {
+
+        // Targets are about to move into the dispatch. Follow their tied
+        // results so an escaping target-set alias remains visible here.
+        bool isMovedIntoDispatch =
+            user == regionOp || targetSet.contains(user);
+        if (!isMovedIntoDispatch && regionOp->isBeforeInBlock(user)) {
+          return cacheResult(true);
+        }
+
+        // The required operation's own results are handled by its owner
+        // liveness check and are not independent aliases of its input.
+        if (use.getOwner() == ignoredOwner) {
           continue;
         }
-        if (regionOp->isBeforeInBlock(user)) {
-          return true;
+
+        // A tied value yielded from the dispatch aliases storage after the
+        // dispatch when the corresponding dispatch result is live.
+        if (user == regionOp &&
+            isa<IREE::Flow::ReturnOp>(use.getOwner()) &&
+            !regionOp->getResult(use.getOperandNumber()).use_empty()) {
+          return cacheResult(true);
         }
+
         if (auto tiedOp =
                 dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
           for (Value result :
@@ -440,7 +469,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         }
       }
     }
-    return false;
+    return cacheResult(false);
   };
 
   // Preserve at most one required carrier for each storage base.
@@ -463,7 +492,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       if (!hasExternalUses && hasAnyResultUses) {
         Value tiedBase = getRequiredTiedResultBase(result);
         preserveRequiredTie = tiedBase && isExternalStorageBase(tiedBase) &&
-                              !hasUseAfterDispatch(tiedBase) &&
+                              !hasUseAfterDispatch(tiedBase,
+                                                   result.getDefiningOp()) &&
                               preservedTiedBases.insert(tiedBase);
       }
       if (hasExternalUses || preserveRequiredTie) {
@@ -486,6 +516,9 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
     rewriter.replaceOpUsesWithinBlock(target, clonedTarget->getResults(),
                                       &body);
+    // Moving the next target changes the tied-use graph, so cached legality
+    // results are valid only for this target's result scan.
+    hasUseAfterDispatchCache.clear();
   }
 
   // Collect all ops that must be moved after the dispatch. Start from direct
