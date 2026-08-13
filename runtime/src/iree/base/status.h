@@ -653,9 +653,11 @@ iree_status_payload_type(const iree_status_payload_t* payload);
 // two-pass pattern: call with buffer_capacity=0/buffer=NULL to query the
 // required length, then call again with a sufficiently sized buffer.
 //
-// Sets |*out_buffer_length| to the number of characters written (or required),
-// excluding NUL. Sets |*out_buffer_length| to 0 if the payload has no
-// formatter.
+// Follows snprintf-style semantics: sets |*out_buffer_length| to the number of
+// characters required to format the entire payload excluding NUL, even if
+// |buffer_capacity| is insufficient, and writes as much NUL-terminated content
+// as fits when |buffer| is provided. Sets |*out_buffer_length| to 0 if the
+// payload has no formatter.
 IREE_API_EXPORT void iree_status_payload_format(
     const iree_status_payload_t* payload, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length);

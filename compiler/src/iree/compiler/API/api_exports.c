@@ -650,6 +650,7 @@ extern void mlirLLVMDIBasicTypeAttrGetName();
 extern void mlirLLVMDICompileUnitAttrGet();
 extern void mlirLLVMDICompileUnitAttrGetName();
 extern void mlirLLVMDICompileUnitAttrGetRecSelf();
+extern void mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect();
 extern void mlirLLVMDICompositeTypeAttrGet();
 extern void mlirLLVMDICompositeTypeAttrGetName();
 extern void mlirLLVMDICompositeTypeAttrGetRecSelf();
@@ -1878,6 +1879,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirLLVMDICompileUnitAttrGet;
   x += (uintptr_t)&mlirLLVMDICompileUnitAttrGetName;
   x += (uintptr_t)&mlirLLVMDICompileUnitAttrGetRecSelf;
+  x += (uintptr_t)&mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect;
   x += (uintptr_t)&mlirLLVMDICompositeTypeAttrGet;
   x += (uintptr_t)&mlirLLVMDICompositeTypeAttrGetName;
   x += (uintptr_t)&mlirLLVMDICompositeTypeAttrGetRecSelf;

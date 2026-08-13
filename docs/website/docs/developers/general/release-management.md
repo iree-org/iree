@@ -49,7 +49,8 @@ in scope:
     If you maintain a project that you would like to connect with this release
     process, please reach out on one of our
     [communication channels](../../index.md#communication-channels). The current
-    project list is driven by the priorities of the core project maintainers and
+    project list is driven by the priorities of the project's maintainers and
+    TSC, and
     we would be happy to adapt the process to include other projects too.
 
 The dependency graph looks like this:

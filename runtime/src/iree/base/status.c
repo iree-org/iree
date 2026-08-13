@@ -395,25 +395,22 @@ iree_status_t iree_status_append_payload(iree_status_t status,
 }
 
 // Formats an iree_status_payload_message_t to the given output |buffer|.
-// |out_buffer_length| will be set to the number of characters written excluding
-// NUL. If |buffer| is omitted then |out_buffer_length| will be set to the
-// total number of characters in |buffer_capacity| required to contain the
-// entire message.
+// Follows snprintf-style semantics: |out_buffer_length| is always set to the
+// total number of characters required to contain the entire message excluding
+// NUL, even if |buffer_capacity| is insufficient. If |buffer| is provided then
+// as much of the message as fits is written NUL-terminated.
 static void iree_status_payload_message_formatter(
     const iree_status_payload_t* base_payload, iree_host_size_t buffer_capacity,
     char* buffer, iree_host_size_t* out_buffer_length) {
   iree_status_payload_message_t* payload =
       (iree_status_payload_message_t*)base_payload;
-  if (!buffer) {
-    *out_buffer_length = payload->message.size;
-    return;
-  }
-  iree_host_size_t n = buffer_capacity < payload->message.size
-                           ? buffer_capacity
+  *out_buffer_length = payload->message.size;
+  if (!buffer || buffer_capacity == 0) return;
+  iree_host_size_t n = buffer_capacity - 1 < payload->message.size
+                           ? buffer_capacity - 1
                            : payload->message.size;
   memcpy(buffer, payload->message.data, n);
   buffer[n] = '\0';
-  *out_buffer_length = n;
 }
 
 // Captures the current stack and attaches it to the status storage.
@@ -860,9 +857,9 @@ static bool iree_status_format_message(iree_status_t status,
     return true;
   }
 
-  // Prefix with source location and status code string (may be 'OK').
+  // Total length written (or that would have been written) excluding NUL.
   iree_host_size_t buffer_length = 0;
-  int n = 0;
+  int n IREE_ATTRIBUTE_UNUSED = 0;
 
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
   // Append base storage message.
@@ -879,14 +876,9 @@ static bool iree_status_format_message(iree_status_t status,
     buffer_length += n;
   }
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
-  if (IREE_UNLIKELY(n < 0)) {
-    return false;
-  } else if (buffer && n >= buffer_capacity) {
-    buffer = NULL;
-  }
 
 #if IREE_STATUS_FEATURES != 0
-  // Append each payload separated by a newline.
+  // Append each payload separated by '; '.
   iree_status_payload_t* payload = storage ? storage->payload_head : NULL;
   while (payload != NULL) {
     // Skip payloads that have no textual representation.
@@ -895,18 +887,19 @@ static bool iree_status_format_message(iree_status_t status,
       continue;
     }
 
-    // Append newline to join with message above and other payloads.
-    if (buffer) {
-      if (2 >= buffer_capacity - buffer_length) {
-        buffer = NULL;
-      } else {
-        buffer[buffer_length] = ';';
-        buffer[buffer_length + 1] = ' ';
-      }
+    // Append separator to join with message above and other payloads.
+    n = iree_snprintf(buffer ? buffer + buffer_length : NULL,
+                      buffer ? buffer_capacity - buffer_length : 0, "; ");
+    if (IREE_UNLIKELY(n < 0)) {
+      return false;
+    } else if (buffer && n >= buffer_capacity - buffer_length) {
+      buffer = NULL;
     }
-    buffer_length += 2;  // '; '
+    buffer_length += n;
 
-    // Append payload via custom formatter callback.
+    // Append payload via custom formatter callback. Formatters have
+    // snprintf-style semantics: |payload_buffer_length| receives the length
+    // required for the entire payload even when truncated.
     iree_host_size_t payload_buffer_length = 0;
     payload->formatter(payload, buffer ? buffer_capacity - buffer_length : 0,
                        buffer ? buffer + buffer_length : NULL,

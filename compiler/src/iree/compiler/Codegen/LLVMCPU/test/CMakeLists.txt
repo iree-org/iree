@@ -35,6 +35,7 @@ iree_lit_test_suite(
     "lowering_strategy_from_tuning_spec.mlir"
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
+    "pipeline_bf16_native_converts_tests.mlir"
     "pipeline_disable_distribution_tests.mlir"
     "pipeline_full_smoketests.mlir"
     "pipeline_gather_tests.mlir"

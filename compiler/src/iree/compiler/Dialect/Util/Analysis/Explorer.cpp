@@ -569,8 +569,22 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
     auto enumerateTerminatorOps = [&](Region &region) {
       for (auto &block : region) {
         if (auto *terminatorOp = block.getTerminator()) {
-          // TODO(benvanik): ensure this terminator can return to parent? this
-          // region op interface confuses me.
+          auto branchTerminatorOp =
+              dyn_cast<RegionBranchTerminatorOpInterface>(terminatorOp);
+          if (!branchTerminatorOp) {
+            continue;
+          }
+          // Region branch terminators may either return to the parent
+          // operation or branch to another region. Only the former can
+          // provide operands for the parent operation's results.
+          SmallVector<RegionSuccessor, 2> successors;
+          regionOp.getSuccessorRegions(RegionBranchPoint(branchTerminatorOp),
+                                       successors);
+          if (llvm::none_of(successors, [&](RegionSuccessor successor) {
+                return successor == parentOp;
+              })) {
+            continue;
+          }
           LLVM_DEBUG({
             llvm::dbgs() << "  == emitting region branch terminator op ";
             terminatorOp->print(llvm::dbgs(), asmState);

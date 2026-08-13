@@ -15,10 +15,41 @@ This file is kept in the `iree` core repository but can refer to other
 affiliated repositories at need. This is meant to help "direct traffic" and
 individual projects should be authoritative about their status.
 
+## Technical Steering Committee
+
+The Technical Steering Committee (TSC) is responsible for the overall
+technical direction and health of the project, as set out in the
+[IREE Technical Charter](https://github.com/lfai/foundation/blob/main/technical%20project%20charters/IREE%20Technical%20Charter%20Final%205-14-2024.docx.pdf),
+and represents the project to the LF AI & Data Foundation's Technical
+Advisory Council (TAC).
+
+The current TSC voting members are listed in
+[CONTRIBUTING.md](CONTRIBUTING.md), as provided for in section 2.b of
+the charter.
+
+### Operation
+
+* The TSC decides by lazy consensus where possible. When a formal vote
+  is needed, each voting member has one vote and voting follows the
+  rules in section 3 of the Technical Charter: majority of those
+  present at a quorate meeting, or majority of all voting members for
+  electronic votes. License exceptions and charter amendments require
+  a two-thirds vote of the entire TSC (charter sections 7.c and 8.a).
+* The chairperson is elected by the TSC voting members and serves as
+  the project's representative to the LF AI & Data TAC.
+* Changes to TSC membership (additions, removals, emeritus status) are
+  decided by TSC vote.
+* The TSC meets monthly. Meetings are open to the public and announced
+  on the [iree-technical-discussion mailing list](https://lists.lfaidata.foundation/g/iree-technical-discussion)
+  and Discord.
+
 ## Overall
 
-Stella Laurenzo (@stellaraccident) is the maintainer of last resort for
-uncovered components, questions of project direction, etc.
+Escalate questions about project direction and questions about components
+without a listed maintainer to the [Technical Steering
+Committee](#technical-steering-committee). Post to the [IREE-TSC mailing
+list](mailto:iree-TSC@lists.lfaidata.foundation) (preferred), or contact one of
+the TSC members individually.
 
 ## Compiler Maintainers
 
