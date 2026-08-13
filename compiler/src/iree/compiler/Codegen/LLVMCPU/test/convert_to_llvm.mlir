@@ -89,6 +89,7 @@ module {
 //       CHECK:   %[[SRC0:.+]] = llvm.load %[[ENV_DATA]]
 //       CHECK:   %[[PATCHED0:.+]] = llvm.or %[[SRC0]], %{{.+}}
 //       CHECK:   llvm.store %[[PATCHED0]], %[[PATCHED_DATA]]
+//   CHECK-NOT:   llvm.alloca
 //       CHECK:   llvm.call @default_cconv_with_extra_fields_in_loop
 //  CHECK-SAME:       %[[PATCHED_DATA]]
 //       CHECK:   llvm.br ^[[HEADER]]
