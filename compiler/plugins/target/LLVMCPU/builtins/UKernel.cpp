@@ -8,6 +8,7 @@
 
 #include "iree/builtins/ukernel/ukernel_bitcode.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
@@ -55,8 +56,15 @@ loadUKernelBitcode(llvm::TargetMachine *targetMachine,
   // combination of data types, a specific SIMD ISA variant, etc. Then all the
   // unused code paths can get DCE'd. That's why failure to inline a ukernel
   // can result in a large penalty in both performance and code size.
+  // Strip the per-function target attributes clang baked in at ukernel-bitcode
+  // build time. They can't conflict with the (attribute-less) dispatch and block
+  // inlining under llvm/llvm-project@7bdca287, and the off-target tile variants
+  // they guard are already DCE'd once the dispatch ABI overwrites cpu_data with a
+  // compile-time constant. (+ vscale_range so RVV bitcode inlines too.)
   for (auto &func : module.get()->functions()) {
     func.addFnAttr(llvm::Attribute::AlwaysInline);
+    stripFunctionTargetAttrs(func);
+    func.removeFnAttr(llvm::Attribute::VScaleRange);
   }
   return module;
 }
