@@ -957,11 +957,12 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   MLIRContext *context = forOp->getContext();
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
-  // Move the stack allocation to the entry point of the block (#24744).
-  // The feature-bit patching below stays at the call site, since that keeps it
-  // visible to store-to-load forwarding after the ukernel is inlined and
-  // tile-function devirtualization relies on that to fold its runtime feature
-  // check.
+  // The stack allocation goes into the entry point of the block.
+  // The compile-time cpu features are patched onto `cpu_data` from the target
+  // environment. That should happen in the loop body, so that the compile-time
+  // cpu features are visible to the post-link LLVM optimizations that would
+  // fold the microkernel tile size selection logic that checks these, and the
+  // selection happens at compile-time.
   Value alloca;
   {
     auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();

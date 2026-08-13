@@ -49,8 +49,8 @@ module {
 // site instead of the function entry block, it would re-execute on every
 // loop iteration without ever popping the stack back off, overflowing it for
 // large iteration counts. So the alloca must be in the entry block and must not
-// reappear in the loop body. Only the alloca is hoisted, though: the feature-bit
-// patch itself stays at the call site.
+// reappear in the loop body, the cpu feature patching itself should be in the loop body
+// next to the call.
 #executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+dotprod", target_triple = "aarch64-none-elf"}>
 module {
   func.func private @default_cconv_with_extra_fields_in_loop(memref<f32>, i32, f64) -> (f32) attributes {
@@ -81,8 +81,8 @@ module {
 // Loop header: just the trip-count check.
 //       CHECK: ^[[HEADER]]
 //       CHECK:   llvm.cond_br %{{.+}}, ^[[BODY:.+]], ^[[EXIT:.+]]
-// Loop body: no fresh alloca; the feature-bit patch stays here, storing into the
-// entry-block buffer right before the call.
+// Loop body: no fresh alloca; the compile-time cpu features are patched onto the target
+// environment here in the loop body, storing into the entry-block buffer right before the call.
 //       CHECK: ^[[BODY]]
 //   CHECK-NOT:   llvm.alloca
 //       CHECK:   %[[ENV_DATA:.+]] = llvm.getelementptr inbounds %[[ARG0]]
