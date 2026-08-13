@@ -182,7 +182,9 @@ using various languages.
 
 IREE is a [sandbox-stage project](https://lfaidata.foundation/projects/iree/)
 of [LF AI & Data Foundation](https://lfaidata.foundation/) made possible thanks
-to a growing community of developers.
+to a growing community of developers. The project is governed by a Technical
+Steering Committee — see
+[GOVERNANCE.md](https://github.com/iree-org/iree/blob/main/GOVERNANCE.md).
 
 See how IREE is used:
 
@@ -202,7 +204,7 @@ See how IREE is used:
   bugs, and other work tracking
 * :fontawesome-brands-discord:
   [IREE Discord server](https://discord.gg/wEWh6Z9nMU): Daily development
-  discussions with the core team and collaborators
+  discussions with maintainers, contributors, and collaborators
 * :fontawesome-solid-bullhorn: (New) [iree-announce email list](https://lists.lfaidata.foundation/g/iree-announce):
   Announcements
 * :fontawesome-solid-envelope: (New) [iree-technical-discussion email list](https://lists.lfaidata.foundation/g/iree-technical-discussion):
