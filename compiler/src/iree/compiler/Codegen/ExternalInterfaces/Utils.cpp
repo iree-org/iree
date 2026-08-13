@@ -311,21 +311,21 @@ Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
   return clone(builder, fillOp, convertedResTypes, convertedOperands);
 }
 
-/// Returns true if `indexingMap` can index `operandType` in the iteration
-/// domain described by `iterationDomainType`. Only static dimensions can be
-/// checked here.
+/// Returns true if `checkedIndexingMap` can index `checkedOperandType` in the
+/// iteration domain described by `iterationDomainType`. Only static dimensions
+/// can be checked here.
 static bool
-isCompatibleWithIterationDomain(AffineMap indexingMap,
-                                RankedTensorType operandType,
+isCompatibleWithIterationDomain(AffineMap checkedIndexingMap,
+                                RankedTensorType checkedOperandType,
                                 RankedTensorType iterationDomainType) {
-  if (indexingMap.getNumDims() != iterationDomainType.getRank() ||
-      indexingMap.getNumResults() != operandType.getRank()) {
+  if (checkedIndexingMap.getNumDims() != iterationDomainType.getRank() ||
+      checkedIndexingMap.getNumResults() != checkedOperandType.getRank()) {
     return false;
   }
-  for (auto [expr, operandDim] :
-       llvm::zip_equal(indexingMap.getResults(), operandType.getShape())) {
-    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
-    if (!dimExpr || dimExpr.getPosition() >= iterationDomainType.getRank()) {
+  for (auto [expr, operandDim] : llvm::zip_equal(
+           checkedIndexingMap.getResults(), checkedOperandType.getShape())) {
+    auto dimExpr = cast<AffineDimExpr>(expr);
+    if (dimExpr.getPosition() >= iterationDomainType.getRank()) {
       return false;
     }
     int64_t iterationDim =
