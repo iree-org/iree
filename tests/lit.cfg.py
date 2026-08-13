@@ -17,9 +17,7 @@ import lit.formats
 
 config.name = "IREE"
 config.suffixes = [".mlir", ".txt"]
-config.test_format = lit.formats.ShTest(
-    execute_external=True, force_execute_external=True
-)
+config.test_format = lit.formats.ShTest()
 
 # Forward all IREE environment variables, as well as some passthroughs.
 # Note: env vars are case-insensitive on Windows, so check matches carefully.
