@@ -311,6 +311,33 @@ Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
   return clone(builder, fillOp, convertedResTypes, convertedOperands);
 }
 
+/// Returns true if `indexingMap` can index `operandType` in the iteration
+/// domain described by `iterationDomainType`. Only static dimensions can be
+/// checked here.
+static bool
+isCompatibleWithIterationDomain(AffineMap indexingMap,
+                                RankedTensorType operandType,
+                                RankedTensorType iterationDomainType) {
+  if (indexingMap.getNumDims() != iterationDomainType.getRank() ||
+      indexingMap.getNumResults() != operandType.getRank()) {
+    return false;
+  }
+  for (auto [expr, operandDim] :
+       llvm::zip_equal(indexingMap.getResults(), operandType.getShape())) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+    if (!dimExpr || dimExpr.getPosition() >= iterationDomainType.getRank()) {
+      return false;
+    }
+    int64_t iterationDim =
+        iterationDomainType.getDimSize(dimExpr.getPosition());
+    if (!ShapedType::isDynamic(iterationDim) &&
+        !ShapedType::isDynamic(operandDim) && iterationDim != operandDim) {
+      return false;
+    }
+  }
+  return true;
+}
+
 Operation *lowerGenericOpWithResolvedLayouts(
     OpBuilder &builder, linalg::GenericOp genericOp,
     TypeRange convertedResTypes, ValueRange convertedOperands,
@@ -391,6 +418,18 @@ Operation *lowerGenericOpWithResolvedLayouts(
           cast<RankedTensorType>(firstOutputOperand->get().getType()),
           layoutAttr);
   if (IREE::Codegen::isIdentityLayout(outMaterializeEncodingInfo)) {
+    // The original indexing maps can only be reused if every operand remains
+    // in the iteration domain. Different packed iteration domains would require
+    // an explicit layout conversion, which is not supported. We do not expect
+    // such instances to arise from dispatch creation / data tiling.
+    for (OpOperand &operand : genericOp->getOpOperands()) {
+      auto operandType = cast<RankedTensorType>(operand.get().getType());
+      MaterializeEncodingInfo materializeEncodingInfo =
+          getEncodingInfoFromLayout(operandType, layoutAttr);
+      if (!IREE::Codegen::isIdentityLayout(materializeEncodingInfo)) {
+        return nullptr;
+      }
+    }
     return clone(builder, genericOp, convertedResTypes, convertedOperands);
   }
   auto convertedResultType =
@@ -576,6 +615,15 @@ Operation *lowerGenericOpWithResolvedLayouts(
     auto packedOperandMap = AffineMap::get(
         /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, packedResultExprs,
         builder.getContext());
+    if (genericOp.isDpsInit(operand) && !packedOperandMap.isPermutation()) {
+      return nullptr;
+    }
+    auto convertedOperandType =
+        cast<RankedTensorType>(convertedOperand.getType());
+    if (!isCompatibleWithIterationDomain(packedOperandMap, convertedOperandType,
+                                         convertedResultType)) {
+      return nullptr;
+    }
     packedIndexingMaps.push_back(packedOperandMap);
   }
   auto materializedGenericOp = linalg::GenericOp::create(
