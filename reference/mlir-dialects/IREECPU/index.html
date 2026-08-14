@@ -2384,17 +2384,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#innertilealignmentsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        InnerTileAlignmentsAttr
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#innertiledsemanticsattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6329,17 +6318,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#innertilealignmentsattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        InnerTileAlignmentsAttr
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#innertiledsemanticsattr" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6522,7 +6500,6 @@ LLVM are handled separately.</p>
 <li><a href="#attributes">Attributes</a><ul>
 <li><a href="#cpuencodingresolverattr">CPUEncodingResolverAttr</a></li>
 <li><a href="#datatiledmmaattr">DataTiledMMAAttr</a></li>
-<li><a href="#innertilealignmentsattr">InnerTileAlignmentsAttr</a></li>
 <li><a href="#innertiledsemanticsattr">InnerTiledSemanticsAttr</a></li>
 <li><a href="#loweringconfigattr">LoweringConfigAttr</a></li>
 <li><a href="#mmaintrinsicattr">MMAIntrinsicAttr</a></li>
@@ -6655,29 +6632,6 @@ here but are unused.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="innertilealignmentsattr">InnerTileAlignmentsAttr<a class="headerlink" href="#innertilealignmentsattr" title="Permanent link">link</a></h3>
-<p><em>Per-tiling-level inner-tile alignment hints for pack/unpack ops.</em></p>
-<p>A discardable hint attached to a scalable <code>linalg.pack</code>/<code>linalg.unpack</code>
-during tile-size selection, recording, per tiling level, the
-<code>mlir::InnerTileAlignment</code> (<code>Unknown</code>, <code>Multiple</code> or <code>Equal</code>) of each
-iteration-domain dimension.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">alignments</td>
-<td style="text-align: center;"><code>DictionaryAttr</code></td>
-<td>Maps a tiling-level name to its per-dim InnerTileAlignment array.</td>
-</tr>
-</tbody>
-</table>
 <h3 id="innertiledsemanticsattr">InnerTiledSemanticsAttr<a class="headerlink" href="#innertiledsemanticsattr" title="Permanent link">link</a></h3>
 <p>Syntax: <code>#iree_cpu.mma_semantics</code></p>
 <p>Attribute describing aspects of inner-tiled MMA semantics that are
@@ -6708,7 +6662,7 @@ value on a dimension. They are expected to be disjoint. It is not enforced
 in the verifier, because we want to keep the flexibility when something is
 wrong in a lowering config. E.g., some transformations still work even if
 they are not disjoint.</p>
-<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
+<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6732,7 +6686,7 @@ they are not disjoint.</p>
   `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`   # value
 &gt;
 </code></pre></div>
-<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
+<h5 id="parameters_3">Parameters:<a class="headerlink" href="#parameters_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6760,7 +6714,7 @@ they are not disjoint.</p>
 by delegating to a builder callback registered via
 registerCPUPipelineBuilder(). The builder must handle all
 LoweringPipeline enum values.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
+<h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6801,7 +6755,7 @@ against ukernels embedded into <code>iree-compile</code> at LLVMCPU plugin init.
 serialization and or materialization, e.g., Encoding::LayoutMaterializerAttr,
 Codegen::PackedLayoutMaterializerAttr, etc. They are implemented through external model
 mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
