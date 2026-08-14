@@ -296,10 +296,14 @@ Operation *lowerFillOpWithResolvedLayouts(OpBuilder &builder,
                                           TypeRange convertedResTypes,
                                           ValueRange convertedOperands);
 
-/// Converts a linalg::GenericOp with encoded inputs into the packed domain,
+/// Converts a linalg::GenericOp with encoded operands into the packed domain,
 /// with an optional swizzle expansion and permutation if applicable. The
-/// `genericOp` must have all parallel iterator types and a single output with
-/// an identity indexing map.
+/// `genericOp` must have all parallel iterator types and one or more outputs
+/// with permutation indexing maps.
+/// All input indexing maps must be representable in the common packed
+/// iteration domain via projected permutations.
+/// All output indexing maps must be representable in the common packed
+/// iteration domain via simple permutations.
 Operation *lowerGenericOpWithResolvedLayouts(
     OpBuilder &builder, linalg::GenericOp genericOp,
     TypeRange convertedResTypes, ValueRange convertedOperands,
