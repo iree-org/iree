@@ -1100,6 +1100,14 @@ static iree_status_t iree_hal_module_command_buffer_dispatch(
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
 }
+// The shim below uses sizeof(iree_vm_abi_rrIiiiI_t) as the offset of the
+// following variadic segment; that is only correct while the struct has no
+// trailing padding as the VM packs cconv arguments unpadded.
+static_assert(sizeof(iree_vm_abi_rrIiiiI_t) ==
+                  offsetof(iree_vm_abi_rrIiiiI_t, i6) +
+                      IREE_VM_ABI_FIELD_SIZE(iree_vm_abi_rrIiiiI_t, i6),
+              "iree_vm_abi_rrIiiiI_t must have no trailing padding; size "
+              "through the final field instead of using sizeof");
 static iree_status_t iree_hal_module_command_buffer_dispatch_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
@@ -1222,6 +1230,14 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
                                 args->constant_count * sizeof(uint32_t)),
       bindings, flags);
 }
+// The shim below uses sizeof(iree_vm_abi_rrIirII_t) as the offset of the
+// following variadic segment; that is only correct while the struct has no
+// trailing padding as the VM packs cconv arguments unpadded.
+static_assert(sizeof(iree_vm_abi_rrIirII_t) ==
+                  offsetof(iree_vm_abi_rrIirII_t, i6) +
+                      IREE_VM_ABI_FIELD_SIZE(iree_vm_abi_rrIirII_t, i6),
+              "iree_vm_abi_rrIirII_t must have no trailing padding; size "
+              "through the final field instead of using sizeof");
 static iree_status_t iree_hal_module_command_buffer_dispatch_indirect_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
