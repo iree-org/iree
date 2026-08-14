@@ -62,7 +62,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// When the output map is a non-identity permutation (e.g. a transpose fused
 /// into the generic's output indexing map by elementwise fusion), each
 /// operand's indexing map is re-expressed in terms of the *output*'s index
-/// space -- rather than the generic's raw loop space -- by composing with
+/// space, rather than the generic's raw loop space, by composing with
 /// the inverse of the output permutation, before it is appended to the
 /// encoding's map chain. This keeps the chain's domain/codomain consistent
 /// with the identity case, of which it is a strict generalization.
@@ -97,8 +97,6 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
     return rewriter.notifyMatchFailure(genericOp,
                                        "output map not a permutation");
   }
-  // For an identity output map, `inversePermutation` is the identity too, so
-  // this degenerates to the previous behavior exactly.
   AffineMap invOutputMap = inversePermutation(outputMap);
 
   RankedTensorType encodedType = encodingOp.getResultType();
