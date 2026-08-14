@@ -130,9 +130,8 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
   SmallVector<Value> encodedOperands;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
     // Append the operand's indexing map to the encoding's user indexing
-    // maps, re-expressed in terms of the output's index space (rather than
-    // the generic's raw loop space) by composing with the inverse of the
-    // output permutation.
+    // maps, re-expressed in terms of the output's index space by
+    // composing with the inverse of the output permutation.
     AffineMap operandMap = genericOp.getMatchingIndexingMap(operand);
     AffineMap remappedOperandMap = operandMap.compose(invOutputMap);
 
