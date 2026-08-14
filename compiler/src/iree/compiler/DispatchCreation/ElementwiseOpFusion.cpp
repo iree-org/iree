@@ -146,6 +146,14 @@ struct GatherFusionPattern final : OpRewritePattern<tensor::ExtractOp> {
     auto resultMap = producerOp.getIndexingMapMatchingResult(result);
     SmallVector<Value> extractOps;
     for (OpOperand &operand : producerOp->getOpOperands()) {
+      // A scalar operand is invariant over the iteration space, so there is no
+      // index to permute and nothing to extract: the body sees the value
+      // itself. Bit width classification ignores non-tensor inputs, so a
+      // producer that qualifies here can still have them.
+      if (!isa<RankedTensorType>(operand.get().getType())) {
+        extractOps.push_back(operand.get());
+        continue;
+      }
       auto inputMap = producerOp.getMatchingIndexingMap(&operand);
       auto composedMap = inputMap.compose(inversePermutation(resultMap));
       auto perm = llvm::map_to_vector<4>(
