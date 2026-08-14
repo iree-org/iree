@@ -195,6 +195,7 @@ set(IREE_UK_TRY_RISCV_64_ZVFHMIN ON)
 # builtin. See: https://github.com/iree-org/iree/issues/22303.
 # Once this issue is resolved, we won't need this check.
 if(IREE_UK_TRY_RISCV_64_ZVFHMIN)
+  include(CheckCSourceCompiles)
   string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_RISCV_64_ZVFHMIN}")
   string(JOIN "\n" IREE_UK_BUILD_RISCV_64_ZVFHMIN_ZVFH_TEST
 "int main() {"

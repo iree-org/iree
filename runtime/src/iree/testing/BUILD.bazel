@@ -116,6 +116,7 @@ iree_runtime_cc_test(
 
 iree_runtime_cc_library(
     name = "coordinated_test",
+    testonly = True,
     srcs = ["coordinated_test.c"],
     hdrs = ["coordinated_test.h"],
     deps = [

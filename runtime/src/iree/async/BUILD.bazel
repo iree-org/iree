@@ -127,6 +127,8 @@ iree_runtime_cc_library(
         "//build_tools/bazel:iree_is_wasm": [
             "//runtime/src/iree/async/platform/js:proactor",
         ],
+        # Generic targets have no platform proactor backend.
+        "//build_tools/bazel:iree_is_generic_riscv64": [],
         "//conditions:default": [
             "//runtime/src/iree/async/platform/posix",
         ],

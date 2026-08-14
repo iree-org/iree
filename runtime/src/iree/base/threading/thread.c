@@ -12,8 +12,8 @@
 #include "iree/base/threading/mutex.h"
 #include "iree/base/threading/thread_impl.h"
 
-#ifdef __NEWLIB__
-// newlib does not provide strnlen; provide a fallback implementation.
+#if defined(__NEWLIB__) || defined(IREE_PLATFORM_GENERIC)
+// newlib and strict ISO C libcs may not provide strnlen.
 static size_t iree_strnlen(const char* s, size_t maxlen) {
   size_t n = 0;
   while (n < maxlen && s[n] != '\0') ++n;

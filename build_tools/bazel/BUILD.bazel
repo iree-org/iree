@@ -45,6 +45,16 @@ config_setting(
     constraint_values = ["@platforms//os:macos"],
 )
 
+# Generic RISC-V 64-bit targets. Include the CPU constraint because
+# @platforms//os:none alone would also match freestanding wasm32 targets.
+config_setting(
+    name = "iree_is_generic_riscv64",
+    constraint_values = [
+        "@platforms//cpu:riscv64",
+        "@platforms//os:none",
+    ],
+)
+
 config_setting(
     name = "iree_is_windows",
     constraint_values = ["@platforms//os:windows"],
