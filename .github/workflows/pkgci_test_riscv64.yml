@@ -92,3 +92,77 @@ jobs:
         env:
           QEMU_BIN: ${{ env.QEMU_PATH_PREFIX }}/qemu-riscv64
         run: ./build_tools/cmake/test_riscv.sh
+
+  riscv64-baremetal:
+    runs-on: ubuntu-24.04
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      VENV_DIR: ${{ github.workspace }}/.venv
+      GH_TOKEN: ${{ github.token }}
+      RISCV_TOOLCHAIN_ROOT: ${{ github.workspace }}/riscv/xpack-gcc
+      # xPack riscv-none-elf gcc: newlib is built -mcmodel=medany and ships
+      # semihost.specs, as samples/baremetal_riscv64 requires.
+      XPACK_GCC_VERSION: "15.2.0-1"
+      XPACK_GCC_SHA256: "aaaa8060c914851a3e5ee1ba82cc3d6f80972f90638a05c6e823a37557a33758"
+    steps:
+      # General setup.
+      - name: "Checking out repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        with:
+          key: ${{ github.job }}
+          save: ${{ inputs.write-caches == 1 }}
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Install build dependencies
+        run: sudo apt update && sudo apt install -y ninja-build qemu-system-misc
+      - name: Setup base venv
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Restore toolchain cache
+        id: restore-toolchain
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: riscv
+          key: riscv-baremetal-toolchain-xpack-${{ env.XPACK_GCC_VERSION }}-${{ runner.arch }}
+      - name: Bootstrap toolchain
+        if: ${{ steps.restore-toolchain.outputs.cache-hit != 'true' }}
+        run: |
+          TARBALL="xpack-riscv-none-elf-gcc-${XPACK_GCC_VERSION}-linux-x64.tar.gz"
+          wget -q "https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v${XPACK_GCC_VERSION}/${TARBALL}"
+          echo "${XPACK_GCC_SHA256}  ${TARBALL}" | sha256sum -c -
+          mkdir -p "${RISCV_TOOLCHAIN_ROOT}"
+          tar -xzf "${TARBALL}" -C "${RISCV_TOOLCHAIN_ROOT}" --no-same-owner --strip-components=1
+          rm "${TARBALL}"
+      - name: Save toolchain cache
+        if: ${{ inputs.write-caches == 1 && steps.restore-toolchain.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: riscv
+          key: riscv-baremetal-toolchain-xpack-${{ env.XPACK_GCC_VERSION }}-${{ runner.arch }}
+      - name: Build riscv64 bare-metal runtime
+        env:
+          IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
+          IREE_READ_REMOTE_CCACHE: 0
+          IREE_WRITE_REMOTE_CCACHE: 0
+          IREE_READ_LOCAL_CCACHE: 1
+          IREE_WRITE_LOCAL_CCACHE: ${{ inputs.write-caches }}
+        run: ./build_tools/cmake/build_riscv_baremetal.sh
+      - name: Run bare-metal smoke tests on QEMU
+        env:
+          QEMU_BIN: qemu-system-riscv64
+        run: ./samples/baremetal_riscv64/run_qemu.sh
