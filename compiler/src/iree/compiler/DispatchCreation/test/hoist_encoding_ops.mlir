@@ -925,13 +925,11 @@ util.func public @no_sink_unset_encoding_through_broadcast(%arg0: tensor<2x2xf32
 
 // -----
 
-// Bubble a set_encoding through a dequant generic whose OUTPUT indexing map
-// is a non-identity permutation (e.g. a transpose fused into the producer by
-// elementwise fusion), with a broadcast operand alongside the bit-extended
-// one. Each operand's own indexing map is composed with the inverse of the
-// output permutation before being appended to the encoding's map chain, so
-// the composed maps checked below reflect that inversion, not the raw
-// output map.
+// Verify bubbling of a set_encoding through a dequant generic whose output
+// indexing map is a non-identity permutation (e.g. a transpose fused into the
+// producer by elementwise fusion).
+// Each operand's own indexing map should be composed with the inverse of the
+// output permutation before being appended to the encoding's map chain.
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -987,13 +985,8 @@ util.func public @bubble_through_dequant_and_transpose(
 
 // -----
 
-// Same bubbling as above, but with an output permutation that is NOT its
-// own inverse (a 3-cycle, rather than a 2-element transpose). A 2-element
-// transpose is an involution, so composing an operand's map with the output
-// map itself vs. with its inverse produces the identical result -- that
-// case alone can't distinguish "correctly inverted" from "not inverted at
-// all". This one can: the composed map below (#map2) must equal the
-// permutation's inverse, not the permutation itself.
+// Same bubbling as above, but with an output permutation that is not its
+// own inverse (d0, d1, d2 -> d1, d2, d0).
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
