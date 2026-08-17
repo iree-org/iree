@@ -146,21 +146,15 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH S
       topology_sysfs_test
     SRCS
       "topology_sysfs_test.cc"
+    # A0 Pixel remains upstream archive (#22455). A1/A2/P-* are plain-text
+    # trees under testdata/sysfs/ (reviewer: no new binary tarballs). CMake
+    # tests read them via IREE_TASK_SYSFS_TESTDATA_DIR (source tree).
     DATA
       "runtime/src/iree/task/testdata/sysfs/arm64_pixel6_tensor.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_dual_numa.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_empty_cpulist.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_numa_no_package.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_numa_over_package.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_package_multi.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_sparse_kernel_numa.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/prop_uncovered_cpu.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/x86_missing_cluster_id.tar.gz"
-      "runtime/src/iree/task/testdata/sysfs/x86_no_numa_single_package.tar.gz"
     DEFINES
       "IREE_TASK_SYSFS_TESTDATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/testdata/sysfs\""
     DEPS
+      ::api
       ::task
       iree::base
       iree::base::internal::sysfs

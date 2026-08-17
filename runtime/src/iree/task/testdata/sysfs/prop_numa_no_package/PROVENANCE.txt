@@ -1,0 +1,4 @@
+Class: P (property test double)
+Role: synthetic input to topology_sysfs mapping f() — NOT a captured machine
+Not authority corpus (A0/A1). See testdata/sysfs/README.md and process/CORPUS.md.
+Derived layout originally from adversarial fixture x86_numa_missing_package (relabeled).

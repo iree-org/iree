@@ -13,12 +13,15 @@ structures used to test `topology_sysfs.c` without live hardware.
    empty cpulist, degrade, …). Labeled honestly; **deferred capture ≠ deferred
    property tests**.
 
-Archives only are checked in (extracted dirs are gitignored):
+**Check-in policy (PR #24815 review):** no **new** binary archives.
+A1 / A2 / P-\* are **plain-text directory trees** in git. Only the upstream
+**A0** Pixel snapshot remains a `.tar.gz` (from #22455); tests extract it
+on demand.
 
 ```bash
+# A0 only (optional local extract)
 tar xzf arm64_pixel6_tensor.tar.gz
-tar xzf x86_hybrid_sparse_clusters.tar.gz
-tar xzf prop_dual_numa.tar.gz   # etc.
+# A1/A2/P-* are already directories under this folder
 ```
 
 ## Authority corpus lineage

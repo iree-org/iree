@@ -1,8 +1,35 @@
-# Ignore all extracted sysfs snapshot directories.
-# Only tar.gz archives should be checked in.
+# Plain-text fixture trees are checked in (PR review: no new binary archives).
+# Upstream Pixel snapshot remains an archive-only A0 (#22455).
 
-# Allow tar.gz archives (override root .gitignore).
-!*.tar.gz
+# Ignore everything in this folder by default...
+*
 
-# Ignore all directories.
-*/
+# ...then allow documentation and tooling.
+!.gitignore
+!README.md
+!capture_sysfs.sh
+
+# A0: upstream archive only (do not check in extracted Pixel tree).
+!arm64_pixel6_tensor.tar.gz
+
+# A1 / A2 / P-*: checked-in text trees.
+!x86_hybrid_sparse_clusters/
+!x86_hybrid_sparse_clusters/**
+!x86_missing_cluster_id/
+!x86_missing_cluster_id/**
+!x86_no_numa_single_package/
+!x86_no_numa_single_package/**
+!prop_dual_numa/
+!prop_dual_numa/**
+!prop_empty_cpulist/
+!prop_empty_cpulist/**
+!prop_numa_no_package/
+!prop_numa_no_package/**
+!prop_numa_over_package/
+!prop_numa_over_package/**
+!prop_package_multi/
+!prop_package_multi/**
+!prop_sparse_kernel_numa/
+!prop_sparse_kernel_numa/**
+!prop_uncovered_cpu/
+!prop_uncovered_cpu/**

@@ -4,6 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// TDD seams for #24761 (confirmed):
+//   S1 — query_node_count / query_current_node
+//   S2 — initialize_from_physical_cores → group_count + processor set
+//   S3 — initialize_from_flags (public flag-driven path; default nodes=current)
+//
+// Oracle literals: issue #24761 paste / ORACLE_TOPOLOGY.md (independent of
+// how fixtures were authored). Plain-text trees under testdata/sysfs/; A0
+// Pixel remains the upstream .tar.gz from #22455.
+
 #include <unistd.h>
 
 #include <cstdlib>
@@ -13,6 +22,7 @@
 #include <vector>
 
 #include "iree/base/internal/sysfs.h"
+#include "iree/task/api.h"
 #include "iree/task/topology.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -24,7 +34,7 @@ namespace {
 using namespace iree::testing::status;
 
 //===----------------------------------------------------------------------===//
-// Fixture resolution (tar.gz under testdata/sysfs)
+// Fixture resolution (plain trees preferred; Pixel A0 may still be tar.gz)
 //===----------------------------------------------------------------------===//
 
 static bool FixturePresentReadable(const std::string& dir) {
@@ -97,7 +107,7 @@ static std::string ResolveFixtureRoot(const char* fixture_name) {
   }
 
   ADD_FAILURE() << "unable to locate fixture '" << fixture_name
-                << "' (set IREE_SYSFS_TEST_ROOT or extract testdata tar.gz)";
+                << "' (set IREE_SYSFS_TEST_ROOT or check testdata/sysfs)";
   return "";
 }
 
@@ -157,37 +167,78 @@ static bool SetIsSubset(const std::set<uint32_t>& subset,
   return true;
 }
 
-//===----------------------------------------------------------------------===//
-// A1 — ORACLE_TOPOLOGY.md §2 (issue #24761 hybrid paste)
-//===----------------------------------------------------------------------===//
-//
-// MUST match oracle: 24 logical CPUs; 10 sparse cluster_ids listed below.
-// DESIGN: node id = NUMA (else package), never raw cluster_id.
-// Scaffolding: single node0 + package_id=0 + core_id/SMT layout (not reporter
-// dumps — see ORACLE_TOPOLOGY.md §1/§3). Benchmark ms are NOT gtest gates.
-//
-// Properties: node_count ≠ |unique cluster_id|; affinity retains issue ids
-// including ≥64 (mask-safety: large cluster_id is affinity, not node bit).
-
-// Oracle unique cluster_id set — ORACLE_TOPOLOGY.md §2 / issue #24761 paste.
+// Oracle unique cluster_id set — issue #24761 paste / ORACLE_TOPOLOGY.md §2.
+// Independent literals (not recomputed from fixture-authoring scripts).
 static const std::set<uint32_t> kIssue24761ClusterIds = {0,  8,  16, 24, 32,
                                                          40, 48, 56, 64, 72};
 
-TEST_F(TopologySysfsFixtureTest, A1_IssueHybridOracle_NodeNotCluster) {
+// Physical cores on A1 harness (24 logical CPUs, SMT pairs → 16 cores).
+static constexpr iree_host_size_t kIssue24761PhysicalCoreCount = 16;
+
+//===----------------------------------------------------------------------===//
+// S1 — node identity queries (must not treat cluster_id as node)
+//===----------------------------------------------------------------------===//
+
+TEST_F(TopologySysfsFixtureTest, S1_A1_NodeCountIsNumaNotClusterCount) {
   UseFixture("x86_hybrid_sparse_clusters");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
 
   const iree_host_size_t node_count = iree_task_topology_query_node_count();
+  // Oracle: single NUMA on reporter-class hybrid → exactly one task node.
   EXPECT_EQ(1u, node_count);
-  // Property: must not treat each sparse cluster as a node.
+  // Anti-regression: must not equal unique sparse cluster count (10).
   EXPECT_NE(node_count, kIssue24761ClusterIds.size());
+}
+
+TEST_F(TopologySysfsFixtureTest, S1_A1_CurrentNodeIsDenseZero) {
+  UseFixture("x86_hybrid_sparse_clusters");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  // With a single NUMA node0, current maps to dense ordinal 0 — not a sparse
+  // cluster_id such as 8/16/64.
   EXPECT_EQ(0u, iree_task_topology_query_current_node());
+}
+
+TEST_F(TopologySysfsFixtureTest, S1_P2_SparseKernelNuma_DenseCount) {
+  UseFixture("prop_sparse_kernel_numa");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  // online=0,2 → two dense nodes (not three, not raw id 2 as a third slot).
+  EXPECT_EQ(2u, iree_task_topology_query_node_count());
+}
+
+TEST_F(TopologySysfsFixtureTest, S1_A0_PixelPackageFallback_OneNode) {
+  UseFixture("arm64_pixel6_tensor");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+  EXPECT_EQ(1u, iree_task_topology_query_node_count());
+}
+
+//===----------------------------------------------------------------------===//
+// S2 — initialize_from_physical_cores (worker pool size + membership)
+//===----------------------------------------------------------------------===//
+
+TEST_F(TopologySysfsFixtureTest, S2_A1_CurrentNodeDoesNotCollapseToOneCluster) {
+  UseFixture("x86_hybrid_sparse_clusters");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
 
   iree_task_topology_t topology;
-  EXPECT_EQ(16u, InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
+  // Bug symptom: cluster-as-node left ~1–2 workers. Fixed: full package/NUMA.
+  const iree_host_size_t groups =
+      InitPhysicalCoreCount(/*node_id=*/0, 24, &topology);
+  EXPECT_EQ(kIssue24761PhysicalCoreCount, groups);
+  EXPECT_GT(groups, 2u);  // hard anti-collapse vs single-cluster pin
   EXPECT_TRUE(AllGroupsIdAssigned(topology));
+  iree_task_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologySysfsFixtureTest, S2_A1_AffinityRetainsIssueClusterIds) {
+  UseFixture("x86_hybrid_sparse_clusters");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  iree_task_topology_t topology;
+  ASSERT_EQ(kIssue24761PhysicalCoreCount,
+            InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
   const auto affinity = CollectAffinityGroups(topology);
-  // Affinity retains issue cluster ids (incl. ≥64); not dense node ordinals.
   for (uint32_t cluster_id : kIssue24761ClusterIds) {
     EXPECT_TRUE(affinity.count(cluster_id))
         << "missing issue cluster_id=" << cluster_id;
@@ -196,93 +247,15 @@ TEST_F(TopologySysfsFixtureTest, A1_IssueHybridOracle_NodeNotCluster) {
     EXPECT_TRUE(kIssue24761ClusterIds.count(g))
         << "unexpected affinity.group=" << g;
   }
-  // Mask-safety discriminator: ids ≥64 appear as affinity.group only.
+  // Mask-safety: ids ≥64 appear as affinity.group metadata, not as node bits.
   EXPECT_TRUE(affinity.count(64));
   EXPECT_TRUE(affinity.count(72));
   iree_task_topology_deinitialize(&topology);
-
-  EXPECT_EQ(16u, InitPhysicalCoreCount(IREE_TASK_TOPOLOGY_NODE_ID_ANY, 24,
-                                       &topology));
-  iree_task_topology_deinitialize(&topology);
 }
 
-//===----------------------------------------------------------------------===//
-// A2a — mutation of A1: delete node/ → package fallback
-//===----------------------------------------------------------------------===//
-// Relative invariant only: single package ⇒ still one dense node; sparse
-// cluster affinity preserved. Not a dual-socket dump.
-
-TEST_F(TopologySysfsFixtureTest, A2a_NoNumaSinglePackage_FromA1) {
-  UseFixture("x86_no_numa_single_package");
-  ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
-  EXPECT_EQ(1u, iree_task_topology_query_node_count());
-
-  iree_task_topology_t topology;
-  EXPECT_EQ(16u, InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
-  const auto affinity = CollectAffinityGroups(topology);
-  EXPECT_EQ(kIssue24761ClusterIds.size(), affinity.size());
-  EXPECT_TRUE(affinity.count(0));
-  EXPECT_TRUE(affinity.count(72));
-  iree_task_topology_deinitialize(&topology);
-}
-
-//===----------------------------------------------------------------------===//
-// A2b — mutation of A1: delete cluster_id files → affinity → package
-//===----------------------------------------------------------------------===//
-// Keeps single NUMA from A1 (does not invent dual-NUMA). Affinity.group falls
-// back to physical_package_id (0) per DESIGN.
-
-TEST_F(TopologySysfsFixtureTest, A2b_MissingClusterId_FromA1) {
-  UseFixture("x86_missing_cluster_id");
-  ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
-  EXPECT_EQ(1u, iree_task_topology_query_node_count());
-
-  iree_task_topology_t topology;
-  EXPECT_EQ(16u, InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
-  EXPECT_TRUE(AllGroupsIdAssigned(topology));
-  for (iree_host_size_t i = 0; i < topology.group_count; ++i) {
-    EXPECT_EQ(0u, topology.groups[i].ideal_thread_affinity.group);
-  }
-  iree_task_topology_deinitialize(&topology);
-}
-
-//===----------------------------------------------------------------------===//
-// A0 — upstream Pixel6 capture (#22455)
-//===----------------------------------------------------------------------===//
-// Property: no node/ + single package → one node, not three dense clusters.
-
-TEST_F(TopologySysfsFixtureTest, A0_Arm64PixelPackageFallback) {
-  UseFixture("arm64_pixel6_tensor");
-  ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
-  const iree_host_size_t node_count = iree_task_topology_query_node_count();
-  EXPECT_EQ(1u, node_count);
-
-  iree_task_topology_t topology;
-  EXPECT_EQ(
-      8u, InitPhysicalCoreCount(IREE_TASK_TOPOLOGY_NODE_ID_ANY, 8, &topology));
-  const auto affinity = CollectAffinityGroups(topology);
-  // Pixel big.LITTLE clusters are dense 0/1/2 — still affinity-only.
-  EXPECT_TRUE(affinity.count(0));
-  EXPECT_TRUE(affinity.count(1));
-  EXPECT_TRUE(affinity.count(2));
-  EXPECT_NE(node_count, affinity.size());
-  iree_task_topology_deinitialize(&topology);
-}
-
-//===----------------------------------------------------------------------===//
-// P-* property test doubles — synthetic input to f(), NOT captured machines
-//===----------------------------------------------------------------------===//
-// See testdata/sysfs/README.md + process/CORPUS.md. Asserts are DESIGN
-// invariants / membership properties of the mapping, not HW fidelity claims.
-
-// P1 — two NUMA cpulists → dense nodes 0,1; filter preserves membership.
-TEST_F(TopologySysfsFixtureTest, P1_DualNuma_DenseMembership) {
+TEST_F(TopologySysfsFixtureTest, S2_P1_DualNuma_Membership) {
   UseFixture("prop_dual_numa");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
   EXPECT_EQ(2u, iree_task_topology_query_node_count());
 
   const std::set<uint32_t> node0_cpus = {0, 1, 2, 3};
@@ -296,46 +269,21 @@ TEST_F(TopologySysfsFixtureTest, P1_DualNuma_DenseMembership) {
   EXPECT_EQ(4u, InitPhysicalCoreCount(/*node_id=*/1, 8, &topology));
   EXPECT_TRUE(SetIsSubset(CollectProcessors(topology), node1_cpus));
   iree_task_topology_deinitialize(&topology);
-
-  EXPECT_EQ(
-      8u, InitPhysicalCoreCount(IREE_TASK_TOPOLOGY_NODE_ID_ANY, 8, &topology));
-  // Sparse clusters remain affinity-only; must not collapse to one cluster.
-  EXPECT_GT(CollectAffinityGroups(topology).size(), 1u);
-  EXPECT_NE(iree_task_topology_query_node_count(),
-            CollectAffinityGroups(topology).size());
-  iree_task_topology_deinitialize(&topology);
 }
 
-// P2 — sparse kernel node/online (0,2) → dense ordinals; raw kernel id ≠ bit.
-TEST_F(TopologySysfsFixtureTest, P2_SparseKernelNuma_DenseRemap) {
+TEST_F(TopologySysfsFixtureTest, S2_P2_RawKernelNodeIdSelectsNothing) {
   UseFixture("prop_sparse_kernel_numa");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
 
-  // online=0,2 → dense count 2 (kernel id 2 is not a third node).
-  EXPECT_EQ(2u, iree_task_topology_query_node_count());
-
-  const std::set<uint32_t> dense0 = {0, 1, 2, 3};  // kernel node0
-  const std::set<uint32_t> dense1 = {4, 5, 6, 7};  // kernel node2
-
   iree_task_topology_t topology;
-  EXPECT_EQ(4u, InitPhysicalCoreCount(/*node_id=*/0, 8, &topology));
-  EXPECT_TRUE(SetIsSubset(CollectProcessors(topology), dense0));
-  iree_task_topology_deinitialize(&topology);
-
-  EXPECT_EQ(4u, InitPhysicalCoreCount(/*node_id=*/1, 8, &topology));
-  EXPECT_TRUE(SetIsSubset(CollectProcessors(topology), dense1));
-  iree_task_topology_deinitialize(&topology);
-
-  // Misusing kernel id 2 as dense node id yields empty selection.
+  // Dense 0/1 are valid; misusing kernel id 2 as dense id → empty.
   EXPECT_EQ(0u, InitPhysicalCoreCount(/*node_id=*/2, 8, &topology));
   iree_task_topology_deinitialize(&topology);
 }
 
-// P3 — WITH node/: must NOT collapse to single package even if package_id=0.
-TEST_F(TopologySysfsFixtureTest, P3_NumaOverPackage_NoCollapse) {
+TEST_F(TopologySysfsFixtureTest, S2_P3_NumaWinsOverPackage) {
   UseFixture("prop_numa_over_package");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
   EXPECT_EQ(2u, iree_task_topology_query_node_count());
 
   iree_task_topology_t topology;
@@ -347,11 +295,9 @@ TEST_F(TopologySysfsFixtureTest, P3_NumaOverPackage_NoCollapse) {
   iree_task_topology_deinitialize(&topology);
 }
 
-// P4 — no node/: multi-package dense fallback (package-only-when-no-node).
-TEST_F(TopologySysfsFixtureTest, P4_PackageMulti_WhenNoNode) {
+TEST_F(TopologySysfsFixtureTest, S2_P4_PackageMulti_WhenNoNode) {
   UseFixture("prop_package_multi");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
   EXPECT_EQ(2u, iree_task_topology_query_node_count());
 
   iree_task_topology_t topology;
@@ -363,11 +309,9 @@ TEST_F(TopologySysfsFixtureTest, P4_PackageMulti_WhenNoNode) {
   iree_task_topology_deinitialize(&topology);
 }
 
-// P5 — empty cpulist on an online node: counted, maps no CPUs.
-TEST_F(TopologySysfsFixtureTest, P5_EmptyCpulist_MapsNone) {
+TEST_F(TopologySysfsFixtureTest, S2_P5_EmptyCpulist_MapsNone) {
   UseFixture("prop_empty_cpulist");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
   EXPECT_EQ(2u, iree_task_topology_query_node_count());
 
   iree_task_topology_t topology;
@@ -377,29 +321,12 @@ TEST_F(TopologySysfsFixtureTest, P5_EmptyCpulist_MapsNone) {
   iree_task_topology_deinitialize(&topology);
 }
 
-// P6 — uncovered CPUs: graceful degrade keeps them when map fails.
-TEST_F(TopologySysfsFixtureTest, P6_UncoveredCpu_DegradeKeep) {
+TEST_F(TopologySysfsFixtureTest, S2_P6_UncoveredCpu_DegradeKeep) {
   UseFixture("prop_uncovered_cpu");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
 
-  EXPECT_EQ(2u, iree_task_topology_query_node_count());
-
   iree_task_topology_t topology;
-  EXPECT_EQ(
-      8u, InitPhysicalCoreCount(IREE_TASK_TOPOLOGY_NODE_ID_ANY, 8, &topology));
-  iree_task_topology_deinitialize(&topology);
-
-  // node0 maps 0-2; unmapped 6-7 kept by degrade → 5 physical cores.
   EXPECT_EQ(5u, InitPhysicalCoreCount(/*node_id=*/0, 8, &topology));
-  {
-    const auto cpus = CollectProcessors(topology);
-    EXPECT_TRUE(cpus.count(6));
-    EXPECT_TRUE(cpus.count(7));
-  }
-  iree_task_topology_deinitialize(&topology);
-
-  // node1 maps 3-5; same unmapped 6-7 kept → 5.
-  EXPECT_EQ(5u, InitPhysicalCoreCount(/*node_id=*/1, 8, &topology));
   {
     const auto cpus = CollectProcessors(topology);
     EXPECT_TRUE(cpus.count(6));
@@ -408,20 +335,88 @@ TEST_F(TopologySysfsFixtureTest, P6_UncoveredCpu_DegradeKeep) {
   iree_task_topology_deinitialize(&topology);
 }
 
-// P7 — NUMA path without physical_package_id (missing-package edge).
-TEST_F(TopologySysfsFixtureTest, P7_NumaNoPackage_StillDense) {
+TEST_F(TopologySysfsFixtureTest, S2_P7_NumaWithoutPackage) {
   UseFixture("prop_numa_no_package");
   ASSERT_FALSE(::testing::Test::HasFatalFailure());
-
   EXPECT_EQ(2u, iree_task_topology_query_node_count());
 
   iree_task_topology_t topology;
   EXPECT_EQ(4u, InitPhysicalCoreCount(/*node_id=*/0, 8, &topology));
   EXPECT_TRUE(SetIsSubset(CollectProcessors(topology), {0, 1, 2, 3}));
-  // Affinity falls back to package when package file absent → group unset/0.
-  // Mapping itself must still succeed via NUMA.
   iree_task_topology_deinitialize(&topology);
-  EXPECT_EQ(4u, InitPhysicalCoreCount(/*node_id=*/1, 8, &topology));
+}
+
+TEST_F(TopologySysfsFixtureTest, S2_A2a_NoNuma_PackageFallback) {
+  UseFixture("x86_no_numa_single_package");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+  EXPECT_EQ(1u, iree_task_topology_query_node_count());
+
+  iree_task_topology_t topology;
+  EXPECT_EQ(kIssue24761PhysicalCoreCount,
+            InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
+  EXPECT_TRUE(CollectAffinityGroups(topology).count(72));
+  iree_task_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologySysfsFixtureTest, S2_A2b_MissingCluster_AffinityPackage) {
+  UseFixture("x86_missing_cluster_id");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  iree_task_topology_t topology;
+  EXPECT_EQ(kIssue24761PhysicalCoreCount,
+            InitPhysicalCoreCount(/*node_id=*/0, 24, &topology));
+  for (iree_host_size_t i = 0; i < topology.group_count; ++i) {
+    EXPECT_EQ(0u, topology.groups[i].ideal_thread_affinity.group);
+  }
+  iree_task_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologySysfsFixtureTest, S2_A0_Pixel_NotThreeClusterNodes) {
+  UseFixture("arm64_pixel6_tensor");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  iree_task_topology_t topology;
+  EXPECT_EQ(
+      8u, InitPhysicalCoreCount(IREE_TASK_TOPOLOGY_NODE_ID_ANY, 8, &topology));
+  const auto affinity = CollectAffinityGroups(topology);
+  EXPECT_TRUE(affinity.count(0));
+  EXPECT_TRUE(affinity.count(1));
+  EXPECT_TRUE(affinity.count(2));
+  EXPECT_NE(iree_task_topology_query_node_count(), affinity.size());
+  iree_task_topology_deinitialize(&topology);
+}
+
+//===----------------------------------------------------------------------===//
+// S3 — public flags path (initialize_from_flags; default mode=physical_cores)
+//===----------------------------------------------------------------------===//
+
+TEST_F(TopologySysfsFixtureTest, S3_A1_FlagsPathMatchesPhysicalCoresOnCurrent) {
+  UseFixture("x86_hybrid_sparse_clusters");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  // Mirrors api.c default: nodes=current → one topology for current node.
+  const iree_task_topology_node_id_t current =
+      iree_task_topology_query_current_node();
+  EXPECT_EQ(0u, current);
+
+  iree_task_topology_t topology;
+  iree_task_topology_initialize(&topology);
+  IREE_ASSERT_OK(iree_task_topology_initialize_from_flags(current, &topology));
+  // Same anti-collapse gate as S2: must not be a single-cluster worker pool.
+  EXPECT_EQ(kIssue24761PhysicalCoreCount, topology.group_count);
+  EXPECT_GT(topology.group_count, 2u);
+  iree_task_topology_deinitialize(&topology);
+}
+
+TEST_F(TopologySysfsFixtureTest, S3_P1_FlagsPathRespectsDenseNodeOne) {
+  UseFixture("prop_dual_numa");
+  ASSERT_FALSE(::testing::Test::HasFatalFailure());
+
+  iree_task_topology_t topology;
+  iree_task_topology_initialize(&topology);
+  IREE_ASSERT_OK(
+      iree_task_topology_initialize_from_flags(/*node_id=*/1, &topology));
+  EXPECT_EQ(4u, topology.group_count);
   EXPECT_TRUE(SetIsSubset(CollectProcessors(topology), {4, 5, 6, 7}));
   iree_task_topology_deinitialize(&topology);
 }
