@@ -69,6 +69,7 @@
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/function_io.h"
+#include "iree/tooling/function_util.h"
 #include "iree/tooling/process_results.h"
 #include "iree/vm/api.h"
 
@@ -610,6 +611,22 @@ class IREEBenchmark {
     if (!outputs_) {
       return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                               "no output list to process");
+    }
+
+    // Transfer outputs to the host so they can be processed. Only required when
+    // using full HAL device-based execution.
+    if (device_ != NULL) {
+      iree_hal_buffer_params_t target_params = {};
+      target_params.usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+      target_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+      target_params.type =
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+      target_params.queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
+      target_params.min_alignment = 0;
+      IREE_RETURN_IF_ERROR(iree_tooling_transfer_variants(
+          outputs_.get(), device_, device_allocator_.get(), target_params,
+          /*wait_fence=*/NULL, /*signal_fence=*/NULL));
     }
 
     IREE_RETURN_IF_ERROR(iree_tooling_process_results_and_print(
