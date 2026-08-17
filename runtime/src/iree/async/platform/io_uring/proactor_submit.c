@@ -725,6 +725,22 @@ static void iree_async_proactor_io_uring_fill_file_open(
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
+// Maximum bytes transferred by a single READ/WRITE SQE: INT_MAX rounded down to
+// a 4KB page.
+//
+// sqe->len is 32 bits, so longer spans must be clamped instead of narrowed: a
+// span that is an exact multiple of 4GB would wrap to zero and complete with no
+// bytes transferred, which the caller cannot distinguish from EOF. Short
+// transfers are part of the file read/write contract, so callers resubmit for
+// the remainder.
+//
+// Any ceiling below 4GB would be correct; this one matches MAX_RW_COUNT
+// (INT_MAX & PAGE_MASK) on a 4KB-page kernel. Kernels with larger pages cap
+// slightly lower and shorten the transfer themselves, which is the same short
+// read callers already handle.
+#define IREE_ASYNC_IO_URING_MAX_RW_LENGTH \
+  ((uint32_t)INT32_MAX & ~UINT32_C(4095))
+
 // Fills an SQE for a FILE_READ operation.
 // Uses IORING_OP_READ for positioned file I/O (pread semantics).
 //
@@ -732,7 +748,7 @@ static void iree_async_proactor_io_uring_fill_file_open(
 //   fd   = file descriptor
 //   off  = file offset
 //   addr = buffer address
-//   len  = buffer length
+//   len  = buffer length (clamped, see IREE_ASYNC_IO_URING_MAX_RW_LENGTH)
 static void iree_async_proactor_io_uring_fill_file_read(
     iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
   iree_async_file_read_operation_t* read_op =
@@ -743,7 +759,8 @@ static void iree_async_proactor_io_uring_fill_file_read(
   sqe->fd = read_op->file->primitive.value.fd;
   sqe->off = read_op->offset;
   sqe->addr = (uint64_t)(uintptr_t)iree_async_span_ptr(read_op->buffer);
-  sqe->len = (uint32_t)read_op->buffer.length;
+  sqe->len = (uint32_t)iree_min(read_op->buffer.length,
+                                IREE_ASYNC_IO_URING_MAX_RW_LENGTH);
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
@@ -754,7 +771,7 @@ static void iree_async_proactor_io_uring_fill_file_read(
 //   fd   = file descriptor
 //   off  = file offset
 //   addr = buffer address
-//   len  = buffer length
+//   len  = buffer length (clamped, see IREE_ASYNC_IO_URING_MAX_RW_LENGTH)
 static void iree_async_proactor_io_uring_fill_file_write(
     iree_io_uring_sqe_t* sqe, iree_async_operation_t* base_operation) {
   iree_async_file_write_operation_t* write_op =
@@ -765,7 +782,8 @@ static void iree_async_proactor_io_uring_fill_file_write(
   sqe->fd = write_op->file->primitive.value.fd;
   sqe->off = write_op->offset;
   sqe->addr = (uint64_t)(uintptr_t)iree_async_span_ptr(write_op->buffer);
-  sqe->len = (uint32_t)write_op->buffer.length;
+  sqe->len = (uint32_t)iree_min(write_op->buffer.length,
+                                IREE_ASYNC_IO_URING_MAX_RW_LENGTH);
   sqe->user_data = (uint64_t)(uintptr_t)base_operation;
 }
 
