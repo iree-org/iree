@@ -27,6 +27,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -49,7 +50,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 ///  1. Have a single result.
 ///  2. Have single use.
 ///  3. Have all parallel iterators.
-///  4. Have an identity output indexing map.
+///  4. Have a permutation (which includes identity) output indexing map.
 ///  5. Have a tensor.empty init operand.
 ///  6. Have as many indexing map dims as there are results in the encoding's
 ///     bcast_map.
@@ -57,6 +58,13 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// This function creates SetEncoding ops on all of the inputs to the
 /// `genericOp`, and replaces the op with an encoded version. If any of
 /// the above conditions are false, then it returns failure.
+///
+/// When the output map is a non-identity permutation (e.g. a transpose fused
+/// into the generic's output indexing map by elementwise fusion), each
+/// operand's indexing map is re-expressed in terms of the *output*'s index
+/// space, rather than the generic's raw loop space, by composing with
+/// the inverse of the output permutation, before it is appended to the
+/// encoding's map chain.
 ///
 /// Note: The bcast_map on the set_encoding op must be identity or absent.
 ///       The implementation should work for cases where it is not, but it is
@@ -84,9 +92,11 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
   }
   AffineMap outputMap =
       genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
-  if (!outputMap.isIdentity()) {
-    return rewriter.notifyMatchFailure(genericOp, "output map not identity");
+  if (!outputMap.isPermutation()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "output map not a permutation");
   }
+  AffineMap invOutputMap = inversePermutation(outputMap);
 
   RankedTensorType encodedType = encodingOp.getResultType();
   auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
@@ -116,12 +126,15 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
   Location loc = genericOp->getLoc();
   SmallVector<Value> encodedOperands;
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
-    // Append the operand's indexing map to the encoding's user indexing maps.
+    // Append the operand's indexing map to the encoding's user indexing
+    // maps, re-expressed in terms of the output's index space by
+    // composing with the inverse of the output permutation.
     AffineMap operandMap = genericOp.getMatchingIndexingMap(operand);
+    AffineMap remappedOperandMap = operandMap.compose(invOutputMap);
 
     // Create new encoding and set encoding on the operand.
     IREE::Encoding::EncodingAttr newEncoding =
-        encoding.cloneWithNewOperandIndexingMap(operandMap);
+        encoding.cloneWithNewOperandIndexingMap(remappedOperandMap);
     auto operandType = cast<RankedTensorType>(operand->get().getType());
     auto resType = RankedTensorType::get(
         operandType.getShape(), operandType.getElementType(), newEncoding);
