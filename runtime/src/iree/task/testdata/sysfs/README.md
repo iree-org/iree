@@ -23,12 +23,33 @@ text - capture those locally for testing but don't check them in.
 **Architecture:** x86_64 (fixture only; no live HW required)
 **Configuration:**
 - 8 logical CPUs, one `physical_package_id` (0), one NUMA `node0` (`cpulist`/`cpumap` = 0-7)
-- Sparse `cluster_id`s: CPUs 0–3 → 0, 8, 16, 24 (P-like); CPUs 4–7 → 32 (E-like group)
+- Sparse `cluster_id`s across CPUs (0, 8, 16, …)
 
 **Expected Behavior (node ≠ cluster — iree-org/iree#24761):**
-- `iree_task_topology_query_node_count()` == **1** (NUMA), **not** unique cluster count (5)
+- `iree_task_topology_query_node_count()` == **1** (NUMA), **not** unique cluster count
 - `initialize_from_physical_cores(0, …)` and `NODE_ID_ANY` yield **8** groups
 - `ideal_thread_affinity.group` still reflects sparse `cluster_id` (affinity hint only)
+
+### GAN adversarial fixtures (#24761)
+
+Checked-in synthetic trees used by `topology_sysfs_test` (see ticket
+`GAN_TOPOLOGY_PLAN.md`). Each attacks a distinct failure mode:
+
+| Fixture | Attack |
+|---------|--------|
+| `x86_hybrid_smt_sparse_clusters` | Hybrid + SMT; physical cores ≠ logical |
+| `x86_dual_numa_sparse_clusters` | Dual socket × dual NUMA + sparse clusters |
+| `x86_single_socket_multi_numa` | AMD SNC-like: 1 package, 2 NUMA (NUMA wins) |
+| `x86_sparse_kernel_numa` | `node/online=0,2` → dense 0,1 (not raw ids) |
+| `x86_multi_package_no_numa` | No `node/` → multi `physical_package_id` |
+| `x86_no_numa_single_package` | No `node/` + single package + sparse clusters |
+| `x86_missing_cluster_id` | Old kernel: affinity falls back to package |
+| `x86_numa_missing_package` | NUMA present without `physical_package_id` |
+| `x86_bare_minimal` | No NUMA/package/cluster → degenerate 1 node |
+| `x86_partial_cpus` | Holes in `cpuN` topology dirs |
+| `x86_empty_cpulist_node` | Empty `cpulist` on an online node |
+| `x86_large_cluster_ids` | `cluster_id` ≥ 64 must not become node count |
+| `x86_numa_uncovered_cpu` | CPUs outside all cpulists → degrade keep |
 
 ### arm64_pixel6_tensor/
 
