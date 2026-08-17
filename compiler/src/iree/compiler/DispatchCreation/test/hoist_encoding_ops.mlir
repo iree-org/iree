@@ -965,8 +965,8 @@ util.func public @bubble_through_dequant_and_transpose(
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 // CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
 // CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1, d0)>
-// CHECK-DAG:   #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:   #{{.*}} = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG:   #{{.*}} = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]>
 // CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP3]]], #[[MAP2]]]>
 // CHECK-DAG:   #[[$ENCODING_BMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP4]]], #[[MAP2]]]>
@@ -1015,8 +1015,8 @@ util.func public @bubble_through_non_involutive_permutation(
 // CHECK-DAG:   #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
-// CHECK-DAG:   #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK-DAG:   #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
+// CHECK-DAG:   #{{.*}} = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK-DAG:   #{{.*}} = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
 // CHECK-DAG:   #[[$ENCODING:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32], user_indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP]]]>
 // CHECK-DAG:   #[[$ENCODING_IBMAP:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32], user_indexing_maps = [#[[MAP]], [#[[MAP1]], #[[MAP2]]], #[[MAP]]]>
 // CHECK-LABEL: @bubble_through_non_involutive_permutation

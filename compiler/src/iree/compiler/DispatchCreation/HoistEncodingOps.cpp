@@ -64,8 +64,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// operand's indexing map is re-expressed in terms of the *output*'s index
 /// space, rather than the generic's raw loop space, by composing with
 /// the inverse of the output permutation, before it is appended to the
-/// encoding's map chain. This keeps the chain's domain/codomain consistent
-/// with the identity case, of which it is a strict generalization.
+/// encoding's map chain.
 ///
 /// Note: The bcast_map on the set_encoding op must be identity or absent.
 ///       The implementation should work for cases where it is not, but it is
