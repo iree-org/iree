@@ -3,23 +3,25 @@
 This directory contains snapshots of `/sys/devices/system/{cpu,node}/`
 structures used to test `topology_sysfs.c` without live hardware.
 
-**Corpus policy (provenance first):** see ops `process/CORPUS.md`. Fixtures
-grow from an **authoritative corpus**, not a forest of unexplained synthetic
-trees. Every checked-in tree is classified A0 / A1 / A2 below. **No orphan
-A2** — each mutation names its parent and the exact edit. Cases that cannot
-be derived from a real dump or documented kernel shape are **deferred (P2:
-needs capture)**, not invented.
+**Corpus policy:** see ops `process/CORPUS.md`. Two layers:
 
-**A1 authority:** ticket `ORACLE_TOPOLOGY.md` (issue #24761 reporter paste).
+1. **Authority corpus (A0 / A1 / A2 mutations)** — grow from real dumps /
+   issue paste. Never invent a fake machine and call it authority.
+2. **Property test doubles (P-\*)** — minimal synthetic trees that are
+   **inputs to the mapping function `f()`**, not captured machines. They
+   discriminate DESIGN invariants (dense NUMA remap, package-only-when-no-node,
+   empty cpulist, degrade, …). Labeled honestly; **deferred capture ≠ deferred
+   property tests**.
 
 Archives only are checked in (extracted dirs are gitignored):
 
 ```bash
 tar xzf arm64_pixel6_tensor.tar.gz
 tar xzf x86_hybrid_sparse_clusters.tar.gz
+tar xzf prop_dual_numa.tar.gz   # etc.
 ```
 
-## Corpus lineage
+## Authority corpus lineage
 
 ```
 A0 arm64_pixel6_tensor          (upstream capture, #22455 / capture_sysfs)
@@ -36,15 +38,32 @@ A1 x86_hybrid_sparse_clusters   (issue #24761 reporter cluster_id paste)
 | **A2a** | `x86_no_numa_single_package` | Mutation of **A1**: remove `node/` | Package-fallback path when NUMA sysfs absent |
 | **A2b** | `x86_missing_cluster_id` | Mutation of **A1**: remove all `topology/cluster_id` | Affinity falls back to `physical_package_id` (pre-5.16 / missing ABI); **keeps single NUMA** |
 
-### Deferred (P2 — needs authoritative capture; not checked in)
+## Property test doubles (P-\*) — synthetic input to `f()`, not a machine
 
-| Case | Why not invented |
-|------|------------------|
-| Dual-socket / dual-NUMA | No real dump in-repo; would be orphan synthetic |
-| Sparse kernel NUMA `online=0,2` | Needs live multi-node capture |
-| AMD SNC (1 package, multi-NUMA) | Needs live capture |
-| Multi-package without NUMA | Dual-socket dump required |
-| Empty cpulist / uncovered CPU / partial cpu dirs | Speculative corners; capture or kernel-doc repro first |
+Each tree is a **test double** for a DESIGN discriminator. Do **not** cite these
+as dual-socket / SNC hardware evidence. Live multi-node dumps remain welcome as
+future **A0** entries.
+
+| ID | Fixture | What it proves (invariant) |
+|----|---------|----------------------------|
+| **P1** | `prop_dual_numa` | Two NUMA cpulists → dense nodes `0,1`; filter by node keeps membership |
+| **P2** | `prop_sparse_kernel_numa` | `node/online=0,2` → dense ordinals; raw kernel id must not be used as dense bit |
+| **P3** | `prop_numa_over_package` | WITH `node/` → must **not** collapse to single package even if `package_id=0` |
+| **P4** | `prop_package_multi` | No `node/` → multi-package dense fallback (package-only-when-no-node) |
+| **P5** | `prop_empty_cpulist` | Empty cpulist on an online node: counted, maps no CPUs |
+| **P6** | `prop_uncovered_cpu` | Unmapped CPUs kept when dense-node map fails (documented degrade) |
+| **P7** | `prop_numa_no_package` | NUMA path works without `physical_package_id` files |
+
+Also covered on **authority** trees (not separate P fixtures):
+
+- A1: `cluster_id` only in `affinity.group`; `node_count ≠ |unique clusters|`; ids ≥64 stay affinity (mask safety)
+- A2a / A0: no `node/` → package dense fallback
+- A2b: missing `cluster_id` → affinity falls back to package
+
+### Still deferred as **authority** (needs capture) — not as property tests
+
+Dual-socket / SNC / sparse-`online` **live dumps** for A0 fidelity. Property
+coverage for those *mapping* behaviors is already in P1–P3 above.
 
 ## A1 oracle detail
 
@@ -78,8 +97,8 @@ Summary (MUST match):
 COPYFILE_DISABLE=1 tar czf my_system_name.tar.gz --exclude='._*' my_system_name/
 ```
 
-Prefer live multi-socket / hybrid captures for future A0/A1 entries. Only check
-in small interesting trees; large x86 dumps stay local.
+Prefer live multi-socket / hybrid captures for future **A0/A1** entries. Property
+doubles stay minimal; do not grow a forest of unlabeled synthetics.
 
 ## Testing
 
@@ -90,4 +109,5 @@ Validate:
 
 1. Node id follows NUMA `node*/cpulist` (else package), **never** raw `cluster_id`
 2. Sparse / large cluster ids remain affinity hints only
-3. Mutations preserve relative invariants of the parent corpus
+3. Authority mutations preserve relative invariants of the parent corpus
+4. P-\* asserts check mapping properties of the synthetic tree, not HW claims

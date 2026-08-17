@@ -148,6 +148,13 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH S
       "topology_sysfs_test.cc"
     DATA
       "runtime/src/iree/task/testdata/sysfs/arm64_pixel6_tensor.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_dual_numa.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_empty_cpulist.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_numa_no_package.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_numa_over_package.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_package_multi.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_sparse_kernel_numa.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/prop_uncovered_cpu.tar.gz"
       "runtime/src/iree/task/testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
       "runtime/src/iree/task/testdata/sysfs/x86_missing_cluster_id.tar.gz"
       "runtime/src/iree/task/testdata/sysfs/x86_no_numa_single_package.tar.gz"

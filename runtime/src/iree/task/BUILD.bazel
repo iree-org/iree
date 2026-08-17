@@ -122,6 +122,13 @@ iree_runtime_cc_test(
     srcs = ["topology_sysfs_test.cc"],
     data = [
         "testdata/sysfs/arm64_pixel6_tensor.tar.gz",
+        "testdata/sysfs/prop_dual_numa.tar.gz",
+        "testdata/sysfs/prop_empty_cpulist.tar.gz",
+        "testdata/sysfs/prop_numa_no_package.tar.gz",
+        "testdata/sysfs/prop_numa_over_package.tar.gz",
+        "testdata/sysfs/prop_package_multi.tar.gz",
+        "testdata/sysfs/prop_sparse_kernel_numa.tar.gz",
+        "testdata/sysfs/prop_uncovered_cpu.tar.gz",
         "testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz",
         "testdata/sysfs/x86_missing_cluster_id.tar.gz",
         "testdata/sysfs/x86_no_numa_single_package.tar.gz",
