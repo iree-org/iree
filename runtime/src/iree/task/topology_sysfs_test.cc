@@ -86,6 +86,7 @@ class TopologySysfsTest : public ::testing::Test {
  protected:
   void SetUp() override {
     fixture_root_ = ResolveHybridFixtureRoot();
+    ASSERT_FALSE(fixture_root_.empty());
     iree_sysfs_set_root_path_for_testing(fixture_root_.c_str());
   }
 

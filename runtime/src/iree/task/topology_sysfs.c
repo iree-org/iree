@@ -961,9 +961,10 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     }
 
     // Filter by NUMA/package dense node id if specified — never by cluster_id.
+    // If node mapping is unavailable, keep the CPU (graceful degradation).
     if (node_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY) {
       iree_task_topology_node_id_t cpu_node = 0;
-      if (!iree_sysfs_try_query_cpu_dense_node(cpu, &cpu_node) ||
+      if (iree_sysfs_try_query_cpu_dense_node(cpu, &cpu_node) &&
           cpu_node != node_id) {
         continue;  // Wrong NUMA/package node.
       }
