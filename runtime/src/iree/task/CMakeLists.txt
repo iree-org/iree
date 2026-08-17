@@ -147,7 +147,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH S
     SRCS
       "topology_sysfs_test.cc"
     DATA
-      "testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
     DEFINES
       "IREE_TASK_SYSFS_TESTDATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/testdata/sysfs\""
     DEPS
