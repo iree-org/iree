@@ -28,7 +28,14 @@ extern "C" {
 // Defaults to "/sys/devices/system" but can be overridden at compile time
 // by defining IREE_SYSFS_ROOT="/path/to/sysfs" for testing with mock
 // filesystem snapshots.
+// A runtime override via iree_sysfs_set_root_path_for_testing takes precedence
+// when set (test-only).
 const char* iree_sysfs_get_root_path(void);
+
+// Test-only: overrides the sysfs root returned by iree_sysfs_get_root_path.
+// Pass NULL to clear the override and restore compile-time / default behavior.
+// Not thread-safe; intended for single-threaded gtest setup/teardown.
+void iree_sysfs_set_root_path_for_testing(const char* path);
 
 //===----------------------------------------------------------------------===//
 // File I/O

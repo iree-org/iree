@@ -68,6 +68,17 @@ TEST(SysfsTest, ParseSizeString) {
                         iree_sysfs_parse_size_string(IREE_SV(""), &size));
 }
 
+TEST(SysfsTest, SetRootPathForTesting) {
+  const char* original = iree_sysfs_get_root_path();
+  ASSERT_NE(nullptr, original);
+
+  iree_sysfs_set_root_path_for_testing("/tmp/iree_sysfs_fixture");
+  EXPECT_STREQ("/tmp/iree_sysfs_fixture", iree_sysfs_get_root_path());
+
+  iree_sysfs_set_root_path_for_testing(NULL);
+  EXPECT_STREQ(original, iree_sysfs_get_root_path());
+}
+
 #else
 
 TEST(SysfsTest, PlatformDisabled) {}

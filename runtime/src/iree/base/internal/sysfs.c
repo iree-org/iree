@@ -17,7 +17,17 @@
 // Configuration
 //===----------------------------------------------------------------------===//
 
+// Test-only override; NULL means use compile-time IREE_SYSFS_ROOT or default.
+static const char* iree_sysfs_root_path_for_testing = NULL;
+
+void iree_sysfs_set_root_path_for_testing(const char* path) {
+  iree_sysfs_root_path_for_testing = path;
+}
+
 const char* iree_sysfs_get_root_path(void) {
+  if (iree_sysfs_root_path_for_testing) {
+    return iree_sysfs_root_path_for_testing;
+  }
 #if defined(IREE_SYSFS_ROOT)
   return IREE_SYSFS_ROOT;
 #else
