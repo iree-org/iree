@@ -147,7 +147,21 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH S
     SRCS
       "topology_sysfs_test.cc"
     DATA
+      "runtime/src/iree/task/testdata/sysfs/arm64_pixel6_tensor.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_bare_minimal.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_dual_numa_sparse_clusters.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_empty_cpulist_node.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_hybrid_smt_sparse_clusters.tar.gz"
       "runtime/src/iree/task/testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_large_cluster_ids.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_missing_cluster_id.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_multi_package_no_numa.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_no_numa_single_package.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_numa_missing_package.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_numa_uncovered_cpu.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_partial_cpus.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_single_socket_multi_numa.tar.gz"
+      "runtime/src/iree/task/testdata/sysfs/x86_sparse_kernel_numa.tar.gz"
     DEFINES
       "IREE_TASK_SYSFS_TESTDATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/testdata/sysfs\""
     DEPS
