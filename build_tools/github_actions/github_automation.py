@@ -48,26 +48,29 @@ class PullRequestGreeter(FirstTimeContributorGreeter):
 {FIRST_TIME_CONTRIBUTOR_COMMENT_TAG}
 Hello @{author} :wave:
 
-Thank you for submitting a Pull Request to IREE! It looks like this is your first one. Below are some useful links and pointers.
+Thank you for submitting a Pull Request to IREE! It looks like this is your first one. We have one ask, and you can also find some general tips below.
+
+---
+
+### Action required: acknowledge IREE project policies
+IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
+
+All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
+- Contributors must fully understand, and vouch for, **all** submitted changes and the intent behind them.
+- Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
+- Contributors must write PR descriptions themselves. There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
+  If a response includes LLM-assisted segments (e.g. reproducers, LLM agent analysis excerpts), the segment should be clearly marked as "assisted", same as for PR contents.
+- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
+
+We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
+
+---
 
 ### General guidance
 Our general [Contributing guide](https://iree.dev/developers/general/contributing/) contains information and links to detailed guides on code quality, testing, commit summaries and our CI system.
 
 A common point for new PRs: if a DCO signing check fails for you, check out the section on [Developer Certificate of Origin](https://iree.dev/developers/general/contributing/#developer-certificate-of-origin).
 In these cases, it should suffice to amend your commit signature(s) per the guide and force-push the PR branch.
-
-### Action required: acknowledge IREE project policies
-IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
-
-Please also note that all contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
-- Contributors must fully understand, and vouch for, **all** submitted changes and the intent behind them.
-- Contributors should write PR descriptions themselves.
-- Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
-- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. We discourage AI tool usage for resolutions to those issues, and substantial use (e.g. fully prompting the fix and/or the tests) is forbidden.
-
-We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
-
----
 
 If you have any questions, feel free to leave a comment here, or ask away on [IREE Discord](https://discord.gg/e4F4NzX99).
 
