@@ -1133,9 +1133,11 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   std::vector<std::pair<std::string, std::string>> param_strings;
   std::vector<iree_string_pair_t> passed_params;
   if (params.has_value()) {
-    for (auto it : params.value()) {
-      param_strings.push_back(std::make_pair(py::cast<std::string>(it.first),
-                                             py::cast<std::string>(it.second)));
+    auto params_dict = params.value();
+    param_strings.reserve(py::len(params_dict));
+    for (auto it : params_dict) {
+      param_strings.emplace_back(py::cast<std::string>(it.first),
+                                 py::cast<std::string>(it.second));
       passed_params.push_back(
           iree_string_pair_t{{{param_strings.back().first.c_str(),
                                param_strings.back().first.size()}},
