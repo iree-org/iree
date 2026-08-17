@@ -93,6 +93,38 @@ for cpu_dir in /sys/devices/system/cpu/cpu[0-9]*; do
 done
 
 echo "Successfully captured ${CPU_COUNT} CPUs to ${DEST}"
+
+# Capture NUMA node topology (sibling of cpu/ under /sys/devices/system).
+DEST_NODE="${DEST}/node"
+if [ -d /sys/devices/system/node ]; then
+  mkdir -p "${DEST_NODE}"
+  for file in online possible has_cpu; do
+    SRC="/sys/devices/system/node/${file}"
+    if [ -f "${SRC}" ]; then
+      cp "${SRC}" "${DEST_NODE}/" 2>/dev/null || true
+    fi
+  done
+  NODE_COUNT=0
+  for node_dir in /sys/devices/system/node/node[0-9]*; do
+    if [ ! -d "${node_dir}" ]; then
+      continue
+    fi
+    NODE_NAME=$(basename "${node_dir}")
+    DEST_NODE_DIR="${DEST_NODE}/${NODE_NAME}"
+    mkdir -p "${DEST_NODE_DIR}"
+    for node_file in cpulist cpumap distance; do
+      SRC_FILE="${node_dir}/${node_file}"
+      if [ -f "${SRC_FILE}" ]; then
+        cp "${SRC_FILE}" "${DEST_NODE_DIR}/"
+      fi
+    done
+    NODE_COUNT=$((NODE_COUNT + 1))
+  done
+  echo "Successfully captured ${NODE_COUNT} NUMA nodes to ${DEST_NODE}"
+else
+  echo "No /sys/devices/system/node present; skipped NUMA capture"
+fi
+
 echo ""
 echo "To test with this snapshot:"
 echo "  ./build/tools/iree-run-module \\"

@@ -17,6 +17,19 @@ text - capture those locally for testing but don't check them in.
 
 ## Test Configurations
 
+### x86_hybrid_sparse_clusters/
+
+**Hardware:** Synthetic Intel hybrid-like (sparse `cluster_id`, single package/NUMA)
+**Architecture:** x86_64 (fixture only; no live HW required)
+**Configuration:**
+- 8 logical CPUs, one `physical_package_id` (0), one NUMA `node0` (`cpulist`/`cpumap` = 0-7)
+- Sparse `cluster_id`s: CPUs 0–3 → 0, 8, 16, 24 (P-like); CPUs 4–7 → 32 (E-like group)
+
+**Expected Behavior (node ≠ cluster — iree-org/iree#24761):**
+- `iree_task_topology_query_node_count()` == **1** (NUMA), **not** unique cluster count (5)
+- `initialize_from_physical_cores(0, …)` and `NODE_ID_ANY` yield **8** groups
+- `ideal_thread_affinity.group` still reflects sparse `cluster_id` (affinity hint only)
+
 ### arm64_pixel6_tensor/
 
 **Hardware:** Google Pixel 6 (Google Tensor GS101)
@@ -32,7 +45,8 @@ text - capture those locally for testing but don't check them in.
   - A55: L1 32KB, L2 128KB, L3 4MB (shared 4-7)
 
 **Expected Behavior:**
-- Should detect 3 clusters based on cluster_id
+- Task **node** identity follows NUMA/package (not raw `cluster_id`); Pixel6 often has a single node
+- Cluster IDs remain available as thread affinity group hints
 - With 75% capacity threshold (768):
   - HIGH performance: CPUs 0-1, 2-3 (capacity >= 768)
   - LOW performance: CPUs 4-7 (capacity < 768)
@@ -56,6 +70,7 @@ The script captures:
 - Per-CPU topology (`core_id`, `cluster_id`, `physical_package_id`, etc.)
 - Per-CPU cache hierarchy (`type`, `level`, `size`, `shared_cpu_list`)
 - ARM-specific files (`cpu_capacity` for big.LITTLE detection)
+- NUMA node files under `node/` (`online`, per-node `cpulist`/`cpumap`) when present
 
 ## Testing with Snapshots
 
@@ -106,7 +121,7 @@ Available flags for topology configuration:
 When testing, verify:
 
 1. **CPU detection:** Correct number of logical processors detected
-2. **Cluster/node mapping:** CPUs grouped correctly by cluster_id
+2. **Node vs cluster:** Task node id follows NUMA `node*/cpulist` (else package), **not** raw `cluster_id`; affinity.group may still use cluster_id
 3. **Cache hierarchy:** L1/L2/L3 sizes and sharing masks accurate
 4. **ARM big.LITTLE filtering:**
    - ANY mode includes all cores

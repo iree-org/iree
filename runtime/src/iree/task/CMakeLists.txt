@@ -140,6 +140,23 @@ if(IREE_ENABLE_CPUINFO)
   message(STATUS "IREE task topology: using cpuinfo")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT EMSCRIPTEN AND NOT IREE_ARCH STREQUAL "wasm_32")
   message(STATUS "IREE task topology: using sysfs (Linux)")
+  # Fixture tests for node≠cluster (#24761). Requires sysfs backend (not cpuinfo).
+  iree_cc_test(
+    NAME
+      topology_sysfs_test
+    SRCS
+      "topology_sysfs_test.cc"
+    DATA
+      "testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz"
+    DEFINES
+      "IREE_TASK_SYSFS_TESTDATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/testdata/sysfs\""
+    DEPS
+      ::task
+      iree::base
+      iree::base::internal::sysfs
+      iree::testing::gtest
+      iree::testing::gtest_main
+  )
 elseif(APPLE)
   message(STATUS "IREE task topology: using platform-specific (Darwin)")
 elseif(WIN32)

@@ -117,6 +117,25 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "topology_sysfs_test",
+    srcs = ["topology_sysfs_test.cc"],
+    data = [
+        "testdata/sysfs/x86_hybrid_sparse_clusters.tar.gz",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":task",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:sysfs",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 cc_binary_benchmark(
     name = "executor_benchmark",
     srcs = ["executor_benchmark.cc"],
