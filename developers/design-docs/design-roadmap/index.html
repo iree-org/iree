@@ -6978,13 +6978,13 @@ broadcasting operation is CSE'd and then the result is used by two or more
 operations that are scheduled independently what would have been a relatively
 cheap lowering of the broadcast to a simple index remapping now becomes an
 additional dispatch, materialization of an intermediate tensor, and a barrier:</p>
-<div class="highlight"><pre><span></span><code>%bcast = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+<div class="highlight"><pre><span></span><code>%bcast = "mhlo.broadcast_in_dim"(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
 %mul1 = mhlo.multiply %arg0, %bcast : tensor&lt;1024x10xf32&gt;
 // (pretend something here that prevents fusion)
 %mul2 = mhlo.multiply %arg1, %bcast : tensor&lt;1024x10xf32&gt;
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>%bcast = flow.dispatch.region(%cst : tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt; {
-  %0 = &quot;mhlo.broadcast_in_dim&quot;(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
+  %0 = "mhlo.broadcast_in_dim"(%cst) : (tensor&lt;f32&gt;) -&gt; tensor&lt;1024x10xf32&gt;
   return %0 : tensor&lt;1024x10xf32&gt;
 }
 // a barrier will be required here

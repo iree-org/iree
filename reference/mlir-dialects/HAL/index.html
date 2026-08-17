@@ -14267,7 +14267,7 @@ result in propagated semaphore failure or device loss.</p>
 = hal.device.resolve on(#something) : !hal.device, !hal.allocator, i64
 // Returns a HAL allocator and (optional) queue affinity.
 = hal.device.resolve on(#something) : !hal.allocator, i64
-// Returns &quot;any&quot; device. Should only be used as a fallback.
+// Returns "any" device. Should only be used as a fallback.
 = hal.device.resolve : !hal.device
 </code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
@@ -14433,15 +14433,15 @@ names to avoid collisions and represent the semantics of the value.</p>
 <p>Constant values can be loaded in the device code with the
 <code>hal.executable.constant.load</code> op:</p>
 <div class="highlight"><pre><span></span><code>hal.executable.variant public @target {
-  hal.executable.constant.block(%device: !hal.device) -&gt; (i32, i32) as (&quot;foo&quot;, &quot;bar&quot;) {
-    %0 = hal.device.query&lt;%device&gt; key(&quot;some.device.prop&quot;)...
-    %1 = hal.device.query&lt;%device&gt; key(&quot;another.device.prop&quot;)...
+  hal.executable.constant.block(%device: !hal.device) -&gt; (i32, i32) as ("foo", "bar") {
+    %0 = hal.device.query&lt;%device&gt; key("some.device.prop")...
+    %1 = hal.device.query&lt;%device&gt; key("another.device.prop")...
     hal.return %0, %1 : i32, i32
   }
   builtin.module {
     func @dispatch0() {
-      %0 = hal.executable.constant.load &quot;foo&quot; : i32
-      %1 = hal.executable.constant.load &quot;bar&quot; : i32
+      %0 = hal.executable.constant.load "foo" : i32
+      %1 = hal.executable.constant.load "bar" : i32
       return
     }
   }
@@ -15788,7 +15788,7 @@ size or distribution varies based on the target device a <code>!hal.device</code
 argument can be used by the workgroup count calculation region to factor in
 device parameters. See <code>hal.device.query</code> for more information on how to
 query information.</p>
-<div class="highlight"><pre><span></span><code>%r = hal.dispatch.extern &quot;some_function&quot;[%c5, %c5](%0, %1)
+<div class="highlight"><pre><span></span><code>%r = hal.dispatch.extern "some_function"[%c5, %c5](%0, %1)
     : (tensor&lt;5x5xf32&gt;, tensor&lt;5xf32&gt;) -&gt; tensor&lt;5x5xf32&gt;
   ...
 </code></pre></div>
@@ -16361,13 +16361,13 @@ expanded based on compiler configuration and flags. Any configuration
 provided will override any defaults provided by the configuration.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>// Default `vulkan` device:
-#hal.device.alias&lt;&quot;vulkan&quot;&gt; : !hal.device
+#hal.device.alias&lt;"vulkan"&gt; : !hal.device
 // Default `vulkan` device with configuration overrides:
-#hal.device.alias&lt;&quot;vulkan&quot;, {
+#hal.device.alias&lt;"vulkan", {
   device_config = 123 : index
 }&gt; : !hal.device
 // The 3rd default `vulkan` device detected at runtime (ordinal = 3):
-#hal.device.alias&lt;&quot;vulkan&quot;[3]&gt; : !hal.device
+#hal.device.alias&lt;"vulkan"[3]&gt; : !hal.device
 </code></pre></div></p>
 <h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
 <table>
@@ -16622,7 +16622,7 @@ device can be selected.</p>
 <p>Examples:
 <div class="highlight"><pre><span></span><code>// Selects a single device matching the given target.
 #hal.device.select&lt;[
-  #hal.device.target&lt;&quot;...&quot;&gt; : !hal.device
+  #hal.device.target&lt;"..."&gt; : !hal.device
 ]&gt; : !hal.device
 // Selects a specific device with the given symbol.
 #hal.device.select&lt;[
@@ -16634,7 +16634,7 @@ device can be selected.</p>
 ]&gt; : !hal.device
 // Selects an optional device if available and otherwise @fallback.
 #hal.device.select&lt;[
-  #hal.device.target&lt;&quot;some_optional_device&quot;&gt; : !hal.device,
+  #hal.device.target&lt;"some_optional_device"&gt; : !hal.device,
   #hal.device.fallback&lt;@fallback&gt; : !hal.device
 ]&gt; : !hal.device
 </code></pre></div></p>
@@ -16672,11 +16672,11 @@ target requirements or null if no devices match. An optional <code>ordinal</code
 index may be provided that selects the N-th matching device and is used to
 select between multiple homogeneous devices.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>#hal.device.target&lt;&quot;local&quot;, {
+<div class="highlight"><pre><span></span><code>#hal.device.target&lt;"local", {
   device_configuration = ...
 }, [
-  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_32&quot;&gt;,
-  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt;,
+  #hal.executable.target&lt;"llvm-cpu", "embedded-elf-arm_32"&gt;,
+  #hal.executable.target&lt;"llvm-cpu", "embedded-elf-arm_64"&gt;,
 ]&gt; : !hal.device
 </code></pre></div></p>
 <h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
@@ -16764,9 +16764,9 @@ Instead of needing global command line flags to link in additional blobs
 the frontend can emit executables with the dependencies already defined per
 variant without needing to reach into the IREE compiler code.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>#hal.executable.object&lt;{path = &quot;some/file.obj&quot;}&gt;
+<div class="highlight"><pre><span></span><code>#hal.executable.object&lt;{path = "some/file.obj"}&gt;
 #hal.executable.object&lt;{
-  path = &quot;some/embedded/file.obj&quot;,
+  path = "some/embedded/file.obj",
   data = dense&lt;[...]&gt; : vector&lt;2048xi8&gt;
 }&gt;
 </code></pre></div></p>
@@ -16805,11 +16805,11 @@ generic sets ("all x86_64 targets get these objects") as well as specific
 ones ("only x86_64 targets with vector_size = 64 get these objects").</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>#hal.executable.objects&lt;{
-  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt; = [
-    #hal.executable.object&lt;{path = &quot;some/file_arm_64.obj&quot;}&gt;
+  #hal.executable.target&lt;"llvm-cpu", "embedded-elf-arm_64"&gt; = [
+    #hal.executable.object&lt;{path = "some/file_arm_64.obj"}&gt;
   ],
-  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;&gt; = [
-    #hal.executable.object&lt;{path = &quot;some/file_x86_64.obj&quot;}&gt;
+  #hal.executable.target&lt;"llvm-cpu", "embedded-elf-x86_64"&gt; = [
+    #hal.executable.object&lt;{path = "some/file_x86_64.obj"}&gt;
   ]
 }&gt;
 </code></pre></div></p>
@@ -16845,11 +16845,11 @@ deployed artifact. An optionally provided configuration dictionary overrides
 backend-specific defaults.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>  // Produce a system-native ELF for x86-64 systems using the LLVM backend:
-  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;system-elf-x86_64&quot;, {
-    triple = &quot;x86_64-unknown-linux-elf&quot;,
-    cpu = &quot;host&quot;,
-    cpu_features = &quot;host&quot;,
-    abi = &quot;lp32&quot;,
+  #hal.executable.target&lt;"llvm-cpu", "system-elf-x86_64", {
+    triple = "x86_64-unknown-linux-elf",
+    cpu = "host",
+    cpu_features = "host",
+    abi = "lp32",
     ...
   }&gt;
 </code></pre></div></p>

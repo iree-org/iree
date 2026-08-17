@@ -6632,21 +6632,21 @@ for all the unused code paths within each microkernel.</p>
 <div class="highlight"><pre><span></span><code>// -----// IR Dump After mlir::iree_compiler::IREE::ABI::WrapEntryPointsPass (iree-abi-wrap-entry-points) //----- //
 [...]
 // -----// IR Dump After Inliner (inline) //----- //
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;local&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}&gt;
+#device_target_llvm_cpu = #hal.device.target&lt;"local", {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
-  func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
+  func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = "sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)"}} {
     %0 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[0] : index
     %1 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[1] : index
-    %2 = hal.tensor.import %arg0 &quot;input0&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%0, %1}
+    %2 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%0, %1}
     %3 = hal.buffer_view.dim&lt;%arg1 : !hal.buffer_view&gt;[0] : index
     %4 = hal.buffer_view.dim&lt;%arg1 : !hal.buffer_view&gt;[1] : index
-    %5 = hal.tensor.import %arg1 &quot;input1&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%3, %4}
+    %5 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%3, %4}
     %6 = hal.buffer_view.dim&lt;%arg2 : !hal.buffer_view&gt;[0] : index
     %7 = hal.buffer_view.dim&lt;%arg2 : !hal.buffer_view&gt;[1] : index
-    %8 = hal.tensor.import %arg2 &quot;input2&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%6, %7}
+    %8 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%6, %7}
     %9 = linalg.matmul ins(%2, %5 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%8 : tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt;
-    %10 = hal.tensor.export %9 &quot;output0&quot; : tensor&lt;?x?xf32&gt;{%6, %7} -&gt; !hal.buffer_view
+    %10 = hal.tensor.export %9 "output0" : tensor&lt;?x?xf32&gt;{%6, %7} -&gt; !hal.buffer_view
     return %10 : !hal.buffer_view
   }
 }
@@ -6657,21 +6657,21 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
 // -----// IR Dump After Canonicalizer (canonicalize) //----- //
 [...]
 // -----// IR Dump After CSE (cse) //----- //
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-x86_64&quot;, {cpu = &quot;znver4&quot;, cpu_features = &quot;+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512&quot;, data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, native_vector_size = 64 : index, target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;, ukernels = &quot;all&quot;}&gt;
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target&lt;"llvm-cpu", "embedded-elf-x86_64", {cpu = "znver4", cpu_features = "+mmx,+popcnt,+sse,+sse2,+sse3,+ssse3,+sse4.1,+sse4.2,+avx,+avx2,+sse4a,+fma,+avx512f,+bmi,+bmi2,+aes,+pclmul,+avx512vl,+avx512bw,+avx512dq,+avx512cd,+avx512vbmi,+avx512ifma,+avx512vpopcntdq,+avx512vbmi2,+gfni,+vpclmulqdq,+avx512vnni,+avx512bitalg,+avx512bf16,+adx,+clflushopt,+clwb,+clzero,+cx16,+cx8,+crc32,+f16c,+fsgsbase,+fxsr,+invpcid,+lzcnt,+movbe,+mwaitx,+pku,+prfchw,+rdpid,+rdpru,+rdrnd,+rdseed,+sahf,+sha,+shstk,+vaes,+wbnoinvd,+x87,+xsave,+xsavec,+xsaveopt,+xsaves,+evex512", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}&gt;
 #map = affine_map&lt;()[s0] -&gt; (s0 ceildiv 16)&gt;
-#device_target_llvm_cpu = #hal.device.target&lt;&quot;local&quot;, {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
+#device_target_llvm_cpu = #hal.device.target&lt;"local", {executable_targets = [#executable_target_embedded_elf_x86_64_]}&gt; : !hal.device
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
-  func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = &quot;sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)&quot;}} {
+  func.func @matmul_dynamic(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub, iree.reflection = {iree.abi.declaration = "sync func @matmul_dynamic(%input0: tensor&lt;?x?xf32&gt;, %input1: tensor&lt;?x?xf32&gt;, %input2: tensor&lt;?x?xf32&gt;) -&gt; (%output0: tensor&lt;?x?xf32&gt;)"}} {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[0] : index
     %1 = hal.buffer_view.dim&lt;%arg0 : !hal.buffer_view&gt;[1] : index
-    %2 = hal.tensor.import %arg0 &quot;input0&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%0, %1}
+    %2 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%0, %1}
     %3 = hal.buffer_view.dim&lt;%arg1 : !hal.buffer_view&gt;[0] : index
     %4 = hal.buffer_view.dim&lt;%arg1 : !hal.buffer_view&gt;[1] : index
-    %5 = hal.tensor.import %arg1 &quot;input1&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%3, %4}
+    %5 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%3, %4}
     %6 = hal.buffer_view.dim&lt;%arg2 : !hal.buffer_view&gt;[0] : index
     %7 = hal.buffer_view.dim&lt;%arg2 : !hal.buffer_view&gt;[1] : index
-    %8 = hal.tensor.import %arg2 &quot;input2&quot; : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%6, %7}
+    %8 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -&gt; tensor&lt;?x?xf32&gt;{%6, %7}
     %9 = affine.apply #map()[%0]
     %10 = tensor.empty(%9, %1) : tensor&lt;?x?x16x1xf32&gt;
     %pack = linalg.pack %2 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %10 : tensor&lt;?x?xf32&gt; -&gt; tensor&lt;?x?x16x1xf32&gt;
@@ -6685,7 +6685,7 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
     %16 = linalg.mmt4d ins(%pack, %pack_0 : tensor&lt;?x?x16x1xf32&gt;, tensor&lt;?x?x16x1xf32&gt;) outs(%pack_1 : tensor&lt;?x?x16x16xf32&gt;) -&gt; tensor&lt;?x?x16x16xf32&gt;
     %17 = tensor.empty(%6, %7) : tensor&lt;?x?xf32&gt;
     %unpack = linalg.unpack %16 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %17 : tensor&lt;?x?x16x16xf32&gt; -&gt; tensor&lt;?x?xf32&gt;
-    %18 = hal.tensor.export %unpack &quot;output0&quot; : tensor&lt;?x?xf32&gt;{%6, %7} -&gt; !hal.buffer_view
+    %18 = hal.tensor.export %unpack "output0" : tensor&lt;?x?xf32&gt;{%6, %7} -&gt; !hal.buffer_view
     return %18 : !hal.buffer_view
   }
 }
@@ -6769,7 +6769,7 @@ module {
         %60 = iree_tensor_ext.dispatch.tensor.load %57, offsets = [%arg1, 0, 0, 0], sizes = [1, %35, 16, 1], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor&lt;readonly:tensor&lt;?x?x16x1xf32&gt;&gt;{%40, %45} -&gt; tensor&lt;1x?x16x1xf32&gt;
         %61 = iree_tensor_ext.dispatch.tensor.load %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor&lt;readwrite:tensor&lt;?x?x16x16xf32&gt;&gt;{%50, %55} -&gt; tensor&lt;1x1x16x16xf32&gt;
         %dim = tensor.dim %60, %c1 : tensor&lt;1x?x16x1xf32&gt;
-        %62 = iree_codegen.ukernel.generic &quot;iree_uk_mmt4d&quot; ins(%59, %60 : tensor&lt;1x?x16x1xf32&gt;, tensor&lt;1x?x16x1xf32&gt;) outs(%61 : tensor&lt;1x1x16x16xf32&gt;) (%c1, %c1, %dim, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = [&quot;processor_data&quot;]} strided_dims([[0], [0], [0]]) -&gt; tensor&lt;1x1x16x16xf32&gt;
+        %62 = iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%59, %60 : tensor&lt;1x?x16x1xf32&gt;, tensor&lt;1x?x16x1xf32&gt;) outs(%61 : tensor&lt;1x1x16x16xf32&gt;) (%c1, %c1, %dim, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"]} strided_dims([[0], [0], [0]]) -&gt; tensor&lt;1x1x16x16xf32&gt;
         iree_tensor_ext.dispatch.tensor.store %62, %58, offsets = [%arg0, %arg1, 0, 0], sizes = [1, 1, 16, 16], strides = [1, 1, 1, 1] : tensor&lt;1x1x16x16xf32&gt; -&gt; !iree_tensor_ext.dispatch.tensor&lt;readwrite:tensor&lt;?x?x16x16xf32&gt;&gt;{%50, %55}
       }
     }
@@ -6867,7 +6867,7 @@ func.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32() {
     scf.for %arg1 = %workgroup_id_x to %40 step %workgroup_count_x {
       %subview_0 = memref.subview %57[%arg1, 0, 0, 0] [1, %35, 16, 1] [1, 1, 1, 1] : memref&lt;?x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt; to memref&lt;1x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;
       %subview_1 = memref.subview %58[%arg0, %arg1, 0, 0] [1, 1, 16, 16] [1, 1, 1, 1] : memref&lt;?x?x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt; to memref&lt;1x1x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;
-      iree_codegen.ukernel.generic &quot;iree_uk_mmt4d&quot; ins(%subview, %subview_0 : memref&lt;1x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;, memref&lt;1x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;) outs(%subview_1 : memref&lt;1x1x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;) (%c1, %c1, %35, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = [&quot;processor_data&quot;]} strided_dims([[0], [0], [0]])
+      iree_codegen.ukernel.generic "iree_uk_mmt4d" ins(%subview, %subview_0 : memref&lt;1x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;, memref&lt;1x?x16x1xf32, strided&lt;[?, 16, 1, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;) outs(%subview_1 : memref&lt;1x1x16x16xf32, strided&lt;[?, 256, 16, 1], offset: ?&gt;, #hal.descriptor_type&lt;storage_buffer&gt;&gt;) (%c1, %c1, %35, %c16_i32, %c16_i32, %c1_i32, %c1281_i32 : index, index, index, i32, i32, i32, i32) fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"]} strided_dims([[0], [0], [0]])
     }
   }
   return
@@ -6876,7 +6876,7 @@ func.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32() {
 <h3 id="ir-dump-after-lowerukernelopstocalls">IR Dump After LowerUKernelOpsToCalls<a class="headerlink" href="#ir-dump-after-lowerukernelopstocalls" title="Permanent link">link</a></h3>
 <div class="highlight"><pre><span></span><code>// -----// IR Dump After LowerUKernelOpsToCalls (iree-codegen-lower-ukernel-ops-to-calls) //----- //
 module {
-  func.func private @iree_uk_mmt4d(memref&lt;f32&gt;, index, index, memref&lt;f32&gt;, index, index, memref&lt;f32&gt;, index, index, index, index, index, i32, i32, i32, i32) attributes {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = [&quot;processor_data&quot;], llvm.bareptr = true}
+  func.func private @iree_uk_mmt4d(memref&lt;f32&gt;, index, index, memref&lt;f32&gt;, index, index, memref&lt;f32&gt;, index, index, index, index, index, i32, i32, i32, i32) attributes {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"], llvm.bareptr = true}
   func.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32() {
     %c1281_i32 = arith.constant 1281 : i32
     %c1_i32 = arith.constant 1 : i32
@@ -6967,8 +6967,8 @@ module {
 </code></pre></div>
 <h3 id="ir-dump-after-converttollvm">IR Dump After ConvertToLLVM<a class="headerlink" href="#ir-dump-after-converttollvm" title="Permanent link">link</a></h3>
 <div class="highlight"><pre><span></span><code>// -----// IR Dump After ConvertToLLVM (iree-convert-to-llvm) //----- //
-module attributes {llvm.data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128&quot;, llvm.target_triple = &quot;x86_64-unknown-unknown-eabi-elf&quot;} {
-  llvm.func @iree_uk_mmt4d(!llvm.ptr) attributes {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = [&quot;processor_data&quot;], llvm.bareptr = true}
+module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", llvm.target_triple = "x86_64-unknown-unknown-eabi-elf"} {
+  llvm.func @iree_uk_mmt4d(!llvm.ptr) attributes {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"], llvm.bareptr = true}
   llvm.func @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32(%arg0: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias}, %arg1: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias}, %arg2: !llvm.ptr {llvm.align = 16 : i64, llvm.noalias}) -&gt; i32 {
     %0 = llvm.mlir.constant(4293970975 : i64) : i64
     %1 = llvm.mlir.constant(8 : i64) : i64
@@ -6983,59 +6983,59 @@ module attributes {llvm.data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:
     %10 = llvm.mlir.constant(16 : i32) : i32
     %11 = llvm.mlir.constant(1 : index) : i64
     %12 = llvm.mlir.constant(32 : i64) : i64
-    %13 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %14 = llvm.extractvalue %13[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %13 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %14 = llvm.extractvalue %13[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %15 = llvm.load %14 : !llvm.ptr -&gt; i32
-    %16 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %17 = llvm.extractvalue %16[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %16 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %17 = llvm.extractvalue %16[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %18 = llvm.getelementptr %17[1] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %19 = llvm.load %18 : !llvm.ptr -&gt; i32
-    %20 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %21 = llvm.extractvalue %20[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %20 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %21 = llvm.extractvalue %20[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %22 = llvm.getelementptr %21[2] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %23 = llvm.load %22 : !llvm.ptr -&gt; i32
-    %24 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %25 = llvm.extractvalue %24[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %24 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %25 = llvm.extractvalue %24[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %26 = llvm.getelementptr %25[3] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %27 = llvm.load %26 : !llvm.ptr -&gt; i32
-    %28 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %29 = llvm.extractvalue %28[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %28 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %29 = llvm.extractvalue %28[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %30 = llvm.getelementptr %29[4] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %31 = llvm.load %30 : !llvm.ptr -&gt; i32
-    %32 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %33 = llvm.extractvalue %32[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %32 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %33 = llvm.extractvalue %32[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %34 = llvm.getelementptr %33[5] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %35 = llvm.load %34 : !llvm.ptr -&gt; i32
-    %36 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %37 = llvm.extractvalue %36[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %36 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %37 = llvm.extractvalue %36[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %38 = llvm.getelementptr %37[6] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %39 = llvm.load %38 : !llvm.ptr -&gt; i32
-    %40 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %41 = llvm.extractvalue %40[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %40 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %41 = llvm.extractvalue %40[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %42 = llvm.getelementptr %41[7] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %43 = llvm.load %42 : !llvm.ptr -&gt; i32
-    %44 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %45 = llvm.extractvalue %44[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %44 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %45 = llvm.extractvalue %44[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %46 = llvm.getelementptr %45[8] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %47 = llvm.load %46 : !llvm.ptr -&gt; i32
-    %48 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %49 = llvm.extractvalue %48[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %48 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %49 = llvm.extractvalue %48[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %50 = llvm.getelementptr %49[9] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %51 = llvm.load %50 : !llvm.ptr -&gt; i32
-    %52 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %53 = llvm.extractvalue %52[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %52 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %53 = llvm.extractvalue %52[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %54 = llvm.getelementptr %53[10] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %55 = llvm.load %54 : !llvm.ptr -&gt; i32
-    %56 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %57 = llvm.extractvalue %56[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %56 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %57 = llvm.extractvalue %56[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %58 = llvm.getelementptr %57[11] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %59 = llvm.load %58 : !llvm.ptr -&gt; i32
-    %60 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %61 = llvm.extractvalue %60[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %60 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %61 = llvm.extractvalue %60[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %62 = llvm.getelementptr %61[14] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %63 = llvm.load %62 : !llvm.ptr -&gt; i32
-    %64 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %65 = llvm.extractvalue %64[9] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %64 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %65 = llvm.extractvalue %64[9] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %66 = llvm.getelementptr %65[15] : (!llvm.ptr) -&gt; !llvm.ptr, i32
     %67 = llvm.load %66 : !llvm.ptr -&gt; i32
     %68 = llvm.zext %15 : i32 to i64
@@ -7067,41 +7067,41 @@ module attributes {llvm.data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:
     %94 = llvm.shl %93, %12  : i64
     %95 = llvm.or %92, %94  : i64
     %96 = llvm.mul %83, %6  : i64
-    %97 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %98 = llvm.extractvalue %97[10] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %97 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %98 = llvm.extractvalue %97[10] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %99 = llvm.load %98 : !llvm.ptr -&gt; !llvm.ptr
     %100 = llvm.mul %91, %6  : i64
-    %101 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %102 = llvm.extractvalue %101[10] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %101 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %102 = llvm.extractvalue %101[10] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %103 = llvm.load %102 : !llvm.ptr -&gt; !llvm.ptr
     %104 = llvm.mul %95, %3  : i64
-    %105 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %106 = llvm.extractvalue %105[10] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %105 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %106 = llvm.extractvalue %105[10] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %107 = llvm.getelementptr %106[1] : (!llvm.ptr) -&gt; !llvm.ptr, !llvm.ptr
     %108 = llvm.load %107 : !llvm.ptr -&gt; !llvm.ptr
-    %109 = llvm.load %arg2 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_workgroup_state_v0_t&quot;, (i32, i32, i16, i16, i32, ptr, i32)&gt;
-    %110 = llvm.extractvalue %109[0] : !llvm.struct&lt;&quot;iree_hal_executable_workgroup_state_v0_t&quot;, (i32, i32, i16, i16, i32, ptr, i32)&gt;
+    %109 = llvm.load %arg2 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_workgroup_state_v0_t", (i32, i32, i16, i16, i32, ptr, i32)&gt;
+    %110 = llvm.extractvalue %109[0] : !llvm.struct&lt;"iree_hal_executable_workgroup_state_v0_t", (i32, i32, i16, i16, i32, ptr, i32)&gt;
     %111 = llvm.zext %110 : i32 to i64
-    %112 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %113 = llvm.extractvalue %112[4] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %112 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %113 = llvm.extractvalue %112[4] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %114 = llvm.zext %113 : i32 to i64
-    %115 = llvm.load %arg2 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_workgroup_state_v0_t&quot;, (i32, i32, i16, i16, i32, ptr, i32)&gt;
-    %116 = llvm.extractvalue %115[1] : !llvm.struct&lt;&quot;iree_hal_executable_workgroup_state_v0_t&quot;, (i32, i32, i16, i16, i32, ptr, i32)&gt;
+    %115 = llvm.load %arg2 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_workgroup_state_v0_t", (i32, i32, i16, i16, i32, ptr, i32)&gt;
+    %116 = llvm.extractvalue %115[1] : !llvm.struct&lt;"iree_hal_executable_workgroup_state_v0_t", (i32, i32, i16, i16, i32, ptr, i32)&gt;
     %117 = llvm.zext %116 : i32 to i64
-    %118 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
-    %119 = llvm.extractvalue %118[5] : !llvm.struct&lt;&quot;iree_hal_executable_dispatch_state_v0_t&quot;, (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %118 = llvm.load %arg1 : !llvm.ptr -&gt; !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
+    %119 = llvm.extractvalue %118[5] : !llvm.struct&lt;"iree_hal_executable_dispatch_state_v0_t", (i32, i32, i16, i16, i32, i32, i16, i8, i8, ptr, ptr, ptr)&gt;
     %120 = llvm.zext %119 : i32 to i64
     llvm.br ^bb1(%117 : i64)
   ^bb1(%121: i64):  // 2 preds: ^bb0, ^bb4
-    %122 = llvm.icmp &quot;slt&quot; %121, %79 : i64
+    %122 = llvm.icmp "slt" %121, %79 : i64
     llvm.cond_br %122, ^bb2(%111 : i64), ^bb5
   ^bb2(%123: i64):  // 2 preds: ^bb1, ^bb3
-    %124 = llvm.icmp &quot;slt&quot; %123, %87 : i64
+    %124 = llvm.icmp "slt" %123, %87 : i64
     llvm.cond_br %124, ^bb3, ^bb4
   ^bb3:  // pred: ^bb2
     %125 = llvm.mul %83, %6  : i64
     %126 = llvm.mul %121, %125  : i64
-    %127 = llvm.icmp &quot;slt&quot; %71, %7 : i64
+    %127 = llvm.icmp "slt" %71, %7 : i64
     %128 = llvm.sub %4, %71  : i64
     %129 = llvm.select %127, %128, %71 : i1, i64
     %130 = llvm.sdiv %129, %5  : i64
@@ -7111,7 +7111,7 @@ module attributes {llvm.data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:
     %134 = llvm.mul %123, %133  : i64
     %135 = llvm.add %132, %134  : i64
     %136 = llvm.mul %123, %3  : i64
-    %137 = llvm.icmp &quot;slt&quot; %75, %7 : i64
+    %137 = llvm.icmp "slt" %75, %7 : i64
     %138 = llvm.sub %4, %75  : i64
     %139 = llvm.select %137, %138, %75 : i1, i64
     %140 = llvm.sdiv %139, %5  : i64
@@ -8074,7 +8074,7 @@ module attributes {llvm.data_layout = &quot;e-m:e-p270:32:32-p271:32:32-p272:64:
 <span class="p">}</span>
 </code></pre></div>
 <h3 id="x86-assembly">x86 assembly<a class="headerlink" href="#x86-assembly" title="Permanent link">link</a></h3>
-<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="na">.section</span><span class="w">  </span><span class="no">.text.matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32</span><span class="p">,</span><span class="s">&quot;ax&quot;</span><span class="p">,</span><span class="na">@progbits</span>
+<div class="highlight"><pre><span></span><code><span class="w">  </span><span class="na">.section</span><span class="w">  </span><span class="no">.text.matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32</span><span class="p">,</span><span class="s">"ax"</span><span class="p">,</span><span class="na">@progbits</span>
 <span class="w">  </span><span class="na">.p2align</span><span class="w">  </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">0x90</span>
 <span class="w">  </span><span class="na">.type</span><span class="w">  </span><span class="no">matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32</span><span class="p">,</span><span class="na">@function</span>
 <span class="nl">matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32:</span>

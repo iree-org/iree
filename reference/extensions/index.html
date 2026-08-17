@@ -7051,7 +7051,7 @@ module @model {
   func.func private @my_custom_module.sync_func(%input: tensor&lt;?xf32&gt;) -&gt; i32
   // Declare an asynchronous external function:
   func.func private @my_custom_module.async_func(%input: tensor&lt;?xf32&gt;) -&gt; tensor&lt;?xf32&gt; attributes {
-    iree.abi.model = &quot;coarse-fences&quot;,
+    iree.abi.model = "coarse-fences",
     nosideeffects
   }
   func.func @predict() {

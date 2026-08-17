@@ -6494,11 +6494,11 @@ may be unstable.</p>
     <a href="https://github.com/iree-org/iree/blob/main/.bazelversion"><code>.bazelversion</code></a>:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Via Go (if installed)</span>
 go<span class="w"> </span>install<span class="w"> </span>github.com/bazelbuild/bazelisk@latest
-<span class="c1"># go install names the binary &#39;bazelisk&#39;. Add a symlink so</span>
-<span class="c1"># &#39;bazel&#39; works (~/go/bin should already be on your PATH).</span>
+<span class="c1"># go install names the binary 'bazelisk'. Add a symlink so</span>
+<span class="c1"># 'bazel' works (~/go/bin should already be on your PATH).</span>
 ln<span class="w"> </span>-s<span class="w"> </span>~/go/bin/bazelisk<span class="w"> </span>~/go/bin/bazel
 
-<span class="c1"># Or download binary directly as &#39;bazel&#39; (recommended by bazelisk docs).</span>
+<span class="c1"># Or download binary directly as 'bazel' (recommended by bazelisk docs).</span>
 curl<span class="w"> </span>-Lo<span class="w"> </span>~/.local/bin/bazel<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 chmod<span class="w"> </span>+x<span class="w"> </span>~/.local/bin/bazel
@@ -6526,7 +6526,7 @@ chmod<span class="w"> </span>+x<span class="w"> </span>~/.local/bin/bazel
 <ol>
 <li>
 <p>Install <a href="https://brew.sh/">Homebrew</a>:</p>
-<div class="highlight"><pre><span></span><code>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/Homebrew/install/master/install.sh<span class="k">)</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code>/bin/bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/Homebrew/install/master/install.sh<span class="k">)</span><span class="s2">"</span>
 </code></pre></div>
 </li>
 <li>
@@ -6580,7 +6580,7 @@ chmod<span class="w"> </span>+x<span class="w"> </span>~/.local/bin/bazel
 <p>Install the full Visual Studio or "Build Tools For Visual Studio" from the
     <a href="https://visualstudio.microsoft.com/downloads/">downloads page</a> then
     set the <code>BAZEL_VS</code> environment variable:</p>
-<div class="highlight"><pre><span></span><code><span class="p">&gt;</span> <span class="nv">$env:BAZEL_VS</span> <span class="p">=</span> <span class="s2">&quot;C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="p">&gt;</span> <span class="nv">$env:BAZEL_VS</span> <span class="p">=</span> <span class="s2">"C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"</span>
 </code></pre></div>
 </li>
 </ol>
@@ -6596,7 +6596,7 @@ git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w
 python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>runtime/bindings/python/iree/runtime/build_requirements.txt
 
 <span class="c1"># Add tools to PATH (from repo root)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/build_tools/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/build_tools/bin:</span><span class="nv">$PATH</span><span class="s2">"</span>
 
 <span class="c1"># Configure once</span>
 iree-bazel-configure
@@ -6646,7 +6646,7 @@ maximum path lengths (260 characters).</p>
 </li>
 <li>
 <p><strong>Add wrapper tools to PATH:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/build_tools/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/build_tools/bin:</span><span class="nv">$PATH</span><span class="s2">"</span>
 </code></pre></div>
 <p>The <code>iree-bazel-*</code> wrapper tools simplify common workflows and provide sensible
 defaults for local development. Run from the IREE repository root.</p>
@@ -6707,11 +6707,11 @@ build<span class="w"> </span>--config<span class="o">=</span>localdev
 
 <span class="c1"># Use --config=debug to compile IREE and LLVM without optimizations</span>
 <span class="c1"># and with assertions enabled.</span>
-build:debug<span class="w"> </span>--config<span class="o">=</span>asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">&#39;--per_file_copt=iree|llvm@-O0&#39;</span><span class="w"> </span>--strip<span class="o">=</span>never
+build:debug<span class="w"> </span>--config<span class="o">=</span>asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">'--per_file_copt=iree|llvm@-O0'</span><span class="w"> </span>--strip<span class="o">=</span>never
 
 <span class="c1"># Use --config=asserts to enable assertions. This has to be done globally:</span>
-<span class="c1"># Code compiled with and without assertions can&#39;t be linked together (ODR violation).</span>
-build:asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">&#39;--copt=-UNDEBUG&#39;</span>
+<span class="c1"># Code compiled with and without assertions can't be linked together (ODR violation).</span>
+build:asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">'--copt=-UNDEBUG'</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -6720,11 +6720,11 @@ build<span class="w"> </span>--config<span class="o">=</span>localdev
 
 <span class="c1"># Use --config=debug to compile IREE and LLVM without optimizations</span>
 <span class="c1"># and with assertions enabled.</span>
-build:debug<span class="w"> </span>--config<span class="o">=</span>asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">&#39;--per_file_copt=iree|llvm@-O0&#39;</span><span class="w"> </span>--strip<span class="o">=</span>never
+build:debug<span class="w"> </span>--config<span class="o">=</span>asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">'--per_file_copt=iree|llvm@-O0'</span><span class="w"> </span>--strip<span class="o">=</span>never
 
 <span class="c1"># Use --config=asserts to enable assertions. This has to be done globally:</span>
-<span class="c1"># Code compiled with and without assertions can&#39;t be linked together (ODR violation).</span>
-build:asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">&#39;--copt=-UNDEBUG&#39;</span>
+<span class="c1"># Code compiled with and without assertions can't be linked together (ODR violation).</span>
+build:asserts<span class="w"> </span>--compilation_mode<span class="o">=</span>opt<span class="w"> </span><span class="s1">'--copt=-UNDEBUG'</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -6741,7 +6741,7 @@ build:debug<span class="w"> </span>--compilation_mode<span class="o">=</span>dbg
 <p>IREE provides wrapper scripts in <code>build_tools/bin/</code> that simplify common Bazel workflows:</p>
 <p><strong>Setup:</strong></p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Add to your PATH (in ~/.bashrc or similar)</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PATH</span><span class="s2">:/path/to/iree/build_tools/bin&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$PATH</span><span class="s2">:/path/to/iree/build_tools/bin"</span>
 </code></pre></div>
 <p><strong>Available tools:</strong></p>
 <ul>
@@ -6771,14 +6771,14 @@ iree-bazel-test<span class="w"> </span>//...
 <span class="nv">IREE_HAL_DRIVER_CUDA</span><span class="o">=</span>ON<span class="w"> </span><span class="nv">IREE_HAL_DRIVER_VULKAN</span><span class="o">=</span>ON<span class="w"> </span>iree-bazel-configure
 
 <span class="c1"># Reconfigure compiler plugins</span>
-<span class="nv">IREE_COMPILER_PLUGINS</span><span class="o">=</span><span class="s2">&quot;all,-input_torch&quot;</span><span class="w"> </span>iree-bazel-configure
+<span class="nv">IREE_COMPILER_PLUGINS</span><span class="o">=</span><span class="s2">"all,-input_torch"</span><span class="w"> </span>iree-bazel-configure
 
 <span class="c1"># Run tool from current directory</span>
 iree-bazel-run<span class="w"> </span>//tools:iree-compile<span class="w"> </span>--<span class="w"> </span>input.mlir<span class="w"> </span>-o<span class="w"> </span>output.vmfb
 
 <span class="c1"># Quick C++ experiment</span>
-iree-bazel-try<span class="w"> </span>-e<span class="w"> </span><span class="s1">&#39;#include &quot;iree/base/api.h&quot;</span>
-<span class="s1">int main() { return iree_status_is_ok(iree_ok_status()) ? 0 : 1; }&#39;</span>
+iree-bazel-try<span class="w"> </span>-e<span class="w"> </span><span class="s1">'#include "iree/base/api.h"</span>
+<span class="s1">int main() { return iree_status_is_ok(iree_ok_status()) ? 0 : 1; }'</span>
 </code></pre></div>
 <p><strong>Watch mode:</strong></p>
 <p>Add <code>-w</code> or <code>--watch</code> to automatically rebuild/retest on file changes:</p>
@@ -6930,10 +6930,10 @@ for full quick-start instructions.</p>
 format strings. The <code>flag_values</code> parameter maps placeholder names to build
 setting labels:</p>
 <div class="highlight"><pre><span></span><code><span class="n">iree_hal_cts_testdata</span><span class="p">(</span>
-    <span class="n">format_name</span> <span class="o">=</span> <span class="s2">&quot;amdgpu&quot;</span><span class="p">,</span>
-    <span class="n">flags</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;--iree-rocm-target=</span><span class="si">{ROCM_TARGET}</span><span class="s2">&quot;</span><span class="p">],</span>
-    <span class="n">flag_values</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;ROCM_TARGET&quot;</span><span class="p">:</span> <span class="s2">&quot;//build_tools/bazel:rocm_test_target&quot;</span><span class="p">},</span>
-    <span class="n">format_string</span> <span class="o">=</span> <span class="s1">&#39;&quot;amdgcn-amd-amdhsa--</span><span class="si">{ROCM_TARGET}</span><span class="s1">&quot;&#39;</span><span class="p">,</span>
+    <span class="n">format_name</span> <span class="o">=</span> <span class="s2">"amdgpu"</span><span class="p">,</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"--iree-rocm-target=</span><span class="si">{ROCM_TARGET}</span><span class="s2">"</span><span class="p">],</span>
+    <span class="n">flag_values</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"ROCM_TARGET"</span><span class="p">:</span> <span class="s2">"//build_tools/bazel:rocm_test_target"</span><span class="p">},</span>
+    <span class="n">format_string</span> <span class="o">=</span> <span class="s1">'"amdgcn-amd-amdhsa--</span><span class="si">{ROCM_TARGET}</span><span class="s1">"'</span><span class="p">,</span>
     <span class="o">...</span>
 <span class="p">)</span>
 </code></pre></div>

@@ -6218,8 +6218,8 @@ native binaries on Android. For a more complete explanation, see the
 <ol>
 <li>
 <p>Push the toolchain files, including <code>lldb-server</code>, to your device:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="s2">&quot;mkdir -p /data/local/tmp/tools&quot;</span>
-adb<span class="w"> </span>push<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$ANDROID_NDK</span><span class="s2">&quot;</span>/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/14.0.6/lib/linux/aarch64/*<span class="w"> </span>/data/local/tmp/tools
+<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="s2">"mkdir -p /data/local/tmp/tools"</span>
+adb<span class="w"> </span>push<span class="w"> </span><span class="s2">"</span><span class="nv">$ANDROID_NDK</span><span class="s2">"</span>/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/14.0.6/lib/linux/aarch64/*<span class="w"> </span>/data/local/tmp/tools
 </code></pre></div>
 <p>You may need to adjust the clang toolchain version to match the one in your
 NDK. You can find it with
@@ -6234,14 +6234,14 @@ NDK. You can find it with
 <li>
 <p>Start an <code>lldb-server</code> in a new interactive adb shell:</p>
 <div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell
-/data/local/tmp/tools/lldb-server<span class="w"> </span>platform<span class="w"> </span>--listen<span class="w"> </span><span class="s1">&#39;*:5039&#39;</span><span class="w"> </span>--server
+/data/local/tmp/tools/lldb-server<span class="w"> </span>platform<span class="w"> </span>--listen<span class="w"> </span><span class="s1">'*:5039'</span><span class="w"> </span>--server
 </code></pre></div>
 </li>
 <li>
 <p>Launch <code>lldb</code>, connect to the server and run the binary:</p>
-<div class="highlight"><pre><span></span><code>lldb<span class="w"> </span>-o<span class="w"> </span><span class="s1">&#39;platform select remote-android&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-o<span class="w"> </span><span class="s1">&#39;platform connect connect://:5039&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-o<span class="w"> </span><span class="s1">&#39;platform shell cd /data/local/tmp&#39;</span>
+<div class="highlight"><pre><span></span><code>lldb<span class="w"> </span>-o<span class="w"> </span><span class="s1">'platform select remote-android'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-o<span class="w"> </span><span class="s1">'platform connect connect://:5039'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-o<span class="w"> </span><span class="s1">'platform shell cd /data/local/tmp'</span>
 target<span class="w"> </span>create<span class="w"> </span>&lt;your-binary&gt;
 run<span class="w"> </span><span class="o">[</span>program<span class="w"> </span>args...<span class="o">]</span>
 </code></pre></div>

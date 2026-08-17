@@ -9329,7 +9329,7 @@ initialized at its definition point in the module, not when first accessed.</p>
 <div class="highlight"><pre><span></span><code>// A is initialized to 1 at this point in module initialization.
 util.global @A = 1 : i32
 
-// This initializer can read A (it&#39;s defined above).
+// This initializer can read A (it's defined above).
 util.initializer {
   %a = util.global.load @A : i32  // Loads 1
 }
@@ -9834,8 +9834,8 @@ as-is. Folds to <code>util.buffer.constant</code> when all arguments are constan
 Partially folds when some arguments are constant by merging constant
 segments into the format string literals.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>%key = util.string.format &quot;blk.{}.attn_q.weight&quot;(%idx) : (index) -&gt; !util.buffer
-%multi = util.string.format &quot;blk.{}.ffn.{}.weight&quot;(%a, %b) : (index, index) -&gt; !util.buffer
+<div class="highlight"><pre><span></span><code>%key = util.string.format "blk.{}.attn_q.weight"(%idx) : (index) -&gt; !util.buffer
+%multi = util.string.format "blk.{}.ffn.{}.weight"(%a, %b) : (index, index) -&gt; !util.buffer
 </code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
@@ -10096,7 +10096,7 @@ lowered SCF to CFG and used <code>util.unreachable</code>.</p>
   scf.condition(%true) ...
 } do {
   ...
-  util.scf.unreachable &quot;infinite loop body&quot;
+  util.scf.unreachable "infinite loop body"
   scf.yield  // Required terminator with poison values
 }
 </code></pre></div></p>
@@ -10120,7 +10120,7 @@ stripped during translation.</p>
   cond_br %true, ^bb2, ^bb1
 ^bb1:
   // Indicates that this branch should never be taken.
-  util.unreachable &quot;shouldn&#39;t be here&quot;
+  util.unreachable "shouldn't be here"
 ^bb2:
   ...
 </code></pre></div>

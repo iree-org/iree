@@ -9980,12 +9980,12 @@ error for hint operands and omit conditionals for <code>scf.if</code> operands.<
 <h3 id="-iree-codegen-split-full-partial-transfer"><code>-iree-codegen-split-full-partial-transfer</code><a class="headerlink" href="#-iree-codegen-split-full-partial-transfer" title="Permanent link">link</a></h3>
 <p><em>Split a vector.transfer operation into an in-bounds (i.e., no out-of-bounds masking) fastpath and a slowpath.</em></p>
 <h4 id="options_21">Options<a class="headerlink" href="#options_21" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-transfers : Split vector transfers between slow (masked) and fast &quot;
-        &quot;(unmasked) variants. Possible options are:\n&quot;
-          &quot;\tnone [default]: keep unsplit vector.transfer and pay the price\n&quot;
-          &quot;\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n&quot;
-          &quot;\tvector-transfers: use extra small unmasked vector.transfers for&quot;
-          &quot; the slow path\n
+<div class="highlight"><pre><span></span><code>-split-transfers : Split vector transfers between slow (masked) and fast "
+        "(unmasked) variants. Possible options are:\n"
+          "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tvector-transfers: use extra small unmasked vector.transfers for"
+          " the slow path\n
 </code></pre></div>
 <h3 id="-iree-codegen-strip-compilation-info"><code>-iree-codegen-strip-compilation-info</code><a class="headerlink" href="#-iree-codegen-strip-compilation-info" title="Permanent link">link</a></h3>
 <p><em>Remove all the the lowering configuration and translation info attributes.</em></p>

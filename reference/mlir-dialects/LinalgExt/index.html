@@ -6897,7 +6897,7 @@ as follows</p>
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (s1, d1)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (d0, s1)&gt;,
                      affine_map&lt;(d0, d1)[s0, s1] -&gt; (d0, d1)],
-    iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;]}
+    iterator_types = ["parallel", "parallel"]}
     ins(%lhs1, %rhs1, %rhs2
         : tensor&lt;1000000x?xf32&gt;, tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;)
     outs(%outs1, %outs2 : tensor&lt;1000000x?xf32&gt;, tensor&lt;1000000x?xf32&gt;) {

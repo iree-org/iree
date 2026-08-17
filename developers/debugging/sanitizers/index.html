@@ -6547,7 +6547,7 @@ python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </sp
 
 <span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
 <span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;detect_leaks=0&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">"detect_leaks=0"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>python<span class="w"> </span>...
 
 AddressSanitizer:DEADLYSIGNAL
@@ -6565,12 +6565,12 @@ AddressSanitizer:DEADLYSIGNAL
 <p class="admonition-title">Tip - Using the CUDA driver with ASan from Python</p>
 <p>If you want to run the IREE CUDA runtime driver it is likely you would
 need.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">"protect_shadow_gap=0"</span>
 </code></pre></div>
 <p>Like this</p>
 <div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
 <span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">"protect_shadow_gap=0"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>python<span class="w"> </span>...
 </code></pre></div>
 </div>
@@ -6648,15 +6648,15 @@ mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDC
 mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span>
 
 <span class="nv">GTHREAD_INCLUDE_DIR</span><span class="o">=</span><span class="nv">$LIBGCC_BIN_DIR</span>/x86_64-pc-linux-gnu/libgcc
-<span class="nv">CXX_AND_C_FLAGS</span><span class="o">=</span><span class="s2">&quot;-I</span><span class="nv">$GTHREAD_INCLUDE_DIR</span><span class="s2"> -g -fno-omit-frame-pointer -fsanitize=thread&quot;</span>
+<span class="nv">CXX_AND_C_FLAGS</span><span class="o">=</span><span class="s2">"-I</span><span class="nv">$GTHREAD_INCLUDE_DIR</span><span class="s2"> -g -fno-omit-frame-pointer -fsanitize=thread"</span>
 
 <span class="nb">cd</span><span class="w"> </span><span class="nv">$LIBSTDCXX_BIN_DIR</span>
 <span class="nv">$SRC_DIR</span>/libstdc++-v3/configure<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">CC</span><span class="o">=</span>gcc-12<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="nv">CXX</span><span class="o">=</span>g++-12<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">CXXFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;-fsanitize=thread&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CFLAGS</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CXXFLAGS</span><span class="o">=</span><span class="s2">"</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">"-fsanitize=thread"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--prefix<span class="o">=</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--disable-multilib<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--disable-libstdcxx-pch<span class="w"> </span><span class="se">\</span>
@@ -6667,7 +6667,7 @@ make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</s
 make<span class="w"> </span>install
 </code></pre></div>
 <p>When running programs you would need to use the sanitized version of libstdc++.</p>
-<div class="highlight"><pre><span></span><code><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="s2">/lib&quot;</span><span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">"</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="s2">/lib"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>my-program<span class="w"> </span>...
 </code></pre></div>
 <h4 id="iree-with-tsan-support">IREE with TSan support<a class="headerlink" href="#iree-with-tsan-support" title="Permanent link">link</a></h4>

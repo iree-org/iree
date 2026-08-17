@@ -6429,7 +6429,7 @@ func.func @foo(
     ) -&gt; tensor&lt;10xf32&gt; {
   // A constant used below.
   %c0f32 = arith.constant 0.0 : f32
-  // Create a result &quot;init value&quot;. Think of it as an abstract &quot;allocation&quot;,
+  // Create a result "init value". Think of it as an abstract "allocation",
   // creating a tensor but not giving its elements any particular value. It would be
   // undefined behavior to read any element from this tensor.
   %result_empty =  tensor.empty() : tensor&lt;10xf32&gt;
@@ -6437,7 +6437,7 @@ func.func @foo(
   // Perform the computation. The following is all a single linalg.generic op.
 
   %result = linalg.generic {
-    // This {...} section is the &quot;attributes&quot; - some compile-time settings for this op.
+    // This {...} section is the "attributes" - some compile-time settings for this op.
     indexing_maps=[
       // Indexing maps for the parameters listed in `ins(...)`
       #map_1d_identity,
@@ -6445,22 +6445,22 @@ func.func @foo(
       // Indexing maps for the parameters listed in `outs(...)`
       #map_1d_identity
     ],
-    // There is one tensor dimension, and it&#39;s a parallel-iteration dimension,
+    // There is one tensor dimension, and it's a parallel-iteration dimension,
     // meaning that it occurs also as a result tensor dimension. The alternative
-    // would be &quot;reduction&quot;, for dimensions that do not occur in the result tensor.
-    iterator_types=[&quot;parallel&quot;]
+    // would be "reduction", for dimensions that do not occur in the result tensor.
+    iterator_types=["parallel"]
   } // End of the attributes for this linalg.generic. Next come the parameters:
     // `ins` is where we pass regular input-parameters
     ins(%lhs, %rhs : tensor&lt;10xf32&gt;, tensor&lt;10xf32&gt;)
-    // `outs` is where we pass the &quot;outputs&quot;, but that term has a subtle meaning
+    // `outs` is where we pass the "outputs", but that term has a subtle meaning
     // in linalg. Here we are passing a tensor.empty, meaning just a placeholder
     // for the output with no preexisting element values. In other examples with
     // an accumulator, this is where the accumulator would be passed.
     outs(%result_empty : tensor&lt;10xf32&gt;)
-    // End of parameters. The next {...} part is the &quot;code block&quot;.
+    // End of parameters. The next {...} part is the "code block".
   {
     // bb0 is a code block taking one scalar from each input tensor as argument, and
-    // computing and &quot;yielding&quot; (ie returning) the corresponding output tensor element.
+    // computing and "yielding" (ie returning) the corresponding output tensor element.
     ^bb0(%lhs_entry : f32, %rhs_entry : f32, %unused_result_entry : f32):
       %add = arith.addf %lhs_entry, %rhs_entry : f32
       linalg.yield %add : f32
@@ -6469,7 +6469,7 @@ func.func @foo(
 
   // End of the linalg.generic op.
 
-  // Return the function&#39;s return value.
+  // Return the function's return value.
   return %result : tensor&lt;10xf32&gt;
 }
 </code></pre></div>
@@ -6539,7 +6539,7 @@ func.func @foo(
       // Indexing maps for the parameters listed in `outs(...)`
       #map_1d_identity
     ],
-    iterator_types=[&quot;parallel&quot;]
+    iterator_types=["parallel"]
   } ins(%lhs, %rhs : tensor&lt;?xf32&gt;, tensor&lt;?xf32&gt;)
     outs(%result_empty : tensor&lt;?xf32&gt;)
   {
@@ -6589,7 +6589,7 @@ func.func @foo(
       // Indexing maps for the parameters listed in `outs(...)`
       #map_1d_identity
     ],
-    iterator_types=[&quot;parallel&quot;]
+    iterator_types=["parallel"]
   } ins(%lhs : tensor&lt;10xf32&gt;)
     outs(%rhs : tensor&lt;10xf32&gt;)
   {
@@ -6643,7 +6643,7 @@ func.func @foo(
       // Indexing maps for the parameters listed in `outs(...)`
       #map_1d_proj_0d
     ],
-    iterator_types=[&quot;reduction&quot;]
+    iterator_types=["reduction"]
   } ins(%input : tensor&lt;10xf32&gt;)
     outs(%result_init : tensor&lt;f32&gt;)
   {
@@ -6687,10 +6687,10 @@ func.func @foo(
     iterator_types=[
       // Rule: the i-th iterator_type corresponds to the i-th coordinate in the
       // source space of the affine_maps defined above, (m, n). So:
-      &quot;parallel&quot;,  // This refers to the `m` coordinate in the affine-maps.
+      "parallel",  // This refers to the `m` coordinate in the affine-maps.
                    // This is the coordinate that is preserved in the result,
                    // see the map_2d_proj_first map given above.
-      &quot;reduction&quot; // This refers to the `n` coordinate in the affine-maps.
+      "reduction" // This refers to the `n` coordinate in the affine-maps.
                   // This is the coordinate that is dropped by the map_2d_proj_first
                   // given above and thus not present in the 1D result.
     ]
@@ -6759,7 +6759,7 @@ target device, <code>iree-opt</code> only applies selected transformations.</p>
 #map2 = affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
 module {
   func.func @foo(%arg0: tensor&lt;?x?xf32&gt;, %arg1: tensor&lt;?x?xf32&gt;, %arg2: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
-    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]} ins(%arg0, %arg1 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%arg2 : tensor&lt;?x?xf32&gt;) {
+    %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%arg0, %arg1 : tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%arg2 : tensor&lt;?x?xf32&gt;) {
     ^bb0(%in: f32, %in_0: f32, %out: f32):
       %1 = arith.mulf %in, %in_0 : f32
       %2 = arith.addf %out, %1 : f32
@@ -6819,7 +6819,7 @@ module {
   func.func @foo(%lhs: tensor&lt;?x?xi8&gt;, %rhs: tensor&lt;?x?xi8&gt;, %acc: tensor&lt;?x?xi32&gt;) -&gt; tensor&lt;?x?xi32&gt; {
     %result = linalg.generic
       {indexing_maps = [#map, #map1, #map2],
-       iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]}
+       iterator_types = ["parallel", "parallel", "reduction"]}
       ins(%lhs, %rhs : tensor&lt;?x?xi8&gt;, tensor&lt;?x?xi8&gt;)
       outs(%acc : tensor&lt;?x?xi32&gt;) {
     ^bb0(%lhs_entry: i8, %rhs_entry: i8, %acc_entry: i32):

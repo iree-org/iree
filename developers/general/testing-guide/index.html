@@ -6765,14 +6765,14 @@ the runtime.</p>
 <p>In the Bazel BUILD file, create a <code>iree_lit_test_suite</code> rule. We usually create
 a single suite that globs all <code>.mlir</code> files in the directory and is called
 "lit".</p>
-<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//iree/build_tools/bazel:iree_lit_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_lit_test_suite&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">"//iree/build_tools/bazel:iree_lit_test.bzl"</span><span class="p">,</span> <span class="s2">"iree_lit_test_suite"</span><span class="p">)</span>
 
 <span class="n">iree_lit_test_suite</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;lit&quot;</span><span class="p">,</span>
-    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">&quot;*.mlir&quot;</span><span class="p">]),</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"lit"</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">"*.mlir"</span><span class="p">]),</span>
     <span class="n">tools</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s2">&quot;@llvm-project//llvm:FileCheck&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;//tools:iree-opt&quot;</span><span class="p">,</span>
+        <span class="s2">"@llvm-project//llvm:FileCheck"</span><span class="p">,</span>
+        <span class="s2">"//tools:iree-opt"</span><span class="p">,</span>
     <span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -6782,7 +6782,7 @@ a single suite that globs all <code>.mlir</code> files in the directory and is c
 <span class="w">  </span><span class="s">NAME</span>
 <span class="w">    </span><span class="s">lit</span>
 <span class="w">  </span><span class="s">SRCS</span>
-<span class="w">    </span><span class="s2">&quot;arithmetic_ops.mlir&quot;</span>
+<span class="w">    </span><span class="s2">"arithmetic_ops.mlir"</span>
 <span class="w">  </span><span class="s">DATA</span>
 <span class="w">    </span><span class="s">FileCheck</span>
 <span class="w">    </span><span class="s">iree-opt</span>
@@ -6814,10 +6814,10 @@ devices. This can be done via environment variables. See the
 page for details regarding these variables.</p>
 <p>For Bazel, you can persist the configuration in <code>user.bazelrc</code> to save typing.
 For example:</p>
-<div class="highlight"><pre><span></span><code>test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=...&quot;</span>
-test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=...&quot;</span>
-test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;LD_LIBRARY_PATH=...&quot;</span>
-test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">&quot;VK_LAYER_PATH=...&quot;</span>
+<div class="highlight"><pre><span></span><code>test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">"LD_LIBRARY_PATH=..."</span>
+test:vkswiftshader<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">"VK_LAYER_PATH=..."</span>
+test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">"LD_LIBRARY_PATH=..."</span>
+test:vknative<span class="w"> </span>--test_env<span class="o">=</span><span class="s2">"VK_LAYER_PATH=..."</span>
 </code></pre></div>
 <p>Then you can use <code>bazel test --config=vkswiftshader</code> to select SwiftShader as
 the Vulkan implementation. Similarly for other implementations.</p>
@@ -6836,11 +6836,11 @@ source and any necessary dependencies. Usually, you can link in a standard gtest
 main function. Use <code>iree/testing:gtest_main</code> instead of the <code>gtest_main</code> that
 comes with gtest.</p>
 <div class="highlight"><pre><span></span><code><span class="n">cc_test</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;arena_test&quot;</span><span class="p">,</span>
-    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;arena_test.cc&quot;</span><span class="p">],</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"arena_test"</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"arena_test.cc"</span><span class="p">],</span>
     <span class="n">deps</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="s2">&quot;:arena&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;//iree/testing:gtest_main&quot;</span><span class="p">,</span>
+        <span class="s2">":arena"</span><span class="p">,</span>
+        <span class="s2">"//iree/testing:gtest_main"</span><span class="p">,</span>
     <span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -6852,7 +6852,7 @@ should generally derive the <code>CMakeLists.txt</code> file from the BUILD file
 <span class="w">  </span><span class="s">NAME</span>
 <span class="w">    </span><span class="s">arena_test</span>
 <span class="w">  </span><span class="s">SRCS</span>
-<span class="w">    </span><span class="s2">&quot;arena_test.cc&quot;</span>
+<span class="w">    </span><span class="s2">"arena_test.cc"</span>
 <span class="w">  </span><span class="s">DEPS</span>
 <span class="w">    </span><span class="s">::arena</span>
 <span class="w">    </span><span class="s">iree::testing::gtest_main</span>
@@ -6910,21 +6910,21 @@ returns no results and corresponds to a single test case.</p>
 <p>As an example, here are some tests for the MHLO floor operation:</p>
 <div class="highlight"><pre><span></span><code>func.func @tensor() {
   %input = util.unfoldable_constant dense&lt;[0.0, 1.1, 2.5, 4.9]&gt; : tensor&lt;4xf32&gt;
-  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt;
+  %result = "mhlo.floor"(%input) : (tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt;
   check.expect_almost_eq_const(%result, dense&lt;[0.0, 1.0, 2.0, 4.0]&gt; : tensor&lt;4xf32&gt;): tensor&lt;4xf32&gt;
   return
 }
 
 func.func @scalar() {
   %input = util.unfoldable_constant dense&lt;101.3&gt; : tensor&lt;f32&gt;
-  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
+  %result = "mhlo.floor"(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
   check.expect_almost_eq_const(%result, dense&lt;101.0&gt; : tensor&lt;f32&gt;): tensor&lt;f32&gt;
   return
 }
 
 func.func @negative() {
   %input = util.unfoldable_constant dense&lt;-1.1&gt; : tensor&lt;f32&gt;
-  %result = &quot;mhlo.floor&quot;(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
+  %result = "mhlo.floor"(%input) : (tensor&lt;f32&gt;) -&gt; tensor&lt;f32&gt;
   check.expect_almost_eq_const(%result, dense&lt;-2.0&gt; : tensor&lt;f32&gt;): tensor&lt;f32&gt;
   return
 }
@@ -6970,13 +6970,13 @@ named top-level module in this file.</p>
 <h3 id="configuring-the-build-system_2">Configuring the build system<a class="headerlink" href="#configuring-the-build-system_2" title="Permanent link">link</a></h3>
 <p>A single <code>.mlir</code> source file can be turned into a test target with the
 <code>iree_check_test</code> Bazel macro (and corresponding CMake function).</p>
-<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_test&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">"//build_tools/bazel:iree_check_test.bzl"</span><span class="p">,</span> <span class="s2">"iree_check_test"</span><span class="p">)</span>
 
 <span class="n">iree_check_test</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check_vmvx_local-task_floor.mlir&quot;</span><span class="p">,</span>
-    <span class="n">src</span> <span class="o">=</span> <span class="s2">&quot;floor.mlir&quot;</span><span class="p">,</span>
-    <span class="n">driver</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span><span class="p">,</span>
-    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">&quot;vmvx&quot;</span><span class="p">,</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"check_vmvx_local-task_floor.mlir"</span><span class="p">,</span>
+    <span class="n">src</span> <span class="o">=</span> <span class="s2">"floor.mlir"</span><span class="p">,</span>
+    <span class="n">driver</span> <span class="o">=</span> <span class="s2">"local-task"</span><span class="p">,</span>
+    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">"vmvx"</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
 <p>The target naming convention is "check_backend_driver_src". The generated test
@@ -6985,13 +6985,13 @@ tests by backend (especially when many tests are generated, as below).</p>
 <p>Usually we want to create a suite of tests across many backends and drivers.
 This can be accomplished with additional macros. For a single backend/driver
 pair:</p>
-<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_single_backend_test_suite&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">"//build_tools/bazel:iree_check_test.bzl"</span><span class="p">,</span> <span class="s2">"iree_check_single_backend_test_suite"</span><span class="p">)</span>
 
 <span class="n">iree_check_single_backend_test_suite</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check_vmvx_local-task&quot;</span><span class="p">,</span>
-    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">&quot;*.mlir&quot;</span><span class="p">]),</span>
-    <span class="n">driver</span> <span class="o">=</span> <span class="s2">&quot;local-task&quot;</span><span class="p">,</span>
-    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">&quot;vmvx&quot;</span><span class="p">,</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"check_vmvx_local-task"</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="n">glob</span><span class="p">([</span><span class="s2">"*.mlir"</span><span class="p">]),</span>
+    <span class="n">driver</span> <span class="o">=</span> <span class="s2">"local-task"</span><span class="p">,</span>
+    <span class="n">target_backend</span> <span class="o">=</span> <span class="s2">"vmvx"</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
 <p>This will generate a separate test target for each file in <code>srcs</code> with a name
@@ -6999,15 +6999,15 @@ following the convention above as well as a Bazel
 <a href="https://bazel.build/reference/be/general#test_suite">test_suite</a>
 called "check_vmvx_local-task" that will run all the generated tests.</p>
 <p>You can also generate suites across multiple pairs:</p>
-<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">&quot;//build_tools/bazel:iree_check_test.bzl&quot;</span><span class="p">,</span> <span class="s2">&quot;iree_check_test_suite&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">load</span><span class="p">(</span><span class="s2">"//build_tools/bazel:iree_check_test.bzl"</span><span class="p">,</span> <span class="s2">"iree_check_test_suite"</span><span class="p">)</span>
 
 <span class="n">iree_check_test_suite</span><span class="p">(</span>
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;check&quot;</span><span class="p">,</span>
-    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;success.mlir&quot;</span><span class="p">],</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"check"</span><span class="p">,</span>
+    <span class="n">srcs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"success.mlir"</span><span class="p">],</span>
     <span class="c1"># Leave this argument off to run on all supported backend/driver pairs.</span>
     <span class="n">target_backends_and_drivers</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="p">(</span><span class="s2">&quot;vmvx&quot;</span><span class="p">,</span> <span class="s2">&quot;local-task&quot;</span><span class="p">),</span>
-        <span class="p">(</span><span class="s2">&quot;vulkan-spirv&quot;</span><span class="p">,</span> <span class="s2">&quot;vulkan&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"vmvx"</span><span class="p">,</span> <span class="s2">"local-task"</span><span class="p">),</span>
+        <span class="p">(</span><span class="s2">"vulkan-spirv"</span><span class="p">,</span> <span class="s2">"vulkan"</span><span class="p">),</span>
     <span class="p">],</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -7086,25 +7086,25 @@ CPU:</p>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;config_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu_llvm_sync&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;iree_compile_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;--iree-hal-target-device=local&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-hal-local-target-device-backends=llvm-cpu&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-input-demote-f64-to-f32=false&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-opt-level=O0&quot;</span>
+<span class="w">  </span><span class="nt">"config_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cpu_llvm_sync"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"iree_compile_flags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"--iree-hal-target-device=local"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-hal-local-target-device-backends=llvm-cpu"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-input-demote-f64-to-f32=false"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-opt-level=O0"</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;iree_run_module_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;--device=local-sync&quot;</span>
+<span class="w">  </span><span class="nt">"iree_run_module_flags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"--device=local-sync"</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;skip_compile_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_dequantizelinear&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_einsum_inner_prod&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_epsilon_expanded&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_group_normalization_example_expanded&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_nonmaxsuppression_two_batches&quot;</span>
+<span class="w">  </span><span class="nt">"skip_compile_tests"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_dequantizelinear"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_einsum_inner_prod"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_group_normalization_epsilon_expanded"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_group_normalization_example_expanded"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_nonmaxsuppression_two_batches"</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;skip_run_tests&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;onnx/node/generated/test_gridsample_zeros_padding&quot;</span>
+<span class="w">  </span><span class="nt">"skip_run_tests"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"onnx/node/generated/test_gridsample_zeros_padding"</span>
 </code></pre></div></td></tr></table></div>
 <h5 id="updating-config-files">Updating config files<a class="headerlink" href="#updating-config-files" title="Permanent link">link</a></h5>
 <p>If the ONNX operator tests fail on a GitHub Actions workflow, check the logs
@@ -7113,7 +7113,7 @@ like this:</p>
 <div class="highlight"><pre><span></span><code>=================================== FAILURES ===================================
 _ IREE compile and run: test_mod_uint64::model.mlir::model.mlir::cpu_llvm_sync _
 [gw1] linux -- Python 3.11.9 /home/runner/work/iree/iree/venv/bin/python
-[XPASS(strict)] Expected run to fail (included in &#39;expected_run_failures&#39;)
+[XPASS(strict)] Expected run to fail (included in 'expected_run_failures')
 </code></pre></div>
 <p>The workflow job that failed should then upload a new config file as an
 "Artifact", which can be downloaded from the action run summary page and then
@@ -7146,19 +7146,19 @@ For example, here is part of a config file for running ONNX model tests on CPU:<
 <span class="normal">12</span>
 <span class="normal">13</span>
 <span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;config_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;cpu_llvm_task&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;iree_compile_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;--iree-hal-target-device=local&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-hal-local-target-device-backends=llvm-cpu&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-llvmcpu-target-cpu=host&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="s2">&quot;--iree-opt-data-tiling&quot;</span>
+<span class="w">  </span><span class="nt">"config_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"cpu_llvm_task"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"iree_compile_flags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"--iree-hal-target-device=local"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-hal-local-target-device-backends=llvm-cpu"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-llvmcpu-target-cpu=host"</span><span class="p">,</span>
+<span class="w">    </span><span class="s2">"--iree-opt-data-tiling"</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;iree_run_module_flags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">    </span><span class="s2">&quot;--device=local-task&quot;</span>
+<span class="w">  </span><span class="nt">"iree_run_module_flags"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">"--device=local-task"</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;tests_and_expected_outcomes&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;default&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;skip&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/age_googlenet.onnx]&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pass&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"tests_and_expected_outcomes"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="s2">"skip"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"tests/model_zoo/validated/vision/body_analysis_models_test.py::test_models[age_gender/models/age_googlenet.onnx]"</span><span class="p">:</span><span class="w"> </span><span class="s2">"pass"</span><span class="p">,</span>
 </code></pre></div></td></tr></table></div>
 <p>Unlike the ONNX operator tests, we do not run the full set of tests on every
 commit to <a href="https://github.com/iree-org/iree">iree-org/iree</a>. Instead, we run a

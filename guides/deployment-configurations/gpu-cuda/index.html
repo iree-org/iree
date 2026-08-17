@@ -6621,7 +6621,7 @@ as an example, import using IREE's <a href="../../ml-frameworks/onnx/">ONNX impo
 <div class="highlight"><pre><span></span><code><span class="c1"># Download the model you want to compile and run.</span>
 wget<span class="w"> </span>https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/mobilenet/model/mobilenetv2-10.onnx
 
-<span class="c1"># Import to MLIR using IREE&#39;s ONNX importer.</span>
+<span class="c1"># Import to MLIR using IREE's ONNX importer.</span>
 pip<span class="w"> </span>install<span class="w"> </span>iree-base-compiler<span class="o">[</span>onnx<span class="o">]</span>
 iree-import-onnx<span class="w"> </span>mobilenetv2-10.onnx<span class="w"> </span>--opset-version<span class="w"> </span><span class="m">17</span><span class="w"> </span>-o<span class="w"> </span>mobilenetv2.mlir
 </code></pre></div>
@@ -6705,7 +6705,7 @@ If the ones you want are missing, please use the canonical form.</p>
 <span class="hll"><span class="w">    </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>--module<span class="o">=</span>mobilenet_cuda.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--function<span class="o">=</span>torch-jit-export<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;1x3x224x224xf32=0&quot;</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">"1x3x224x224xf32=0"</span>
 </code></pre></div>
 <p>The above assumes the exported function in the model is named <code>torch-jit-export</code>
 and it expects one 224x224 RGB image. We are feeding in an image with all 0

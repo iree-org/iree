@@ -6248,7 +6248,7 @@ or generate distinct code for certain device/architecture/performance profiles.<
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireec</span>
 
 <span class="n">ireec</span><span class="o">.</span><span class="n">query_available_targets</span><span class="p">()</span>
-<span class="c1"># [&#39;cuda&#39;, &#39;llvm-cpu&#39;, &#39;metal-spirv&#39;, &#39;rocm&#39;, &#39;vmvx&#39;, &#39;vmvx-inline&#39;, &#39;vulkan-spirv&#39;]</span>
+<span class="c1"># ['cuda', 'llvm-cpu', 'metal-spirv', 'rocm', 'vmvx', 'vmvx-inline', 'vulkan-spirv']</span>
 </code></pre></div>
 </div>
 </div>
@@ -6336,12 +6336,12 @@ focus and the build configuration.</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-run-module<span class="w"> </span>--dump_devices
 
 <span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;cuda&#39;</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">'cuda'</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 
 
 <span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;hip&#39;</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">'hip'</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
@@ -6370,7 +6370,7 @@ focus and the build configuration.</p>
 <span class="go">- gpu-memory-max-clock-rate: 1124 mHz</span>
 <span class="go">- gpu-warp-size: 32</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;local-sync&#39;</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">'local-sync'</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
@@ -6379,7 +6379,7 @@ focus and the build configuration.</p>
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
 
 <span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;local-task&#39;</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">'local-task'</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
@@ -6388,7 +6388,7 @@ focus and the build configuration.</p>
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
 
 <span class="gp"># </span><span class="o">============================================================================</span>
-<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">&#39;vulkan&#39;</span>
+<span class="gp"># </span>Enumerated<span class="w"> </span>devices<span class="w"> </span><span class="k">for</span><span class="w"> </span>driver<span class="w"> </span><span class="s1">'vulkan'</span>
 <span class="gp"># </span><span class="o">============================================================================</span>
 
 <span class="gp"># </span><span class="o">===</span>----------------------------------------------------------------------<span class="o">===</span>
@@ -6402,7 +6402,7 @@ focus and the build configuration.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireert</span>
 
 <span class="n">ireert</span><span class="o">.</span><span class="n">system_setup</span><span class="o">.</span><span class="n">query_available_drivers</span><span class="p">()</span>
-<span class="c1"># [&#39;cuda&#39;, &#39;hip&#39;, &#39;local-sync&#39;, &#39;local-task&#39;, &#39;vulkan&#39;]</span>
+<span class="c1"># ['cuda', 'hip', 'local-sync', 'local-task', 'vulkan']</span>
 </code></pre></div>
 <p>List devices:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.runtime</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireert</span>
@@ -6413,20 +6413,20 @@ focus and the build configuration.</p>
         <span class="n">driver</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">get_driver</span><span class="p">(</span><span class="n">driver_name</span><span class="p">)</span>
         <span class="n">device_infos</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">query_available_devices</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">device_info</span> <span class="ow">in</span> <span class="n">device_infos</span><span class="p">:</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">device_info</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">device_info</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="k">except</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  (failed to initialize)&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  (failed to initialize)"</span><span class="p">)</span>
 
 <span class="c1"># cuda</span>
 <span class="c1">#   (failed to initialize)</span>
 <span class="c1"># hip</span>
-<span class="c1">#   {&#39;device_id&#39;: 1, &#39;path&#39;: &#39;GPU-00000000-1111-2222-3333-444444444444&#39;, &#39;name&#39;: &#39;AMD Radeon ...&#39;}</span>
+<span class="c1">#   {'device_id': 1, 'path': 'GPU-00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}</span>
 <span class="c1"># local-sync</span>
-<span class="c1">#   {&#39;device_id&#39;: 0, &#39;path&#39;: &#39;&#39;, &#39;name&#39;: &#39;default&#39;}</span>
+<span class="c1">#   {'device_id': 0, 'path': '', 'name': 'default'}</span>
 <span class="c1"># local-task</span>
-<span class="c1">#   {&#39;device_id&#39;: 0, &#39;path&#39;: &#39;&#39;, &#39;name&#39;: &#39;default&#39;}</span>
+<span class="c1">#   {'device_id': 0, 'path': '', 'name': 'default'}</span>
 <span class="c1"># vulkan</span>
-<span class="c1">#   {&#39;device_id&#39;: 1234, &#39;path&#39;: &#39;00000000-1111-2222-3333-444444444444&#39;, &#39;name&#39;: &#39;AMD Radeon ...&#39;}</span>
+<span class="c1">#   {'device_id': 1234, 'path': '00000000-1111-2222-3333-444444444444', 'name': 'AMD Radeon ...'}</span>
 </code></pre></div>
 </div>
 </div>

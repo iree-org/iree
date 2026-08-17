@@ -6241,14 +6241,14 @@
 <h2 id="mapping-releases-back-to-git-commits">Mapping releases back to git commits<a class="headerlink" href="#mapping-releases-back-to-git-commits" title="Permanent link">link</a></h2>
 <p>The source IREE commit SHA is embedded into pip releases in a few places.
 Starting in a python venv, you can find the IREE commit from both the shell:</p>
-<div class="highlight"><pre><span></span><code><span class="s2">&quot;</span><span class="k">$(</span>find<span class="w"> </span>.<span class="w"> </span>-name<span class="w"> </span><span class="s1">&#39;iree-compile&#39;</span><span class="w"> </span>-executable<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>--version
+<div class="highlight"><pre><span></span><code><span class="s2">"</span><span class="k">$(</span>find<span class="w"> </span>.<span class="w"> </span>-name<span class="w"> </span><span class="s1">'iree-compile'</span><span class="w"> </span>-executable<span class="k">)</span><span class="s2">"</span><span class="w"> </span>--version
 IREE<span class="w"> </span><span class="o">(</span>https://iree.dev<span class="o">)</span>:
 <span class="w">  </span>IREE<span class="w"> </span>compiler<span class="w"> </span>version<span class="w"> </span><span class="m">20231016</span>.553<span class="w"> </span>@<span class="w"> </span>f1cb2692a086738d7f16274b9b3af6d2c15ef133
 <span class="w">  </span>LLVM<span class="w"> </span>version<span class="w"> </span><span class="m">18</span>.0.0git
 <span class="w">  </span>Optimized<span class="w"> </span>build
 </code></pre></div>
 <p>and the Python API:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import iree.compiler.version as v; print(v.REVISIONS[&#39;IREE&#39;])&quot;</span>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import iree.compiler.version as v; print(v.REVISIONS['IREE'])"</span>
 f1cb2692a086738d7f16274b9b3af6d2c15ef133
 </code></pre></div>
 <h2 id="manylinux-releases">Manylinux releases<a class="headerlink" href="#manylinux-releases" title="Permanent link">link</a></h2>
@@ -6303,7 +6303,7 @@ cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDe
 ninja
 
 <span class="c1"># Or you may need this if buggy LLVM tools (like mlir-tblgen) are leaking :(</span>
-<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;detect_leaks=0&quot;</span><span class="w"> </span>ninja
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">"detect_leaks=0"</span><span class="w"> </span>ninja
 </code></pre></div>
 <p>Other tips:</p>
 <ul>

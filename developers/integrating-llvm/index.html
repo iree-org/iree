@@ -6287,12 +6287,12 @@ git<span class="w"> </span>clone<span class="w"> </span>https://github.com/iree-
 git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
 </code></pre></div>
 <p>Add the upstream LLVM repo to the LLVM submodule:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>remote<span class="w"> </span>add<span class="w"> </span>upstream<span class="w"> </span>https://github.com/llvm/llvm-project.git
 git<span class="w"> </span>fetch<span class="w"> </span>-pP<span class="w"> </span>upstream
 </code></pre></div>
 <p>Create the virtual environment for IREE work:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">"</span>
 uv<span class="w"> </span>venv<span class="w"> </span>venv<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.11
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>iree/runtime/bindings/python/iree/runtime/build_requirements.txt<span class="w"> </span>-p<span class="w"> </span>venv
 uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pyright<span class="w"> </span>-p<span class="w"> </span>venv
@@ -6300,7 +6300,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 </code></pre></div>
 <h2 id="integrating-llvm-upstream">Integrating LLVM upstream<a class="headerlink" href="#integrating-llvm-upstream" title="Permanent link">link</a></h2>
 <p>Update the local IREE repo and create an integration branch:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree"</span>
 git<span class="w"> </span>fetch<span class="w"> </span>-pP<span class="w"> </span>origin
 git<span class="w"> </span>checkout<span class="w"> </span>main
 git<span class="w"> </span>pull<span class="w"> </span>--ff-only
@@ -6310,9 +6310,9 @@ git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w
 </code></pre></div>
 <p>Take a note of the git hash of the LLVM repository currently used by IREE.
 Check if there are any fixup commit from the earlier integrations:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project&quot;</span>
-git<span class="w"> </span>status<span class="w">  </span><span class="c1"># should show detached HEAD pointing to the commit used in IREE&#39;s submodule</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">CURRENT_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
+git<span class="w"> </span>status<span class="w">  </span><span class="c1"># should show detached HEAD pointing to the commit used in IREE's submodule</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">CURRENT_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
 git<span class="w"> </span>fetch<span class="w"> </span>-pP<span class="w"> </span>upstream
 <span class="nb">export</span><span class="w"> </span><span class="nv">BASE_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>merge-base<span class="w"> </span><span class="nv">$CURRENT_LLVM_HASH</span><span class="w"> </span>upstream/main<span class="k">)</span>
 git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span><span class="nv">$BASE_LLVM_HASH</span>
@@ -6325,7 +6325,7 @@ drop those and go back to a clean LLVM integration. If that's not possible, it
 is also acceptable to keep those commits.</p>
 <p>Create an integration branch in the LLVM submodule and rebase it on LLVM
 upstream <code>main</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 git<span class="w"> </span>rebase<span class="w"> </span>upstream/main
 </code></pre></div>
@@ -6359,14 +6359,14 @@ basically follows the instructions to get a build started in
 order to catch more integration issues. Address sanitizers are enabled to
 catch bugs like a buffer overrun or a use-after-free. The Python bindings are
 enabled to make sure those also still build fine after the integration.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">"</span>
 <span class="nb">source</span><span class="w"> </span>venv/bin/activate
 <span class="nb">cd</span><span class="w"> </span>iree
-cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree-build&quot;</span><span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
+cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </span>-B<span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree-build"</span><span class="w"> </span>-S<span class="w"> </span>.<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_ENABLE_ASAN<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_BUILD_PYTHON_BINDINGS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/venv/bin/python&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-DPython3_EXECUTABLE<span class="o">=</span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/venv/bin/python"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_ENABLE_ASSERTIONS<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_ENABLE_SPLIT_DWARF<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_ENABLE_THIN_ARCHIVES<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
@@ -6374,14 +6374,14 @@ cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </s
 <span class="w">      </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DIREE_ENABLE_LLD<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
 <span class="w">      </span>-DCMAKE_C_COMPILER_LAUNCHER<span class="o">=</span>ccache<span class="w"> </span>-DCMAKE_CXX_COMPILER_LAUNCHER<span class="o">=</span>ccache
-<span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree-build&quot;</span>
+<span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree-build"</span>
 <span class="nb">set</span><span class="w"> </span>-o<span class="w"> </span>pipefail
 <span class="nb">export</span><span class="w"> </span><span class="nv">WORKERS</span><span class="o">=</span><span class="m">12</span><span class="w">  </span><span class="c1"># please adapt based on number of cores and amount of main memory</span>
 ninja<span class="w"> </span>-j<span class="w"> </span><span class="nv">$WORKERS</span><span class="w"> </span>-k<span class="w"> </span><span class="m">999</span><span class="w"> </span>all<span class="w"> </span><span class="p">|&amp;</span><span class="w"> </span>tee<span class="w"> </span>ninja-all.log
 ninja<span class="w"> </span>-j<span class="w"> </span><span class="nv">$WORKERS</span><span class="w"> </span>-k<span class="w"> </span><span class="m">999</span><span class="w"> </span>iree-test-deps<span class="w"> </span><span class="p">|&amp;</span><span class="w"> </span>tee<span class="w"> </span>iree-test-deps.log
 </code></pre></div>
 <p>Verify that the Bazel build works:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree"</span>
 python<span class="w"> </span>configure_bazel.py
 bazel<span class="w"> </span>build<span class="w"> </span>-j<span class="w"> </span><span class="nv">$WORKERS</span><span class="w"> </span>//tools/...
 </code></pre></div>
@@ -6394,7 +6394,7 @@ out if the LLVM file that defines it has been updated in the additional LLVM
 commits that are being added. It is usually helpful to check the new commits
 from LLVM upstream if any of those touched the file defining the type or
 function:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span><span class="nv">$BASE_LLVM_HASH</span>..<span class="w"> </span>--<span class="w"> </span>relative/path/of/llvm/file.h
 </code></pre></div>
 <p>If any commits are listed here, those have usually changed a type of a function
@@ -6428,14 +6428,14 @@ below for copy-and-paste-able commands.)</p>
 integration works.</p>
 <p>If all the verification steps are successful, submit the branches to the IREE
 upstream repos:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>:sm-iree-integrates/llvm-<span class="nv">$DATE</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">NEW_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39; &#39;</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
-<span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">NEW_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
+<span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">"</span>
 <span class="nb">source</span><span class="w"> </span>venv/bin/activate
 <span class="nb">cd</span><span class="w"> </span>iree
 git<span class="w"> </span>add<span class="w"> </span>third_party/llvm-project
-git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Integrate LLVM to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2">&quot;</span>
+git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Integrate LLVM to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2">"</span>
 git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message if any fixes / cherry-picks / reverts had been needed, mention LLVM commits that caused the need for adaptions</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>integrates/llvm-<span class="nv">$DATE</span>:integrates/llvm-<span class="nv">$DATE</span>
 </code></pre></div>
@@ -6446,10 +6446,10 @@ stablehlo, it is currently recommended to patch the IREE forks of those
 submodules if needed during an LLVM integration into IREE.</p>
 <p>Here are the example commands, using stablehlo as an example, for pushing some
 required changes to an integration branch in the IREE fork:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/stablehlo&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/stablehlo"</span>
 git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 git<span class="w"> </span>add<span class="w"> </span>-p<span class="w">  </span><span class="c1"># confirm changes</span>
-git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Adaptions to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2"> for integrating LLVM into IREE&quot;</span>
+git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Adaptions to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2"> for integrating LLVM into IREE"</span>
 git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message, mention what has been fixed and why, mention LLVM commits that caused the need for adaptions</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>integrates/llvm-<span class="nv">$DATE</span>:integrates/llvm-<span class="nv">$DATE</span>
 </code></pre></div>

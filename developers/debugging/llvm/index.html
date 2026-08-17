@@ -6421,7 +6421,7 @@ are often useful.</p>
 <a href="https://github.com/iree-org/iree/issues/22001">issue #22001</a> was</p>
 <div class="highlight"><pre><span></span><code><span class="ch">#!/usr/bin/env bash</span>
 
-<span class="o">[</span>llvm-bin<span class="o">]</span>/not<span class="w"> </span>--crash<span class="w"> </span><span class="o">[</span>llvm-bin<span class="o">]</span>/opt<span class="w"> </span>-passes<span class="o">=</span><span class="s1">&#39;amdgpu-lower-buffer-fat-pointers&#39;</span><span class="w"> </span>-disable-output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null
+<span class="o">[</span>llvm-bin<span class="o">]</span>/not<span class="w"> </span>--crash<span class="w"> </span><span class="o">[</span>llvm-bin<span class="o">]</span>/opt<span class="w"> </span>-passes<span class="o">=</span><span class="s1">'amdgpu-lower-buffer-fat-pointers'</span><span class="w"> </span>-disable-output<span class="w"> </span><span class="s2">"</span><span class="nv">$@</span><span class="s2">"</span><span class="w"> </span><span class="m">2</span>&gt;/dev/null
 </code></pre></div>
 <p>which was used with <code>llvm-reduce -test=interesting.sh pre-buffer-loads.ll</code>
 on output created by adding

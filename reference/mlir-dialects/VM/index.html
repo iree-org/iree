@@ -19396,8 +19396,8 @@ runtime error handling mechanisms such as semaphores or synchronous
 invocation results.</p>
 <p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
 operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref&lt;?&gt;
 </code></pre></div>
 <p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
 <h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
@@ -19437,8 +19437,8 @@ runtime error handling mechanisms such as semaphores or synchronous
 invocation results.</p>
 <p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
 operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref&lt;?&gt;
 </code></pre></div>
 <p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
@@ -19478,8 +19478,8 @@ runtime error handling mechanisms such as semaphores or synchronous
 invocation results.</p>
 <p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
 operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref&lt;?&gt;
 </code></pre></div>
 <p>Traits: <code>VM_PseudoOp</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
@@ -19515,8 +19515,8 @@ runtime error handling mechanisms such as semaphores or synchronous
 invocation results.</p>
 <p>This is implemented as a pseudo-op that transforms into a vm.cond_fail
 operation.</p>
-<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, &quot;a == b&quot; : i32
-vm.check.nz %ref, &quot;!null&quot; : !vm.ref&lt;?&gt;
+<div class="highlight"><pre><span></span><code>vm.check.eq %a, %b, "a == b" : i32
+vm.check.nz %ref, "!null" : !vm.ref&lt;?&gt;
 </code></pre></div>
 <p>Traits: <code>Commutative</code>, <code>VM_PseudoOp</code></p>
 <h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
@@ -19619,7 +19619,7 @@ or pending when the failure occurs will complete.</p>
 guarded by the condition.</p>
 <div class="highlight"><pre><span></span><code>%nz = vm.cmp.nz.i32 %value : i32
 %statusCode = vm.const.i32 9
-vm.cond_fail %nz, %statusCode, &quot;expected non-zero&quot;
+vm.cond_fail %nz, %statusCode, "expected non-zero"
 </code></pre></div>
 <p>Traits: <code>VM_MayFail</code>, <code>VM_PseudoOp</code></p>
 <h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
@@ -19661,7 +19661,7 @@ have a latency between when they are emitted and when the application can
 observe the failure. It's also possible that other work that is in-flight
 or pending when the failure occurs will complete.</p>
 <div class="highlight"><pre><span></span><code>%statusCode = vm.const.i32 9
-vm.fail %statusCode, &quot;oh no!&quot;
+vm.fail %statusCode, "oh no!"
 </code></pre></div>
 <p>Traits: <code>Terminator</code>, <code>VM_MayFail</code></p>
 <p>Interfaces: <code>VMSerializableOp</code></p>

@@ -6522,14 +6522,14 @@ files, digest validation can dominate capture and replay setup time.</p>
 <code>iree_hal_device_group_t</code>. The wrapped group preserves topology order and
 contains replacement devices that record operations before forwarding to the
 real devices.</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/replay/recorder.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/io/file_handle.h&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/hal/replay/recorder.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/io/file_handle.h"</span>
 
 <span class="n">iree_io_file_handle_t</span><span class="o">*</span><span class="w"> </span><span class="n">file_handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
 <span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_io_file_handle_create</span><span class="p">(</span>
 <span class="w">    </span><span class="n">IREE_IO_FILE_MODE_WRITE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IREE_IO_FILE_MODE_SEQUENTIAL_SCAN</span><span class="w"> </span><span class="o">|</span>
 <span class="w">        </span><span class="n">IREE_IO_FILE_MODE_SHARE_READ</span><span class="p">,</span>
-<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;/tmp/model.ireereplay&quot;</span><span class="p">),</span><span class="w"> </span><span class="cm">/*initial_size=*/</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">,</span>
+<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"/tmp/model.ireereplay"</span><span class="p">),</span><span class="w"> </span><span class="cm">/*initial_size=*/</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">,</span>
 <span class="w">    </span><span class="o">&amp;</span><span class="n">file_handle</span><span class="p">));</span>
 
 <span class="n">iree_hal_replay_recorder_options_t</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span>
@@ -6550,12 +6550,12 @@ real devices.</p>
 <span class="w">                                           </span><span class="n">host_allocator</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">replay_group</span><span class="p">);</span>
 <span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="n">status</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">iree_hal_replay_recorder_scope_begin</span><span class="p">(</span><span class="n">recorder</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;prefill&quot;</span><span class="p">));</span>
+<span class="w">      </span><span class="n">iree_hal_replay_recorder_scope_begin</span><span class="p">(</span><span class="n">recorder</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"prefill"</span><span class="p">));</span>
 <span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="cm">/* Use replay_group for the application phase being captured. */</span>
 <span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_status_join</span><span class="p">(</span>
 <span class="w">        </span><span class="n">status</span><span class="p">,</span>
-<span class="w">        </span><span class="n">iree_hal_replay_recorder_scope_end</span><span class="p">(</span><span class="n">recorder</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;prefill&quot;</span><span class="p">)));</span>
+<span class="w">        </span><span class="n">iree_hal_replay_recorder_scope_end</span><span class="p">(</span><span class="n">recorder</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"prefill"</span><span class="p">)));</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="w">  </span><span class="n">iree_hal_device_group_release</span><span class="p">(</span><span class="n">replay_group</span><span class="p">);</span>
 <span class="p">}</span>
@@ -6648,15 +6648,15 @@ records:
 </code></pre></div>
 <p>Use JSONL for scripts and agent workflows:</p>
 <div class="highlight"><pre><span></span><code>iree-dump-replay<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireereplay<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.kind==&quot;operation&quot; and .operation==&quot;device.queue_execute&quot;)&#39;</span>
+<span class="w">  </span>jq<span class="w"> </span><span class="s1">'select(.kind=="operation" and .operation=="device.queue_execute")'</span>
 </code></pre></div>
 <p>Query named replay scopes:</p>
 <div class="highlight"><pre><span></span><code>iree-dump-replay<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireereplay<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.payload_type==&quot;replay_scope&quot;) |</span>
-<span class="s1">      {operation, name: .payload.name}&#39;</span>
+<span class="w">  </span>jq<span class="w"> </span><span class="s1">'select(.payload_type=="replay_scope") |</span>
+<span class="s1">      {operation, name: .payload.name}'</span>
 </code></pre></div>
 <p>Example JSONL row:</p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="s2">&quot;operation&quot;</span><span class="p">,</span><span class="nt">&quot;sequence_ordinal&quot;</span><span class="p">:</span><span class="mi">27</span><span class="p">,</span><span class="nt">&quot;object_type&quot;</span><span class="p">:</span><span class="s2">&quot;device&quot;</span><span class="p">,</span><span class="nt">&quot;operation&quot;</span><span class="p">:</span><span class="s2">&quot;device.queue_execute&quot;</span><span class="p">,</span><span class="nt">&quot;payload&quot;</span><span class="p">:{</span><span class="nt">&quot;command_buffer_id&quot;</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span><span class="nt">&quot;wait_semaphores&quot;</span><span class="p">:[{</span><span class="nt">&quot;semaphore_id&quot;</span><span class="p">:</span><span class="mi">7</span><span class="p">,</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="mi">1</span><span class="p">}],</span><span class="nt">&quot;signal_semaphores&quot;</span><span class="p">:[{</span><span class="nt">&quot;semaphore_id&quot;</span><span class="p">:</span><span class="mi">9</span><span class="p">,</span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="mi">1</span><span class="p">}]}}</span>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="s2">"operation"</span><span class="p">,</span><span class="nt">"sequence_ordinal"</span><span class="p">:</span><span class="mi">27</span><span class="p">,</span><span class="nt">"object_type"</span><span class="p">:</span><span class="s2">"device"</span><span class="p">,</span><span class="nt">"operation"</span><span class="p">:</span><span class="s2">"device.queue_execute"</span><span class="p">,</span><span class="nt">"payload"</span><span class="p">:{</span><span class="nt">"command_buffer_id"</span><span class="p">:</span><span class="mi">5</span><span class="p">,</span><span class="nt">"wait_semaphores"</span><span class="p">:[{</span><span class="nt">"semaphore_id"</span><span class="p">:</span><span class="mi">7</span><span class="p">,</span><span class="nt">"value"</span><span class="p">:</span><span class="mi">1</span><span class="p">}],</span><span class="nt">"signal_semaphores"</span><span class="p">:[{</span><span class="nt">"semaphore_id"</span><span class="p">:</span><span class="mi">9</span><span class="p">,</span><span class="nt">"value"</span><span class="p">:</span><span class="mi">1</span><span class="p">}]}}</span>
 </code></pre></div>
 <p>The dumper reports blob payloads as byte ranges in the original replay file.
 That keeps large captures queryable and lets generated projections refer to the
@@ -6667,8 +6667,8 @@ useful when iterating on generated kernels while preserving the same captured
 HAL workload, inputs, synchronization, and benchmark harness.</p>
 <p>First find executable ids:</p>
 <div class="highlight"><pre><span></span><code>iree-dump-replay<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireereplay<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.operation==&quot;executable_cache.prepare_executable&quot;) |</span>
-<span class="s1">      {executable_id:.related_object_id, format:.payload.format_range}&#39;</span>
+<span class="w">  </span>jq<span class="w"> </span><span class="s1">'select(.operation=="executable_cache.prepare_executable") |</span>
+<span class="s1">      {executable_id:.related_object_id, format:.payload.format_range}'</span>
 </code></pre></div>
 <p>Then substitute a replacement:</p>
 <div class="highlight"><pre><span></span><code>iree-run-replay<span class="w"> </span><span class="se">\</span>
@@ -6758,16 +6758,16 @@ original file read path.</p>
 <h2 id="appendix-programmatic-replay-execution">Appendix: Programmatic replay execution<a class="headerlink" href="#appendix-programmatic-replay-execution" title="Permanent link">link</a></h2>
 <p>Embedding applications can execute a replay directly with
 <code>iree_hal_replay_execute_file</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/replay/execute.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/io/file_contents.h&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/hal/replay/execute.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/io/file_contents.h"</span>
 
 <span class="n">iree_io_file_contents_t</span><span class="o">*</span><span class="w"> </span><span class="n">replay_contents</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
 <span class="n">iree_status_t</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_io_file_contents_map</span><span class="p">(</span>
-<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;/tmp/model.ireereplay&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">IREE_IO_FILE_ACCESS_READ</span><span class="p">,</span>
+<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"/tmp/model.ireereplay"</span><span class="p">),</span><span class="w"> </span><span class="n">IREE_IO_FILE_ACCESS_READ</span><span class="p">,</span>
 <span class="w">    </span><span class="n">host_allocator</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">replay_contents</span><span class="p">);</span>
 
 <span class="n">iree_hal_replay_file_path_remap_t</span><span class="w"> </span><span class="n">remaps</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="p">{</span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;/mnt/capture&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;/mnt/replay&quot;</span><span class="p">)},</span>
+<span class="w">    </span><span class="p">{</span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"/mnt/capture"</span><span class="p">),</span><span class="w"> </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"/mnt/replay"</span><span class="p">)},</span>
 <span class="p">};</span>
 <span class="n">iree_hal_replay_execute_options_t</span><span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">=</span>
 <span class="w">    </span><span class="n">iree_hal_replay_execute_options_default</span><span class="p">();</span>

@@ -6451,7 +6451,7 @@ treated as ordinary benchmark data.</p>
 <h2 id="useful-capture-flags">Useful capture flags<a class="headerlink" href="#useful-capture-flags" title="Permanent link">link</a></h2>
 <p>Common filters select which operations emit expensive artifacts while leaving
 cheap metadata available for decoding:</p>
-<div class="highlight"><pre><span></span><code>--device_profiling_filter_export<span class="o">=</span><span class="s1">&#39;*matmul*&#39;</span>
+<div class="highlight"><pre><span></span><code>--device_profiling_filter_export<span class="o">=</span><span class="s1">'*matmul*'</span>
 --device_profiling_filter_command_buffer<span class="o">=</span><span class="m">3</span>
 --device_profiling_filter_command_index<span class="o">=</span><span class="m">12</span>
 --device_profiling_filter_physical_device<span class="o">=</span><span class="m">0</span>
@@ -6467,7 +6467,7 @@ counter names:</p>
 <span class="w">  </span>--device_profiling_mode<span class="o">=</span>counters<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device_profiling_counter<span class="o">=</span>SQ_WAVES<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device_profiling_counter<span class="o">=</span>SQ_BUSY_CYCLES<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device_profiling_filter_export<span class="o">=</span><span class="s1">&#39;*matmul*&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device_profiling_filter_export<span class="o">=</span><span class="s1">'*matmul*'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device_profiling_output<span class="o">=</span>/tmp/model-counters.ireeprof
 </code></pre></div>
 <p>Long-running workloads can request periodic flushes:</p>
@@ -6494,15 +6494,15 @@ Metal GPU traces. Success does not imply that a <code>.ireeprof</code> bundle wa
 <p>Embedding applications can capture the same profile bundles directly through
 the HAL API. Create a sink, begin profiling on the devices you want to observe,
 run the workload, and end profiling.</p>
-<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/hal/utils/profile_file.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/io/file_handle.h&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/hal/api.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/hal/utils/profile_file.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/io/file_handle.h"</span>
 
 <span class="n">iree_io_file_handle_t</span><span class="o">*</span><span class="w"> </span><span class="n">file_handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
 <span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_io_file_handle_create</span><span class="p">(</span>
 <span class="w">    </span><span class="n">IREE_IO_FILE_MODE_WRITE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">IREE_IO_FILE_MODE_SEQUENTIAL_SCAN</span><span class="w"> </span><span class="o">|</span>
 <span class="w">        </span><span class="n">IREE_IO_FILE_MODE_SHARE_READ</span><span class="p">,</span>
-<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">&quot;/tmp/model.ireeprof&quot;</span><span class="p">),</span><span class="w"> </span><span class="cm">/*initial_size=*/</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">,</span>
+<span class="w">    </span><span class="n">IREE_SV</span><span class="p">(</span><span class="s">"/tmp/model.ireeprof"</span><span class="p">),</span><span class="w"> </span><span class="cm">/*initial_size=*/</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">,</span>
 <span class="w">    </span><span class="o">&amp;</span><span class="n">file_handle</span><span class="p">));</span>
 
 <span class="n">iree_hal_profile_sink_t</span><span class="o">*</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
@@ -6553,7 +6553,7 @@ iree-profile<span class="w"> </span>queue<span class="w"> </span>--format<span c
 iree-profile<span class="w"> </span><span class="nb">command</span><span class="w"> </span>--id<span class="o">=</span><span class="m">3</span><span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>--dispatch_events<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>/tmp/model.ireeprof
 iree-profile<span class="w"> </span>memory<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireeprof
-iree-profile<span class="w"> </span>executable<span class="w"> </span>--filter<span class="o">=</span><span class="s1">&#39;*matmul*&#39;</span><span class="w"> </span>/tmp/model.ireeprof
+iree-profile<span class="w"> </span>executable<span class="w"> </span>--filter<span class="o">=</span><span class="s1">'*matmul*'</span><span class="w"> </span>/tmp/model.ireeprof
 </code></pre></div>
 <p><code>statistics</code> is useful for compact scripts:</p>
 <div class="highlight"><pre><span></span><code>iree-profile<span class="w"> </span>statistics<span class="w"> </span>/tmp/model.ireeprof
@@ -6568,10 +6568,10 @@ iree-profile<span class="w"> </span>executable<span class="w"> </span>--filter<s
 </code></pre></div>
 <p>For automation, prefer JSONL projections:</p>
 <div class="highlight"><pre><span></span><code>iree-profile<span class="w"> </span>dispatch<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireeprof<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.type==&quot;dispatch_group&quot;) | {key,avg_ns,count}&#39;</span>
+<span class="w">  </span>jq<span class="w"> </span><span class="s1">'select(.type=="dispatch_group") | {key,avg_ns,count}'</span>
 
 iree-profile<span class="w"> </span>queue<span class="w"> </span>--format<span class="o">=</span>jsonl<span class="w"> </span>/tmp/model.ireeprof<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.type==&quot;queue_event&quot; or .type==&quot;queue_submission&quot;)&#39;</span>
+<span class="w">  </span>jq<span class="w"> </span><span class="s1">'select(.type=="queue_event" or .type=="queue_submission")'</span>
 
 iree-profile<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="o">=</span>ireeperf-jsonl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="o">=</span>/tmp/model.ireeperf.jsonl<span class="w"> </span>/tmp/model.ireeprof
@@ -6587,7 +6587,7 @@ Perfetto TrackEvent <code>.pftrace</code> files:</p>
 <div class="highlight"><pre><span></span><code>iree-profile<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="o">=</span>ireeperf-jsonl<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="o">=</span>/tmp/model.ireeperf.jsonl<span class="w"> </span>/tmp/model.ireeprof
 
-uvx<span class="w"> </span>--with<span class="w"> </span>perfetto<span class="w"> </span>--with<span class="w"> </span>protobuf<span class="w"> </span>python<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>iree-profile-render<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+uvx<span class="w"> </span>--with<span class="w"> </span>perfetto<span class="w"> </span>--with<span class="w"> </span>protobuf<span class="w"> </span>python<span class="w"> </span><span class="s2">"</span><span class="k">$(</span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>iree-profile-render<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--format<span class="o">=</span>perfetto<span class="w"> </span>/tmp/model.ireeperf.jsonl<span class="w"> </span>-o<span class="w"> </span>/tmp/model.pftrace
 </code></pre></div>
 <p>The renderer is a Python tool with optional format-specific dependencies. The
@@ -6597,7 +6597,7 @@ or install <code>perfetto</code> and <code>protobuf</code> into the active Pytho
 <code>iree-profile-render</code> directly.</p>
 <p>For pipelines, stream the exporter into the renderer:</p>
 <div class="highlight"><pre><span></span><code>iree-profile<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="o">=</span>ireeperf-jsonl<span class="w"> </span>--output<span class="o">=</span>-<span class="w"> </span>/tmp/model.ireeprof<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>uvx<span class="w"> </span>--with<span class="w"> </span>perfetto<span class="w"> </span>--with<span class="w"> </span>protobuf<span class="w"> </span>python<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>iree-profile-render<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>uvx<span class="w"> </span>--with<span class="w"> </span>perfetto<span class="w"> </span>--with<span class="w"> </span>protobuf<span class="w"> </span>python<span class="w"> </span><span class="s2">"</span><span class="k">$(</span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>iree-profile-render<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--format<span class="o">=</span>perfetto<span class="w"> </span>-<span class="w"> </span>-o<span class="w"> </span>/tmp/model.pftrace
 </code></pre></div>
 <p>Open the resulting <code>.pftrace</code> in the Perfetto UI to inspect host queue events,
@@ -6639,12 +6639,12 @@ AMDGPU ATT/SQTT trace artifacts embedded in a <code>.ireeprof</code> bundle:</p>
 <span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--benchmark_min_time<span class="o">=</span>20x<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device_profiling_mode<span class="o">=</span>executable-traces,dispatch-events,executable-metadata<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device_profiling_filter_export<span class="o">=</span><span class="s1">&#39;*matmul*&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device_profiling_filter_export<span class="o">=</span><span class="s1">'*matmul*'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device_profiling_output<span class="o">=</span>/tmp/model-att.ireeprof
 
 iree-profile<span class="w"> </span>att<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--rocm_library_path<span class="o">=</span>/opt/rocm/lib<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--filter<span class="o">=</span><span class="s1">&#39;*matmul*&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--filter<span class="o">=</span><span class="s1">'*matmul*'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>/tmp/model-att.ireeprof
 </code></pre></div>
 <p>Executable traces are heavy and should be captured with a narrow filter. If

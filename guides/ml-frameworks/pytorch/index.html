@@ -6634,7 +6634,7 @@ computation graph and feeds that graph through to the selected backend compiler.
 <span class="n">linear_module</span> <span class="o">=</span> <span class="n">LinearModule</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
 
 <span class="c1"># Compile the program using the turbine backend.(1)</span>
-<span class="n">opt_linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">linear_module</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;turbine_cpu&quot;</span><span class="p">)</span>
+<span class="n">opt_linear_module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">linear_module</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"turbine_cpu"</span><span class="p">)</span>
 
 <span class="c1"># Use the compiled program as you would the original program.</span>
 <span class="n">args</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
@@ -6714,7 +6714,7 @@ Python and then export deployment-ready artifacts that can be used in IREE's
 <span class="n">binary</span> <span class="o">=</span> <span class="n">export_output</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">save_to</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 
 <span class="c1"># Use the IREE runtime API to test the compiled program.</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">"local-task"</span><span class="p">)</span>
 <span class="n">vm_module</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">load_vm_module</span><span class="p">(</span>
     <span class="n">ireert</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">copy_buffer</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span><span class="p">,</span> <span class="n">binary</span><span class="o">.</span><span class="n">map_memory</span><span class="p">()),</span>
     <span class="n">config</span><span class="p">,</span>
@@ -6846,13 +6846,13 @@ models parameters on disk, so that they can be loaded later during runtime.</p>
 
 <span class="n">linear_module</span> <span class="o">=</span> <span class="n">LinearModule</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="mi">3</span><span class="p">)</span>
 
-<span class="c1"># Create a params dictionary. Note that the keys here match LinearModule&#39;s</span>
+<span class="c1"># Create a params dictionary. Note that the keys here match LinearModule's</span>
 <span class="c1"># attributes. We will use the saved safetensor file for use from the command</span>
 <span class="c1"># line.</span>
 <span class="n">wt</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">weight</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
 <span class="n">bias</span> <span class="o">=</span> <span class="n">linear_module</span><span class="o">.</span><span class="n">bias</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
-<span class="n">params</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">&quot;weight&quot;</span><span class="p">:</span> <span class="n">wt</span><span class="p">,</span> <span class="s2">&quot;bias&quot;</span><span class="p">:</span> <span class="n">bias</span> <span class="p">}</span>
-<span class="n">save_file</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="s2">&quot;params.safetensors&quot;</span><span class="p">)</span>
+<span class="n">params</span> <span class="o">=</span> <span class="p">{</span> <span class="s2">"weight"</span><span class="p">:</span> <span class="n">wt</span><span class="p">,</span> <span class="s2">"bias"</span><span class="p">:</span> <span class="n">bias</span> <span class="p">}</span>
+<span class="n">save_file</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="s2">"params.safetensors"</span><span class="p">)</span>
 
 <span class="c1"># Externalize the model parameters. This removes weight tensors from the IR</span>
 <span class="c1"># module, allowing them to be loaded at runtime. Symbolic references to these</span>
@@ -6870,7 +6870,7 @@ models parameters on disk, so that they can be loaded later during runtime.</p>
 <span class="c1"># Save the input as an npy tensor, so that it can be passed in through the</span>
 <span class="c1"># command line to `iree-run-module`.</span>
 <span class="n">input_np</span> <span class="o">=</span> <span class="nb">input</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
-<span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;input.npy&quot;</span><span class="p">,</span> <span class="n">input_np</span><span class="p">)</span>
+<span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"input.npy"</span><span class="p">,</span> <span class="n">input_np</span><span class="p">)</span>
 </code></pre></div>
 <div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Python runtime</label><label for="__tabbed_3_2">Command line tools</label></div>
 <div class="tabbed-content">
@@ -6883,16 +6883,16 @@ called <code>create_io_parameters_module()</code>.</p>
 <span class="c1"># To load the parameters, we need to define ParameterIndex for each</span>
 <span class="c1"># parameter class.</span>
 <span class="n">idx</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">ParameterIndex</span><span class="p">()</span>
-<span class="n">idx</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">&quot;weight&quot;</span><span class="p">,</span> <span class="n">wt</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
-<span class="n">idx</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">&quot;bias&quot;</span><span class="p">,</span> <span class="n">bias</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
+<span class="n">idx</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">"weight"</span><span class="p">,</span> <span class="n">wt</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
+<span class="n">idx</span><span class="o">.</span><span class="n">add_buffer</span><span class="p">(</span><span class="s2">"bias"</span><span class="p">,</span> <span class="n">bias</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tobytes</span><span class="p">())</span>
 
 
 <span class="c1"># Create the runtime instance, and load the runtime.</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="n">driver_name</span><span class="o">=</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="n">driver_name</span><span class="o">=</span><span class="s2">"local-task"</span><span class="p">)</span>
 <span class="n">instance</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">vm_instance</span>
 
 <span class="n">param_module</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">create_io_parameters_module</span><span class="p">(</span>
-    <span class="n">instance</span><span class="p">,</span> <span class="n">idx</span><span class="o">.</span><span class="n">create_provider</span><span class="p">(</span><span class="n">scope</span><span class="o">=</span><span class="s2">&quot;model&quot;</span><span class="p">),</span>
+    <span class="n">instance</span><span class="p">,</span> <span class="n">idx</span><span class="o">.</span><span class="n">create_provider</span><span class="p">(</span><span class="n">scope</span><span class="o">=</span><span class="s2">"model"</span><span class="p">),</span>
 <span class="p">)</span>
 
 <span class="c1"># Load the runtime. There are essentially two modules to load, one for the</span>
@@ -6916,7 +6916,7 @@ called <code>create_io_parameters_module()</code>.</p>
 through the command line to generate outputs.</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># When save_to is not None, the binary is saved to the given path,</span>
 <span class="c1"># and a None value is returned.</span>
-<span class="n">binary</span> <span class="o">=</span> <span class="n">exported_module</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">save_to</span><span class="o">=</span><span class="s2">&quot;compiled_module.vmfb&quot;</span><span class="p">)</span>
+<span class="n">binary</span> <span class="o">=</span> <span class="n">exported_module</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">save_to</span><span class="o">=</span><span class="s2">"compiled_module.vmfb"</span><span class="p">)</span>
 </code></pre></div>
 <p>The stored safetensors file, the input tensor, and the VMFB can now be passed
 in to IREE through the command line.</p>

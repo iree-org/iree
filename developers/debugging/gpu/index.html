@@ -6616,7 +6616,7 @@ a <code>.hsaco</code> with</p>
 while potentially making modifications, the process is</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># A PATH edit is not strictly required. It is used here to point out that the</span>
 <span class="c1"># LLVM binaries used should me built from the same LLVM sources IREE uses.</span>
-<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">&quot;[build-directory]/llvm-project/bin:[build-directory]/tools/bin:</span><span class="nv">$PATH</span><span class="s2">&quot;</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">PATH</span><span class="o">=</span><span class="s2">"[build-directory]/llvm-project/bin:[build-directory]/tools/bin:</span><span class="nv">$PATH</span><span class="s2">"</span>
 
 iree-compile<span class="w"> </span>dispatch.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-device<span class="o">=</span>hip<span class="w"> </span><span class="se">\</span>

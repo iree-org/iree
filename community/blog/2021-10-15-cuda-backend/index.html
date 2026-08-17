@@ -6415,7 +6415,7 @@ following mlir in <code>/tmp/add.mlir</code> and then run the following given co
   %0 = tensor.empty() : tensor&lt;4xf32&gt;
   %1 = linalg.generic {
     indexing_maps = [
-      affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;]}
+      affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;], iterator_types = ["parallel"]}
       ins(%arg0, %arg1 : tensor&lt;4xf32&gt;, tensor&lt;4xf32&gt;)
       outs(%0 : tensor&lt;4xf32&gt;) {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
@@ -6436,8 +6436,8 @@ $<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </s
 <span class="w">  </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--module<span class="o">=</span>/tmp/add.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--function<span class="o">=</span>add<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[1 2 3 4]&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[2 2 2 2]&quot;</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">"4xf32=[1 2 3 4]"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">"4xf32=[2 2 2 2]"</span>
 
 EXEC<span class="w"> </span>@add
 <span class="nv">4xf32</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">6</span>
@@ -6458,7 +6458,7 @@ threads per block.
 We will then have a pass tiling the ops in the dispatch region a second time to
 distribute the work onto threads within the block.</p>
 <p>At this stage the IR looks like the following:</p>
-<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+<div class="highlight"><pre><span></span><code>    %8 = "gpu.thread_id"() {dimension = "x"} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
     %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
@@ -6467,7 +6467,7 @@ distribute the work onto threads within the block.</p>
         indexing_maps = [affine_map&lt;(d0) -&gt; (d0)&gt;,
                          affine_map&lt;(d0) -&gt; (d0)&gt;,
                          affine_map&lt;(d0) -&gt; (d0)&gt;],
-        iterator_types = [&quot;parallel&quot;]}
+        iterator_types = ["parallel"]}
       ins(%10, %11 :
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;,
           memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;)
@@ -6485,7 +6485,7 @@ After tiling to a size we vectorize the IR to get vector read/write mapping to
 load4/store4. This significantly improves the memory access pattern of the code
 generated.</p>
 <p>This convert the previous IR to:</p>
-<div class="highlight"><pre><span></span><code>    %8 = &quot;gpu.thread_id&quot;() {dimension = &quot;x&quot;} : () -&gt; index
+<div class="highlight"><pre><span></span><code>    %8 = "gpu.thread_id"() {dimension = "x"} : () -&gt; index
     %9 = affine.apply affine_map&lt;()[s0] -&gt; (s0 * 4)&gt;()[%8]
     %10 = memref.subview %in0[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;
     %11 = memref.subview %in1[%9] [4] [1] : memref&lt;128xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt; to memref&lt;4xf32, affine_map&lt;(d0)[s0] -&gt; (d0 + s0)&gt;&gt;

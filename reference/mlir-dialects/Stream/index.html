@@ -11362,8 +11362,8 @@ multiple async.parameter.read operations but allows implementations to
 batch operations for better performance.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>%updated, %result_timepoint = stream.async.parameter.gather {
-  &quot;scope&quot;::&quot;key0&quot;[%offset0] -&gt; %target[%target_offset0 to %target_end0 for %length0],
-  &quot;scope&quot;::&quot;key1&quot;[%offset1] -&gt; %target[%target_offset1 to %target_end1 for %length1]
+  "scope"::"key0"[%offset0] -&gt; %target[%target_offset0 to %target_end0 for %length0],
+  "scope"::"key1"[%offset1] -&gt; %target[%target_offset1 to %target_end1 for %length1]
 } : !stream.resource&lt;staging&gt;{%target_size} =&gt; !stream.timepoint
 </code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
@@ -11460,9 +11460,9 @@ any point prior to the first use. When an await_timepoint is specified the
 load will not begin until that timepoint is reached, allowing for explicit
 ordering with other timeline operations.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>%result, %result_timepoint = stream.async.parameter.load &quot;scope&quot;::&quot;key&quot;[%offset]
+<div class="highlight"><pre><span></span><code>%result, %result_timepoint = stream.async.parameter.load "scope"::"key"[%offset]
     : !stream.resource&lt;constant&gt;{%size} =&gt; !stream.timepoint
-%ordered, %ordered_timepoint = stream.async.parameter.load await(%tp) &quot;scope&quot;::&quot;key2&quot;[%offset]
+%ordered, %ordered_timepoint = stream.async.parameter.load await(%tp) "scope"::"key2"[%offset]
     : !stream.resource&lt;constant&gt;{%size} =&gt; !stream.timepoint
 </code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
@@ -11543,7 +11543,7 @@ resources, or when the allocation is managed separately (e.g., staging
 buffers). The target resource is a tied operand: the input is mutated and
 returned with the specified range updated.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>%updated, %result_timepoint = stream.async.parameter.read &quot;scope&quot;::&quot;key&quot;[%param_offset]
+<div class="highlight"><pre><span></span><code>%updated, %result_timepoint = stream.async.parameter.read "scope"::"key"[%param_offset]
     -&gt; %target[%target_offset to %target_end for %length]
     : !stream.resource&lt;staging&gt;{%target_size} =&gt; !stream.timepoint
 </code></pre></div></p>
@@ -11640,8 +11640,8 @@ performance. The source resource is returned unchanged to establish proper
 data flow dependencies.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>%result, %result_timepoint = stream.async.parameter.scatter {
-  %source[%source_offset0 to %source_end0 for %length0] -&gt; &quot;scope&quot;::&quot;key0&quot;[%target_offset0],
-  %source[%source_offset1 to %source_end1 for %length1] -&gt; &quot;scope&quot;::&quot;key1&quot;[%target_offset1]
+  %source[%source_offset0 to %source_end0 for %length0] -&gt; "scope"::"key0"[%target_offset0],
+  %source[%source_offset1 to %source_end1 for %length1] -&gt; "scope"::"key1"[%target_offset1]
 } : !stream.resource&lt;staging&gt;{%source_size} =&gt; !stream.timepoint
 </code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
@@ -11735,7 +11735,7 @@ saving model weights. The source resource is returned unchanged to establish
 proper data flow dependencies.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>%result, %result_timepoint = stream.async.parameter.write %source[%source_offset to %source_end for %length]
-    -&gt; &quot;scope&quot;::&quot;key&quot;[%param_offset]
+    -&gt; "scope"::"key"[%param_offset]
     : !stream.resource&lt;staging&gt;{%source_size} =&gt; !stream.timepoint
 </code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>

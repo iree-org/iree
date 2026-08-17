@@ -6573,7 +6573,7 @@ profile was recording a specific event type, as in the above <code>-e
 L1-dcache-load-misses</code> example:</p>
 <div class="highlight"><pre><span></span><code>perf<span class="w"> </span>report<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
 
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
+Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">'L1-dcache-load-misses'</span>,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
 Overhead<span class="w">  </span>Command<span class="w">          </span>Shared<span class="w"> </span>Object<span class="w">              </span>Symbol
 <span class="w">  </span><span class="m">61</span>.53%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_31
 <span class="w">  </span><span class="m">13</span>.30%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_11
@@ -6589,7 +6589,7 @@ profiling by specific event types as in the above <code>-e L1-dcache-load-misses
 example:</p>
 <div class="highlight"><pre><span></span><code>perf<span class="w"> </span>annotate<span class="w"> </span>-i<span class="w"> </span>perf.data
 
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span><span class="m">4000</span><span class="w"> </span>Hz,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
+Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">'L1-dcache-load-misses'</span>,<span class="w"> </span><span class="m">4000</span><span class="w"> </span>Hz,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
 serving_default_ex_dispatch_31<span class="w">  </span>/tmp/dylib_executablenzpx2Q.so<span class="w"> </span><span class="o">[</span>Percent:<span class="w"> </span><span class="nb">local</span><span class="w"> </span>period<span class="o">]</span>
 <span class="w">  </span><span class="m">1</span>.66<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x1000<span class="o">(</span>%rdi<span class="o">)</span>,%xmm10
 <span class="w">  </span><span class="m">0</span>.48<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x800<span class="o">(</span>%rdi<span class="o">)</span>,%xmm9

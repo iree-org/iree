@@ -8489,10 +8489,10 @@ dimension values are integers.</p>
 <p>Used inside <code>iree_codegen.smt.constraints</code> regions.</p>
 <p>Examples:
 <div class="highlight"><pre><span></span><code>// Static message (no args):
-iree_codegen.smt.assert %cond, &quot;dim_0 == 128&quot; : !smt.bool
+iree_codegen.smt.assert %cond, "dim_0 == 128" : !smt.bool
 
 // Format string with args:
-iree_codegen.smt.assert %cond, &quot;wg_x ({}) &lt; wg_y ({})&quot;, %x, %y : !smt.bool, !smt.int, !smt.int
+iree_codegen.smt.assert %cond, "wg_x ({}) &lt; wg_y ({})", %x, %y : !smt.bool, !smt.int, !smt.int
 </code></pre></div></p>
 <p>Traits: <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
@@ -8548,11 +8548,11 @@ tuner or verification passes, and erased before lowering.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>// The matmul is marked: {root_op = #iree_codegen.root_op&lt;set = 0&gt;}
 iree_codegen.smt.constraints target = &lt;set = 0&gt;, pipeline = #iree_gpu.pipeline&lt;VectorDistribute&gt;,
- knobs = {workgroup = [#iree_codegen.smt.int_knob&lt;&quot;wg_m&quot;&gt;, #iree_codegen.smt.int_knob&lt;&quot;wg_n&quot;&gt;]}
+ knobs = {workgroup = [#iree_codegen.smt.int_knob&lt;"wg_m"&gt;, #iree_codegen.smt.int_knob&lt;"wg_n"&gt;]}
  dims(%M, %N, %K) {
 ^bb0(%m: !smt.int, %n: !smt.int, %k: !smt.int):
-  %wg_m = iree_codegen.smt.knob &quot;wg_m&quot; : !smt.int
-  %wg_n = iree_codegen.smt.knob &quot;wg_n&quot; : !smt.int
+  %wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
+  %wg_n = iree_codegen.smt.knob "wg_n" : !smt.int
 }
 </code></pre></div></p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>NoTerminator</code>, <code>SingleBlock</code></p>
@@ -8591,7 +8591,7 @@ enclosing <code>iree_codegen.smt.constraints</code> op's <code>knobs</code> dict
 <p>In SMT terminology this is a constant (0-ary function), not a variable.
 The tuner assigns concrete integer values to these constants.</p>
 <p>Example:
-<div class="highlight"><pre><span></span><code>%wg_m = iree_codegen.smt.knob &quot;wg_m&quot; : !smt.int
+<div class="highlight"><pre><span></span><code>%wg_m = iree_codegen.smt.knob "wg_m" : !smt.int
 </code></pre></div></p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;ConstraintsOp&gt;</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>

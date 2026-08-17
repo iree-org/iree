@@ -6503,10 +6503,10 @@ inherit this summary.</p>
   S_1 frontier: {A: 5}
 
 Q_B waits on S_1 &gt;= 1, then signals semaphore S_2 to value 1
-  S_2 frontier: {A: 5, B: 3}  (merged A&#39;s frontier with B&#39;s own axis)
+  S_2 frontier: {A: 5, B: 3}  (merged A's frontier with B's own axis)
 
 Q_C waits on S_2 &gt;= 1
-  Q_C&#39;s frontier after import: {A: 5, B: 3, C: ...}
+  Q_C's frontier after import: {A: 5, B: 3, C: ...}
 </code></pre></div>
 <p>Q_C now knows about Q_A's work, even though Q_C never directly interacted
 with Q_A or semaphore S_1. The knowledge propagated transitively through

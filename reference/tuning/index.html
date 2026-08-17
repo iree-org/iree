@@ -6483,7 +6483,7 @@ func.func @matmul_reduce_32_1024_2048(%lhs: tensor&lt;32x1024xf16&gt;, %rhs: ten
   %c0_f32 = arith.constant 0.0: f32
   %red_acc = tensor.empty() : tensor&lt;32xf32&gt;
   %red_fill = linalg.fill ins(%c0_f32 : f32) outs(%red_acc : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
-  %red = linalg.generic {indexing_maps = [#map, #map1], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%mm : tensor&lt;32x2048xf32&gt;) outs(%red_fill : tensor&lt;32xf32&gt;)  {
+  %red = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%mm : tensor&lt;32x2048xf32&gt;) outs(%red_fill : tensor&lt;32xf32&gt;)  {
   ^bb0(%in: f32, %out: f32):
     %7 = arith.addf %in, %out : f32
     linalg.yield %7 : f32
@@ -6534,7 +6534,7 @@ hal.executable public @matmul_reduce_32_1024_2048_dispatch_1 {
         %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [32, 2048], strides = [1, 1] : !flow.dispatch.tensor&lt;readonly:tensor&lt;32x2048xf32&gt;&gt; -&gt; tensor&lt;32x2048xf32&gt;
         %3 = tensor.empty() : tensor&lt;32xf32&gt;
         %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor&lt;32xf32&gt;) -&gt; tensor&lt;32xf32&gt;
-        %5 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;, affine_map&lt;(d0, d1) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;, &quot;reduction&quot;]} ins(%2 : tensor&lt;32x2048xf32&gt;) outs(%4 : tensor&lt;32xf32&gt;) {
+        %5 = linalg.generic {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;, affine_map&lt;(d0, d1) -&gt; (d0)&gt;], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor&lt;32x2048xf32&gt;) outs(%4 : tensor&lt;32xf32&gt;) {
         ^bb0(%in: f32, %out: f32):
           %6 = arith.addf %in, %out : f32
           linalg.yield %6 : f32
@@ -6675,7 +6675,7 @@ attempting the default one.</p>
 in our earlier example.</p>
 <div class="highlight"><pre><span></span><code>module attributes {iree_codegen.tuning_spec_with_default_entrypoint, transform.with_named_sequence} {
   transform.named_sequence @apply_op_config(%arg0: !transform.any_op {transform.readonly}, %arg1: !transform.any_param {transform.readonly}) {
-    transform.annotate %arg0 &quot;compilation_info&quot; = %arg1 : !transform.any_op, !transform.any_param
+    transform.annotate %arg0 "compilation_info" = %arg1 : !transform.any_op, !transform.any_param
     transform.yield
   }
   transform.named_sequence @match_matmul_reduce_32_1024_2048_dispatch_0_matmul_32x2048x1024_f16xf16xf32(%arg0: !transform.any_op {transform.readonly}) -&gt; (!transform.any_op, !transform.any_param) {
@@ -6684,7 +6684,7 @@ in our earlier example.</p>
     transform.iree.match.dims_equal %m_dims, [32] : !transform.param&lt;i64&gt;
     transform.iree.match.dims_equal %n_dims, [2048] : !transform.param&lt;i64&gt;
     transform.iree.match.dims_equal %k_dims, [1024] : !transform.param&lt;i64&gt;
-    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}&gt;, translation_info = &lt;pipeline = #iree_gpu.pipeline&lt;VectorDistribute&gt; workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {&quot;amdgpu-waves-per-eu&quot; = &quot;2&quot;}}&gt;&gt; -&gt; !transform.any_param
+    %0 = transform.param.constant #iree_codegen.compilation_info&lt;lowering_config = #iree_gpu.lowering_config&lt;{mma_kind = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;, promote_operands = [0, 1], reduction = [0, 0, 64], subgroup_basis = [[1, 2, 1], [0, 1, 2]], workgroup = [32, 256, 0]}&gt;, translation_info = &lt;pipeline = #iree_gpu.pipeline&lt;VectorDistribute&gt; workgroup_size = [128, 1, 1] subgroup_size = 64, {gpu_pipeline_options = #iree_gpu.pipeline_options&lt;prefetch_shared_memory = true&gt;, llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}&gt;&gt; -&gt; !transform.any_param
     transform.yield %arg0, %0 : !transform.any_op, !transform.any_param
   }
   transform.named_sequence @__kernel_config(%arg0: !transform.any_op {transform.consumed}) -&gt; !transform.any_op attributes {iree_codegen.tuning_spec_entrypoint} {

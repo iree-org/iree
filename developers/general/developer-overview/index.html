@@ -6652,9 +6652,9 @@ above on IREE's local-task CPU device:</p>
 <span class="normal">10</span>
 <span class="normal">11</span>
 <span class="normal">12</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input="2xf32=-2 3") | FileCheck %s</span>
 <span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input="2xf32=-2 3") | FileCheck %s</span>
 
 <span class="c1">// CHECK-LABEL: EXEC @abs</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">abs</span><span class="p">(</span><span class="o">%</span><span class="n">input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -6813,7 +6813,7 @@ above on IREE's local-task CPU device:</p>
 
 <span class="c1">// -----</span>
 
-<span class="c1">// Buffers (&quot;tensors&quot;) use the form `--input=[shape]xtype=[value]`.</span>
+<span class="c1">// Buffers ("tensors") use the form `--input=[shape]xtype=[value]`.</span>
 <span class="c1">//   * If any values are omitted, zeroes will be used.</span>
 <span class="c1">//   * Quotes should be used around values with spaces.</span>
 <span class="c1">//   * Brackets may also be used to separate element values.</span>
@@ -6825,7 +6825,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// RUN:                  --function=buffers \</span>
 <span class="c1">// RUN:                  --input=i32=5 \</span>
 <span class="c1">// RUN:                  --input=2xi32 \</span>
-<span class="c1">// RUN:                  --input=&quot;2x3xi32=1 2 3 4 5 6&quot;) | \</span>
+<span class="c1">// RUN:                  --input="2x3xi32=1 2 3 4 5 6") | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=INPUT-BUFFERS %s</span>
 <span class="c1">// INPUT-BUFFERS-LABEL: EXEC @buffers</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">buffers</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg2</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x3xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x3xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -6880,8 +6880,8 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
 <span class="c1">// RUN:                  --module=- \</span>
 <span class="c1">// RUN:                  --function=small_buffers \</span>
-<span class="c1">// RUN:                  --input=&quot;2xi16=65535 -32767&quot; \</span>
-<span class="c1">// RUN:                  --input=&quot;3xi8=-6 250 0xFF&quot;) | \</span>
+<span class="c1">// RUN:                  --input="2xi16=65535 -32767" \</span>
+<span class="c1">// RUN:                  --input="3xi8=-6 250 0xFF") | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=INPUT-SMALL-INTEGERS %s</span>
 <span class="c1">// INPUT-SMALL-INTEGERS-LABEL: EXEC @small_buffers</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">small_buffers</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi16</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">3</span><span class="n">xi8</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi16</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">3</span><span class="n">xi8</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -7045,7 +7045,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// RUN:                  --output= \</span>
 <span class="c1">// RUN:                  --output=@%t.npy \</span>
 <span class="c1">// RUN:                  --output=+%t.npy) &amp;&amp; \</span>
-<span class="c1">// RUN:  &quot;%PYTHON&quot; %S/echo_npy.py %t.npy | \</span>
+<span class="c1">// RUN:  "%PYTHON" %S/echo_npy.py %t.npy | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-NUMPY %s</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">numpy</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="c1">// Output skipped:</span>
@@ -7144,7 +7144,7 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.0) | \</span>
 <span class="c1">// RUN:  FileCheck %s --check-prefix=SUCCESS-MATCHES</span>
 <span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
-<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=&quot;(ignored)&quot;) | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output="(ignored)") | \</span>
 <span class="c1">// RUN:  FileCheck %s --check-prefix=SUCCESS-IGNORED</span>
 <span class="c1">// RUN: (iree-compile --iree-hal-target-device=local --iree-hal-local-target-device-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.1 --expected_f32_threshold=0.1) | \</span>
@@ -7221,24 +7221,24 @@ implementations, and debugging token-level issues.</p>
 <a href="https://huggingface.co/models?library=tokenizers">HuggingFace Hub</a> model
 repositories (look for <code>tokenizer.json</code> in the model files).</p>
 <p>Example encoding text to token IDs:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span><span class="s2">&quot;Hello, world!&quot;</span>
-<span class="o">{</span><span class="s2">&quot;ids&quot;</span>:<span class="o">[</span><span class="m">101</span>,7592,1010,2088,999,102<span class="o">]}</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span><span class="s2">"Hello, world!"</span>
+<span class="o">{</span><span class="s2">"ids"</span>:<span class="o">[</span><span class="m">101</span>,7592,1010,2088,999,102<span class="o">]}</span>
 </code></pre></div>
 <p>Example with raw output (comma-separated IDs, no JSON):</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s2">&quot;Hello, world!&quot;</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s2">"Hello, world!"</span>
 <span class="m">101</span>,7592,1010,2088,999,102
 </code></pre></div>
 <p>The <code>--raw</code> flag is useful for integration with <code>iree-run-module</code>:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span>--module<span class="o">=</span>model.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--input<span class="o">=</span><span class="s2">&quot;6xi32=</span><span class="k">$(</span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s1">&#39;hello&#39;</span><span class="k">)</span><span class="s2">&quot;</span>
+<span class="w">    </span>--input<span class="o">=</span><span class="s2">"6xi32=</span><span class="k">$(</span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--raw<span class="w"> </span><span class="s1">'hello'</span><span class="k">)</span><span class="s2">"</span>
 </code></pre></div>
 <p>Example decoding token IDs back to text:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--decode<span class="w"> </span><span class="s2">&quot;101,7592,1010,2088,999,102&quot;</span>
-<span class="o">{</span><span class="s2">&quot;text&quot;</span>:<span class="s2">&quot;Hello, world!&quot;</span><span class="o">}</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--decode<span class="w"> </span><span class="s2">"101,7592,1010,2088,999,102"</span>
+<span class="o">{</span><span class="s2">"text"</span>:<span class="s2">"Hello, world!"</span><span class="o">}</span>
 </code></pre></div>
 <p>Example showing tokenizer metadata:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-tokenize<span class="w"> </span>tokenizer.json<span class="w"> </span>--info
-<span class="o">{</span><span class="s2">&quot;vocab_size&quot;</span>:30522,<span class="s2">&quot;model_type&quot;</span>:<span class="s2">&quot;WordPiece&quot;</span>,<span class="s2">&quot;unk_id&quot;</span>:100,<span class="s2">&quot;cls_id&quot;</span>:101,<span class="s2">&quot;sep_id&quot;</span>:102<span class="o">}</span>
+<span class="o">{</span><span class="s2">"vocab_size"</span>:30522,<span class="s2">"model_type"</span>:<span class="s2">"WordPiece"</span>,<span class="s2">"unk_id"</span>:100,<span class="s2">"cls_id"</span>:101,<span class="s2">"sep_id"</span>:102<span class="o">}</span>
 </code></pre></div>
 <p>Additional modes include <code>--batch</code> for processing multiple lines from stdin and
 <code>--stream</code> for continuous tokenization of large inputs. Run with <code>--help</code> for

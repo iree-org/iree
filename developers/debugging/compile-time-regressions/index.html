@@ -6493,13 +6493,13 @@ git<span class="w"> </span>bisect<span class="w"> </span>run<span class="w"> </s
 <span class="c1"># Settings                                                                    #</span>
 <span class="c1"># --------------------------------------------------------------------------- #</span>
 
-<span class="nv">INPUT_FILE_PATH</span><span class="o">=</span><span class="s2">&quot;/path/to/program.mlirbc&quot;</span>
-<span class="nv">TMP_DIR</span><span class="o">=</span><span class="s2">&quot;../iree-tmp&quot;</span>
+<span class="nv">INPUT_FILE_PATH</span><span class="o">=</span><span class="s2">"/path/to/program.mlirbc"</span>
+<span class="nv">TMP_DIR</span><span class="o">=</span><span class="s2">"../iree-tmp"</span>
 
 <span class="nb">declare</span><span class="w"> </span>-a<span class="w"> </span><span class="nv">COMPILER_FLAGS</span><span class="o">=(</span>
-<span class="w">  </span><span class="s2">&quot;--iree-input-type=stablehlo&quot;</span>
-<span class="w">  </span><span class="s2">&quot;--iree-hal-target-device=cuda&quot;</span>
-<span class="w">  </span><span class="s2">&quot;--iree-cuda-target=sm_80&quot;</span>
+<span class="w">  </span><span class="s2">"--iree-input-type=stablehlo"</span>
+<span class="w">  </span><span class="s2">"--iree-hal-target-device=cuda"</span>
+<span class="w">  </span><span class="s2">"--iree-cuda-target=sm_80"</span>
 <span class="o">)</span>
 
 <span class="nv">TIMEOUT_SECONDS_FOR_COMPILING_EACH_SOURCE</span><span class="o">=</span><span class="m">10</span>
@@ -6508,10 +6508,10 @@ git<span class="w"> </span>bisect<span class="w"> </span>run<span class="w"> </s
 <span class="c1"># Utility functions                                                           #</span>
 <span class="c1"># --------------------------------------------------------------------------- #</span>
 
-<span class="c1"># Call to have `git bisect` skip this commit (don&#39;t mark as good _or_ bad)</span>
+<span class="c1"># Call to have `git bisect` skip this commit (don't mark as good _or_ bad)</span>
 <span class="c1"># https://git-scm.com/docs/git-bisect#_bisect_run</span>
 skip_on_error<span class="o">()</span><span class="w"> </span><span class="o">{</span>
-<span class="w">  </span>&gt;<span class="p">&amp;</span><span class="m">2</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;** Skipping due to error: </span><span class="nv">$1</span><span class="s2"> **&quot;</span>
+<span class="w">  </span>&gt;<span class="p">&amp;</span><span class="m">2</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"** Skipping due to error: </span><span class="nv">$1</span><span class="s2"> **"</span>
 <span class="w">  </span><span class="nb">exit</span><span class="w"> </span><span class="m">125</span><span class="w">  </span><span class="c1"># Special exit code for `git bisect skip`</span>
 <span class="o">}</span>
 
@@ -6520,19 +6520,19 @@ skip_on_error<span class="o">()</span><span class="w"> </span><span class="o">{<
 <span class="c1"># --------------------------------------------------------------------------- #</span>
 
 <span class="c1"># Store git version hash, so we can dump artifacts to unique directories later.</span>
-<span class="nv">GIT_SHA</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>--short<span class="w"> </span>HEAD<span class="k">)</span><span class="s2">&quot;</span>
+<span class="nv">GIT_SHA</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>--short<span class="w"> </span>HEAD<span class="k">)</span><span class="s2">"</span>
 
-<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;** Building iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2"> **&quot;</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"** Building iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2"> **"</span>
 
 <span class="c1"># The `git bisect` command only checks out a commit, so update submodules.</span>
 git<span class="w"> </span>submodule<span class="w"> </span>update
 
-<span class="c1"># Build the compiler. You&#39;ll want ccache configured to make this fast!</span>
-cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>iree-compile<span class="w"> </span><span class="o">||</span><span class="w"> </span>skip_on_error<span class="w"> </span><span class="s2">&quot;CMake build failed&quot;</span>
+<span class="c1"># Build the compiler. You'll want ccache configured to make this fast!</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span class="w"> </span>--target<span class="w"> </span>iree-compile<span class="w"> </span><span class="o">||</span><span class="w"> </span>skip_on_error<span class="w"> </span><span class="s2">"CMake build failed"</span>
 
 <span class="c1"># Run the compiler, dumping executable sources and stopping.</span>
-<span class="nv">SOURCES_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">/sources-</span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2">&quot;</span>
-<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;** Running iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2">, dumping sources to </span><span class="si">${</span><span class="nv">SOURCES_DIR</span><span class="si">}</span><span class="s2"> **&quot;</span>
+<span class="nv">SOURCES_DIR</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">TMP_DIR</span><span class="si">}</span><span class="s2">/sources-</span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2">"</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"** Running iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2">, dumping sources to </span><span class="si">${</span><span class="nv">SOURCES_DIR</span><span class="si">}</span><span class="s2"> **"</span>
 ../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="si">${</span><span class="nv">INPUT_FILE_PATH</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="si">${</span><span class="nv">COMPILER_FLAGS</span><span class="p">[@]</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
@@ -6541,10 +6541,10 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span 
 <span class="w">    </span>-o<span class="w"> </span>/dev/null
 
 <span class="c1"># Run the compiler again on each executable individually.</span>
-<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;** Running iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2"> for each executable source **&quot;</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"** Running iree-compile at </span><span class="si">${</span><span class="nv">GIT_SHA</span><span class="si">}</span><span class="s2"> for each executable source **"</span>
 <span class="nv">SOURCES</span><span class="o">=(</span><span class="k">$(</span>ls<span class="w"> </span>-1<span class="w"> </span><span class="si">${</span><span class="nv">SOURCES_DIR</span><span class="si">}</span><span class="k">)</span><span class="o">)</span>
-<span class="k">for</span><span class="w"> </span>SOURCE<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SOURCES</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
-<span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;  * Compiling: </span><span class="si">${</span><span class="nv">SOURCE</span><span class="si">}</span><span class="s2"> *&quot;</span>
+<span class="k">for</span><span class="w"> </span>SOURCE<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SOURCES</span><span class="p">[@]</span><span class="si">}</span><span class="s2">"</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">  </span><span class="nb">echo</span><span class="w"> </span><span class="s2">"  * Compiling: </span><span class="si">${</span><span class="nv">SOURCE</span><span class="si">}</span><span class="s2"> *"</span>
 <span class="w">  </span>timeout<span class="w"> </span>--verbose<span class="w"> </span><span class="si">${</span><span class="nv">TIMEOUT_SECONDS_FOR_COMPILING_EACH_SOURCE</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 <span class="w">   </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="si">${</span><span class="nv">SOURCES_DIR</span><span class="si">}</span>/<span class="si">${</span><span class="nv">SOURCE</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="si">${</span><span class="nv">COMPILER_FLAGS</span><span class="p">[@]</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
@@ -6606,8 +6606,8 @@ steps to profile <code>iree-compile</code> and visualize the results as a flame 
    adding <code>-fno-omit-frame-pointers</code> to your compiler flags:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>&lt;Your-CMAKE-Flags&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">   </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
-<span class="w">   </span>-DCMAKE_CXX_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">   </span>-DCMAKE_C_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span>
+<span class="w">   </span>-DCMAKE_CXX_FLAGS<span class="o">=</span><span class="s2">"-fno-omit-frame-pointer"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">   </span>-DCMAKE_C_FLAGS<span class="o">=</span><span class="s2">"-fno-omit-frame-pointer"</span>
 </code></pre></div>
 </li>
 <li>
@@ -6620,7 +6620,7 @@ steps to profile <code>iree-compile</code> and visualize the results as a flame 
 <p>Run <code>iree-compile</code> under the <code>perf</code> profiler and collect profile data. This
    requires <code>sudo</code>.</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>perf<span class="w"> </span>record<span class="w"> </span>-F<span class="w"> </span><span class="m">999</span><span class="w"> </span>-g<span class="w"> </span>--<span class="w"> </span>tools/iree-compile<span class="w"> </span>&lt;Your-Compile-Arguments&gt;
-sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$USER</span><span class="s2">:</span><span class="nv">$USER</span><span class="s2">&quot;</span><span class="w"> </span>perf.data
+sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">"</span><span class="nv">$USER</span><span class="s2">:</span><span class="nv">$USER</span><span class="s2">"</span><span class="w"> </span>perf.data
 </code></pre></div>
 </li>
 <li>
@@ -6630,7 +6630,7 @@ sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;
    instructions and make sure to build
    <a href="https://github.com/google/perf_data_converter"><code>perf_data_converter</code></a> and
    add it to your <code>PATH</code>.</p>
-<div class="highlight"><pre><span></span><code>pprof<span class="w"> </span>-http<span class="w"> </span><span class="s1">&#39;:&#39;</span><span class="w"> </span>perf.data
+<div class="highlight"><pre><span></span><code>pprof<span class="w"> </span>-http<span class="w"> </span><span class="s1">':'</span><span class="w"> </span>perf.data
 </code></pre></div>
 </li>
 </ol>

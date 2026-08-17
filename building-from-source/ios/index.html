@@ -6351,7 +6351,7 @@ cmake<span class="w"> </span>--build<span class="w"> </span>../iree-build/<span 
 <span class="w">  </span>-DCMAKE_SYSTEM_PROCESSOR<span class="o">=</span>arm64<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_OSX_DEPLOYMENT_TARGET<span class="o">=</span><span class="m">11</span>.0<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_IOS_INSTALL_COMBINED<span class="o">=</span>YES<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install/bin&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/../iree-build/install/bin"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span>../build-ios-sim/install<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF
 
@@ -6375,7 +6375,7 @@ of the <code>-DCMAKE OSX SYSROOT</code> option to:</p>
 <span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">"f32=-5"</span>
 </code></pre></div>
 <p>To run it on the iOS simulator, we need to copy the vmfb file into the
 <code>iree-run-module</code> iOS app bundle.</p>
@@ -6413,7 +6413,7 @@ module <code>simple_abs_vmvx.vmfb</code>.</p>
 <span class="w">  </span>dev.iree.runmodule<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;f32=-5&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">"f32=-5"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--module<span class="o">=</span><span class="k">$(</span>xcrun<span class="w"> </span>simctl<span class="w"> </span>get_app_container<span class="w"> </span>&lt;UDID&gt;<span class="w"> </span>dev.iree.iree-run-module<span class="k">)</span>/simple_abs_vmvx.vmfb
 </code></pre></div>
 

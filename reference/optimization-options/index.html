@@ -6426,7 +6426,7 @@ below for subflags not covered by optimization flags.</p>
 <p>Although <code>iree-opt-level</code> sets the default for each subflag, they can be
 explicitly set on or off independently.</p>
 <p>For example:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Apply the default optimizations of `O2` but don&#39;t remove assertions.</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Apply the default optimizations of `O2` but don't remove assertions.</span>
 iree-compile<span class="w"> </span>--iree-opt-level<span class="o">=</span>O2<span class="w"> </span>--iree-strip-assertions<span class="o">=</span><span class="nb">false</span>
 
 <span class="c1"># Minimize optimizations, but still preform aggressive fusion.</span>

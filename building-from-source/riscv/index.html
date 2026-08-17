@@ -6485,7 +6485,7 @@ For other RISC-V targets, please refer to
 as a reference of how to set up the cmake configuration.</p>
 <h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-GNinja<span class="w"> </span>-B<span class="w"> </span>../iree-build-riscv/<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/linux_riscv64.cmake&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">"./build_tools/cmake/linux_riscv64.cmake"</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_HOST_BIN_DIR<span class="o">=</span><span class="k">$(</span>realpath<span class="w"> </span>../iree-build/install/bin<span class="k">)</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DIREE_BUILD_COMPILER<span class="o">=</span>OFF<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-DRISCV_TOOLCHAIN_ROOT<span class="o">=</span>/path/to/riscv/toolchain/clang/linux/RISCV<span class="w"> </span><span class="se">\</span>
@@ -6548,7 +6548,7 @@ with the additional command-line flags</p>
 <span class="hll"><span class="w">  </span>--iree-hal-local-target-device-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-triple<span class="o">=</span>riscv64<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-abi<span class="o">=</span>lp64d<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+zvl512b,+v&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--iree-llvmcpu-target-cpu-features<span class="o">=</span><span class="s2">"+m,+a,+f,+d,+zvl512b,+v"</span><span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>--riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_cpu.vmfb
 </code></pre></div>
@@ -6560,7 +6560,7 @@ with the additional command-line flags</p>
 <span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 </span><span class="w">  </span>--module<span class="o">=</span>mobilenet_cpu.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--function<span class="o">=</span>predict<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">"1x224x224x3xf32=0"</span>
 </code></pre></div>
 
 

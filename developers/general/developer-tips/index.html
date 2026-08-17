@@ -6329,7 +6329,7 @@ to see the full list:</p>
 
 <span class="go">OVERVIEW: IREE compilation driver</span>
 
-<span class="go">USAGE: iree-compile [options] &lt;input file or &#39;-&#39; for stdin&gt;</span>
+<span class="go">USAGE: iree-compile [options] &lt;input file or '-' for stdin&gt;</span>
 
 <span class="go">OPTIONS:</span>
 <span class="go">  ...</span>
@@ -6340,16 +6340,16 @@ to see the full list:</p>
 <code>extra_args=["--flag"]</code> argument:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">iree.compiler</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ireec</span>
 
-<span class="n">input_mlir</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="n">input_mlir</span> <span class="o">=</span> <span class="s2">"""</span>
 <span class="s2">func.func @abs(</span><span class="si">%i</span><span class="s2">nput : tensor&lt;f32&gt;) -&gt; (tensor&lt;f32&gt;) {</span>
 <span class="s2">  </span><span class="si">%r</span><span class="s2">esult = math.absf </span><span class="si">%i</span><span class="s2">nput : tensor&lt;f32&gt;</span>
 <span class="s2">  return </span><span class="si">%r</span><span class="s2">esult : tensor&lt;f32&gt;</span>
-<span class="s2">}&quot;&quot;&quot;</span>
+<span class="s2">}"""</span>
 
 <span class="n">compiled_module</span> <span class="o">=</span> <span class="n">ireec</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">compile_str</span><span class="p">(</span>
     <span class="n">input_mlir</span><span class="p">,</span>
-    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;llvm-cpu&quot;</span><span class="p">],</span>
-<span class="hll">    <span class="n">extra_args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;--mlir-timing&quot;</span><span class="p">])</span>
+    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">"llvm-cpu"</span><span class="p">],</span>
+<span class="hll">    <span class="n">extra_args</span><span class="o">=</span><span class="p">[</span><span class="s2">"--mlir-timing"</span><span class="p">])</span>
 </span></code></pre></div>
 </div>
 <h2 id="inspecting-vmfb-files">Inspecting <code>.vmfb</code> files<a class="headerlink" href="#inspecting-vmfb-files" title="Permanent link">link</a></h2>
@@ -6397,12 +6397,12 @@ environments like bare metal platforms.</p>
 standard tools:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>readelf<span class="w"> </span>-Ws<span class="w"> </span>./simple_abs_cpu/abs_dispatch_0_system_elf_x86_64.so
 
-<span class="go">Symbol table &#39;.dynsym&#39; contains 2 entries:</span>
+<span class="go">Symbol table '.dynsym' contains 2 entries:</span>
 <span class="go">  Num:    Value          Size Type    Bind   Vis      Ndx Name</span>
 <span class="go">    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND</span>
 <span class="go">    1: 0000000000001760    17 FUNC    GLOBAL DEFAULT    7 iree_hal_executable_library_query</span>
 
-<span class="go">Symbol table &#39;.symtab&#39; contains 42 entries:</span>
+<span class="go">Symbol table '.symtab' contains 42 entries:</span>
 <span class="go">  Num:    Value          Size Type    Bind   Vis      Ndx Name</span>
 <span class="go">    0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND</span>
 <span class="go">    1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS abs_dispatch_0</span>
@@ -6528,9 +6528,9 @@ can be disassembled using
 <span class="gp">$ </span>llvm-dis<span class="w"> </span>module_abs_dispatch_0_system_elf_x86_64.codegen.bc
 <span class="gp">$ </span>cat<span class="w"> </span>module_abs_dispatch_0_system_elf_x86_64.codegen.ll
 
-<span class="go">; ModuleID = &#39;module_abs_dispatch_0_system_elf_x86_64.codegen.bc&#39;</span>
-<span class="go">source_filename = &quot;abs_dispatch_0&quot;</span>
-<span class="go">target triple = &quot;x86_64-linux-gnu&quot;</span>
+<span class="go">; ModuleID = 'module_abs_dispatch_0_system_elf_x86_64.codegen.bc'</span>
+<span class="go">source_filename = "abs_dispatch_0"</span>
+<span class="go">target triple = "x86_64-linux-gnu"</span>
 
 <span class="gp">%</span><span class="nv">iree_hal_executable_library_header_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">type</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>i32,<span class="w"> </span>ptr,<span class="w"> </span>i32,<span class="w"> </span>i32<span class="w"> </span><span class="o">}</span>
 <span class="gp">%</span><span class="nv">iree_hal_executable_dispatch_attrs_v0_t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">type</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>i16,<span class="w"> </span>i16<span class="w"> </span><span class="o">}</span>
@@ -6597,14 +6597,14 @@ be disassembled using <code>spirv-dis</code> from
 <span class="go">; Bound: 20</span>
 <span class="go">; Schema: 0</span>
 <span class="go">              OpCapability Shader</span>
-<span class="go">              OpExtension &quot;SPV_KHR_storage_buffer_storage_class&quot;</span>
-<span class="gp">        %</span><span class="nv">18</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpExtInstImport<span class="w"> </span><span class="s2">&quot;GLSL.std.450&quot;</span>
+<span class="go">              OpExtension "SPV_KHR_storage_buffer_storage_class"</span>
+<span class="gp">        %</span><span class="nv">18</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>OpExtInstImport<span class="w"> </span><span class="s2">"GLSL.std.450"</span>
 <span class="go">              OpMemoryModel Logical GLSL450</span>
-<span class="go">              OpEntryPoint GLCompute %abs_dispatch_0_generic &quot;abs_dispatch_0_generic&quot;</span>
+<span class="go">              OpEntryPoint GLCompute %abs_dispatch_0_generic "abs_dispatch_0_generic"</span>
 <span class="go">              OpExecutionMode %abs_dispatch_0_generic LocalSize 1 1 1</span>
-<span class="go">              OpName %__resource_var_0_0_ &quot;__resource_var_0_0_&quot;</span>
-<span class="go">              OpName %__resource_var_0_1_ &quot;__resource_var_0_1_&quot;</span>
-<span class="go">              OpName %abs_dispatch_0_generic &quot;abs_dispatch_0_generic&quot;</span>
+<span class="go">              OpName %__resource_var_0_0_ "__resource_var_0_0_"</span>
+<span class="go">              OpName %__resource_var_0_1_ "__resource_var_0_1_"</span>
+<span class="go">              OpName %abs_dispatch_0_generic "abs_dispatch_0_generic"</span>
 <span class="go">              OpDecorate %_arr_float_uint_1 ArrayStride 4</span>
 <span class="go">              OpMemberDecorate %_struct_2 0 Offset 0</span>
 <span class="go">              OpDecorate %_struct_2 Block</span>
@@ -6672,8 +6672,8 @@ can be disassembled using
 <span class="gp">$ </span>llvm-dis<span class="w"> </span>module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
 <span class="gp">$ </span>cat<span class="w"> </span>module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
 
-<span class="go">; ModuleID = &#39;module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc&#39;</span>
-<span class="go">source_filename = &quot;abs_dispatch_0&quot;</span>
+<span class="go">; ModuleID = 'module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc'</span>
+<span class="go">source_filename = "abs_dispatch_0"</span>
 
 <span class="go">declare ptr @malloc(i64)</span>
 
@@ -6698,10 +6698,10 @@ can be disassembled using
 
 <span class="go">!nvvm.annotations = !{!0, !1, !2, !3}</span>
 
-<span class="go">!0 = !{ptr @abs_dispatch_0_generic, !&quot;kernel&quot;, i32 1}</span>
-<span class="go">!1 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidx&quot;, i32 1}</span>
-<span class="go">!2 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidy&quot;, i32 1}</span>
-<span class="go">!3 = !{ptr @abs_dispatch_0_generic, !&quot;maxntidz&quot;, i32 1}</span>
+<span class="go">!0 = !{ptr @abs_dispatch_0_generic, !"kernel", i32 1}</span>
+<span class="go">!1 = !{ptr @abs_dispatch_0_generic, !"maxntidx", i32 1}</span>
+<span class="go">!2 = !{ptr @abs_dispatch_0_generic, !"maxntidy", i32 1}</span>
+<span class="go">!3 = !{ptr @abs_dispatch_0_generic, !"maxntidz", i32 1}</span>
 </code></pre></div>
 </details>
 </div>
@@ -6837,7 +6837,7 @@ for more information and examples.</p>
 <p>For an accurate list of phases, see
 <a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Pipelines/Pipelines.h">the source code</a>
 or check the help output with a command such as:</p>
-<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--help<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">&#39;/--compile-to/,/--/p&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span>-1
+<div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span>--help<span class="w"> </span><span class="p">|</span><span class="w"> </span>sed<span class="w"> </span>-n<span class="w"> </span><span class="s1">'/--compile-to/,/--/p'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span>-1
 </code></pre></div>
 </details>
 <p>You can output a program snapshot at intermediate phases with the
@@ -6853,9 +6853,9 @@ or check the help output with a command such as:</p>
 
 <span class="go">module {</span>
 <span class="go">  func.func @abs(%arg0: !hal.buffer_view) -&gt; !hal.buffer_view attributes {iree.abi.stub} {</span>
-<span class="gp">    %</span><span class="nv">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.import<span class="w"> </span>%arg0<span class="w"> </span><span class="s2">&quot;input 0&quot;</span><span class="w"> </span>:<span class="w"> </span>!hal.buffer_view<span class="w"> </span>-&gt;<span class="w"> </span>tensor&lt;f32&gt;
+<span class="gp">    %</span><span class="nv">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.import<span class="w"> </span>%arg0<span class="w"> </span><span class="s2">"input 0"</span><span class="w"> </span>:<span class="w"> </span>!hal.buffer_view<span class="w"> </span>-&gt;<span class="w"> </span>tensor&lt;f32&gt;
 <span class="gp">    %</span><span class="nv">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>math.absf<span class="w"> </span>%0<span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;
-<span class="gp">    %</span><span class="nv">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.export<span class="w"> </span>%1<span class="w"> </span><span class="s2">&quot;output 0&quot;</span><span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;<span class="w"> </span>-&gt;<span class="w"> </span>!hal.buffer_view
+<span class="gp">    %</span><span class="nv">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>hal.tensor.export<span class="w"> </span>%1<span class="w"> </span><span class="s2">"output 0"</span><span class="w"> </span>:<span class="w"> </span>tensor&lt;f32&gt;<span class="w"> </span>-&gt;<span class="w"> </span>!hal.buffer_view
 <span class="go">    return %2 : !hal.buffer_view</span>
 <span class="go">  }</span>
 <span class="go">}</span>
@@ -6868,8 +6868,8 @@ then resume compilation and continue through the pipeline:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span>--compile-to<span class="o">=</span>abi<span class="w"> </span>-o<span class="w"> </span>simple_abs_abi.mlir
 
 <span class="gp">$ </span>sed<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="s1">&#39;s/math.absf/math.exp/&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-e<span class="w"> </span><span class="s1">&#39;s/@abs/@exp/&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span><span class="s1">'s/math.absf/math.exp/'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span><span class="s1">'s/@abs/@exp/'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>simple_abs_abi.mlir<span class="w"> </span>&gt;<span class="w"> </span>simple_exp_abi.mlir
 
 <span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>

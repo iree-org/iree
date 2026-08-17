@@ -6293,7 +6293,7 @@ a dense <code>mma_layout</code>, and a <code>workgroup</code> tile of 16 rows.</
     affine_map&lt;(d0, d1, d2) -&gt; (d1, d2)&gt;,
     affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
   ],
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]
+  iterator_types = ["parallel", "parallel", "reduction"]
 } ins(%6, %7 : tensor&lt;8x16384xf16&gt;, tensor&lt;13312x16384xf16&gt;)
   outs(%9 : tensor&lt;8x13312xf32&gt;)
   attrs = {
@@ -6528,7 +6528,7 @@ virtual layout.</p>
     affine_map&lt;(d0, d1, d2) -&gt; (d1, d2)&gt;,
     affine_map&lt;(d0, d1, d2) -&gt; (d0, d1)&gt;
   ],
-  iterator_types = [&quot;parallel&quot;, &quot;parallel&quot;, &quot;reduction&quot;]
+  iterator_types = ["parallel", "parallel", "reduction"]
 } ins(%6, %7 : tensor&lt;8x16384xf16&gt;, tensor&lt;13312x16384xf16&gt;)
   outs(%9 : tensor&lt;8x13312xf32&gt;)
   attrs = {

@@ -6871,7 +6871,7 @@ the <a href="#samples">samples below</a>.</p>
 
 <div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">CMakeLists.txt</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
 <span class="normal">2</span>
-<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">_IREE_COMPILER_API</span><span class="w"> </span><span class="s2">&quot;${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler&quot;</span><span class="p">)</span>
+<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">_IREE_COMPILER_API</span><span class="w"> </span><span class="s2">"${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler"</span><span class="p">)</span>
 <span class="nb">target_include_directories</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">SYSTEM</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="o">${</span><span class="nv">_IREE_COMPILER_API</span><span class="o">}</span><span class="p">)</span>
 <span class="nb">target_link_libraries</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">iree_compiler_bindings_c_loader</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6911,7 +6911,7 @@ the <a href="#samples">samples below</a>.</p>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="c1">// Load the compiler library then initialize it.</span>
-<span class="w">  </span><span class="n">ireeCompilerLoadLibrary</span><span class="p">(</span><span class="s">&quot;libIREECompiler.so&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">ireeCompilerLoadLibrary</span><span class="p">(</span><span class="s">"libIREECompiler.so"</span><span class="p">);</span>
 <span class="w">  </span><span class="n">ireeCompilerGlobalInitialize</span><span class="p">();</span>
 
 <span class="w">  </span><span class="c1">// Create a session to track compiler state and set flags.</span>
@@ -6920,7 +6920,7 @@ the <a href="#samples">samples below</a>.</p>
 
 <span class="w">  </span><span class="c1">// Open a file as an input source to the compiler.</span>
 <span class="w">  </span><span class="n">iree_compiler_source_t</span><span class="w"> </span><span class="o">*</span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="w">  </span><span class="n">ireeCompilerSourceOpenFile</span><span class="p">(</span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;input.mlir&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">source</span><span class="p">);</span>
+<span class="w">  </span><span class="n">ireeCompilerSourceOpenFile</span><span class="p">(</span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="s">"input.mlir"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">source</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Use an invocation to compile from the input source to one or more outputs.</span>
 <span class="w">  </span><span class="n">iree_compiler_invocation_t</span><span class="w"> </span><span class="o">*</span><span class="n">inv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ireeCompilerInvocationCreate</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
@@ -6928,7 +6928,7 @@ the <a href="#samples">samples below</a>.</p>
 
 <span class="w">  </span><span class="c1">// Output the compiled artifact to a file.</span>
 <span class="w">  </span><span class="n">iree_compiler_output_t</span><span class="w"> </span><span class="o">*</span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="w">  </span><span class="n">ireeCompilerOutputOpenFile</span><span class="p">(</span><span class="s">&quot;output.vmfb&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">output</span><span class="p">);</span>
+<span class="w">  </span><span class="n">ireeCompilerOutputOpenFile</span><span class="p">(</span><span class="s">"output.vmfb"</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">output</span><span class="p">);</span>
 <span class="w">  </span><span class="n">ireeCompilerInvocationOutputVMBytecode</span><span class="p">(</span><span class="n">inv</span><span class="p">,</span><span class="w"> </span><span class="n">output</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Cleanup state.</span>
@@ -7415,8 +7415,8 @@ their state.</p>
 <span class="normal">128</span>
 <span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/demo/simple_mul_module_c.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/runtime/api.h"</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/runtime/demo/simple_mul_module_c.h"</span>
 
 <span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">);</span>
 <span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">);</span>
@@ -7449,7 +7449,7 @@ their state.</p>
 <span class="w">  </span><span class="c1">// TODO(#5724): move device selection into the compiled modules.</span>
 <span class="w">  </span><span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
 <span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_instance_try_create_default_device</span><span class="p">(</span>
-<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
+<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">"local-task"</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
 
 <span class="w">  </span><span class="c1">// Create one session per loaded module to hold the module state.</span>
 <span class="w">  </span><span class="n">iree_runtime_session_options_t</span><span class="w"> </span><span class="n">session_options</span><span class="p">;</span>
@@ -7482,7 +7482,7 @@ their state.</p>
 <span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="n">iree_runtime_call_t</span><span class="w"> </span><span class="n">call</span><span class="p">;</span>
 <span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_initialize_by_name</span><span class="p">(</span>
-<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;module.simple_mul&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">"module.simple_mul"</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
 
 <span class="w">  </span><span class="c1">// %arg0: tensor&lt;4xf32&gt;</span>
 <span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
@@ -7505,7 +7505,7 @@ their state.</p>
 <span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_inputs_push_back_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="n">arg0</span><span class="p">));</span>
 <span class="w">  </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg0</span><span class="p">);</span>
 
-<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// %arg1: tensor&lt;4xf32&gt;</span>
 <span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
@@ -7530,7 +7530,7 @@ their state.</p>
 
 <span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_invoke</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="cm">/*flags=*/</span><span class="mi">0</span><span class="p">));</span>
 
-<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// -&gt; tensor&lt;4xf32&gt;</span>
 <span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">ret0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
@@ -7816,7 +7816,7 @@ their state.</p>
 <span class="normal">268</span>
 <span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/api.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/runtime/api.h"</span>
 
 <span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">iree_runtime_demo_main</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
 <span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span>
@@ -7831,7 +7831,7 @@ their state.</p>
 <span class="c1">// Takes the first argument on the command line as a file path and loads it.</span>
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;usage: session_demo module_file.vmfb</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">"usage: session_demo module_file.vmfb</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="w">  </span><span class="n">demo_file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
@@ -7847,7 +7847,7 @@ their state.</p>
 
 <span class="cp">#elif defined(IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA)</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/demo/simple_mul_module_c.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"iree/runtime/demo/simple_mul_module_c.h"</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_demo_main</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
 
@@ -7870,7 +7870,7 @@ their state.</p>
 <span class="p">}</span>
 
 <span class="cp">#else</span>
-<span class="cp">#error &quot;must specify a way to load the module data&quot;</span>
+<span class="cp">#error "must specify a way to load the module data"</span>
 <span class="cp">#endif  </span><span class="c1">// IREE_RUNTIME_DEMO_LOAD_FILE_FROM_*</span>
 
 <span class="c1">//===----------------------------------------------------------------------===//</span>
@@ -7926,14 +7926,14 @@ their state.</p>
 <span class="c1">// like variables will be retained across calls within the same session.</span>
 
 <span class="c1">// Loads the demo module and uses it to perform some math.</span>
-<span class="c1">// In a real application you&#39;d want to hang on to the iree_runtime_session_t</span>
+<span class="c1">// In a real application you'd want to hang on to the iree_runtime_session_t</span>
 <span class="c1">// and reuse it for future calls - especially if it holds state internally.</span>
 <span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span>
 <span class="w">    </span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="c1">// TODO(#5724): move device selection into the compiled modules.</span>
 <span class="w">  </span><span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
 <span class="w">  </span><span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_runtime_instance_try_create_default_device</span><span class="p">(</span>
-<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
+<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">"local-task"</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
 
 <span class="w">  </span><span class="c1">// Set up the session to run the demo module.</span>
 <span class="w">  </span><span class="c1">// Sessions are like OS processes and are used to isolate modules from each</span>
@@ -7986,7 +7986,7 @@ their state.</p>
 <span class="w">  </span><span class="c1">// Initialize the call to the function.</span>
 <span class="w">  </span><span class="n">iree_runtime_call_t</span><span class="w"> </span><span class="n">call</span><span class="p">;</span>
 <span class="w">  </span><span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_runtime_call_initialize_by_name</span><span class="p">(</span>
-<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;module.simple_mul&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">"module.simple_mul"</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
 
 <span class="w">  </span><span class="c1">// Append the function inputs with the HAL device allocator in use by the</span>
 <span class="w">  </span><span class="c1">// session. The buffers will be usable within the session and _may_ be usable</span>
@@ -8033,7 +8033,7 @@ their state.</p>
 <span class="w">    </span><span class="c1">// Since the call retains the buffer view we can release it here.</span>
 <span class="w">    </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg0</span><span class="p">);</span>
 
-<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
 
 <span class="w">    </span><span class="c1">// %arg1: tensor&lt;4xf32&gt;</span>
 <span class="w">    </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
@@ -8064,7 +8064,7 @@ their state.</p>
 <span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_call_invoke</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="cm">/*flags=*/</span><span class="mi">0</span><span class="p">);</span>
 <span class="w">  </span><span class="p">}</span>
 
-<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">"</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Dump the function outputs.</span>
 <span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">ret0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>

@@ -7016,13 +7016,13 @@ completed. The original weights remain available on disk or in system
 memory for future reload.</p>
 <div class="highlight"><pre><span></span><code>Deallocate Bark weights (4GB) on GPU 1:
   death_frontier: {bark_axis: latest_bark_epoch, dgpu1_axis: ...}
-  Buffers return to GPU 1&#39;s free pool
+  Buffers return to GPU 1's free pool
 
 GPU 1: load SDXL weights from system memory or disk
   try_reuse(sdxl_queue, freed_buffers)
   dominates(sdxl_queue_frontier, bark_death_frontier)?
-    Yes — Bark&#39;s last compute completed before dealloc, which happened
-    before SDXL&#39;s current epoch. Reuse is safe.
+    Yes — Bark's last compute completed before dealloc, which happened
+    before SDXL's current epoch. Reuse is safe.
   signal(sdxl_sem, 1)
 </code></pre></div>
 <p>No DMA "eviction" step — Bark's weights are immutable, so dropping them
@@ -7055,7 +7055,7 @@ GPU memory. The scheduler pages cold KV cache blocks to host memory or
 NVMe.</p>
 <div class="highlight"><pre><span></span><code>Llama sessions 1-10 active on GPU 0. Session 3 goes idle (user reading).
 
-Page manager evicts session 3&#39;s KV blocks:
+Page manager evicts session 3's KV blocks:
   NVMe DMA: write KV blocks from GPU 0 to SSD
     wait(llama_sem, session_3_latest_epoch)  // ensure decode finished
     signal(page_sem, P)
@@ -7091,7 +7091,7 @@ GPU 0: backward pass (gradients)
   signal(train_sem, step*3 + 2)
 
 NVMe DMA: page out optimizer state from previous step to SSD
-  (freeing memory for the current step&#39;s gradient accumulation)
+  (freeing memory for the current step's gradient accumulation)
   wait(train_sem, step*3 + 1)  // forward done, old optimizer state unused
   signal(page_sem, P)
 
@@ -7402,8 +7402,8 @@ Node 1 NIC: RDMA send (activations to node 2)
   frontier: {node1_tp_collective: ..., pipeline: S, nic1_axis: N}
 
 Node 2 NIC: RDMA receive
-  signal(network_sem, N)  // node 2&#39;s perspective
-  frontier: {nic2_axis: N}  // inherits node 1&#39;s frontier via the data
+  signal(network_sem, N)  // node 2's perspective
+  frontier: {nic2_axis: N}  // inherits node 1's frontier via the data
 
 Node 2 GPUs 0-3: layers 32-79 (TP collective within node)
   wait(network_sem, N), signal(pipeline_sem, S+1)
@@ -7502,12 +7502,12 @@ Phase 3 (multi-modal LLM):
     frontier: {cpu: ..., whisper_gpu: ..., clip_gpu: ..., tp_collective: T}
 
 Phase 4 (code generation):
-  GPUs 6-7: Code-Llama-34B generates code based on Llama&#39;s description
+  GPUs 6-7: Code-Llama-34B generates code based on Llama's description
     wait(llama_sem, T), signal(code_sem, C)
     frontier: includes all upstream axes transitively
 
 Phase 5 (image generation):
-  GPU (any): SDXL-Turbo generates image from Code-Llama&#39;s code description
+  GPU (any): SDXL-Turbo generates image from Code-Llama's code description
     wait(code_sem, C), signal(sdxl_sem, 1)
     frontier: captures entire pipeline provenance
 

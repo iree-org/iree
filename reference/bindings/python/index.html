@@ -6595,19 +6595,19 @@ page for instructions for building from source.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">iree</span><span class="w"> </span><span class="kn">import</span> <span class="n">compiler</span> <span class="k">as</span> <span class="n">ireec</span>
 
 <span class="c1"># Compile a module.</span>
-<span class="n">INPUT_MLIR</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="n">INPUT_MLIR</span> <span class="o">=</span> <span class="s2">"""</span>
 <span class="s2">module @arithmetic {</span>
 <span class="s2">  func.func @simple_mul(</span><span class="si">%a</span><span class="s2">rg0: tensor&lt;4xf32&gt;, </span><span class="si">%a</span><span class="s2">rg1: tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt; {</span>
 <span class="s2">    %0 = arith.mulf </span><span class="si">%a</span><span class="s2">rg0, </span><span class="si">%a</span><span class="s2">rg1 : tensor&lt;4xf32&gt;</span>
 <span class="s2">    return %0 : tensor&lt;4xf32&gt;</span>
 <span class="s2">  }</span>
 <span class="s2">}</span>
-<span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">"""</span>
 
 <span class="c1"># Compile using the vmvx (reference) target:</span>
 <span class="n">compiled_flatbuffer</span> <span class="o">=</span> <span class="n">ireec</span><span class="o">.</span><span class="n">tools</span><span class="o">.</span><span class="n">compile_str</span><span class="p">(</span>
     <span class="n">INPUT_MLIR</span><span class="p">,</span>
-    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;vmvx&quot;</span><span class="p">])</span>
+    <span class="n">target_backends</span><span class="o">=</span><span class="p">[</span><span class="s2">"vmvx"</span><span class="p">])</span>
 </code></pre></div>
 <h3 id="run-a-compiled-program">Run a compiled program<a class="headerlink" href="#run-a-compiled-program" title="Permanent link">link</a></h3>
 <p><a href="https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
@@ -6615,19 +6615,19 @@ page for instructions for building from source.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
 <span class="c1"># Register the module with a runtime context.</span>
-<span class="c1"># Use the &quot;local-task&quot; CPU driver, which can load the vmvx executable:</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;local-task&quot;</span><span class="p">)</span>
+<span class="c1"># Use the "local-task" CPU driver, which can load the vmvx executable:</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">"local-task"</span><span class="p">)</span>
 <span class="n">ctx</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">SystemContext</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
 <span class="n">vm_module</span> <span class="o">=</span> <span class="n">ireert</span><span class="o">.</span><span class="n">VmModule</span><span class="o">.</span><span class="n">copy_buffer</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">instance</span><span class="p">,</span> <span class="n">compiled_flatbuffer</span><span class="p">)</span>
 <span class="n">ctx</span><span class="o">.</span><span class="n">add_vm_module</span><span class="p">(</span><span class="n">vm_module</span><span class="p">)</span>
 
 <span class="c1"># Invoke the function and print the result.</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;INVOKE simple_mul&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"INVOKE simple_mul"</span><span class="p">)</span>
 <span class="n">arg0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.</span><span class="p">,</span> <span class="mf">2.</span><span class="p">,</span> <span class="mf">3.</span><span class="p">,</span> <span class="mf">4.</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
 <span class="n">arg1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">4.</span><span class="p">,</span> <span class="mf">5.</span><span class="p">,</span> <span class="mf">6.</span><span class="p">,</span> <span class="mf">7.</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
-<span class="n">f</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">arithmetic</span><span class="p">[</span><span class="s2">&quot;simple_mul&quot;</span><span class="p">]</span>
+<span class="n">f</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">modules</span><span class="o">.</span><span class="n">arithmetic</span><span class="p">[</span><span class="s2">"simple_mul"</span><span class="p">]</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">arg0</span><span class="p">,</span> <span class="n">arg1</span><span class="p">)</span><span class="o">.</span><span class="n">to_host</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Results:&quot;</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Results:"</span><span class="p">,</span> <span class="n">results</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="samples"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h3>
 <p>Check out the samples in IREE's
