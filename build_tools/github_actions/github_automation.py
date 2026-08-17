@@ -60,7 +60,7 @@ All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree
 - Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
 - Contributors must write PR descriptions themselves. There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
   If a response includes LLM-assisted segments (e.g. reproducers, LLM agent analysis excerpts), the segment should be clearly marked as "assisted", same as for PR contents.
-- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With a few exceptions for boilerplate edits, AI tool usage for resolutions to such issues is forbidden.
+- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
 
 We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
 
