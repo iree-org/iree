@@ -176,7 +176,7 @@ static bool iree_sysfs_should_constrain_to_host_affinity(void) {
 
 // Insertion-sorts |values| ascending in place (N is tiny).
 static void iree_sysfs_sort_u32_ascending(uint32_t* values,
-                                         iree_host_size_t count) {
+                                          iree_host_size_t count) {
   for (iree_host_size_t i = 1; i < count; ++i) {
     const uint32_t key = values[i];
     iree_host_size_t j = i;
@@ -190,9 +190,9 @@ static void iree_sysfs_sort_u32_ascending(uint32_t* values,
 
 // Appends |value| to |values| if not already present. Returns false if full.
 static bool iree_sysfs_append_unique_u32(uint32_t* values,
-                                        iree_host_size_t* io_count,
-                                        iree_host_size_t capacity,
-                                        uint32_t value) {
+                                         iree_host_size_t* io_count,
+                                         iree_host_size_t capacity,
+                                         uint32_t value) {
   for (iree_host_size_t i = 0; i < *io_count; ++i) {
     if (values[i] == value) return true;
   }
@@ -204,8 +204,8 @@ static bool iree_sysfs_append_unique_u32(uint32_t* values,
 // Returns the dense index of |value| in a sorted unique |values| array, or
 // |count| if not found.
 static iree_host_size_t iree_sysfs_dense_index_of(const uint32_t* values,
-                                                 iree_host_size_t count,
-                                                 uint32_t value) {
+                                                  iree_host_size_t count,
+                                                  uint32_t value) {
   for (iree_host_size_t i = 0; i < count; ++i) {
     if (values[i] == value) return i;
   }
@@ -231,8 +231,8 @@ static bool iree_sysfs_cpu_membership_callback(uint32_t start_cpu,
 
 // Reads node/nodeN/cpulist (CPU-list form of cpumap membership).
 static bool iree_sysfs_try_read_node_cpulist(uint32_t kernel_node, char* buffer,
-                                            size_t buffer_size,
-                                            iree_host_size_t* out_length) {
+                                             size_t buffer_size,
+                                             iree_host_size_t* out_length) {
   char path[256];
   iree_snprintf(path, sizeof(path), "%s/node/node%u/cpulist",
                 iree_sysfs_get_root_path(), kernel_node);
@@ -241,16 +241,17 @@ static bool iree_sysfs_try_read_node_cpulist(uint32_t kernel_node, char* buffer,
 
 // Returns true if |cpu| is listed in the NUMA node's cpulist.
 static bool iree_sysfs_cpu_in_kernel_numa_node(uint32_t cpu,
-                                              uint32_t kernel_node) {
+                                               uint32_t kernel_node) {
   char buffer[256];
   iree_host_size_t length = 0;
   if (!iree_sysfs_try_read_node_cpulist(kernel_node, buffer, sizeof(buffer),
-                                       &length)) {
+                                        &length)) {
     return false;
   }
   iree_sysfs_cpu_membership_context_t ctx = {.cpu = cpu, .found = false};
   if (!iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
-                                    iree_sysfs_cpu_membership_callback, &ctx)) {
+                                     iree_sysfs_cpu_membership_callback,
+                                     &ctx)) {
     return false;
   }
   return ctx.found;
@@ -263,13 +264,13 @@ typedef struct {
 } iree_sysfs_collect_nodes_context_t;
 
 static bool iree_sysfs_collect_nodes_callback(uint32_t start_node,
-                                             uint32_t end_node,
-                                             void* user_data) {
+                                              uint32_t end_node,
+                                              void* user_data) {
   iree_sysfs_collect_nodes_context_t* ctx =
       (iree_sysfs_collect_nodes_context_t*)user_data;
   for (uint32_t node = start_node; node < end_node; ++node) {
     if (!iree_sysfs_append_unique_u32(ctx->nodes, ctx->count, ctx->capacity,
-                                     node)) {
+                                      node)) {
       return false;
     }
   }
@@ -277,7 +278,8 @@ static bool iree_sysfs_collect_nodes_callback(uint32_t start_node,
 }
 
 // Collects kernel NUMA node IDs from node/online, else by probing nodeN/.
-// On success |out_nodes| holds unique IDs (unsorted); returns count (0 if none).
+// On success |out_nodes| holds unique IDs (unsorted); returns count (0 if
+// none).
 static iree_host_size_t iree_sysfs_collect_numa_kernel_nodes(
     uint32_t* out_nodes, iree_host_size_t capacity) {
   iree_host_size_t count = 0;
@@ -293,8 +295,8 @@ static iree_host_size_t iree_sysfs_collect_numa_kernel_nodes(
         .capacity = capacity,
     };
     if (!iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
-                                      iree_sysfs_collect_nodes_callback,
-                                      &ctx)) {
+                                       iree_sysfs_collect_nodes_callback,
+                                       &ctx)) {
       count = 0;
     }
   }
@@ -303,7 +305,7 @@ static iree_host_size_t iree_sysfs_collect_numa_kernel_nodes(
     // Probe node0.. for cpulist presence (fixtures may omit node/online).
     for (uint32_t node = 0; node < (uint32_t)capacity; ++node) {
       if (iree_sysfs_try_read_node_cpulist(node, buffer, sizeof(buffer),
-                                          &length)) {
+                                           &length)) {
         iree_sysfs_append_unique_u32(out_nodes, &count, capacity, node);
       }
     }
@@ -313,7 +315,7 @@ static iree_host_size_t iree_sysfs_collect_numa_kernel_nodes(
   iree_host_size_t readable = 0;
   for (iree_host_size_t i = 0; i < count; ++i) {
     if (iree_sysfs_try_read_node_cpulist(out_nodes[i], buffer, sizeof(buffer),
-                                        &length)) {
+                                         &length)) {
       out_nodes[readable++] = out_nodes[i];
     }
   }
@@ -331,7 +333,7 @@ static iree_host_size_t iree_sysfs_collect_package_ids(
       continue;
     }
     if (!iree_sysfs_append_unique_u32(out_packages, &count, capacity,
-                                     package_id)) {
+                                      package_id)) {
       break;
     }
   }
@@ -343,8 +345,8 @@ static iree_host_size_t iree_sysfs_collect_package_ids(
 static bool iree_sysfs_try_query_cpu_dense_node(
     uint32_t cpu, iree_task_topology_node_id_t* out_node) {
   uint32_t numa_nodes[IREE_SYSFS_MAX_NODE_IDS];
-  iree_host_size_t numa_count =
-      iree_sysfs_collect_numa_kernel_nodes(numa_nodes, IREE_ARRAYSIZE(numa_nodes));
+  iree_host_size_t numa_count = iree_sysfs_collect_numa_kernel_nodes(
+      numa_nodes, IREE_ARRAYSIZE(numa_nodes));
   if (numa_count > 0) {
     iree_sysfs_sort_u32_ascending(numa_nodes, numa_count);
     for (iree_host_size_t i = 0; i < numa_count; ++i) {
@@ -500,8 +502,8 @@ void iree_task_topology_query_default_caches(
 iree_host_size_t iree_task_topology_query_node_count(void) {
   // Prefer NUMA node*/cpulist (dense). Never use cluster_id as node identity.
   uint32_t numa_nodes[IREE_SYSFS_MAX_NODE_IDS];
-  iree_host_size_t numa_count =
-      iree_sysfs_collect_numa_kernel_nodes(numa_nodes, IREE_ARRAYSIZE(numa_nodes));
+  iree_host_size_t numa_count = iree_sysfs_collect_numa_kernel_nodes(
+      numa_nodes, IREE_ARRAYSIZE(numa_nodes));
   if (numa_count > 0) {
     return numa_count;
   }
@@ -516,7 +518,7 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   iree_task_topology_node_id_t node = 0;
   if (iree_sysfs_try_query_cpu_dense_node(iree_sysfs_query_current_cpu(),
-                                         &node)) {
+                                          &node)) {
     return node;
   }
   return 0;  // Fallback to node 0.
@@ -937,7 +939,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   // process is allowed to run on. Constrain topology discovery with the current
   // affinity mask so cgroups, cpusets, taskset, and qemu-user test runners do
   // not create worker groups that can never execute. Skip when pointing at a
-  // fixture / IREE_SYSFS_ROOT override so host affinity does not clip fake CPUs.
+  // fixture / IREE_SYSFS_ROOT override so host affinity does not clip fake
+  // CPUs.
   cpu_set_t current_affinity;
   const cpu_set_t* current_affinity_ptr = NULL;
   if (iree_sysfs_should_constrain_to_host_affinity() &&

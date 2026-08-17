@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/internal/sysfs.h"
-#include "iree/task/topology.h"
-#include "iree/testing/gtest.h"
-#include "iree/testing/status_matchers.h"
+#include <unistd.h>
 
 #include <cstdlib>
 #include <string>
 
-#include <unistd.h>
+#include "iree/base/internal/sysfs.h"
+#include "iree/task/topology.h"
+#include "iree/testing/gtest.h"
+#include "iree/testing/status_matchers.h"
 
 namespace {
 
@@ -21,7 +21,8 @@ namespace {
 using namespace iree::testing::status;
 
 // Resolves the hybrid sparse-cluster fixture directory, extracting the checked
-// in tar.gz when needed. Override with IREE_SYSFS_TEST_ROOT for local debugging.
+// in tar.gz when needed. Override with IREE_SYSFS_TEST_ROOT for local
+// debugging.
 static bool FixturePresentReadable(const std::string& dir) {
   const std::string present = dir + "/cpu/present";
   return access(present.c_str(), R_OK) == 0;
