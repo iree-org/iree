@@ -1,167 +1,93 @@
 # Sysfs CPU Topology Test Data
 
-This directory contains snapshots of `/sys/devices/system/cpu/` directory
-structures from various systems. These snapshots are used to test the
-`topology_sysfs.c` implementation without requiring physical hardware access.
+This directory contains snapshots of `/sys/devices/system/{cpu,node}/`
+structures used to test `topology_sysfs.c` without live hardware.
 
-**Note:** Test data is stored as compressed tar.gz archives to minimize
-repository size. Extract archives before testing:
+**Corpus policy (provenance first):** see ops `process/CORPUS.md`. Fixtures
+grow from an **authoritative corpus**, not a forest of unexplained synthetic
+trees. Every checked-in tree is classified A0 / A1 / A2 below. **No orphan
+A2** — each mutation names its parent and the exact edit. Cases that cannot
+be derived from a real dump or documented kernel shape are **deferred (P2:
+needs capture)**, not invented.
+
+**A1 authority:** ticket `ORACLE_TOPOLOGY.md` (issue #24761 reporter paste).
+
+Archives only are checked in (extracted dirs are gitignored):
 
 ```bash
 tar xzf arm64_pixel6_tensor.tar.gz
+tar xzf x86_hybrid_sparse_clusters.tar.gz
 ```
 
-We only check in small weird configurations (like ARM) for smoke testing and
-manual debugging. Large x86 systems can be thousands of files and megabytes of
-text - capture those locally for testing but don't check them in.
+## Corpus lineage
 
-## Test Configurations
+```
+A0 arm64_pixel6_tensor          (upstream capture, #22455 / capture_sysfs)
+  │
+A1 x86_hybrid_sparse_clusters   (issue #24761 reporter cluster_id paste)
+  ├── A2a x86_no_numa_single_package   (from A1: delete node/)
+  └── A2b x86_missing_cluster_id       (from A1: delete cluster_id files)
+```
 
-### x86_hybrid_sparse_clusters/
+| Class | Name | Provenance | Notes |
+|-------|------|------------|-------|
+| **A0** | `arm64_pixel6_tensor` | Upstream capture (Pixel 6 / Tensor GS101; #22455 era `capture_sysfs`) | Real dump; no `node/`; dense clusters 0–2 |
+| **A1** | `x86_hybrid_sparse_clusters` | **Issue-derived** — full-fidelity map from ticket `ORACLE_TOPOLOGY.md` §2 ([#24761](https://github.com/iree-org/iree/issues/24761) paste) | 24 CPUs; exact 10 cluster_ids `0,8,…,72`; SMT/E layout from paste; `node0`+`package_id=0` are **harness scaffolding** (not reporter dumps — see oracle §1/§3) |
+| **A2a** | `x86_no_numa_single_package` | Mutation of **A1**: remove `node/` | Package-fallback path when NUMA sysfs absent |
+| **A2b** | `x86_missing_cluster_id` | Mutation of **A1**: remove all `topology/cluster_id` | Affinity falls back to `physical_package_id` (pre-5.16 / missing ABI); **keeps single NUMA** |
 
-**Hardware:** Synthetic Intel hybrid-like (sparse `cluster_id`, single package/NUMA)
-**Architecture:** x86_64 (fixture only; no live HW required)
-**Configuration:**
-- 8 logical CPUs, one `physical_package_id` (0), one NUMA `node0` (`cpulist`/`cpumap` = 0-7)
-- Sparse `cluster_id`s across CPUs (0, 8, 16, …)
+### Deferred (P2 — needs authoritative capture; not checked in)
 
-**Expected Behavior (node ≠ cluster — iree-org/iree#24761):**
-- `iree_task_topology_query_node_count()` == **1** (NUMA), **not** unique cluster count
-- `initialize_from_physical_cores(0, …)` and `NODE_ID_ANY` yield **8** groups
-- `ideal_thread_affinity.group` still reflects sparse `cluster_id` (affinity hint only)
+| Case | Why not invented |
+|------|------------------|
+| Dual-socket / dual-NUMA | No real dump in-repo; would be orphan synthetic |
+| Sparse kernel NUMA `online=0,2` | Needs live multi-node capture |
+| AMD SNC (1 package, multi-NUMA) | Needs live capture |
+| Multi-package without NUMA | Dual-socket dump required |
+| Empty cpulist / uncovered CPU / partial cpu dirs | Speculative corners; capture or kernel-doc repro first |
 
-### GAN adversarial fixtures (#24761)
+## A1 oracle detail
 
-Checked-in synthetic trees used by `topology_sysfs_test` (see ticket
-`GAN_TOPOLOGY_PLAN.md`). Each attacks a distinct failure mode:
+Full verbatim paste + MUST/MAY rules: ticket
+`tickets/iree-org-iree#24761/ORACLE_TOPOLOGY.md`.
 
-| Fixture | Attack |
-|---------|--------|
-| `x86_hybrid_smt_sparse_clusters` | Hybrid + SMT; physical cores ≠ logical |
-| `x86_dual_numa_sparse_clusters` | Dual socket × dual NUMA + sparse clusters |
-| `x86_single_socket_multi_numa` | AMD SNC-like: 1 package, 2 NUMA (NUMA wins) |
-| `x86_sparse_kernel_numa` | `node/online=0,2` → dense 0,1 (not raw ids) |
-| `x86_multi_package_no_numa` | No `node/` → multi `physical_package_id` |
-| `x86_no_numa_single_package` | No `node/` + single package + sparse clusters |
-| `x86_missing_cluster_id` | Old kernel: affinity falls back to package |
-| `x86_numa_missing_package` | NUMA present without `physical_package_id` |
-| `x86_bare_minimal` | No NUMA/package/cluster → degenerate 1 node |
-| `x86_partial_cpus` | Holes in `cpuN` topology dirs |
-| `x86_empty_cpulist_node` | Empty `cpulist` on an online node |
-| `x86_large_cluster_ids` | `cluster_id` ≥ 64 must not become node count |
-| `x86_numa_uncovered_cpu` | CPUs outside all cpulists → degrade keep |
+Summary (MUST match):
 
-### arm64_pixel6_tensor/
+| Metric | Value |
+|--------|-------|
+| Logical CPUs | **24** (`cpu0`–`cpu23`) |
+| Unique `cluster_id` | **10** — `0,8,16,24,32,40,48,56,64,72` |
+| Benchmark numbers | Documentation only (422/422 broken; 63.9/709 diagnostic) — **not** gtest wall-time gates |
 
-**Hardware:** Google Pixel 6 (Google Tensor GS101)
-**Architecture:** ARM64
-**Configuration:**
-- 8 cores in heterogeneous big.LITTLE configuration:
-  - CPUs 0-1: Cortex-X1 (prime), capacity 1024, cluster 0
-  - CPUs 2-3: Cortex-A76 (big), capacity 820, cluster 1
-  - CPUs 4-7: Cortex-A55 (LITTLE), capacity 280, cluster 2
-- Cache hierarchy varies by cluster:
-  - X1: L1 32KB, L2 512KB, L3 4MB (shared 0-1)
-  - A76: L1 32KB, L2 256KB, L3 4MB (shared 2-3)
-  - A55: L1 32KB, L2 128KB, L3 4MB (shared 4-7)
+**Expected (DESIGN + oracle invariants — not invented toy counts):**
 
-**Expected Behavior:**
-- Task **node** identity follows NUMA/package (not raw `cluster_id`); Pixel6 often has a single node
-- Cluster IDs remain available as thread affinity group hints
-- With 75% capacity threshold (768):
-  - HIGH performance: CPUs 0-1, 2-3 (capacity >= 768)
-  - LOW performance: CPUs 4-7 (capacity < 768)
-  - ANY: All 8 CPUs
-- Heterogeneous system should be detected (max_capacity 1024 != min_capacity 280)
+- `query_node_count()` == **1** (scaffolded single NUMA/package), **≠** 10 unique clusters
+- Physical-core span covers all scheduling domains (8P+8E from reporter taxonomy → 16 groups with SMT scaffolding)
+- `ideal_thread_affinity.group` still carries sparse issue cluster ids (incl. ≥64)
+- Do **not** assert wall/CPU ms in unit tests
 
-## Capturing New Test Data
+## A0 Pixel detail
 
-Use the `capture_sysfs.sh` script to create snapshots from real systems:
+**Hardware:** Google Pixel 6 (Tensor GS101), ARM64 big.LITTLE
+**Expected:** one package node (not 3 clusters as nodes); affinity groups 0/1/2; capacity filtering as before.
+
+## Capturing new data
 
 ```bash
-# Capture current system to a new directory
 ./capture_sysfs.sh my_system_name
-
-# Capture with automatic timestamped name
-./capture_sysfs.sh
+COPYFILE_DISABLE=1 tar czf my_system_name.tar.gz --exclude='._*' my_system_name/
 ```
 
-The script captures:
-- Top-level CPU list files (`present`, `possible`, `online`, etc.)
-- Per-CPU topology (`core_id`, `cluster_id`, `physical_package_id`, etc.)
-- Per-CPU cache hierarchy (`type`, `level`, `size`, `shared_cpu_list`)
-- ARM-specific files (`cpu_capacity` for big.LITTLE detection)
-- NUMA node files under `node/` (`online`, per-node `cpulist`/`cpumap`) when present
+Prefer live multi-socket / hybrid captures for future A0/A1 entries. Only check
+in small interesting trees; large x86 dumps stay local.
 
-## Testing with Snapshots
+## Testing
 
-To test with sysfs snapshots, compile IREE with the `IREE_SYSFS_ROOT` define
-pointing to your snapshot directory:
+Compile with sysfs topology (`IREE_ENABLE_CPUINFO=OFF` on Linux) and run
+`topology_sysfs_test`, or use `IREE_SYSFS_ROOT` / `iree_sysfs_set_root_path_for_testing`.
 
-```bash
-# Configure with sysfs snapshot path
-cmake -B build/ -S . \
-  -DCMAKE_C_FLAGS="-DIREE_SYSFS_ROOT=\\\"/path/to/arm64_pixel6_tensor\\\"" \
-  -DCMAKE_CXX_FLAGS="-DIREE_SYSFS_ROOT=\\\"/path/to/arm64_pixel6_tensor\\\""
+Validate:
 
-# Build and test
-cmake --build build/ --target iree-run-module
-
-# Test ARM64 big.LITTLE with default settings (all cores, scatter distribution)
-./build/tools/iree-run-module --dump_task_topologies
-
-# Test ARM64 big.LITTLE with HIGH performance cores only
-./build/tools/iree-run-module \
-  --task_topology_performance_level=high \
-  --dump_task_topologies
-
-# Test ARM64 with compact distribution (fill cache domains sequentially)
-./build/tools/iree-run-module \
-  --task_topology_distribution=compact \
-  --dump_task_topologies
-
-# Test ARM64 with latency preset (compact + high performance)
-./build/tools/iree-run-module \
-  --task_topology_favor=latency \
-  --dump_task_topologies
-
-# Test ARM64 with only LITTLE cores (low power)
-./build/tools/iree-run-module \
-  --task_topology_performance_level=low \
-  --dump_task_topologies
-```
-
-Available flags for topology configuration:
-- `--task_topology_performance_level`: `any`, `low` (or `efficiency`), `high` (or `performance`)
-- `--task_topology_distribution`: `compact`, `scatter`
-- `--task_topology_favor`: `latency`, `throughput`, `efficiency` (overrides above flags)
-- `--task_topology_nodes`: `current`, `all`, or comma-separated node IDs (e.g., `0,2`)
-
-## Validation
-
-When testing, verify:
-
-1. **CPU detection:** Correct number of logical processors detected
-2. **Node vs cluster:** Task node id follows NUMA `node*/cpulist` (else package), **not** raw `cluster_id`; affinity.group may still use cluster_id
-3. **Cache hierarchy:** L1/L2/L3 sizes and sharing masks accurate
-4. **ARM big.LITTLE filtering:**
-   - ANY mode includes all cores
-   - HIGH mode filters to high-capacity cores only
-   - LOW mode filters to low-capacity cores only
-5. **Graceful degradation:** Missing files handled without errors
-
-## Adding New Test Cases
-
-Good candidates for test data to capture locally (but only check in small/unusual ones):
-
-- **NUMA systems:** Multi-socket x86 servers (Xeon, EPYC) - capture locally, don't check in
-- **ARM heterogeneous:** Snapdragon 8 Gen 3, Apple M-series, AWS Graviton - small enough to check in
-- **Unusual configurations:** Hybrid x86 (Intel Alder Lake P/E cores), RISC-V SMP - check in if interesting
-
-When adding new test data:
-1. Run `capture_sysfs.sh <directory_name>` on the target hardware
-2. Compress the directory: `tar czf <directory_name>.tar.gz <directory_name>/`
-3. Test the snapshot to ensure it exercises the intended code paths
-4. **Only check in tar.gz if small and interesting** (ARM heterogeneous, exotic architectures)
-5. Update this README with hardware details and expected behavior if checking in
-6. Large x86 systems stay local - don't commit multi-MB tar files
+1. Node id follows NUMA `node*/cpulist` (else package), **never** raw `cluster_id`
+2. Sparse / large cluster ids remain affinity hints only
+3. Mutations preserve relative invariants of the parent corpus
