@@ -607,22 +607,26 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
 
 bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
     Value value, Operation *ignoredOwner) {
-  return hasUseAfterDispatch(value, ignoredOwner,
-                             [](Operation *) { return false; });
+  auto &ownerCache = cache[value];
+  if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
+    return it->second;
+  }
+  bool result = computeHasUseAfterDispatch(
+      value, ignoredOwner, [](Operation *) { return false; });
+  ownerCache[ignoredOwner] = result;
+  return result;
 }
 
 bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
     Value value, Operation *ignoredOwner,
     llvm::function_ref<bool(Operation *)> isMovingIntoDispatch) {
-  auto &ownerCache = cache[value];
-  if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
-    return it->second;
-  }
-  auto cacheResult = [&](bool result) {
-    ownerCache[ignoredOwner] = result;
-    return result;
-  };
+  return computeHasUseAfterDispatch(value, ignoredOwner,
+                                    isMovingIntoDispatch);
+}
 
+bool DispatchRegionTiedUseAnalysis::computeHasUseAfterDispatch(
+    Value value, Operation *ignoredOwner,
+    llvm::function_ref<bool(Operation *)> isMovingIntoDispatch) {
   Block *dispatchBlock = regionOp->getBlock();
   llvm::SetVector<Value> tiedValues;
   tiedValues.insert(value);
@@ -630,11 +634,11 @@ bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
     for (OpOperand &use : tiedValues[i].getUses()) {
       Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
       if (!user) {
-        return cacheResult(true);
+        return true;
       }
       bool isMovedIntoDispatch = user == regionOp || isMovingIntoDispatch(user);
       if (!isMovedIntoDispatch && regionOp->isBeforeInBlock(user)) {
-        return cacheResult(true);
+        return true;
       }
 
       // The required operation itself is allowed to produce live results;
@@ -648,7 +652,7 @@ bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
       if (user == regionOp) {
         if (isa<Flow::ReturnOp>(use.getOwner()) &&
             !regionOp->getResult(use.getOperandNumber()).use_empty()) {
-          return cacheResult(true);
+          return true;
         }
       }
 
@@ -660,7 +664,7 @@ bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
       }
     }
   }
-  return cacheResult(false);
+  return false;
 }
 
 // Returns the storage base for a required result when preserving the result can
