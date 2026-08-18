@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/RegionOpUtils.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -81,26 +80,6 @@ static bool hasDynamicShape(Type t) {
     return false;
   }
   return !shapedType.hasStaticShape();
-}
-
-// Returns the storage base for a required result when preserving the result can
-// form a direct, type-compatible dispatch tie.
-static Value getRequiredTiedResultBase(Value value) {
-  auto result = dyn_cast<OpResult>(value);
-  if (!result) {
-    return {};
-  }
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
-  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
-    return {};
-  }
-  Value tiedOperand = tiedOp.getTiedResultOperand(result);
-  Value tiedBase = tiedOp.getTiedResult(result.getResultNumber());
-  if (!tiedOperand || tiedOperand != tiedBase ||
-      tiedOperand.getType() != result.getType()) {
-    return {};
-  }
-  return tiedBase;
 }
 
 /// Reify the dynamic dimensions of the given value.
@@ -417,60 +396,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         regionOp->getBlock()->findAncestorOpInBlock(*definingOp);
     return !ancestor || !targetSet.contains(ancestor);
   };
-  llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>>
-      hasUseAfterDispatchCache;
-  auto hasUseAfterDispatch = [&](Value value, Operation *ignoredOwner) {
-    auto &ownerCache = hasUseAfterDispatchCache[value];
-    if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
-      return it->second;
-    }
-    auto cacheResult = [&](bool result) {
-      ownerCache[ignoredOwner] = result;
-      return result;
-    };
-
-    llvm::SetVector<Value> tiedValues;
-    tiedValues.insert(value);
-    for (unsigned i = 0; i < tiedValues.size(); ++i) {
-      for (OpOperand &use : tiedValues[i].getUses()) {
-        Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
-        if (!user) {
-          return cacheResult(true);
-        }
-
-        // Targets are about to move into the dispatch. Follow their tied
-        // results so an escaping target-set alias remains visible here.
-        bool isMovedIntoDispatch =
-            user == regionOp || targetSet.contains(user);
-        if (!isMovedIntoDispatch && regionOp->isBeforeInBlock(user)) {
-          return cacheResult(true);
-        }
-
-        // The required operation's own results are handled by its owner
-        // liveness check and are not independent aliases of its input.
-        if (use.getOwner() == ignoredOwner) {
-          continue;
-        }
-
-        // A tied value yielded from the dispatch aliases storage after the
-        // dispatch when the corresponding dispatch result is live.
-        if (user == regionOp &&
-            isa<IREE::Flow::ReturnOp>(use.getOwner()) &&
-            !regionOp->getResult(use.getOperandNumber()).use_empty()) {
-          return cacheResult(true);
-        }
-
-        if (auto tiedOp =
-                dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
-          for (Value result :
-               tiedOp.getOperandTiedResults(use.getOperandNumber())) {
-            tiedValues.insert(result);
-          }
-        }
-      }
-    }
-    return cacheResult(false);
-  };
+  DispatchRegionTiedUseAnalysis tiedUseAnalysis(regionOp);
 
   // Preserve at most one required carrier for each storage base.
   llvm::SetVector<Value> preservedTiedBases;
@@ -490,11 +416,14 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       bool hasExternalUses = hasUsesOutsideOfRegion(result);
       bool preserveRequiredTie = false;
       if (!hasExternalUses && hasAnyResultUses) {
-        Value tiedBase = getRequiredTiedResultBase(result);
-        preserveRequiredTie = tiedBase && isExternalStorageBase(tiedBase) &&
-                              !hasUseAfterDispatch(tiedBase,
-                                                   result.getDefiningOp()) &&
-                              preservedTiedBases.insert(tiedBase);
+        Value tiedBase =
+            IREE::Util::TiedOpInterface::getRequiredTiedResultBase(result);
+        preserveRequiredTie =
+            tiedBase && isExternalStorageBase(tiedBase) &&
+            !tiedUseAnalysis.hasUseAfterDispatch(
+                tiedBase, result.getDefiningOp(),
+                [&](Operation *user) { return targetSet.contains(user); }) &&
+            preservedTiedBases.insert(tiedBase);
       }
       if (hasExternalUses || preserveRequiredTie) {
         if (hasExternalUses) {
@@ -518,7 +447,7 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                       &body);
     // Moving the next target changes the tied-use graph, so cached legality
     // results are valid only for this target's result scan.
-    hasUseAfterDispatchCache.clear();
+    tiedUseAnalysis.clear();
   }
 
   // Collect all ops that must be moved after the dispatch. Start from direct
