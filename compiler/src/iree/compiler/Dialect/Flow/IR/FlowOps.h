@@ -54,8 +54,8 @@ namespace mlir::iree_compiler::IREE::Flow {
 // Analyzes whether a value or one of its tied aliases remains live after a
 // dispatch. Callers moving operations into the dispatch can provide a
 // predicate for those operations. Queries with a custom predicate are not
-// cached because the predicate affects the result; clear() must be called
-// after mutating the tied-use graph for cached queries.
+// cached because the predicate affects the result. The cached overload is
+// valid while the tied-use graph remains unchanged.
 class DispatchRegionTiedUseAnalysis {
 public:
   explicit DispatchRegionTiedUseAnalysis(DispatchRegionOp regionOp)
@@ -65,7 +65,6 @@ public:
   bool hasUseAfterDispatch(
       Value value, Operation *ignoredOwner,
       llvm::function_ref<bool(Operation *)> isMovingIntoDispatch);
-  void clear() { cache.clear(); }
 
 private:
   bool computeHasUseAfterDispatch(

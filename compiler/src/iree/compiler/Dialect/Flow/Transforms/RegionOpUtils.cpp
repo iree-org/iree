@@ -445,9 +445,6 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
 
     rewriter.replaceOpUsesWithinBlock(target, clonedTarget->getResults(),
                                       &body);
-    // Moving the next target changes the tied-use graph, so cached legality
-    // results are valid only for this target's result scan.
-    tiedUseAnalysis.clear();
   }
 
   // Collect all ops that must be moved after the dispatch. Start from direct
