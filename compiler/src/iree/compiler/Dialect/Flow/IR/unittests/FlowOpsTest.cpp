@@ -64,8 +64,8 @@ module {
   BlockArgument argument = function.getArgument(0);
   EXPECT_FALSE(analysis.hasUseAfterDispatch(
       argument, nullptr, [&](Operation *op) { return op == use; }));
-  EXPECT_TRUE(analysis.hasUseAfterDispatch(
-      argument, nullptr, [&](Operation *op) { return op != use; }));
+  EXPECT_TRUE(analysis.hasUseAfterDispatch(argument, nullptr,
+                                           [](Operation *) { return false; }));
 }
 
 } // namespace
