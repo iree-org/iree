@@ -611,8 +611,8 @@ bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
   if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
     return it->second;
   }
-  bool result = computeHasUseAfterDispatch(
-      value, ignoredOwner, [](Operation *) { return false; });
+  bool result = computeHasUseAfterDispatch(value, ignoredOwner,
+                                           [](Operation *) { return false; });
   ownerCache[ignoredOwner] = result;
   return result;
 }
@@ -620,8 +620,7 @@ bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
 bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
     Value value, Operation *ignoredOwner,
     llvm::function_ref<bool(Operation *)> isMovingIntoDispatch) {
-  return computeHasUseAfterDispatch(value, ignoredOwner,
-                                    isMovingIntoDispatch);
+  return computeHasUseAfterDispatch(value, ignoredOwner, isMovingIntoDispatch);
 }
 
 bool DispatchRegionTiedUseAnalysis::computeHasUseAfterDispatch(
