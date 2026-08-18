@@ -550,13 +550,35 @@ static iree_status_t iree_hal_cuda_native_executable_export_parameters(
                           "parameter reflection not implemented");
 }
 
+// PTX identifiers only allow [a-zA-Z0-9_]; the compiler sanitizes kernel names
+// by replacing every other character with '_' (matching sanitizeSymbolName in
+// compiler/src/iree/compiler/Utils/StringUtils.cpp). The runtime lookup
+// receives the original unsanitized name, so we sanitize it here before
+// comparing against the stored (already-sanitized) kernel names.
+// TODO(upstream): remove once the compiler stores both the original and PTX
+// names in the flatbuffer so the runtime can do an unsanitized lookup.
+static bool iree_hal_cuda_name_matches_sanitized(iree_string_view_t stored,
+                                                 iree_string_view_t name) {
+  if (stored.size != name.size) return false;
+  for (iree_host_size_t i = 0; i < name.size; ++i) {
+    char c = name.data[i];
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+          (c >= '0' && c <= '9') || c == '_')) {
+      c = '_';
+    }
+    if (stored.data[i] != c) return false;
+  }
+  return true;
+}
+
 static iree_status_t iree_hal_cuda_native_executable_lookup_export_by_name(
     iree_hal_executable_t* base_executable, iree_string_view_t name,
     iree_hal_executable_function_t* out_export_ordinal) {
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   for (iree_host_size_t i = 0; i < executable->export_count; ++i) {
-    if (iree_string_view_equal(executable->exports[i].name, name)) {
+    if (iree_hal_cuda_name_matches_sanitized(executable->exports[i].name,
+                                             name)) {
       *out_export_ordinal =
           iree_hal_executable_function_from_index((uint32_t)i);
       return iree_ok_status();
