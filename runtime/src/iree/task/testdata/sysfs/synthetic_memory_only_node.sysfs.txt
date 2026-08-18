@@ -1,0 +1,49 @@
+# SYNTHETIC machine (not a hardware capture): 4 cores all on NUMA node 0,
+# plus a memory-only node 1 (listed in node/online with a readable but EMPTY
+# cpulist -- CXL / Optane / some SNC configs). The CPU-less node must never
+# be enumerated as a schedulable node or become an executor with zero worker
+# groups.
+cpu/cpu0/cache/index0/level=1
+cpu/cpu0/cache/index0/shared_cpu_list=0
+cpu/cpu0/cache/index0/size=32K
+cpu/cpu0/cache/index0/type=Data
+cpu/cpu0/cache/index1/level=2
+cpu/cpu0/cache/index1/shared_cpu_list=0
+cpu/cpu0/cache/index1/size=1024K
+cpu/cpu0/cache/index1/type=Unified
+cpu/cpu0/topology/core_id=0
+cpu/cpu0/topology/physical_package_id=0
+cpu/cpu1/cache/index0/level=1
+cpu/cpu1/cache/index0/shared_cpu_list=1
+cpu/cpu1/cache/index0/size=32K
+cpu/cpu1/cache/index0/type=Data
+cpu/cpu1/cache/index1/level=2
+cpu/cpu1/cache/index1/shared_cpu_list=1
+cpu/cpu1/cache/index1/size=1024K
+cpu/cpu1/cache/index1/type=Unified
+cpu/cpu1/topology/core_id=1
+cpu/cpu1/topology/physical_package_id=0
+cpu/cpu2/cache/index0/level=1
+cpu/cpu2/cache/index0/shared_cpu_list=2
+cpu/cpu2/cache/index0/size=32K
+cpu/cpu2/cache/index0/type=Data
+cpu/cpu2/cache/index1/level=2
+cpu/cpu2/cache/index1/shared_cpu_list=2
+cpu/cpu2/cache/index1/size=1024K
+cpu/cpu2/cache/index1/type=Unified
+cpu/cpu2/topology/core_id=2
+cpu/cpu2/topology/physical_package_id=0
+cpu/cpu3/cache/index0/level=1
+cpu/cpu3/cache/index0/shared_cpu_list=3
+cpu/cpu3/cache/index0/size=32K
+cpu/cpu3/cache/index0/type=Data
+cpu/cpu3/cache/index1/level=2
+cpu/cpu3/cache/index1/shared_cpu_list=3
+cpu/cpu3/cache/index1/size=1024K
+cpu/cpu3/cache/index1/type=Unified
+cpu/cpu3/topology/core_id=3
+cpu/cpu3/topology/physical_package_id=0
+cpu/present=0-3
+node/node0/cpulist=0,1,2,3
+node/node1/cpulist=
+node/online=0,1

@@ -1,8 +1,4 @@
-# Ignore all extracted sysfs snapshot directories.
-# Only tar.gz archives should be checked in.
-
-# Allow tar.gz archives (override root .gitignore).
-!*.tar.gz
-
-# Ignore all directories.
-*/
+# Locally captured snapshots and expansions (capture_sysfs.sh default output)
+# are not checked in; curated manifests like arm64_pixel6_tensor.sysfs.txt are
+# committed as plain text.
+captured_*
