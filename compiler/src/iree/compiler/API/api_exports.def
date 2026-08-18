@@ -781,16 +781,25 @@ EXPORTS
   mlirMemRefTypeGetName
   mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
+  mlirMemoryEffectGetEffectID
+  mlirMemoryEffectInstanceClone
   mlirMemoryEffectInstanceCreate
   mlirMemoryEffectInstanceCreateForBlockArgument
   mlirMemoryEffectInstanceCreateForOpOperand
   mlirMemoryEffectInstanceCreateForOpResult
   mlirMemoryEffectInstanceCreateForSymbol
   mlirMemoryEffectInstanceDestroy
-  mlirMemoryEffectInstancesListAppend
+  mlirMemoryEffectInstanceGetEffect
+  mlirMemoryEffectInstanceGetEffectOnFullRegion
+  mlirMemoryEffectInstanceGetParameters
+  mlirMemoryEffectInstanceGetResource
+  mlirMemoryEffectInstanceGetStage
+  mlirMemoryEffectInstanceGetSymbolRef
+  mlirMemoryEffectInstanceGetValue
   mlirMemoryEffectsAllocateGet
   mlirMemoryEffectsFreeGet
   mlirMemoryEffectsOpInterfaceAttachFallbackModel
+  mlirMemoryEffectsOpInterfaceGetEffects
   mlirMemoryEffectsOpInterfaceTypeID
   mlirMemoryEffectsReadGet
   mlirMemoryEffectsWriteGet

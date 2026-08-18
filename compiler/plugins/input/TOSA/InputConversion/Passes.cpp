@@ -61,6 +61,10 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // data type validation.
   tosaTargetOptions.level = tosa::Level::none;
   tosa::TosaValidationOptions tosaValidationOptions;
+  // IREE supports dynamic dimensions in function signatures, which TOSA
+  // signature validation rejects for spec version <= 1.0. Disable this,
+  // matching upstream tosa-to-linalg pipeline.
+  tosaValidationOptions.validateFunctionSignature = false;
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
                               tosaToLinalgNamedOptions, tosaValidationOptions,
                               tosaTargetOptions);
