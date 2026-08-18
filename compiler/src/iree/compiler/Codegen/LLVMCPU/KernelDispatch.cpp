@@ -3807,7 +3807,7 @@ void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
 /// Captures the inner-tile alignment of a scalable `linalg.pack` at tiling
 /// `level` from its (unpacked-domain) loop tile sizes.
 static void capturePackInnerTileAlignment(
-    linalg::PackOp packOp, const SizesAndScalableFlags &packSaf,
+    linalg::PackOp packOp, const SizesAndScalableFlags &packScalableTilesFlags,
     IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
     ArrayRef<bool> scalableFlags,
     SmallVectorImpl<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>>
@@ -3823,11 +3823,11 @@ static void capturePackInnerTileAlignment(
   for (auto [i, pos] : llvm::enumerate(packOp.getInnerDimsPos())) {
     // Only scalable inner tiles need a hint; static ones are resolved by static
     // shape inference downstream.
-    if (!packSaf.second[i] || pos >= tileSizes.size()) {
+    if (!packScalableTilesFlags.second[i] || pos >= tileSizes.size()) {
       continue;
     }
     mlir::InnerTileAlignment kind = getScalableInnerTileAlignment(
-        tileSizes[pos], scalableFlags[pos], packSaf.first[i]);
+        tileSizes[pos], scalableFlags[pos], packScalableTilesFlags.first[i]);
     alignments[pos] = llvm::to_underlying(kind);
     if (kind != mlir::InnerTileAlignment::Unknown) {
       any = true;
@@ -3884,10 +3884,11 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // Capture this level's inner tile alignment for the pack's scalable
         // inner tiles from the loop tile sizes while they are still in the
         // unpacked domain.
-        if (auto packSaf =
+        if (auto packScalableTilesFlags =
                 getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
-          capturePackInnerTileAlignment(packOp, *packSaf, level, tileSizes,
-                                        scalableFlags, perLevelAlignments);
+          capturePackInnerTileAlignment(packOp, *packScalableTilesFlags, level,
+                                        tileSizes, scalableFlags,
+                                        perLevelAlignments);
         }
         // `MultiLoweringConfigGenerator` propagates tiling on the
         // unpacked dimensions, while for a pack operation, `LoweringConfig`
@@ -4188,12 +4189,11 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
 }
 
 /// For a `linalg.pack` whose producer is a `linalg.unpack`, no lowering config
-/// is assigned (see `shouldSetLoweringConfig`), so the consumer-tiling pass
-/// cannot derive how the pack's scalable inner tiles relate to its loop tile
-/// sizes. The pack shares its (unpacked) iteration domain with the producer
-/// unpack, which does carry a config, so for each tiling level present on the
-/// unpack we compare that level's tile sizes against the pack's scalable inner
-/// tiles and infer the inner tile alignment hints.
+/// is assigned (see `shouldSetLoweringConfig`), so we cannot derive alignment
+/// hints from that. The pack shares its (unpacked) iteration domain with the
+/// producer unpack, which does carry a config, so for each tiling level present
+/// on the unpack we compare that level's tile sizes against the pack's scalable
+/// inner tiles and infer the inner tile alignment hints.
 static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
   auto unpackOp = packOp.getSource().getDefiningOp<linalg::UnPackOp>();
   if (!unpackOp) {
@@ -4204,9 +4204,9 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
   if (!unpackConfig) {
     return;
   }
-  std::optional<SizesAndScalableFlags> packSaf =
+  std::optional<SizesAndScalableFlags> packScalableTilesFlags =
       getScalableTileSizesAndFlags(packOp.getMixedTiles());
-  if (!packSaf) {
+  if (!packScalableTilesFlags) {
     return;
   }
 
@@ -4225,7 +4225,8 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     if (!levelAttr) {
       continue;
     }
-    capturePackInnerTileAlignment(packOp, *packSaf, level, levelAttr.getSizes(),
+    capturePackInnerTileAlignment(packOp, *packScalableTilesFlags, level,
+                                  levelAttr.getSizes(),
                                   levelAttr.getScalableFlags(), perLevel);
   }
 
@@ -4326,7 +4327,7 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
     // Packs fed by an unpack are pruned above and never receive a lowering
     // config, yet they are still tiled as fused consumers downstream.
     // Precompute the alignment of their scalable inner tiles relative to the
-    // producer unpack's inner tiles.
+    // producer unpack's per-level tile sizes.
     for (Operation *op : computeOps) {
       if (auto packOp = dyn_cast<linalg::PackOp>(op)) {
         annotateScalablePackConsumerOfUnpack(packOp);

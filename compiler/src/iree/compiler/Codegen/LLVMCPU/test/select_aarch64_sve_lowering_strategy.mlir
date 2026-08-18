@@ -479,7 +479,7 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tens
 
 // -----
 
-// Same as the above, but the pack operations scalable inner tile does not match it's unpack consumer's.
+// Same as the above, but the pack operations scalable inner tile does not match it's unpack producer's.
 // The alignment hint is not set.
 
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
