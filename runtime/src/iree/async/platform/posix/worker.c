@@ -81,6 +81,16 @@ static iree_status_t iree_async_posix_execute_file_open(
   return status;
 }
 
+// Maximum bytes transferred by a single pread/pwrite call: INT_MAX rounded down
+// to a 4KB page.
+//
+// POSIX leaves the result implementation-defined once nbyte exceeds SSIZE_MAX,
+// and implementations diverge well below that: Darwin fails with EINVAL for
+// nbyte > INT_MAX while Linux silently caps at MAX_RW_COUNT. Clamping under
+// both turns an oversized span into a short transfer everywhere instead of an
+// error on some platforms, and callers resubmit for the remainder.
+#define IREE_ASYNC_POSIX_MAX_RW_LENGTH ((size_t)INT32_MAX & ~(size_t)4095)
+
 // Executes a FILE_READ operation using the pread() syscall.
 static iree_status_t iree_async_posix_execute_file_read(
     iree_async_file_read_operation_t* op) {
@@ -88,7 +98,7 @@ static iree_status_t iree_async_posix_execute_file_read(
 
   int fd = op->file->primitive.value.fd;
   void* buffer = iree_async_span_ptr(op->buffer);
-  size_t length = op->buffer.length;
+  size_t length = iree_min(op->buffer.length, IREE_ASYNC_POSIX_MAX_RW_LENGTH);
   off_t offset = (off_t)op->offset;
 
   // Execute the pread syscall (blocking).
@@ -114,7 +124,7 @@ static iree_status_t iree_async_posix_execute_file_write(
 
   int fd = op->file->primitive.value.fd;
   const void* buffer = iree_async_span_ptr(op->buffer);
-  size_t length = op->buffer.length;
+  size_t length = iree_min(op->buffer.length, IREE_ASYNC_POSIX_MAX_RW_LENGTH);
   off_t offset = (off_t)op->offset;
 
   // Execute the pwrite syscall (blocking).

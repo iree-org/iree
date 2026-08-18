@@ -1060,6 +1060,16 @@ static iree_status_t iree_async_proactor_iocp_submit_message(
 // File I/O submit handlers
 //===----------------------------------------------------------------------===//
 
+// Maximum bytes transferred by a single ReadFile/WriteFile call. Held to the
+// same ceiling as the io_uring backend so both clamp identically.
+//
+// The count argument is a DWORD, so longer spans must be clamped instead of
+// narrowed: a span that is an exact multiple of 4GB would wrap to zero and
+// complete with no bytes transferred, which the caller cannot distinguish from
+// EOF. Short transfers are part of the file read/write contract, so callers
+// resubmit for the remainder.
+#define IREE_ASYNC_IOCP_MAX_RW_LENGTH ((uint32_t)INT32_MAX & ~UINT32_C(4095))
+
 static iree_status_t iree_async_proactor_iocp_submit_file_open(
     iree_async_proactor_iocp_t* proactor,
     iree_async_file_open_operation_t* open_op) {
@@ -1177,7 +1187,8 @@ static iree_status_t iree_async_proactor_iocp_submit_file_read(
   carrier->overlapped.OffsetHigh = (DWORD)(read_op->offset >> 32);
 
   void* buffer_ptr = iree_async_span_ptr(read_op->buffer);
-  DWORD buffer_length = (DWORD)read_op->buffer.length;
+  DWORD buffer_length =
+      (DWORD)iree_min(read_op->buffer.length, IREE_ASYNC_IOCP_MAX_RW_LENGTH);
 
   BOOL read_ok = ReadFile(file_handle, buffer_ptr, buffer_length, NULL,
                           &carrier->overlapped);
@@ -1220,7 +1231,8 @@ static iree_status_t iree_async_proactor_iocp_submit_file_write(
   carrier->overlapped.OffsetHigh = (DWORD)(write_op->offset >> 32);
 
   const void* buffer_ptr = iree_async_span_ptr(write_op->buffer);
-  DWORD buffer_length = (DWORD)write_op->buffer.length;
+  DWORD buffer_length =
+      (DWORD)iree_min(write_op->buffer.length, IREE_ASYNC_IOCP_MAX_RW_LENGTH);
 
   BOOL write_ok = WriteFile(file_handle, buffer_ptr, buffer_length, NULL,
                             &carrier->overlapped);

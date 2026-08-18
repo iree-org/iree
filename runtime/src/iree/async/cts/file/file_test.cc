@@ -13,9 +13,18 @@
 #include "iree/async/file.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
+
+#include "iree/base/target_platform.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <windows.h>
+#else
+#include <sys/mman.h>
+#endif  // IREE_PLATFORM_WINDOWS
 
 #include "iree/async/cts/file/native_file.h"
 #include "iree/async/cts/util/registry.h"
@@ -26,6 +35,54 @@
 #include "iree/testing/temp_file.h"
 
 namespace iree::async::cts {
+
+//===----------------------------------------------------------------------===//
+// Sparse buffer
+//===----------------------------------------------------------------------===//
+
+// A large writable byte range backed by lazily faulted pages, so only the pages
+// actually touched cost physical memory. Lets a test build a span whose length
+// is the thing under test without committing gigabytes for I/O that touches a
+// few kilobytes.
+//
+// Holds nothing (`operator bool` is false) if the reservation is refused, which
+// lets callers skip rather than fail on hosts short on address space.
+class SparseBuffer {
+ public:
+  explicit SparseBuffer(uint64_t length) : length_(length) {
+    if (length_ > (uint64_t)SIZE_MAX) return;
+#if defined(IREE_PLATFORM_WINDOWS)
+    // MEM_COMMIT charges the system commit limit even for untouched pages, so
+    // this can fail on machines with little swap configured.
+    data_ = (uint8_t*)VirtualAlloc(NULL, (SIZE_T)length_,
+                                   MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+#else
+    void* mapping =
+        mmap(NULL, (size_t)length_, PROT_READ | PROT_WRITE,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, /*fd=*/-1, /*off=*/0);
+    if (mapping != MAP_FAILED) data_ = (uint8_t*)mapping;
+#endif  // IREE_PLATFORM_WINDOWS
+  }
+
+  ~SparseBuffer() {
+    if (!data_) return;
+#if defined(IREE_PLATFORM_WINDOWS)
+    VirtualFree(data_, 0, MEM_RELEASE);
+#else
+    munmap(data_, (size_t)length_);
+#endif  // IREE_PLATFORM_WINDOWS
+  }
+
+  SparseBuffer(const SparseBuffer&) = delete;
+  SparseBuffer& operator=(const SparseBuffer&) = delete;
+
+  explicit operator bool() const { return data_ != nullptr; }
+  uint8_t* data() const { return data_; }
+
+ private:
+  uint64_t length_;
+  uint8_t* data_ = nullptr;
+};
 
 //===----------------------------------------------------------------------===//
 // Test fixture with temp file helpers
@@ -271,6 +328,71 @@ TEST_P(FileTest, ReadPastEOFShortRead) {
   // Short read: file has 5 bytes, we requested 1024.
   EXPECT_EQ(read_op.bytes_read, strlen(kTestData));
   EXPECT_EQ(memcmp(read_buffer, kTestData, strlen(kTestData)), 0);
+
+  iree_async_file_release(file);
+}
+
+// A span longer than what a backend can transfer in one call must be clamped
+// down to a short read, never handed through as-is.
+//
+// Backends fail this two different ways. Where the native count is 32 bits
+// (io_uring's sqe->len, IOCP's DWORD), a bare cast of exactly 4GB wraps to zero
+// and completes having moved nothing, which the caller cannot distinguish from
+// EOF. Where the count is a size_t (pread/pwrite), there is no wrap but the
+// syscall may reject the length outright -- Darwin returns EINVAL above
+// INT_MAX, while Linux quietly caps at MAX_RW_COUNT.
+//
+// The span is address space, not committed memory, so only the handful of pages
+// the read fills are ever faulted in.
+TEST_P(FileTest, ReadSpanLargerThan4GiBIsClampedNotTruncated) {
+  if (sizeof(iree_host_size_t) < 8) {
+    GTEST_SKIP() << "span lengths over 4GB are unrepresentable on 32-bit";
+  }
+
+  // Exactly 4GB: the length a 32-bit narrowing cast turns into zero.
+  static constexpr uint64_t kSpanLength = 4ull * 1024 * 1024 * 1024;
+
+  static constexpr size_t kFileSize = 8192;
+  std::vector<uint8_t> pattern(kFileSize);
+  for (size_t i = 0; i < kFileSize; ++i) {
+    pattern[i] = static_cast<uint8_t>(i & 0xFF);
+  }
+  std::string path = CreateTempFileWithContents(pattern.data(), kFileSize);
+
+  SparseBuffer span_memory(kSpanLength);
+  if (!span_memory) {
+    GTEST_SKIP() << "unable to reserve a 4GB sparse buffer";
+  }
+
+  iree_async_file_t* file = ImportTempFileForRead(path);
+  ASSERT_NE(file, nullptr);
+
+  iree_async_file_read_operation_t read_op;
+  memset(&read_op, 0, sizeof(read_op));
+  read_op.base.type = IREE_ASYNC_OPERATION_TYPE_FILE_READ;
+  read_op.file = file;
+  read_op.offset = 0;
+  read_op.buffer = iree_async_span_from_ptr(span_memory.data(),
+                                            (iree_host_size_t)kSpanLength);
+  read_op.bytes_read = 0;
+
+  CompletionTracker tracker;
+  read_op.base.completion_fn = CompletionTracker::Callback;
+  read_op.base.user_data = &tracker;
+
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &read_op.base));
+  PollUntil(/*min_completions=*/1,
+            /*total_budget=*/iree_make_duration_ms(10000));
+
+  EXPECT_EQ(tracker.call_count, 1);
+  IREE_EXPECT_OK(tracker.ConsumeStatus());
+
+  // The file fits inside the clamp, so a correct backend reads all of it and
+  // reports a short read against the oversized span.
+  EXPECT_EQ(read_op.bytes_read, kFileSize)
+      << "expected the file contents; 0 means the transfer length was "
+         "truncated to zero rather than clamped";
+  EXPECT_EQ(memcmp(span_memory.data(), pattern.data(), kFileSize), 0);
 
   iree_async_file_release(file);
 }
