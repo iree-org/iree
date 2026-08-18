@@ -84,10 +84,8 @@ static bool isRequiredDirectTiedResult(IREE::Flow::DispatchRegionOp regionOp,
   if (!result || !regionOp->isProperAncestor(result.getOwner())) {
     return false;
   }
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
-  return tiedOp && tiedOp.isTiedResultRequired(result.getResultNumber()) &&
-         tiedOp.getTiedResultOperand(result) == tiedArgument &&
-         result.getType() == tiedArgument.getType();
+  return IREE::Util::TiedOpInterface::getRequiredTiedResultBase(value) ==
+         tiedArgument;
 }
 
 } // namespace
