@@ -1060,6 +1060,13 @@ SortOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
+bool SortOp::isResultUsedInComparator(unsigned resultIndex) {
+  assert(resultIndex < getNumResults() && "result index out of bounds");
+  auto blockArgs = getRegion().front().getArguments();
+  return !blockArgs[2 * resultIndex].use_empty() ||
+         !blockArgs[2 * resultIndex + 1].use_empty();
+}
+
 namespace {
 
 /// This pattern removes unused results from SortOp. The SortOp uses the
@@ -1104,15 +1111,12 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
       return failure();
     }
 
-    Block &block = sortOp.getRegion().front();
-    auto blockArgs = block.getArguments();
-    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
+    SmallVector<Value> usedOperands, usedResults;
     SmallVector<Type> usedResultTypes;
     BitVector eraseArg(numRes * 2, false);
     for (auto idx : llvm::seq<unsigned>(numRes)) {
       // If result or associated block arg is used, do not erase.
-      if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
-          !blockArgs[2 * idx + 1].use_empty()) {
+      if (!results[idx].use_empty() || sortOp.isResultUsedInComparator(idx)) {
         usedOperands.push_back(operands[idx]);
         usedResults.push_back(results[idx]);
         usedResultTypes.push_back(results[idx].getType());

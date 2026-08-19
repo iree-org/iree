@@ -75,6 +75,19 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
   return value;
 }
 
+// Returns true when |value| is an operation-required result that ties directly
+// to |tiedArgument|. Required carriers take precedence when several results
+// reach the same external storage base.
+static bool isRequiredDirectTiedResult(IREE::Flow::DispatchRegionOp regionOp,
+                                       Value value, Value tiedArgument) {
+  auto result = dyn_cast<OpResult>(value);
+  if (!result || !regionOp->isProperAncestor(result.getOwner())) {
+    return false;
+  }
+  return IREE::Util::TiedOpInterface::getRequiredTiedResultBase(value) ==
+         tiedArgument;
+}
+
 } // namespace
 
 /// Rewrite the DispatchRegionOp into a DispatchWorkgroupsOp. The
@@ -129,6 +142,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   // The logic to find the tied arguments only works for single block regions.
   // For ops with multiple blocks, just ignore tied arguments for now.
   if (llvm::hasSingleElement(region)) {
+    SmallVector<std::pair<unsigned, Value>> requiredTies;
+    SmallVector<std::pair<unsigned, Value>> otherTies;
     for (const auto &it :
          llvm::enumerate(origTerminators.front()->getOperands())) {
       auto tiedArgument =
@@ -138,14 +153,23 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       }
       assert(argumentsSet.contains(*tiedArgument) &&
              "expected that tiedArgument is already an argument");
-      // Do not tie an argument to multiple results.
-      if (tiedArgumentsSet.contains(*tiedArgument)) {
-        continue;
-      }
-      tiedArgumentsSet.insert(*tiedArgument);
-      tiedArguments[it.index()] = std::distance(
-          argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
+      bool isRequired =
+          isRequiredDirectTiedResult(regionOp, it.value(), *tiedArgument);
+      auto &candidates = isRequired ? requiredTies : otherTies;
+      candidates.emplace_back(it.index(), *tiedArgument);
     }
+    auto assignTies = [&](ArrayRef<std::pair<unsigned, Value>> candidates) {
+      for (auto [resultIndex, tiedArgument] : candidates) {
+        // Do not tie an argument to multiple results.
+        if (!tiedArgumentsSet.insert(tiedArgument).second) {
+          continue;
+        }
+        tiedArguments[resultIndex] = std::distance(
+            argumentsSet.begin(), llvm::find(argumentsSet, tiedArgument));
+      }
+    };
+    assignTies(requiredTies);
+    assignTies(otherTies);
   }
 
   // Create empty dispatch region.

@@ -830,6 +830,20 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the operation requires the given result tie to remain
+        represented while the operation executes, even when the result has no
+        SSA uses. This does not require preserving an otherwise dead operation.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isTiedResultRequired",
+      /*args=*/(ins "unsigned":$resultIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Walks up the SSA use-def chain to find the first defined value reachable
         from the given value by traversing tied ops. The returned value may be
         in another block if that block dominates the one the result is defined
@@ -967,6 +981,10 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     // from the given value by traversing tied ops. Note that the returned
     // value may be a block argument and have no defining op.
     static Value findTiedBaseValue(Value derivedValue);
+
+    // Returns the storage base for a required result that forms a direct,
+    // type-compatible tie to its operand, or a null value otherwise.
+    static Value getRequiredTiedResultBase(Value value);
 
     // Returns true if any of |value|'s uses have tied it to a result.
     static bool hasAnyTiedUses(Value value);

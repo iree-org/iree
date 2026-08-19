@@ -14,6 +14,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -46,5 +48,33 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc" // IWYU pragma: export
+
+namespace mlir::iree_compiler::IREE::Flow {
+
+// Analyzes whether a value or one of its tied aliases remains live after a
+// dispatch. Callers moving operations into the dispatch can provide a
+// predicate for those operations. Queries with a custom predicate are not
+// cached because the predicate affects the result. The cached overload is
+// valid while the tied-use graph remains unchanged.
+class DispatchRegionTiedUseAnalysis {
+public:
+  explicit DispatchRegionTiedUseAnalysis(DispatchRegionOp regionOp)
+      : regionOp(regionOp) {}
+
+  bool hasUseAfterDispatch(Value value, Operation *ignoredOwner);
+  bool hasUseAfterDispatch(
+      Value value, Operation *ignoredOwner,
+      llvm::function_ref<bool(Operation *)> isMovingIntoDispatch);
+
+private:
+  bool computeHasUseAfterDispatch(
+      Value value, Operation *ignoredOwner,
+      llvm::function_ref<bool(Operation *)> isMovingIntoDispatch);
+
+  DispatchRegionOp regionOp;
+  llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>> cache;
+};
+
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_IR_FLOWOPS_H_
