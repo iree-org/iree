@@ -744,6 +744,13 @@ iree_status_t iree_vm_bytecode_function_verify(
     IREE_VM_ISA_DECODE_RESULT_F32(result);                \
   });
 
+#define IREE_VM_ISA_VERIFY_OP_EXT_F32_MIXED_BINARY_F32(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {                     \
+    IREE_VM_ISA_DECODE_OPERAND_F32(lhs);                        \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs);                        \
+    IREE_VM_ISA_DECODE_RESULT_F32(result);                      \
+  });
+
 #define IREE_VM_ISA_VERIFY_OP_EXT_F32_TERNARY_F32(op_name) \
   IREE_VM_ISA_VERIFY_OP(EXT_F32, op_name, {                \
     IREE_VM_ISA_DECODE_OPERAND_F32(a);                     \
@@ -763,6 +770,13 @@ iree_status_t iree_vm_bytecode_function_verify(
     IREE_VM_ISA_DECODE_OPERAND_F64(lhs);                  \
     IREE_VM_ISA_DECODE_OPERAND_F64(rhs);                  \
     IREE_VM_ISA_DECODE_RESULT_F64(result);                \
+  });
+
+#define IREE_VM_ISA_VERIFY_OP_EXT_F64_MIXED_BINARY_F64(op_name) \
+  IREE_VM_ISA_VERIFY_OP(EXT_F64, op_name, {                     \
+    IREE_VM_ISA_DECODE_OPERAND_F64(lhs);                        \
+    IREE_VM_ISA_DECODE_OPERAND_I64(rhs);                        \
+    IREE_VM_ISA_DECODE_RESULT_F64(result);                      \
   });
 
 #define IREE_VM_ISA_VERIFY_OP_EXT_F64_TERNARY_F64(op_name) \
@@ -1849,6 +1863,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Log1pF32);
     IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(Log2F32);
     IREE_VM_ISA_VERIFY_OP_EXT_F32_BINARY_F32(PowF32);
+    IREE_VM_ISA_VERIFY_OP_EXT_F32_MIXED_BINARY_F32(FPowI32);
     IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(RsqrtF32);
     IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(SqrtF32);
     IREE_VM_ISA_VERIFY_OP_EXT_F32_UNARY_F32(TanhF32);
@@ -2059,6 +2074,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Log1pF64);
     IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(Log2F64);
     IREE_VM_ISA_VERIFY_OP_EXT_F64_BINARY_F64(PowF64);
+    IREE_VM_ISA_VERIFY_OP_EXT_F64_MIXED_BINARY_F64(FPowI64);
     IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(RsqrtF64);
     IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(SqrtF64);
     IREE_VM_ISA_VERIFY_OP_EXT_F64_UNARY_F64(TanhF64);
