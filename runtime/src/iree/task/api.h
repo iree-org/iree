@@ -16,6 +16,24 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
+// Node selection
+//===----------------------------------------------------------------------===//
+
+// A resolved --task_topology_nodes selection: an explicit list of NUMA node ids
+// to build one topology (executor) for each.
+//
+// Node ids may be sparse, this holds the actual ids rather than a dense
+// [0, count) range.
+typedef struct iree_task_node_selection_t {
+  iree_host_size_t count;
+  iree_task_topology_node_id_t ids[IREE_TASK_TOPOLOGY_MAX_NODES];
+} iree_task_node_selection_t;
+
+// Resolves a --task_topology_nodes |spec|.
+iree_status_t iree_task_topology_select_nodes(
+    iree_string_view_t spec, iree_task_node_selection_t* out_selection);
+
+//===----------------------------------------------------------------------===//
 // Flag parsing
 //===----------------------------------------------------------------------===//
 
@@ -25,8 +43,8 @@ iree_status_t iree_task_executor_options_initialize_from_flags(
     iree_task_executor_options_t* out_options);
 
 // Initializes |out_topology| from the command line flags.
-// Depending on the mode flags |node_id| will be used to pin the topology to a
-// specific NUMA node.
+// Depending on the mode flags the topology is pinned to NUMA |node_id|; pass
+// IREE_TASK_TOPOLOGY_NODE_ID_ANY to span all cores.
 iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_node_id_t node_id, iree_task_topology_t* out_topology);
 

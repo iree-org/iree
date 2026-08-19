@@ -324,7 +324,7 @@ iree_status_t iree_hal_task_device_create(
   // Select the device-level default proactor from the first queue's executor
   // NUMA node. Used for operations without specific queue affinity.
   iree_task_topology_node_id_t default_node_id =
-      iree_task_executor_node_id(queue_executors[0]);
+      iree_task_executor_numa_node_id(queue_executors[0]);
   iree_status_t status = iree_async_proactor_pool_get_for_node(
       device->proactor_pool, default_node_id, &device->proactor);
 
@@ -358,7 +358,7 @@ iree_status_t iree_hal_task_device_create(
       // executor's node doesn't have a dedicated proactor.
       iree_async_proactor_t* queue_proactor = NULL;
       iree_task_topology_node_id_t node_id =
-          iree_task_executor_node_id(queue_executors[i]);
+          iree_task_executor_numa_node_id(queue_executors[i]);
       status = iree_async_proactor_pool_get_for_node(device->proactor_pool,
                                                      node_id, &queue_proactor);
       if (!iree_status_is_ok(status)) break;
