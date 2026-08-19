@@ -46,6 +46,9 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
 struct HoistableTensorTypeInterface
     : IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
+
+  // TODO: Avoid walking the type twice by merging `hasComputableBitWidth` and
+  // `getTypeBitWidth` into a single function.
   bool isHoistableType(Type type) const {
     auto tensorType = cast<RankedTensorType>(type);
     Type elementType = tensorType.getElementType();
@@ -55,6 +58,9 @@ struct HoistableTensorTypeInterface
     unsigned bitWidth = IREE::Util::getTypeBitWidth(elementType);
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
+
+  // TODO: Avoid walking the type twice by merging `hasComputableBitWidth` and
+  // `getTypeBitWidth` into a single function.
   bool isHoistableLeafType(Type type) const {
     auto tensorType = cast<RankedTensorType>(type);
     Type elementType = tensorType.getElementType();
