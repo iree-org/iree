@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
+#include <cstdint>
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/schemas/cpu_data.h"
@@ -12,6 +13,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
+#include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -893,38 +895,35 @@ Value HALDispatchABI::loadProcessorID(Operation *forOp, OpBuilder &builder) {
                       di.getBasicType(resultValue.getType()), builder);
 }
 
-Value HALDispatchABI::updateProcessorDataFromTargetAttr(
-    Operation *forOp, Value processorDataPtrValue, OpBuilder &builder) {
-  // Get the target attr.
-  IREE::HAL::ExecutableTargetAttr targetAttr =
-      IREE::HAL::ExecutableTargetAttr::lookup(forOp);
+static uint64_t getFeatureBitPattern(Operation *forOp) {
+  uint64_t specifiedCpuDataField0 = 0;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(forOp);
   if (!targetAttr) {
-    return processorDataPtrValue;
+    return specifiedCpuDataField0;
   }
   DictionaryAttr targetConfig = targetAttr.getConfiguration();
-
-  // Lookup CPU features.
   std::optional<StringRef> cpuFeatures = getConfigCpuFeatures(targetConfig);
   if (!cpuFeatures) {
-    return processorDataPtrValue;
+    return specifiedCpuDataField0;
   }
-
-  // Currently requiring all CPU feature bits to be in field 0. Generalize as
-  // needed when other CPU feature fields start to be used.
-  uint64_t specifiedCpuDataField0 = 0;
-  {
-    // Map llvm feature-name to bit used to represent it in IREE_CPUDATA_FIELD0.
-    //
-    // TODO(ravishankarm): This link to the runtime schemas needs to be broken.
-    // Instead we should use a reflection callback to resolve arch guarded
-    // features directly in the compiler.
-    llvm::StringMap<uint64_t> featureToBitPattern;
-    auto targetTriple = getTargetTriple(targetConfig);
-    if (!targetTriple) {
-      return processorDataPtrValue;
-    }
-    std::string targetArchUppercase =
-        StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
+  std::optional<llvm::Triple> targetTriple = getTargetTriple(targetConfig);
+  if (!targetTriple) {
+    return specifiedCpuDataField0;
+  }
+  // Currently requiring all CPU feature bits to be in field 0. Generalize
+  // as needed when other CPU feature fields start to be used.
+  // The remaining fields _can_ carry architecture-defined runtime processor
+  // data and are passed through unchanged.
+  //
+  // Map llvm feature-name to bit used to represent it in
+  // IREE_CPUDATA_FIELD0.
+  //
+  // TODO(ravishankarm): This link to the runtime schemas needs to be
+  // broken. Instead we should use a reflection callback to resolve arch
+  // guarded features directly in the compiler.
+  llvm::StringMap<uint64_t> featureToBitPattern;
+  std::string targetArchUppercase =
+      StringRef(getIreeArchNameForTargetTriple(targetTriple.value())).upper();
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name)  \
   if (targetArchUppercase == #arch) {                                          \
     assert(field_index == 0);                                                  \
@@ -933,36 +932,36 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
 #include "iree/schemas/cpu_feature_bits.inl"
 #undef IREE_CPU_FEATURE_BIT
 
-    // Find CPU features in featureToBitPattern
-    SmallVector<StringRef> cpuFeatureStrings;
-    cpuFeatures.value().split(cpuFeatureStrings, ',', /*MakeSplit=*/-1,
-                              /*KeepEmpty=*/false);
-    for (auto featureString : cpuFeatureStrings) {
-      // CPU features are typically prefixed with a +, e.g. +avx,+avx2,+fma.
-      featureString.consume_front("+");
-      // Silently skip unknown CPU features, more flexible for now. Note that
-      // some features occurring here are not standard CPU features but internal
-      // things such as the "+reserve-x18" that we add on arm64.
-      if (featureToBitPattern.count(featureString)) {
-        specifiedCpuDataField0 |= featureToBitPattern.lookup(featureString);
-      }
+  // Find CPU features in featureToBitPattern.
+  SmallVector<StringRef> cpuFeatureStrings;
+  cpuFeatures.value().split(cpuFeatureStrings, ',', /*MakeSplit=*/-1,
+                            /*KeepEmpty=*/false);
+  for (auto featureString : cpuFeatureStrings) {
+    // CPU features are typically prefixed with a +, e.g. +avx,+avx2,+fma.
+    featureString.consume_front("+");
+    // Silently skip unknown CPU features, more flexible for now. Note that
+    // some features occurring here are not standard CPU features but
+    // internal things such as the "+reserve-x18" that we add on arm64.
+    if (featureToBitPattern.count(featureString)) {
+      specifiedCpuDataField0 |= featureToBitPattern.lookup(featureString);
     }
   }
-  if (specifiedCpuDataField0 == 0) {
-    return processorDataPtrValue;
-  }
+  return specifiedCpuDataField0;
+}
 
-  // Create a new stack allocation for the bit pattern.
+Value HALDispatchABI::updateProcessorDataFromTargetAttr(
+    Operation *forOp, Value processorDataPtrValue, OpBuilder &builder) {
+  uint64_t specifiedCpuDataField0 = getFeatureBitPattern(forOp);
   Location loc = forOp->getLoc();
   MLIRContext *context = forOp->getContext();
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
   // The stack allocation goes into the entry point of the block.
-  // The compile-time cpu features are patched onto `cpu_data` from the target
-  // environment. That should happen in the loop body, so that the compile-time
-  // cpu features are visible to the post-link LLVM optimizations that would
-  // fold the microkernel tile size selection logic that checks these, and the
-  // selection happens at compile-time.
+  // The compile-time cpu features overwrite the field 0 of `cpu_data` from the
+  // target environment. That should happen in the loop body, so that the
+  // compile-time cpu features are visible to the post-link LLVM optimizations
+  // that would fold the microkernel tile size selection logic that checks
+  // these, and the selection happens at compile-time.
   Value alloca;
   {
     auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
@@ -974,15 +973,11 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
     alloca = LLVM::AllocaOp::create(builder, loc, ptrType, i64Ty, arraySize,
                                     /*alignment=*/sizeof(uint64_t));
   }
-  // Load the 0-th value.
-  Value srcData0 =
-      LLVM::LoadOp::create(builder, loc, i64Ty, processorDataPtrValue);
-  // Set the specified CPU arch data.
-  Value bitPatternVal = LLVM::ConstantOp::create(
+  // Field 0: the compile-time CPU feature bitmask.
+  Value field0 = LLVM::ConstantOp::create(
       builder, loc, i64Ty, builder.getI64IntegerAttr(specifiedCpuDataField0));
-  srcData0 = LLVM::OrOp::create(builder, loc, srcData0, bitPatternVal);
-  LLVM::StoreOp::create(builder, loc, srcData0, alloca);
-  // Copy over the rest.
+  LLVM::StoreOp::create(builder, loc, field0, alloca);
+  // Fields 1..N: the runtime processor data, copied through.
   for (int64_t i = 1, e = ProcessorDataCapacity; i < e; ++i) {
     Value loadPtr = LLVM::GEPOp::create(
         builder, loc, processorDataPtrValue.getType(), i64Ty,
