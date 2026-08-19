@@ -146,6 +146,27 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_paged_attention_gpu_cuda_f16
+  TEST_TYPE
+    attention
+  GENERATOR
+    "generate_e2e_paged_attention_tests.py"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-attention-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_attention_cpu_f16_f16_f16_decode_large
   TEST_TYPE
     attention
