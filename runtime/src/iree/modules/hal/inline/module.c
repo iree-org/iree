@@ -87,6 +87,9 @@ static iree_status_t iree_hal_inline_storage_buffer_create(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*storage),
                                 (void**)&storage));
+  storage->host_allocator = host_allocator;
+  storage->hal_buffer = hal_buffer;
+  iree_hal_buffer_retain(hal_buffer);
 
   // Map the HAL buffer into host-accessible memory. It almost always is but
   // it's possible the buffer we were passed was allocated on a real device that
