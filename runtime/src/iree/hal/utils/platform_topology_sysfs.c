@@ -19,60 +19,63 @@
 // NUMA topology (Linux sysfs)
 //===----------------------------------------------------------------------===//
 
-iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
-  // Read /sys/devices/system/node/online to get the list of online NUMA nodes.
-  // Format: "0-3" (4 nodes) or "0" (single node) or "0,2-4" (nodes 0,2,3,4).
-  char path[256];
-  iree_snprintf(path, sizeof(path), "%s/node/online",
-                iree_sysfs_get_root_path());
+// Node ids are uint8_t throughout this API (see
+// iree_hal_platform_query_numa_distance), so at most 256 nodes are
+// addressable. That bounds both files this reads:
+//   node/nodeN/distance - one value per node, at most three digits plus a
+//                         separator, so 256 * 4 bytes.
+//   node/online         - a list of node ids, whose worst case is smaller.
+#define IREE_HAL_PLATFORM_MAX_NUMA_NODES 256
+#define IREE_HAL_PLATFORM_NODE_FILE_MAX_BYTES \
+  (IREE_HAL_PLATFORM_MAX_NUMA_NODES * 4 + 1)
 
-  char buffer[256];
+// Raises |user_data|, a uint32_t holding an exclusive upper bound on the online
+// node ids, to cover this range. 0 means the file named no nodes.
+static bool iree_hal_platform_numa_online_callback(uint32_t start_id,
+                                                   uint32_t end_id,
+                                                   void* user_data) {
+  (void)start_id;
+  uint32_t* node_id_limit = (uint32_t*)user_data;
+  if (end_id > *node_id_limit) *node_id_limit = end_id;
+  return true;  // continue enumeration
+}
+
+iree_host_size_t iree_hal_platform_query_numa_node_count_impl(void) {
+  // Read /sys/devices/system/node/online, which uses the kernel list format
+  // ("0", "0-3", "0,2-4") that iree_sysfs_try_parse_cpu_list handles. Unlike
+  // the task system's node enumeration this counts every online node,
+  // including memory-only ones (CXL, Optane): those have NUMA distances and
+  // can host device memory even though no CPU belongs to them.
+  char path[IREE_SYSFS_MAX_PATH];
+  iree_string_builder_t builder;
+  iree_string_builder_initialize_with_storage(path, sizeof(path), &builder);
+  IREE_CHECK_OK(iree_string_builder_append_format(&builder, "%s/node/online",
+                                                  iree_sysfs_get_root_path()));
+  char buffer[IREE_HAL_PLATFORM_NODE_FILE_MAX_BYTES];
   iree_host_size_t length = 0;
-  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
-    // Fallback: assume single NUMA node if sysfs file doesn't exist.
+  iree_status_t status =
+      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
+  // Truncating a node list would silently report the wrong nodes, so a file
+  // that exists but does not fit is fatal. Absent or unreadable falls back.
+  if (iree_status_is_out_of_range(status)) {
+    IREE_CHECK_OK(status);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    return 1;  // no NUMA information; assume a single node
+  }
+
+  // The accumulated value is already what callers want: a bound on node *ids*,
+  // i.e. the highest online id plus one. An unparsable or empty list reports a
+  // single node, matching the unreadable-file fallback above.
+  uint32_t node_id_limit = 0;
+  if (!iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                     iree_hal_platform_numa_online_callback,
+                                     &node_id_limit) ||
+      node_id_limit == 0) {
     return 1;
   }
-
-  // Count the maximum node ID in the online list.
-  uint32_t max_node_id = 0;
-  iree_string_view_t text = iree_make_string_view(buffer, length);
-  text = iree_string_view_trim(text);
-
-  // Parse CPU list format (same format as CPU online).
-  // We'll count the max ID seen.
-  iree_host_size_t offset = 0;
-  while (offset < text.size) {
-    iree_host_size_t comma_pos = iree_string_view_find_char(text, ',', offset);
-    iree_host_size_t segment_end =
-        (comma_pos == IREE_STRING_VIEW_NPOS) ? text.size : comma_pos;
-    iree_string_view_t segment =
-        iree_string_view_substr(text, offset, segment_end - offset);
-    segment = iree_string_view_trim(segment);
-
-    if (!iree_string_view_is_empty(segment)) {
-      iree_host_size_t dash_pos = iree_string_view_find_char(segment, '-', 0);
-      if (dash_pos == IREE_STRING_VIEW_NPOS) {
-        // Single node: "N".
-        uint32_t node_id;
-        if (iree_string_view_atoi_uint32(segment, &node_id)) {
-          if (node_id > max_node_id) max_node_id = node_id;
-        }
-      } else {
-        // Range: "N-M".
-        iree_string_view_t end_str =
-            iree_string_view_substr(segment, dash_pos + 1, IREE_HOST_SIZE_MAX);
-        uint32_t end_node_id;
-        if (iree_string_view_atoi_uint32(end_str, &end_node_id)) {
-          if (end_node_id > max_node_id) max_node_id = end_node_id;
-        }
-      }
-    }
-
-    offset = (comma_pos == IREE_STRING_VIEW_NPOS) ? text.size : comma_pos + 1;
-  }
-
-  // Node count is max_id + 1.
-  return (iree_host_size_t)(max_node_id + 1);
+  return (iree_host_size_t)node_id_limit;
 }
 
 bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
@@ -96,16 +99,27 @@ bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
   // Read distance from /sys/devices/system/node/node<A>/distance.
   // Format: space-separated list of distances from node A to all other nodes.
   // Example (4-node system): "10 20 20 20" (node 0 distances to 0,1,2,3).
-  char path[256];
-  iree_snprintf(path, sizeof(path), "%s/node/node%u/distance",
-                iree_sysfs_get_root_path(), node_a);
+  char path[IREE_SYSFS_MAX_PATH];
+  iree_string_builder_t builder;
+  iree_string_builder_initialize_with_storage(path, sizeof(path), &builder);
+  IREE_CHECK_OK(iree_string_builder_append_format(
+      &builder, "%s/node/node%u/distance", iree_sysfs_get_root_path(), node_a));
 
-  char buffer[1024];
+  char buffer[IREE_HAL_PLATFORM_NODE_FILE_MAX_BYTES];
   iree_host_size_t length = 0;
-  if (!iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
-    // Distance file doesn't exist: assume default cross-node distance.
-    *out_distance = 20;  // Default: one hop away.
-    return true;
+  iree_status_t status =
+      iree_sysfs_read_small_file(path, buffer, sizeof(buffer), &length);
+  // Truncating a node list would silently report the wrong nodes, so a file
+  // that exists but does not fit is fatal. Absent or unreadable falls back.
+  if (iree_status_is_out_of_range(status)) {
+    IREE_CHECK_OK(status);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    // No SLIT data for this node: the caller has its own documented fallback
+    // and can refine the edge with driver-specific information, which a
+    // fabricated distance would silently pre-empt.
+    return false;
   }
 
   // Parse space-separated list of distances.
@@ -141,18 +155,14 @@ bool iree_hal_platform_try_query_numa_distance_impl(uint8_t node_a,
         *out_distance = (uint8_t)iree_min(distance_value, 255u);
         return true;
       } else {
-        // Parse error: use default.
-        *out_distance = 20;
-        return true;
+        return false;  // malformed SLIT entry; see above
       }
     }
 
     current_node++;
   }
 
-  // Didn't find node_b in the distance list: use default.
-  *out_distance = 20;
-  return true;
+  return false;  // node_b absent from the SLIT row; see above
 }
 
 iree_status_t iree_hal_platform_query_numa_distance_impl(

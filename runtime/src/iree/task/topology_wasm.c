@@ -18,7 +18,25 @@ void iree_task_topology_query_default_caches(
   // No cache query API available in the browser environment.
 }
 
-iree_host_size_t iree_task_topology_query_node_count(void) { return 1; }
+iree_status_t iree_task_topology_set_snapshot_path(const char* path) {
+  (void)path;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "the wasm topology backend reads no "
+                          "redirectable data source");
+}
+
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer) {
+  (void)processor;
+  (void)buffer_capacity;
+  (void)buffer;
+  return 0;
+}
+
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids) {
+  return iree_task_topology_dense_node_ids(/*count=*/1, capacity, out_ids);
+}
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   return 0;
@@ -82,6 +100,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   // distribution strategies are not possible. The distribution parameter is
   // accepted for API compatibility but ignored.
   (void)distribution;
+  (void)node_id;
 
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, max_core_count);
@@ -98,7 +117,6 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     group_count /= 2;
   }
   iree_task_topology_initialize_from_group_count(group_count, out_topology);
-  out_topology->node_id = node_id;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
