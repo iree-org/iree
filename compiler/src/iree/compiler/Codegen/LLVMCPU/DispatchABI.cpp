@@ -957,11 +957,11 @@ Value HALDispatchABI::updateProcessorDataFromTargetAttr(
   auto ptrType = LLVM::LLVMPointerType::get(context);
   auto i64Ty = builder.getI64Type();
   // The stack allocation goes into the entry point of the block.
-  // The compile-time cpu features are patched onto `cpu_data` from the target
-  // environment. That should happen in the loop body, so that the compile-time
-  // cpu features are visible to the post-link LLVM optimizations that would
-  // fold the microkernel tile size selection logic that checks these, and the
-  // selection happens at compile-time.
+  // The compile-time cpu features overwrite the field 0 of `cpu_data` from the
+  // target environment. That should happen in the loop body, so that the
+  // compile-time cpu features are visible to the post-link LLVM optimizations
+  // that would fold the microkernel tile size selection logic that checks
+  // these, and the selection happens at compile-time.
   Value alloca;
   {
     auto funcOp = forOp->getParentOfType<LLVM::LLVMFuncOp>();
