@@ -4,6 +4,11 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Generator for the paged-KV CUDA e2e attention test.
+
+This follows the structure of `generate_e2e_attention_tests.py` while
+producing a fixed-shape paged-KV attention module and calls module.
+"""
 
 import argparse
 
