@@ -437,7 +437,7 @@ InnerTileAlignmentsAttr InnerTileAlignmentsAttr::getFromOp(Operation *op) {
 // declares its shape here, including scalable ones, which declare their base
 // sizes.
 std::optional<std::tuple<int64_t, int64_t, int64_t>>
-getIntrinsicMNKShape(MMAIntrinsic intrinsic) {
+getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
   using Tuple = std::tuple<int64_t, int64_t, int64_t>;
   switch (intrinsic) {
   case MMAIntrinsic::None:
@@ -505,10 +505,16 @@ constexpr uint32_t kMMAIntrinsicGenericBudgetMask = 0x00FF;
 constexpr uint32_t kMMAIntrinsicISAX86Avx2 = 0x1200;
 constexpr uint32_t kMMAIntrinsicISAX86Avx512 = 0x1300;
 constexpr uint32_t kMMAIntrinsicISAArmSve = 0x2200;
+constexpr uint32_t kMMAIntrinsicISARiscvV = 0x3100;
 
 bool isGenericScalar(MMAIntrinsic intr) {
   return (static_cast<uint32_t>(intr) & kMMAIntrinsicISAMask) ==
          kMMAIntrinsicISAGeneric;
+}
+
+bool isVlenParameterized(MMAIntrinsic intr) {
+  return (static_cast<uint32_t>(intr) & kMMAIntrinsicISAMask) ==
+         kMMAIntrinsicISARiscvV;
 }
 
 int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr) {
@@ -516,7 +522,7 @@ int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr) {
   return static_cast<uint32_t>(intr) & kMMAIntrinsicGenericBudgetMask;
 }
 
-int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
+int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic, int64_t vlen) {
   // Total architectural vector register file size, in bytes. The inner-tiled
   // cost model uses this as the capacity for the union of the ACC, LHS and
   // RHS tiles. For scalable ISAs we treat the vector length as its minimum
@@ -532,6 +538,8 @@ int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic) {
     return 32 * 64;
   case kMMAIntrinsicISAArmSve: // 32 Z × (VL treated as 128 bits).
     return 32 * 16;
+  case kMMAIntrinsicISARiscvV: // 32 v × vlen bits.
+    return 32 * (vlen / 8);
   default:
     // Plausible default, but override it on each arch you care for.
     return 16 * 32;
@@ -561,17 +569,20 @@ static Codegen::TileSwizzle fixupSwizzle(Codegen::TileSwizzle swizzle) {
 /// Returns the hand-rolled TileSwizzle for the intrinsics whose tiles are not
 /// row-major, or nullopt for every other intrinsic.
 static std::optional<Codegen::TileSwizzle>
-getNonRowMajorIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma, int operandIdx) {
+getNonRowMajorIntrinsicSwizzle(IREE::CPU::MMAIntrinsic intrinsic,
+                               int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
   using Dim = TileSwizzle::Dim;
 
   // SVE has scalable dims that the row-major path can't express. The natural
-  // orientation is 1×4VL×1: 4VL lives on RHS dim 0 (N) and ACC dim 0 (the
-  // convention is `(N, M)` here). The transposed orientation 4VL×1×1 mirrors
-  // that: 4VL on LHS dim 0 (M) and ACC dim 0 (now `(M, N)`).
-  if (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32 ||
-      mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32) {
-    bool transposed = (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32);
+  // orientation is 1×4VL×1: 4VL lives on
+  // RHS dim 0 (N) and ACC dim 0 (the convention is `(N, M)` here). The
+  // transposed orientation 4VL×1×1 mirrors that: 4VL on LHS dim 0 (M) and
+  // ACC dim 0 (now `(M, N)`).
+  if (intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32) {
+    bool transposed =
+        intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32;
     TileSwizzle swizzle;
     swizzle.expandShape().resize(2);
     int operandWith4VL = transposed ? 0 : 1;
@@ -591,7 +602,7 @@ getNonRowMajorIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma, int operandIdx) {
   // are ordered (rlo, chi, rhi, clo) with r = 4*rhi + rlo, c = 4*chi + clo.
   // As a TileSwizzle: split M into [rhi(4), rlo(4)] and N into [chi(4),
   // clo(4)] (expanded dims 0..3), then permute to (rlo, chi, rhi, clo).
-  if (mma == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16 &&
+  if (intrinsic == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16 &&
       operandIdx == 2) {
     TileSwizzle swizzle;
     swizzle.expandShape().resize(2);
@@ -604,11 +615,12 @@ getNonRowMajorIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma, int operandIdx) {
   return std::nullopt;
 }
 
-Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
+Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::DataTiledMMAAttr mma,
                                          int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
+  MMAIntrinsic intrinsic = mma.getIntrinsic();
   if (std::optional<TileSwizzle> swizzle =
-          getNonRowMajorIntrinsicSwizzle(mma, operandIdx)) {
+          getNonRowMajorIntrinsicSwizzle(intrinsic, operandIdx)) {
     return *swizzle;
   }
 
@@ -622,7 +634,7 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
   // If you're trying to add support for a new intrinsic that doesn't have a
   // row-major tile layout, its swizzle belongs in
   // `getNonRowMajorIntrinsicSwizzle`.
-  auto maybeMnkTuple = getIntrinsicMNKShape(mma);
+  auto maybeMnkTuple = getIntrinsicMNKShape(intrinsic, mma.getVlen());
   if (!maybeMnkTuple) {
     assert(false && "intrinsic does not declare an MNK shape.");
     return TileSwizzle();
@@ -658,7 +670,7 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
 Codegen::TileSwizzle getSwizzle(IREE::CPU::DataTiledMMAAttr mma,
                                 int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
-  TileSwizzle swizzle = getIntrinsicSwizzle(mma.getIntrinsic(), operandIdx);
+  TileSwizzle swizzle = getIntrinsicSwizzle(mma, operandIdx);
   TileSwizzle::Dim intrinsicsM =
       TileSwizzle::Dim::crossIntrinsic(mma.getIntrinsicsM());
   TileSwizzle::Dim intrinsicsN =
@@ -775,6 +787,32 @@ getABCElementTypes(MLIRContext *context, IREE::CPU::DataTiledMMAAttr attr) {
 //===----------------------------------------------------------------------===//
 // DataTiledMMA Attributes
 //===----------------------------------------------------------------------===//
+
+LogicalResult DataTiledMMAAttr::verify(
+    function_ref<InFlightDiagnostic()> emitError, MMAIntrinsic intrinsic,
+    int64_t intrinsics_m, int64_t intrinsics_n, int64_t intrinsics_k,
+    Type lhs_type, Type rhs_type, Type acc_type, int64_t vlen) {
+  if (isVlenParameterized(intrinsic)) {
+    // 128 is the V extension's architectural minimum VLEN.
+    if (vlen < 128 || (vlen & (vlen - 1)) != 0) {
+      return emitError() << "intrinsic " << stringifyMMAIntrinsic(intrinsic)
+                         << " is VLEN-parameterized and requires `vlen` to be "
+                            "a power of two >= 128; got "
+                         << vlen;
+    }
+    // A well-formed VLEN is not enough: the intrinsic must also have a tile
+    // shape at this VLEN, or there is no layout to materialize.
+    if (!getIntrinsicMNKShape(intrinsic, vlen)) {
+      return emitError() << "intrinsic " << stringifyMMAIntrinsic(intrinsic)
+                         << " has no tile shape for vlen = " << vlen;
+    }
+  } else if (vlen != 0) {
+    return emitError() << "`vlen` is only meaningful for VLEN-parameterized "
+                          "intrinsics; got vlen = "
+                       << vlen;
+  }
+  return success();
+}
 
 int64_t DataTiledMMAAttr::getExpectedNumInputs() const { return 2; }
 

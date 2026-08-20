@@ -142,3 +142,10 @@ func.func @cpu_inner_tiled_sve_rhs_n_must_be_dynamic(
 // An empty hint (no tiling levels) is meaningless and is rejected.
 // expected-error@+1 {{expected at least one tiling level}}
 #invalid_inner_tile_alignment_empty = #iree_cpu.inner_tile_alignments<>
+
+// -----
+
+// `vlen` is only accepted on VLEN-parameterized intrinsics (RISC-V V).
+// expected-error@+1 {{`vlen` is only meaningful for VLEN-parameterized intrinsics}}
+#invalid_vlen_on_non_parameterized_intrinsic = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, vlen = 512>
