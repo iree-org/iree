@@ -1,100 +1,125 @@
 #!/usr/bin/env bash
-# Copyright 2025 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Captures /sys/devices/system/cpu/ topology information for testing.
-# This script creates a snapshot of the current system's CPU topology that can
-# be used to test topology_sysfs.c without requiring physical hardware.
+# Captures the CPU topology of the current system as a single-file manifest.
+#
+# Manifest format: '# comment' lines plus one 'relative/path=content' line per
+# sysfs file, rooted at /sys/devices/system. Only the files topology_sysfs.c
+# reads are captured.
 #
 # Usage:
-#   ./capture_sysfs.sh [destination_dir]
+#   ./capture_sysfs.sh [manifest_file]                 # capture this machine
+#   ./capture_sysfs.sh --expand <manifest> <dest_dir>  # manifest -> tree
 #
-# If destination_dir is not provided, it defaults to a timestamped directory.
 
 set -e
 
-# Determine destination directory.
+SYSFS_ROOT="/sys/devices/system"
+
+#===------------------------------------------------------------------------===
+# --expand: manifest -> directory tree
+#===------------------------------------------------------------------------===
+if [ "$1" = "--expand" ]; then
+  MANIFEST="$2"
+  DEST="$3"
+  if [ -z "${MANIFEST}" ] || [ -z "${DEST}" ]; then
+    echo "usage: $0 --expand <manifest> <dest_dir>" >&2
+    exit 1
+  fi
+  FILE_COUNT=0
+  while IFS= read -r line; do
+    case "${line}" in
+      '' | '#'*) continue ;;
+    esac
+    path="${line%%=*}"
+    value="${line#*=}"
+    mkdir -p "${DEST}/$(dirname "${path}")"
+    printf '%s\n' "${value}" > "${DEST}/${path}"
+    FILE_COUNT=$((FILE_COUNT + 1))
+  done < "${MANIFEST}"
+  echo "Expanded ${FILE_COUNT} files from ${MANIFEST} to ${DEST}"
+  echo ""
+  exit 0
+fi
+
+#===------------------------------------------------------------------------===
+# capture: this machine -> manifest
+#===------------------------------------------------------------------------===
 if [ -n "$1" ]; then
-  DEST="$1"
+  OUT="$1"
 else
   TIMESTAMP=$(date +%Y%m%d_%H%M%S)
   HOSTNAME=$(hostname -s)
-  DEST="captured_${HOSTNAME}_${TIMESTAMP}"
+  OUT="captured_${HOSTNAME}_${TIMESTAMP}.sysfs.txt"
 fi
 
-DEST_CPU="${DEST}/cpu"
-mkdir -p "${DEST_CPU}"
+echo "Capturing sysfs CPU topology to: ${OUT}"
 
-echo "Capturing sysfs CPU topology to: ${DEST}"
+{
+  echo "# sysfs topology snapshot of $(hostname -s), captured $(date -u +%Y-%m-%d)."
+  echo "# Format: one 'relative/path=content' line per sysfs file; expand with"
+  echo "#   ./capture_sysfs.sh --expand <this file> <destdir>"
+} > "${OUT}"
 
-# Copy top-level CPU files.
-for file in present possible online offline kernel_max sched_isolated isolated; do
-  SRC="/sys/devices/system/cpu/${file}"
-  if [ -f "${SRC}" ]; then
-    cp "${SRC}" "${DEST_CPU}/" 2>/dev/null || true
+# Appends 'path=content' for one sysfs file if it exists. Sysfs values are
+# single-line; the trailing newline is stripped here and re-added on expansion.
+emit() {
+  local path="$1"
+  if [ -f "${SYSFS_ROOT}/${path}" ]; then
+    printf '%s=%s\n' "${path}" "$(tr -d '\n' < "${SYSFS_ROOT}/${path}")" \
+      >> "${OUT}"
+  fi
+}
+
+# CPU enumeration (only what topology_sysfs.c reads: present, with kernel_max
+# as its fallback).
+emit "cpu/present"
+emit "cpu/kernel_max"
+
+# NUMA node hierarchy (node/online + per-node cpulist). This is the primary
+# source of node identity for the backend.
+emit "node/online"
+for node_dir in "${SYSFS_ROOT}"/node/node[0-9]*; do
+  if [ -d "${node_dir}" ]; then
+    emit "node/$(basename "${node_dir}")/cpulist"
   fi
 done
 
-# Capture per-CPU information.
+# Per-CPU information.
 CPU_COUNT=0
-for cpu_dir in /sys/devices/system/cpu/cpu[0-9]*; do
+for cpu_dir in "${SYSFS_ROOT}"/cpu/cpu[0-9]*; do
   if [ ! -d "${cpu_dir}" ]; then
     continue
   fi
-
   CPU_NAME=$(basename "${cpu_dir}")
-  DEST_CPU_DIR="${DEST_CPU}/${CPU_NAME}"
-  mkdir -p "${DEST_CPU_DIR}"
 
-  # Copy cpu_capacity (ARM big.LITTLE).
-  if [ -f "${cpu_dir}/cpu_capacity" ]; then
-    cp "${cpu_dir}/cpu_capacity" "${DEST_CPU_DIR}/"
-  fi
+  # cpu_capacity (ARM big.LITTLE).
+  emit "cpu/${CPU_NAME}/cpu_capacity"
 
-  # Copy topology information.
-  if [ -d "${cpu_dir}/topology" ]; then
-    DEST_TOPO="${DEST_CPU_DIR}/topology"
-    mkdir -p "${DEST_TOPO}"
-    for topo_file in core_id physical_package_id cluster_id core_cpus_list thread_siblings_list; do
-      SRC_FILE="${cpu_dir}/topology/${topo_file}"
-      if [ -f "${SRC_FILE}" ]; then
-        cp "${SRC_FILE}" "${DEST_TOPO}/"
-      fi
-    done
-  fi
+  # Topology. thread_siblings_list is captured because pre-5.3 kernels do not
+  # expose core_cpus_list.
+  for topo_file in core_id physical_package_id cluster_id core_cpus_list thread_siblings_list; do
+    emit "cpu/${CPU_NAME}/topology/${topo_file}"
+  done
 
-  # Copy cache hierarchy.
-  if [ -d "${cpu_dir}/cache" ]; then
-    DEST_CACHE="${DEST_CPU_DIR}/cache"
-    mkdir -p "${DEST_CACHE}"
-
-    for cache_index_dir in "${cpu_dir}"/cache/index*; do
-      if [ ! -d "${cache_index_dir}" ]; then
-        continue
-      fi
-
+  # Cache hierarchy.
+  for cache_index_dir in "${cpu_dir}"/cache/index*; do
+    if [ -d "${cache_index_dir}" ]; then
       INDEX_NAME=$(basename "${cache_index_dir}")
-      DEST_INDEX="${DEST_CACHE}/${INDEX_NAME}"
-      mkdir -p "${DEST_INDEX}"
-
-      for cache_file in type level size coherency_line_size number_of_sets physical_line_partition shared_cpu_list; do
-        SRC_FILE="${cache_index_dir}/${cache_file}"
-        if [ -f "${SRC_FILE}" ]; then
-          cp "${SRC_FILE}" "${DEST_INDEX}/"
-        fi
+      for cache_file in type level size shared_cpu_list; do
+        emit "cpu/${CPU_NAME}/cache/${INDEX_NAME}/${cache_file}"
       done
-    done
-  fi
+    fi
+  done
 
   CPU_COUNT=$((CPU_COUNT + 1))
 done
 
-echo "Successfully captured ${CPU_COUNT} CPUs to ${DEST}"
+echo "Successfully captured ${CPU_COUNT} CPUs to ${OUT}"
 echo ""
-echo "To test with this snapshot:"
-echo "  ./build/tools/iree-run-module \\"
-echo "    --task_topology_sysfs_root=$(realpath "${DEST}") \\"
-echo "    --dump_task_topologies"
+echo "To test, expand into a directory tree and point the tools at it:"
+echo "  $0 --expand ${OUT} /tmp/$(basename "${OUT%.sysfs.txt}")"
