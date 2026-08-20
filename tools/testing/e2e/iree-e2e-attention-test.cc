@@ -493,13 +493,14 @@ class AttentionTestModuleState final {
     return std::move(result_view);
   }
 
-  Status CheckPagedAttentionResults(
-      iree_hal_device_t* device, int64_t batch, int64_t num_pages,
-      int64_t page_size, int64_t head_dim, iree_hal_buffer_view_t* query,
-      iree_hal_buffer_view_t* kv_storage,
-      iree_hal_buffer_view_t* key_page_table,
-      iree_hal_buffer_view_t* value_page_table,
-      iree_hal_buffer_view_t* actual_result) {
+  Status CheckPagedAttentionResults(iree_hal_device_t* device, int64_t batch,
+                                    int64_t num_pages, int64_t page_size,
+                                    int64_t head_dim,
+                                    iree_hal_buffer_view_t* query,
+                                    iree_hal_buffer_view_t* kv_storage,
+                                    iree_hal_buffer_view_t* key_page_table,
+                                    iree_hal_buffer_view_t* value_page_table,
+                                    iree_hal_buffer_view_t* actual_result) {
     iree_hal_buffer_t* query_buffer = iree_hal_buffer_view_buffer(query);
     iree_hal_buffer_t* kv_buffer = iree_hal_buffer_view_buffer(kv_storage);
     iree_hal_buffer_t* key_table_buffer =
@@ -532,8 +533,9 @@ class AttentionTestModuleState final {
         device, kv_buffer, 0, kv_data.data(), kv_data.size(),
         IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
     IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-        device, key_table_buffer, 0, key_table_data.data(), key_table_data.size(),
-        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+        device, key_table_buffer, 0, key_table_data.data(),
+        key_table_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout()));
     IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
         device, value_table_buffer, 0, value_table_data.data(),
         value_table_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
@@ -558,7 +560,8 @@ class AttentionTestModuleState final {
 
     const int64_t pool_pages =
         kv_bytes / (sizeof(uint16_t) * page_size * head_dim);
-    const uint16_t* query_f16 = reinterpret_cast<const uint16_t*>(query_data.data());
+    const uint16_t* query_f16 =
+        reinterpret_cast<const uint16_t*>(query_data.data());
     const uint16_t* kv_f16 = reinterpret_cast<const uint16_t*>(kv_data.data());
     const int64_t* key_pages =
         reinterpret_cast<const int64_t*>(key_table_data.data());
@@ -606,14 +609,17 @@ class AttentionTestModuleState final {
       for (int64_t position = 0; position < sequence_length; ++position) {
         const int64_t page = value_pages[b * num_pages + position / page_size];
         if (page < 0 || page >= pool_pages) {
-          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                  "paged attention value page is out of bounds");
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "paged attention value page is out of bounds");
         }
         const float weight = scores[position] / weight_sum;
         for (int64_t d = 0; d < head_dim; ++d) {
           expected[b * head_dim + d] +=
-              weight * iree_math_f16_to_f32(
-                  kv_f16[(page * page_size + position % page_size) * head_dim + d]);
+              weight *
+              iree_math_f16_to_f32(
+                  kv_f16[(page * page_size + position % page_size) * head_dim +
+                         d]);
         }
       }
     }
@@ -624,10 +630,11 @@ class AttentionTestModuleState final {
       const float tolerance =
           kAbsoluteTolerance + kRelativeTolerance * fabsf(expected[i]);
       if (!isfinite(actual[i]) || fabsf(expected[i] - actual[i]) > tolerance) {
-        return iree_make_status(IREE_STATUS_DATA_LOSS,
-                                "paged attention result mismatch at element %" PRId64
-                                ": expected %.8g, actual %.8g, tolerance %.8g",
-                                i, expected[i], actual[i], tolerance);
+        return iree_make_status(
+            IREE_STATUS_DATA_LOSS,
+            "paged attention result mismatch at element %" PRId64
+            ": expected %.8g, actual %.8g, tolerance %.8g",
+            i, expected[i], actual[i], tolerance);
       }
     }
     return iree_ok_status();
