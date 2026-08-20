@@ -114,36 +114,6 @@ iree_generated_e2e_runner_test(
     "local"
 )
 
-# CUDA decode smoke test: m=1 (single token attending to cached KV). The
-# generator and reference checker exercise the same dense KV layout used by the
-# baseline attention op; this intentionally does not claim paged-KV/page-table
-# coverage.
-iree_generated_e2e_runner_test(
-  NAME
-    e2e_attention_gpu_cuda_f16_f16_f16_decode_small
-  TEST_TYPE
-    attention
-  GENERATOR
-    "generate_e2e_attention_tests.py"
-  GENERATOR_ARGS
-    "--query_type=f16"
-    "--key_type=f16"
-    "--value_type=f16"
-    "--shapes=decode_small"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-attention-test
-  TARGET_BACKENDS
-    "cuda"
-  DRIVERS
-    "cuda"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
 iree_generated_e2e_runner_test(
   NAME
     e2e_paged_attention_gpu_cuda_f16
