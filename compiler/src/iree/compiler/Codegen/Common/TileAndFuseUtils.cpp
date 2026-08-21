@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
@@ -20,13 +21,36 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Interfaces/TilingInterface.h"
 
 #include <cassert>
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
 namespace mlir::iree_compiler {
+
+scf::InnerTileAlignmentFnTy
+makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel) {
+  return [tilingLevel](
+             TilingInterface op, ArrayRef<OpFoldResult>,
+             ArrayRef<Operation *>) -> SmallVector<mlir::InnerTileAlignment> {
+    // Tile-size selection already recorded this op's per-dimension inner-tile
+    // alignments, keyed by tiling level. Read back this level's entry; an op
+    // without one (or without any hint) gets no alignment.
+    auto hint =
+        IREE::CPU::InnerTileAlignmentsAttr::getFromOp(op.getOperation());
+    if (!hint) {
+      return {};
+    }
+    auto alignments = hint.getAlignments().getAs<DenseI64ArrayAttr>(
+        IREE::CPU::getTilingLevelName(tilingLevel));
+    return alignments
+               ? mlir::convertInnerTileAlignments(alignments.asArrayRef())
+               : SmallVector<mlir::InnerTileAlignment>{};
+  };
+}
 
 void fuseProducersOfSlices(RewriterBase &rewriter,
                            std::queue<Operation *> &worklist,
@@ -54,7 +78,9 @@ void fuseProducersOfSlices(RewriterBase &rewriter,
     // values produced by operations that implement the `TilingInterface`.
     // Add these operations to the worklist.
     std::optional<scf::SCFFuseProducerOfSliceResult> fusedResult =
-        scf::tileAndFuseProducerOfSlice(rewriter, candidateSlice, loops);
+        scf::tileAndFuseProducerOfSlice(
+            rewriter, candidateSlice, loops,
+            options.tilingOptions.innerTileAlignmentFn);
     if (!fusedResult) {
       continue;
     }
@@ -109,10 +135,11 @@ struct ConsumerFusionQueueEntry {
 };
 } // namespace
 
-FailureOr<std::queue<Operation *>>
-fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
-                        MutableArrayRef<LoopLikeOpInterface> loops,
-                        std::function<bool(Operation *)> filterFn) {
+FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
+    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
+    MutableArrayRef<LoopLikeOpInterface> loops,
+    std::function<bool(Operation *)> filterFn,
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn) {
   // Collect the candidate slices which can be potential consumers that can be
   // fused. Keep them in a vector reverse-sorted by dominance: the candidate
   // dominating others comes last (so it can be cheaply popped from the vector).
@@ -213,7 +240,8 @@ fuseConsumersIntoForall(RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
     ConsumerFusionQueueEntry entry = candidates.pop_back_val();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops);
+        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops,
+                                       innerTileAlignmentFn);
     if (failed(fusedResult)) {
       return failure();
     }
