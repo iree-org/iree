@@ -6,6 +6,7 @@
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+load("//runtime/src/iree/task:testdata/sysfs/expanded_snapshots.bzl", "expanded_sysfs_snapshots")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -106,12 +107,48 @@ iree_runtime_cc_test(
     ],
 )
 
+# sysfs snapshots expanded into directory trees at build
+# time via `capture_sysfs.sh --expand`.
+expanded_sysfs_snapshots(
+    name = "expanded_sysfs_snapshots",
+    expand_tool = "testdata/sysfs/capture_sysfs.sh",
+    manifests = [
+        "testdata/sysfs/arm64_pixel6_tensor.sysfs.txt",
+        "testdata/sysfs/synthetic_big_little.sysfs.txt",
+        "testdata/sysfs/synthetic_dual_socket.sysfs.txt",
+        "testdata/sysfs/synthetic_dual_socket_no_siblings.sysfs.txt",
+        "testdata/sysfs/synthetic_fragmented_cpulist.sysfs.txt",
+        "testdata/sysfs/synthetic_invalid_package.sysfs.txt",
+        "testdata/sysfs/synthetic_memory_only_node.sysfs.txt",
+        "testdata/sysfs/synthetic_meteor_lake.sysfs.txt",
+        "testdata/sysfs/synthetic_raptor_lake.sysfs.txt",
+        "testdata/sysfs/synthetic_snc.sysfs.txt",
+        "testdata/sysfs/synthetic_sparse_node_ids.sysfs.txt",
+        "testdata/sysfs/synthetic_too_many_nodes.sysfs.txt",
+        "testdata/sysfs/x86_64_ryzen9_7950x.sysfs.txt",
+    ],
+)
+
 iree_runtime_cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
+    # The sysfs snapshot tests only compile in on Linux.
+    args = select({
+        "@platforms//os:linux": [
+            "--task_topology_test_snapshots=$(rootpath :expanded_sysfs_snapshots)",
+        ],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:linux": [":expanded_sysfs_snapshots"],
+        "//conditions:default": [],
+    }),
     deps = [
+        ":api",
         ":task",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
