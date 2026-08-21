@@ -459,6 +459,14 @@ func.func @matmul_f16_compute_bound(
 // CHECK:   lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME: mma_kind = #iree_gpu.mma_layout<MFMA_F32_32x32x16_F16>
 
+// The iterative phase-aware search finds xor_shuffle<128, 8> for this
+// intrinsic. The old tuned table used <64, 8> — the search picks a larger
+// rowElems that spans more LDS banks, which is needed for this layout to
+// achieve zero bank conflicts.
+// CHECK-DIRECT-LOAD-LABEL: func.func @matmul_f16_compute_bound
+// CHECK-DIRECT-LOAD:       linalg.matmul
+// CHECK-DIRECT-LOAD-SAME:    promotion_types = [#iree_gpu.swizzle_operand<copy_config = #iree_gpu.use_global_load_dma, swizzle = #iree_codegen.xor_shuffle<128, 8>>, #iree_gpu.use_global_load_dma]
+
 // CHECK-REMARKS: [Analysis] SharedMemoryUsage
 // CHECK-REMARKS-SAME: Category:deduceMMASchedule
 // CHECK-REMARKS-SAME: Remark=32768
@@ -651,7 +659,9 @@ func.func @group_conv_10_channels(%arg0: tensor<32x102x102x32x10xf16>, %arg1: te
 
 // -----
 
-// BF16 matmul with DMA. Both LHS and RHS are not transposed, so only LHS gets XOR swizzle.
+// BF16 matmul with DMA. Both LHS and RHS are not transposed, so only LHS
+// gets XOR swizzle. The iterative search produces xor_shuffle<64, 8>,
+// matching what the old tuned table had for MFMA_F32_16x16x32_BF16.
 func.func @matmul_bf16(
     %arg0: tensor<4096x4096xbf16>,
     %arg1: tensor<4096x4096xbf16>,
@@ -667,9 +677,10 @@ func.func @matmul_bf16(
 
 // -----
 
-// BF16 1x1 conv (preprocessed to fold unit spatial dims) with DMA. The MMA intrinsic
-// (MFMA_F32_32x32x8_BF16) is not in the tuned swizzle table, so no XOR
-// swizzle should be applied -- only plain use_global_load_dma.
+// BF16 1x1 conv with DMA. The iterative search finds xor_shuffle<128, 4> as
+// the conflict-free swizzle for MFMA_F32_32x32x8_BF16, but accessElems=4 is
+// not a multiple of the 128-bit DMA segment's elements-per-lane (8), so the
+// DMA constraint rejects it. Result: plain DMA, no swizzle.
 func.func @conv_1x1_bf16_no_untuned_swizzle(
     %arg0: tensor<16x96x64x40xbf16>,
     %arg1: tensor<40x40xbf16>) -> tensor<16x96x64x40xf32> {

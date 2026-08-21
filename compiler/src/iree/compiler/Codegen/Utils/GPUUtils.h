@@ -155,7 +155,7 @@ std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op);
 /// Helper function to return native size for MMA.SYNC-based operations.
 std::optional<SmallVector<int64_t>> getMmaNativeVectorSize(Operation *op);
 
-/// Rerutn true if memref has #amdgpu.address_space<fat_raw_buffer> address
+/// Return true if memref has #amdgpu.address_space<fat_raw_buffer> address
 /// space.
 bool hasAMDGPUFatRawBufferAddressSpace(MemRefType memrefType);
 
@@ -251,44 +251,29 @@ getXorShuffleBounds(IREE::Codegen::InnerTileDescAttrInterface intrinsic,
 /// elements.
 /// - The number of columns in a row does not evenly divide the total number of
 /// tile elements.
-bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
+bool isXorShuffleValid(int64_t numRowElems, int64_t numAccessElems,
                        int64_t totalTileElems);
 
-/// Returns XOR shuffle parameters known to be optimal for the given target and
-/// intrinsic based on profiling results.
-FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex);
-
-/// Note this generic heuristic for untuned cases is not guaranteed to be
-/// optimal for all targets and intrinsics.
-FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
-    IREE::GPU::TargetAttr target,
-    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-    ArrayRef<int64_t> reductionTileSizes, int operandIndex);
-
-/// Returns the XOR shuffle parameters (row elements and access elements) for
-/// the given target, intrinsic, and operand index. For some targets and
-/// intrinsics, the optimal XOR shuffle for a given operand might be known. For
-/// these cases of "Tuned" targets and intrinsics, a look up table is used to
-/// obtain values for the XOR shuffle attributes. Otherwise, these values are
-/// computed by calculating the K tile size and LDS bank width. Note this
-/// generic heuristic for untuned cases is not guaranteed to be optimal for all
-/// targets and intrinsics.
-FailureOr<XorShuffleParams>
+/// Searches for the smallest power-of-2 XOR shuffle that eliminates shared
+/// memory bank conflicts for the given intrinsic operand. Returns the shuffle
+/// parameters on success, or std::nullopt if no swizzle is needed (layout is
+/// already conflict-free) or no valid shuffle could be found.
+std::optional<XorShuffleParams>
 getXorShuffleParams(IREE::GPU::TargetAttr target,
                     IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                    bool skipUntunedFallback = false);
+                    int operandIndex, bool isTransposed = false,
+                    bool useDirectLoad = false);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
-/// operand index.
-FailureOr<Attribute>
+/// operand index. Returns std::nullopt when no swizzle is needed or could not
+/// be determined; otherwise returns the swizzle attribute wrapping the base
+/// config.
+std::optional<Attribute>
 getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
                   IREE::GPU::TargetAttr target,
                   IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                  bool skipUntunedFallback = false);
+                  int operandIndex, bool isTransposed = false,
+                  bool useDirectLoad = false);
 
 /// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
 /// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
