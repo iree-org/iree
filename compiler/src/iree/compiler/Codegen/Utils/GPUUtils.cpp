@@ -32,6 +32,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <optional>
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
@@ -1331,6 +1332,84 @@ bool targetSupportsShuffleBitwidth(IREE::GPU::TargetAttr target,
     return true;
   }
   return target && target.isAMD();
+}
+
+std::optional<int64_t> getMinDMAAlignedElements(FunctionOpInterface funcOp,
+                                                Type elementType) {
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (!subgroupSize) {
+    return std::nullopt;
+  }
+
+  int64_t elementBits = elementType.getIntOrFloatBitWidth();
+
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target || !targetSupportsGlobalLoadDMA(target)) {
+    return std::nullopt;
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+
+  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
+  for (int64_t dmaSize : dmaSizes) {
+    if (dmaSize % elementBits != 0) {
+      continue;
+    }
+    int64_t elementsPerLane = dmaSize / elementBits;
+    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
+    minElementsPerTransfer =
+        std::min(minElementsPerTransfer, elementsPerTransfer);
+  }
+
+  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
+    return std::nullopt;
+  }
+  return minElementsPerTransfer;
+}
+
+std::optional<int64_t> getDMAAlignedSubgroupSize(FunctionOpInterface funcOp,
+                                                 Type elementType,
+                                                 int64_t availableElements) {
+  std::optional<int64_t> minAligned =
+      getMinDMAAlignedElements(funcOp, elementType);
+  if (!minAligned || availableElements % *minAligned != 0) {
+    return std::nullopt;
+  }
+  // getMinDMAAlignedElements already validated subgroupSize is present.
+  return getSubgroupSize(funcOp);
+}
+
+FailureOr<XorShuffleParams>
+getXorShuffleParamsForDMA(IREE::GPU::TargetAttr target, int64_t elementBitWidth,
+                          int64_t totalElements, int64_t computeAccessWidth) {
+  IREE::GPU::TargetWgpAttr wgp = target.getWgp();
+  std::optional<int64_t> bankCount = wgp.getWorkgroupMemoryBankCount();
+  if (!bankCount) {
+    return failure();
+  }
+
+  constexpr int64_t bankWidthBits = 32;
+  int64_t rowElems = (*bankCount * bankWidthBits) / elementBitWidth;
+  if (!isXORShuffleValid(rowElems, computeAccessWidth, totalElements)) {
+    return failure();
+  }
+
+  ArrayRef<int64_t> dmaSizes;
+  if (auto dmaSizesAttr = wgp.getDmaSizes()) {
+    dmaSizes = dmaSizesAttr.asArrayRef();
+  }
+  bool hasCompatibleDMASize = llvm::any_of(dmaSizes, [&](int64_t dmaSize) {
+    return dmaSize % elementBitWidth == 0 &&
+           computeAccessWidth % (dmaSize / elementBitWidth) == 0;
+  });
+  if (!hasCompatibleDMASize) {
+    return failure();
+  }
+
+  return XorShuffleParams{rowElems, computeAccessWidth};
 }
 
 void addConfigGPUTarget(MLIRContext *context,
