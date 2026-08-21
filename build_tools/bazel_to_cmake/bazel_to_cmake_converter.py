@@ -31,6 +31,7 @@ _BUILD_SETTING_CMAKE_VARIABLES = {
 _PLATFORM_CMAKE_SYSTEM_NAME = {
     # select() condition labels (config_setting in build_tools/bazel/).
     "//build_tools/bazel:iree_is_android": "Android",
+    "//build_tools/bazel:iree_is_generic_riscv64": "Generic",
     "//build_tools/bazel:iree_is_linux": "Linux",
     "//build_tools/bazel:iree_is_macos": "Darwin",
     "//build_tools/bazel:iree_is_wasm": "wasm_32",

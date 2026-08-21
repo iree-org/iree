@@ -101,6 +101,7 @@ iree_cc_library(
     "coordinated_test.c"
   DEPS
     iree::base
+  TESTONLY
   PUBLIC
 )
 
