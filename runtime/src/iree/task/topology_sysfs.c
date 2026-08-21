@@ -126,14 +126,19 @@ static uint32_t iree_sysfs_query_current_cpu(void) {
   return 0;
 }
 
-// Linux uses -1 as sentinel for "not available." When read as unsigned
-// this can be UINT16_MAX or UINT32_MAX (some sysfs inconsistency?).
-static inline bool iree_sysfs_is_valid_cluster(uint32_t cluster_id) {
-  return cluster_id != UINT16_MAX && cluster_id != UINT32_MAX;
+// Reads the physical package ID for a specific logical processor.
+// Returns false if the file doesn't exist or can't be parsed.
+static bool iree_sysfs_try_query_physical_package_id(uint32_t processor,
+                                                     uint32_t* out_package_id) {
+  char path[256];
+  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/physical_package_id",
+                iree_sysfs_get_root_path(), processor);
+  return iree_sysfs_try_read_uint32(path, out_package_id);
 }
 
 // Reads the cluster ID for a specific logical processor.
 // Tries multiple fallback sources if cluster_id is not available.
+// Used only for ideal_thread_affinity.group — never as a NUMA/node id.
 // Returns false if no cluster info is available.
 static bool iree_sysfs_try_query_cluster_id(uint32_t processor,
                                             uint32_t* out_cluster_id) {
@@ -148,14 +153,223 @@ static bool iree_sysfs_try_query_cluster_id(uint32_t processor,
   }
 
   // Fallback to physical_package_id (socket/package).
-  iree_snprintf(path, sizeof(path), "%s/cpu/cpu%u/topology/physical_package_id",
-                iree_sysfs_get_root_path(), processor);
-  if (iree_sysfs_try_read_uint32(path, out_cluster_id)) {
+  if (iree_sysfs_try_query_physical_package_id(processor, out_cluster_id)) {
     return true;
   }
 
   // No cluster info available.
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Node identity is NUMA or package, never cluster_id (#24761).
+//===----------------------------------------------------------------------===//
+
+// Upper bound on NUMA / package nodes we map into a dense 0..N-1 space.
+#define IREE_SYSFS_MAX_NODE_IDS 64
+
+// Insertion-sorts |values| ascending in place (N is tiny).
+static void iree_sysfs_sort_u32_ascending(uint32_t* values,
+                                          iree_host_size_t count) {
+  for (iree_host_size_t i = 1; i < count; ++i) {
+    const uint32_t key = values[i];
+    iree_host_size_t j = i;
+    while (j > 0 && values[j - 1] > key) {
+      values[j] = values[j - 1];
+      --j;
+    }
+    values[j] = key;
+  }
+}
+
+// Appends |value| to |values| if not already present. Returns false if full.
+static bool iree_sysfs_append_unique_u32(uint32_t* values,
+                                         iree_host_size_t* io_count,
+                                         iree_host_size_t capacity,
+                                         uint32_t value) {
+  for (iree_host_size_t i = 0; i < *io_count; ++i) {
+    if (values[i] == value) return true;
+  }
+  if (*io_count >= capacity) return false;
+  values[(*io_count)++] = value;
+  return true;
+}
+
+// Returns the dense index of |value| in a sorted unique |values| array, or
+// |count| if not found.
+static iree_host_size_t iree_sysfs_dense_index_of(const uint32_t* values,
+                                                  iree_host_size_t count,
+                                                  uint32_t value) {
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    if (values[i] == value) return i;
+  }
+  return count;
+}
+
+typedef struct {
+  uint32_t cpu;
+  bool found;
+} iree_sysfs_cpu_membership_context_t;
+
+static bool iree_sysfs_cpu_membership_callback(uint32_t start_cpu,
+                                               uint32_t end_cpu,
+                                               void* user_data) {
+  iree_sysfs_cpu_membership_context_t* ctx =
+      (iree_sysfs_cpu_membership_context_t*)user_data;
+  if (ctx->cpu >= start_cpu && ctx->cpu < end_cpu) {
+    ctx->found = true;
+    return false;  // Stop enumeration.
+  }
+  return true;
+}
+
+// Reads node/nodeN/cpulist (CPU-list form of cpumap membership).
+static bool iree_sysfs_try_read_node_cpulist(uint32_t kernel_node, char* buffer,
+                                             size_t buffer_size,
+                                             iree_host_size_t* out_length) {
+  char path[256];
+  iree_snprintf(path, sizeof(path), "%s/node/node%u/cpulist",
+                iree_sysfs_get_root_path(), kernel_node);
+  return iree_sysfs_try_read_small_file(path, buffer, buffer_size, out_length);
+}
+
+// Returns true if |cpu| is listed in the NUMA node's cpulist.
+static bool iree_sysfs_cpu_in_kernel_numa_node(uint32_t cpu,
+                                               uint32_t kernel_node) {
+  char buffer[256];
+  iree_host_size_t length = 0;
+  if (!iree_sysfs_try_read_node_cpulist(kernel_node, buffer, sizeof(buffer),
+                                        &length)) {
+    return false;
+  }
+  iree_sysfs_cpu_membership_context_t ctx = {.cpu = cpu, .found = false};
+  if (!iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                     iree_sysfs_cpu_membership_callback,
+                                     &ctx)) {
+    return false;
+  }
+  return ctx.found;
+}
+
+typedef struct {
+  uint32_t* nodes;
+  iree_host_size_t* count;
+  iree_host_size_t capacity;
+} iree_sysfs_collect_nodes_context_t;
+
+static bool iree_sysfs_collect_nodes_callback(uint32_t start_node,
+                                              uint32_t end_node,
+                                              void* user_data) {
+  iree_sysfs_collect_nodes_context_t* ctx =
+      (iree_sysfs_collect_nodes_context_t*)user_data;
+  for (uint32_t node = start_node; node < end_node; ++node) {
+    if (!iree_sysfs_append_unique_u32(ctx->nodes, ctx->count, ctx->capacity,
+                                      node)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Collects kernel NUMA node IDs from node/online, else by probing nodeN/.
+// On success |out_nodes| holds unique IDs (unsorted); returns count (0 if
+// none).
+static iree_host_size_t iree_sysfs_collect_numa_kernel_nodes(
+    uint32_t* out_nodes, iree_host_size_t capacity) {
+  iree_host_size_t count = 0;
+  char path[256];
+  iree_snprintf(path, sizeof(path), "%s/node/online",
+                iree_sysfs_get_root_path());
+  char buffer[256];
+  iree_host_size_t length = 0;
+  if (iree_sysfs_try_read_small_file(path, buffer, sizeof(buffer), &length)) {
+    iree_sysfs_collect_nodes_context_t ctx = {
+        .nodes = out_nodes,
+        .count = &count,
+        .capacity = capacity,
+    };
+    if (!iree_sysfs_try_parse_cpu_list(iree_make_string_view(buffer, length),
+                                       iree_sysfs_collect_nodes_callback,
+                                       &ctx)) {
+      count = 0;
+    }
+  }
+
+  if (count == 0) {
+    // Probe node0.. if node/online is missing.
+    for (uint32_t node = 0; node < (uint32_t)capacity; ++node) {
+      if (iree_sysfs_try_read_node_cpulist(node, buffer, sizeof(buffer),
+                                           &length)) {
+        iree_sysfs_append_unique_u32(out_nodes, &count, capacity, node);
+      }
+    }
+  }
+
+  // Drop nodes that have no readable cpulist (cannot map CPUs).
+  iree_host_size_t readable = 0;
+  for (iree_host_size_t i = 0; i < count; ++i) {
+    if (iree_sysfs_try_read_node_cpulist(out_nodes[i], buffer, sizeof(buffer),
+                                         &length)) {
+      out_nodes[readable++] = out_nodes[i];
+    }
+  }
+  return readable;
+}
+
+// Collects unique physical_package_id values across present CPUs.
+static iree_host_size_t iree_sysfs_collect_package_ids(
+    uint32_t* out_packages, iree_host_size_t capacity) {
+  const uint32_t processor_count = iree_sysfs_query_processor_count();
+  iree_host_size_t count = 0;
+  for (uint32_t cpu = 0; cpu < processor_count; ++cpu) {
+    uint32_t package_id = 0;
+    if (!iree_sysfs_try_query_physical_package_id(cpu, &package_id)) {
+      continue;
+    }
+    if (!iree_sysfs_append_unique_u32(out_packages, &count, capacity,
+                                      package_id)) {
+      break;
+    }
+  }
+  return count;
+}
+
+// Maps |cpu| to a dense NUMA node id (preferred) or dense package id.
+// Returns false if topology data is unavailable.
+static bool iree_sysfs_try_query_cpu_dense_node(
+    uint32_t cpu, iree_task_topology_node_id_t* out_node) {
+  uint32_t numa_nodes[IREE_SYSFS_MAX_NODE_IDS];
+  iree_host_size_t numa_count = iree_sysfs_collect_numa_kernel_nodes(
+      numa_nodes, IREE_ARRAYSIZE(numa_nodes));
+  if (numa_count > 0) {
+    iree_sysfs_sort_u32_ascending(numa_nodes, numa_count);
+    for (iree_host_size_t i = 0; i < numa_count; ++i) {
+      if (iree_sysfs_cpu_in_kernel_numa_node(cpu, numa_nodes[i])) {
+        *out_node = (iree_task_topology_node_id_t)i;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  uint32_t packages[IREE_SYSFS_MAX_NODE_IDS];
+  iree_host_size_t package_count =
+      iree_sysfs_collect_package_ids(packages, IREE_ARRAYSIZE(packages));
+  if (package_count == 0) {
+    return false;
+  }
+  iree_sysfs_sort_u32_ascending(packages, package_count);
+  uint32_t package_id = 0;
+  if (!iree_sysfs_try_query_physical_package_id(cpu, &package_id)) {
+    return false;
+  }
+  const iree_host_size_t dense =
+      iree_sysfs_dense_index_of(packages, package_count, package_id);
+  if (dense >= package_count) {
+    return false;
+  }
+  *out_node = (iree_task_topology_node_id_t)dense;
+  return true;
 }
 
 // Reads the CPU capacity for a specific logical processor.
@@ -280,39 +494,26 @@ void iree_task_topology_query_default_caches(
 }
 
 iree_host_size_t iree_task_topology_query_node_count(void) {
-  // Count unique cluster IDs across all processors.
-  const uint32_t processor_count = iree_sysfs_query_processor_count();
-  if (processor_count == 0) {
-    // Fallback to single node.
-    return 1;
+  // Prefer NUMA node*/cpulist (dense). Never use cluster_id as node identity.
+  uint32_t numa_nodes[IREE_SYSFS_MAX_NODE_IDS];
+  iree_host_size_t numa_count = iree_sysfs_collect_numa_kernel_nodes(
+      numa_nodes, IREE_ARRAYSIZE(numa_nodes));
+  if (numa_count > 0) {
+    return numa_count;
   }
 
-  // Track unique cluster IDs and count them as we discover new ones.
-  cpu_set_t cluster_set;
-  CPU_ZERO(&cluster_set);
-  iree_host_size_t unique_clusters = 0;
-  for (uint32_t cpu = 0; cpu < processor_count; ++cpu) {
-    uint32_t cluster_id = 0;
-    if (iree_sysfs_try_query_cluster_id(cpu, &cluster_id) &&
-        iree_sysfs_is_valid_cluster(cluster_id)) {
-      if (!CPU_ISSET(cluster_id, &cluster_set)) {
-        CPU_SET(cluster_id, &cluster_set);
-        ++unique_clusters;
-      }
-    }
-  }
-
-  return unique_clusters > 0 ? unique_clusters : 1;
+  // Fallback: dense map of physical_package_id.
+  uint32_t packages[IREE_SYSFS_MAX_NODE_IDS];
+  iree_host_size_t package_count =
+      iree_sysfs_collect_package_ids(packages, IREE_ARRAYSIZE(packages));
+  return package_count > 0 ? package_count : 1;
 }
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
-  const uint32_t current_cpu = iree_sysfs_query_current_cpu();
-  uint32_t cluster_id = 0;
-  if (iree_sysfs_try_query_cluster_id(current_cpu, &cluster_id)) {
-    if (!iree_sysfs_is_valid_cluster(cluster_id)) {
-      return 0;  // Invalid clusters are node 0.
-    }
-    return cluster_id;
+  iree_task_topology_node_id_t node = 0;
+  if (iree_sysfs_try_query_cpu_dense_node(iree_sysfs_query_current_cpu(),
+                                          &node)) {
+    return node;
   }
   return 0;  // Fallback to node 0.
 }
@@ -752,16 +953,13 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
       continue;  // Skip CPUs we can't query.
     }
 
-    // Filter by cluster/node if specified.
+    // Filter by NUMA/package dense node id if specified — never by cluster_id.
+    // If node mapping is unavailable, keep the CPU (graceful degradation).
     if (node_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY) {
-      // Only filter if cluster info is valid and doesn't match.
-      uint32_t cluster_id = 0;
-      // When invalid we skip filtering on invalid values to avoid removing all
-      // cores on homogeneous systems.
-      if (iree_sysfs_try_query_cluster_id(cpu, &cluster_id) &&
-          iree_sysfs_is_valid_cluster(cluster_id) &&
-          cluster_id != (uint32_t)node_id) {
-        continue;  // Wrong cluster.
+      iree_task_topology_node_id_t cpu_node = 0;
+      if (iree_sysfs_try_query_cpu_dense_node(cpu, &cpu_node) &&
+          cpu_node != node_id) {
+        continue;  // Wrong NUMA/package node.
       }
     }
 
