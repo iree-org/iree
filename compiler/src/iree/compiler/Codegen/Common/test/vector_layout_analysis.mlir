@@ -1080,7 +1080,7 @@ func.func @scan_source_forward_propagation(%src: vector<16x16xf16>, %init: vecto
   %srcl = iree_vector_ext.to_layout %src to layout(#layout_scan_fwd_src) : vector<16x16xf16>
   // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [8, 16], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
   // expected-remark @below {{layout of result #1 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
-  %out:2 = vector.scan <add>, %srcl, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %srcl, %init reduction_dim = 0, inclusive = true
     : vector<16x16xf16>, vector<16xf16>
   func.return %out#0, %out#1 : vector<16x16xf16>, vector<16xf16>
 }
@@ -1112,7 +1112,7 @@ func.func @scan_backward_propagation(%arr: memref<16x16xf16>, %arr_init: memref<
   %init = vector.transfer_read %arr_init[%c0], %cst_0 {in_bounds = [true]} : memref<16xf16>, vector<16xf16>
   // expected-remark @above {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1], batch_tile = [1], outer_tile = [1], thread_tile = [1], element_tile = [16], subgroup_strides = [0], thread_strides = [0]>}}
   // expected-remark @below {{layout of result #0 is #iree_vector_ext.nested_layout<subgroup_tile = [1, 1], batch_tile = [2, 1], outer_tile = [1, 1], thread_tile = [1, 1], element_tile = [8, 16], subgroup_strides = [0, 0], thread_strides = [0, 0]>}}
-  %out:2 = vector.scan <add>, %src, %init {inclusive = false, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src, %init reduction_dim = 0, inclusive = false
     : vector<16x16xf16>, vector<16xf16>
   %destl = iree_vector_ext.to_layout %out#0 to layout(#layout_scan_bwd) : vector<16x16xf16>
   func.return %destl, %out#1 : vector<16x16xf16>, vector<16xf16>

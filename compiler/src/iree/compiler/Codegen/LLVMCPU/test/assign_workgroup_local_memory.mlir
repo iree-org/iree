@@ -61,7 +61,7 @@ hal.executable private @packing_and_alignment {
         %1 = memref.alloc() : memref<4xf32, #iree_codegen.workgroup_local>
         // CHECK: %[[C64:.+]] = arith.constant 64 : index
         // CHECK: memref.view %[[PACKED]][%[[C64]]][] : memref<80xi8, #iree_codegen.workgroup_local> to memref<4xf32, #iree_codegen.workgroup_local>
-        %2 = memref.alloc() {alignment = 64 : i64} : memref<4xf32, #iree_codegen.workgroup_local>
+        %2 = memref.alloc() alignment = 64 : memref<4xf32, #iree_codegen.workgroup_local>
         return
       }
       // CHECK: iree_codegen.dispatch_config @dispatch workgroup_local_memory = 80

@@ -9,7 +9,7 @@ builtin.module {
     %c4 = arith.constant 4 : index
     %cst_0 = arith.constant 0.000000e+00 : f32
     // Make sure we emit the bypassL1.
-    // CHECK: %[[CP0:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 4  {bypassL1} :
+    // CHECK: %[[CP0:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 4  bypassL1 :
     %1 = vector.transfer_read %a[%c0, %c0], %cst_0 {in_bounds = [true]} : memref<1024x1024xf32>, vector<4xf32>
     vector.transfer_write %1, %0[%c0, %c0, %c0] {in_bounds = [true]} : vector<4xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>
     // CHECK-NOT: nvgpu.device_async_create_group

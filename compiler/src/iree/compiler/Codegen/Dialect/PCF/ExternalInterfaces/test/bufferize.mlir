@@ -19,8 +19,8 @@ util.func private @bufferize_generic(%d0: index, %d1: index, %d2: index, %d3: in
 //  CHECK-SAME:   %[[D2:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[D3:[A-Za-z0-9]+]]: index
 
-//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 64 : i64} : memref<?xi32>
-//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc(%[[D3]]) {alignment = 64 : i64} : memref<?xi32, "foo">
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 64 : memref<?xi32>
+//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc(%[[D3]]) alignment = 64 : memref<?xi32, "foo">
 //       CHECK:   pcf.generic scope(#pcf.test_scope)
 //  CHECK-NEXT:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[ALLOC]],
 //  CHECK-SAME:             %[[REF1:[A-Za-z0-9_]+]],
@@ -74,7 +74,7 @@ util.func private @bufferize_generic_mixed(%d0: index, %d1: index, %d2: index, %
 //  CHECK-SAME:   %[[D2:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[INIT1:[A-Za-z0-9]+]]: memref<?xi32, "foo">
 
-//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 64 : i64} : memref<?xi32>
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 64 : memref<?xi32>
 //       CHECK:   pcf.generic scope(#pcf.test_scope)
 //  CHECK-NEXT:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[ALLOC]],
 //  CHECK-SAME:             %[[REF1:[A-Za-z0-9_]+]],
@@ -110,8 +110,8 @@ util.func private @bufferize_loop(%d0: index, %d1: index, %d2: index, %d3: index
 //  CHECK-SAME:   %[[D2:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[D3:[A-Za-z0-9]+]]: index
 
-//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 64 : i64} : memref<?xi32>
-//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc(%[[D3]]) {alignment = 64 : i64} : memref<?xi32, "foo">
+//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 64 : memref<?xi32>
+//   CHECK-DAG:   %[[ALLOC1:.+]] = memref.alloc(%[[D3]]) alignment = 64 : memref<?xi32, "foo">
 //       CHECK:   pcf.loop scope(#pcf.test_scope) count
 //  CHECK-NEXT:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[ALLOC]],
 //  CHECK-SAME:             %[[REF1:[A-Za-z0-9_]+]],
@@ -146,7 +146,7 @@ util.func private @bufferize_loop_mixed(%d0: index, %d1: index, %d2: index, %1: 
 //  CHECK-SAME:   %[[D2:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[INIT1:[A-Za-z0-9]+]]: memref<?xi32, "foo">
 
-//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 64 : i64} : memref<?xi32>
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 64 : memref<?xi32>
 //       CHECK:   pcf.loop sync true scope(#pcf.test_scope) count
 //  CHECK-NEXT:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[ALLOC]],
 //  CHECK-SAME:             %[[REF1:[A-Za-z0-9_]+]],
@@ -171,7 +171,7 @@ util.func private @write_tensor(%dst: !pcf.sref<?xi32, #pcf.test_scope>) {
 
 // CHECK-LABEL: @write_tensor
 //  CHECK-SAME:   %[[DST:[A-Za-z0-9]+]]: !pcf.sref<?xi32, #pcf.test_scope>
-//       CHECK:   %[[SRC:.+]] = memref.alloc() {alignment = 64 : i64} : memref<2xi32>
+//       CHECK:   %[[SRC:.+]] = memref.alloc() alignment = 64 : memref<2xi32>
 //  CHECK-NEXT:   pcf.write_slice %[[SRC]] into %[[DST]][1] [2] [1] : memref<2xi32> into !pcf.sref<?xi32, #pcf.test_scope>
 
 // -----
@@ -237,7 +237,7 @@ util.func private @bufferize_generic_with_initializer(%d0: index, %d1: index) {
 // CHECK-LABEL: @bufferize_generic_with_initializer(
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[D1:[A-Za-z0-9]+]]: index
-//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]], %[[D1]]) {alignment = 64 : i64} : memref<?x?xf32>
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]], %[[D1]]) alignment = 64 : memref<?x?xf32>
 //       CHECK:   pcf.generic scope(#pcf.test_scope) initialize {
 //  CHECK-NEXT:       %[[C42:.+]] = arith.constant 42
 //  CHECK-NEXT:       pcf.yield %[[C42]]
@@ -268,7 +268,7 @@ util.func private @bufferize_loop_tied_result_users(%d0: index, %n: index) -> (t
 // CHECK-LABEL: @bufferize_loop_tied_result_users(
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[N:[A-Za-z0-9]+]]: index
-//       CHECK:   %[[INIT:.+]] = memref.alloc() {alignment = 64 : i64} : memref<4xi32>
+//       CHECK:   %[[INIT:.+]] = memref.alloc() alignment = 64 : memref<4xi32>
 //       CHECK:   %[[LOOP:.+]]:2 = pcf.loop scope(#pcf.test_scope) count(%[[N]])
 //  CHECK-NEXT:     execute(%{{.*}} = %[[INIT]], %{{.*}})[%{{.*}}: index]
 //  CHECK-NEXT:          : (!pcf.sref<4xi32, #pcf.test_scope>,

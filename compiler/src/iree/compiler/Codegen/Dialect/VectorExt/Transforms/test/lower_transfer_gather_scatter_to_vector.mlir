@@ -14,10 +14,10 @@ module {
     %4 = vector.step : vector<16xindex>
     %5 = arith.muli %4, %cst : vector<16xindex>
     %6 = iree_vector_ext.transfer_gather %arg0[%c0, %c0, %c0] [%5 : vector<16xindex>], %cst_0 {indexing_maps = [#map, #map1]} : tensor<1x1x31xf32>, vector<16xf32>
-    %7 = vector.insert_strided_slice %6, %0 {offsets = [0, 0], strides = [1]} : vector<16xf32> into vector<1x16xf32>
-    %8 = vector.insert_strided_slice %7, %1 {offsets = [0, 0, 0], strides = [1, 1]} : vector<1x16xf32> into vector<1x1x16xf32>
-    %9 = vector.insert_strided_slice %8, %2 {offsets = [0, 0, 0, 0], strides = [1, 1, 1]} : vector<1x1x16xf32> into vector<1x1x1x16xf32>
-    %10 = vector.insert_strided_slice %9, %3 {offsets = [0, 0, 0, 0, 0], strides = [1, 1, 1, 1]} : vector<1x1x1x16xf32> into vector<1x1x1x1x16xf32>
+    %7 = vector.insert_strided_slice %6, %0 offsets = [0, 0], strides = [1] : vector<16xf32> into vector<1x16xf32>
+    %8 = vector.insert_strided_slice %7, %1 offsets = [0, 0, 0], strides = [1, 1] : vector<1x16xf32> into vector<1x1x16xf32>
+    %9 = vector.insert_strided_slice %8, %2 offsets = [0, 0, 0, 0], strides = [1, 1, 1] : vector<1x1x16xf32> into vector<1x1x1x16xf32>
+    %10 = vector.insert_strided_slice %9, %3 offsets = [0, 0, 0, 0, 0], strides = [1, 1, 1, 1] : vector<1x1x1x16xf32> into vector<1x1x1x1x16xf32>
     %11 = vector.transfer_write %10, %arg1[%c0, %c0, %c0, %c0, %c0] {in_bounds = [true, true, true, true, true]} : vector<1x1x1x1x16xf32>, tensor<1x1x1x1x16xf32>
     return %11 : tensor<1x1x1x1x16xf32>
   }

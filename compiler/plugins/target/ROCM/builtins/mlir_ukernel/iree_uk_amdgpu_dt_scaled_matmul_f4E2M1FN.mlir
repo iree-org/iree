@@ -137,11 +137,11 @@ util.func @pingpong_dt_medium_f4E2M1FN(
   %lhs_scale_byte = iree_tensor_ext.bitcast %lhs_scale_base : !lhs_scale_ty{%k} -> !lhs_scale_byte_ty{%k}
   %rhs_scale_byte = iree_tensor_ext.bitcast %rhs_scale_base : !rhs_scale_ty{%k} -> !rhs_scale_byte_ty{%k}
 
-  %lhs = bufferization.to_buffer %lhs_byte {read_only} : !lhs_byte_ty to !lhs_buffer_ty
-  %rhs = bufferization.to_buffer %rhs_byte {read_only} : !rhs_byte_ty to !rhs_buffer_ty
+  %lhs = bufferization.to_buffer %lhs_byte read_only : !lhs_byte_ty to !lhs_buffer_ty
+  %rhs = bufferization.to_buffer %rhs_byte read_only : !rhs_byte_ty to !rhs_buffer_ty
 
-  %lhs_scale = bufferization.to_buffer %lhs_scale_byte {read_only} : !lhs_scale_byte_ty to !lhs_scale_buffer_ty
-  %rhs_scale = bufferization.to_buffer %rhs_scale_byte {read_only} : !rhs_scale_byte_ty to !rhs_scale_buffer_ty
+  %lhs_scale = bufferization.to_buffer %lhs_scale_byte read_only : !lhs_scale_byte_ty to !lhs_scale_buffer_ty
+  %rhs_scale = bufferization.to_buffer %rhs_scale_byte read_only : !rhs_scale_byte_ty to !rhs_scale_buffer_ty
 
   // Collapse shapes to reduce memory indexing overhead.
   %lhs_collapse = memref.collapse_shape %lhs [[0, 1], [2, 3, 4, 5, 6, 7, 8]] : !lhs_buffer_ty into !lhs_buffer_collapse_ty

@@ -51,7 +51,7 @@ func.func @matmul_tile_and_fuse_mma_sync()
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x2xf16> to vector<4x2xf16>
 // Verify nvgpu.mma.sync is generated with correct shape
-// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]}
+// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16]
 //       CHECK:   scf.yield
 
 // -----
@@ -95,7 +95,7 @@ func.func @matmul_tile_and_fuse_mma_sync_f16()
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x2xf16> to vector<2x2x2xf16>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x2xf16> to vector<4x2xf16>
 // Verify nvgpu.mma.sync is generated with f16 output type
-// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : ({{.*}}) -> vector<2x2xf16>
+// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16] : ({{.*}}) -> vector<2x2xf16>
 
 // -----
 
@@ -137,5 +137,5 @@ func.func @matmul_tile_and_fuse_mma_sync_bf16()
 //   CHECK-DAG:   memref.alloc() : memref<{{.*}}xbf16, #gpu.address_space<workgroup>>
 //       CHECK:   scf.for
 // Verify nvgpu.mma.sync is generated with correct shape for BF16
-// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : ({{.*}}) -> vector<2x2xf32>
+// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16] : ({{.*}}) -> vector<2x2xf32>
 //       CHECK:   scf.yield

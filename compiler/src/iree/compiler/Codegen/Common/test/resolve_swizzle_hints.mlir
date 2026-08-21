@@ -91,8 +91,8 @@ func.func @swizzle_unroll_load(%src: memref<?xf32>) -> (vector<4xf32>, vector<4x
   %0 = iree_codegen.swizzle_hint %src[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 60 : index
   %1 = vector.load %0[%offset] : memref<?xf32>, vector<8xf32>
-  %2 = vector.extract_strided_slice %1 {offsets = [0], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
-  %3 = vector.extract_strided_slice %1 {offsets = [4], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
+  %2 = vector.extract_strided_slice %1 offsets = [0], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
+  %3 = vector.extract_strided_slice %1 offsets = [4], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
   return %2, %3 : vector<4xf32>, vector<4xf32>
 }
 
@@ -110,8 +110,8 @@ func.func @swizzle_unroll_store(%dst: memref<?xf32>, %src0: vector<4xf32>, %src1
   %0 = iree_codegen.swizzle_hint %dst[#iree_codegen.rotate_rows<64, 4>] : memref<?xf32>
   %offset = arith.constant 60 : index
   %cst = arith.constant dense<0.0> : vector<8xf32>
-  %1 = vector.insert_strided_slice %src0, %cst {offsets = [0], strides = [1]} : vector<4xf32> into vector<8xf32>
-  %2 = vector.insert_strided_slice %src1, %1 {offsets = [4], strides = [1]} : vector<4xf32> into vector<8xf32>
+  %1 = vector.insert_strided_slice %src0, %cst offsets = [0], strides = [1] : vector<4xf32> into vector<8xf32>
+  %2 = vector.insert_strided_slice %src1, %1 offsets = [4], strides = [1] : vector<4xf32> into vector<8xf32>
   vector.store %2, %0[%offset] : memref<?xf32>, vector<8xf32>
   return
 }

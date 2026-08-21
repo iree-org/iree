@@ -39,18 +39,18 @@ func.func @matmul_pipelining() {
     nvgpu.device_async_wait %21
     gpu.barrier memfence [#gpu.address_space<workgroup>]
     %22 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%2]
-    %23 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c0] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
-    %24 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c16] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+    %23 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c0] leadDimension 40 : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+    %24 = gpu.subgroup_mma_load_matrix %4[%16, %22, %c16] leadDimension 40 : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
     %25 = affine.apply affine_map<()[s0] -> ((s0 floordiv 32) * 16)>()[%1]
-    %26 = gpu.subgroup_mma_load_matrix %5[%16, %c0, %25] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "BOp">
-    %27 = gpu.subgroup_mma_load_matrix %5[%16, %c16, %25] {leadDimension = 40 : index} : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "BOp">
+    %26 = gpu.subgroup_mma_load_matrix %5[%16, %c0, %25] leadDimension 40 : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "BOp">
+    %27 = gpu.subgroup_mma_load_matrix %5[%16, %c16, %25] leadDimension 40 : memref<4x32x40xf16, 3> -> !gpu.mma_matrix<16x16xf16, "BOp">
     %28 = gpu.subgroup_mma_compute %23, %26, %arg1 : !gpu.mma_matrix<16x16xf16, "AOp">, !gpu.mma_matrix<16x16xf16, "BOp"> -> !gpu.mma_matrix<16x16xf16, "COp">
     %29 = gpu.subgroup_mma_compute %24, %27, %28 : !gpu.mma_matrix<16x16xf16, "AOp">, !gpu.mma_matrix<16x16xf16, "BOp"> -> !gpu.mma_matrix<16x16xf16, "COp">
     scf.yield %29 : !gpu.mma_matrix<16x16xf16, "COp">
   }
   %12 = affine.apply affine_map<()[s0, s1] -> (s0 * 16 + s1 * 32)>()[%2, %workgroup_id_y]
   %13 = affine.apply affine_map<()[s0, s1] -> (s1 * 32 + (s0 floordiv 32) * 16)>()[%1, %workgroup_id_x]
-  gpu.subgroup_mma_store_matrix %11, %8[%12, %13] {leadDimension = 1024 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<3456x1024xf16>
+  gpu.subgroup_mma_store_matrix %11, %8[%12, %13] leadDimension 1024 : !gpu.mma_matrix<16x16xf16, "COp">, memref<3456x1024xf16>
   return
 }
 }
@@ -76,7 +76,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK: nvgpu.device_async_copy
 // CHECK: nvgpu.device_async_create_group
 // CHECK: scf.for
-// CHECK:   nvgpu.device_async_wait %{{.*}} {numGroups = 3 : i32}
+// CHECK:   nvgpu.device_async_wait %{{.*}} numGroups = 3
 // CHECK:   nvgpu.device_async_copy
 // CHECK:   nvgpu.device_async_copy
 // CHECK:   nvgpu.device_async_create_group
