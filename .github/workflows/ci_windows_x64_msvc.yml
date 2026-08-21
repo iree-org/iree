@@ -45,17 +45,23 @@ jobs:
           python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
       # TODO(#18813): Fix to actually use either ccache or sccache.
       #               No need to install both, and neither is currently used.
+      # Route choco through the cluster-local Nexus proxy group (choco-group) to
+      # avoid sporadic 503s / rate limiting from the public community.chocolatey.org
+      # feed. See https://github.com/iree-org/iree/issues/24826
       - name: "Installing requirements"
-        run: choco install ccache --yes
+        run: |
+          choco source disable -n=chocolatey
+          choco source add -n=internal -s http://nexus-service.nexus-ns.svc.cluster.local:8081/repository/choco-group/ --priority=1
+          choco install ccache --yes --no-progress
       - name: "Configuring MSVC"
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
       - name: "Installing IREE requirements"
         run: |
-          choco install sccache
-          choco install cmake
+          choco install sccache --no-progress -y
+          choco install cmake --no-progress -y
           # ninja pinned due to a bug in the 1.13.0 release:
           # https://github.com/ninja-build/ninja/issues/2616
-          choco install ninja --version 1.12.1
+          choco install ninja --version 1.12.1 --no-progress -y
           Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
           refreshenv
       - name: "Building IREE"
