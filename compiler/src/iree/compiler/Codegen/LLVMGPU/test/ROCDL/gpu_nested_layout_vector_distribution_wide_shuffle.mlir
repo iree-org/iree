@@ -195,7 +195,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_f64_gfx942_carve_out
 func.func @scan_f64_gfx942_carve_out(%src: vector<16xf64>, %init: vector<f64>) -> (vector<16xf64>, vector<f64>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_f64) : vector<16xf64>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = true
     : vector<16xf64>, vector<f64>
   return %out#0, %out#1 : vector<16xf64>, vector<f64>
 }

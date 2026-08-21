@@ -56,111 +56,111 @@ func.func @hoist_unrolled_vector_for_mma() {
     %59 = affine.apply affine_map<(d0) -> (d0 + 16)>(%6)
     %60 = affine.apply affine_map<(d0) -> (d0 + 48)>(%arg0)
     %61 = vector.transfer_read %1[%60, %59], %cst {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>} : memref<2048x1024xf16>, vector<16x16xf16>
-    %62 = vector.extract_strided_slice %44 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %63 = vector.extract_strided_slice %arg1 {offsets = [0, 0], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %62 = vector.extract_strided_slice %44 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %63 = vector.extract_strided_slice %arg1 offsets = [0, 0], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %64 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %26, %62, %63 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %65 = vector.extract_strided_slice %44 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %66 = vector.extract_strided_slice %arg1 {offsets = [0, 8], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %65 = vector.extract_strided_slice %44 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %66 = vector.extract_strided_slice %arg1 offsets = [0, 8], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %67 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %26, %65, %66 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %68 = vector.extract_strided_slice %52 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %69 = vector.extract_strided_slice %arg1 {offsets = [0, 16], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %68 = vector.extract_strided_slice %52 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %69 = vector.extract_strided_slice %arg1 offsets = [0, 16], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %70 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %26, %68, %69 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %71 = vector.extract_strided_slice %52 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %72 = vector.extract_strided_slice %arg1 {offsets = [0, 24], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %71 = vector.extract_strided_slice %52 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %72 = vector.extract_strided_slice %arg1 offsets = [0, 24], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %73 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %26, %71, %72 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %74 = vector.extract_strided_slice %44 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %75 = vector.extract_strided_slice %arg1 {offsets = [16, 0], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %74 = vector.extract_strided_slice %44 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %75 = vector.extract_strided_slice %arg1 offsets = [16, 0], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %76 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %34, %74, %75 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %77 = vector.extract_strided_slice %44 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %78 = vector.extract_strided_slice %arg1 {offsets = [16, 8], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %77 = vector.extract_strided_slice %44 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %78 = vector.extract_strided_slice %arg1 offsets = [16, 8], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %79 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %34, %77, %78 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %80 = vector.extract_strided_slice %52 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %81 = vector.extract_strided_slice %arg1 {offsets = [16, 16], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %80 = vector.extract_strided_slice %52 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %81 = vector.extract_strided_slice %arg1 offsets = [16, 16], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %82 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %34, %80, %81 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %83 = vector.extract_strided_slice %52 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
-    %84 = vector.extract_strided_slice %arg1 {offsets = [16, 24], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+    %83 = vector.extract_strided_slice %52 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
+    %84 = vector.extract_strided_slice %arg1 offsets = [16, 24], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
     %85 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %34, %83, %84 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %86 = vector.extract_strided_slice %46 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %86 = vector.extract_strided_slice %46 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %87 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %28, %86, %64 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %88 = vector.extract_strided_slice %46 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %88 = vector.extract_strided_slice %46 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %89 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %28, %88, %67 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %90 = vector.extract_strided_slice %55 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %90 = vector.extract_strided_slice %55 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %91 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %28, %90, %70 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %92 = vector.extract_strided_slice %55 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %92 = vector.extract_strided_slice %55 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %93 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %28, %92, %73 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %94 = vector.extract_strided_slice %46 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %94 = vector.extract_strided_slice %46 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %95 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %37, %94, %76 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %96 = vector.extract_strided_slice %46 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %96 = vector.extract_strided_slice %46 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %97 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %37, %96, %79 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %98 = vector.extract_strided_slice %55 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %98 = vector.extract_strided_slice %55 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %99 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %37, %98, %82 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %100 = vector.extract_strided_slice %55 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %100 = vector.extract_strided_slice %55 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %101 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %37, %100, %85 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %102 = vector.extract_strided_slice %48 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %102 = vector.extract_strided_slice %48 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %103 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %30, %102, %87 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %104 = vector.extract_strided_slice %48 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %104 = vector.extract_strided_slice %48 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %105 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %30, %104, %89 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %106 = vector.extract_strided_slice %58 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %106 = vector.extract_strided_slice %58 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %107 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %30, %106, %91 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %108 = vector.extract_strided_slice %58 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %108 = vector.extract_strided_slice %58 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %109 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %30, %108, %93 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %110 = vector.extract_strided_slice %48 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %110 = vector.extract_strided_slice %48 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %111 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %40, %110, %95 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %112 = vector.extract_strided_slice %48 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %112 = vector.extract_strided_slice %48 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %113 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %40, %112, %97 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %114 = vector.extract_strided_slice %58 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %114 = vector.extract_strided_slice %58 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %115 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %40, %114, %99 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %116 = vector.extract_strided_slice %58 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %116 = vector.extract_strided_slice %58 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %117 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %40, %116, %101 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %118 = vector.extract_strided_slice %50 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %118 = vector.extract_strided_slice %50 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %119 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %32, %118, %103 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %120 = vector.extract_strided_slice %50 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %120 = vector.extract_strided_slice %50 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %121 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %32, %120, %105 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %122 = vector.extract_strided_slice %61 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %122 = vector.extract_strided_slice %61 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %123 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %32, %122, %107 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %124 = vector.extract_strided_slice %61 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %124 = vector.extract_strided_slice %61 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %125 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %32, %124, %109 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %126 = vector.extract_strided_slice %50 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %126 = vector.extract_strided_slice %50 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %127 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %43, %126, %111 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %128 = vector.extract_strided_slice %50 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %128 = vector.extract_strided_slice %50 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %129 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %43, %128, %113 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %130 = vector.extract_strided_slice %61 {offsets = [0, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %130 = vector.extract_strided_slice %61 offsets = [0, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %131 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %43, %130, %115 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %132 = vector.extract_strided_slice %61 {offsets = [8, 0], sizes = [8, 16], strides = [1, 1]} : vector<16x16xf16> to vector<8x16xf16>
+    %132 = vector.extract_strided_slice %61 offsets = [8, 0], sizes = [8, 16], strides = [1, 1] : vector<16x16xf16> to vector<8x16xf16>
     %133 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %43, %132, %117 : vector<16x16xf16>, vector<8x16xf16> into vector<16x8xf32>
-    %134 = vector.insert_strided_slice %119, %cst_0 {offsets = [0, 0], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %135 = vector.insert_strided_slice %121, %134 {offsets = [0, 8], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %136 = vector.insert_strided_slice %123, %135 {offsets = [0, 16], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %137 = vector.insert_strided_slice %125, %136 {offsets = [0, 24], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %138 = vector.insert_strided_slice %127, %137 {offsets = [16, 0], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %139 = vector.insert_strided_slice %129, %138 {offsets = [16, 8], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %140 = vector.insert_strided_slice %131, %139 {offsets = [16, 16], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
-    %141 = vector.insert_strided_slice %133, %140 {offsets = [16, 24], strides = [1, 1]} : vector<16x8xf32> into vector<32x32xf32>
+    %134 = vector.insert_strided_slice %119, %cst_0 offsets = [0, 0], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %135 = vector.insert_strided_slice %121, %134 offsets = [0, 8], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %136 = vector.insert_strided_slice %123, %135 offsets = [0, 16], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %137 = vector.insert_strided_slice %125, %136 offsets = [0, 24], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %138 = vector.insert_strided_slice %127, %137 offsets = [16, 0], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %139 = vector.insert_strided_slice %129, %138 offsets = [16, 8], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %140 = vector.insert_strided_slice %131, %139 offsets = [16, 16], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
+    %141 = vector.insert_strided_slice %133, %140 offsets = [16, 24], strides = [1, 1] : vector<16x8xf32> into vector<32x32xf32>
     scf.yield %141 : vector<32x32xf32>
   }
-  %8 = vector.extract_strided_slice %7 {offsets = [0, 0], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %8 = vector.extract_strided_slice %7 offsets = [0, 0], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   vector.transfer_write %8, %2[%5, %6] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %9 = vector.extract_strided_slice %7 {offsets = [0, 8], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %9 = vector.extract_strided_slice %7 offsets = [0, 8], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %10 = affine.apply affine_map<(d0) -> (d0 + 8)>(%6)
   vector.transfer_write %9, %2[%5, %10] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %11 = vector.extract_strided_slice %7 {offsets = [0, 16], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %11 = vector.extract_strided_slice %7 offsets = [0, 16], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %12 = affine.apply affine_map<(d0) -> (d0 + 16)>(%6)
   vector.transfer_write %11, %2[%5, %12] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %13 = vector.extract_strided_slice %7 {offsets = [0, 24], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %13 = vector.extract_strided_slice %7 offsets = [0, 24], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %14 = affine.apply affine_map<(d0) -> (d0 + 24)>(%6)
   vector.transfer_write %13, %2[%5, %14] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %15 = vector.extract_strided_slice %7 {offsets = [16, 0], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %15 = vector.extract_strided_slice %7 offsets = [16, 0], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %16 = affine.apply affine_map<(d0) -> (d0 + 16)>(%5)
   vector.transfer_write %15, %2[%16, %6] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %17 = vector.extract_strided_slice %7 {offsets = [16, 8], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %17 = vector.extract_strided_slice %7 offsets = [16, 8], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %18 = affine.apply affine_map<(d0) -> (d0 + 16)>(%5)
   %19 = affine.apply affine_map<(d0) -> (d0 + 8)>(%6)
   vector.transfer_write %17, %2[%18, %19] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %20 = vector.extract_strided_slice %7 {offsets = [16, 16], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %20 = vector.extract_strided_slice %7 offsets = [16, 16], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %21 = affine.apply affine_map<(d0) -> (d0 + 16)>(%5)
   %22 = affine.apply affine_map<(d0) -> (d0 + 16)>(%6)
   vector.transfer_write %20, %2[%21, %22] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>
-  %23 = vector.extract_strided_slice %7 {offsets = [16, 24], sizes = [16, 8], strides = [1, 1]} : vector<32x32xf32> to vector<16x8xf32>
+  %23 = vector.extract_strided_slice %7 offsets = [16, 24], sizes = [16, 8], strides = [1, 1] : vector<32x32xf32> to vector<16x8xf32>
   %24 = affine.apply affine_map<(d0) -> (d0 + 16)>(%5)
   %25 = affine.apply affine_map<(d0) -> (d0 + 24)>(%6)
   vector.transfer_write %23, %2[%24, %25] {in_bounds = [true, true]} : vector<16x8xf32>, memref<3456x1024xf32>

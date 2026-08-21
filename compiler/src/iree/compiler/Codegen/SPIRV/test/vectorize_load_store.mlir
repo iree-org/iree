@@ -31,9 +31,9 @@ func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32
 //       BASE:   %[[LOAD2:.+]] = memref.load %[[ARG]][%[[IDX0]], %[[OFFSET2]]]
 //       BASE:   %[[VEC:.+]] = vector.shuffle %[[LOAD1]], %[[LOAD2]] [0, 1, 2, 3, 4, 5, 6, 7] : vector<4xf32>, vector<4xf32>
 
-//       BASE:   %[[VEC0:.+]] = vector.extract_strided_slice %[[VEC]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
+//       BASE:   %[[VEC0:.+]] = vector.extract_strided_slice %[[VEC]] offsets = [0], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
 //       BASE:   memref.store %[[VEC0]], %[[ALLOC]][%[[IDX0]], %[[OFFSET1]]]
-//       BASE:   %[[VEC1:.+]] = vector.extract_strided_slice %[[VEC]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf32> to vector<4xf32>
+//       BASE:   %[[VEC1:.+]] = vector.extract_strided_slice %[[VEC]] offsets = [4], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
 //       BASE:   memref.store %[[VEC1]], %[[ALLOC]][%[[IDX0]], %4]
 
 // -----
@@ -386,15 +386,15 @@ func.func @scalarize_indivisible_vector_transfer_write_op(%value: vector<4xf32>,
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
 func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
-  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
-  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 32 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] leadDimension 32 : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] leadDimension 32 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
   return
 }
 
 // CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<32x4xvector<4xf32>, 3>
 // CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
-// CHECK: %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : memref<32x4xvector<4xf32>, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
-// CHECK: gpu.subgroup_mma_store_matrix %[[LD]], %[[ALLOC]][%[[I0]], %[[IDX]]] {leadDimension = 4 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x4xvector<4xf32>, 3>
+// CHECK: %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[I0]], %[[IDX]]] leadDimension 4 : memref<32x4xvector<4xf32>, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+// CHECK: gpu.subgroup_mma_store_matrix %[[LD]], %[[ALLOC]][%[[I0]], %[[IDX]]] leadDimension 4 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x4xvector<4xf32>, 3>
 
 // -----
 
@@ -402,32 +402,32 @@ func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
 func.func @vectorize_alloc_with_mma_load_store(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
-  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 16 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
-  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 16 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] leadDimension 16 : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] leadDimension 16 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
   return
 }
 
 //      CHECK: affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()
 //      CHECK: gpu.subgroup_mma_load_matrix
-// CHECK-SAME:   leadDimension = 2 : index
+// CHECK-SAME:   leadDimension 2
 //      CHECK: gpu.subgroup_mma_store_matrix
-// CHECK-SAME:   leadDimension = 2 : index
+// CHECK-SAME:   leadDimension 2
 
 // -----
 
 // CHECK-LABEL: func.func @vectorize_alloc_with_mma_load_store_unaligned_case
 func.func @vectorize_alloc_with_mma_load_store_unaligned_case(%i0: index, %i1: index) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
-  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 18 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
-  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] {leadDimension = 18 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] leadDimension 18 : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %0, %alloc[%i0, %i1] leadDimension 18 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
   return
 }
 
 //  CHECK-NOT: affine.apply
 //      CHECK: gpu.subgroup_mma_load_matrix
-// CHECK-SAME:   leadDimension = 18 : index
+// CHECK-SAME:   leadDimension 18
 //      CHECK: gpu.subgroup_mma_store_matrix
-// CHECK-SAME:   leadDimension = 18 : index
+// CHECK-SAME:   leadDimension 18
 
 // -----
 
@@ -485,8 +485,8 @@ func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) 
   %c0 = arith.constant 0 : index
   %span0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
   %span1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
-  %val = gpu.subgroup_mma_load_matrix %span0[%i0, %i1] {leadDimension = 1280 : index} : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>> -> !gpu.mma_matrix<16x16xf16, "COp">
-  gpu.subgroup_mma_store_matrix %val, %span1[%i0, %i1] {leadDimension = 1280 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
+  %val = gpu.subgroup_mma_load_matrix %span0[%i0, %i1] leadDimension 1280 : memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>> -> !gpu.mma_matrix<16x16xf16, "COp">
+  gpu.subgroup_mma_store_matrix %val, %span1[%i0, %i1] leadDimension 1280 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x1280xf16, strided<[1280, 1], offset: 11840>, #hal.descriptor_type<storage_buffer>>
   return
 }
 
@@ -494,8 +494,8 @@ func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) 
 // CHECK: %[[SPAN0:.+]] = hal.interface.binding.subspan {{.+}} offset(%[[C0]]) flags(ReadOnly) : memref<32x160xvector<4xf32>, strided<[160, 1], offset: 1480>, #hal.descriptor_type<storage_buffer>>
 // CHECK: %[[SPAN1:.+]] = hal.interface.binding.subspan {{.+}} offset(%[[C0]]) : memref<32x160xvector<4xf32>, strided<[160, 1], offset: 1480>, #hal.descriptor_type<storage_buffer>>
 // CHECK: %[[APPLY:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[I1]]]
-// CHECK: %[[VAL:.+]] = gpu.subgroup_mma_load_matrix %[[SPAN0]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
-// CHECK: gpu.subgroup_mma_store_matrix %[[VAL]], %[[SPAN1]][%[[I0]], %[[APPLY]]] {leadDimension = 160 : index}
+// CHECK: %[[VAL:.+]] = gpu.subgroup_mma_load_matrix %[[SPAN0]][%[[I0]], %[[APPLY]]] leadDimension 160
+// CHECK: gpu.subgroup_mma_store_matrix %[[VAL]], %[[SPAN1]][%[[I0]], %[[APPLY]]] leadDimension 160
 
 // -----
 
@@ -599,10 +599,10 @@ func.func @transfer_read_vector2_vector8(%x: index) -> (vector<2xi32>, vector<8x
 //       CHECK:   %[[LOAD2:.+]] = memref.load %[[SUBSPAN]][%[[OFFSET2]]]
 //       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
 //       CHECK:   %[[LOAD3:.+]] = memref.load %[[SUBSPAN]][%[[OFFSET3]]]
-//       CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[INIT]] {offsets = [0], strides = [1]} : vector<2xi32> into vector<8xi32>
-//       CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[LOAD1]], %[[INSERT0]] {offsets = [2], strides = [1]} : vector<2xi32> into vector<8xi32>
-//       CHECK:   %[[INSERT2:.+]] = vector.insert_strided_slice %[[LOAD2]], %[[INSERT1]] {offsets = [4], strides = [1]} : vector<2xi32> into vector<8xi32>
-//       CHECK:   %[[INSERT3:.+]] = vector.insert_strided_slice %[[LOAD3]], %[[INSERT2]] {offsets = [6], strides = [1]} : vector<2xi32> into vector<8xi32>
+//       CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[INIT]] offsets = [0], strides = [1] : vector<2xi32> into vector<8xi32>
+//       CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[LOAD1]], %[[INSERT0]] offsets = [2], strides = [1] : vector<2xi32> into vector<8xi32>
+//       CHECK:   %[[INSERT2:.+]] = vector.insert_strided_slice %[[LOAD2]], %[[INSERT1]] offsets = [4], strides = [1] : vector<2xi32> into vector<8xi32>
+//       CHECK:   %[[INSERT3:.+]] = vector.insert_strided_slice %[[LOAD3]], %[[INSERT2]] offsets = [6], strides = [1] : vector<2xi32> into vector<8xi32>
 //       CHECK:   return %[[LOAD0]], %[[INSERT3]]
 
 // -----
@@ -626,15 +626,15 @@ func.func @transfer_write_vector2_vector8(%x: index, %val0: vector<2xi32>, %val1
 //       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[INDEX]]]
 //       CHECK:   memref.store %[[VAL0]], %[[SUBSPAN]][%[[OFFSET0]]]
 
-//       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [0], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [0], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
 //       CHECK:   memref.store %[[SLICE0]], %[[SUBSPAN]][%[[OFFSET0]]]
-//       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [2], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [2], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
 //       CHECK:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[INDEX]]]
 //       CHECK:   memref.store %[[SLICE1]], %[[SUBSPAN]][%[[OFFSET1]]]
-//       CHECK:   %[[SLICE2:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [4], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[SLICE2:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [4], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
 //       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[INDEX]]]
 //       CHECK:   memref.store %[[SLICE2]], %[[SUBSPAN]][%[[OFFSET2]]]
-//       CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [6], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
+//       CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [6], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
 //       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
 //       CHECK:   memref.store %[[SLICE3]], %[[SUBSPAN]][%[[OFFSET3]]]
 

@@ -305,12 +305,14 @@ VER_0 {
     mlirConditionallySpeculatableOpInterfaceTypeID;
     mlirContextAppendDialectRegistry;
     mlirContextAttachDiagnosticHandler;
+    mlirContextBeginTransientScope;
     mlirContextCreate;
     mlirContextCreateWithRegistry;
     mlirContextCreateWithThreading;
     mlirContextDestroy;
     mlirContextDetachDiagnosticHandler;
     mlirContextEnableMultithreading;
+    mlirContextEndTransientScope;
     mlirContextEqual;
     mlirContextGetAllowUnregisteredDialects;
     mlirContextGetLoadedDialect;
@@ -319,6 +321,7 @@ VER_0 {
     mlirContextGetNumThreads;
     mlirContextGetOrLoadDialect;
     mlirContextGetThreadPool;
+    mlirContextIsInTransientScope;
     mlirContextIsRegisteredOperation;
     mlirContextLoadAllAvailableDialects;
     mlirContextSetAllowUnregisteredDialects;
@@ -642,6 +645,7 @@ VER_0 {
     mlirLLVMDICompileUnitAttrGetName;
     mlirLLVMDICompileUnitAttrGetRecSelf;
     mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect;
+    mlirLLVMDICompileUnitAttrGetWithSourceLanguageName;
     mlirLLVMDICompositeTypeAttrGet;
     mlirLLVMDICompositeTypeAttrGetName;
     mlirLLVMDICompositeTypeAttrGetRecSelf;

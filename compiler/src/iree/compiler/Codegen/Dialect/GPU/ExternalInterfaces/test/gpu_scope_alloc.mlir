@@ -18,7 +18,7 @@ util.func private @subgroup_scope_alloc(%d0: index) {
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9_]+]]: index
 //       CHECK:   pcf.generic scope(#iree_gpu.subgroup_scope)
 //  CHECK-NEXT:     execute[{{.*}}] {
-//  CHECK-NEXT:     %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 16 : i64} : memref<?x8xi32, #gpu.address_space<workgroup>>
+//  CHECK-NEXT:     %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 16 : memref<?x8xi32, #gpu.address_space<workgroup>>
 //  CHECK-NEXT:     util.optimization_barrier %[[ALLOC]]
 //  CHECK-NEXT:     pcf.return
 

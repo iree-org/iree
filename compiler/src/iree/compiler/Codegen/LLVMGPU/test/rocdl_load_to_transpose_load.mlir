@@ -408,8 +408,8 @@ func.func @transform_i8_8x1() -> vector<8x1xi8> {
 // CHECK: %[[ROW_OFFSET:.+]] = arith.addi %[[DIV4]], %[[C4]] : index
 // CHECK: %[[ROW1:.+]] = arith.addi %[[ROW]], %[[ROW_OFFSET]] : index
 // CHECK: %[[L1:.+]] = amdgpu.transpose_load %{{.*}}[%[[ROW1]], %[[NEW_COL]]] : memref<128x256xf16, #gpu.address_space<workgroup>> -> vector<4xf16>
-// CHECK: vector.insert_strided_slice %[[L0]], {{.*}} {offsets = [0], strides = [1]}
-// CHECK: vector.insert_strided_slice %[[L1]], {{.*}} {offsets = [4], strides = [1]}
+// CHECK: vector.insert_strided_slice %[[L0]], {{.*}} offsets = [0], strides = [1]
+// CHECK: vector.insert_strided_slice %[[L1]], {{.*}} offsets = [4], strides = [1]
 // CHECK: vector.shape_cast {{.*}} : vector<8xf16> to vector<8x1xf16>
 func.func @transform_unroll_f16_8x1() -> vector<8x1xf16> {
   %src = memref.alloc() : memref<128x256xf16, #gpu.address_space<workgroup>>

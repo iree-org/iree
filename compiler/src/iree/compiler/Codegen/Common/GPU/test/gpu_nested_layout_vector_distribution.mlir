@@ -33,10 +33,10 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[YX:.+]]:3 = affine.delinearize_index %[[IDX]] into (4, 8)
 // CHECK: %[[Y_SCALED:.+]] = affine.linearize_index disjoint [%[[YX]]#1, %c0] by (4, 4)
 // CHECK: %[[RD00:.+]] = vector.transfer_read %arg0[%[[Y_SCALED]], %[[YX]]#2], {{.*}} : memref<32x32xf16>, vector<4x1xf16>
-// CHECK: vector.insert_strided_slice %[[RD00]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1]} : vector<4x1xf16> into vector<1x2x1x1x4x1xf16>
+// CHECK: vector.insert_strided_slice %[[RD00]], %{{.*}} offsets = [0, 0, 0, 0, 0, 0], strides = [1, 1] : vector<4x1xf16> into vector<1x2x1x1x4x1xf16>
 // CHECK: %[[X_PLUS_BATCH:.+]] = affine.linearize_index disjoint [%c1, %[[YX]]#2] by (2, 8)
 // CHECK: vector.transfer_read %arg0[%[[Y_SCALED]], %[[X_PLUS_BATCH]]], %{{.*}} {in_bounds = [true, true]} : memref<32x32xf16>, vector<4x1xf16>
-// CHECK: vector.insert_strided_slice {{.*}} {offsets = [0, 1, 0, 0, 0, 0]
+// CHECK: vector.insert_strided_slice {{.*}} offsets = [0, 1, 0, 0, 0, 0]
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<1x2x1x1x4x1xf16> -> vector<16x16xf16>
 
 // -----
@@ -121,8 +121,8 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-SAME:    %[[I0:.+]]: index, %[[I1:.+]]: index
 
 // CHECK: %[[BROADCAST_READ:.+]] = vector.transfer_read %{{.*}}[%c0, %c0, %[[I0]], %[[I1]]], %{{.*}} permutation_map = #[[$MAP]]
-// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} {offsets = [0, 0, 0, 0, 0, 0]
-// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} {offsets = [0, 1, 0, 0, 0, 0]
+// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} offsets = [0, 0, 0, 0, 0, 0]
+// CHECK: vector.insert_strided_slice %[[BROADCAST_READ]], %{{.*}} offsets = [0, 1, 0, 0, 0, 0]
 
 // -----
 

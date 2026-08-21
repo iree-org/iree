@@ -29,5 +29,5 @@ func.func @pad_conv_2d_nchw_fchw_1x320x64x64x320x3x3() attributes {hal.executabl
 //
 // Check that the stack buffer is bounded by tiling sizes.
 //
-// CHECK:          memref.alloca() {alignment = 64 : i64} : memref<1x8x1x8xf32>
+// CHECK:          memref.alloca() alignment = 64 : memref<1x8x1x8xf32>
 // CHECK:          vector.fma

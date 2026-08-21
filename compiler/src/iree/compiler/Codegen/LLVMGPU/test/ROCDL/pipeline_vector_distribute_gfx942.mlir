@@ -504,12 +504,12 @@ func.func @virtual_intrinsic_256x256x256_16x16x32xf8E4M3FNUZ_f32() attributes {h
 
 // CHECK:       %[[A_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
 // CHECK:       %[[B_CAST:.+]] = vector.shape_cast %{{.+}} : vector<1x8xf16> to vector<8xf16>
-// CHECK:       %[[A_SLICE_0:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-// CHECK:       %[[B_SLICE_0:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+// CHECK:       %[[A_SLICE_0:.+]] = vector.extract_strided_slice %[[A_CAST]] offsets = [0], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
+// CHECK:       %[[B_SLICE_0:.+]] = vector.extract_strided_slice %[[B_CAST]] offsets = [0], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 // CHECK:       %[[MFMA_0:.*]] = amdgpu.mfma 32x32x8 %[[A_SLICE_0]] * %[[B_SLICE_0]] + %[[ACC]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
-// CHECK:       %[[A_SLICE_1:.+]] = vector.extract_strided_slice %[[A_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-// CHECK:       %[[B_SLICE_1:.+]] = vector.extract_strided_slice %[[B_CAST]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+// CHECK:       %[[A_SLICE_1:.+]] = vector.extract_strided_slice %[[A_CAST]] offsets = [4], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
+// CHECK:       %[[B_SLICE_1:.+]] = vector.extract_strided_slice %[[B_CAST]] offsets = [4], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 // CHECK:       amdgpu.mfma 32x32x8 %[[A_SLICE_1]] * %[[B_SLICE_1]] + %[[MFMA_0]] blgp =  none
 // CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 

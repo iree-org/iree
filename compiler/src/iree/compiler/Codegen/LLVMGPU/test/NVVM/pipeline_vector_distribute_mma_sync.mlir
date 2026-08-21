@@ -35,7 +35,7 @@ func.func @matmul_256x256x256_f16_f32() attributes {hal.executable.target = #exe
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
 //       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf32>)
-// CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
+// CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16] : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
 //       CHECK:     scf.yield
 
 // -----
@@ -70,5 +70,5 @@ func.func @matmul_256x256x256_f16_f16() attributes {hal.executable.target = #exe
 
 // CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
 //       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x2xf16>)
-// CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
+// CHECK-COUNT-2:   nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16] : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf16>) -> vector<2x2xf16>
 //       CHECK:     scf.yield

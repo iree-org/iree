@@ -146,12 +146,12 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //         CHECK:      scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:        %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
 //         CHECK:        %[[READ:.+]] = vector.transfer_read %[[SPAN0]][%[[DELIN]]#0, %[[DELIN]]#1, %[[OFFSET]]], %[[PV]] {in_bounds = [true]} : memref<10x9216x9216xf16{{.*}}>, vector<8xf16>
-//         CHECK:        %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [0], sizes = [4], strides = [1]}
+//         CHECK:        %[[SLICE0:.+]] = vector.extract_strided_slice %[[READ]] offsets = [0], sizes = [4], strides = [1]
 //         CHECK:        %[[DIV0:.+]] = arith.divf %[[SLICE0]], %[[BROADCAST]] : vector<4xf16>
-//         CHECK:        %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst {offsets = [0], strides = [1]}
-//         CHECK:        %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] {offsets = [4], sizes = [4], strides = [1]}
+//         CHECK:        %[[SLICE1:.+]] = vector.insert_strided_slice %[[DIV0]], %cst offsets = [0], strides = [1]
+//         CHECK:        %[[SLICE2:.+]] = vector.extract_strided_slice %[[READ]] offsets = [4], sizes = [4], strides = [1]
 //         CHECK:        %[[DIV1:.+]] = arith.divf %[[SLICE2]], %[[BROADCAST]] : vector<4xf16>
-//         CHECK:        %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] {offsets = [4], strides = [1]}
+//         CHECK:        %[[SLICE3:.+]] = vector.insert_strided_slice %[[DIV1]], %[[SLICE1]] offsets = [4], strides = [1]
 //         CHECK:        vector.transfer_write %[[SLICE3]], %[[SPAN1]][%[[DELIN]]#0, %[[DELIN]]#1, %{{.*}}] {in_bounds = [true]} : vector<8xf16>, memref<10x9216x9216xf16{{.*}}>
 //         CHECK:      }
 //         CHECK:    }

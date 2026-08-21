@@ -131,7 +131,7 @@ func.func @matmul_transpose_b_mfma()
 // CHECK-COUNT-4:   amdgpu.mfma 16x16x16
 //       CHECK:     scf.yield
 //       CHECK:   %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<4xf32> to vector<4x1xf32>
-//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0]{{.*}}} : vector<4x1xf32> into vector<2x2x4x1xf32>
+//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} offsets = [1, 1, 0, 0]{{.*}} : vector<4x1xf32> into vector<2x2x4x1xf32>
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %{{.+}}, [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:   vector.transfer_write %[[LOOP_T]], %[[BUF2]]
 //       CHECK:   iree_codegen.dispatch_config @matmul_transpose_b_mfma workgroup_size = [128, 2, 1] subgroup_size = 64
@@ -201,7 +201,7 @@ func.func @matmul_transpose_b_wmmar3()
 // CHECK-COUNT-8:   amdgpu.wmma 16x16x16 {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
 //       CHECK:     scf.yield
 //       CHECK:   %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<8xf32> to vector<8x1x1xf32>
-//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0, 0]{{.*}}} : vector<8x1x1xf32> into vector<2x2x8x1x1xf32>
+//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} offsets = [1, 1, 0, 0, 0]{{.*}} : vector<8x1x1xf32> into vector<2x2x8x1x1xf32>
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %{{.+}}, [0, 2, 3, 1, 4] : vector<2x2x8x1x1xf32> to vector<2x8x1x2x1xf32>
 //       CHECK:   vector.transfer_write %[[LOOP_T]], %[[BUF2]]
 //       CHECK:   iree_codegen.dispatch_config @matmul_transpose_b_wmmar3 workgroup_size = [64, 2, 1] subgroup_size = 32
@@ -1012,7 +1012,7 @@ func.func @matmul_transpose_b_promote_result()
 // CHECK-COUNT-4:   amdgpu.mfma 16x16x16
 //       CHECK:     scf.yield
 //       CHECK:   %[[SC:.+]] = vector.shape_cast %[[LOOP]]#0 : vector<4xf32> to vector<4x1xf32>
-//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} {offsets = [1, 1, 0, 0]{{.*}}} : vector<4x1xf32> into vector<2x2x4x1xf32>
+//       CHECK:   %[[INS:.+]] = vector.insert_strided_slice %[[SC]], %{{.+}} offsets = [1, 1, 0, 0]{{.*}} : vector<4x1xf32> into vector<2x2x4x1xf32>
 //       CHECK:   %[[LOOP_T:.+]] = vector.transpose %{{.+}}, [0, 2, 1, 3] : vector<2x2x4x1xf32> to vector<2x4x2x1xf32>
 //       CHECK:   vector.transfer_write %[[LOOP_T]]
 //       CHECK:   scf.for {{.*}} {

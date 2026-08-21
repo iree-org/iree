@@ -84,9 +84,9 @@ func.func @matmul_i4_quant_weight() {
 //           CHECK:     %[[SCALE0:.+]] = vector.transfer_read %[[SCALE_SUB]]
 //           CHECK:     %[[SCALE1:.+]] = vector.transfer_read %[[SCALE_SUB]]
 //           CHECK:     %[[ZP:.+]] = vector.transfer_read %[[ZP_SUB]]
-//           CHECK:     %[[SLICE0:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
+//           CHECK:     %[[SLICE0:.+]] = vector.extract_strided_slice %[[ZP]] offsets = [0], sizes = [4], strides = [1] : vector<8xi4> to vector<4xi4>
 //           CHECK:     %[[ZP_EXT0:.+]] = arith.extsi %[[SLICE0]] : vector<4xi4> to vector<4xi32>
-//           CHECK:     %[[SLICE1:.+]] = vector.extract_strided_slice %[[ZP]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xi4> to vector<4xi4>
+//           CHECK:     %[[SLICE1:.+]] = vector.extract_strided_slice %[[ZP]] offsets = [4], sizes = [4], strides = [1] : vector<8xi4> to vector<4xi4>
 //           CHECK:     %[[ZP_EXT1:.+]] = arith.extsi %[[SLICE1]] : vector<4xi4> to vector<4xi32>
 
 //           CHECK:     scf.for %arg5 = %c0 to %c96 step %c32 iter_args({{.+}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)

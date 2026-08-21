@@ -20,7 +20,7 @@ pdl.pattern @f16_pingpong : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.specialization_ranges"
   pdl.apply_native_constraint "hasAttr"(
         %matmul, %attr_name
-        : !pdl.operation, !pdl.attribute) {isNegated = true}
+        : !pdl.operation, !pdl.attribute) is_negated = true
 
   pdl.rewrite %matmul {
     %ranges = pdl.attribute = #util<int.assumption.multi_array[
@@ -51,7 +51,7 @@ pdl.pattern @bf16_pingpong : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.specialization_ranges"
   pdl.apply_native_constraint "hasAttr"(
         %matmul, %attr_name
-        : !pdl.operation, !pdl.attribute) {isNegated = true}
+        : !pdl.operation, !pdl.attribute) is_negated = true
 
   pdl.rewrite %matmul {
     %ranges = pdl.attribute = #util<int.assumption.multi_array[
@@ -82,7 +82,7 @@ pdl.pattern @f8E4M3_pingpong : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.specialization_ranges"
   pdl.apply_native_constraint "hasAttr"(
         %matmul, %attr_name
-        : !pdl.operation, !pdl.attribute) {isNegated = true}
+        : !pdl.operation, !pdl.attribute) is_negated = true
 
   pdl.rewrite %matmul {
     %ranges = pdl.attribute = #util<int.assumption.multi_array[
@@ -115,7 +115,7 @@ pdl.pattern @f4E2M1FN_pingpong : benefit(1) {
   %attr_name = pdl.attribute = "iree_codegen.specialization_ranges"
   pdl.apply_native_constraint "hasAttr"(
         %scaled_matmul, %attr_name
-        : !pdl.operation, !pdl.attribute) {isNegated = true}
+        : !pdl.operation, !pdl.attribute) is_negated = true
 
   pdl.rewrite %scaled_matmul {
     %ranges = pdl.attribute = #util<int.assumption.multi_array[
