@@ -19,4 +19,4 @@ void populateFP8ToNVVMConversionPatterns(LLVMTypeConverter &typeConverter,
 } // namespace iree_compiler
 } // namespace mlir
 
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_FP8LOWERING_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_FP8LOWERING_H_

@@ -55,8 +55,7 @@ static uint32_t getSubnormalF32Bits(uint32_t mantissa,
   int32_t exponent = 1 - static_cast<int32_t>(format.exponentBias) -
                      static_cast<int32_t>(format.mantissaBits) +
                      static_cast<int32_t>(leadingBit);
-  uint32_t fraction =
-      (mantissa - (1u << leadingBit)) << (23u - leadingBit);
+  uint32_t fraction = (mantissa - (1u << leadingBit)) << (23u - leadingBit);
   return (static_cast<uint32_t>(exponent + 127) << 23u) | fraction;
 }
 
@@ -66,9 +65,9 @@ static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
   Type i32Type = getTypeWithElementType(input.getType(), rewriter.getI32Type());
   Value bits = LLVM::ZExtOp::create(rewriter, loc, i32Type, input);
 
-  Value sign = LLVM::LShrOp::create(
-      rewriter, loc, i32Type, bits,
-      createIntegerConstant(rewriter, loc, i32Type, 7));
+  Value sign =
+      LLVM::LShrOp::create(rewriter, loc, i32Type, bits,
+                           createIntegerConstant(rewriter, loc, i32Type, 7));
   sign = LLVM::ShlOp::create(rewriter, loc, i32Type, sign,
                              createIntegerConstant(rewriter, loc, i32Type, 31));
 
@@ -87,11 +86,10 @@ static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
 
   Value exponentF32 = LLVM::AddOp::create(
       rewriter, loc, i32Type, exponent,
-      createIntegerConstant(rewriter, loc, i32Type,
-                            127 - format.exponentBias));
-  exponentF32 = LLVM::ShlOp::create(
-      rewriter, loc, i32Type, exponentF32,
-      createIntegerConstant(rewriter, loc, i32Type, 23));
+      createIntegerConstant(rewriter, loc, i32Type, 127 - format.exponentBias));
+  exponentF32 =
+      LLVM::ShlOp::create(rewriter, loc, i32Type, exponentF32,
+                          createIntegerConstant(rewriter, loc, i32Type, 23));
   Value mantissaF32 = LLVM::ShlOp::create(
       rewriter, loc, i32Type, mantissa,
       createIntegerConstant(rewriter, loc, i32Type, 23 - format.mantissaBits));
@@ -111,15 +109,15 @@ static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
     Value isValue = LLVM::ICmpOp::create(
         rewriter, loc, LLVM::ICmpPredicate::eq, mantissa,
         createIntegerConstant(rewriter, loc, i32Type, value));
-    subnormal = LLVM::SelectOp::create(rewriter, loc, isValue, valueBits,
-                                       subnormal);
+    subnormal =
+        LLVM::SelectOp::create(rewriter, loc, isValue, valueBits, subnormal);
   }
 
-  Value isExponentZero = LLVM::ICmpOp::create(
-      rewriter, loc, LLVM::ICmpPredicate::eq, exponent,
-      createIntegerConstant(rewriter, loc, i32Type, 0));
-  Value result = LLVM::SelectOp::create(rewriter, loc, isExponentZero,
-                                        subnormal, normal);
+  Value isExponentZero =
+      LLVM::ICmpOp::create(rewriter, loc, LLVM::ICmpPredicate::eq, exponent,
+                           createIntegerConstant(rewriter, loc, i32Type, 0));
+  Value result =
+      LLVM::SelectOp::create(rewriter, loc, isExponentZero, subnormal, normal);
 
   Value isMaxExponent = LLVM::ICmpOp::create(
       rewriter, loc, LLVM::ICmpPredicate::eq, exponent,
@@ -130,17 +128,16 @@ static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
         createIntegerConstant(rewriter, loc, i32Type, 0x7f800000));
     Value nan = LLVM::OrOp::create(
         rewriter, loc, i32Type, infinity,
-        LLVM::ShlOp::create(
-            rewriter, loc, i32Type, mantissa,
-            createIntegerConstant(rewriter, loc, i32Type,
-                                  23 - format.mantissaBits)));
-    Value isMantissaZero = LLVM::ICmpOp::create(
-        rewriter, loc, LLVM::ICmpPredicate::eq, mantissa,
-        createIntegerConstant(rewriter, loc, i32Type, 0));
-    Value special = LLVM::SelectOp::create(rewriter, loc, isMantissaZero,
-                                           infinity, nan);
-    result = LLVM::SelectOp::create(rewriter, loc, isMaxExponent, special,
-                                    result);
+        LLVM::ShlOp::create(rewriter, loc, i32Type, mantissa,
+                            createIntegerConstant(rewriter, loc, i32Type,
+                                                  23 - format.mantissaBits)));
+    Value isMantissaZero =
+        LLVM::ICmpOp::create(rewriter, loc, LLVM::ICmpPredicate::eq, mantissa,
+                             createIntegerConstant(rewriter, loc, i32Type, 0));
+    Value special =
+        LLVM::SelectOp::create(rewriter, loc, isMantissaZero, infinity, nan);
+    result =
+        LLVM::SelectOp::create(rewriter, loc, isMaxExponent, special, result);
   } else {
     Value isNaN = LLVM::AndOp::create(
         rewriter, loc, isMaxExponent.getType(), isMaxExponent,
@@ -157,8 +154,7 @@ static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
 }
 
 struct LowerFP8ExtFOp final : OpConversionPattern<arith::ExtFOp> {
-  LowerFP8ExtFOp(const LLVMTypeConverter &typeConverter,
-                 MLIRContext *context)
+  LowerFP8ExtFOp(const LLVMTypeConverter &typeConverter, MLIRContext *context)
       : OpConversionPattern(typeConverter, context, PatternBenefit(2)) {}
 
   LogicalResult
@@ -185,8 +181,8 @@ struct LowerFP8ExtFOp final : OpConversionPattern<arith::ExtFOp> {
     if (!convertedResultType) {
       return failure();
     }
-    Value resultBits = createFP8ToF32Bits(rewriter, op.getLoc(),
-                                           adaptor.getIn(), format);
+    Value resultBits =
+        createFP8ToF32Bits(rewriter, op.getLoc(), adaptor.getIn(), format);
     rewriter.replaceOpWithNewOp<LLVM::BitcastOp>(op, convertedResultType,
                                                  resultBits);
     return success();
