@@ -57,8 +57,10 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include <cstdint>
 #include <numeric>
 #include <optional>
+#include <type_traits>
 
 #define DEBUG_TYPE "kernel-dispatch"
 
@@ -3804,30 +3806,37 @@ void MultiLoweringConfigGenerator::splitCommonInnerVectorTiles() {
   }
 }
 
-/// Captures the inner-tile alignment of a scalable `linalg.pack` at tiling
-/// `level` from its (unpacked-domain) loop tile sizes.
-static void capturePackInnerTileAlignment(
-    linalg::PackOp packOp, const SizesAndScalableFlags &packScalableTilesFlags,
+/// Captures the inner-tile alignment of a scalable `linalg.pack/unpack` at
+/// tiling `level` from its (unpacked-domain) loop tile sizes.
+template <typename PackUnpackType>
+static void captureInnerTileAlignment(
+    PackUnpackType op, const SizesAndScalableFlags &scalableTilesFlags,
     IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
     ArrayRef<bool> scalableFlags,
     SmallVectorImpl<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>>
         &perLevel) {
+  static_assert(
+      std::is_same_v<PackUnpackType, linalg::PackOp> ||
+          std::is_same_v<PackUnpackType, linalg::UnPackOp>,
+      "Inner tile alignment hints can only be captured for pack/unpack ops!");
   // TODO(egebeysel): wire in distribution tile size alignment logic.
   if (level == IREE::CPU::TilingLevel::DistributionTiles) {
     return;
   }
+  int64_t rank = std::is_same_v<PackUnpackType, linalg::PackOp>
+                     ? op.getSourceRank()
+                     : op.getDestRank();
   SmallVector<int64_t> alignments(
-      packOp.getSourceRank(),
-      llvm::to_underlying(mlir::InnerTileAlignment::Unknown));
+      rank, llvm::to_underlying(mlir::InnerTileAlignment::Unknown));
   bool any = false;
-  for (auto [i, pos] : llvm::enumerate(packOp.getInnerDimsPos())) {
+  for (auto [i, pos] : llvm::enumerate(op.getInnerDimsPos())) {
     // Only scalable inner tiles need a hint; static ones are resolved by static
     // shape inference downstream.
-    if (!packScalableTilesFlags.second[i] || pos >= tileSizes.size()) {
+    if (!scalableTilesFlags.second[i] || pos >= tileSizes.size()) {
       continue;
     }
     mlir::InnerTileAlignment kind = getScalableInnerTileAlignment(
-        tileSizes[pos], scalableFlags[pos], packScalableTilesFlags.first[i]);
+        tileSizes[pos], scalableFlags[pos], scalableTilesFlags.first[i]);
     alignments[pos] = llvm::to_underlying(kind);
     if (kind != mlir::InnerTileAlignment::Unknown) {
       any = true;
@@ -3886,9 +3895,9 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // unpacked domain.
         if (auto packScalableTilesFlags =
                 getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
-          capturePackInnerTileAlignment(packOp, *packScalableTilesFlags, level,
-                                        tileSizes, scalableFlags,
-                                        perLevelAlignments);
+          captureInnerTileAlignment<linalg::PackOp>(
+              packOp, *packScalableTilesFlags, level, tileSizes, scalableFlags,
+              perLevelAlignments);
         }
         // `MultiLoweringConfigGenerator` propagates tiling on the
         // unpacked dimensions, while for a pack operation, `LoweringConfig`
@@ -3896,19 +3905,26 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // `undoScaleAndPermutateTilingForPackOp` to translate the tiling
         // information from the unpacked to the packed dimensions.
         undoScaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
-      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op);
-                 unpackOp &&
-                 level == IREE::CPU::TilingLevel::VectorCommonParallelTiles &&
-                 unpackOp.getSource().getDefiningOp<linalg::LinalgOp>()) {
-        // The `IterationDimTracker` ties an unpack's destination loops only to
-        // the *outer* dims of its packed source operand, so `tileSizes`
-        // holds the source's outer tiling for consumer unpack operations. Map
-        // these onto the destination unpacked domain by scaling and permuting
-        // with the inner tile sizes.
-        undoScaleAndPermutateTilingForUnpackOp(unpackOp, tileSizes,
-                                               scalableFlags);
+      } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
+        if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles &&
+            unpackOp.getSource().getDefiningOp<linalg::LinalgOp>()) {
+          // The `IterationDimTracker` ties an unpack's destination loops only
+          // to the *outer* dims of its packed source operand, so `tileSizes`
+          // holds the source's outer tiling for consumer unpack operations. Map
+          // these onto the destination unpacked domain by scaling and permuting
+          // with the inner tile sizes.
+          undoScaleAndPermutateTilingForUnpackOp(unpackOp, tileSizes,
+                                                 scalableFlags);
+        }
+        // Capture this level's alignment for the unpack's scalable inner tiles
+        // after converting them to the unpacked domain.
+        if (auto unpackScalableTilesFlags =
+                getScalableTileSizesAndFlags(unpackOp.getMixedTiles())) {
+          captureInnerTileAlignment<linalg::UnPackOp>(
+              unpackOp, *unpackScalableTilesFlags, level, tileSizes,
+              scalableFlags, perLevelAlignments);
+        }
       }
-
       // Append tiling info.
       newTilingInfo.push_back(
           {level, std::move(tileSizes), std::move(scalableFlags)});
@@ -4225,9 +4241,9 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     if (!levelAttr) {
       continue;
     }
-    capturePackInnerTileAlignment(packOp, *packScalableTilesFlags, level,
-                                  levelAttr.getSizes(),
-                                  levelAttr.getScalableFlags(), perLevel);
+    captureInnerTileAlignment<linalg::PackOp>(
+        packOp, *packScalableTilesFlags, level, levelAttr.getSizes(),
+        levelAttr.getScalableFlags(), perLevel);
   }
 
   if (!perLevel.empty()) {

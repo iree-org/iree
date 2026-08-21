@@ -189,6 +189,7 @@ func.func @unpack(%arg0 : tensor<128x10x?x8x?xf32>) -> tensor<128x80x320xf32> at
 //       CHECK: func.func @unpack
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -210,6 +211,28 @@ func.func @unpack_outer_dynamic(%arg0 : tensor<?x?x32x?xi32>, %dim0 : index, %di
 //       CHECK: func.func @unpack_outer_dynamic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Transposed `inner_dims_pos` puts the scalable inner tile on the first (rather
+// than the last) result dimension, so the hint's `Equal` must match that.
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+func.func @unpack_transposed(%arg0 : tensor<?x?x32x?xf32>, %dim0 : index, %dim1 : index) -> tensor<?x?xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %init = tensor.empty(%dim0, %dim1) : tensor<?x?xf32>
+  %unpack = linalg.unpack %arg0 inner_dims_pos = [1, 0] inner_tiles = [32, %c8_vscale] into %init : tensor<?x?x32x?xf32> -> tensor<?x?xf32>
+  return %unpack : tensor<?x?xf32>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = {{\[\[}}8], 32]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>
+//       CHECK: func.func @unpack_transposed
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   linalg.unpack
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Equal, Unknown]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -227,6 +250,7 @@ func.func @unpack_fully_dynamic(%arg0 : tensor<?x?x?x?xi32>, %m0 : index, %n0 : 
 //       CHECK: func.func @unpack_fully_dynamic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
+//  CHECK-NOT:        inner_tile_alignments
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -255,6 +279,7 @@ func.func @unpack_with_generic(%arg0 : tensor<128x10x?x8x?xf32>, %arg1 : tensor<
 //       CHECK: func.func @unpack_with_generic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG_UNPACK]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[CONFIG_GENERIC]]
@@ -469,10 +494,12 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tens
 // CHECK-SAME:      {lowering_config = #[[$CONFIG1]]}
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// The producer unpack carries a precomputed inner-tile alignment hint.
 // CHECK:         linalg.unpack
-// CHECK-SAME:      {lowering_config = #[[$CONFIG2]]}
-// The consumer pack has no lowering config of its own; it carries the
-// precomputed inner-tile alignment hint instead.
+// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:      lowering_config = #[[$CONFIG2]]
+// The consumer pack also carries a precomputed inner-tile alignment hint and
+// has no lowering config of its own.
 // CHECK:         linalg.pack
 // CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
 // CHECK-NOT:       lowering_config
@@ -519,8 +546,10 @@ func.func @negative_hint_mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16
 // CHECK-SAME:      {lowering_config = #[[$CONFIG1]]}
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
+// The producer unpack is a plain scalable unpack, so it carries the hint.
 // CHECK:         linalg.unpack
-// CHECK-SAME:      {lowering_config = #[[$CONFIG2]]}
+// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:      lowering_config = #[[$CONFIG2]]
 // The consumer pack has no lowering config nor carries an inner tile alignment,
 // since the unpack and pack inner dimensions are not aligned.
 // CHECK:         linalg.pack
