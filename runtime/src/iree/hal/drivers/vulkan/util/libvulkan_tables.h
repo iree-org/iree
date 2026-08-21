@@ -160,7 +160,7 @@ IREE_HAL_VULKAN_DEVICE_PFN(VkResult, vkAllocateMemory,
                                 VkDeviceMemory* pMemory),
                            ARGS(device, pAllocateInfo, pAllocator, pMemory))
 
-IREE_HAL_VULKAN_DEVICE_PFN(
+IREE_HAL_VULKAN_DEVICE_OPTIONAL_PFN(
     VkResult, vkGetMemoryHostPointerPropertiesEXT,
     DECL(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType,
          const void* pHostPointer,
