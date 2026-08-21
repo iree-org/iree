@@ -502,8 +502,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     See https://www.tensorflow.org/xla/operation_semantics#sort.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins Variadic<AnyRankedTensorOrMemRef>:$inputs,
+                       Variadic<AnyRankedTensorOrMemRef>:$outputs,
                        I64Attr:$dimension
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -516,9 +516,6 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getOperand(int index) {
-      return getOutputs()[index];
-    }
     ShapedType getOperandType(int index) {
       return cast<ShapedType>(getOperand(index).getType());
     }
