@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "executable_benchmarks.mlir"
     "hal_executable.mlir"
     "inline_dynamic_hal_executable.mlir"
+    "inline_hal_mutable_global.mlir"
     "inline_static_hal_executable.mlir"
     "precompile.mlir"
     "preprocessing_flags.mlir"
