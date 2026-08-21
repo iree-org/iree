@@ -1,0 +1,40 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = enforce_glob(
+        [
+            "invalid_options.txt",
+            "invalid_plugin.c",
+            "valid_plugin.c",
+        ],
+        include = [
+            "*.txt",
+            "*.c",
+        ],
+    ),
+    cfg = "//compiler:lit.cfg.py",
+    target_compatible_with = select({
+        "@platforms//os:macos": ["@platforms//os:macos"],
+        "@platforms//os:linux": ["@platforms//os:linux"],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    tools = [
+        "//tools:iree-compile",
+        "//tools:iree-opt",
+        "@llvm-project//clang",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

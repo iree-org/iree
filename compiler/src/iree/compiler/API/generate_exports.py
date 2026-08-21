@@ -22,7 +22,7 @@ dependencies and is very invasive.
 Instead, once we have our list of symbols, we generate:
 
 * api_exports.ld : A GNU-style linker script for setting up exports.
-* api_exports.lst : A MacOS-style file suitable to pass to
+* api_exports.macos.lst : A MacOS-style file suitable to pass to
   --exported_symbols_list
 * api_exports.def : A Windows def file.
 * api_exports.c : Source file that triggers extern resolution for the symbols

@@ -51,6 +51,14 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
   InitLLVM y(argc, argv);
 
+  // Handle loading plugins before any initialization and CLI parsing
+  if (!mlir::iree_compiler::DynamicPluginRegistry::create(
+          argc, argv, /*allowEnvPlugins=*/true)) {
+    mlir::iree_compiler::DynamicPluginRegistry::get().reportErrors(
+        llvm::errs());
+    return failure();
+  }
+
   // We support a limited form of the PluginManager, allowing it to perform
   // global initialization and dialect registration.
   mlir::iree_compiler::PluginManager pluginManager;

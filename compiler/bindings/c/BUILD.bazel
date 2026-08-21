@@ -47,10 +47,10 @@ cc_test(
         "iree/compiler/loader/loader_test.c",
     ],
     args = [
-        "lib/libIREECompiler.so",
+        "$(location //lib:IREECompiler)",
     ],
     data = [
-        "//lib:libIREECompiler.so",
+        "//lib:IREECompiler",
     ],
     tags = ["skip-bazel_to_cmake"],
     deps = [

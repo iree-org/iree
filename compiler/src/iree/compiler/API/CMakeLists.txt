@@ -160,6 +160,31 @@ endforeach()
 # library structures.
 set(CMAKE_PLATFORM_NO_VERSIONED_SONAME ON)
 
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+  # Renamed ABI: every llvm/mlir C++ symbol is rewritten to an IREE-private
+  # Itanium name before link (see build_tools/cmake/iree_renamed_link.cmake),
+  # and the resulting library exports everything except the bundled runtime's
+  # snake_case `iree_*` C-API. Dynamic plugins rename their own archives the
+  # same way and resolve the shared closure from this library at dlopen time.
+  set(_SHARED_IMPL_LINKOPTS
+    "$<$<PLATFORM_ID:Linux>:-Wl,--version-script=${IREE_ROOT_DIR}/lib/hide_iree_runtime_capi.ld>"
+    "$<$<PLATFORM_ID:Darwin>:-Wl,-unexported_symbols_list,${IREE_ROOT_DIR}/lib/hide_iree_runtime_capi.macos.txt>"
+  )
+  set(_SHARED_IMPL_LINK_DEPENDS
+    "${IREE_ROOT_DIR}/lib/hide_iree_runtime_capi.ld;${IREE_ROOT_DIR}/lib/hide_iree_runtime_capi.macos.txt"
+  )
+else()
+  set(_SHARED_IMPL_LINKOPTS
+    # Linux uses a linker script to version symbols.
+    "$<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld>"
+    # Hide all symbols from static archives (.a) linked into the shared library.
+    # Without this, LLVM/MLIR internal symbols leak through the `global: *`
+    # version script since LLVM is not compiled with -fvisibility=hidden.
+    "$<$<PLATFORM_ID:Linux>:LINKER:--exclude-libs,ALL>"
+  )
+  set(_SHARED_IMPL_LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld")
+endif()
+
 iree_cc_library(
   SHARED
   NAME
@@ -168,40 +193,49 @@ iree_cc_library(
      # Force this to be a regular library with an empty source file.
      empty.c
   LINKOPTS
-    # Linux uses a linker script to version symbols.
-    $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld>
-    # Hide all symbols from static archives (.a) linked into the shared library.
-    # Without this, LLVM/MLIR internal symbols leak through the `global: *`
-    # version script since LLVM is not compiled with -fvisibility=hidden.
-    $<$<PLATFORM_ID:Linux>:LINKER:--exclude-libs,ALL>
+    ${_SHARED_IMPL_LINKOPTS}
   DEPS
     iree::compiler::bindings::c::headers
 )
 
 # Make sure that re-link if extra linker inputs change.
 set_target_properties(iree_compiler_API_SharedImpl PROPERTIES
-  LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld
+  LINK_DEPENDS "${_SHARED_IMPL_LINK_DEPENDS}"
 )
 
-# We need to add the object sources directly to the SHARED sub-target, not
-# the .objects sub-target, which is what would happen if added to SRCS.
-target_sources(iree_compiler_API_SharedImpl PRIVATE
-  ${_EXPORT_OBJECT_SRCS}
-)
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+  include(iree_renamed_link)
 
-# Explicitly link deps as PRIVATE (the default rule uses PUBLIC) so that usage
-# requirements do not cascade: The shared library is intended to be used as an
-# isolated boundary for C consumers.
-target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
-  ${_EXPORT_OBJECT_DEPS}
-)
+  # The renamed link assembly needs the transitive closure of these object
+  # libraries, and most of the compiler tree is not configured yet when this
+  # directory is processed (the non-renamed branch below defers the same
+  # problem to generate time with GENEX_EVAL). Run it at the end of the
+  # top-level directory instead, when every target exists.
+  set_property(GLOBAL PROPERTY
+    IREE_RENAMED_SHARED_IMPL_OBJECT_LIBS "${_EXPORT_OBJECT_LIBS}")
+  cmake_language(DEFER DIRECTORY "${IREE_ROOT_DIR}"
+    CALL iree_renamed_shared_impl_finalize)
+else()
+  # We need to add the object sources directly to the SHARED sub-target, not
+  # the .objects sub-target, which is what would happen if added to SRCS.
+  target_sources(iree_compiler_API_SharedImpl PRIVATE
+    ${_EXPORT_OBJECT_SRCS}
+  )
 
-# Link MLIRTargetLLVMIRImport and MLIRExportSMTLIB directly since they are
-# not exported as object libraries.
-target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
-  MLIRExportSMTLIB
-  MLIRTargetLLVMIRImport
-)
+  # Explicitly link deps as PRIVATE (the default rule uses PUBLIC) so that usage
+  # requirements do not cascade: The shared library is intended to be used as an
+  # isolated boundary for C consumers.
+  target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
+    ${_EXPORT_OBJECT_DEPS}
+  )
+
+  # Link MLIRTargetLLVMIRImport and MLIRExportSMTLIB directly since they are
+  # not exported as object libraries.
+  target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
+    MLIRExportSMTLIB
+    MLIRTargetLLVMIRImport
+  )
+endif()
 
 # If not using sanitizers, ask linkers to error on undefined symbols.
 # For shared libraries, using sanitizers implies undefined symbols on Unix-like.
