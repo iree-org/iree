@@ -240,17 +240,16 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<{";
-  os << "max_allocation_size = " << getMaxAllocationSize() << ", ";
-  os << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
-     << ", ";
-  os << "max_buffer_range = " << getMaxBufferRange() << ", ";
-  os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
-  os << "index_bits = " << getIndexBits() << ", ";
-  os << "alias_mutable_bindings = " << getAliasMutableBindings() << ", ";
-  os << "memory_model = " << stringifyMemoryModel(getMemoryModel());
-  os << "}>";
+  p << "<{";
+  p << "max_allocation_size = " << getMaxAllocationSize() << ", ";
+  p << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
+    << ", ";
+  p << "max_buffer_range = " << getMaxBufferRange() << ", ";
+  p << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
+  p << "index_bits = " << getIndexBits() << ", ";
+  p << "alias_mutable_bindings = " << getAliasMutableBindings() << ", ";
+  p << "memory_model = " << stringifyMemoryModel(getMemoryModel());
+  p << "}>";
 }
 
 // static
