@@ -137,3 +137,42 @@ util.func public @splitResourceConstants() -> (!stream.resource<constant>, !stre
   // CHECK: util.return %[[RES0]], %[[RES1]], %[[IF1]]#0
   util.return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
+
+// -----
+
+// Tests that a single constant larger than the max allocation size still gets
+// its own buffer (no infinite loop or error). A 256-byte constant exceeds the
+// 128 byte limit, but because offset is 0 (buffer is empty) it is not spilled,
+// so no empty buffer is created.
+
+#singleConstantExceedsLimitConfig = #stream.resource_config<{
+  max_allocation_size = 128,
+  min_buffer_offset_alignment = 16,
+  max_buffer_range = 1073741824,
+  min_buffer_range_alignment = 16,
+  index_bits = 32
+}>
+
+// CHECK-NOT: #composite_of_0b = #util.composite<0x{{[[:alnum:]]+}}, []>
+// CHECK: #composite_of_256b = #util.composite<256xi8, [
+// CHECK:     dense<42> : tensor<64xi32>,
+// CHECK: ]>
+
+// CHECK-LABEL: @singleConstantExceedsLimit
+util.func public @singleConstantExceedsLimit() -> (!stream.resource<constant>, !stream.timepoint)
+    attributes {stream.resources = #singleConstantExceedsLimitConfig} {
+  %c256 = arith.constant 256 : index
+
+  // CHECK-NOT: %[[RODATA:.+]] = util.buffer.constant {alignment = {{[:digit:]]+}} : index} : !util.buffer = #composite_of_0b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_256b
+  // CHECK: %[[DID_MAP:.+]], %[[TRY_MAP:.+]] = stream.resource.try_map %[[RODATA]]
+  // CHECK: %[[IF:.+]]:2 = scf.if %[[DID_MAP]]
+  // CHECK: %[[RES:.+]] = stream.resource.subview %[[IF]]#1[%c0] : !stream.resource<constant>{%c256} -> !stream.resource<constant>{%c256}
+
+  %0:2 = stream.resource.constants :
+    !stream.resource<constant>{%c256} = dense<42> : tensor<64xi32>
+    => !stream.timepoint
+
+  // CHECK: util.return %[[RES]], %[[IF]]#0
+  util.return %0#0, %0#1 : !stream.resource<constant>, !stream.timepoint
+}
