@@ -154,23 +154,42 @@ iree_tablegen_library(
     -gen-op-defs Dialect/TorchConversion/IR/TorchConversionOps.cpp.inc
 )
 
+# Conditionally include TorchToStablehlo when IREE_INPUT_STABLEHLO is enabled.
+# Must be set before any tablegen that reads Passes.td files with
+# #ifdef TORCH_MLIR_ENABLE_STABLEHLO guards (TorchConversion/Transforms and
+# Conversion/Passes.td both use this guard).
+set(_stablehlo_srcs "")
+set(_stablehlo_deps "")
+set(_stablehlo_defines "")
+set(_stablehlo_tablegen_flag "")
+if(IREE_INPUT_STABLEHLO)
+  file(GLOB _stablehlo_srcs
+    "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchToStablehlo/*.cpp"
+  )
+  set(_stablehlo_deps ChloOps StablehloOps StablehloPasses MLIRComplexDialect)
+  set(_stablehlo_defines TORCH_MLIR_ENABLE_STABLEHLO)
+  set(_stablehlo_tablegen_flag -DTORCH_MLIR_ENABLE_STABLEHLO)
+endif()
+
 iree_tablegen_library(
   NAME
     TorchConversionDialectTransformsGen
   TD_FILE
     "${TORCH_MLIR_ROOT_DIR}/include/torch-mlir/Dialect/TorchConversion/Transforms/Passes.td"
   OUTS
-    -gen-pass-decls Dialect/TorchConversion/Transforms/Passes.h.inc
-    -gen-pass-capi-header Dialect/TorchConversion/Transforms/Transforms.capi.h.inc
-    -gen-pass-capi-impl Dialect/TorchConversion/Transforms/Transforms.capi.cpp.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-decls Dialect/TorchConversion/Transforms/Passes.h.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-capi-header Dialect/TorchConversion/Transforms/Transforms.capi.h.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-capi-impl Dialect/TorchConversion/Transforms/Transforms.capi.cpp.inc
 )
 
 ###############################################################################
 # Torch conversion pipelines
-# Note that we do not include TorchToStableHLO here due to dependency issues.
-# Also, The "TorchDialect" transforms seem to have a circular dependency on
-# these conversions. To simplify, we just have this one conversion library
-# with all conversion sources and those from Dialect/TorchConversion/Transforms.
+# TorchToStablehlo sources are included when IREE_INPUT_STABLEHLO is enabled;
+# they require ChloOps/StablehloOps from third_party/stablehlo and the
+# TORCH_MLIR_ENABLE_STABLEHLO compile/tablegen define.
+# The "TorchDialect" transforms have a circular dependency on these conversions;
+# to avoid that, all conversion sources (including TorchConversion/Transforms)
+# are compiled into this single ConversionPasses library.
 ###############################################################################
 
 file(GLOB _ConversionPasses_SRCS
@@ -183,6 +202,7 @@ file(GLOB _ConversionPasses_SRCS
   "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/Utils/*.cpp"
   "${TORCH_MLIR_ROOT_DIR}/lib/Dialect/TorchConversion/Transforms/*.cpp"
 )
+list(APPEND _ConversionPasses_SRCS ${_stablehlo_srcs})
 iree_cc_library(
   NAME
     ConversionPasses
@@ -204,6 +224,9 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMLProgramDialect
     MLIRSCFDialect
+    ${_stablehlo_deps}
+  DEFINES
+    ${_stablehlo_defines}
 )
 
 iree_tablegen_library(
@@ -212,9 +235,9 @@ iree_tablegen_library(
   TD_FILE
     "${TORCH_MLIR_ROOT_DIR}/include/torch-mlir/Conversion/Passes.td"
   OUTS
-    -gen-pass-decls Conversion/Passes.h.inc
-    -gen-pass-capi-header Conversion/Passes.capi.h.inc
-    -gen-pass-capi-impl Conversion/Passes.capi.cpp.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-decls Conversion/Passes.h.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-capi-header Conversion/Passes.capi.h.inc
+    ${_stablehlo_tablegen_flag} -gen-pass-capi-impl Conversion/Passes.capi.cpp.inc
 )
 
 ###############################################################################
