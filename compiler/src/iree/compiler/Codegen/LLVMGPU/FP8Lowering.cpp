@@ -23,14 +23,6 @@ struct FP8Format {
   bool hasInfinity;
 };
 
-static Type getTypeWithElementType(Type type, Type elementType) {
-  if (auto vectorType = dyn_cast<VectorType>(type)) {
-    return VectorType::get(vectorType.getShape(), elementType,
-                           vectorType.getScalableDims());
-  }
-  return elementType;
-}
-
 static Value createIntegerConstant(ConversionPatternRewriter &rewriter,
                                    Location loc, Type type, uint32_t value) {
   auto elementType = cast<IntegerType>(getElementTypeOrSelf(type));
@@ -62,7 +54,10 @@ static uint32_t getSubnormalF32Bits(uint32_t mantissa,
 static Value createFP8ToF32Bits(ConversionPatternRewriter &rewriter,
                                 Location loc, Value input,
                                 const FP8Format &format) {
-  Type i32Type = getTypeWithElementType(input.getType(), rewriter.getI32Type());
+  Type i32Type = rewriter.getI32Type();
+  if (auto vectorType = dyn_cast<VectorType>(input.getType())) {
+    i32Type = vectorType.cloneWith(std::nullopt, i32Type);
+  }
   Value bits = LLVM::ZExtOp::create(rewriter, loc, i32Type, input);
 
   Value sign =
