@@ -53,11 +53,20 @@ static const iree_hal_metal_driver_t* iree_hal_metal_driver_const_cast(
   return (const iree_hal_metal_driver_t*)base_value;
 }
 
-// Returns an retained array of available Metal GPU devices; the caller should release later.
+// Returns a retained array of available Metal GPU devices; the caller should release later.
 static NSArray<id<MTLDevice>>* iree_hal_metal_device_copy() {
 #if defined(IREE_PLATFORM_MACOS)
-  // For macOS, we might have more then one GPU devices.
-  return MTLCopyAllDevices();  // +1
+  // For macOS, we might have more than one GPU device.
+  NSArray<id<MTLDevice>>* devices = MTLCopyAllDevices();  // +1
+  if (devices.count == 0) {
+    id<MTLDevice> default_device = MTLCreateSystemDefaultDevice();  // +1
+    if (default_device) {
+      [devices release];                                                // -1
+      devices = [[NSArray alloc] initWithObjects:default_device, nil];  // +1
+      [default_device release];                                         // -1
+    }
+  }
+  return devices;
 #else
   // For other Apple platforms, we only have one GPU device.
   @autoreleasepool {  // Use @autorelasepool to trigger the autorelease carried in NSArray literal.
