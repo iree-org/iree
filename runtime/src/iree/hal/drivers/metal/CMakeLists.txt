@@ -53,3 +53,20 @@ iree_cc_library(
     "-framework Metal"
   PUBLIC
 )
+
+iree_cc_test(
+  NAME
+    metal_device_test
+  SRCS
+    "metal_device_test.cc"
+  DEPS
+    ::metal
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=metal"
+)
