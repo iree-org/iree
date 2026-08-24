@@ -1016,9 +1016,9 @@ iree_hal_vulkan_logical_device_required_queue_flags_for_command_categories(
     // emulated with compute built-ins (see the fill/update replay paths in
     // command_buffer.c). The queue family is fixed before those dispatches are
     // recorded, so a transfer command buffer must be placed on a
-    // compute-capable lane; otherwise the built-in dispatch is recorded onto a
-    // transfer-only queue family, which is invalid and silently drops the work
-    // on hardware (hanging any semaphore waiting on the submission).
+    // compute-capable lane. Recording the built-in dispatch onto a
+    // transfer-only is invalid – that will hang any semaphore waiting on the
+    // submission.
     queue_flags |= VK_QUEUE_TRANSFER_BIT | VK_QUEUE_COMPUTE_BIT;
   }
   return queue_flags;
