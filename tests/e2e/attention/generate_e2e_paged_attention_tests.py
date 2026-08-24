@@ -21,52 +21,35 @@ HEAD_DIM = 128
 
 def generate_attention_mlir(output_path):
     text = f"""\
-#executable_target_cuda = #hal.executable.target<\"cuda\", \"cuda-nvptx-fb\">
-#translation = #iree_codegen.translation_info<
-    pipeline = #iree_gpu.pipeline<VectorDistribute>
-    workgroup_size = [128, 1, 1]
-    subgroup_size = 32>
-#qk_attrs_config = #iree_gpu.lowering_config<{{
-    subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]],
-    thread = [0, 0, 0, 8, 0, 0],
-    lane_basis = [[1, 1, 1, 1, 1, 2, 16], [2, 1, 0, 4, 5, 6]]
-}}>
-#pv_attrs_config = #iree_gpu.lowering_config<{{
-    subgroup_basis = [[1, 1, 1, 1, 1, 4, 1], [4, 3, 2, 1, 5, 6]],
-    thread = [0, 0, 0, 8, 0, 0],
-    lane_basis = [[1, 1, 1, 1, 1, 2, 16], [2, 1, 0, 4, 5, 6]]
-}}>
-#attention_lowering_config = #iree_gpu.lowering_config<{{
-    partial_reduction = [0, 0, 0, 0, 0, 8, 0],
-    workgroup = [1, 1, 1, 0, 0, 0, 0]
-}}>
-
 func.func @paged_attention(
     %query: tensor<{BATCH}x1x1x{HEAD_DIM}xf16>,
     %kv_storage: tensor<{POOL_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>,
-    %key_page_table: tensor<{BATCH}x{NUM_PAGES}xi64>,
-    %value_page_table: tensor<{BATCH}x{NUM_PAGES}xi64>)
-    -> tensor<{BATCH}x1x1x{HEAD_DIM}xf32> attributes {{
-      hal.executable.target = #executable_target_cuda,
-      translation_info = #translation
-    }} {{
+    %key_page_table: tensor<{BATCH}x?xi64>,
+    %value_page_table: tensor<{BATCH}x?xi64>)
+    -> tensor<{BATCH}x1x1x{HEAD_DIM}xf32> {{
   %zero_f32 = arith.constant 0.0 : f32
   %neg_inf_f32 = arith.constant 0xFF800000 : f32
   %scale = arith.constant 8.837890e-02 : f16
-  %key_empty = tensor.empty() : tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
-  %value_empty = tensor.empty() : tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
+  %c1 = arith.constant 1 : index
+  %num_pages = tensor.dim %key_page_table, %c1 : tensor<{BATCH}x?xi64>
+  %key_empty = tensor.empty(%num_pages) : tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
+  %value_empty = tensor.empty(%num_pages) : tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
   %key = iree_linalg_ext.gather dimension_map = [0]
       ins(%kv_storage, %key_page_table :
         tensor<{POOL_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>,
-        tensor<{BATCH}x{NUM_PAGES}xi64>)
-      outs(%key_empty : tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>)
-      -> tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
+        tensor<{BATCH}x?xi64>)
+      outs(%key_empty : tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>)
+      -> tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
   %value = iree_linalg_ext.gather dimension_map = [0]
       ins(%kv_storage, %value_page_table :
         tensor<{POOL_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>,
-        tensor<{BATCH}x{NUM_PAGES}xi64>)
-      outs(%value_empty : tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>)
-      -> tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
+        tensor<{BATCH}x?xi64>)
+      outs(%value_empty : tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>)
+      -> tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>
+  %mask_empty = tensor.empty(%num_pages) : tensor<{BATCH}x1x1x?x{PAGE_SIZE}xf32>
+  %mask = linalg.fill ins(%zero_f32 : f32)
+      outs(%mask_empty : tensor<{BATCH}x1x1x?x{PAGE_SIZE}xf32>)
+      -> tensor<{BATCH}x1x1x?x{PAGE_SIZE}xf32>
   %output_empty = tensor.empty() : tensor<{BATCH}x1x1x{HEAD_DIM}xf32>
   %max_empty = tensor.empty() : tensor<{BATCH}x1x1xf32>
   %sum_empty = tensor.empty() : tensor<{BATCH}x1x1xf32>
@@ -78,24 +61,21 @@ func.func @paged_attention(
   %sum_init = linalg.fill ins(%zero_f32 : f32)
       outs(%sum_empty : tensor<{BATCH}x1x1xf32>) -> tensor<{BATCH}x1x1xf32>
   %attention:3 = iree_linalg_ext.online_attention {{
-      decomposition_config = {{
-        pv_attrs = {{lowering_config = #pv_attrs_config}},
-        qk_attrs = {{lowering_config = #qk_attrs_config}}
-      }},
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>],
-      lowering_config = #attention_lowering_config
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]
     }}
-    ins(%query, %key, %value, %scale :
+    ins(%query, %key, %value, %scale, %mask :
       tensor<{BATCH}x1x1x{HEAD_DIM}xf16>,
-      tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>,
-      tensor<{BATCH}x{NUM_PAGES}x1x{PAGE_SIZE}x{HEAD_DIM}xf16>, f16)
+      tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>,
+      tensor<{BATCH}x?x1x{PAGE_SIZE}x{HEAD_DIM}xf16>, f16,
+      tensor<{BATCH}x1x1x?x{PAGE_SIZE}xf32>)
     outs(%output_init, %max_init, %sum_init :
       tensor<{BATCH}x1x1x{HEAD_DIM}xf32>, tensor<{BATCH}x1x1xf32>,
       tensor<{BATCH}x1x1xf32>) {{
