@@ -65,41 +65,93 @@ class SocketTestBase : public CtsTestBase<BaseType> {
     return listener;
   }
 
-  // Returns a loopback address where nothing is listening, guaranteed to
-  // produce ECONNREFUSED on any platform.
+  // Poll budget for connect attempts to CreateRefusedAddress() addresses.
   //
-  // On POSIX: create a listener on an ephemeral port, record the address,
-  // close the listener. The kernel sends RST to subsequent SYN packets on
-  // the recently-listened port. No guard is needed because POSIX ephemeral
-  // port allocators do not immediately reassign recently-closed ports.
+  // On POSIX loopback the refusal is effectively immediate: the RST (Reset
+  // segment - "there is no connection here, stop immediately") elicited by
+  // the SYN surfaces as ECONNREFUSED on the first poll. Windows is slower by
+  // design, in two independent ways:
   //
-  // On Windows: the same close-then-connect pattern races because the OS
-  // ephemeral port allocator can reassign the port between close and
-  // ConnectEx, causing the connect to succeed against a different listener.
-  // To prevent this, a guard socket is co-bound (via SO_REUSEADDR, which on
-  // Windows allows co-binding) to the same port without calling listen().
-  // Connections to a bound-but-not-listening port are refused on Windows.
+  // 1. Retry-after-RST: Winsock does not fail the connect on the first RST;
+  //    it retransmits the SYN and reports WSAECONNREFUSED only once the
+  //    connect retry budget is exhausted. Because the RST proves the target
+  //    is reachable, the retry timeout is not doubled between attempts. Per
+  //    MS KB175523 "INFO: Winsock TCP Connection Performance to Unused
+  //    Ports" (archived): "As long as an ACK/RST packet from an unused port
+  //    is received, the time-out value will not increase and the process
+  //    will repeat until the maximum retry value is reached."
+  //    https://mskb.pkisolutions.com/kb/175523
+  //    Net effect: a refused loopback connect takes on the order of seconds,
+  //    not microseconds.
   //
-  // On Windows, the guard socket is returned via |out_guard| and MUST be
-  // released by the caller after the connect attempt completes. On POSIX,
-  // |*out_guard| is set to NULL.
-  iree_async_address_t CreateRefusedAddress(iree_async_socket_t** out_guard) {
-    iree_async_address_t address;
-    iree_async_socket_t* listener = CreateListener(&address);
+  // 2. Unanswered-SYN backoff: if a SYN or its RST reply is dropped outright
+  //    (loaded CI runners), the connect falls back to retransmission after
+  //    the RTO (Retransmission TimeOut - how long TCP waits for an ACK
+  //    before retransmitting a segment) with exponential backoff. With the
+  //    defaults documented for TcpMaxConnectRetransmissions (initial timeout
+  //    3s, "doubled with each successive retransmission", default 2
+  //    retransmissions) the worst case is 3+6+12 = ~21 seconds:
+  //    https://learn.microsoft.com/en-us/troubleshoot/windows-client/networking/tcpip-and-nbt-configuration-parameters
+  //    Modern Windows exposes the equivalent knobs via Get/Set-NetTCPSetting
+  //    as InitialRtoMs ("the period ... before connect, or SYN, retransmit")
+  //    and MaxSynRetransmissions ("the maximum number of times the computer
+  //    sends SYN packets without receiving a response"):
+  //    https://learn.microsoft.com/en-us/powershell/module/nettcpip/set-nettcpsetting
+  //
+  // 30s covers the Windows worst case with margin. This does not slow down
+  // healthy runs: PollUntil() returns as soon as the completion arrives; the
+  // budget only bounds how long a genuinely broken run takes to fail.
+  static constexpr iree_duration_t kRefusedConnectBudget =
+      30ll * 1000 * 1000 * 1000;  // 30s
 
-#if defined(IREE_PLATFORM_WINDOWS)
-    // Co-bind a guard to hold the port after the listener closes.
+  // Returns a loopback address guaranteed to refuse TCP connections
+  // (ECONNREFUSED / WSAECONNREFUSED) for as long as |*out_guard| stays alive.
+  //
+  // Implementation: binds a TCP socket to an ephemeral loopback port and
+  // never calls listen(). RFC 9293 3.5.2 (Reset Generation, group 1:
+  // connection does not exist) requires: "a reset is sent in response to any
+  // incoming segment except another reset. A SYN segment that does not match
+  // an existing connection is rejected by this means."
+  // https://www.rfc-editor.org/rfc/rfc9293.html#section-3.5.2
+  // The RFC speaks of connections, not sockets; the sockets-API mapping is
+  // that bind() alone creates neither a connection nor a listener (only
+  // listen() moves a socket to LISTEN), so an incoming SYN matches nothing
+  // and the port is CLOSED as far as segment matching is concerned. Linux,
+  // macOS, and Windows all implement this by answering the SYN with RST -
+  // identical to a port with no socket at all. The bound-but-not-listening
+  // socket merely reserves the port number so nothing else can claim it.
+  //
+  // Keeping the bound socket alive (the guard) is what makes this race-free:
+  // the port cannot be handed back to the ephemeral allocator and claimed by
+  // a concurrent test (or another process) whose listener would accept our
+  // connect instead of refusing it. An earlier revision closed a listener
+  // and connected to its stale port, which raced exactly that way; the
+  // Windows variant co-bound a SO_REUSEADDR guard, but SO_REUSEADDR itself
+  // permits any other SO_REUSEADDR socket to bind the same port and start
+  // listening, so even the guarded port was hijackable:
+  // https://learn.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
+  // The bind-only guard requests no SO_REUSEADDR, so the port is exclusively
+  // owned until the guard is released.
+  //
+  // NOTE: the refusal is deterministic but not necessarily fast; use
+  // kRefusedConnectBudget when polling for the connect completion and
+  // ReapIfPending() before releasing the sockets (see kRefusedConnectBudget
+  // for the Windows SYN-retry latency details).
+  //
+  // The guard is returned via |out_guard| on all platforms and MUST be
+  // released by the caller after the connect attempt completes.
+  iree_async_address_t CreateRefusedAddress(iree_async_socket_t** out_guard) {
     iree_async_socket_t* guard = nullptr;
     IREE_CHECK_OK(
         iree_async_socket_create(this->proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
-                                 IREE_ASYNC_SOCKET_OPTION_REUSE_ADDR, &guard));
-    IREE_CHECK_OK(iree_async_socket_bind(guard, &address));
+                                 IREE_ASYNC_SOCKET_OPTION_NONE, &guard));
+    iree_async_address_t bind_address;
+    IREE_CHECK_OK(
+        iree_async_address_from_ipv4(IREE_SV("127.0.0.1"), 0, &bind_address));
+    IREE_CHECK_OK(iree_async_socket_bind(guard, &bind_address));
+    iree_async_address_t address;
+    IREE_CHECK_OK(iree_async_socket_query_local_address(guard, &address));
     *out_guard = guard;
-#else
-    *out_guard = nullptr;
-#endif  // IREE_PLATFORM_WINDOWS
-
-    iree_async_socket_release(listener);
     return address;
   }
 
