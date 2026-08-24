@@ -306,6 +306,36 @@ class CtsTestBase : public BaseType {
     }
   }
 
+  // Ensures |operation| is no longer in flight before returning: if its
+  // |tracker| callback has not fired yet, the operation is cancelled and the
+  // proactor is polled until the (typically CANCELLED) completion is
+  // delivered.
+  //
+  // Call this before releasing an operation's resources or returning from a
+  // test in which a preceding PollUntil() may have timed out with the
+  // operation still pending. Destroying a proactor with an operation in
+  // flight violates the proactor contract: the kernel still owns the
+  // operation's memory (the OVERLAPPED embedded in the carrier on Windows
+  // IOCP, SQE user data on io_uring) and trips the outstanding-operation
+  // assert in the backend destroy path, aborting the entire test binary
+  // instead of failing a single test.
+  //
+  // The canonical flake this guards against: a refused TCP connect on
+  // Windows can outlive a generous poll budget because the stack retries the
+  // SYN before reporting WSAECONNREFUSED (see
+  // SocketTestBase::kRefusedConnectBudget). TearDown()'s DrainPending() only
+  // reaps completions that already arrived; it cannot wait out an in-flight
+  // ConnectEx, so the pending operation must be cancelled explicitly.
+  void ReapIfPending(iree_async_operation_t* operation,
+                     CompletionTracker* tracker) {
+    if (tracker->call_count > 0) return;
+    // Cancellation is best-effort by contract; the completion (CANCELLED or
+    // the operation's natural result if it won the race) is what we wait for.
+    iree_status_ignore(iree_async_proactor_cancel(proactor_, operation));
+    PollUntilCondition([&]() { return tracker->call_count > 0; },
+                       "pending operation reaped after cancel");
+  }
+
   // Convenience: poll once with a short timeout, draining whatever is ready.
   void PollOnce() {
     iree_host_size_t completed = 0;
