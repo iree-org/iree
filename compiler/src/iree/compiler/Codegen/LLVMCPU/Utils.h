@@ -33,22 +33,6 @@ bool hasAVX2Feature(DictionaryAttr targetConfig);
 /// Returns true if the 'targetAttr' contains '+avx512f' in its cpu features.
 bool hasAVX512fFeature(DictionaryAttr targetConfig);
 
-/// Returns true if the 'targetAttr' contains '+v' in its cpu features.
-bool hasVFeature(DictionaryAttr targetConfig);
-
-/// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
-bool hasZve32xFeature(DictionaryAttr targetConfig);
-
-/// Returns true if the 'targetAttr' contains '+zve32f' in its cpu features.
-bool hasZve32fFeature(DictionaryAttr targetConfig);
-
-/// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
-bool hasZve64xFeature(DictionaryAttr targetConfig);
-
-/// Returns true if the 'targetAttr' contains any riscv vector feature in its
-/// cpu features.
-bool hasAnyVFeature(DictionaryAttr targetConfig);
-
 /// Returns true if the 'targetAttr' contains '+zfbfmin' in its cpu features.
 bool hasZfbfminFeature(DictionaryAttr targetConfig);
 

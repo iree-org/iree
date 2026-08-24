@@ -1899,7 +1899,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
     // Note: Inferring scalable sizes is not supported is `opResult` is set
     // (which is used to compute sizes for linalg.pack/unpack).
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
-    vscaleRange = getDefaultVscaleRange(targetAttr);
+    vscaleRange = getVscaleRange(targetAttr);
   }
 
   VectorizationTileSizes result;

@@ -8,6 +8,7 @@
 
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -97,6 +98,7 @@ void LLVMTarget::print(llvm::raw_ostream &os) const {
      << ", cpuFeatures=" << cpuFeatures << "\n"
      << "  dataLayout=" << dataLayout << "\n"
      << "  vectorWidthInBytes=" << vectorWidthInBytes << "\n"
+     << "  vscaleRange=[" << vscaleRangeMin << ", " << vscaleRangeMax << "]\n"
      << "  linkEmbedded=" << linkEmbedded << "\n"
      << "  debugSymbols=" << debugSymbols << "\n"
      << "  sanitizer=" << static_cast<int>(sanitizerKind) << "\n"
@@ -137,6 +139,9 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   }
   if (vectorWidthInBytes != DEFAULT_VECTOR_WIDTH_IN_BYTES) {
     addConfigNativeVectorSize(context, vectorWidthInBytes, config);
+  }
+  if (vscaleRangeMax != DEFAULT_VSCALE_RANGE) {
+    addConfigVscaleRange(context, vscaleRangeMin, vscaleRangeMax, config);
   }
   addConfigMaxStackAllocationSize(context, maxStackAllocSizeInBytes, config);
   if (linkEmbedded != DEFAULT_LINK_EMBEDDED) {
@@ -283,6 +288,10 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   target.dataLayout = getConfigDataLayout(config).value_or(DEFAULT_DATA_LAYOUT);
   target.vectorWidthInBytes =
       getConfigNativeVectorSize(config).value_or(DEFAULT_VECTOR_WIDTH_IN_BYTES);
+  if (auto vscaleRange = getConfigVscaleRange(config)) {
+    target.vscaleRangeMin = vscaleRange->first;
+    target.vscaleRangeMax = vscaleRange->second;
+  }
 
   target.debugSymbols = getBool("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
   target.linkStatic = getBool("link_static", DEFAULT_LINK_STATIC);
@@ -595,6 +604,11 @@ void LLVMCPUTargetCLOptions::bindOptions(OptionsBinder &binder) {
                        targetVectorWidthInBytes, llvm::cl::cat(category),
                        llvm::cl::desc("Overrides the native vector register "
                                       "width (in bytes) of the target."));
+  binder.opt<std::string>(
+      "iree-llvmcpu-vscale-range", targetVscaleRange, llvm::cl::cat(category),
+      llvm::cl::desc(
+          "Vscale range for scalable vectorization, in vscale units, as `max` "
+          "or `min,max` (e.g. `16`, `1,16`), where 1 <= min <= max."));
   binder.opt<llvm::cl::PowerOf2ByteSize>(
       "iree-llvmcpu-stack-allocation-limit", targetMaxStackAllocSizeInBytes,
       llvm::cl::cat(category),
@@ -672,6 +686,31 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.floatABI = targetFloatABI;
   target.dataLayout = targetDataLayout;
   target.vectorWidthInBytes = targetVectorWidthInBytes;
+  // Parse the vscale range spec, accepted as `max` (min defaults to 1) or
+  // `min,max`. Both ends are vscale multipliers, so they must be positive and
+  // ordered.
+  if (!targetVscaleRange.empty()) {
+    SmallVector<StringRef> fields;
+    StringRef(targetVscaleRange).split(fields, ',');
+    auto parsePositive = [](StringRef field, int64_t &value) {
+      field = field.trim();
+      return !field.empty() && !field.getAsInteger(10, value) && value >= 1;
+    };
+    int64_t min = 1, max = 0;
+    bool valid = fields.size() == 1
+                     ? parsePositive(fields[0], max)
+                     : fields.size() == 2 && parsePositive(fields[0], min) &&
+                           parsePositive(fields[1], max);
+    if (!valid || min > max) {
+      // TODO(egebeysel): promote this to an error.
+      llvm::errs() << "invalid --iree-llvmcpu-vscale-range: '"
+                   << targetVscaleRange
+                   << "'; expected `max` or `min,max` with 1 <= min <= max\n";
+    } else {
+      target.vscaleRangeMin = min;
+      target.vscaleRangeMax = max;
+    }
+  }
   target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;
   target.ukernels = enableUkernels;
   target.llvmUkernels = enableLlvmUkernels;
