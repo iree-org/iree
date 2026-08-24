@@ -228,6 +228,25 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
   return success();
 }
 
+/// Verifies that a vscale range is available when scalable vectorization is
+/// enabled for a target that can generate scalable vectors.
+static LogicalResult
+verifyScalableVectorizationConfig(FunctionOpInterface funcOp) {
+  if (!isScalableVectorizationEnabled()) {
+    return success();
+  }
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  DictionaryAttr targetConfig =
+      targetAttr ? targetAttr.getConfiguration() : nullptr;
+  if (!targetSupportsScalableVectors(targetConfig) ||
+      getVscaleRange(targetAttr)) {
+    return success();
+  }
+  return funcOp.emitOpError("scalable vectorization is enabled but no vscale "
+                            "range is available; specify one via "
+                            "--iree-llvmcpu-vscale-range");
+}
+
 /// Verify that valid configuration is set for all ops within the funcOp.
 template <typename F>
 static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
@@ -253,6 +272,10 @@ static LogicalResult verifyLoweringConfiguration(FunctionOpInterface funcOp,
 void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   mlir::ModuleOp moduleOp = getOperation();
   for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    if (failed(verifyScalableVectorizationConfig(funcOp))) {
+      return signalPassFailure();
+    }
+
     // Set the strategy with default heuristics.
     if (failed(initCPULaunchConfig(funcOp))) {
       funcOp.emitOpError("failed to set lowering configuration");

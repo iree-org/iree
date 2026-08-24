@@ -31,12 +31,16 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Linker/Linker.h"
+#include "llvm/TargetParser/RISCVTargetParser.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
@@ -141,6 +145,33 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   std::memcpy(baseFile.data() + baseFileSize + debugFileSize, &footer,
               sizeof(footer));
   return success();
+}
+
+// Returns the vscale range to attach to the module's functions, or nullopt if
+// the target does not specify one.
+static std::optional<std::pair<unsigned, unsigned>>
+getVscaleRangeForFunctions(const LLVMTarget &target) {
+  if (target.vscaleRangeMax == LLVMTarget::DEFAULT_VSCALE_RANGE) {
+    return std::nullopt;
+  }
+  auto vscaleMin = static_cast<unsigned>(target.vscaleRangeMin);
+  auto vscaleMax = static_cast<unsigned>(target.vscaleRangeMax);
+  SmallVector<StringRef> features;
+  StringRef(target.getCpuFeatures())
+      .split(features, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  for (StringRef feature : features) {
+    if (feature.consume_front("+zvl") && feature.consume_back("b")) {
+      unsigned bits = 0;
+      if (!feature.getAsInteger(10, bits) &&
+          bits >= llvm::RISCV::RVVBitsPerBlock) {
+        vscaleMin = std::max(vscaleMin, bits / llvm::RISCV::RVVBitsPerBlock);
+      }
+    } else if (feature == "+v") {
+      // `+v` implies `+zvl128b`, i.e. a minimum RVV VLEN of 128 bits.
+      vscaleMin = std::max(vscaleMin, 128u / llvm::RISCV::RVVBitsPerBlock);
+    }
+  }
+  return std::make_pair(vscaleMin, vscaleMax);
 }
 
 class LLVMCPUTargetBackend final : public TargetBackend {
@@ -342,6 +373,12 @@ public:
                                       "dialect to the native llvm::Module";
     }
 
+    // The `vscale_range` function attribute is how the AArch64 (SVE) and
+    // RISC-V (RVV) backends learn the target's vector-length bounds, each
+    // scaling it by its own vscale unit width.
+    std::optional<std::pair<unsigned, unsigned>> vscaleRange =
+        getVscaleRangeForFunctions(target);
+
     // Configure the functions in the module. This may override defaults set
     // during the MLIR->LLVM conversion.
     for (auto &func : *llvmModule) {
@@ -358,6 +395,11 @@ public:
       // Our dispatches are all hot - that's kind of the point.
       // This may favor more aggressive optimizations.
       func.addFnAttr("hot");
+
+      if (vscaleRange) {
+        func.addFnAttr(llvm::Attribute::getWithVScaleRangeArgs(
+            context, vscaleRange->first, vscaleRange->second));
+      }
     }
 
     // Build the IREE HAL executable library metadata. The runtime uses this to

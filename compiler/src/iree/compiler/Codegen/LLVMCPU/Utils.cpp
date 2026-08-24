@@ -66,29 +66,6 @@ bool hasAVX512fFeature(DictionaryAttr targetConfig) {
   return hasFeature(targetConfig, "+avx512f");
 }
 
-bool hasVFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+v");
-}
-
-bool hasZve32xFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+zve32x");
-}
-
-bool hasZve32fFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+zve32f");
-}
-
-bool hasZve64xFeature(DictionaryAttr targetConfig) {
-  return hasFeature(targetConfig, "+zve64x");
-}
-
-bool hasAnyVFeature(DictionaryAttr targetConfig) {
-  return hasVFeature(targetConfig) || hasZve32xFeature(targetConfig) ||
-         hasZve32fFeature(targetConfig) || hasZve64xFeature(targetConfig) ||
-         hasFeature(targetConfig, "+zve64f") ||
-         hasFeature(targetConfig, "+zve64d");
-}
-
 bool hasZfbfminFeature(DictionaryAttr targetConfig) {
   return hasFeature(targetConfig, "+zfbfmin");
 }
