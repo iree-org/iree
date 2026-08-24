@@ -15,6 +15,10 @@ contact:
     given-names: Stella
     email: stellaraccident@gmail.com
     affiliation: Advanced Micro Devices, Inc.
+  - family-names: Bartel
+    given-names: Maximilian
+    email: bartel@roofline.ai
+    affiliation: RooflineAI GmbH
 license: "Apache-2.0 WITH LLVM-exception"
 url: "https://iree.dev/"
 repository-code: "https://github.com/iree-org/iree"
