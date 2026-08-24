@@ -107,40 +107,90 @@ class SocketTestBase : public CtsTestBase<BaseType> {
   // Returns a loopback address guaranteed to refuse TCP connections
   // (ECONNREFUSED / WSAECONNREFUSED) for as long as |*out_guard| stays alive.
   //
-  // Implementation: binds a TCP socket to an ephemeral loopback port and
-  // never calls listen(). RFC 9293 3.5.2 (Reset Generation, group 1:
-  // connection does not exist) requires: "a reset is sent in response to any
-  // incoming segment except another reset. A SYN segment that does not match
-  // an existing connection is rejected by this means."
+  // Implementation, Linux and Windows: binds a TCP socket to an ephemeral
+  // loopback port and never calls listen(). RFC 9293 3.5.2 (Reset Generation,
+  // group 1: connection does not exist) requires: "a reset is sent in
+  // response to any incoming segment except another reset. A SYN segment that
+  // does not match an existing connection is rejected by this means."
   // https://www.rfc-editor.org/rfc/rfc9293.html#section-3.5.2
-  // The RFC speaks of connections, not sockets; the sockets-API mapping is
-  // that bind() alone creates neither a connection nor a listener (only
-  // listen() moves a socket to LISTEN), so an incoming SYN matches nothing
-  // and the port is CLOSED as far as segment matching is concerned. Linux,
-  // macOS, and Windows all implement this by answering the SYN with RST -
-  // identical to a port with no socket at all. The bound-but-not-listening
-  // socket merely reserves the port number so nothing else can claim it.
+  // The RFC speaks of connections, not sockets, so whether a bound-but-not-
+  // listening port "matches" an incoming SYN is up to the stack, and the
+  // major stacks genuinely disagree:
   //
-  // Keeping the bound socket alive (the guard) is what makes this race-free:
-  // the port cannot be handed back to the ephemeral allocator and claimed by
-  // a concurrent test (or another process) whose listener would accept our
-  // connect instead of refusing it. An earlier revision closed a listener
-  // and connected to its stale port, which raced exactly that way; the
-  // Windows variant co-bound a SO_REUSEADDR guard, but SO_REUSEADDR itself
-  // permits any other SO_REUSEADDR socket to bind the same port and start
-  // listening, so even the guarded port was hijackable:
+  // - Linux: bind() only reserves the port in the bind hash
+  //   (inet_csk_get_port -> bhash), which is bookkeeping for port
+  //   allocation, not a demux table; a socket enters the listener lookup
+  //   table (lhash2) only via listen() (net/ipv4/inet_hashtables.c:
+  //   __inet_hash inserts into lhash2 only for sk_state == TCP_LISTEN, and
+  //   __inet_lookup_listener consults only lhash2). The incoming SYN
+  //   therefore matches no socket and tcp_v4_rcv() answers with RST
+  //   (net/ipv4/tcp_ipv4.c: "no_tcp_socket" label -> tcp_v4_send_reset,
+  //   SKB_DROP_REASON_NO_SOCKET):
+  //   https://github.com/torvalds/linux/blob/v6.14/net/ipv4/tcp_ipv4.c
+  //   https://github.com/torvalds/linux/blob/v6.14/net/ipv4/inet_hashtables.c
+  //
+  // - Windows: refuses connections to a bound-but-not-listening port. No
+  //   public source or explicit documentation; verified empirically - the
+  //   Windows runtime CI job exercises this path in every run of these
+  //   tests, and the refusal completes within kRefusedConnectBudget.
+  //
+  // So on Linux/Windows the bound socket doubles as a race-free guard: it
+  // reserves the port so no other test or process can claim it and start
+  // listening, while never accepting anything itself. The guard deliberately
+  // does NOT request SO_REUSEADDR: on Windows a SO_REUSEADDR binding would
+  // allow any other SO_REUSEADDR socket to bind the same port and start
+  // listening, hijacking the refusal:
   // https://learn.microsoft.com/en-us/windows/win32/winsock/using-so-reuseaddr-and-so-exclusiveaddruse
-  // The bind-only guard requests no SO_REUSEADDR, so the port is exclusively
-  // owned until the guard is released.
   //
-  // NOTE: the refusal is deterministic but not necessarily fast; use
+  // - macOS resolves the RFC ambiguity the other way: XNU inserts bound pcbs
+  //   into the incoming-segment lookup hash at bind() time
+  //   (bsd/netinet/in_pcb.c: in_pcbbind -> in_pcbinshash), so the SYN
+  //   matches the bound-but-not-listening pcb; tcp_input then sees
+  //   t_state == TCPS_CLOSED and SILENTLY DISCARDS the segment - no RST
+  //   (bsd/netinet/tcp_input.c: "If the TCB exists but is in CLOSED state,
+  //   it is embryonic, but should either do a listen or a connect soon" ->
+  //   DROP_REASON_TCP_CLOSED, goto drop). Only a port with no pcb at all is
+  //   reset (goto dropwithresetnosock, logged as "closed port"):
+  //   https://github.com/apple-oss-distributions/xnu/blob/main/bsd/netinet/tcp_input.c
+  //   https://github.com/apple-oss-distributions/xnu/blob/main/bsd/netinet/in_pcb.c
+  //   The client's SYN is then retransmitted with backoff until the connect
+  //   times out; observed in CI as the connect never being refused (the
+  //   kqueue variant surfaced an error only after ~26s, the poll variant
+  //   exhausted a 30s budget with no completion - never ECONNREFUSED).
+  //
+  // On Apple platforms this helper therefore creates a real listener,
+  // records its port, and closes it before connecting: the port then has no
+  // TCP pcb at all and the SYN takes XNU's dropwithresetnosock path - an
+  // immediate RST. This trades back a small ephemeral-port reuse race
+  // (something else could bind+listen on the port between close and
+  // connect), which is acceptable because XNU allocates anonymous ports by
+  // walking sequentially from a (possibly randomized) starting point
+  // (bsd/netinet/in_pcb.c: in_pcbbind lastport walk), so the just-released
+  // port is only re-allocated if the walk wraps onto it or a randomized
+  // start lands on it. This was also the long-standing POSIX behavior of
+  // this helper before the guard existed, reliable on macOS in practice.
+  //
+  // NOTE: the refusal is deterministic but not necessarily fast (see
+  // kRefusedConnectBudget for the Windows SYN-retry latency); use
   // kRefusedConnectBudget when polling for the connect completion and
-  // ReapIfPending() before releasing the sockets (see kRefusedConnectBudget
-  // for the Windows SYN-retry latency details).
+  // ReapIfPending() before releasing the sockets.
   //
-  // The guard is returned via |out_guard| on all platforms and MUST be
-  // released by the caller after the connect attempt completes.
+  // On Linux and Windows the guard is returned via |out_guard| and MUST be
+  // released by the caller after the connect attempt completes; on Apple
+  // platforms |*out_guard| is set to NULL (release is NULL-safe, so callers
+  // may release unconditionally).
   iree_async_address_t CreateRefusedAddress(iree_async_socket_t** out_guard) {
+#if defined(IREE_PLATFORM_APPLE)
+    // Close-then-connect: leaves the port with no TCP PCB so the SYN is
+    // answered with RST (see above for why bind-only guarding fails here).
+    *out_guard = nullptr;
+    iree_async_address_t address;
+    iree_async_socket_t* listener = CreateListener(&address);
+    iree_async_socket_release(listener);
+    return address;
+#else
+    // Bind-only guard: reserves the port and guarantees RST-refusal for as
+    // long as it stays alive (see above).
     iree_async_socket_t* guard = nullptr;
     IREE_CHECK_OK(
         iree_async_socket_create(this->proactor_, IREE_ASYNC_SOCKET_TYPE_TCP,
@@ -153,6 +203,7 @@ class SocketTestBase : public CtsTestBase<BaseType> {
     IREE_CHECK_OK(iree_async_socket_query_local_address(guard, &address));
     *out_guard = guard;
     return address;
+#endif  // IREE_PLATFORM_APPLE
   }
 
   // Establishes a connected client/server pair via loopback.
