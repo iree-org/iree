@@ -617,6 +617,15 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
   return llvm::PowerOf2Ceil(size);
 }
 
+/// Returns the maximum vscale recorded on the target, or 0 if no `vscale_range`
+/// is set.
+static int64_t getVscaleMax(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (auto range = getVscaleRange(targetAttr)) {
+    return static_cast<int64_t>(range->vscaleMax);
+  }
+  return 0;
+}
+
 /// Computes the maximum tile size that can be used to distribute a dimension
 /// based on its number of iterations and the native vector size used of the
 /// target. The resulting tile size will be a multiple of the provided vector
@@ -2039,12 +2048,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int srcRank = op.getSourceRank();
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  IREE::Codegen::ScalableTileFlags scalableFlags(innerTiles.size(), false);
   // Try to infer scalable tile sizes. This is a no-op in case of static inner
   // tiles or if dynamic tile sizes are found, but scalable tile sizes cannot be
   // inferred.
   if (auto sizesAndScalableFlags =
           getScalableTileSizesAndFlags(op.getMixedTiles())) {
     innerTiles = sizesAndScalableFlags->first;
+    scalableFlags = sizesAndScalableFlags->second;
   }
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
@@ -2077,6 +2088,19 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
 
+  // For scalable inner tiles, the distribution tile on the packed dim must be a
+  // multiple of the largest possible inner tile (base * vscaleMax).
+  int64_t vscaleMax = getVscaleMax(target);
+  if (vscaleMax > 0) {
+    for (auto [pos, size, scalable] :
+         llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+      if (!scalable || distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
+        continue;
+      }
+      distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * vscaleMax);
+    }
+  }
+
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
@@ -2107,20 +2131,20 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     innerTiles = sizesAndScalableFlags->first;
     scalableFlags = sizesAndScalableFlags->second;
   }
-  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
-  // In case of scalable tile sizes, we align the distribution tile size with
-  // the static constant of the scalable tile size and round up to the next
-  // power of 2. Since vscale is a power of 2, this makes sure
-  // that the selected distribution size is divisible by or less than the
-  // effective scalable inner tile size.
+  // Align distribution tile sizes to inner tile sizes. For
+  // scalable inner tiles, align to the largest possible inner tile
+  // (base * vscaleMax) so the distribution tile stays a whole multiple of the
+  // runtime inner tile for any vscale.
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn));
   for (auto [pos, size, scalable] :
        llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
     if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
       continue;
     }
-    int64_t alignedTileSize = llvm::alignTo(distTileSizes[pos], size);
-    distTileSizes[pos] = roundUpToPow2(alignedTileSize, scalable);
+    int64_t multiplier = scalable ? vscaleMax : 1;
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * multiplier);
   }
 
   SmallVector<int64_t> vecTileSizes(op.getDestRank(), 1);
@@ -3603,6 +3627,8 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
 void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   ArrayRef<int64_t> rootOpGlobalDims =
       dimTracker.getAllGlobalDimIdx(rootOperation);
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(rootOperation));
   auto adjust = [&](Operation *op, ArrayRef<int64_t> vecTileSize,
                     IREE::CPU::TilingLevel level,
                     llvm::function_ref<int64_t(int64_t, int64_t)> updater) {
@@ -3641,11 +3667,24 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
         continue;
       }
       // For pack op, align the distribution tile size and overwrite the
-      // vector parallel tile size and scalable flag.
-      adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
+      // vector parallel tile size and scalable flag. Distribution tiles for
+      // scalable inner tiles are aligned to their largest runtime size (base *
+      // vscaleMax).
+      SmallVector<bool> packScalableFlags = nonRootOpScalableFlags.lookup(op);
+      SmallVector<int64_t> distAlignTiles(vecTileSize.begin(),
+                                          vecTileSize.end());
+      if (vscaleMax > 0) {
+        for (auto [i, scalable] : llvm::enumerate(packScalableFlags)) {
+          if (scalable && i < distAlignTiles.size() && distAlignTiles[i] > 0) {
+            distAlignTiles[i] *= vscaleMax;
+          }
+        }
+      }
+      adjust(op, distAlignTiles, IREE::CPU::TilingLevel::DistributionTiles,
+             align);
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
-      adjustScalableFlags(op, nonRootOpScalableFlags.lookup(op),
+      adjustScalableFlags(op, packScalableFlags,
                           IREE::CPU::TilingLevel::VectorCommonParallelTiles,
                           overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
@@ -4058,10 +4097,11 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "The tile sizes for each dimension should be aligned to "
          << alignedSizes;
 
-  // Fixup for making tileSizes be multiple of inner_tile_sizes. In case of
-  // scalable inner tiles, we align the distribution tile sizes with the static
-  // constant of the scalable inner tile size and round up to the next power of
-  // 2 to ensure alignment.
+  // Fixup for making tileSizes be multiple of inner_tile_sizes. Scalable
+  // distribution tiles are aligned to the largest possible inner tile
+  // (base * vscaleMax).
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn));
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       loweringConfig.getAvailableTilingInfo();
   for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
@@ -4070,12 +4110,12 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
       if (tileSizes[idx] == 0) {
         continue;
       }
-      int64_t alignedTileSize =
-          llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
-      tileSizes[idx] = roundUpToPow2(
-          alignedTileSize,
-          vecParallelScalableTileFlags[idx] &&
-              info.level == IREE::CPU::TilingLevel::DistributionTiles);
+      int multiplier = (vecParallelScalableTileFlags[idx] &&
+                        info.level == IREE::CPU::TilingLevel::DistributionTiles)
+                           ? vscaleMax
+                           : 1;
+      tileSizes[idx] =
+          llvm::alignTo(tileSizes[idx], alignedSizes[idx] * multiplier);
     }
     // Fixup for the scalable tile flags.
     if (info.level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
