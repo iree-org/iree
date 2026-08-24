@@ -236,9 +236,7 @@ iree_uk_mmt4d_tile_s8s8s32_8xXXx8_to_32xXXx32_riscv_64_xsmtvdot(
 }
 
 // Shared 1x4-atom (narrow) xsmtvdot body: truncation of the 3x4 primary grid
-// down to a single atom-row. Same N0 = 4*atom and K0 = 2*atom as the
-// matching primary tile for a given atom (VLEN bucket); only M0 = atom
-// shrinks.
+// down to a single atom-row.
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_s8s8s32_4xXXx8_to_16xXXx32_riscv_64_xsmtvdot(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,

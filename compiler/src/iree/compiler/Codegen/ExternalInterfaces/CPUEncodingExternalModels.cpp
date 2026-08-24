@@ -1247,8 +1247,8 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
     // SpaceMiT IME (vmadot): fixed hardware tiles for VLEN ∈ {256, 1024,
     // 4096}. Primary tile is a 3×4 grid of the SEW=8 MAC atom (4×4×8 / 8×8×16
     // / 16×16×32); narrow truncations of the same grid (2×4 and 1×4 atom
-    // rows) share the same N0/K0 and only shrink M0, to avoid falling back to
-    // slower non-IME paths for narrow-M matmuls. Other VLENs / scalable mode
+    // rows) share the same N0/K0 and only shrink M0, to avoid excessive
+    // padding for narrow-M matmuls. Other VLENs / scalable mode
     // fall through to standard RVV tiles.
     if (hasFeature(config, "+xsmtvdot") && !isScalableVectorizationEnabled()) {
       int atom = 0;
