@@ -97,6 +97,24 @@
 // CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: +sse4.2,
 // CHECK-X86-64-V4-WITH-USER-FEATURES-SAME: -avx512f
 
+// A `min,max` spec is recorded on the target config as a vscale_range [min, max].
+//
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN:              --iree-llvmcpu-vscale-range=2,16 \
+// RUN: | FileCheck %s --check-prefix=CHECK-VSCALE-RANGE
+//
+// CHECK-VSCALE-RANGE: #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+// CHECK-VSCALE-RANGE-SAME: vscale_range = [2, 16]
+
+// A single value sets the maximum; the minimum defaults to 1.
+//
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu %s \
+// RUN:              --iree-llvmcpu-vscale-range=16 \
+// RUN: | FileCheck %s --check-prefix=CHECK-VSCALE-MAX-ONLY
+//
+// CHECK-VSCALE-MAX-ONLY: #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+// CHECK-VSCALE-MAX-ONLY-SAME: vscale_range = [1, 16]
+
 module {
   util.func public @foo(%arg0: tensor<?xf32>) -> tensor<?xf32> {
     util.return %arg0 : tensor<?xf32>

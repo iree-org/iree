@@ -33,6 +33,8 @@ enum class SanitizerKind {
 struct LLVMTarget {
   static constexpr const char *DEFAULT_DATA_LAYOUT = "";
   static constexpr int64_t DEFAULT_VECTOR_WIDTH_IN_BYTES = 0;
+  // 0 means "unset": no scalable-vector range is assumed.
+  static constexpr int64_t DEFAULT_VSCALE_RANGE = 0;
   static constexpr int64_t DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES = 32768;
   static constexpr bool DEFAULT_LINK_EMBEDDED = true;
   static constexpr bool DEFAULT_DEBUG_SYMBOLS = true;
@@ -63,6 +65,8 @@ struct LLVMTarget {
     cpuFeatures = other.cpuFeatures;
     dataLayout = other.dataLayout;
     vectorWidthInBytes = other.vectorWidthInBytes;
+    vscaleRangeMin = other.vscaleRangeMin;
+    vscaleRangeMax = other.vscaleRangeMax;
     linkEmbedded = other.linkEmbedded;
     ukernels = other.ukernels;
     linkUkernelBitcode = other.linkUkernelBitcode;
@@ -97,6 +101,9 @@ struct LLVMTarget {
   std::string dataLayout = DEFAULT_DATA_LAYOUT;
   // Overrides the vector width (in bytes) of the target.
   int64_t vectorWidthInBytes = DEFAULT_VECTOR_WIDTH_IN_BYTES;
+  // Either both ends are set or neither is; DEFAULT_VSCALE_RANGE means unset.
+  int64_t vscaleRangeMin = DEFAULT_VSCALE_RANGE;
+  int64_t vscaleRangeMax = DEFAULT_VSCALE_RANGE;
   int64_t maxStackAllocSizeInBytes = DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
@@ -216,6 +223,8 @@ struct LLVMCPUTargetCLOptions {
   llvm::FloatABI::ABIType targetFloatABI = LLVMTarget::DEFAULT_FLOAT_ABI;
   std::string targetDataLayout = LLVMTarget::DEFAULT_DATA_LAYOUT;
   unsigned targetVectorWidthInBytes = LLVMTarget::DEFAULT_VECTOR_WIDTH_IN_BYTES;
+  // Scalable-vector range spec, as `max` or `min,max` (empty = unset).
+  std::string targetVscaleRange;
   llvm::cl::PowerOf2ByteSize targetMaxStackAllocSizeInBytes =
       LLVMTarget::DEFAULT_MAX_STACK_ALLOC_SIZE_IN_BYTES;
   std::string enableUkernels = LLVMTarget::DEFAULT_ENABLE_UKERNELS;

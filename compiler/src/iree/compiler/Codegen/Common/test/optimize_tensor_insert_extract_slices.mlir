@@ -371,7 +371,7 @@ func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 
 func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
   attributes {hal.executable.target = #aarch64_sve}
@@ -429,7 +429,7 @@ func.func @negative_fold_insert_slice_into_transfer_write_static(%v: vector<3x5x
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 
 func.func @negative_fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[2]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
   attributes {hal.executable.target = #aarch64_sve}

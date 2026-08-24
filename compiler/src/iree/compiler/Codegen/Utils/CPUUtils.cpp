@@ -21,6 +21,8 @@
 
 namespace mlir::iree_compiler {
 
+static const char kVscaleRangeAttrName[] = "vscale_range";
+
 static llvm::cl::opt<bool> clEnableScalableVectorization(
     "iree-llvmcpu-enable-scalable-vectorization",
     llvm::cl::desc("Enable scalable vectorization if it is supported by the "
@@ -152,6 +154,60 @@ bool hasAnySVEFeature(DictionaryAttr targetConfig) {
          hasFeature(targetConfig, "+sve2") || hasFeature(targetConfig, "+v9a");
 }
 
+bool hasVFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+v");
+}
+
+bool hasZve32xFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+zve32x");
+}
+
+bool hasZve32fFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+zve32f");
+}
+
+bool hasZve64xFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+zve64x");
+}
+
+bool hasAnyVFeature(DictionaryAttr targetConfig) {
+  return hasVFeature(targetConfig) || hasZve32xFeature(targetConfig) ||
+         hasZve32fFeature(targetConfig) || hasZve64xFeature(targetConfig) ||
+         hasFeature(targetConfig, "+zve64f") ||
+         hasFeature(targetConfig, "+zve64d");
+}
+
+bool targetSupportsScalableVectors(DictionaryAttr targetConfig) {
+  if (!targetConfig) {
+    return false;
+  }
+  return (isAArch64(targetConfig) && hasAnySVEFeature(targetConfig)) ||
+         (isRISCV(targetConfig) && hasAnyVFeature(targetConfig));
+}
+
+std::optional<std::pair<int64_t, int64_t>>
+getConfigVscaleRange(DictionaryAttr targetConfig) {
+  auto attr = targetConfig.getAs<ArrayAttr>(kVscaleRangeAttrName);
+  if (!attr || attr.size() != 2) {
+    return std::nullopt;
+  }
+  auto lo = dyn_cast<IntegerAttr>(attr[0]);
+  auto hi = dyn_cast<IntegerAttr>(attr[1]);
+  if (!lo || !hi) {
+    return std::nullopt;
+  }
+  return std::make_pair(lo.getInt(), hi.getInt());
+}
+void addConfigVscaleRange(MLIRContext *context, int64_t vscaleMin,
+                          int64_t vscaleMax,
+                          SmallVectorImpl<NamedAttribute> &config) {
+  auto i64 = IntegerType::get(context, 64);
+  config.emplace_back(
+      StringAttr::get(context, kVscaleRangeAttrName),
+      ArrayAttr::get(context, {IntegerAttr::get(i64, vscaleMin),
+                               IntegerAttr::get(i64, vscaleMax)}));
+}
+
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (targetAttr) {
@@ -165,6 +221,18 @@ getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
   }
   // TODO: Implement for other architectures.
   return std::nullopt;
+}
+
+std::optional<vector::VscaleRange>
+getVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (!targetAttr) {
+    return std::nullopt;
+  }
+  if (auto range = getConfigVscaleRange(targetAttr.getConfiguration())) {
+    return vector::VscaleRange{static_cast<unsigned>(range->first),
+                               static_cast<unsigned>(range->second)};
+  }
+  return getDefaultVscaleRange(targetAttr);
 }
 
 } // namespace mlir::iree_compiler
