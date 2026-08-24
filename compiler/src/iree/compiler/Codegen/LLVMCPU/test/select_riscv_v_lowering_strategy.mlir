@@ -121,7 +121,7 @@ func.func @pack(%arg0: tensor<20x48xf32>) -> tensor<2x?x16x?xf32> attributes {ha
 //      CHECK: func.func @pack(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pack
-// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -152,7 +152,7 @@ func.func @elem_pack(%arg0: tensor<128x384xf32>) -> tensor<16x?x8x?xf32> attribu
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
 //      CHECK:   linalg.pack
-// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 
 // -----

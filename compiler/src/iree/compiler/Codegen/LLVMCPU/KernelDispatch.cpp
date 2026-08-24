@@ -3872,11 +3872,6 @@ static void captureInnerTileAlignment(
           std::is_same_v<PackUnpackType, linalg::UnPackOp>,
       "Inner tile alignment hints can only be captured for pack/unpack ops!");
   bool isDistribution = level == IREE::CPU::TilingLevel::DistributionTiles;
-  // Distribution-level hints for pack ops are captured separately; for now only
-  // unpack ops get a distribution hint.
-  if (isDistribution && std::is_same_v<PackUnpackType, linalg::PackOp>) {
-    return;
-  }
   int64_t rank = std::is_same_v<PackUnpackType, linalg::PackOp>
                      ? op.getSourceRank()
                      : op.getDestRank();
