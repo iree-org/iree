@@ -77,7 +77,7 @@ func.func @unpack(%arg0 : tensor<128x10x?x8x?xf32>) -> tensor<128x80x320xf32> at
 //       CHECK: func.func @unpack
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
-//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Unknown, Equal]>
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Unknown, Multiple], vector_common_parallel = [Unknown, Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -99,7 +99,7 @@ func.func @unpack_outer_dynamic(%arg0 : tensor<?x?x32x?xf32>, %dim0 : index, %di
 //       CHECK: func.func @unpack_outer_dynamic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
-//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----

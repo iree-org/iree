@@ -3292,6 +3292,19 @@ getScalableInnerTileAlignment(int64_t loopTile, bool loopScalable,
   return mlir::InnerTileAlignment::Unknown;
 }
 
+/// Returns the `InnerTileAlignment` of a static distribution tile relative to a
+/// scalable inner tile whose largest runtime size is `maxInnerTile`
+/// (base * vscaleMax). A distribution tile that is a whole multiple of the
+/// largest inner tile is a whole multiple of the inner tile for any vscale, so
+/// it is reported as `Multiple`.
+static mlir::InnerTileAlignment
+getDistributionInnerTileAlignment(int64_t distTile, int64_t maxInnerTile) {
+  if (distTile <= 0 || maxInnerTile <= 0 || distTile % maxInnerTile != 0) {
+    return mlir::InnerTileAlignment::Unknown;
+  }
+  return mlir::InnerTileAlignment::Multiple;
+}
+
 /// Transforms tiling sizes from the unpacked domain to the packed domain
 /// for a `PackOp` by undoing the scaling for inner dimensions and applying
 /// outer dimension permutations.
@@ -3851,15 +3864,17 @@ template <typename PackUnpackType>
 static void captureInnerTileAlignment(
     PackUnpackType op, const SizesAndScalableFlags &scalableTilesFlags,
     IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
-    ArrayRef<bool> scalableFlags,
+    ArrayRef<bool> scalableFlags, int64_t vscaleMax,
     SmallVectorImpl<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>>
         &perLevel) {
   static_assert(
       std::is_same_v<PackUnpackType, linalg::PackOp> ||
           std::is_same_v<PackUnpackType, linalg::UnPackOp>,
       "Inner tile alignment hints can only be captured for pack/unpack ops!");
-  // TODO(egebeysel): wire in distribution tile size alignment logic.
-  if (level == IREE::CPU::TilingLevel::DistributionTiles) {
+  bool isDistribution = level == IREE::CPU::TilingLevel::DistributionTiles;
+  // Distribution-level hints for pack ops are captured separately; for now only
+  // unpack ops get a distribution hint.
+  if (isDistribution && std::is_same_v<PackUnpackType, linalg::PackOp>) {
     return;
   }
   int64_t rank = std::is_same_v<PackUnpackType, linalg::PackOp>
@@ -3874,8 +3889,16 @@ static void captureInnerTileAlignment(
     if (!scalableTilesFlags.second[i] || pos >= tileSizes.size()) {
       continue;
     }
-    mlir::InnerTileAlignment kind = getScalableInnerTileAlignment(
-        tileSizes[pos], scalableFlags[pos], scalableTilesFlags.first[i]);
+    int64_t innerBase = scalableTilesFlags.first[i];
+    // At the distribution level the loop tile is static but has been aligned to
+    // the largest inner tile (base * vscaleMax), so classify against that;
+    // other levels compare the scalable loop tile against the base directly.
+    mlir::InnerTileAlignment kind =
+        isDistribution
+            ? getDistributionInnerTileAlignment(tileSizes[pos],
+                                                innerBase * vscaleMax)
+            : getScalableInnerTileAlignment(tileSizes[pos], scalableFlags[pos],
+                                            innerBase);
     alignments[pos] = llvm::to_underlying(kind);
     if (kind != mlir::InnerTileAlignment::Unknown) {
       any = true;
@@ -3894,6 +3917,8 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
   }
   std::sort(tilingLevels.begin(), tilingLevels.end());
 
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(rootOperation));
   for (auto op : computeOps) {
     SmallVector<utils::IteratorType> iterTypes =
         cast<TilingInterface>(op).getLoopIteratorTypes();
@@ -3936,7 +3961,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
                 getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
           captureInnerTileAlignment<linalg::PackOp>(
               packOp, *packScalableTilesFlags, level, tileSizes, scalableFlags,
-              perLevelAlignments);
+              vscaleMax, perLevelAlignments);
         }
         // `MultiLoweringConfigGenerator` propagates tiling on the
         // unpacked dimensions, while for a pack operation, `LoweringConfig`
@@ -3961,7 +3986,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
                 getScalableTileSizesAndFlags(unpackOp.getMixedTiles())) {
           captureInnerTileAlignment<linalg::UnPackOp>(
               unpackOp, *unpackScalableTilesFlags, level, tileSizes,
-              scalableFlags, perLevelAlignments);
+              scalableFlags, vscaleMax, perLevelAlignments);
         }
       }
       // Append tiling info.
@@ -4266,6 +4291,8 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     return;
   }
 
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(packOp));
   SmallVector<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>> perLevel;
   for (int levelIdx = 0;
        levelIdx < llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
@@ -4283,7 +4310,7 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     }
     captureInnerTileAlignment<linalg::PackOp>(
         packOp, *packScalableTilesFlags, level, levelAttr.getSizes(),
-        levelAttr.getScalableFlags(), perLevel);
+        levelAttr.getScalableFlags(), vscaleMax, perLevel);
   }
 
   if (!perLevel.empty()) {
