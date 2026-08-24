@@ -892,8 +892,7 @@ static int iree_hal_vulkan_allocator_score_memory_type(
 static bool iree_hal_vulkan_allocator_select_memory_type(
     const iree_hal_vulkan_allocator_t* allocator,
     uint32_t allowed_memory_type_bits, const iree_hal_buffer_params_t* params,
-    iree_hal_memory_type_t required_type,
-    iree_hal_buffer_params_t* out_params,
+    iree_hal_memory_type_t required_type, iree_hal_buffer_params_t* out_params,
     iree_hal_vulkan_allocator_memory_placement_t* out_placement) {
   const VkPhysicalDeviceMemoryProperties* memory_properties =
       &allocator->memory_properties2.memoryProperties;
@@ -910,7 +909,8 @@ static bool iree_hal_vulkan_allocator_select_memory_type(
     const iree_hal_buffer_usage_t allowed_usage =
         iree_hal_vulkan_allowed_usage_from_memory_type(memory_type);
     if (!iree_all_bits_set(allowed_usage, candidate_params.usage)) {
-      if (!iree_hal_vulkan_allocator_strip_optional_mapping(&candidate_params)) {
+      if (!iree_hal_vulkan_allocator_strip_optional_mapping(
+              &candidate_params)) {
         continue;
       }
       if (!iree_all_bits_set(allowed_usage, candidate_params.usage)) continue;
