@@ -28,7 +28,7 @@
 /experimental/ @benvanik @jschuhmacher @maxbartel @stellaraccident
 
 # Infra Top-Level Directories
-/.github/ @AGindinson @amd-eochoalo @kuhar @schuermans-roofline
+/.github/ @AGindinson @kuhar @schuermans-roofline
 /build_tools/ @AGindinson @jschuhmacher @schuermans-roofline
 /build_tools/python_deploy/ @chrsmcgrr @maxbartel @stellaraccident
 /build_tools/scripts/ @AGindinson @Manewing @schuermans-roofline
@@ -50,7 +50,7 @@
 /compiler/src/iree/compiler/API/ @benvanik @jschuhmacher @maxbartel @schuermans-roofline
 /compiler/src/iree/compiler/Codegen/ @AGindinson @egebeysel @phemashekar
 /compiler/src/iree/compiler/Codegen/Common @AGindinson @egebeysel @phemashekar
-/compiler/src/iree/compiler/Codegen/**/*Vector* @amd-eochoalo @Groverkss @hanhanW @sommerlukas
+/compiler/src/iree/compiler/Codegen/**/*Vector* @Groverkss @hanhanW @sommerlukas
 /compiler/src/iree/compiler/Codegen/Common/GPU @AGindinson @egebeysel @ziereis
 /compiler/src/iree/compiler/Codegen/Dialect/CPU @AGindinson @egebeysel @hanhanW
 /compiler/src/iree/compiler/Codegen/Dialect/GPU @AGindinson @egebeysel @Groverkss @krzysz00
