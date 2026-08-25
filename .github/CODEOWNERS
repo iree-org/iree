@@ -12,83 +12,74 @@
 # CMakeLists.txt file to always ping a bunch of people.
 
 # Third-Party Code
-/.gitmodules @ScottTodd @stellaraccident
-/third_party/ @ScottTodd @stellaraccident
+/.gitmodules @schuermans-roofline @jschuhmacher @AGindinson
+/third_party/ @schuermans-roofline @jschuhmacher @AGindinson
 # Except for routinely-updated submodules
-/third_party/llvm-project @ghost
-/third_party/llvm-project.branch-pin @ghost
-/third_party/stablehlo @ghost
-/third_party/torch-mlir @ghost
+/third_party/llvm-project @schuermans-roofline @AGindinson
+/third_party/stablehlo @jschuhmacher @maxbartel
+/third_party/torch-mlir @AGindinson @maxbartel @ziereis
 
 # Bindings
-/runtime/bindings/python/ @stellaraccident
-/runtime/bindings/tflite/ @benvanik
-
-# Integrations
-/integrations/ @benvanik @stellaraccident
-/integrations/tensorflow/ @stellaraccident
-/integrations/tensorflow/test/**/iree_tfl_tests/ @rsuderman
+/runtime/bindings/python/ @stellaraccident @devtbi @schuermans-roofline @Manewing
+/runtime/bindings/tflite/ @benvanik @maxbartel @AGindinson
 
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
-/experimental/ @benvanik @stellaraccident
+/experimental/ @jschuhmacher @maxbartel @benvanik @stellaraccident
 
 # Infra Top-Level Directories
-/build_tools/ @Groverkss @kuhar
-/build_tools/python_deploy/ @stellaraccident
-/build_tools/scripts/ @Groverkss @kuhar
-/build_tools/third_party/ @ScottTodd @stellaraccident
-/.github/ @amd-eochoalo @kuhar @Groverkss
-
-# llvm-external-projects
-/llvm-external-projects/ @stellaraccident
+/build_tools/ @AGindinson @jschuhmacher @schuermans-roofline
+/build_tools/python_deploy/ @stellaraccident @maxbartel @chrsmcgrr
+/build_tools/scripts/ @schuermans-roofline @AGindinson @Manewing
+/build_tools/third_party/ @stellaraccident @AGindinson @devtbi
+/.github/ @AGindinson @schuermans-roofline @amd-eochoalo @kuhar
 
 # Other Top-Level Directories
-/docs/ @ScottTodd
-/tools/ @benvanik
+/docs/ @jschuhmacher @AGindinson @schuermans-roofline @devtbi
+/tools/ @benvanik @devtbi @schuermans-roofline
 
 # Tests
-/tests/external/iree-test-suites @Groverkss @MaheshRavishankar @kuhar
+# TODO: Invite @roberto-laudani as a separate PR
+/tests/external/iree-test-suites @jschuhmacher @AGindinson @ziereis
 
 # Compiler
-/compiler/src/iree/compiler/ @benvanik
-/compiler/src/iree/compiler/API/ @benvanik @IanWood1
-/compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/Common @hanhanW @Max191 @MaheshRavishankar @qedawkins
+/compiler/src/iree/compiler/ @benvanik @jschuhmacher @AGindinson
+/compiler/src/iree/compiler/API/ @benvanik @jschuhmacher @maxbartel @schuermans-roofline
+/compiler/src/iree/compiler/Codegen/ @AGindinson @egebeysel @phemashekar
+/compiler/src/iree/compiler/Codegen/Common @AGindinson @egebeysel @phemashekar
 /compiler/src/iree/compiler/Codegen/**/*Vector* @amd-eochoalo @Groverkss @hanhanW @sommerlukas
-/compiler/src/iree/compiler/Codegen/Common/GPU @qedawkins @Groverkss @kuhar
-/compiler/src/iree/compiler/Codegen/Dialect/Codegen @Max191 @MaheshRavishankar @qedawkins
-/compiler/src/iree/compiler/Codegen/Dialect/CPU @hanhanW
-/compiler/src/iree/compiler/Codegen/Dialect/GPU @qedawkins @Max191 @Groverkss @nirvedhmeshram @krzysz00
-/compiler/src/iree/compiler/Codegen/Dialect/PCF @qedawkins
-/compiler/src/iree/compiler/Codegen/Dialect/VectorExt @Groverkss
-/compiler/src/iree/compiler/Codegen/ExternalInterfaces @hanhanW @Max191 @jtuyls
-/compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW
-/compiler/src/iree/compiler/Codegen/LLVMGPU/ @qedawkins @kuhar @Groverkss @nirvedhmeshram @krzysz00 @Max191
-/compiler/src/iree/compiler/Codegen/SPIRV/ @kuhar
-/compiler/src/iree/compiler/ConstEval/ @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/Encoding/ @hanhanW @Max191 @jtuyls
-/compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1 @bangtianliu
-/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/TensorExt/ @hanhanW @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/Dialect/Vulkan/ @kuhar
-/compiler/src/iree/compiler/DispatchCreation/ @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/GlobalOptimization/ @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar
-/compiler/src/iree/compiler/Pipelines/ @benvanik @IanWood1
-/compiler/src/iree/compiler/Preprocessing/ @qedawkins @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/Common/GPU @AGindinson @egebeysel @ziereis
+/compiler/src/iree/compiler/Codegen/Dialect/CPU @AGindinson @egebeysel @hanhanW
+/compiler/src/iree/compiler/Codegen/Dialect/GPU @AGindinson @egebeysel @Groverkss @krzysz00
+/compiler/src/iree/compiler/Codegen/LLVMCPU/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @AGindinson @egebeysel @Groverkss @krzysz00 @ziereis
+/compiler/src/iree/compiler/Codegen/SPIRV/ @AGindinson @egebeysel @devtbi
+/compiler/src/iree/compiler/ConstEval/ @jschuhmacher @AGindinson @MaheshRavishankar
+/compiler/src/iree/compiler/Dialect/Encoding/ @jschuhmacher @egebeysel @phemashekar @hanhanW
+/compiler/src/iree/compiler/Dialect/Flow/ @devtbi @jschuhmacher @ziereis @mbknust
+/compiler/src/iree/compiler/Dialect/LinalgExt/ @jschuhmacher @AGindinson @maxbartel @ziereis
+/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @devtbi @ziereis
+/compiler/src/iree/compiler/Dialect/TensorExt/ @devtbi @egebeysel @ziereis
+/compiler/src/iree/compiler/Dialect/Vulkan/ @AGindinson @devtbi
+/compiler/src/iree/compiler/DispatchCreation/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/GlobalOptimization/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
+/compiler/src/iree/compiler/InputConversion/ @jschuhmacher @AGindinson
+/compiler/src/iree/compiler/Pipelines/ @benvanik @jschuhmacher
+/compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/plugins/ @jschuhmacher @schuermans-roofline @Manewing
+/compiler/src/iree/compiler/plugins/input @jschuhmacher @maxbartel @AGindinson
+/compiler/src/iree/compiler/plugins/target @jschuhmacher @devtbi @AGindinson @Manewing
 
 # Compiler Plugins
-/compiler/plugins/input/StableHLO/ @MaheshRavishankar @rsuderman
-/compiler/plugins/input/Torch/ @keshavvinayak01 @rsuderman @zjgarvey
-/compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
+/compiler/plugins/input/StableHLO/ @jschuhmacher @maxbartel
+/compiler/plugins/input/Torch/ @AGindinson @ziereis @rsuderman @zjgarvey
+/compiler/plugins/input/TOSA/ @chrsmcgrr @jschuhmacher @AGindinson @Manewing
 /compiler/plugins/target/ROCM/ @kuhar @krzysz00 @jtuyls @Yu-Zhewen
 
 # Runtime
-/runtime/src/iree/ @benvanik
-/runtime/src/iree/hal/drivers/amdgpu/ @benvanik @AWoloszyn
-/runtime/src/iree/hal/drivers/cuda/ @antiagainst
-/runtime/src/iree/hal/drivers/hip/ @AWoloszyn
-/runtime/src/iree/hal/drivers/metal/ @antiagainst
-/runtime/src/iree/hal/drivers/vulkan/ @antiagainst
+/runtime/src/iree/ @benvanik @devtbi @Manewing @schuermans-roofline
+/runtime/src/iree/hal/drivers/amdgpu/ @benvanik @kuhar @krzysz00
+/runtime/src/iree/hal/drivers/cuda/ @devtbi @antiagainst
+/runtime/src/iree/hal/drivers/hip/ @AWoloszyn @krzysz00
+/runtime/src/iree/hal/drivers/metal/ @devtbi @antiagainst
+/runtime/src/iree/hal/drivers/vulkan/ @benvanik @devtbi @AGindinson
