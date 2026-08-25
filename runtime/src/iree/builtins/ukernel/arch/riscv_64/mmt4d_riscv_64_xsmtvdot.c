@@ -108,7 +108,6 @@ iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot(
     rhs += IME_NT * panel_stride;
 
     __asm__ volatile(
-        "    vsetvli     x0, %[vl], e8, m1, ta, ma  \n\t"
         "    smt.vmadot  %[c0],  %[a0], %[b0]       \n\t"
         "    smt.vmadot  %[c1],  %[a0], %[b1]       \n\t"
         "    smt.vmadot  %[c2],  %[a0], %[b2]       \n\t"
@@ -126,7 +125,7 @@ iree_uk_mmt4d_tile_s8s8s32_12xXXx8_to_48xXXx32_riscv_64_xsmtvdot(
           [c6] "+vr"(acc6), [c7] "+vr"(acc7), [c8] "+vr"(acc8),
           [c9] "+vr"(acc9), [c10] "+vr"(acc10), [c11] "+vr"(acc11)
         : [a0] "vr"(a0), [a1] "vr"(a1), [a2] "vr"(a2), [b0] "vr"(b0),
-          [b1] "vr"(b1), [b2] "vr"(b2), [b3] "vr"(b3), [vl] "r"(vl8)
+          [b1] "vr"(b1), [b2] "vr"(b2), [b3] "vr"(b3)
         :);
   }
 
@@ -205,7 +204,6 @@ iree_uk_mmt4d_tile_s8s8s32_8xXXx8_to_32xXXx32_riscv_64_xsmtvdot(
     rhs += IME_NT * panel_stride;
 
     __asm__ volatile(
-        "    vsetvli     x0, %[vl], e8, m1, ta, ma  \n\t"
         "    smt.vmadot  %[c0], %[a0], %[b0]        \n\t"
         "    smt.vmadot  %[c1], %[a0], %[b1]        \n\t"
         "    smt.vmadot  %[c2], %[a0], %[b2]        \n\t"
@@ -218,7 +216,7 @@ iree_uk_mmt4d_tile_s8s8s32_8xXXx8_to_32xXXx32_riscv_64_xsmtvdot(
           [c3] "+vr"(acc3), [c4] "+vr"(acc4), [c5] "+vr"(acc5),
           [c6] "+vr"(acc6), [c7] "+vr"(acc7)
         : [a0] "vr"(a0), [a1] "vr"(a1), [b0] "vr"(b0), [b1] "vr"(b1),
-          [b2] "vr"(b2), [b3] "vr"(b3), [vl] "r"(vl8)
+          [b2] "vr"(b2), [b3] "vr"(b3)
         :);
   }
 
@@ -287,14 +285,13 @@ iree_uk_mmt4d_tile_s8s8s32_4xXXx8_to_16xXXx32_riscv_64_xsmtvdot(
     rhs += IME_NT * panel_stride;
 
     __asm__ volatile(
-        "    vsetvli     x0, %[vl], e8, m1, ta, ma  \n\t"
         "    smt.vmadot  %[c0], %[a0], %[b0]        \n\t"
         "    smt.vmadot  %[c1], %[a0], %[b1]        \n\t"
         "    smt.vmadot  %[c2], %[a0], %[b2]        \n\t"
         "    smt.vmadot  %[c3], %[a0], %[b3]        \n\t"
         : [c0] "+vr"(acc0), [c1] "+vr"(acc1), [c2] "+vr"(acc2), [c3] "+vr"(acc3)
         : [a0] "vr"(a0), [b0] "vr"(b0), [b1] "vr"(b1), [b2] "vr"(b2),
-          [b3] "vr"(b3), [vl] "r"(vl8)
+          [b3] "vr"(b3)
         :);
   }
 
