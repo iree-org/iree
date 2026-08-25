@@ -57,7 +57,7 @@
 /compiler/src/iree/compiler/ConstEval/ @jschuhmacher @AGindinson @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Encoding/ @jschuhmacher @egebeysel @phemashekar @hanhanW
 /compiler/src/iree/compiler/Dialect/Flow/ @devtbi @jschuhmacher @ziereis @mbknust
-/compiler/src/iree/compiler/Dialect/LinalgExt/ @jschuhmacher @AGindinson @maxbartel @ziereis
+/compiler/src/iree/compiler/Dialect/LinalgExt/ @jschuhmacher @AGindinson @egebeysel @ziereis
 /compiler/src/iree/compiler/Dialect/Stream/ @benvanik @devtbi @ziereis
 /compiler/src/iree/compiler/Dialect/TensorExt/ @devtbi @egebeysel @ziereis
 /compiler/src/iree/compiler/Dialect/Vulkan/ @AGindinson @devtbi
@@ -68,7 +68,7 @@
 /compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @phemashekar @ziereis
 /compiler/src/iree/compiler/plugins/ @jschuhmacher @schuermans-roofline @Manewing
 /compiler/src/iree/compiler/plugins/input @jschuhmacher @maxbartel @AGindinson
-/compiler/src/iree/compiler/plugins/target @jschuhmacher @devtbi @AGindinson @Manewing
+/compiler/src/iree/compiler/plugins/target @jschuhmacher @devtbi @egebeysel @Manewing
 
 # Compiler Plugins
 /compiler/plugins/input/StableHLO/ @jschuhmacher @maxbartel
@@ -78,6 +78,7 @@
 
 # Runtime
 /runtime/src/iree/ @benvanik @devtbi @Manewing @schuermans-roofline
+/runtime/src/iree/builtins/ukernel @jschuhmacher @egebeysel @phemashekar
 /runtime/src/iree/hal/drivers/amdgpu/ @benvanik @kuhar @krzysz00
 /runtime/src/iree/hal/drivers/cuda/ @devtbi @antiagainst
 /runtime/src/iree/hal/drivers/hip/ @AWoloszyn @krzysz00
