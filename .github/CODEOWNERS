@@ -43,6 +43,9 @@
 /tests/external/iree-test-suites @AGindinson @jschuhmacher @ziereis
 
 # Compiler
+/compiler/plugins/ @jschuhmacher @Manewing @schuermans-roofline
+/compiler/plugins/input @AGindinson @jschuhmacher @maxbartel
+/compiler/plugins/target @devtbi @egebeysel @jschuhmacher @Manewing
 /compiler/src/ @AGindinson @benvanik @jschuhmacher
 /compiler/src/iree/compiler/API/ @benvanik @jschuhmacher @maxbartel @schuermans-roofline
 /compiler/src/iree/compiler/Codegen/ @AGindinson @egebeysel @phemashekar
@@ -65,9 +68,6 @@
 /compiler/src/iree/compiler/GlobalOptimization/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
 /compiler/src/iree/compiler/InputConversion/ @AGindinson @jschuhmacher
 /compiler/src/iree/compiler/Pipelines/ @benvanik @jschuhmacher
-/compiler/src/iree/compiler/plugins/ @jschuhmacher @Manewing @schuermans-roofline
-/compiler/src/iree/compiler/plugins/input @AGindinson @jschuhmacher @maxbartel
-/compiler/src/iree/compiler/plugins/target @devtbi @egebeysel @jschuhmacher @Manewing
 /compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @phemashekar @ziereis
 
 # Compiler Plugins
