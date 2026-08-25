@@ -43,7 +43,7 @@
 /tests/external/iree-test-suites @jschuhmacher @AGindinson @ziereis
 
 # Compiler
-/compiler/src/iree/compiler/ @benvanik @jschuhmacher @AGindinson
+/compiler/src/ @benvanik @jschuhmacher @AGindinson
 /compiler/src/iree/compiler/API/ @benvanik @jschuhmacher @maxbartel @schuermans-roofline
 /compiler/src/iree/compiler/Codegen/ @AGindinson @egebeysel @phemashekar
 /compiler/src/iree/compiler/Codegen/Common @AGindinson @egebeysel @phemashekar
@@ -77,7 +77,7 @@
 /compiler/plugins/target/ROCM/ @kuhar @krzysz00 @jtuyls @Yu-Zhewen
 
 # Runtime
-/runtime/src/iree/ @benvanik @devtbi @Manewing @schuermans-roofline
+/runtime/src/ @benvanik @devtbi @Manewing @schuermans-roofline
 /runtime/src/iree/builtins/ukernel @jschuhmacher @egebeysel @phemashekar
 /runtime/src/iree/hal/drivers/amdgpu/ @benvanik @kuhar @krzysz00
 /runtime/src/iree/hal/drivers/cuda/ @devtbi @antiagainst
