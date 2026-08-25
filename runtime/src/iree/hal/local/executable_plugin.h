@@ -415,7 +415,7 @@ typedef struct iree_hal_executable_plugin_v0_t {
   // The value specified in |out_self| will be passed to subsequent plugin
   // interface calls and may be NULL if the plugin has no state. As the same
   // plugin may be instantiated multiple times global state should be avoided
-  // unless the
+  // unless the plugin is designed to share it safely across all instances.
   iree_hal_executable_plugin_status_t (*load)(
       const iree_hal_executable_plugin_environment_v0_t* environment,
       size_t param_count,
