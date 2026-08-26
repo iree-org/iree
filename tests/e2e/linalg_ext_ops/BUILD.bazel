@@ -32,8 +32,28 @@ ALL_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "grouped_matmul.mlir",
         "scan_configured.mlir",
     ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_grouped_matmul_local-task",
+    srcs = ["grouped_matmul.mlir"],
+    compiler_flags = [
+        "--iree-dispatch-creation-data-tiling=true",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_grouped_matmul_local-task",
+    srcs = ["grouped_matmul.mlir"],
+    compiler_flags = ["--iree-dispatch-creation-data-tiling=true"],
+    driver = "local-task",
+    target_backend = "vmvx",
 )
 
 iree_check_single_backend_test_suite(
@@ -68,6 +88,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "grouped_matmul.mlir",
         "attention_i1_mask.mlir",
         "scan_configured.mlir",
     ],
@@ -96,6 +117,7 @@ LLVM_GPU_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "grouped_matmul.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
         "dynamic_attention.mlir",
@@ -138,6 +160,7 @@ ROCM_HIP_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "grouped_matmul.mlir",
         "top-k.mlir",
         "attention_i1_mask.mlir",
         "dynamic_attention.mlir",
@@ -167,6 +190,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "grouped_matmul.mlir",
             "attention.mlir",
             "attention_i1_mask.mlir",
             "dynamic_attention.mlir",
@@ -199,6 +223,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "grouped_matmul.mlir",
             "attention.mlir",
             "attention_i1_mask.mlir",
             "dynamic_attention.mlir",

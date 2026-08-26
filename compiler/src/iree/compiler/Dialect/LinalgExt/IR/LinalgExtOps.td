@@ -485,6 +485,62 @@ def IREELinalgExt_MapStoreOp : IREELinalgExt_Op<"map_store",
   }];
 }
 
+def IREELinalgExt_GroupMatmulOp : IREELinalgExt_Op<"group_matmul"> {
+  let summary = [{Performs a grouped matrix multiplication.}];
+  let description = [{
+    Multiplies rows of the 2D `input` matrix by a corresponding slice of the
+    3D `expert_weights` matrix. Rows of `input` are grouped by expert according
+    to `expert_offsets`, which specify the exclusive end row for each expert
+    (i.e., the cumulative sum of the number of rows per expert).
+
+    All dimensions must be static, except the number of rows in `input`.
+  }];
+  let arguments = (ins
+    TensorRankOf<[AnyType], [2]>:$input,
+    TensorRankOf<[AnyType], [3]>:$expert_weights,
+    TensorRankOf<[AnySignlessIntegerOrIndex], [1]>:$expert_offsets,
+    Index:$row_offset,
+    TensorRankOf<[AnyType], [2]>:$output);
+  let results = (outs TensorRankOf<[AnyType], [2]>:$result);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict `ins` `(` $input `,` $expert_weights `,` $expert_offsets `,`
+      $row_offset `:` type($input) `,` type($expert_weights) `,`
+      type($expert_offsets) `,` type($row_offset) `)`
+      `outs` `(` $output `:` type($output) `)` `->` type($result)
+  }];
+  let extraClassDeclaration = [{
+    MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
+  }];
+}
+
+def IREELinalgExt_GroupMmt4DOp : IREELinalgExt_Op<"group_mmt4d"> {
+  let summary = [{Performs a grouped matrix-matrix-transpose multiplication of a packed 4D input by 5D weights.}];
+  let description = [{
+    Used for data tiling of `group_matmul`.
+  }];
+  let arguments = (ins
+    TensorRankOf<[AnyType], [4]>:$input,
+    TensorRankOf<[AnyType], [5]>:$expert_weights,
+    TensorRankOf<[AnySignlessIntegerOrIndex], [1]>:$expert_offsets,
+    Index:$row_offset,
+    TensorRankOf<[AnyType], [4]>:$output,
+    DefaultValuedAttr<BoolAttr, "false">:$transposed);
+  let results = (outs TensorRankOf<[AnyType], [4]>:$result);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict `ins` `(` $input `,` $expert_weights `,` $expert_offsets `,`
+      $row_offset `:` type($input) `,` type($expert_weights) `,`
+      type($expert_offsets) `,` type($row_offset) `)`
+      `outs` `(` $output `:` type($output) `)` `->` type($result)
+  }];
+  let extraClassDeclaration = [{
+    MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
+    ArrayRef<int64_t> getOutputPermutation() const;
+    ArrayRef<int64_t> getLoopPermutation() const;
+  }];
+}
+
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [AttrSizedOperandSegments,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,

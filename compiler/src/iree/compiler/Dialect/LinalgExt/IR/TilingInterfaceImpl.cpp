@@ -4326,6 +4326,190 @@ FailureOr<TilingResult> ConcatOpTilingExternalModel::getTiledImplementation(
       {tiledConcatOp}, SmallVector<Value>(tiledConcatOp->getResults()), slices};
 }
 
+namespace {
+struct GroupMatmulTilingExternalModel
+    : TilingInterface::ExternalModel<GroupMatmulTilingExternalModel,
+                                     GroupMatmulOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *) const {
+    return {utils::IteratorType::parallel, utils::IteratorType::parallel,
+            utils::IteratorType::reduction};
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const {
+    auto groupMatmul = cast<GroupMatmulOp>(op);
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    Location loc = groupMatmul.getLoc();
+    return {{zero, getDim(builder, loc, groupMatmul.getInput(), 0), one},
+            {zero, getDim(builder, loc, groupMatmul.getOutput(), 1), one},
+            {zero, getDim(builder, loc, groupMatmul.getInput(), 1), one}};
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    auto groupMatmul = cast<GroupMatmulOp>(op);
+    Location loc = groupMatmul.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    SmallVector<OpFoldResult> inputOffsets{offsets[0], offsets[2]};
+    SmallVector<OpFoldResult> inputSizes{sizes[0], sizes[2]};
+    Value input = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getInput(), inputOffsets, inputSizes,
+        SmallVector<OpFoldResult>{one, one});
+    SmallVector<OpFoldResult> weightOffsets{zero, offsets[2], offsets[1]};
+    SmallVector<OpFoldResult> weightSizes{
+        getDim(builder, loc, groupMatmul.getExpertWeights(), 0), sizes[2],
+        sizes[1]};
+    Value weights = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getExpertWeights(), weightOffsets,
+        weightSizes, SmallVector<OpFoldResult>{one, one, one});
+    SmallVector<OpFoldResult> outputOffsets{offsets[0], offsets[1]};
+    SmallVector<OpFoldResult> outputSizes{sizes[0], sizes[1]};
+    Value output = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getOutput(), outputOffsets, outputSizes,
+        SmallVector<OpFoldResult>{one, one});
+    Value tileRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[0]);
+    Value rowOffset = arith::AddIOp::create(
+        builder, loc, groupMatmul.getRowOffset(), tileRowOffset);
+    Operation *tiledOp = mlir::clone(
+        builder, groupMatmul.getOperation(), TypeRange{output.getType()},
+        ValueRange{input, weights, groupMatmul.getExpertOffsets(), rowOffset,
+                   output});
+    return TilingResult{{tiledOp},
+                        SmallVector<Value>(tiledOp->getResults()),
+                        {input.getDefiningOp(), weights.getDefiningOp(),
+                         output.getDefiningOp()}};
+  }
+
+  FailureOr<TilingResult> getTiledImplementation(
+      Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult getResultTilePosition(
+      Operation *, OpBuilder &, unsigned, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+      SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.begin() + 2);
+    resultSizes.assign(sizes.begin(), sizes.begin() + 2);
+    return success();
+  }
+};
+
+struct GroupMmt4DTilingExternalModel
+    : TilingInterface::ExternalModel<GroupMmt4DTilingExternalModel,
+                                     GroupMmt4DOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *) const {
+    return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
+            utils::IteratorType::reduction, utils::IteratorType::parallel,
+            utils::IteratorType::parallel,  utils::IteratorType::reduction};
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const {
+    auto groupMmt4d = cast<GroupMmt4DOp>(op);
+    Location loc = groupMmt4d.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    ArrayRef<int64_t> outputPermutation = groupMmt4d.getOutputPermutation();
+    return {{zero, getDim(builder, loc, groupMmt4d.getInput(), 0), one},
+            {zero,
+             getDim(builder, loc, groupMmt4d.getOutput(), outputPermutation[1]),
+             one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 1), one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 2), one},
+            {zero,
+             getDim(builder, loc, groupMmt4d.getOutput(), outputPermutation[3]),
+             one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 3), one}};
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    auto groupMmt4d = cast<GroupMmt4DOp>(op);
+    Location loc = groupMmt4d.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    SmallVector<OpFoldResult> inputOffsets{offsets[0], offsets[2], offsets[3],
+                                           offsets[5]};
+    SmallVector<OpFoldResult> inputSizes{sizes[0], sizes[2], sizes[3],
+                                         sizes[5]};
+    Value input = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getInput(), inputOffsets, inputSizes,
+        SmallVector<OpFoldResult>(4, one));
+    SmallVector<OpFoldResult> weightOffsets{zero, offsets[1], offsets[2],
+                                            offsets[4], offsets[5]};
+    SmallVector<OpFoldResult> weightSizes{
+        getDim(builder, loc, groupMmt4d.getExpertWeights(), 0), sizes[1],
+        sizes[2], sizes[4], sizes[5]};
+    Value weights = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getExpertWeights(), weightOffsets, weightSizes,
+        SmallVector<OpFoldResult>(5, one));
+    ArrayRef<int64_t> outputPermutation = groupMmt4d.getOutputPermutation();
+    SmallVector<OpFoldResult> outputOffsets{offsets[0], offsets[1], offsets[3],
+                                            offsets[4]};
+    SmallVector<OpFoldResult> outputSizes{sizes[0], sizes[1], sizes[3],
+                                          sizes[4]};
+    applyPermutationToVector(outputOffsets, outputPermutation);
+    applyPermutationToVector(outputSizes, outputPermutation);
+    Value output = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getOutput(), outputOffsets, outputSizes,
+        SmallVector<OpFoldResult>(4, one));
+    Value outerRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[0]);
+    Value innerRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[3]);
+    Value innerTileRows =
+        tensor::DimOp::create(builder, loc, groupMmt4d.getInput(), 2);
+    Value rowOffset = arith::AddIOp::create(
+        builder, loc, groupMmt4d.getRowOffset(),
+        arith::AddIOp::create(
+            builder, loc,
+            arith::MulIOp::create(builder, loc, outerRowOffset, innerTileRows),
+            innerRowOffset));
+    Operation *tiledOp = mlir::clone(
+        builder, groupMmt4d.getOperation(), TypeRange{output.getType()},
+        ValueRange{input, weights, groupMmt4d.getExpertOffsets(), rowOffset,
+                   output});
+    return TilingResult{{tiledOp},
+                        SmallVector<Value>(tiledOp->getResults()),
+                        {input.getDefiningOp(), weights.getDefiningOp(),
+                         output.getDefiningOp()}};
+  }
+
+  FailureOr<TilingResult> getTiledImplementation(
+      Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult getResultTilePosition(
+      Operation *op, OpBuilder &, unsigned, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+      SmallVector<OpFoldResult> &resultSizes) const {
+    ArrayRef<int64_t> outputPermutation =
+        cast<GroupMmt4DOp>(op).getOutputPermutation();
+    resultOffsets = {offsets[0], offsets[1], offsets[3], offsets[4]};
+    resultSizes = {sizes[0], sizes[1], sizes[3], sizes[4]};
+    applyPermutationToVector(resultOffsets, outputPermutation);
+    applyPermutationToVector(resultSizes, outputPermutation);
+    return success();
+  }
+};
+} // namespace
+
+void registerGroupMatmulTilingInterfaceExternalModel(MLIRContext *ctx) {
+  GroupMatmulOp::attachInterface<GroupMatmulTilingExternalModel>(*ctx);
+  GroupMmt4DOp::attachInterface<GroupMmt4DTilingExternalModel>(*ctx);
+}
+
 void registerConcatOpTilingInterfaceExternalModel(MLIRContext *ctx) {
   tensor::ConcatOp::attachInterface<ConcatOpTilingExternalModel>(*ctx);
 }

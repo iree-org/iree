@@ -121,6 +121,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
   funcPassManager.addPass(createConvertAccGEMMToGEMMPass());
   funcPassManager.addPass(
       createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeGroupMmt4DPass());
   funcPassManager.addPass(createFoldReshapeIntoInterfaceTensorPass());
   funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());
