@@ -1,3 +1,8 @@
+# Attention e2e tests compare a device result against a host reference that
+# computes attention in f32. The operation order differs and the f16 inputs are
+# rounded, so bit-exact results are not achievable and every test has to state
+# an explicit tolerance. 0.01 was measured to hold across all shapes here.
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_attention_cpu_f16_f16_f16_small
@@ -16,6 +21,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -39,6 +47,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -62,6 +73,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -86,6 +100,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -109,6 +126,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -127,6 +147,9 @@ iree_generated_e2e_runner_test(
     "cuda"
   DRIVERS
     "cuda"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -153,6 +176,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -178,6 +204,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -202,6 +231,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "hostonly"
     "local"
@@ -237,6 +269,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -265,6 +300,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -293,6 +331,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -322,6 +363,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -350,6 +394,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -378,6 +425,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -408,6 +458,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
@@ -437,6 +490,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=0.01"
   LABELS
     "noasan"
     "nomsan"
