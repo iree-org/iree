@@ -123,6 +123,17 @@ def DecomposeAttentionPass :
   ];
 }
 
+def DecomposeGroupMmt4DPass :
+    InterfacePass<"iree-linalg-ext-decompose-group-mmt4d", "mlir::FunctionOpInterface"> {
+  let summary = "Decomposes grouped mmt4d ops after workgroup tiling";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 def ConvertAttentionToOnlineAttentionPass :
     Pass<"iree-linalg-ext-convert-attention-to-online-attention", ""> {
   let summary = "Converts attention op to online_attention op";
