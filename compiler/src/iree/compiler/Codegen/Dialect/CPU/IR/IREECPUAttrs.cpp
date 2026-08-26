@@ -485,6 +485,14 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
     return Tuple{1, 4, 1};
   case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
     return Tuple{4, 1, 1};
+  // VLs = vlen / 8 lanes, one LMUL=2 register group at 16-bit elements.
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16: {
+    int64_t vl = vlen / 8;
+    bool transposed =
+        intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16;
+    return transposed ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
+  }
   default:
     if (isGenericScalar(intrinsic)) {
       return Tuple{1, 1, 1};
@@ -538,7 +546,7 @@ int64_t getRegisterSpaceBytes(MMAIntrinsic intrinsic, int64_t vlen) {
     return 32 * 64;
   case kMMAIntrinsicISAArmSve: // 32 Z × (VL treated as 128 bits).
     return 32 * 16;
-  case kMMAIntrinsicISARiscvV: // 32 v × vlen bits.
+  case kMMAIntrinsicISARiscvV: // 32 v × vlen B.
     return 32 * (vlen / 8);
   default:
     // Plausible default, but override it on each arch you care for.
@@ -735,6 +743,8 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
     return {f16, f16, f32};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
   case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
     return {f16, f16, f16};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
@@ -793,12 +803,14 @@ LogicalResult DataTiledMMAAttr::verify(
     int64_t intrinsics_m, int64_t intrinsics_n, int64_t intrinsics_k,
     Type lhs_type, Type rhs_type, Type acc_type, int64_t vlen) {
   if (isVlenParameterized(intrinsic)) {
-    // 128 is the V extension's architectural minimum VLEN.
-    if (vlen < 128 || (vlen & (vlen - 1)) != 0) {
-      return emitError() << "intrinsic " << stringifyMMAIntrinsic(intrinsic)
-                         << " is VLEN-parameterized and requires `vlen` to be "
-                            "a power of two >= 128; got "
-                         << vlen;
+    // 128 is the V extension's architectural minimum, and 65536 is the maximum
+    // VLEN.
+    if (vlen < 128 || vlen > 65536 || (vlen & (vlen - 1)) != 0) {
+      return emitError()
+             << "intrinsic " << stringifyMMAIntrinsic(intrinsic)
+             << " is VLEN-parameterized and requires a power of two "
+                "128 <= vlen <= 65536; got "
+             << vlen;
     }
     // A well-formed VLEN is not enough: the intrinsic must also have a tile
     // shape at this VLEN, or there is no layout to materialize.

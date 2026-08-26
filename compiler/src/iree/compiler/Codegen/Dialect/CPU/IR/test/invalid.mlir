@@ -149,3 +149,17 @@ func.func @cpu_inner_tiled_sve_rhs_n_must_be_dynamic(
 // expected-error@+1 {{`vlen` is only meaningful for VLEN-parameterized intrinsics}}
 #invalid_vlen_on_non_parameterized_intrinsic = #iree_cpu.data_tiled_mma_layout<
     intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, vlen = 512>
+
+// -----
+
+// A VLEN-parameterized intrinsic requires a `vlen`.
+// expected-error@+1 {{is VLEN-parameterized and requires a power of two 128 <= vlen <= 65536}}
+#invalid_vlen_missing = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16>
+
+// -----
+
+// RVV VLEN is a power of two, at least the V extension's 128-bit minimum.
+// expected-error@+1 {{is VLEN-parameterized and requires a power of two 128 <= vlen <= 65536}}
+#invalid_vlen_not_pow2 = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16, vlen = 384>

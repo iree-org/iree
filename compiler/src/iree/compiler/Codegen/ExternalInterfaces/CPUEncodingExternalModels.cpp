@@ -432,6 +432,9 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return {"+avx512vnni"};
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
+    return {"+v", "+zvfh"};
   default:
     return {};
   }
@@ -552,6 +555,24 @@ static bool isMmaIntrinsicArrayValid(DictionaryAttr config,
 /// when no real MMA covers the requested element types.
 ///
 /// There must be no early-return path that omits the trailing
+/// Appends the intrinsics from `candidates` whose required target features are
+/// all present in `config` to `out`.
+static void
+checkIntrinsicRequiredFeatures(DictionaryAttr config,
+                               ArrayRef<IREE::CPU::MMAIntrinsic> candidates,
+                               SmallVectorImpl<IREE::CPU::MMAIntrinsic> &out) {
+  for (IREE::CPU::MMAIntrinsic intr : candidates) {
+    SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
+    if (required.empty()) {
+      continue;
+    }
+    if (llvm::all_of(required,
+                     [&](StringRef f) { return hasFeature(config, f); })) {
+      out.push_back(intr);
+    }
+  }
+}
+
 /// generic-scalar push — `out` is asserted to be non-empty / well-formed at
 /// the bottom and downstream callers rely on always seeing at least the
 /// generic fallback. Place the generic at the end (rather than the front)
@@ -592,16 +613,14 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8,
         MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16,
     };
-    for (MMAIntrinsic intr : kAllX86) {
-      SmallVector<StringRef> required = getMmaIntrinsicRequiredFeatures(intr);
-      if (required.empty()) {
-        continue;
-      }
-      if (llvm::all_of(required,
-                       [&](StringRef f) { return hasFeature(config, f); })) {
-        out.push_back(intr);
-      }
-    }
+    checkIntrinsicRequiredFeatures(config, kAllX86, out);
+  }
+  if (isRISCV64(config)) {
+    static const MMAIntrinsic kAllRiscvV[] = {
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
+    };
+    checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
   }
   out.push_back(pickGenericScalarMMAForTarget(config));
   assert(isMmaIntrinsicArrayValid(config, out) &&
@@ -1708,6 +1727,10 @@ private:
       return info;
     }
     info = std::move(maybeEncodingInfo.value());
+    // TODO(egebeysel): this does not work. The tile shape comes from an
+    // intrinsic and is static, so marking a dim scalable makes the packed
+    // extent dynamic while the inner tile type keeps its literal size, and the
+    // `expand_shape` onto the inner tile is then rejected.
     FailureOr<IREE::Codegen::ScalableTileFlags> scalableFlags =
         getScalableTileFlags(cDims, encoding, config);
     if (succeeded(scalableFlags)) {
