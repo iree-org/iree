@@ -57,6 +57,8 @@ static const iree_hal_metal_driver_t* iree_hal_metal_driver_const_cast(
 static NSArray<id<MTLDevice>>* iree_hal_metal_device_copy() {
 #if defined(IREE_PLATFORM_MACOS)
   // For macOS, we might have more than one GPU device.
+  // Sandboxed processes may be unable to enumerate Metal devices; see
+  // https://github.com/openai/codex/issues/17644.
   NSArray<id<MTLDevice>>* devices = MTLCopyAllDevices();  // +1
   if (devices.count == 0) {
     id<MTLDevice> default_device = MTLCreateSystemDefaultDevice();  // +1

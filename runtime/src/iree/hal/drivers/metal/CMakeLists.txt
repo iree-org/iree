@@ -49,6 +49,7 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::metal_executable_def_c_fbs
+    "-framework CoreGraphics"
     "-framework Foundation"
     "-framework Metal"
   PUBLIC
