@@ -30,7 +30,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
 //       CHECK:   amdgpu.mfma 16x16x16 %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4xf32>
 
 // -----
 
@@ -64,7 +64,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
 //       CHECK:   amdgpu.mfma 32x32x8 %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
 
@@ -98,7 +98,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
 //       CHECK:   amdgpu.mfma 32x32x8 %[[RHS]] * %[[LHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
 
@@ -483,7 +483,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]]) : (vector<4x1xf32>) -> vector<4xf32>
 //       CHECK:     vector.shape_cast %[[ACC_B]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[MMA:.+]] = amdgpu.mfma 16x16x16 %[[LHSCAST]] * %[[RHSCAST]] + %[[ACCCAST]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //       CHECK:   util.hoistable_conversion "shape_cast_from_intrinsic" inverts("shape_cast_to_intrinsic")
 //  CHECK-SAME:     (%[[MMA_B:.+]] = %[[MMA]]) : (vector<4xf32>) -> vector<4x1xf32>
 //       CHECK:     vector.shape_cast %[[MMA_B]] : vector<4xf32> to vector<4x1xf32>
@@ -618,7 +618,7 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[LHS_S:.+]] = vector.extract %[[LHS]][0] : f64 from vector<1xf64>
 //   CHECK-DAG:   %[[RHS_S:.+]] = vector.extract %[[RHS]][0] : f64 from vector<1xf64>
 //   CHECK-DAG:   %[[ACC_S:.+]] = vector.extract %[[ACC]][0] : f64 from vector<1xf64>
-//       CHECK:   %[[MMA:.+]] = amdgpu.mfma 4x4x4 %[[LHS_S]] * %[[RHS_S]] + %[[ACC_S]] {blocks = 4 : i32} blgp = none : f64, f64, f64
+//       CHECK:   %[[MMA:.+]] = amdgpu.mfma blocks(4) 4x4x4 %[[LHS_S]] * %[[RHS_S]] + %[[ACC_S]] : f64, f64, f64
 //       CHECK:   vector.broadcast %[[MMA]] : f64 to vector<1xf64>
 
 // -----
