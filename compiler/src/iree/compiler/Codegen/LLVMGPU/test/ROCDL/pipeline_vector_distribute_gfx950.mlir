@@ -35,7 +35,7 @@ func.func @matmul_256x256x512_f16_f32() attributes {hal.executable.target = #exe
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
-// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_256x256x512_f16_f32 workgroup_size = [256, 1, 1] subgroup_size = 64
@@ -68,7 +68,7 @@ func.func @matmul_256x256x512_f16_f32() attributes {hal.executable.target = #exe
 
 //    CHECK-LABEL: func.func @matmul_256x256x512_f16_f32()
 //          CHECK:   scf.for {{.*}} = %c0 to %c512 step %c256 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_256x256x512_f16_f32 workgroup_size = [256, 1, 1] subgroup_size = 64
@@ -128,7 +128,7 @@ func.func @expanded_matmul_transpose_b() attributes {hal.executable.target = #ex
 // This has more than 2 iterations. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 256 = 1792.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1792 step %c256 iter_args({{.*}}) -> (vector<4xf32>, vector<4xf32>, vector<4xf32>, vector<4xf32>)
-// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma 16x16x32 {{.*}} : vector<8xf16>, vector<8xf16>, vector<4xf32>
 //          CHECK:     scf.yield
 // CHECK-COUNT-32:   amdgpu.mfma
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true, true, true]} : vector<1x1x4x1xf32>, memref<2x10x64x64xf32, #amdgpu.address_space<fat_raw_buffer>>
@@ -213,7 +213,7 @@ func.func @matmul_256x256x256_16x16x128_f8_f32() attributes {hal.executable.targ
 //    CHECK-LABEL: func.func @matmul_256x256x256_16x16x128_f8_f32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 2 times
 // along the K dimension. So in total 8 mfma ops.
-// CHECK-COUNT-8:     amdgpu.mfma 16x16x128 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
+// CHECK-COUNT-8:     amdgpu.mfma 16x16x128 {{.*}} : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<4xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_256x256x256_16x16x128_f8_f32 workgroup_size = [256, 1, 1] subgroup_size = 64
 
@@ -250,7 +250,7 @@ func.func @matmul_256x256x256_i8_i32() attributes {hal.executable.target = #exec
 //    CHECK-LABEL: func.func @matmul_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_256x256x256_i8_i32 workgroup_size = [256, 1, 1] subgroup_size = 64
 
@@ -287,7 +287,7 @@ func.func @matmul_256x256x256_32x32x64_f8_f32() attributes {hal.executable.targe
 //    CHECK-LABEL: func.func @matmul_256x256x256_32x32x64_f8_f32()
 // Each subgroup handles 1 * 1 tiles, and for each tile we accumulate (256/64) = 4 times
 // along the K dimension. So in total 4 mfma ops.
-//  CHECK-COUNT-4:     amdgpu.mfma 32x32x64 {{.*}} blgp =  none : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
+//  CHECK-COUNT-4:     amdgpu.mfma 32x32x64 {{.*}} : vector<32xf8E4M3FN>, vector<32xf8E4M3FN>, vector<16xf32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_256x256x256_32x32x64_f8_f32 workgroup_size = [256, 1, 1] subgroup_size = 64
 
@@ -330,7 +330,7 @@ func.func @matmul_transpose_b_256x256x256_i8_i32() attributes {hal.executable.ta
 //    CHECK-LABEL: func.func @matmul_transpose_b_256x256x256_i8_i32()
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 4 times
 // along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} blgp =  none : vector<16xi8>, vector<16xi8>, vector<4xi32>
+// CHECK-COUNT-16:     amdgpu.mfma 16x16x64 {{.*}} : vector<16xi8>, vector<16xi8>, vector<4xi32>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xi32>, memref<256x256xi32, #amdgpu.address_space<fat_raw_buffer>>
 //          CHECK:   iree_codegen.dispatch_config @matmul_transpose_b_256x256x256_i8_i32 workgroup_size = [256, 1, 1] subgroup_size = 64
 
@@ -389,8 +389,8 @@ func.func @attention_20x4096x64x4096x64() attributes {hal.executable.target = #e
 // CHECK: transfer_read
 
 // CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c128
-// CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<4xf32>
-// CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK-COUNT-32:  amdgpu.mfma 16x16x32 {{.*}} : vector<8xf16>, vector<8xf16>, vector<4xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 16x16x16 {{.*}} : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield
 // CHECK: iree_codegen.dispatch_config @attention_20x4096x64x4096x64 workgroup_size = [128, 1, 1] subgroup_size = 64
 
@@ -451,8 +451,8 @@ func.func @attention_mfma_32x32x16() attributes {hal.executable.target = #execut
 
 // CHECK-LABEL: func.func @attention_mfma_32x32x16()
 // CHECK: scf.for %{{.*}} = %c0 to %c4608 step %c64
-// CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} blgp =  none : vector<8xf16>, vector<8xf16>, vector<16xf32>
-// CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+// CHECK-COUNT-16:  amdgpu.mfma 32x32x16 {{.*}} : vector<8xf16>, vector<8xf16>, vector<16xf32>
+// CHECK-COUNT-8:  amdgpu.mfma 32x32x8 {{.*}} : vector<4xf16>, vector<4xf16>, vector<16xf32>
 // CHECK: scf.yield
 // CHECK: iree_codegen.dispatch_config @attention_mfma_32x32x16 workgroup_size = [256, 1, 1] subgroup_size = 64
 
