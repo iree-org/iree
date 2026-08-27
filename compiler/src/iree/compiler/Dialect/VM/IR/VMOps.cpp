@@ -284,8 +284,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
     result.addAttribute("is_optional", builder.getUnitAttr());
   }
   StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    getSymNameAttrName(result.name),
+  if (failed(parser.parseSymbolName(nameAttr, getSymNameAttrName(result.name),
                                     result.attributes)) ||
       failed(parser.parseLParen())) {
     return parser.emitError(parser.getNameLoc()) << "invalid import name";
