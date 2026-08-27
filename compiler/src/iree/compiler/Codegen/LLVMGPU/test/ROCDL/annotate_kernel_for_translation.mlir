@@ -176,9 +176,9 @@ iree_codegen.dispatch_config @test_kern_arg workgroup_size = [128, 2, 1] subgrou
 }
 
 // CHECK-LABEL: llvm.func @test_kern_arg
-// CHECK:       denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
+// CHECK-SAME:  llvm_func_attrs = {check_attr
+// CHECK-SAME:  denormal_fpenv = #llvm.denormal_fpenv<default_output_mode = ieee, default_input_mode = ieee, float_output_mode = preservesign, float_input_mode = preservesign>
 // CHECK-NOT:   iree_codegen.denormal_fp_math_f32
-// CHECK:       llvm_func_attrs = {check_attr
 
 // -----
 

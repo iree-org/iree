@@ -145,7 +145,7 @@ struct ConvertHALEntryPointFuncOp
         LLVM::LLVMFuncOp::getAttributeNames().end());
     SmallVector<NamedAttribute> funcAttrs;
     for (auto attr : stdFuncOp->getAttrs()) {
-      if (attr.getName() == SymbolTable::getSymbolAttrName() ||
+      if (attr.getName() == stdFuncOp.getSymNameAttrName() ||
           attr.getName() == stdFuncOp.getFunctionTypeAttrName()) {
         continue;
       }

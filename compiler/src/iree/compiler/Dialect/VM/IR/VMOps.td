@@ -33,6 +33,8 @@ let opDocGroup = OpGroupStructuralOps in {
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::VM::ModuleTerminatorOp">,
+    SymbolName,
+    SymbolVisibility,
     Symbol,
     SymbolTable,
   ]> {
@@ -95,6 +97,8 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     FunctionOpInterface,
     CallableOpInterface,
     Symbol,
@@ -106,6 +110,8 @@ def VM_FuncOp : VM_Op<"func", [
   }];
 
   let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
@@ -196,6 +202,8 @@ def VM_ExportOp : VM_Op<"export", [
 }
 
 def VM_ImportOp : VM_Op<"import", [
+    SymbolName,
+    SymbolVisibility,
     Symbol,
     FunctionOpInterface,
     CallableOpInterface,
@@ -286,6 +294,8 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     FunctionOpInterface,
     CallableOpInterface,
     Util_InitializerOpInterface,
@@ -298,6 +308,8 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -365,6 +377,8 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
+      SymbolName,
+      SymbolVisibility,
       Symbol,
       DeclareOpInterfaceMethods<Util_GlobalOpInterface, [
         "createLoadOp",
@@ -397,7 +411,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      $_state.addAttribute(SymbolTable::getSymbolAttrName(),
+      $_state.addAttribute(getSymNameAttrName($_state.name),
                            $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
@@ -470,6 +484,8 @@ def VM_GlobalRefOp :
     VM_Op<"global.ref", [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
+      SymbolName,
+      SymbolVisibility,
       Symbol,
       DeclareOpInterfaceMethods<Util_GlobalOpInterface>,
     ]> {
@@ -504,7 +520,7 @@ def VM_GlobalRefOp :
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      $_state.addAttribute(SymbolTable::getSymbolAttrName(),
+      $_state.addAttribute(getSymNameAttrName($_state.name),
                            $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
@@ -1193,6 +1209,8 @@ def VM_AssignRefOp : VM_Op<"assign.ref", [
 def VM_RodataOp : VM_Op<"rodata", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     Symbol,
   ]> {
   let summary = [{Read-only data definition operation.}];

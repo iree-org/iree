@@ -68,7 +68,7 @@ func.func @conv_nhwc() {
 }
 
 // CHECK-LABEL: func.func @conv_nhwc()
-// CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #iree_gpu.lowering_config
+// CHECK: linalg.conv_2d_nhwc_hwcf {{.*}}lowering_config = #iree_gpu.lowering_config
 // CHECK-SAME:                           mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>
 // CHECK-SAME:                           reduction =  [0, 0, 0, 0, 1, 1, 32]
 // CHECK-SAME{LITERAL}:                  subgroup_basis = [[1, 1, 2, 2, 1, 1, 1], [0, 1, 2, 3, 4, 5, 6]]

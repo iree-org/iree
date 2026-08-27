@@ -1030,7 +1030,9 @@ struct MergeExecutableConstantBlocks : OpRewritePattern<ExecutableVariantOp> {
     rewriter.setInsertionPoint(blockOps.front());
     auto fusedLoc = rewriter.getFusedLoc(blockLocs);
     auto newBlockOp = ExecutableConstantBlockOp::create(
-        rewriter, fusedLoc, rewriter.getFunctionType(inputTypes, resultTypes),
+        rewriter, fusedLoc, /*sym_name=*/StringAttr(),
+        /*sym_visibility=*/StringAttr(),
+        rewriter.getFunctionType(inputTypes, resultTypes),
         rewriter.getArrayAttr(resultKeys), /*arg_attrs=*/ArrayAttr(),
         /*res_attrs=*/ArrayAttr());
 

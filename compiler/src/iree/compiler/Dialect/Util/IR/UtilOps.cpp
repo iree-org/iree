@@ -1826,9 +1826,9 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
                    ArrayRef<NamedAttribute> attrs,
                    ArrayRef<DictionaryAttr> argAttrs,
                    ArrayRef<DictionaryAttr> resAttrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(name));
-  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+  state.addAttribute(getSymVisibilityAttrName(state.name),
                      builder.getStringAttr("public"));
   state.addAttribute("function_type", TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
@@ -1891,12 +1891,12 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   }
   if (symVisibilityAttr) {
-    result.addAttribute(SymbolTable::getVisibilityAttrName(),
+    result.addAttribute(getSymVisibilityAttrName(result.name),
                         symVisibilityAttr);
   }
 
   StringAttr nameAttr;
-  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+  if (parser.parseSymbolName(nameAttr, getSymNameAttrName(result.name),
                              result.attributes)) {
     return failure();
   }
@@ -1932,8 +1932,8 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
   }
   for (StringRef disallowed : {
-           SymbolTable::getVisibilityAttrName(),
-           SymbolTable::getSymbolAttrName(),
+           getSymVisibilityAttrName(result.name).getValue(),
+           getSymNameAttrName(result.name).getValue(),
            StringRef("function_type"),
        }) {
     if (parsedAttributes.get(disallowed)) {
@@ -2244,7 +2244,7 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      std::optional<TypedAttr> initialValue,
                      ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
+  result.addAttribute(getSymNameAttrName(result.name),
                       builder.getStringAttr(name));
   if (isMutable) {
     result.addAttribute("is_mutable", builder.getUnitAttr());
