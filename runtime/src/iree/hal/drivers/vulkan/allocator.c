@@ -887,29 +887,17 @@ static int iree_hal_vulkan_allocator_score_memory_type(
   return score;
 }
 
-static bool iree_hal_vulkan_allocator_resolve_memory_placement(
+// Scans the physical device's memory types for the highest-scoring one that
+// provides |required_type| and can satisfy the requested usage.
+static bool iree_hal_vulkan_allocator_select_memory_type(
     const iree_hal_vulkan_allocator_t* allocator,
-    uint32_t allowed_memory_type_bits, iree_hal_buffer_params_t* params,
+    uint32_t allowed_memory_type_bits, const iree_hal_buffer_params_t* params,
+    iree_hal_memory_type_t required_type, iree_hal_buffer_params_t* out_params,
     iree_hal_vulkan_allocator_memory_placement_t* out_placement) {
-  memset(out_placement, 0, sizeof(*out_placement));
-  if (!iree_hal_vulkan_allocator_normalize_queue_affinity(allocator, params)) {
-    return false;
-  }
-  if (!iree_device_size_is_valid_alignment(params->min_alignment)) {
-    return false;
-  }
-
-  const iree_hal_memory_type_t required_type =
-      params->type & ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
   const VkPhysicalDeviceMemoryProperties* memory_properties =
       &allocator->memory_properties2.memoryProperties;
-
   bool found = false;
   int best_score = 0;
-  iree_hal_buffer_params_t best_params = *params;
-  iree_hal_vulkan_allocator_memory_placement_t best_placement;
-  memset(&best_placement, 0, sizeof(best_placement));
-
   for (uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i) {
     if (!iree_all_bits_set(allowed_memory_type_bits, 1u << i)) continue;
     const VkMemoryType* vk_memory_type = &memory_properties->memoryTypes[i];
@@ -933,20 +921,61 @@ static bool iree_hal_vulkan_allocator_resolve_memory_placement(
     if (!found || score > best_score) {
       found = true;
       best_score = score;
-      best_params = candidate_params;
-      best_params.type = memory_type;
-      best_placement = (iree_hal_vulkan_allocator_memory_placement_t){
+      *out_params = candidate_params;
+      out_params->type = memory_type;
+      *out_placement = (iree_hal_vulkan_allocator_memory_placement_t){
           .memory_type_index = i,
           .memory_property_flags = vk_memory_type->propertyFlags,
           .memory_type = memory_type,
       };
     }
   }
+  return found;
+}
 
-  if (!found) return false;
-  *params = best_params;
-  *out_placement = best_placement;
-  return true;
+static bool iree_hal_vulkan_allocator_resolve_memory_placement(
+    const iree_hal_vulkan_allocator_t* allocator,
+    uint32_t allowed_memory_type_bits, iree_hal_buffer_params_t* params,
+    iree_hal_vulkan_allocator_memory_placement_t* out_placement) {
+  memset(out_placement, 0, sizeof(*out_placement));
+  if (!iree_hal_vulkan_allocator_normalize_queue_affinity(allocator, params)) {
+    return false;
+  }
+  if (!iree_device_size_is_valid_alignment(params->min_alignment)) {
+    return false;
+  }
+
+  const iree_hal_memory_type_t required_type =
+      params->type & ~IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  iree_hal_buffer_params_t resolved_params = *params;
+
+  if (iree_hal_vulkan_allocator_select_memory_type(
+          allocator, allowed_memory_type_bits, params, required_type,
+          &resolved_params, out_placement)) {
+    *params = resolved_params;
+    return true;
+  }
+
+  // Unified-memory fallback. iree_hal_vulkan_memory_type_from_vk only reports
+  // HOST_LOCAL for host-visible, non-device-local memory, so unified-memory
+  // devices (integrated GPUs, software rasterizers) that expose a single
+  // device-local + host-visible type never satisfy a strict host-local request.
+
+  // Skip the fallback if the caller didn't ask for host-local
+  if (!iree_all_bits_set(required_type, IREE_HAL_MEMORY_TYPE_HOST_LOCAL)) {
+    return false;
+  }
+  // Retry requiring only host-visible (i.e. mappable)
+  const iree_hal_memory_type_t host_visible_type =
+      (required_type & ~IREE_HAL_MEMORY_TYPE_HOST_LOCAL) |
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_COHERENT;
+  if (iree_hal_vulkan_allocator_select_memory_type(
+          allocator, allowed_memory_type_bits, params, host_visible_type,
+          &resolved_params, out_placement)) {
+    *params = resolved_params;
+    return true;
+  }
+  return false;
 }
 
 static iree_status_t iree_hal_vulkan_allocator_align_allocation_size(
