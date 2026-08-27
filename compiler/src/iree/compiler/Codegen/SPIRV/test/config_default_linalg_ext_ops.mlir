@@ -1,7 +1,8 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=vp_android_baseline_2022@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 func.func @static_1d_sort(%1: tensor<1000xi32>) -> tensor<1000xi32> {
-  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<1000xi32>) {
+  %empty = tensor.empty() : tensor<1000xi32>
+  %2 = iree_linalg_ext.sort dimension(0) ins(%1 : tensor<1000xi32>) outs(%empty : tensor<1000xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %3 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1
@@ -26,7 +27,7 @@ func.func @static_3d_sort(%0: memref<64x32x128xi32>, %1: memref<64x32x128xi32>) 
   ^bb0(%in: i32, %out: i32):
     linalg.yield %in : i32
   }
-  iree_linalg_ext.sort dimension(1) outs(%1 : memref<64x32x128xi32>) {
+  iree_linalg_ext.sort dimension(1) ins(%1 : memref<64x32x128xi32>) outs(%1 : memref<64x32x128xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %2 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %2 : i1

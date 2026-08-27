@@ -999,18 +999,23 @@ void MapStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 LogicalResult SortOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs()) {
-    return op->emitOpError("does not expect to take any inputs");
+  if (getNumDpsInputs() == 0) {
+    return op->emitOpError("expected at least one `ins` operand");
   }
   if (getNumDpsInits() == 0) {
     return op->emitOpError("expected at least one `outs` operand");
   }
+  if (getNumDpsInputs() != getNumDpsInits()) {
+    return op->emitOpError(
+               "expected the same number of `ins` and `outs` operands, got ")
+           << getNumDpsInputs() << " and " << getNumDpsInits();
+  }
 
   Block &block = getRegion().front();
-  size_t numOutputs = getNumDpsInits();
-  if (block.getNumArguments() != 2 * numOutputs) {
+  size_t numInputs = getNumDpsInputs();
+  if (block.getNumArguments() != 2 * numInputs) {
     return op->emitOpError("region block should have ")
-           << 2 * numOutputs << " arguments";
+           << 2 * numInputs << " arguments";
   }
 
   int64_t rank = getOperandRank();
@@ -1020,7 +1025,7 @@ LogicalResult SortOp::verify() {
   }
 
   ArrayRef<int64_t> shape = getOperandShape();
-  for (auto [index, operand] : llvm::enumerate(getOutputs())) {
+  for (auto [index, operand] : llvm::enumerate(getInputs())) {
     auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
       return op->emitOpError("expected operand ")
@@ -1038,6 +1043,20 @@ LogicalResult SortOp::verify() {
                << i << " should be of type " << elemType << " but got "
                << argType;
       }
+    }
+
+    auto outputType = cast<ShapedType>(getOutputs()[index].getType());
+    if (outputType.getRank() != rank) {
+      return op->emitOpError("expected output ")
+             << index << " to be rank " << rank << ", same as inputs";
+    }
+    if (outputType.getShape() != shape) {
+      return op->emitOpError("expected output ")
+             << index << " to have same shape as inputs";
+    }
+    if (outputType.getElementType() != operandType.getElementType()) {
+      return op->emitOpError("expected output ")
+             << index << " to have the same element type as input " << index;
     }
   }
 
@@ -1069,8 +1088,11 @@ namespace {
 ///
 /// For example:
 ///
-/// %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1:
-/// tensor<?x10xf32>, tensor<?x10xi64>) {
+/// %empty0 = tensor.empty(...) : tensor<?x10xf32>
+/// %empty1 = tensor.empty(...) : tensor<?x10xi64>
+/// %0:2 = iree_linalg_ext.sort dimension(1)
+/// ins(%arg0, %arg1: tensor<?x10xf32>, tensor<?x10xi64>)
+/// outs(%empty0, %empty1: tensor<?x10xf32>, tensor<?x10xi64>) {
 ///   ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
 ///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
 ///    iree_linalg_ext.yield %42 : i1
@@ -1078,7 +1100,9 @@ namespace {
 ///
 /// ->
 ///
-/// %0 = iree_linalg_ext.sort dimension(1) outs(%arg0: tensor<?x10xf32>) {
+/// %0 = iree_linalg_ext.sort dimension(1)
+/// ins(%arg0: tensor<?x10xf32>)
+/// outs(%empty0: tensor<?x10xf32>) {
 ///   ^bb0(%arg2: f32, %arg3: f32):
 ///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
 ///    iree_linalg_ext.yield %42 : i1
@@ -1094,7 +1118,8 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     // To avoid problems in dispatches associated with unused results, prune
     // them here.
     Location loc = sortOp->getLoc();
-    auto operands = sortOp.getOutputs();
+    auto inputs = sortOp.getInputs();
+    auto outputs = sortOp.getOutputs();
     auto results = sortOp.getResults();
     unsigned numRes = sortOp.getNumResults();
 
@@ -1106,14 +1131,15 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
 
     Block &block = sortOp.getRegion().front();
     auto blockArgs = block.getArguments();
-    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
+    SmallVector<Value> usedInputs, usedOutputs, usedResults;
     SmallVector<Type> usedResultTypes;
     BitVector eraseArg(numRes * 2, false);
     for (auto idx : llvm::seq<unsigned>(numRes)) {
       // If result or associated block arg is used, do not erase.
       if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
           !blockArgs[2 * idx + 1].use_empty()) {
-        usedOperands.push_back(operands[idx]);
+        usedInputs.push_back(inputs[idx]);
+        usedOutputs.push_back(outputs[idx]);
         usedResults.push_back(results[idx]);
         usedResultTypes.push_back(results[idx].getType());
         continue;
@@ -1130,7 +1156,7 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     // args.
     auto newSortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, usedResultTypes,
-        /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
+        /*inputs=*/usedInputs, usedOutputs, sortOp.getDimension());
     newSortOp.getRegion().takeBody(sortOp.getRegion());
     newSortOp.getRegion().front().eraseArguments(eraseArg);
     rewriter.replaceAllUsesWith(usedResults, newSortOp.getResults());

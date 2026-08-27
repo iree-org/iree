@@ -19,7 +19,7 @@ hal.executable private @static_3d_sort  {
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
         %1 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
         %subview = memref.subview %0[%workgroup_id_y, 0, %1] [1, 32, 64] [1, 1, 1] : memref<64x32x128xi32, #hal.descriptor_type<storage_buffer>> to memref<1x32x64xi32, strided<[4096, 128, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>
-        iree_linalg_ext.sort {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 64], [1, 0, 1]]>} dimension(1) outs(%subview : memref<1x32x64xi32, strided<[4096, 128, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) {
+        iree_linalg_ext.sort {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 64], [1, 0, 1]]>} dimension(1) ins(%subview : memref<1x32x64xi32, strided<[4096, 128, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) outs(%subview : memref<1x32x64xi32, strided<[4096, 128, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>) {
         ^bb0(%arg0: i32, %arg1: i32):
           %2 = arith.cmpi slt, %arg0, %arg1 : i32
           iree_linalg_ext.yield %2 : i1
