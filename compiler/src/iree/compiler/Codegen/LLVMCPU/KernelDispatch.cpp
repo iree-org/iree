@@ -3276,22 +3276,34 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 }
 
 /// Returns the `InnerTileAlignment` implied by a loop tile size relative to a
-/// pack/unpack inner tile size.
-static mlir::InnerTileAlignment getInnerTileAlignment(int64_t loopTile,
-                                                      bool loopScalable,
-                                                      int64_t innerTile,
-                                                      bool innerScalable) {
+/// pack/unpack inner tile size. When only one side is scalable, the alignment
+/// has to hold for every vscale in range, so that side is taken at the extreme
+/// that is hardest to satisfy: `vscaleMax` for an inner tile, `vscaleMin` for a
+/// loop tile.
+static mlir::InnerTileAlignment
+getInnerTileAlignment(int64_t loopTile, bool loopScalable, int64_t innerTile,
+                      bool innerScalable,
+                      std::optional<vector::VscaleRange> vscaleRange) {
   if (innerTile <= 0 || loopTile <= 0) {
     return mlir::InnerTileAlignment::Unknown;
   }
-  if (loopScalable) {
-    if (innerScalable && loopTile == innerTile) {
+  if (loopScalable && innerScalable) {
+    if (loopTile == innerTile) {
       return mlir::InnerTileAlignment::Equal;
     }
     return loopTile % innerTile == 0 ? mlir::InnerTileAlignment::Multiple
                                      : mlir::InnerTileAlignment::Unknown;
   }
-  return mlir::InnerTileAlignment::Unknown;
+  if ((!loopScalable && !innerScalable) || !vscaleRange) {
+    return mlir::InnerTileAlignment::Unknown;
+  }
+  int64_t scaledLoopTile =
+      loopScalable ? loopTile * vscaleRange->vscaleMin : loopTile;
+  int64_t scaledInnerTile =
+      innerScalable ? innerTile * vscaleRange->vscaleMax : innerTile;
+  return scaledLoopTile % scaledInnerTile == 0
+             ? mlir::InnerTileAlignment::Multiple
+             : mlir::InnerTileAlignment::Unknown;
 }
 
 /// Transforms tiling sizes from the unpacked domain to the packed domain
@@ -3854,16 +3866,13 @@ static void captureInnerTileAlignment(
     PackUnpackType op, const SizesAndScalableFlags &scalableTilesFlags,
     IREE::CPU::TilingLevel level, ArrayRef<int64_t> tileSizes,
     ArrayRef<bool> scalableFlags,
+    std::optional<vector::VscaleRange> vscaleRange,
     SmallVectorImpl<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>>
         &perLevel) {
   static_assert(
       std::is_same_v<PackUnpackType, linalg::PackOp> ||
           std::is_same_v<PackUnpackType, linalg::UnPackOp>,
       "Inner tile alignment hints can only be captured for pack/unpack ops!");
-  // TODO(egebeysel): wire in distribution tile size alignment logic.
-  if (level == IREE::CPU::TilingLevel::DistributionTiles) {
-    return;
-  }
   int64_t rank = std::is_same_v<PackUnpackType, linalg::PackOp>
                      ? op.getSourceRank()
                      : op.getDestRank();
@@ -3881,9 +3890,9 @@ static void captureInnerTileAlignment(
     if (!innerScalable && !loopScalable) {
       continue;
     }
-    mlir::InnerTileAlignment kind =
-        getInnerTileAlignment(tileSizes[pos], loopScalable,
-                              scalableTilesFlags.first[i], innerScalable);
+    mlir::InnerTileAlignment kind = getInnerTileAlignment(
+        tileSizes[pos], loopScalable, scalableTilesFlags.first[i],
+        innerScalable, vscaleRange);
     alignments[pos] = llvm::to_underlying(kind);
     if (kind != mlir::InnerTileAlignment::Unknown) {
       any = true;
@@ -3902,6 +3911,8 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
   }
   std::sort(tilingLevels.begin(), tilingLevels.end());
 
+  std::optional<vector::VscaleRange> vscaleRange =
+      getVscaleRange(IREE::HAL::ExecutableTargetAttr::lookup(rootOperation));
   for (auto op : computeOps) {
     SmallVector<utils::IteratorType> iterTypes =
         cast<TilingInterface>(op).getLoopIteratorTypes();
@@ -3944,7 +3955,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
                 getScalableTileSizesAndFlags(packOp.getMixedTiles())) {
           captureInnerTileAlignment<linalg::PackOp>(
               packOp, *packScalableTilesFlags, level, tileSizes, scalableFlags,
-              perLevelAlignments);
+              vscaleRange, perLevelAlignments);
         }
         // `MultiLoweringConfigGenerator` propagates tiling on the
         // unpacked dimensions, while for a pack operation, `LoweringConfig`
@@ -3953,13 +3964,14 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
         // information from the unpacked to the packed dimensions.
         undoScaleAndPermutateTilingForPackOp(packOp, tileSizes, scalableFlags);
       } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
-        if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles &&
+        // The `IterationDimTracker` ties an unpack's destination loops only to
+        // the *outer* dims of its packed source operand, so `tileSizes` holds
+        // the source's outer tiling for consumer unpack operations. Map these
+        // onto the destination unpacked domain by scaling and permuting with
+        // the inner tile sizes.
+        if ((level == IREE::CPU::TilingLevel::VectorCommonParallelTiles ||
+             level == IREE::CPU::TilingLevel::DistributionTiles) &&
             unpackOp.getSource().getDefiningOp<linalg::LinalgOp>()) {
-          // The `IterationDimTracker` ties an unpack's destination loops only
-          // to the *outer* dims of its packed source operand, so `tileSizes`
-          // holds the source's outer tiling for consumer unpack operations. Map
-          // these onto the destination unpacked domain by scaling and permuting
-          // with the inner tile sizes.
           undoScaleAndPermutateTilingForUnpackOp(unpackOp, tileSizes,
                                                  scalableFlags);
         }
@@ -3969,7 +3981,7 @@ void MultiLoweringConfigGenerator::setNewTilingConfigs() {
                 getScalableTileSizesAndFlags(unpackOp.getMixedTiles())) {
           captureInnerTileAlignment<linalg::UnPackOp>(
               unpackOp, *unpackScalableTilesFlags, level, tileSizes,
-              scalableFlags, perLevelAlignments);
+              scalableFlags, vscaleRange, perLevelAlignments);
         }
       }
       // Append tiling info.
@@ -4252,6 +4264,85 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
+/// Returns the inner tile alignments recorded on `op` for `level`, or an empty
+/// vector if `op` carries none.
+static SmallVector<mlir::InnerTileAlignment>
+getInnerTileAlignmentsForLevel(Operation *op, IREE::CPU::TilingLevel level) {
+  auto attr = IREE::CPU::InnerTileAlignmentsAttr::getFromOp(op);
+  if (!attr) {
+    return {};
+  }
+  auto alignments = attr.getAlignments().getAs<DenseI64ArrayAttr>(
+      IREE::CPU::getTilingLevelName(level));
+  if (!alignments) {
+    return {};
+  }
+  return mlir::convertInnerTileAlignments(alignments.asArrayRef());
+}
+
+/// Composes the `distribution`-level inner tile alignment of a `linalg.pack`
+/// from its producer `linalg.unpack`'s hints on a shared iteration dimension.
+///
+/// `unpackVector` being `Equal` means the vector loop tile on that dimension is
+/// the unpack's inner tile, which is what lets `packVector` be read as the
+/// alignment between the unpack's inner tile and the pack's. Composing that
+/// with `unpackDistribution` relates the distribution tile to the pack's inner
+/// tile.
+static mlir::InnerTileAlignment composeDistributionInnerTileAlignment(
+    mlir::InnerTileAlignment unpackDistribution,
+    mlir::InnerTileAlignment unpackVector,
+    mlir::InnerTileAlignment packVector) {
+  if (unpackVector != mlir::InnerTileAlignment::Equal ||
+      packVector == mlir::InnerTileAlignment::Unknown) {
+    return mlir::InnerTileAlignment::Unknown;
+  }
+  // The distribution tile is the unpack's inner tile, so it relates to the
+  // pack's inner tile exactly as the unpack's inner tile does.
+  if (unpackDistribution == mlir::InnerTileAlignment::Equal) {
+    return packVector;
+  }
+  // The distribution tile is a whole multiple of the unpack's inner tile, which
+  // is itself a whole multiple of the pack's.
+  if (unpackDistribution == mlir::InnerTileAlignment::Multiple) {
+    return mlir::InnerTileAlignment::Multiple;
+  }
+  return mlir::InnerTileAlignment::Unknown;
+}
+
+/// Composes the `distribution`-level inner tile alignments of a `linalg.pack`
+/// that consumes `unpackOp`, given the pack's own `vector_common_parallel`
+/// alignments. Distribution tile sizes are only set on the root operation, so
+/// the level is absent from a non-root unpack's config and cannot be read from
+/// there. Returns an empty vector if nothing could be inferred.
+static SmallVector<int64_t>
+inferDistributionAlignmentForUnpackConsumerPack(linalg::UnPackOp unpackOp,
+                                                ArrayRef<int64_t> packVector) {
+  SmallVector<mlir::InnerTileAlignment> unpackDistribution =
+      getInnerTileAlignmentsForLevel(unpackOp,
+                                     IREE::CPU::TilingLevel::DistributionTiles);
+  SmallVector<mlir::InnerTileAlignment> unpackVector =
+      getInnerTileAlignmentsForLevel(
+          unpackOp, IREE::CPU::TilingLevel::VectorCommonParallelTiles);
+  if (unpackDistribution.empty() || unpackVector.empty()) {
+    return {};
+  }
+  SmallVector<int64_t> alignments(
+      packVector.size(),
+      llvm::to_underlying(mlir::InnerTileAlignment::Unknown));
+  bool any = false;
+  for (auto [pos, packAlignment] : llvm::enumerate(packVector)) {
+    if (pos >= unpackDistribution.size() || pos >= unpackVector.size()) {
+      continue;
+    }
+    mlir::InnerTileAlignment kind = composeDistributionInnerTileAlignment(
+        unpackDistribution[pos], unpackVector[pos],
+        static_cast<mlir::InnerTileAlignment>(packAlignment));
+    alignments[pos] = llvm::to_underlying(kind);
+    any |= kind != mlir::InnerTileAlignment::Unknown;
+  }
+  return any ? alignments : SmallVector<int64_t>{};
+}
+
 /// For a `linalg.pack` whose producer is a `linalg.unpack`, no lowering config
 /// is assigned (see `shouldSetLoweringConfig`), so we cannot derive alignment
 /// hints from that. The pack shares its (unpacked) iteration domain with the
@@ -4274,13 +4365,13 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     return;
   }
 
+  std::optional<vector::VscaleRange> vscaleRange =
+      getVscaleRange(IREE::HAL::ExecutableTargetAttr::lookup(packOp));
   SmallVector<std::pair<IREE::CPU::TilingLevel, SmallVector<int64_t>>> perLevel;
   for (int levelIdx = 0;
        levelIdx < llvm::to_underlying(IREE::CPU::TilingLevel::MaxNumTileLevels);
        ++levelIdx) {
     auto level = static_cast<IREE::CPU::TilingLevel>(levelIdx);
-    // TODO(egebeysel): distribution tile sizes are only set on the root
-    // operation. They need special logic here.
     if (!unpackConfig.hasTilingLevel(llvm::to_underlying(level))) {
       continue;
     }
@@ -4291,7 +4382,20 @@ static void annotateScalablePackConsumerOfUnpack(linalg::PackOp packOp) {
     }
     captureInnerTileAlignment<linalg::PackOp>(
         packOp, *packScalableTilesFlags, level, levelAttr.getSizes(),
-        levelAttr.getScalableFlags(), perLevel);
+        levelAttr.getScalableFlags(), vscaleRange, perLevel);
+  }
+
+  ArrayRef<int64_t> packVector;
+  for (auto &[level, alignments] : perLevel) {
+    if (level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {
+      packVector = alignments;
+    }
+  }
+  SmallVector<int64_t> distribution =
+      inferDistributionAlignmentForUnpackConsumerPack(unpackOp, packVector);
+  if (!distribution.empty()) {
+    perLevel.emplace_back(IREE::CPU::TilingLevel::DistributionTiles,
+                          std::move(distribution));
   }
 
   if (!perLevel.empty()) {
