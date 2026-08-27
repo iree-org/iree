@@ -454,8 +454,8 @@ static bool isMmaIntrinsicArrayValid(MLIRContext *ctx,
   // `ui8` LHS visibly swaps with its sibling's `ui8` RHS. Read directly
   // from `getABCElementTypes`; `getUndistributedTileTypes` would strip it.
   auto getShapeAndTypes = [&](MMAIntrinsic intr) {
-    auto mnk = IREE::CPU::getRowMajorTilesMNKShape(intr);
-    assert(mnk && "validator only handles row-major-tile intrinsics");
+    auto mnk = IREE::CPU::getIntrinsicMNKShape(intr);
+    assert(mnk && "intrinsic does not declare an MNK shape");
     auto [m, n, k] = *mnk;
     auto [lhs, rhs, acc] = IREE::CPU::getABCElementTypes(ctx, intr);
     return std::make_tuple(m, n, k, lhs, rhs, acc);
@@ -599,7 +599,7 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
       accTy != elementTypes[2]) {
     return std::nullopt;
   }
-  auto mnk = IREE::CPU::getRowMajorTilesMNKShape(intr);
+  auto mnk = IREE::CPU::getIntrinsicMNKShape(intr);
   if (!mnk) {
     return std::nullopt;
   }
