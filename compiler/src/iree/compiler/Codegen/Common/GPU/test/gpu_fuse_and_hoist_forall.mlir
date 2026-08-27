@@ -1005,9 +1005,9 @@ func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128
 }
 
 // CHECK-LABEL: func @swizzle_with_fusion(
-//       CHECK:   %[[ALLOC1:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf16>
+//       CHECK:   %[[ALLOC1:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf16>
 //       CHECK:   %[[SWIZZLE1:.+]] = iree_codegen.swizzle_hint %[[ALLOC1]][#iree_codegen.xor_shuffle<64, 8>] : tensor<128x128xf16>
-//       CHECK:   %[[ALLOC2:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf16>
+//       CHECK:   %[[ALLOC2:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf16>
 //       CHECK:   %[[SWIZZLE2:.+]] = iree_codegen.swizzle_hint %[[ALLOC2]][#iree_codegen.xor_shuffle<64, 16>] : tensor<128x128xf16>
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf16>
 //       CHECK:   scf.forall {{.*}} shared_outs(%[[OUT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf16>) {

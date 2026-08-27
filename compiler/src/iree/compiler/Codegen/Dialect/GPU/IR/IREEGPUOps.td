@@ -61,7 +61,7 @@ def IREEGPU_BarrierRegionOp : Op<IREEGPU_Dialect, "barrier_region", [
 
     ```mlir
       %0 = scf.forall (%idy, %idx) in (8, 8) -> (tensor<4x128xf32>) {
-        %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space<workgroup>}
+        %alloc = bufferization.alloc_tensor <{memory_space = #gpu.address_space<workgroup>}>
           : tensor<4x128xf32>
         %barrier = iree_gpu.barrier_region %alloc {
         ^bb0(%shared: tensor<4x128xf32>):
