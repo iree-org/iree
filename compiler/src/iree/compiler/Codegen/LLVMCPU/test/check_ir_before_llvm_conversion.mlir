@@ -36,9 +36,51 @@ func.func @mix_static_and_dynamic_allocas(%arg0: index) {
 
 // -----
 
+// expected-error @+1 {{exceeded stack allocation limit of 32768 bytes for function. Got 32769 bytes}}
+func.func @sub_byte_alloca_rounds_up() {
+  %0 = memref.alloca() : memref<262145xi1>
+  return
+}
+
+// -----
+
 func.func @overflowing_static_alloca() {
   // expected-error @+1 {{stack allocation size overflows 64 bits}}
-  %0 = memref.alloca() {alignment = 64 : i64} : memref<9007199254740991x1024x14x14xf32>
+  %0 = memref.alloca() : memref<9007199254740991x1024x14x14xf32>
+  return
+}
+
+// -----
+
+func.func @overflowing_dynamic_alloca(%arg0: index) {
+  %0 = util.assume.int %arg0<umin = 0, umax = 9007199254740991> : index
+  // expected-error @+1 {{stack allocation size overflows 64 bits}}
+  %1 = memref.alloca(%0) : memref<?x1024x14x14xf32>
+  return
+}
+
+// -----
+
+// 9 x (2^63-8 bits = 2^60-1 bytes) > 2^63-1 bytes
+func.func @cumulative_overflowing_allocas() {
+  %0 = memref.alloca() : memref<1152921504606846975xi8>
+  %1 = memref.alloca() : memref<1152921504606846975xi8>
+  %2 = memref.alloca() : memref<1152921504606846975xi8>
+  %3 = memref.alloca() : memref<1152921504606846975xi8>
+  %4 = memref.alloca() : memref<1152921504606846975xi8>
+  %5 = memref.alloca() : memref<1152921504606846975xi8>
+  %6 = memref.alloca() : memref<1152921504606846975xi8>
+  %7 = memref.alloca() : memref<1152921504606846975xi8>
+  // expected-error @+1 {{cumulative stack allocation size overflows 64 bits}}
+  %8 = memref.alloca() : memref<1152921504606846975xi8>
+  return
+}
+
+// -----
+
+func.func @overflowing_aligned_alloca() {
+  // expected-error @+1 {{stack allocation size overflows 64 bits}}
+  %0 = memref.alloca() {alignment = 64 : i64} : memref<1152921504606846975xi8>
   return
 }
 

@@ -53,30 +53,32 @@ static LogicalResult checkGPUAllocationSize(
           "has unsupported dynamic shared memory allocations");
     }
 
-    auto func = allocOp->getParentOfType<mlir::FunctionOpInterface>();
-    FailureOr<int64_t> allocSizeBits =
-        getStaticShapeSizeInBits(allocType, [&](Type elementType) -> int64_t {
+    FailureOr<int64_t> allocSizeBits = getStaticShapeSizeInBits(
+        allocType, [funcOp, getIndexBitwidth](Type elementType) -> int64_t {
           if (elementType.isIndex()) {
-            assert(getIndexBitwidth &&
-                   "getIndexBitwidth should have been set earlier");
-            return getIndexBitwidth(func);
+            assert(getIndexBitwidth && "getIndexBitwidth must not be null");
+            return getIndexBitwidth(funcOp);
           }
           return IREE::Util::getTypeBitWidth(elementType);
         });
     if (failed(allocSizeBits)) {
-      return emitError(funcOp->getLoc())
-             << "function '" << funcOp.getName()
-             << "' shared memory allocation size overflows the size "
-                "computation; exceeded the limit of "
-             << limit << " bytes";
+      return allocOp.emitOpError(
+          "shared memory allocation size overflows 64 bits");
     }
     int64_t allocSize = *allocSizeBits;
     if (allocOp.getAlignment()) {
       int64_t alignmentInBits = *allocOp.getAlignment() * 8;
-      allocSize =
-          (llvm::divideCeil(allocSize, alignmentInBits) * alignmentInBits);
+      int64_t alignedUnits = llvm::divideCeil(allocSize, alignmentInBits);
+      if (llvm::MulOverflow(alignedUnits, alignmentInBits, allocSize)) {
+        return allocOp.emitOpError(
+            "shared memory allocation size overflows 64 bits");
+      }
     }
-    cumSize += allocSize / 8;
+    int64_t allocSizeBytes = llvm::divideCeil(allocSize, 8);
+    if (llvm::AddOverflow(cumSize, allocSizeBytes, cumSize)) {
+      return allocOp.emitOpError(
+          "cumulative shared memory allocation size overflows 64 bits");
+    }
   }
   if (cumSize > limit) {
     return emitError(funcOp->getLoc())

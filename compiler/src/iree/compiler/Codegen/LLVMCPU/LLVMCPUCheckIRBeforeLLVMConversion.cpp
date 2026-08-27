@@ -72,18 +72,13 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
           "all stack allocations need to be hoisted to the entry block of the "
           "function");
     }
-    auto emitOverflowError = [&]() {
-      return allocaOp->emitOpError(
-          "stack allocation size overflows 64 bits; the allocation is "
-          "unbounded in practice and cannot live on the stack");
-    };
     auto allocaType = cast<ShapedType>(allocaOp.getType());
     FailureOr<int64_t> staticSizeBits =
         getStaticShapeSizeInBits(allocaType, [](Type elementType) -> int64_t {
           return IREE::Util::getTypeBitWidth(elementType);
         });
     if (failed(staticSizeBits)) {
-      return emitOverflowError();
+      return allocaOp.emitOpError("stack allocation size overflows 64 bits");
     }
     int64_t allocaSize = *staticSizeBits;
     for (auto operand : allocaOp.getDynamicSizes()) {
@@ -100,7 +95,8 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
         if (llvm::MulOverflow(allocaSize,
                               static_cast<int64_t>(ub->getSize()->baseSize),
                               allocaSize)) {
-          return emitOverflowError();
+          return allocaOp.emitOpError(
+              "stack allocation size overflows 64 bits");
         }
         continue;
       }
@@ -110,11 +106,12 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
       int64_t alignedUnits = llvm::divideCeil(allocaSize, alignmentInBits);
       if (llvm::MulOverflow(alignedUnits, alignmentInBits, allocaSize)) {
-        return emitOverflowError();
+        return allocaOp.emitOpError("stack allocation size overflows 64 bits");
       }
     }
-    if (llvm::AddOverflow(cumSize, allocaSize / 8, cumSize)) {
-      return allocaOp->emitOpError(
+    int64_t allocaSizeBytes = llvm::divideCeil(allocaSize, 8);
+    if (llvm::AddOverflow(cumSize, allocaSizeBytes, cumSize)) {
+      return allocaOp.emitOpError(
           "cumulative stack allocation size overflows 64 bits");
     }
   }
