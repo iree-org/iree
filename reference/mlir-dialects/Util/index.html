@@ -9360,6 +9360,7 @@ they may indicate complex initialization patterns that could be fragile:
 While such patterns are allowed they should be used with caution as the
 initialization behavior depends on runtime control flow and the compiler
 may disable optimizations on those globals.</p>
+<p>Traits: <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
@@ -9989,7 +9990,7 @@ a cast is performed within the callee.</p>
 <p>An operation declaring a callable function.</p>
 <p>An external function declaration (used when referring to a function declared
 in some other module) has no body.</p>
-<p>Traits: <code>AffineScope</code>, <code>AutomaticAllocationScope</code>, <code>IsolatedFromAbove</code></p>
+<p>Traits: <code>AffineScope</code>, <code>AutomaticAllocationScope</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>OpAsmOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
@@ -10039,11 +10040,13 @@ util.initializer {
   %b = util.global.load @B : i32   // Loads 2
 }
 </code></pre></div></p>
-<p>Traits: <code>IsolatedFromAbove</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
 <h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
