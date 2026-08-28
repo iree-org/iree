@@ -43,7 +43,7 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   } else {
 // CHECK:     scf.yield %[[V3F0]] : vector<3xf32>
 // CHECK:   }
-// CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[IF0]], %[[FULL]] {offsets = [0, 0, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
+// CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[IF0]], %[[FULL]] offsets = [0, 0, 0], strides = [1] : vector<3xf32> into vector<2x2x3xf32>
 
 // CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW2]], %[[I1]]
 // CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB2]], %[[I1]]
@@ -56,7 +56,7 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   } else {
 // CHECK:     scf.yield %[[V3F0]] : vector<3xf32>
 // CHECK:   }
-// CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[IF1]], %[[INSERT0]] {offsets = [0, 1, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
+// CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[IF1]], %[[INSERT0]] offsets = [0, 1, 0], strides = [1] : vector<3xf32> into vector<2x2x3xf32>
 
 // CHECK:   %[[LE:.+]] = arith.cmpi sle, %[[LOW1]], %[[I1]]
 // CHECK:   %[[GT:.+]] = arith.cmpi sgt, %[[UB1]], %[[I1]]
@@ -69,7 +69,7 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   } else {
 // CHECK:     scf.yield %[[V3F0]] : vector<3xf32>
 // CHECK:   }
-// CHECK:   %[[INSERT2:.+]] = vector.insert_strided_slice %[[IF2]], %[[INSERT1]] {offsets = [1, 0, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
+// CHECK:   %[[INSERT2:.+]] = vector.insert_strided_slice %[[IF2]], %[[INSERT1]] offsets = [1, 0, 0], strides = [1] : vector<3xf32> into vector<2x2x3xf32>
 
 // CHECK:   %[[AND3:.+]] = arith.andi %[[DIM1INDEX1INBOUND]], %[[DIM2INDEX1INBOUND]]
 // CHECK:   %[[IF3:.+]] = scf.if %[[AND3]] -> (vector<3xf32>) {
@@ -78,7 +78,7 @@ func.func @tensor_pad(%source: tensor<1x?x?x3xf32>, %low1: index, %low2: index, 
 // CHECK:   } else {
 // CHECK:     scf.yield %[[V3F0]] : vector<3xf32>
 // CHECK:   }
-// CHECK:   %[[INSERT3:.+]] = vector.insert_strided_slice %[[IF3]], %[[INSERT2]] {offsets = [1, 1, 0], strides = [1]} : vector<3xf32> into vector<2x2x3xf32>
+// CHECK:   %[[INSERT3:.+]] = vector.insert_strided_slice %[[IF3]], %[[INSERT2]] offsets = [1, 1, 0], strides = [1] : vector<3xf32> into vector<2x2x3xf32>
 
 // CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<1x2x2x3xf32>
 // CHECK:   %[[WRITE:.+]] = vector.transfer_write %[[INSERT3]], %[[INIT]][%[[I0]], %[[I0]], %[[I0]], %[[I0]]] {in_bounds = [true, true, true]} : vector<2x2x3xf32>, tensor<1x2x2x3xf32>

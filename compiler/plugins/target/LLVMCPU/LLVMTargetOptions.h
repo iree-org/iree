@@ -105,6 +105,9 @@ struct LLVMTarget {
   // Optimization level to be used by the LLVM code generator (back-end).
   llvm::CodeGenOptLevel codeGenOptLevel;
   llvm::TargetOptions llvmTargetOptions;
+  // Floating-point ABI to use, recorded on generated LLVM modules via the
+  // "float-abi" module flag (Default defers to the target triple).
+  llvm::FloatABI::ABIType floatABI = DEFAULT_FLOAT_ABI;
 
   bool getLinkEmbedded() const { return linkEmbedded; }
 

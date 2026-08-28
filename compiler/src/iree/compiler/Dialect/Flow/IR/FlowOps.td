@@ -426,6 +426,8 @@ let opDocGroup = OpGroupExecutableOps in {
 def FLOW_ExecutableOp : FLOW_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Flow::ExecutableEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -479,6 +481,8 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
 
 def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   IsolatedFromAbove,
 ]> {
@@ -648,6 +652,8 @@ let opDocGroup = OpGroupStreamableCallOps in {
 
 def FLOW_FuncOp : FLOW_Op<"func", [
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   IsolatedFromAbove,
 ]> {

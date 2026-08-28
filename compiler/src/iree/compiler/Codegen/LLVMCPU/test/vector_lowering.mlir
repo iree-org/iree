@@ -16,7 +16,7 @@ func.func @matmul_391x384x384_f32() {
   %c16 = arith.constant 16 : index
   %cst_0 = arith.constant dense<0.000000e+00> : vector<8x32xf32>
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
-  %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
+  %alloca = memref.alloca() alignment = 64 : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>
@@ -93,7 +93,7 @@ func.func @matmul_scalar_loads() {
   %c16 = arith.constant 16 : index
   %cst_0 = arith.constant dense<0.000000e+00> : vector<8x32xf32>
   %cst_1 = arith.constant dense<6.000000e+00> : vector<8x32xf32>
-  %alloca = memref.alloca() {alignment = 64 : i64} : memref<8x32xf32>
+  %alloca = memref.alloca() alignment = 64 : memref<8x32xf32>
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : memref<391x384xf32>
   %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) flags(ReadOnly) : memref<384x384xf32>
   %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) flags(ReadOnly) : memref<384xf32>

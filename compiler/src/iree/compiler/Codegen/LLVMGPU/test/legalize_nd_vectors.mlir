@@ -316,11 +316,11 @@ func.func @scf_for_nd(%init: vector<2x4xf32>, %arg: vector<2x4xf32>) -> vector<2
 // nvgpu.mma.sync is legal despite having n-D vectors; materializations bridge
 // the 1-D converted values and the n-D op interface.
 func.func @mma_sync_legal(%a: vector<4x2xf16>, %b: vector<2x2xf16>, %c: vector<2x2xf32>) -> vector<2x2xf32> {
-  %0 = nvgpu.mma.sync(%a, %b, %c) {mmaShape = [16, 8, 16]} : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
+  %0 = nvgpu.mma.sync(%a, %b, %c) mmaShape = [16, 8, 16] : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
   return %0 : vector<2x2xf32>
 }
 // CHECK-LABEL: func.func @mma_sync_legal
-//       CHECK:   nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 16]}
+//       CHECK:   nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 16]
 //  CHECK-SAME:     : (vector<4x2xf16>, vector<2x2xf16>, vector<2x2xf32>) -> vector<2x2xf32>
 //       CHECK:   return {{.*}} : vector<2xf32>, vector<2xf32>
 

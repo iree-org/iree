@@ -59,7 +59,7 @@ public:
 
 private:
   StringAttr functionRefName; // "function_ref"
-  StringAttr symbolAttrName;  // SymbolTable::getSymbolAttrName()
+  StringAttr symbolAttrName;  // Conventional "sym_name" attribute.
 
   SmallVector<IRMapping *> mappingFreeList;
 

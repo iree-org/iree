@@ -254,7 +254,7 @@ module {
     %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : memref<128x32xf32>
     %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : memref<128x32xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
-    %alloc = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
+    %alloc = memref.alloc() alignment = 64 : memref<32xf32, #gpu.address_space<workgroup>>
     %2 = vector.transfer_read %0[%workgroup_id_x, %c0], %cst_0 {in_bounds = [true]} : memref<128x32xf32>, vector<32xf32>
     vector.transfer_write %2, %alloc[%c0] {in_bounds = [true]} : vector<32xf32>, memref<32xf32, #gpu.address_space<workgroup>>
     gpu.barrier memfence [#gpu.address_space<workgroup>]
@@ -265,7 +265,7 @@ module {
 }
 
 // CHECK-LABEL: func.func @shared_memory_copy()
-//       CHECK:   %[[ALLOC:.*]] = memref.alloc() {alignment = 64 : i64} : memref<32xf32, #gpu.address_space<workgroup>>
+//       CHECK:   %[[ALLOC:.*]] = memref.alloc() alignment = 64 : memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   vector.transfer_read {{.*}} : memref<128x32xf32>, vector<1xf32>
 //       CHECK:   vector.transfer_write {{.*}} %[[ALLOC]]{{.*}} : vector<1xf32>, memref<32xf32, #gpu.address_space<workgroup>>
 //       CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]

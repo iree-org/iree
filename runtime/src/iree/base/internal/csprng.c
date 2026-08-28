@@ -92,6 +92,16 @@ IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
   return iree_ok_status();
 }
 
+#elif defined(IREE_PLATFORM_GENERIC)
+
+// Generic platforms have no standard entropy source.
+
+IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
+  (void)buffer;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "no CSPRNG available on generic platforms");
+}
+
 #else
 
 #error "CSPRNG not implemented for this platform"

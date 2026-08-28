@@ -8,9 +8,9 @@
 
 #include "iree/base/internal/atomics.h"
 
-#if !defined(IREE_PLATFORM_WINDOWS)
+#if IREE_POSIX_SIGNALS_ENABLE
 #include <signal.h>
-#endif
+#endif  // IREE_POSIX_SIGNALS_ENABLE
 
 //===----------------------------------------------------------------------===//
 // iree_async_signal_name
@@ -42,25 +42,9 @@ iree_async_signal_name(iree_async_signal_t signal) {
 // iree_async_signal_block_default / iree_async_signal_ignore_broken_pipe
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_PLATFORM_WINDOWS)
+#if !IREE_POSIX_SIGNALS_ENABLE
 
-// Windows doesn't have POSIX signals. These are no-ops.
-
-IREE_API_EXPORT iree_status_t iree_async_signal_block_default(void) {
-  // No-op on Windows; signals don't exist in the POSIX sense.
-  // Console control events are handled via SetConsoleCtrlHandler.
-  return iree_ok_status();
-}
-
-IREE_API_EXPORT iree_status_t iree_async_signal_ignore_broken_pipe(void) {
-  // No-op on Windows; SIGPIPE doesn't exist.
-  // Socket errors are returned from send/recv calls directly.
-  return iree_ok_status();
-}
-
-#elif defined(IREE_PLATFORM_WASM)
-
-// Wasm has no POSIX signals.
+// POSIX signals are unavailable on this platform; these operations are no-ops.
 
 IREE_API_EXPORT iree_status_t iree_async_signal_block_default(void) {
   return iree_ok_status();
@@ -104,7 +88,7 @@ IREE_API_EXPORT iree_status_t iree_async_signal_ignore_broken_pipe(void) {
   return iree_ok_status();
 }
 
-#endif  // POSIX
+#endif  // IREE_POSIX_SIGNALS_ENABLE
 
 //===----------------------------------------------------------------------===//
 // Global signal ownership
@@ -251,7 +235,7 @@ iree_async_signal_subscription_t* iree_async_signal_subscription_dispatch(
 // POSIX signal number conversion
 //===----------------------------------------------------------------------===//
 
-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
+#if IREE_POSIX_SIGNALS_ENABLE
 
 int iree_async_signal_to_posix(iree_async_signal_t signal) {
   switch (signal) {
@@ -301,4 +285,4 @@ void iree_async_signal_build_sigset(sigset_t* mask) {
   sigaddset(mask, SIGUSR2);
 }
 
-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM
+#endif  // IREE_POSIX_SIGNALS_ENABLE

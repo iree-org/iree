@@ -37,7 +37,7 @@ LLVMTarget::LLVMTarget() {
   // TODO(benvanik): add an option for this.
   optimizerOptLevel = llvm::OptimizationLevel::O2;
   codeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
-  llvmTargetOptions.FloatABIType = DEFAULT_FLOAT_ABI;
+  floatABI = DEFAULT_FLOAT_ABI;
 
   // Force `-ffunction-sections` so we can strip unused code.
   llvmTargetOptions.FunctionSections = true;
@@ -111,8 +111,7 @@ void LLVMTarget::print(llvm::raw_ostream &os) const {
      << "    SLPVectorization=" << pipelineTuningOptions.SLPVectorization
      << "\n"
      << "  }, llvmTargetOptions={\n"
-     << "    FloatABIType=" << static_cast<int>(llvmTargetOptions.FloatABIType)
-     << "\n"
+     << "    FloatABI=" << static_cast<int>(floatABI) << "\n"
      << "  }\n"
      << "  ukernels=" << ukernels << "\n"
      << "  linkUkernelBitcode=" << linkUkernelBitcode << "\n"
@@ -180,8 +179,8 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   if (!llvmTargetOptions.MCOptions.ABIName.empty()) {
     addString("target_abi", llvmTargetOptions.MCOptions.ABIName);
   }
-  if (llvmTargetOptions.FloatABIType != DEFAULT_FLOAT_ABI) {
-    switch (llvmTargetOptions.FloatABIType) {
+  if (floatABI != DEFAULT_FLOAT_ABI) {
+    switch (floatABI) {
     case llvm::FloatABI::Default:
       addString("float_abi", "default");
       break;
@@ -318,11 +317,11 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   auto floatAbi = getOptionalString("float_abi");
   if (floatAbi) {
     if (floatAbi == "default") {
-      target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
+      target.floatABI = llvm::FloatABI::Default;
     } else if (floatAbi == "soft") {
-      target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
+      target.floatABI = llvm::FloatABI::Default;
     } else if (floatAbi == "hard") {
-      target.llvmTargetOptions.FloatABIType = llvm::FloatABI::Default;
+      target.floatABI = llvm::FloatABI::Default;
     } else {
       emitError(loc) << "executable config unexpected value for 'float_abi'";
       return {};
@@ -670,7 +669,7 @@ LLVMTargetOptions LLVMCPUTargetCLOptions::getTargetOptions() {
   target.pipelineTuningOptions.SLPVectorization = llvmSLPVectorization;
   target.sanitizerKind = sanitizerKind;
   target.llvmTargetOptions.MCOptions.ABIName = targetABI;
-  target.llvmTargetOptions.FloatABIType = targetFloatABI;
+  target.floatABI = targetFloatABI;
   target.dataLayout = targetDataLayout;
   target.vectorWidthInBytes = targetVectorWidthInBytes;
   target.maxStackAllocSizeInBytes = targetMaxStackAllocSizeInBytes.value;

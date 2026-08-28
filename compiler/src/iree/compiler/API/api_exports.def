@@ -304,12 +304,14 @@ EXPORTS
   mlirConditionallySpeculatableOpInterfaceTypeID
   mlirContextAppendDialectRegistry
   mlirContextAttachDiagnosticHandler
+  mlirContextBeginTransientScope
   mlirContextCreate
   mlirContextCreateWithRegistry
   mlirContextCreateWithThreading
   mlirContextDestroy
   mlirContextDetachDiagnosticHandler
   mlirContextEnableMultithreading
+  mlirContextEndTransientScope
   mlirContextEqual
   mlirContextGetAllowUnregisteredDialects
   mlirContextGetLoadedDialect
@@ -318,6 +320,7 @@ EXPORTS
   mlirContextGetNumThreads
   mlirContextGetOrLoadDialect
   mlirContextGetThreadPool
+  mlirContextIsInTransientScope
   mlirContextIsRegisteredOperation
   mlirContextLoadAllAvailableDialects
   mlirContextSetAllowUnregisteredDialects
@@ -641,6 +644,7 @@ EXPORTS
   mlirLLVMDICompileUnitAttrGetName
   mlirLLVMDICompileUnitAttrGetRecSelf
   mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect
+  mlirLLVMDICompileUnitAttrGetWithSourceLanguageName
   mlirLLVMDICompositeTypeAttrGet
   mlirLLVMDICompositeTypeAttrGetName
   mlirLLVMDICompositeTypeAttrGetRecSelf
@@ -1063,8 +1067,8 @@ EXPORTS
   mlirSymbolTableCreate
   mlirSymbolTableDestroy
   mlirSymbolTableErase
+  mlirSymbolTableGetDefaultVisibilityAttributeName
   mlirSymbolTableGetSymbolAttributeName
-  mlirSymbolTableGetVisibilityAttributeName
   mlirSymbolTableInsert
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses

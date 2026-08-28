@@ -466,6 +466,6 @@ func.func @matmul_f16() attributes {hal.executable.target = #executable_target_c
 
 //    SM80-LABEL: llvm.func @matmul_f16
 //     SM80-NOT:     nvgpu.mma.sync
-// SM80-COUNT-64: nvvm.mma.sync{{.*}}shape = #nvvm.shape<m = 16, n = 8, k = 16>
+// SM80-COUNT-64: nvvm.mma.sync{{.*}}shape = <m = 16, n = 8, k = 16>
 //     SM80-NOT:     nvvm.mma.sync
 //         SM80:     llvm.return

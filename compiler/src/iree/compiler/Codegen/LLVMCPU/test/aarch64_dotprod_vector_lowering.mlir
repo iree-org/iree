@@ -24,10 +24,10 @@ func.func @mmt4d_kernel_dispatch(%0: memref<1x2x8x4xi8>, %1: memref<1x2x8x4xi8>,
 // CHECK-LABEL:  @mmt4d_kernel_dispatch(
 // CHECK:        %[[LHS_FLAT32:.+]] = vector.transfer_read {{.*}} : memref<1x2x32xi8>, vector<32xi8>
 // CHECK:        %[[RHS_FLAT32:.+]] = vector.transfer_read {{.*}} : memref<1x2x32xi8>, vector<32xi8>
-// CHECK:        %[[LHS_FLAT16_0:.+]] = vector.extract_strided_slice %[[LHS_FLAT32]] {offsets = [0], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
-// CHECK:        %[[LHS_FLAT16_1:.+]] = vector.extract_strided_slice %[[LHS_FLAT32]] {offsets = [16], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
-// CHECK:        %[[RHS_FLAT16_0:.+]] = vector.extract_strided_slice %[[RHS_FLAT32]] {offsets = [0], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
-// CHECK:        %[[RHS_FLAT16_1:.+]] = vector.extract_strided_slice %[[RHS_FLAT32]] {offsets = [16], sizes = [16], strides = [1]} : vector<32xi8> to vector<16xi8>
+// CHECK:        %[[LHS_FLAT16_0:.+]] = vector.extract_strided_slice %[[LHS_FLAT32]] offsets = [0], sizes = [16], strides = [1] : vector<32xi8> to vector<16xi8>
+// CHECK:        %[[LHS_FLAT16_1:.+]] = vector.extract_strided_slice %[[LHS_FLAT32]] offsets = [16], sizes = [16], strides = [1] : vector<32xi8> to vector<16xi8>
+// CHECK:        %[[RHS_FLAT16_0:.+]] = vector.extract_strided_slice %[[RHS_FLAT32]] offsets = [0], sizes = [16], strides = [1] : vector<32xi8> to vector<16xi8>
+// CHECK:        %[[RHS_FLAT16_1:.+]] = vector.extract_strided_slice %[[RHS_FLAT32]] offsets = [16], sizes = [16], strides = [1] : vector<32xi8> to vector<16xi8>
 // CHECK:        llvm.inline_asm
 // CHECK-SAME:      {{((.*sdot){16})}}
 // CHECK-SAME:      %[[LHS_FLAT16_0]], %[[LHS_FLAT16_1]], %[[RHS_FLAT16_0]], %[[RHS_FLAT16_1]],

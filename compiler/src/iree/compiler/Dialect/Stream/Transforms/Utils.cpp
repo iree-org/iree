@@ -215,8 +215,7 @@ duplicateExecutablesPerLayoutVariant(ModuleOp moduleOp,
       assert(dispatchSiteToExecutableOp.count(info));
 
       auto executableOp = dispatchSiteToExecutableOp[info];
-      auto newSym = SymbolRefAttr::get(executableOp->getAttrOfType<StringAttr>(
-                                           SymbolTable::getSymbolAttrName()),
+      auto newSym = SymbolRefAttr::get(executableOp.getNameAttr(),
                                        entryPoint.getNestedReferences());
       newEntryPoints.push_back(newSym);
     });

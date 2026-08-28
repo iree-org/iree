@@ -199,6 +199,6 @@ func.func @vectorize_scan_masked_configured(
 // CHECK:         vector.create_mask {{.*}} : vector<8xi1>
 // CHECK:         vector.transfer_read {{.*}} : tensor<?xf32>, vector<8xf32>
 // CHECK:         arith.select {{.*}} : vector<8xi1>, vector<8xf32>
-// CHECK:         vector.scan <add>, {{.*}} {inclusive = true, reduction_dim = 1 : i64}
+// CHECK:         vector.scan <add>, {{.*}} reduction_dim = 1, inclusive = true
 // CHECK:         vector.transfer_write {{.*}} : vector<8x16xf32>, tensor<?x?xf32>
 // CHECK:         vector.transfer_write {{.*}} : vector<8xf32>, tensor<?xf32>

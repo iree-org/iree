@@ -658,6 +658,8 @@ let opDocGroup = OpGroupStructuralOps in {
 
 def Util_InitializerOp : Util_Op<"initializer", [
   IsolatedFromAbove,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   CallableOpInterface,
   Util_InitializerOpInterface,
@@ -704,6 +706,8 @@ def Util_InitializerOp : Util_Op<"initializer", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -757,6 +761,8 @@ def Util_InitializerOp : Util_Op<"initializer", [
 def Util_FuncOp : Util_Op<"func", [
   AffineScope,
   AutomaticAllocationScope,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   IsolatedFromAbove,
   OpAsmOpInterface,
@@ -1072,6 +1078,8 @@ def OpGroupGlobalOps : OpDocGroup {
 let opDocGroup = OpGroupGlobalOps in {
 
 def Util_GlobalOp : Util_Op<"global", [
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   Util_GlobalOpInterface,
 ]> {

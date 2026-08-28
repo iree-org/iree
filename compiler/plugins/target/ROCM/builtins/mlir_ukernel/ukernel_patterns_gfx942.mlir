@@ -34,7 +34,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_medium_expanded : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 128 == 0, K % 128 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -119,7 +119,7 @@ pdl.pattern @annotate_matmul_like_f8E4M3FNUZ_large_expanded : benefit(2) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 256 == 0, K % 128 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -211,7 +211,7 @@ pdl.pattern @annotate_matmul_like_f16_large : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 256 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -293,7 +293,7 @@ pdl.pattern @annotate_matmul_like_f16_medium_expanded : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 128 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -382,7 +382,7 @@ pdl.pattern @annotate_matmul_like_f16_large_expanded : benefit(2) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 256 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -471,7 +471,7 @@ pdl.pattern @annotate_matmul_like_bf16_large : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 256 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -553,7 +553,7 @@ pdl.pattern @annotate_matmul_like_bf16_medium_expanded : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 128 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -646,7 +646,7 @@ pdl.pattern @annotate_matmul_like_bf16_large_expanded : benefit(2) {
         : !pdl.operation, !pdl.attribute, !pdl.attribute)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   // M % 256 == 0, K % 64 == 0, N % 256 == 0
   %empty = pdl.attribute = {}
@@ -708,7 +708,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_medium : benefit(1) {
   %generic_op = pdl.operation "iree_codegen.inner_tiled" (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   %lhs_cast_type = pdl.type : tensor<?x?x8x4x16x2x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
@@ -765,7 +765,7 @@ pdl.pattern @annotate_inner_tiled_f8E4M3FNUZ_large : benefit(2) {
   %generic_op = pdl.operation "iree_codegen.inner_tiled" (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x8xf8E4M3FNUZ>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)
@@ -822,7 +822,7 @@ pdl.pattern @annotate_inner_tiled_f16_large : benefit(1) {
   %generic_op = pdl.operation "iree_codegen.inner_tiled" (%lhs, %rhs, %out_init : !pdl.value, !pdl.value, !pdl.value) -> (%out_type : !pdl.type)
 
   %attr_name = pdl.attribute = "iree_codegen.ukernel"
-  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) {isNegated = true}
+  pdl.apply_native_constraint "hasAttr"(%generic_op, %attr_name : !pdl.operation, !pdl.attribute) is_negated = true
 
   %lhs_cast_type = pdl.type : tensor<?x?x2x8x4x16x4xf16>
   pdl.apply_native_constraint "matchCastCompatibleType"(%lhs, %lhs_cast_type : !pdl.value, !pdl.type)

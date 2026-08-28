@@ -503,7 +503,7 @@ func.func @subview(%offset : index, %i0: index, %i1: index) -> f32 {
 
 func.func @subgroup_mma_load(%i0: index, %i1: index) -> !gpu.mma_matrix<16x16xf16, "AOp"> {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
-  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+  %0 = gpu.subgroup_mma_load_matrix %alloc[%i0, %i1] leadDimension 32 : memref<32x32xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
   return %0 : !gpu.mma_matrix<16x16xf16, "AOp">
 }
 
@@ -512,14 +512,14 @@ func.func @subgroup_mma_load(%i0: index, %i1: index) -> !gpu.mma_matrix<16x16xf1
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index)
 //       CHECK:  %[[ALLOC:.+]] = memref.alloc() : memref<1024xf16, 3>
 //       CHECK:  %[[IDX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]]]
-//       CHECK:  %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[IDX]]] {leadDimension = 32 : index} : memref<1024xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+//       CHECK:  %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[ALLOC]][%[[IDX]]] leadDimension 32 : memref<1024xf16, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
 //       CHECK:  return %[[LD]]
 
 // -----
 
 func.func @subgroup_mma_store(%i0: index, %i1: index, %val: !gpu.mma_matrix<16x16xf16, "COp">) {
   %alloc = memref.alloc() : memref<32x32xf16, 3>
-  gpu.subgroup_mma_store_matrix %val, %alloc[%i0, %i1] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
+  gpu.subgroup_mma_store_matrix %val, %alloc[%i0, %i1] leadDimension 128 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, 3>
   return
 }
 
@@ -528,7 +528,7 @@ func.func @subgroup_mma_store(%i0: index, %i1: index, %val: !gpu.mma_matrix<16x1
 //  CHECK-SAME: (%[[I0:.+]]: index, %[[I1:.+]]: index, %[[VAL:.+]]: !gpu.mma_matrix<16x16xf16, "COp">) {
 //       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<1024xf16, 3>
 //       CHECK:   %[[IDX:.+]] = affine.apply #[[$MAP]]()[%[[I0]], %[[I1]]]
-//       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[ALLOC]][%[[IDX]]] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<1024xf16, 3>
+//       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[ALLOC]][%[[IDX]]] leadDimension 128 : !gpu.mma_matrix<16x16xf16, "COp">, memref<1024xf16, 3>
 
 // -----
 
@@ -537,7 +537,7 @@ func.func @subgroup_mma_store(%i0: index, %i1: index, %val: !gpu.mma_matrix<16x1
 ]>
 func.func @subgroup_mma_load_with_offset(%offset : index, %i0: index, %i1: index) -> !gpu.mma_matrix<16x16xf16, "AOp"> {
   %subspan = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%offset) : memref<32x32xf16, strided<[32, 1], offset: ?>, 3>
-  %0 = gpu.subgroup_mma_load_matrix %subspan[%i0, %i1] {leadDimension = 32 : index} : memref<32x32xf16, strided<[32, 1], offset: ?>, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
+  %0 = gpu.subgroup_mma_load_matrix %subspan[%i0, %i1] leadDimension 32 : memref<32x32xf16, strided<[32, 1], offset: ?>, 3> -> !gpu.mma_matrix<16x16xf16, "AOp">
   return %0 : !gpu.mma_matrix<16x16xf16, "AOp">
 }
 
@@ -549,7 +549,7 @@ func.func @subgroup_mma_load_with_offset(%offset : index, %i0: index, %i1: index
 //   CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[ZERO]]) : memref<?xf16, 3>{%[[SIZE]]}
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP2]]()[%[[OFFSET]], %[[I0]], %[[I1]]]
-//       CHECK:   %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[SUBSPAN]][%[[INDEX]]] {leadDimension = 32 : index}
+//       CHECK:   %[[LD:.+]] = gpu.subgroup_mma_load_matrix %[[SUBSPAN]][%[[INDEX]]] leadDimension 32
 //       CHECK:   return %[[LD]]
 
 // -----
@@ -559,7 +559,7 @@ func.func @subgroup_mma_load_with_offset(%offset : index, %i0: index, %i1: index
 ]>
 func.func @subgroup_mma_store_with_offset(%offset : index, %i0: index, %i1: index, %val: !gpu.mma_matrix<16x16xf16, "COp">) {
   %subspan = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) offset(%offset) : memref<32x32xf16, strided<[32, 1], offset: ?>, 3>
-  gpu.subgroup_mma_store_matrix %val, %subspan[%i0, %i1] {leadDimension = 128 : index} : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, strided<[32, 1], offset: ?>, 3>
+  gpu.subgroup_mma_store_matrix %val, %subspan[%i0, %i1] leadDimension 128 : !gpu.mma_matrix<16x16xf16, "COp">, memref<32x32xf16, strided<[32, 1], offset: ?>, 3>
   return
 }
 
@@ -571,7 +571,7 @@ func.func @subgroup_mma_store_with_offset(%offset : index, %i0: index, %i1: inde
 //   CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) offset(%[[ZERO]]) : memref<?xf16, 3>{%[[SIZE]]}
 //       CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP2]]()[%[[OFFSET]], %[[I0]], %[[I1]]]
-//       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] {leadDimension = 128 : index}
+//       CHECK:   gpu.subgroup_mma_store_matrix %[[VAL]], %[[SUBSPAN]][%[[INDEX]]] leadDimension 128
 
 // -----
 

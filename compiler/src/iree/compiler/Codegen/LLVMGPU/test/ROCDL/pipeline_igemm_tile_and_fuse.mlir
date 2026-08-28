@@ -68,7 +68,7 @@ func.func @conv_nhwc_stride_2() attributes {hal.executable.target = #executable_
 //      CHECK-DAG:     vector.transpose %[[RHS_MM]], [0, 2, 3, 1] : vector<2x4x4x1xf16> to vector<2x4x1x4xf16>
 // CHECK-COUNT-32:     amdgpu.mfma 16x16x16
 //          CHECK:   vector.shape_cast %[[LOOP]]#{{.+}} : vector<4xf32> to vector<4x1xf32>
-//          CHECK:   vector.insert_strided_slice {{.*}} {offsets = [3, 0, 3, 0, 0]{{.*}}} : vector<4x1xf32> into vector<4x1x4x4x1xf32>
+//          CHECK:   vector.insert_strided_slice {{.*}} offsets = [3, 0, 3, 0, 0]{{.*}} : vector<4x1xf32> into vector<4x1x4x4x1xf32>
 //          CHECK:   %[[LOOP_T:.+]] = vector.transpose %{{.+}}, [0, 1, 2, 4, 3, 5] : vector<1x4x1x4x4x1xf32> to vector<1x4x1x4x4x1xf32>
 //          CHECK:   %[[CAST:.+]] = vector.shape_cast %[[LOOP_T]] : vector<1x4x1x4x4x1xf32> to vector<4x1x4x4x1xf32>
 //          CHECK:   vector.transfer_write %[[CAST]], %[[BUF2]]

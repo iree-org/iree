@@ -49,7 +49,25 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::schemas::executable_debug_info_c_fbs
     iree::schemas::metal_executable_def_c_fbs
+    "-framework CoreGraphics"
     "-framework Foundation"
     "-framework Metal"
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    metal_device_test
+  SRCS
+    "metal_device_test.cc"
+  DEPS
+    ::metal
+    iree::async::util::proactor_pool
+    iree::base
+    iree::base::threading
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=metal"
 )

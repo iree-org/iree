@@ -23,15 +23,15 @@ func.func @transfer_read_index_type(%mem: memref<64xindex>) -> vector<4xindex> {
 //   CHECK-DAG:   %[[CST2:.+]] = arith.constant dense<2> : vector<1xindex>
 //   CHECK-DAG:   %[[CST1:.+]] = arith.constant dense<1> : vector<1xindex>
 //       CHECK:   %[[STEP:.+]] = vector.step : vector<1xindex>
-//       CHECK:   %[[INS0:.+]] = vector.insert_strided_slice %[[STEP]], %{{.+}} {offsets = [0], strides = [1]} : vector<1xindex> into vector<5xindex>
+//       CHECK:   %[[INS0:.+]] = vector.insert_strided_slice %[[STEP]], %{{.+}} offsets = [0], strides = [1] : vector<1xindex> into vector<5xindex>
 //       CHECK:   %[[ADD1:.+]] = arith.addi %[[STEP]], %[[CST1]] : vector<1xindex>
-//       CHECK:   %[[INS1:.+]] = vector.insert_strided_slice %[[ADD1]], %[[INS0]] {offsets = [1], strides = [1]} : vector<1xindex> into vector<5xindex>
+//       CHECK:   %[[INS1:.+]] = vector.insert_strided_slice %[[ADD1]], %[[INS0]] offsets = [1], strides = [1] : vector<1xindex> into vector<5xindex>
 //       CHECK:   %[[ADD2:.+]] = arith.addi %[[STEP]], %[[CST2]] : vector<1xindex>
-//       CHECK:   %[[INS2:.+]] = vector.insert_strided_slice %[[ADD2]], %[[INS1]] {offsets = [2], strides = [1]} : vector<1xindex> into vector<5xindex>
+//       CHECK:   %[[INS2:.+]] = vector.insert_strided_slice %[[ADD2]], %[[INS1]] offsets = [2], strides = [1] : vector<1xindex> into vector<5xindex>
 //       CHECK:   %[[ADD3:.+]] = arith.addi %[[STEP]], %[[CST3]] : vector<1xindex>
-//       CHECK:   %[[INS3:.+]] = vector.insert_strided_slice %[[ADD3]], %[[INS2]] {offsets = [3], strides = [1]} : vector<1xindex> into vector<5xindex>
+//       CHECK:   %[[INS3:.+]] = vector.insert_strided_slice %[[ADD3]], %[[INS2]] offsets = [3], strides = [1] : vector<1xindex> into vector<5xindex>
 //       CHECK:   %[[ADD4:.+]] = arith.addi %[[STEP]], %[[CST4]] : vector<1xindex>
-//       CHECK:   %[[INS4:.+]] = vector.insert_strided_slice %[[ADD4]], %[[INS3]] {offsets = [4], strides = [1]} : vector<1xindex> into vector<5xindex>
+//       CHECK:   %[[INS4:.+]] = vector.insert_strided_slice %[[ADD4]], %[[INS3]] offsets = [4], strides = [1] : vector<1xindex> into vector<5xindex>
 //       CHECK:   vector.store %[[INS4]], %{{.+}}[%{{.+}}] : memref<5xindex>, vector<5xindex>
 func.func @step_unroll(%dest: memref<5xindex>) {
   %c0 = arith.constant 0 : index

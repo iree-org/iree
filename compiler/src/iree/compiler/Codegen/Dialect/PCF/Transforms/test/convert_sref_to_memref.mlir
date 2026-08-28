@@ -38,8 +38,8 @@ util.func private @convert_generic_with_alloc(%d0: index, %d1: index, %d2: index
 //  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG1:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG2:[A-Za-z0-9_]+]]: index
-//  CHECK-DAG:    %[[ALLOC:.+]] = memref.alloc(%[[ARG0]]) {alignment = 16 : i64} : memref<?xi32>
-//  CHECK-DAG:    %[[ALLOC1:.+]] = memref.alloc(%[[ARG1]], %[[ARG2]]) {alignment = 16 : i64} : memref<?x?xi32>
+//  CHECK-DAG:    %[[ALLOC:.+]] = memref.alloc(%[[ARG0]]) alignment = 16 : memref<?xi32>
+//  CHECK-DAG:    %[[ALLOC1:.+]] = memref.alloc(%[[ARG1]], %[[ARG2]]) alignment = 16 : memref<?x?xi32>
 //       CHECK:   pcf.generic scope(#pcf.test_scope)
 //  CHECK-NEXT:     execute[{{.*}}] {
 //  CHECK-NEXT:     util.optimization_barrier %[[ALLOC]], %[[ALLOC1]]
@@ -91,7 +91,7 @@ util.func private @inline_generic_initializer_with_alloc() {
 //       CHECK:   pcf.generic scope(#pcf.sequential)
 //  CHECK-NEXT:     execute[{{.*}}] {
 //  CHECK-NEXT:     %[[I:.+]] = arith.constant 42 : index
-//  CHECK-NEXT:     %[[ALLOC:.+]] = memref.alloc(%[[I]]) {alignment = 16 : i64} : memref<?x5xi32>
+//  CHECK-NEXT:     %[[ALLOC:.+]] = memref.alloc(%[[I]]) alignment = 16 : memref<?x5xi32>
 //  CHECK-NEXT:     util.optimization_barrier %[[I]], %[[ALLOC]]
 //  CHECK-NEXT:     pcf.return
 
@@ -135,8 +135,8 @@ util.func private @convert_loop_with_alloc(%d0: index, %d1: index, %d2: index, %
 //  CHECK-SAME:     %[[ARG0:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG1:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:     %[[ARG2:[A-Za-z0-9_]+]]: index
-//  CHECK-DAG:    %[[ALLOC:.+]] = memref.alloc(%[[ARG0]]) {alignment = 16 : i64} : memref<?xi32>
-//  CHECK-DAG:    %[[ALLOC1:.+]] = memref.alloc(%[[ARG1]], %[[ARG2]]) {alignment = 16 : i64} : memref<?x?xi32>
+//  CHECK-DAG:    %[[ALLOC:.+]] = memref.alloc(%[[ARG0]]) alignment = 16 : memref<?xi32>
+//  CHECK-DAG:    %[[ALLOC1:.+]] = memref.alloc(%[[ARG1]], %[[ARG2]]) alignment = 16 : memref<?x?xi32>
 //       CHECK:   pcf.loop scope(#pcf.test_scope)
 //  CHECK-NEXT:     execute[{{.*}}] {
 //  CHECK-NEXT:     util.optimization_barrier %[[ALLOC]], %[[ALLOC1]]
@@ -286,7 +286,7 @@ func.func @convert_alloc(%d0: index) -> !pcf.sref<?x5xi32, #pcf.sequential> {
 
 // CHECK-LABEL: @convert_alloc
 //  CHECK-SAME:   %[[D0:[A-Za-z0-9]+]]: index
-//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) {alignment = 16 : i64} : memref<?x5xi32>
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc(%[[D0]]) alignment = 16 : memref<?x5xi32>
 //       CHECK:   return %[[ALLOC]] : memref<?x5xi32>
 
 // -----
@@ -413,7 +413,7 @@ func.func @convert_tensor_read_slice_no_tied_init(%dim_0: index, %dim_1: index) 
 // CHECK-LABEL: @convert_tensor_read_slice_no_tied_init
 //  CHECK-SAME:     %[[DIM0:[A-Za-z0-9_]+]]: index
 //  CHECK-SAME:     %[[DIM1:[A-Za-z0-9_]+]]: index
-//   CHECK-DAG:     %[[ALLOC:.+]] = memref.alloc(%[[DIM0]], %[[DIM1]]) {alignment = 16 : i64} : memref<?x?xi32>
+//   CHECK-DAG:     %[[ALLOC:.+]] = memref.alloc(%[[DIM0]], %[[DIM1]]) alignment = 16 : memref<?x?xi32>
 //       CHECK:   pcf.generic
 //  CHECK-NEXT:     execute[{{.*}}] {
 //   CHECK-DAG:     %[[SV:.+]] = memref.subview %[[ALLOC]][1, 2] [3, 4] [1, 1] : memref<?x?xi32> to memref<3x4xi32, strided<[?, 1], offset: ?>>

@@ -8,7 +8,7 @@
 //       CHECK:   %[[C512:.+]] = arith.constant 512 : index
 //       CHECK:   memref.view %[[PACKED]][%[[C512]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   nvgpu.device_async_create_group
-//       CHECK:   nvgpu.device_async_wait %0 {numGroups = 0 : i32}
+//       CHECK:   nvgpu.device_async_wait %0 numGroups = 0
 //       CHECK:   gpu.barrier
 //       CHECK:   memref.view %[[PACKED]][%[[C0]]][] : memref<1024xi8, #gpu.address_space<workgroup>> to memref<32xf32, #gpu.address_space<workgroup>>
 func.func @shared_memory_disjoint() {

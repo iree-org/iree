@@ -380,8 +380,8 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
     %3 = scf.for %i = %c1 to %nDim step %c1 iter_args(%iter = %2) -> vector<8x2x1x4xf32> {
       // Local loads of lhs.
       %lhs_vec = vector.transfer_read %lhs_shared[%c0, %ids#0, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_lhs_shared_ty, vector<2x8x1x16xf8E4M3FNUZ>
-      %lhs_vec_0 = vector.extract_strided_slice %lhs_vec {offsets = [0, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1]} : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
-      %lhs_vec_2 = vector.extract_strided_slice %lhs_vec {offsets = [1, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1]} : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
+      %lhs_vec_0 = vector.extract_strided_slice %lhs_vec offsets = [0, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1] : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
+      %lhs_vec_2 = vector.extract_strided_slice %lhs_vec offsets = [1, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1] : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
       %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x8x1x16xf8E4M3FNUZ> to vector<8x2x1x8xf8E4M3FNUZ>
       %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x8x1x16xf8E4M3FNUZ> to vector<8x2x1x8xf8E4M3FNUZ>
 
@@ -397,8 +397,8 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
 
       // Local loads of rhs.
       %rhs_vec = vector.transfer_read %rhs_shared[%c0, %glb0_rhs, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_rhs_shared_ty, vector<2x2x1x16xf8E4M3FNUZ>
-      %rhs_vec_0 = vector.extract_strided_slice %rhs_vec {offsets = [0, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1]} : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
-      %rhs_vec_2 = vector.extract_strided_slice %rhs_vec {offsets = [1, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1]} : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
+      %rhs_vec_0 = vector.extract_strided_slice %rhs_vec offsets = [0, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1] : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
+      %rhs_vec_2 = vector.extract_strided_slice %rhs_vec offsets = [1, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1] : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
       %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x2x1x16xf8E4M3FNUZ> to vector<2x2x1x8xf8E4M3FNUZ>
       %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x2x1x16xf8E4M3FNUZ> to vector<2x2x1x8xf8E4M3FNUZ>
 
@@ -461,14 +461,14 @@ util.func private @pingpong_dt_medium_f8E4M3FNUZ(%lhs_base: !m_lhs_base_ty, %rhs
 
     // Epilogue
     %lhs_vec = vector.transfer_read %lhs_shared[%c0, %ids#0, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_lhs_shared_ty, vector<2x8x1x16xf8E4M3FNUZ>
-    %lhs_vec_0 = vector.extract_strided_slice %lhs_vec {offsets = [0, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1]} : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
-    %lhs_vec_2 = vector.extract_strided_slice %lhs_vec {offsets = [1, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1]} : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
+    %lhs_vec_0 = vector.extract_strided_slice %lhs_vec offsets = [0, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1] : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
+    %lhs_vec_2 = vector.extract_strided_slice %lhs_vec offsets = [1, 0, 0, 0], sizes = [1, 8, 1, 16], strides = [1, 1, 1, 1] : vector<2x8x1x16xf8E4M3FNUZ> to vector<1x8x1x16xf8E4M3FNUZ>
     %lhs_vec_0_t = vector.shape_cast %lhs_vec_0 : vector<1x8x1x16xf8E4M3FNUZ> to vector<8x2x1x8xf8E4M3FNUZ>
     %lhs_vec_2_t = vector.shape_cast %lhs_vec_2 : vector<1x8x1x16xf8E4M3FNUZ> to vector<8x2x1x8xf8E4M3FNUZ>
 
     %rhs_vec = vector.transfer_read %rhs_shared[%c0, %glb0_rhs, %ids#2, %c0], %cst {in_bounds = [true, true, true, true]} : !m_rhs_shared_ty, vector<2x2x1x16xf8E4M3FNUZ>
-    %rhs_vec_0 = vector.extract_strided_slice %rhs_vec {offsets = [0, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1]} : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
-    %rhs_vec_2 = vector.extract_strided_slice %rhs_vec {offsets = [1, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1]} : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
+    %rhs_vec_0 = vector.extract_strided_slice %rhs_vec offsets = [0, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1] : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
+    %rhs_vec_2 = vector.extract_strided_slice %rhs_vec offsets = [1, 0, 0, 0], sizes = [1, 2, 1, 16], strides = [1, 1, 1, 1] : vector<2x2x1x16xf8E4M3FNUZ> to vector<1x2x1x16xf8E4M3FNUZ>
     %rhs_vec_0_t = vector.shape_cast %rhs_vec_0 : vector<1x2x1x16xf8E4M3FNUZ> to vector<2x2x1x8xf8E4M3FNUZ>
     %rhs_vec_2_t = vector.shape_cast %rhs_vec_2 : vector<1x2x1x16xf8E4M3FNUZ> to vector<2x2x1x8xf8E4M3FNUZ>
 

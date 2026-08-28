@@ -125,7 +125,8 @@ iree_vm_buffer_create(iree_vm_buffer_access_t access, iree_host_size_t length,
   memset(data_ptr, 0, prefix_size - sizeof(*buffer));  // padding
   iree_byte_span_t target_span =
       iree_make_byte_span(data_ptr + prefix_size, length);
-  iree_vm_buffer_initialize(access, target_span, allocator, buffer);
+  iree_vm_buffer_initialize(access | IREE_VM_BUFFER_ACCESS_COALLOCATED,
+                            target_span, allocator, buffer);
 
   *out_buffer = buffer;
   IREE_TRACE_ZONE_END(z0);
@@ -140,10 +141,16 @@ static void iree_vm_buffer_destroy(void* ptr) {
     // Module-owned buffers are embedded in the bytecode module. Reaching zero
     // external references releases the owner retain taken by the first retain.
     iree_vm_module_release(buffer->storage_module);
-  } else {
+  } else if (iree_all_bits_set(buffer->access,
+                               IREE_VM_BUFFER_ACCESS_COALLOCATED)) {
     // Buffers are stored as [prefix | data]; freeing the prefix is all we need
     // to do to free it all.
     iree_allocator_free_aligned(buffer->allocator, buffer);
+  } else {
+    // Buffer handle was initialized in-place over storage owned elsewhere;
+    // notify the allocator so any wrapping storage can be released. Note that
+    // it must not be treated as an aligned allocation.
+    iree_allocator_free(buffer->allocator, buffer);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -263,7 +270,8 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_clone(
   memset(data_ptr, 0, prefix_size - sizeof(*buffer));  // padding
   iree_byte_span_t target_span =
       iree_make_byte_span(data_ptr + prefix_size, length);
-  iree_vm_buffer_initialize(access, target_span, allocator, buffer);
+  iree_vm_buffer_initialize(access | IREE_VM_BUFFER_ACCESS_COALLOCATED,
+                            target_span, allocator, buffer);
 
   // Copy the data from the source buffer.
   memcpy(target_span.data, source_span.data, target_span.data_length);

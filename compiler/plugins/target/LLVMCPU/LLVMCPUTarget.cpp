@@ -531,6 +531,15 @@ public:
     // Specialize the module to our target machine.
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetMachine->getTargetTriple());
+    // An explicit "float-abi" module flag wins; only record the target's ABI
+    // when the module does not already carry one.
+    if (target.floatABI != llvm::FloatABI::Default &&
+        !llvmModule->getModuleFlag("float-abi")) {
+      llvmModule->addModuleFlag(
+          llvm::Module::Error, "float-abi",
+          llvm::MDString::get(llvmModule->getContext(),
+                              llvm::FloatABI::getABITypeName(target.floatABI)));
+    }
 
     // Dump just the codegen bitcode before linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {

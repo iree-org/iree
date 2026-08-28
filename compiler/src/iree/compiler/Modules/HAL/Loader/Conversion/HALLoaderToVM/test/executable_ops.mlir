@@ -2,7 +2,7 @@
 // RUN:   --iree-vm-conversion --canonicalize %s | FileCheck %s
 
 // CHECK-DAG: vm.import private @hal_loader.executable.dispatch{{\(.+}}attributes {minimum_version = 1 : i32}
-// CHECK-DAG: vm.import private @hal_loader.executable.lookup.function{{.*}}attributes {minimum_version = 1 : i32, nosideeffects}
+// CHECK-DAG: vm.import private @hal_loader.executable.lookup.function{{.*}}attributes {nosideeffects, minimum_version = 1 : i32}
 
 // CHECK-LABEL: @executableLoad
 // CHECK-SAME: (%[[EXECUTABLE_DATA:.+]]: !vm.buffer)

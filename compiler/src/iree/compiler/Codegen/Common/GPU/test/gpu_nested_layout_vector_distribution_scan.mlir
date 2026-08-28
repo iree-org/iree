@@ -18,7 +18,7 @@
 // CHECK-LABEL: @scan_single_bo_inclusive
 func.func @scan_single_bo_inclusive(%src: vector<16xf32>, %init: vector<f32>) -> (vector<16xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d) : vector<16xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = true
     : vector<16xf32>, vector<f32>
   return %out#0, %out#1 : vector<16xf32>, vector<f32>
 }
@@ -34,7 +34,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16xf32> -> vector<1x1x4xf32>
 // Local inclusive scan with identity init.
-// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] {inclusive = true, reduction_dim = 2 : i64} : vector<1x1x4xf32>, vector<1x1xf32>
+// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] reduction_dim = 2, inclusive = true : vector<1x1x4xf32>, vector<1x1xf32>
 // Subgroup scan of localTotal.
 // CHECK: %[[SCALAR_TOTAL:.*]] = vector.extract %[[LOCAL_TOTAL]][0, 0] : f32 from vector<1x1xf32>
 // CHECK: %[[SUBGROUP_SCAN:.*]], %[[SUBGROUP_TOTAL:.*]] = iree_gpu.subgroup_scan(%[[SCALAR_TOTAL]], {{.*}}) cluster(size = 4)
@@ -69,7 +69,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_single_bo_exclusive
 func.func @scan_single_bo_exclusive(%src: vector<16xf32>, %init: vector<f32>) -> (vector<16xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d_excl) : vector<16xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = false, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = false
     : vector<16xf32>, vector<f32>
   return %out#0, %out#1 : vector<16xf32>, vector<f32>
 }
@@ -85,9 +85,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16xf32> -> vector<1x1x4xf32>
 // Local exclusive scan with identity init.
-// CHECK: %[[LOCAL_SCAN:.*]], %[[ACC_VAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: %[[LOCAL_SCAN:.*]], %[[ACC_VAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] reduction_dim = 2, inclusive = false
 // Fix up localTotal: combine accumulated_value with last source element.
-// CHECK: %[[LAST_ELEM:.*]] = vector.extract_strided_slice %[[SRC_DIST]] {offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]}
+// CHECK: %[[LAST_ELEM:.*]] = vector.extract_strided_slice %[[SRC_DIST]] offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]
 // CHECK: %[[LAST_FLAT:.*]] = vector.shape_cast %[[LAST_ELEM]] : vector<1x1x1xf32> to vector<1x1xf32>
 // CHECK: %[[LOCAL_TOTAL:.*]] = arith.addf %[[ACC_VAL]], %[[LAST_FLAT]] : vector<1x1xf32>
 // Subgroup scan of fixed-up localTotal.
@@ -127,7 +127,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_cross_subgroup_inclusive
 func.func @scan_cross_subgroup_inclusive(%src: vector<32xf32>, %init: vector<f32>) -> (vector<32xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_cross) : vector<32xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = true
     : vector<32xf32>, vector<f32>
   return %out#0, %out#1 : vector<32xf32>, vector<f32>
 }
@@ -143,7 +143,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<1x1x4xf32>
 // Local inclusive scan with identity init.
-// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %{{.*}} {inclusive = true, reduction_dim = 2 : i64}
+// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %{{.*}} reduction_dim = 2, inclusive = true
 // Subgroup scan of localTotal.
 // CHECK: %[[SUBGROUP_SCAN:.*]], %[[SUBGROUP_TOTAL:.*]] = iree_gpu.subgroup_scan
 // Apply subgroup scan carry to local result.
@@ -187,7 +187,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_cross_subgroup_exclusive
 func.func @scan_cross_subgroup_exclusive(%src: vector<32xf32>, %init: vector<f32>) -> (vector<32xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_cross_excl) : vector<32xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = false, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = false
     : vector<32xf32>, vector<f32>
   return %out#0, %out#1 : vector<32xf32>, vector<f32>
 }
@@ -203,9 +203,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[CST:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<1x1x4xf32>
 // Local exclusive scan with identity init.
-// CHECK: %[[LOCAL_SCAN:.*]], %[[ACC_VAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[CST]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: %[[LOCAL_SCAN:.*]], %[[ACC_VAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[CST]] reduction_dim = 2, inclusive = false
 // Fix up localTotal: combine accumulated_value with last source element.
-// CHECK: %[[LAST_ELEM:.*]] = vector.extract_strided_slice %[[SRC_DIST]] {offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]}
+// CHECK: %[[LAST_ELEM:.*]] = vector.extract_strided_slice %[[SRC_DIST]] offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]
 // CHECK: %[[LAST_FLAT:.*]] = vector.shape_cast %[[LAST_ELEM]] : vector<1x1x1xf32> to vector<1x1xf32>
 // CHECK: %[[LOCAL_TOTAL:.*]] = arith.addf %[[ACC_VAL]], %[[LAST_FLAT]] : vector<1x1xf32>
 // Subgroup scan of fixed-up localTotal.
@@ -264,7 +264,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_multi_bo_inclusive
 func.func @scan_multi_bo_inclusive(%src: vector<32xf32>, %init: vector<f32>) -> (vector<32xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_multi) : vector<32xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = true
     : vector<32xf32>, vector<f32>
   return %out#0, %out#1 : vector<32xf32>, vector<f32>
 }
@@ -282,7 +282,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // First (b=0): extract srcChunk, local scan, subgroup scan.
 // CHECK: %[[CHUNK0:.*]] = vector.extract %[[SRC_DIST]][0, 0] : vector<4xf32> from vector<2x1x4xf32>
 // CHECK: %[[CHUNK0_RS:.*]] = vector.shape_cast %[[CHUNK0]] : vector<4xf32> to vector<1x1x4xf32>
-// CHECK: %[[SCAN0:.*]], %[[TOTAL0:.*]] = vector.scan <add>, %[[CHUNK0_RS]], %[[ID_VEC]] {inclusive = true, reduction_dim = 2 : i64} : vector<1x1x4xf32>, vector<1x1xf32>
+// CHECK: %[[SCAN0:.*]], %[[TOTAL0:.*]] = vector.scan <add>, %[[CHUNK0_RS]], %[[ID_VEC]] reduction_dim = 2, inclusive = true : vector<1x1x4xf32>, vector<1x1xf32>
 // CHECK: %[[SCALAR0:.*]] = vector.extract %[[TOTAL0]][0, 0] : f32 from vector<1x1xf32>
 // CHECK: %[[SG_SCAN0:.*]], %[[SG_TOTAL0:.*]] = iree_gpu.subgroup_scan(%[[SCALAR0]], {{.*}}) cluster(size = 4)
 // Broadcast both subgroup scan results.
@@ -292,13 +292,13 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[BLOCK_INCR0:.*]] = arith.addf %[[SG_SCAN0_VEC]], %[[ID_VEC]] : vector<1x1xf32>
 // CHECK: %[[BLOCK_INCR0_BCAST:.*]] = vector.broadcast %[[BLOCK_INCR0]] : vector<1x1xf32> to vector<1x1x4xf32>
 // CHECK: %[[LOCAL_RESULT0:.*]] = arith.addf %[[BLOCK_INCR0_BCAST]], %[[SCAN0]] : vector<1x1x4xf32>
-// CHECK: %[[RES0:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT0]], %{{.*}} {offsets = [0, 0, 0], strides = [1, 1, 1]}
+// CHECK: %[[RES0:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT0]], %{{.*}} offsets = [0, 0, 0], strides = [1, 1, 1]
 // Advance batchOuterRunning.
 // CHECK: %[[BO_RUNNING1:.*]] = arith.addf %[[SG_TOTAL0_VEC]], %[[ID_VEC]] : vector<1x1xf32>
 // Second (b=1): extract srcChunk, local scan, subgroup scan.
 // CHECK: %[[CHUNK1:.*]] = vector.extract %[[SRC_DIST]][1, 0] : vector<4xf32> from vector<2x1x4xf32>
 // CHECK: %[[CHUNK1_RS:.*]] = vector.shape_cast %[[CHUNK1]] : vector<4xf32> to vector<1x1x4xf32>
-// CHECK: %[[SCAN1:.*]], %[[TOTAL1:.*]] = vector.scan <add>, %[[CHUNK1_RS]], %[[ID_VEC]] {inclusive = true, reduction_dim = 2 : i64} : vector<1x1x4xf32>, vector<1x1xf32>
+// CHECK: %[[SCAN1:.*]], %[[TOTAL1:.*]] = vector.scan <add>, %[[CHUNK1_RS]], %[[ID_VEC]] reduction_dim = 2, inclusive = true : vector<1x1x4xf32>, vector<1x1xf32>
 // CHECK: %[[SCALAR1:.*]] = vector.extract %[[TOTAL1]][0, 0] : f32 from vector<1x1xf32>
 // CHECK: %[[SG_SCAN1:.*]], %[[SG_TOTAL1:.*]] = iree_gpu.subgroup_scan(%[[SCALAR1]], {{.*}}) cluster(size = 4)
 // Broadcast both subgroup scan results.
@@ -308,7 +308,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[BLOCK_INCR1:.*]] = arith.addf %[[BO_RUNNING1]], %[[SG_SCAN1_VEC]] : vector<1x1xf32>
 // CHECK: %[[BLOCK_INCR1_BCAST:.*]] = vector.broadcast %[[BLOCK_INCR1]] : vector<1x1xf32> to vector<1x1x4xf32>
 // CHECK: %[[LOCAL_RESULT1:.*]] = arith.addf %[[BLOCK_INCR1_BCAST]], %[[SCAN1]] : vector<1x1x4xf32>
-// CHECK: %[[RESULT:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT1]], %[[RES0]] {offsets = [1, 0, 0], strides = [1, 1, 1]}
+// CHECK: %[[RESULT:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT1]], %[[RES0]] offsets = [1, 0, 0], strides = [1, 1, 1]
 // Accumulated value = final batchOuterRunning.
 // CHECK: %[[FINAL_BO_RUNNING:.*]] = arith.addf %[[BO_RUNNING1]], %[[SG_TOTAL1_VEC]] : vector<1x1xf32>
 // CHECK: %[[ACC:.*]] = vector.shape_cast %[[FINAL_BO_RUNNING]] : vector<1x1xf32> to vector<f32>
@@ -333,7 +333,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_multi_bo_exclusive
 func.func @scan_multi_bo_exclusive(%src: vector<32xf32>, %init: vector<f32>) -> (vector<32xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_multi_excl) : vector<32xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = false, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = false
     : vector<32xf32>, vector<f32>
   return %out#0, %out#1 : vector<32xf32>, vector<f32>
 }
@@ -351,9 +351,9 @@ builtin.module attributes { transform.with_named_sequence } {
 // First (b=0): extract srcChunk, local exclusive scan.
 // CHECK: %[[CHUNK0:.*]] = vector.extract %[[SRC_DIST]][0, 0] : vector<4xf32> from vector<2x1x4xf32>
 // CHECK: %[[CHUNK0_RS:.*]] = vector.shape_cast %[[CHUNK0]] : vector<4xf32> to vector<1x1x4xf32>
-// CHECK: %[[SCAN0:.*]], %[[ACC0:.*]] = vector.scan <add>, %[[CHUNK0_RS]], %[[ID_VEC]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: %[[SCAN0:.*]], %[[ACC0:.*]] = vector.scan <add>, %[[CHUNK0_RS]], %[[ID_VEC]] reduction_dim = 2, inclusive = false
 // Fix up localTotal: combine accumulated_value with last source element.
-// CHECK: %[[LAST0:.*]] = vector.extract_strided_slice %[[CHUNK0_RS]] {offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]}
+// CHECK: %[[LAST0:.*]] = vector.extract_strided_slice %[[CHUNK0_RS]] offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]
 // CHECK: %[[LAST0_FLAT:.*]] = vector.shape_cast %[[LAST0]] : vector<1x1x1xf32> to vector<1x1xf32>
 // CHECK: %[[LOCAL_TOTAL0:.*]] = arith.addf %[[ACC0]], %[[LAST0_FLAT]] : vector<1x1xf32>
 // Subgroup scan.
@@ -366,15 +366,15 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[BLOCK_INCR0:.*]] = arith.addf %[[SG_SCAN0_VEC]], %[[ID_VEC]] : vector<1x1xf32>
 // CHECK: %[[BLOCK_INCR0_BCAST:.*]] = vector.broadcast %[[BLOCK_INCR0]] : vector<1x1xf32> to vector<1x1x4xf32>
 // CHECK: %[[LOCAL_RESULT0:.*]] = arith.addf %[[BLOCK_INCR0_BCAST]], %[[SCAN0]] : vector<1x1x4xf32>
-// CHECK: %[[RES0:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT0]], %{{.*}} {offsets = [0, 0, 0], strides = [1, 1, 1]}
+// CHECK: %[[RES0:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT0]], %{{.*}} offsets = [0, 0, 0], strides = [1, 1, 1]
 // Advance batchOuterRunning.
 // CHECK: %[[BO_RUNNING1:.*]] = arith.addf %[[SG_TOTAL0_VEC]], %[[ID_VEC]] : vector<1x1xf32>
 // Second (b=1): extract srcChunk, local exclusive scan.
 // CHECK: %[[CHUNK1:.*]] = vector.extract %[[SRC_DIST]][1, 0] : vector<4xf32> from vector<2x1x4xf32>
 // CHECK: %[[CHUNK1_RS:.*]] = vector.shape_cast %[[CHUNK1]] : vector<4xf32> to vector<1x1x4xf32>
-// CHECK: %[[SCAN1:.*]], %[[ACC1:.*]] = vector.scan <add>, %[[CHUNK1_RS]], %[[ID_VEC]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: %[[SCAN1:.*]], %[[ACC1:.*]] = vector.scan <add>, %[[CHUNK1_RS]], %[[ID_VEC]] reduction_dim = 2, inclusive = false
 // Fix up localTotal for second chunk.
-// CHECK: %[[LAST1:.*]] = vector.extract_strided_slice %[[CHUNK1_RS]] {offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]}
+// CHECK: %[[LAST1:.*]] = vector.extract_strided_slice %[[CHUNK1_RS]] offsets = [0, 0, 3], sizes = [1, 1, 1], strides = [1, 1, 1]
 // CHECK: %[[LAST1_FLAT:.*]] = vector.shape_cast %[[LAST1]] : vector<1x1x1xf32> to vector<1x1xf32>
 // CHECK: %[[LOCAL_TOTAL1:.*]] = arith.addf %[[ACC1]], %[[LAST1_FLAT]] : vector<1x1xf32>
 // Subgroup scan.
@@ -385,7 +385,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[BLOCK_INCR1:.*]] = arith.addf %[[BO_RUNNING1]], %[[SG_SCAN1_VEC]] : vector<1x1xf32>
 // CHECK: %[[BLOCK_INCR1_BCAST:.*]] = vector.broadcast %[[BLOCK_INCR1]] : vector<1x1xf32> to vector<1x1x4xf32>
 // CHECK: %[[LOCAL_RESULT1:.*]] = arith.addf %[[BLOCK_INCR1_BCAST]], %[[SCAN1]] : vector<1x1x4xf32>
-// CHECK: %[[PRE_INIT:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT1]], %[[RES0]] {offsets = [1, 0, 0], strides = [1, 1, 1]}
+// CHECK: %[[PRE_INIT:.*]] = vector.insert_strided_slice %[[LOCAL_RESULT1]], %[[RES0]] offsets = [1, 0, 0], strides = [1, 1, 1]
 // Application of user init.
 // CHECK: %[[INIT_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<f32> -> vector<f32>
 // CHECK: %[[INIT_BCAST:.*]] = vector.broadcast %[[INIT_DIST]] : vector<f32> to vector<2x1x4xf32>
@@ -415,7 +415,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_2d_dim1_inclusive
 func.func @scan_2d_dim1_inclusive(%src: vector<2x16xf32>, %init: vector<2xf32>) -> (vector<2x16xf32>, vector<2xf32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_2d_dim1) : vector<2x16xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 1 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 1, inclusive = true
     : vector<2x16xf32>, vector<2xf32>
   return %out#0, %out#1 : vector<2x16xf32>, vector<2xf32>
 }
@@ -430,7 +430,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-DAG: %[[ID_VEC:.*]] = arith.constant dense<0.000000e+00> : vector<2x1x1x1x1xf32>
 // CHECK-DAG: %[[SRC_DIST:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<2x16xf32> -> vector<2x1x1x1x1x4xf32>
-// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] {inclusive = true, reduction_dim = 5 : i64} : vector<2x1x1x1x1x4xf32>, vector<2x1x1x1x1xf32>
+// CHECK: %[[LOCAL_SCAN:.*]], %[[LOCAL_TOTAL:.*]] = vector.scan <add>, %[[SRC_DIST]], %[[ID_VEC]] reduction_dim = 5, inclusive = true : vector<2x1x1x1x1x4xf32>, vector<2x1x1x1x1xf32>
 // CHECK: %[[SCALAR0:.*]] = vector.extract %[[LOCAL_TOTAL]][0, 0, 0, 0, 0] : f32 from vector<2x1x1x1x1xf32>
 // CHECK: iree_gpu.subgroup_scan(%[[SCALAR0]], {{.*}}) cluster(size = 4)
 // CHECK: %[[SCALAR1:.*]] = vector.extract %[[LOCAL_TOTAL]][1, 0, 0, 0, 0] : f32 from vector<2x1x1x1x1xf32>
@@ -456,7 +456,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_single_bo_exclusive_f16
 func.func @scan_single_bo_exclusive_f16(%src: vector<16xf16>, %init: vector<f16>) -> (vector<16xf16>, vector<f16>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d_f16_excl) : vector<16xf16>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = false, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = false
     : vector<16xf16>, vector<f16>
   return %out#0, %out#1 : vector<16xf16>, vector<f16>
 }
@@ -471,7 +471,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-DAG: %[[ID_VEC_F16:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf16>
 // CHECK-DAG: %[[SRC_DIST_F16:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16xf16> -> vector<1x1x4xf16>
-// CHECK: %[[LOCAL_SCAN_F16:.*]], %[[ACC_VAL_F16:.*]] = vector.scan <add>, %[[SRC_DIST_F16]], %[[ID_VEC_F16]] {inclusive = false, reduction_dim = 2 : i64}
+// CHECK: %[[LOCAL_SCAN_F16:.*]], %[[ACC_VAL_F16:.*]] = vector.scan <add>, %[[SRC_DIST_F16]], %[[ID_VEC_F16]] reduction_dim = 2, inclusive = false
 // CHECK: arith.addf %{{.*}}, %{{.*}} : vector<1x1x4xf16>
 // CHECK: %[[LAST_ACC_F16:.*]] = vector.extract %{{.*}}[0, 0, 3] : f16 from vector<1x1x4xf16>
 // CHECK: %[[PACKED:.*]] = arith.bitcast %[[LAST_ACC_F16]] : f16 to i16
@@ -500,7 +500,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: @scan_thread_tile_1_inclusive
 func.func @scan_thread_tile_1_inclusive(%src: vector<4xf32>, %init: vector<f32>) -> (vector<4xf32>, vector<f32>) {
   %src_l = iree_vector_ext.to_layout %src to layout(#layout_scan_1d_thread_tile_1) : vector<4xf32>
-  %out:2 = vector.scan <add>, %src_l, %init {inclusive = true, reduction_dim = 0 : i64}
+  %out:2 = vector.scan <add>, %src_l, %init reduction_dim = 0, inclusive = true
     : vector<4xf32>, vector<f32>
   return %out#0, %out#1 : vector<4xf32>, vector<f32>
 }
@@ -515,7 +515,7 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-DAG: %[[ID_VEC_T1:.*]] = arith.constant dense<0.000000e+00> : vector<1x1xf32>
 // CHECK-DAG: %[[SRC_DIST_T1:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<4xf32> -> vector<1x1x4xf32>
-// CHECK: %[[LOCAL_SCAN_T1:.*]], %[[LOCAL_TOTAL_T1:.*]] = vector.scan <add>, %[[SRC_DIST_T1]], %[[ID_VEC_T1]] {inclusive = true, reduction_dim = 2 : i64} : vector<1x1x4xf32>, vector<1x1xf32>
+// CHECK: %[[LOCAL_SCAN_T1:.*]], %[[LOCAL_TOTAL_T1:.*]] = vector.scan <add>, %[[SRC_DIST_T1]], %[[ID_VEC_T1]] reduction_dim = 2, inclusive = true : vector<1x1x4xf32>, vector<1x1xf32>
 // CHECK-NOT: iree_gpu.subgroup_scan
 // CHECK: arith.addf %[[LOCAL_SCAN_T1]], %{{.*}} : vector<1x1x4xf32>
 // CHECK: %[[BO_RUNNING_T1:.*]] = arith.addf %[[LOCAL_TOTAL_T1]], %[[ID_VEC_T1]] : vector<1x1xf32>

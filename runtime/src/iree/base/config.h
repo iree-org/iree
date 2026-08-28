@@ -172,12 +172,29 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // can be stripped out. Socket functions will still be defined but return
 // IREE_STATUS_UNIMPLEMENTED. Override with -DIREE_SOCKETS_ENABLE=1 for custom
 // platforms that provide a POSIX-compatible socket layer.
-#if defined(IREE_PLATFORM_WASM)
+#if defined(IREE_PLATFORM_WASM) || defined(IREE_PLATFORM_GENERIC)
 #define IREE_SOCKETS_ENABLE 0
 #else
 #define IREE_SOCKETS_ENABLE 1
-#endif  // IREE_PLATFORM_WASM
+#endif  // IREE_PLATFORM_WASM || IREE_PLATFORM_GENERIC
 #endif  // !IREE_SOCKETS_ENABLE
+
+//===----------------------------------------------------------------------===//
+// POSIX signals
+//===----------------------------------------------------------------------===//
+
+#if !defined(IREE_POSIX_SIGNALS_ENABLE)
+// On platforms without POSIX signals (Windows, wasm, bare-metal), signal
+// handling can be stripped out. Signal functions will still be defined but
+// behave as no-ops. Override with -DIREE_POSIX_SIGNALS_ENABLE=1 for custom
+// platforms that provide the required POSIX-compatible signal APIs.
+#if defined(IREE_PLATFORM_WINDOWS) || defined(IREE_PLATFORM_WASM) || \
+    defined(IREE_PLATFORM_GENERIC)
+#define IREE_POSIX_SIGNALS_ENABLE 0
+#else
+#define IREE_POSIX_SIGNALS_ENABLE 1
+#endif  // IREE_PLATFORM_WINDOWS || IREE_PLATFORM_WASM || IREE_PLATFORM_GENERIC
+#endif  // !IREE_POSIX_SIGNALS_ENABLE
 
 #if !defined(IREE_MAX_PATH)
 // Maximum path C string length in characters excluding the NUL terminator.

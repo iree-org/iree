@@ -30,7 +30,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
 //       CHECK:   amdgpu.mfma 16x16x16 %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4xf32>
 
 // -----
 
@@ -64,7 +64,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
 //       CHECK:   amdgpu.mfma 32x32x8 %[[LHS]] * %[[RHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
 
@@ -98,7 +98,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<4xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<16xf32>
 //       CHECK:   amdgpu.mfma 32x32x8 %[[RHS]] * %[[LHS]] + %[[ACC]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<16xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
 
 // -----
 
@@ -132,11 +132,11 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[LHS:[A-Za-z0-9]+]]: vector<8xf16>
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: vector<8xf16>
 //  CHECK-SAME:   %[[ACC:[A-Za-z0-9]+]]: vector<4xf32>
-//  CHECK: %[[LHS0:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-//  CHECK: %[[RHS0:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[LHS0:.*]] = vector.extract_strided_slice %[[LHS]] offsets = [0], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[RHS0:.*]] = vector.extract_strided_slice %[[RHS]] offsets = [0], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 //  CHECK: %[[ACC0:.*]] = amdgpu.mfma 16x16x16 %[[RHS0]] * %[[LHS0]] + %[[ACC]]
-//  CHECK: %[[LHS1:.*]] = vector.extract_strided_slice %[[LHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-//  CHECK: %[[RHS1:.*]] = vector.extract_strided_slice %[[RHS]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[LHS1:.*]] = vector.extract_strided_slice %[[LHS]] offsets = [4], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
+//  CHECK: %[[RHS1:.*]] = vector.extract_strided_slice %[[RHS]] offsets = [4], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 //  CHECK: %[[ACC1:.*]] = amdgpu.mfma 16x16x16 %[[RHS1]] * %[[LHS1]] + %[[ACC0]]
 //  CHECK: return %[[ACC1]] : vector<4xf32>
 
@@ -483,7 +483,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:     (%[[ACC_B:.+]] = %[[ACC]]) : (vector<4x1xf32>) -> vector<4xf32>
 //       CHECK:     vector.shape_cast %[[ACC_B]] : vector<4x1xf32> to vector<4xf32>
 //       CHECK:   %[[MMA:.+]] = amdgpu.mfma 16x16x16 %[[LHSCAST]] * %[[RHSCAST]] + %[[ACCCAST]]
-//  CHECK-SAME:     blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //       CHECK:   util.hoistable_conversion "shape_cast_from_intrinsic" inverts("shape_cast_to_intrinsic")
 //  CHECK-SAME:     (%[[MMA_B:.+]] = %[[MMA]]) : (vector<4xf32>) -> vector<4x1xf32>
 //       CHECK:     vector.shape_cast %[[MMA_B]] : vector<4xf32> to vector<4x1xf32>
@@ -618,7 +618,7 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[LHS_S:.+]] = vector.extract %[[LHS]][0] : f64 from vector<1xf64>
 //   CHECK-DAG:   %[[RHS_S:.+]] = vector.extract %[[RHS]][0] : f64 from vector<1xf64>
 //   CHECK-DAG:   %[[ACC_S:.+]] = vector.extract %[[ACC]][0] : f64 from vector<1xf64>
-//       CHECK:   %[[MMA:.+]] = amdgpu.mfma 4x4x4 %[[LHS_S]] * %[[RHS_S]] + %[[ACC_S]] {blocks = 4 : i32} blgp = none : f64, f64, f64
+//       CHECK:   %[[MMA:.+]] = amdgpu.mfma blocks(4) 4x4x4 %[[LHS_S]] * %[[RHS_S]] + %[[ACC_S]] : f64, f64, f64
 //       CHECK:   vector.broadcast %[[MMA]] : f64 to vector<1xf64>
 
 // -----
@@ -671,10 +671,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11] : vector<16xf16>, vector<16xf16>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [4], sizes = [4], strides = [1] : vector<8xf16> to vector<4xf16>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [4, 5, 12, 13, 6, 7, 14, 15] : vector<16xf16>, vector<16xf16>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -695,10 +695,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xbf16> to vector<4xbf16>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [4], strides = [1] : vector<8xbf16> to vector<4xbf16>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 8, 9, 2, 3, 10, 11] : vector<16xbf16>, vector<16xbf16>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [4], sizes = [4], strides = [1]} : vector<8xbf16> to vector<4xbf16>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [4], sizes = [4], strides = [1] : vector<8xbf16> to vector<4xbf16>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [4, 5, 12, 13, 6, 7, 14, 15] : vector<16xbf16>, vector<16xbf16>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x32 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -787,10 +787,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [8], strides = [1]} : vector<16xi8> to vector<8xi8>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [8], strides = [1] : vector<16xi8> to vector<8xi8>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23] : vector<32xi8>, vector<32xi8>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xi8> to vector<8xi8>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [8], sizes = [8], strides = [1] : vector<16xi8> to vector<8xi8>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xi8>, vector<32xi8>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -811,10 +811,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [8], strides = [1] : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [8], sizes = [8], strides = [1] : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -835,10 +835,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [8], strides = [1] : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [8], sizes = [8], strides = [1] : vector<16xf8E5M2FNUZ> to vector<8xf8E5M2FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -859,10 +859,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [8], strides = [1] : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [8], sizes = [8], strides = [1] : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E5M2FNUZ>, vector<32xf8E5M2FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")
@@ -883,10 +883,10 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[LOW_BIT:.+]] = arith.andi %[[LANE_ID]]
 //       CHECK:   %[[IS_ODD:.+]] = arith.cmpi ne, %[[LOW_BIT]]
 //       CHECK:   %[[SPARSE_IDX:.+]] = arith.select %[[IS_ODD]]
-//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] {offsets = [0], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+//       CHECK:   %[[A_LO:.+]] = vector.extract_strided_slice %[[A]] offsets = [0], sizes = [8], strides = [1] : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_0:.+]] = vector.shuffle %[[B]], %[[B]] [0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_0:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_LO]] * %[[B_INTLV_0]] + %[[ACC_EXPAND]] sparse(%[[SPARSE_IDX]]
-//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] {offsets = [8], sizes = [8], strides = [1]} : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
+//       CHECK:   %[[A_HI:.+]] = vector.extract_strided_slice %[[A]] offsets = [8], sizes = [8], strides = [1] : vector<16xf8E4M3FNUZ> to vector<8xf8E4M3FNUZ>
 //       CHECK:   %[[B_INTLV_1:.+]] = vector.shuffle %[[B]], %[[B]] [8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31] : vector<32xf8E4M3FNUZ>, vector<32xf8E4M3FNUZ>
 //       CHECK:   %[[SMFMAC_1:.+]] = amdgpu.sparse_mfma 16x16x64 %[[A_HI]] * %[[B_INTLV_1]] + %[[SMFMAC_0]] sparse(%[[SPARSE_IDX]]
 //       CHECK:   %[[ACC_COLLAPSE:.+]] = util.hoistable_conversion "vdmfma_deinterleave_acc" inverts("vdmfma_interleave_acc")

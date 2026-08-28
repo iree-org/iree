@@ -2837,6 +2837,8 @@ let opDocGroup = OpGroupAsyncControlFlowOps in {
 
 def Stream_AsyncFuncOp : Stream_Op<"async.func", [
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   IsolatedFromAbove,
   Stream_AsyncPhaseOp,
@@ -3931,6 +3933,8 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
 def Stream_CmdFuncOp : Stream_Op<"cmd.func", [
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   IsolatedFromAbove,
   Stream_CmdPhaseOp,
@@ -5018,6 +5022,8 @@ let opDocGroup = OpGroupExecutableOps in {
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Stream::ExecutableEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -5070,6 +5076,8 @@ def Stream_ExecutableEndOp : Stream_Op<"executable.end", [
 
 def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   HasParent<"IREE::Stream::ExecutableOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   IsolatedFromAbove,
 ]> {

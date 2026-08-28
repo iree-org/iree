@@ -2615,6 +2615,8 @@ let opDocGroup = OpGroupExecutableOps in {
 def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -2684,6 +2686,8 @@ def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
 def HAL_ExecutableOp : HAL_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -2740,6 +2744,8 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 }
 
 def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   ParentOneOf<[
@@ -2868,6 +2874,8 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   IsolatedFromAbove,
   HasParent<"IREE::HAL::ExecutableOp">,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
 ]> {
@@ -2963,6 +2971,8 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
 
 def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   IsolatedFromAbove,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   CallableOpInterface,
 ]> {
@@ -2976,6 +2986,8 @@ def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -3021,6 +3033,8 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
   ]>,
   IsolatedFromAbove,
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
 ]> {
   let summary = [{Executable constant block initializer.}];
@@ -3066,6 +3080,8 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     ArrayAttr:$keys,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
@@ -3134,6 +3150,8 @@ def HAL_ExecutableConstantLoadOp : HAL_PureOp<"executable.constant.load"> {
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   HasParent<"IREE::HAL::ExecutableOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
 ]> {
   let summary = [{Compiled executable binary data.}];
