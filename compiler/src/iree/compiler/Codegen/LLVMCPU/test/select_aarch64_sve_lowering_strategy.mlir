@@ -512,7 +512,7 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tens
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map2 = affine_map<()[s0] -> (77 ceildiv s0)>
-func.func @negative_hint_mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<?x4096x?x1xf16>) -> tensor<?x640x16x?xf16> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+func.func @mmt4d_generic_unpack_pack_mixed_static_scalable_inner_tiles(%arg0: tensor<5x4096x16x1xf16>, %arg1: tensor<?x4096x?x1xf16>) -> tensor<?x640x16x?xf16> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 0.000000e+00 : f32
 
@@ -539,7 +539,7 @@ func.func @negative_hint_mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16
 // CHECK-DAG:   #[[$CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, [16]]>
 // CHECK-DAG:   #[[$CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 16, [16], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
 // CHECK-DAG:   #[[$CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [16, [16]]>
-// CHECK-LABEL: func.func @negative_hint_mmt4d_generic_unpack_pack(
+// CHECK-LABEL: func.func @mmt4d_generic_unpack_pack_mixed_static_scalable_inner_tiles(
 // CHECK:         linalg.fill
 // CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
 // CHECK:         linalg.mmt4d
@@ -550,10 +550,10 @@ func.func @negative_hint_mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x16x1xf16
 // CHECK:         linalg.unpack
 // CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:      lowering_config = #[[$CONFIG2]]
-// The consumer pack has no lowering config nor carries an inner tile alignment,
-// since the unpack and pack inner dimensions are not aligned.
+// The consumer pack's inner dims are transposed: only the static inner tile
+// divides its scalable loop tile. The pack gets no lowering config.
 // CHECK:         linalg.pack
-// CHECK-NOT:      inner_tile_alignments
+// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Multiple]>
 // CHECK-NOT:       lowering_config
 
 // -----
