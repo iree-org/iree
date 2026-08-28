@@ -14327,7 +14327,7 @@ result in propagated semaphore failure or device loss.</p>
 </code></pre></div>
 <p>A compiled executable binary with an optional nested module containing the
 IR prior to serialization (for debugging).</p>
-<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code></p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
@@ -14409,11 +14409,13 @@ op that returns true if the variant is valid for use on the provided
 runtime <code>!hal.device</code>. If no variants within an executable are valid then
 loading will fail at runtime. If multiple variants are valid the first valid
 one found will be loaded and used for execution.</p>
-<p>Traits: <code>IsolatedFromAbove</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
@@ -14454,11 +14456,13 @@ a way compatible with its execution model. Examples:
 - SPIR-V: specialization constants
 - Metal: function constants
 - WebGPU: pipeline-overridable constants</p>
-<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>keys</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
@@ -14606,7 +14610,7 @@ information required is data-dependent on work within the same command
 buffer some backends will suffer a performance penalty. Condition regions
 consuming dynamic workloads in particular may result in long chains of
 indirect dispatches sent to the device or even host round-trips.</p>
-<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
@@ -14775,7 +14779,7 @@ while still appearing as one executable at runtime (ala fat binaries).</p>
 <p>At runtime executables are loaded during module initialization and cached
 for the lifetime of the module. If the <code>lazy</code> attribute is set the
 executable <em>may</em> have its loading deferred until first use.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code>, <code>Util_ObjectLike</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolName</code>, <code>SymbolTable</code>, <code>SymbolVisibility</code>, <code>Util_ObjectLike</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
@@ -14802,7 +14806,7 @@ executable <em>may</em> have its loading deferred until first use.</p>
 <p>This is an unspecialized source representation of an executable
 module without an assigned target. This is useful for hand-authoring
 executables prior to device specification.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableSourceEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code>, <code>Util_ObjectLike</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableSourceEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolName</code>, <code>SymbolTable</code>, <code>SymbolVisibility</code>, <code>Util_ObjectLike</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
@@ -14836,7 +14840,7 @@ op that returns true if the variant is valid for use on the provided
 runtime <code>!hal.device</code>. If no variants within an executable are valid then
 loading will fail at runtime. If multiple variants are valid the first valid
 one found will be loaded and used for execution.</p>
-<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableVariantEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableVariantEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolName</code>, <code>SymbolTable</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
