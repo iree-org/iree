@@ -15,6 +15,19 @@
 
 namespace mlir::iree_compiler {
 
+// Returns true if `getTypeBitWidth()` can compute a bit width for `type`.
+// E.g., `index` type's bitwidth currently cannot be safely deduced at this
+// stage.
+static bool hasComputableBitWidth(Type type) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
+    return hasComputableBitWidth(complexType.getElementType());
+  }
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
+    return hasComputableBitWidth(vectorType.getElementType());
+  }
+  return type.isIntOrFloat();
+}
+
 static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
                                      RankedTensorType targetType,
                                      Value global) {
@@ -32,16 +45,28 @@ static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
 struct HoistableTensorTypeInterface
     : IREE::Util::HoistableTypeInterface::ExternalModel<
           HoistableTensorTypeInterface, RankedTensorType> {
+
+  // TODO: Avoid walking the type twice by merging `hasComputableBitWidth` and
+  // `getTypeBitWidth` into a single function.
   bool isHoistableType(Type type) const {
     auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+    Type elementType = tensorType.getElementType();
+    if (!hasComputableBitWidth(elementType)) {
+      return false;
+    }
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(elementType);
     return llvm::isPowerOf2_32(bitWidth) && bitWidth <= 64;
   }
+
+  // TODO: Avoid walking the type twice by merging `hasComputableBitWidth` and
+  // `getTypeBitWidth` into a single function.
   bool isHoistableLeafType(Type type) const {
     auto tensorType = cast<RankedTensorType>(type);
-    unsigned bitWidth =
-        IREE::Util::getTypeBitWidth(tensorType.getElementType());
+    Type elementType = tensorType.getElementType();
+    if (!hasComputableBitWidth(elementType)) {
+      return false;
+    }
+    unsigned bitWidth = IREE::Util::getTypeBitWidth(elementType);
     // Never hoist boolean values; IREE still does implicit extension of
     // booleans to a byte width so we avoid packing them.
     return bitWidth != 1;
