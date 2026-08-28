@@ -17,8 +17,7 @@ namespace mlir::iree_compiler {
 
 OperationEquivalenceCache::OperationEquivalenceCache(MLIRContext *context)
     : functionRefName(StringAttr::get(context, "function_ref")),
-      symbolAttrName(
-          StringAttr::get(context, SymbolTable::getSymbolAttrName())) {}
+      symbolAttrName(StringAttr::get(context, "sym_name")) {}
 
 OperationEquivalenceCache::~OperationEquivalenceCache() {
   for (auto *mapping : mappingFreeList) {

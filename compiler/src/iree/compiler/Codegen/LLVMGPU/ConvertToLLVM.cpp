@@ -323,7 +323,7 @@ public:
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
-      if (attr.getName() == SymbolTable::getSymbolAttrName() ||
+      if (attr.getName() == funcOp.getSymNameAttrName() ||
           attr.getName() == funcOp.getFunctionTypeAttrName()) {
         continue;
       }

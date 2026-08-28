@@ -74,7 +74,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 // CHECK-SAME:          %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x2x8x4x16x2x8xi8>
 // CHECK-SAME:          %[[ARG1:[a-zA-Z0-9]+]]: tensor<1x2x4x2x4x16x2x8xi8>
 // CHECK-SAME:          %[[ARG2:[a-zA-Z0-9]+]]: tensor<1x1x4x8x2x4x16x4xi32>
-// CHECK:               %[[ALLOC:.*]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<8192xi8>
+// CHECK:               %[[ALLOC:.*]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<8192xi8>
 // CHECK:               %[[C1_INDEX:.*]] = arith.constant 1 : index
 // CHECK:               %[[DIM:.*]] = tensor.dim %[[ARG0]], %[[C1_INDEX]] : tensor<1x2x8x4x16x2x8xi8>
 // CHECK:               %[[DIM_CAST:.*]] = arith.index_cast %[[DIM]] : index to i32

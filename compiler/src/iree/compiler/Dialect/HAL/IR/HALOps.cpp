@@ -1683,7 +1683,7 @@ LogicalResult ExecutableSourceOp::verify() {
 void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(name));
 }
 
@@ -1961,7 +1961,7 @@ void ExecutableVariantOp::build(OpBuilder &builder, OperationState &state,
                                 StringRef symName,
                                 IREE::HAL::ExecutableTargetAttr target) {
   ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(symName));
   state.addAttribute("target", target);
 }
@@ -2228,7 +2228,7 @@ LogicalResult ExecutableConstantBlockOp::verify() {
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringRef format,
                                std::vector<uint8_t> data) {
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(symName));
   state.addAttribute("format", builder.getStringAttr(format));
   state.addAttribute("data",
@@ -2241,7 +2241,7 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
                                StringRef symName, StringAttr format,
                                DenseIntElementsAttr data) {
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(symName));
   state.addAttribute("format", format);
   state.addAttribute("data", data);

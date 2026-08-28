@@ -1067,8 +1067,8 @@ EXPORTS
   mlirSymbolTableCreate
   mlirSymbolTableDestroy
   mlirSymbolTableErase
+  mlirSymbolTableGetDefaultVisibilityAttributeName
   mlirSymbolTableGetSymbolAttributeName
-  mlirSymbolTableGetVisibilityAttributeName
   mlirSymbolTableInsert
   mlirSymbolTableLookup
   mlirSymbolTableReplaceAllSymbolUses

@@ -15,7 +15,7 @@ func.func @write_in_lane_forall(%dest : tensor<4x3xi32>) -> tensor<4x3xi32> {
 }
 
 // CHECK-LABEL: func @write_in_lane_forall
-// CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<private>}
+// CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<private>}>
 // CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
 
 // -----
@@ -31,24 +31,24 @@ func.func @forall_shared_dest(%w : tensor<2x3xi32>) -> tensor<4x3xi32> {
 }
 
 // CHECK-LABEL: func @forall_shared_dest
-// CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>}
+// CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}>
 // CHECK:   scf.forall {{.*}} shared_outs(%{{.*}} = %[[ALLOC]])
 
 // -----
 
 func.func @already_annotated_alloc() -> tensor<2x3xi32> {
-  %alloc = bufferization.alloc_tensor() {memory_space = #gpu.address_space<private>} : tensor<2x3xi32>
+  %alloc = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<private>}> : tensor<2x3xi32>
   return %alloc : tensor<2x3xi32>
 }
 
 // CHECK-LABEL: func @already_annotated_alloc
-// CHECK:   bufferization.alloc_tensor() {memory_space = #gpu.address_space<private>}
+// CHECK:   bufferization.alloc_tensor() <{memory_space = #gpu.address_space<private>}>
 
 // -----
 
 // expected-error@+1 {{failed to set the gpu memory space for all `bufferization.alloc_tensor` ops}}
 func.func @unknown_memory_space() -> tensor<2x3xi32> {
   // expected-error@+1 {{unexpected gpu memory space must be private or workgroup.}}
-  %alloc = bufferization.alloc_tensor() {memory_space = "bad"} : tensor<2x3xi32>
+  %alloc = bufferization.alloc_tensor() <{memory_space = "bad"}> : tensor<2x3xi32>
   return %alloc : tensor<2x3xi32>
 }
