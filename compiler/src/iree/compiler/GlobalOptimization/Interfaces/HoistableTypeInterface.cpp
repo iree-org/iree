@@ -16,9 +16,8 @@
 namespace mlir::iree_compiler {
 
 // Returns true if `getTypeBitWidth()` can compute a bit width for `type`.
-// E.g., `!quant.uniform<...>` types are neither plain integers/floats nor
-// complex/vector types wrapping them, so they have no well-defined bit width
-// here.
+// E.g., `index` type's bitwidth currently cannot be safely deduced at this
+// stage.
 static bool hasComputableBitWidth(Type type) {
   if (auto complexType = dyn_cast<ComplexType>(type)) {
     return hasComputableBitWidth(complexType.getElementType());

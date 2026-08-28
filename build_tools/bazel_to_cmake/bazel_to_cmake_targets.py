@@ -82,7 +82,6 @@ class TargetConverter:
                 "@llvm-project//mlir:MlirLspServerLib": ["MLIRLspServerLib"],
                 "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
                 "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
-                "@llvm-project//mlir:QuantOps": ["MLIRQuantDialect"],
                 "@llvm-project//mlir:CAPISMT": [
                     "MLIRCAPISMT",
                     "MLIRCAPIExportSMTLIB",

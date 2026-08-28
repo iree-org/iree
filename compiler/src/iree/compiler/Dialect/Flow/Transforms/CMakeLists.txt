@@ -72,7 +72,6 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRParser
     MLIRPass
-    MLIRQuantDialect
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSupport

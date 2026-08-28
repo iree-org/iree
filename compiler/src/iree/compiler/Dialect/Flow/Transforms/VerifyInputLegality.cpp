@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
-#include "mlir/Dialect/Quant/IR/Quant.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
@@ -32,7 +31,7 @@ struct VerifyInputLegalityPass
     target.addIllegalDialect("stablehlo");
     // `quant` dialect ops/types (e.g., `!quant.uniform<...>`) must be lowered
     // to plain arith before reaching this point.
-    target.addIllegalDialect<quant::QuantDialect>();
+    target.addIllegalDialect("quant");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
     if (failed(iree_compiler::verifyAllOperationsAreLegal(getOperation(),
