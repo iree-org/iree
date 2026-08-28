@@ -110,9 +110,14 @@ static void iree_uk_benchmark_register_mmt4d_impl(
 static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
                                              int N0, int K0,
                                              const char* cpu_features) {
-  // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
-  // narrow variants for handling these cases. xsmtvdot has no narrow variants.
-  if (!strstr(cpu_features, "xsmtvdot")) {
+  if (strstr(cpu_features, "xsmtvdot")) {
+    // IME narrow tiles: 2x4 and 1x4 atom grids, same N0/K0 as the 3x4
+    // primary grid.
+    iree_uk_benchmark_register_mmt4d_impl(flags, M0 / 3, N0, K0, cpu_features,
+                                          "");
+    iree_uk_benchmark_register_mmt4d_impl(flags, 2 * M0 / 3, N0, K0,
+                                          cpu_features, "");
+  } else {
     for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
       iree_uk_benchmark_register_mmt4d_impl(flags, narrowM0, N0, K0,
                                             cpu_features, "");

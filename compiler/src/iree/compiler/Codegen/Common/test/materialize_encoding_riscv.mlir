@@ -277,6 +277,86 @@ func.func @matmul_lowering_i8i8i32_riscv64_zvl256b(
 
 // -----
 
+// RISC-V 64 + xsmtvdot + zvl256b, narrow M: with a static narrow M=8 and
+// dynamic N (iteration_sizes = [8, ?, ?]), the cost model picks the IME
+// narrow 2x4 atom grid (8x16x8) over the 3x4 primary (12x16x8), since it has
+// zero M-padding penalty and a larger product than the 1x4 grid (4x16x8).
+// Same N0/K0 as the primary tile. In SCALABLE mode xsmtvdot is not
+// enumerated, so this falls back to the same standard RVV tile (M0=7) as the
+// dynamic-M case, since narrowM=8 doesn't reduce it.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl256b_narrow_m8(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl256b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl256b_narrow_m8(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x8x8xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x8x16xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
+// RISC-V 64 + xsmtvdot + zvl256b, narrow M: with a static narrow M=4 and
+// dynamic N (iteration_sizes = [4, ?, ?]), the cost model picks the IME
+// narrow 1x4 atom grid (4x16x8). Same N0/K0 as the primary tile. In SCALABLE
+// mode xsmtvdot is not enumerated, so this falls back to the standard RVV
+// tile with M0=4 (the narrowM=4 hint now also affects the fallback list).
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [4, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl256b_narrow_m4(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl256b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl256b_narrow_m4(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x4x8xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x16x8xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x4x16xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x4x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x4x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
 // RISC-V 64 + xsmtvdot + zvl1024b: IME 24x32x16 tile (3x4 of 8x8x16).
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -312,6 +392,78 @@ func.func @matmul_lowering_i8i8i32_riscv64_zvl1024b(
 
 // -----
 
+// RISC-V 64 + xsmtvdot + zvl1024b, narrow M=16: IME narrow 2x4 atom grid
+// (16x32x16). Same N0/K0 as the primary 24x32x16 tile.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl1024b_narrow_m16(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl1024b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl1024b_narrow_m16(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x16x16xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x32x16xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x16x32xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
+// RISC-V 64 + xsmtvdot + zvl1024b, narrow M=8: IME narrow 1x4 atom grid
+// (8x32x16). Same N0/K0 as the primary 24x32x16 tile.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [8, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl1024b_narrow_m8(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl1024b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl1024b_narrow_m8(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x8x16xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x32x16xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x8x32xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
 // RISC-V 64 + xsmtvdot + zvl4096b: IME 48x64x32 tile (3x4 of 16x16x32).
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -337,6 +489,78 @@ func.func @matmul_lowering_i8i8i32_riscv64_zvl4096b(
 // STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x48x32xi8>
 // STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
 // STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x48x64xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
+// RISC-V 64 + xsmtvdot + zvl4096b, narrow M=32: IME narrow 2x4 atom grid
+// (32x64x32). Same N0/K0 as the primary 48x64x32 tile.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [32, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl4096b_narrow_m32(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl4096b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl4096b_narrow_m32(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x32x32xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x32x64xi32>
+// SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
+// SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
+// SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
+// CHECK:         %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:      ins(%[[LHS]], %[[RHS]]
+// CHECK-SAME:      outs(%[[ACC]]
+// CHECK:         return %[[MMT4D]]
+
+// -----
+
+// RISC-V 64 + xsmtvdot + zvl4096b, narrow M=16: IME narrow 1x4 atom grid
+// (16x64x32). Same N0/K0 as the primary 48x64x32 tile.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#encoding_lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+#encoding_rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+#encoding_result = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [16, ?, ?]>
+func.func @matmul_lowering_i8i8i32_riscv64_zvl4096b_narrow_m16(
+    %lhs: tensor<?x?xi8, #encoding_lhs>,
+    %rhs: tensor<?x?xi8, #encoding_rhs>,
+    %result: tensor<?x?xi32, #encoding_result>
+) -> tensor<?x?xi32, #encoding_result> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple="riscv64-xyz-xyz", cpu_features="+v,+zvl4096b,+xsmtvdot", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %out = linalg.matmul
+      ins(%lhs, %rhs : tensor<?x?xi8, #encoding_lhs>,
+                       tensor<?x?xi8, #encoding_rhs>)
+      outs(%result : tensor<?x?xi32, #encoding_result>)
+      -> tensor<?x?xi32, #encoding_result>
+  return %out : tensor<?x?xi32, #encoding_result>
+}
+// CHECK-LABEL: func @matmul_lowering_i8i8i32_riscv64_zvl4096b_narrow_m16(
+// STATIC-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x16x32xi8>
+// STATIC-SAME:   %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x64x32xi8>
+// STATIC-SAME:   %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x16x64xi32>
 // SCALABLE-SAME: %[[LHS:[a-zA-Z0-9]+]]: tensor<?x?x7x1xi8>
 // SCALABLE-SAME: %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?x?x1xi8>
 // SCALABLE-SAME: %[[ACC:[a-zA-Z0-9]+]]: tensor<?x?x7x?xi32>
