@@ -18998,7 +18998,7 @@ lifetime.</p>
 <p>By default all rodata will be aligned in the final module output at a
 16-byte granularity. An optional alignment can be specified to override the
 default for cases where larger or smaller alignments are needed.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
@@ -23661,7 +23661,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code>, <code>VM_ExtF32</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
@@ -23686,7 +23686,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code>, <code>VM_ExtF64</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
@@ -23711,7 +23711,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
@@ -23736,7 +23736,7 @@ Initialized to zero unless an initial value is specified.</p>
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
@@ -24137,7 +24137,7 @@ Initialized to zero unless an initial value is specified.</p>
 retain the ref object for the lifetime of the context or until the value is
 replaced with a store or reset.
 Initialized to null unless an initial value is specified.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
@@ -26567,13 +26567,11 @@ exports can reference the same internal functions.</p>
 <p><em>Function defined with VM control flow ops.</em></p>
 <p>Represents a function containing VM ops and those of compatible dialects.
 All flow control is performed by VM ops.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 <tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
@@ -26590,7 +26588,6 @@ contains the import. The maximum declared minimum version of all required
 imports from the module will become the required minimum version at runtime.</p>
 <p>Optional imports not present at runtime will be invalid to call and whether
 they were resolved can be queried with <code>vm.import.resolved</code>.</p>
-<p>Traits: <code>SymbolName</code>, <code>SymbolVisibility</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
@@ -26610,13 +26607,11 @@ they were resolved can be queried with <code>vm.import.resolved</code>.</p>
 <p>A function that is called in definition order upon module initialization.
 Must not load any globals that are defined or initialized after it in the
 module.</p>
-<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
 <h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
@@ -26631,7 +26626,7 @@ module.</p>
               regions
 </code></pre></div>
 <p>Top-level container for VM functions.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::VM::ModuleTerminatorOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolName</code>, <code>SymbolTable</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::VM::ModuleTerminatorOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
 <table>

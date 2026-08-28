@@ -8171,7 +8171,7 @@ mapping type.</p>
 of these two loops can be merged with a barrier an insert_slice and a
 shuffle where the boundary of the loops currently is.</p>
 <div class="highlight"><pre><span></span><code>  %0 = scf.forall (%idy, %idx) in (8, 8) -&gt; (tensor&lt;4x128xf32&gt;) {
-    %alloc = bufferization.alloc_tensor &lt;{memory_space = #gpu.address_space&lt;workgroup&gt;}&gt;
+    %alloc = bufferization.alloc_tensor {memory_space = #gpu.address_space&lt;workgroup&gt;}
       : tensor&lt;4x128xf32&gt;
     %barrier = iree_gpu.barrier_region %alloc {
     ^bb0(%shared: tensor&lt;4x128xf32&gt;):

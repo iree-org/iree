@@ -10320,7 +10320,7 @@ execution may begin immediately.</p>
 <p>Declares a function that can be called as an asynchronous streaming
 operation via <code>stream.async.call</code>. Today only external functions are
 allowed.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_AsyncPhaseOp</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
@@ -12611,7 +12611,7 @@ exports can reference the same internal function.</p>
 <p>Each entry point can have a unique workgroup count calculation region.
 This region takes the workload parameters passed to each flow.dispatch and
 produces an XYZ workgroup count for the 3D grid dispatch.</p>
-<p>Traits: <code>HasParent&lt;IREE::Stream::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>HasParent&lt;IREE::Stream::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
@@ -12632,7 +12632,7 @@ produces an XYZ workgroup count for the 3D grid dispatch.</p>
 <p>An executable module containing one or more public functions. The contents
 of the functions are safe to dispatch and can be lowered further to
 target-specific backend IR representations.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolName</code>, <code>SymbolTable</code>, <code>SymbolVisibility</code>, <code>Util_ObjectLike</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code>, <code>Util_ObjectLike</code></p>
 <p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
@@ -13185,7 +13185,7 @@ available to the target and can be made visible there using
 <p>Declares a function that can be called as an asynchronous streaming
 operation via <code>stream.cmd.call</code>. Today only external functions are
 allowed.</p>
-<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_CmdPhaseOp</code>, <code>SymbolName</code>, <code>SymbolVisibility</code></p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_CmdPhaseOp</code></p>
 <p>Interfaces: <code>ArgAndResultAttrsOpInterface</code>, <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
