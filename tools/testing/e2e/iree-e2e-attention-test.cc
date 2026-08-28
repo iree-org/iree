@@ -537,8 +537,7 @@ class AttentionTestModuleState final {
   }
 
   // Gathers the paged KV cache into dense key/value tensors and then defers to
-  // the shared attention reference and result checker. This deliberately does
-  // not reimplement attention itself.
+  // the shared attention reference and result checker.
   Status CheckPagedAttentionResults(iree_hal_device_t* device, int64_t batch,
                                     int64_t num_pages, int64_t page_size,
                                     int64_t head_dim, float scale,
