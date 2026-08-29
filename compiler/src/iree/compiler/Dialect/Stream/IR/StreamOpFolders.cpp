@@ -1859,8 +1859,11 @@ struct CoalesceAdjacentFills : OpRewritePattern<AsyncFillOp> {
           fusedLoc, sourceOp.getTargetLength(), fillOp.getTargetLength());
     } else {
       // Extending source op to fill toward the beginning: [fillOp][sourceOp]
-      newOffset = rewriter.createOrFold<arith::AddIOp>(
-          fusedLoc, fillOp.getTargetOffset(), sourceOp.getTargetOffset());
+      // The fill covers the region immediately before the producer, so the
+      // merged fill starts at the fill's (earlier) offset -- mirror of the
+      // toward-the-end branch above, which uses sourceOp.getTargetOffset().
+      // Adding the two absolute offsets would place the merged fill wrong.
+      newOffset = fillOp.getTargetOffset();
       newEnd = sourceOp.getTargetEnd();
       newLength = rewriter.createOrFold<arith::AddIOp>(
           fusedLoc, fillOp.getTargetLength(), sourceOp.getTargetLength());
