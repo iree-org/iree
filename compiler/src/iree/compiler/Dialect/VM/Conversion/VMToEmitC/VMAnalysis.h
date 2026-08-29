@@ -10,7 +10,6 @@
 #include <optional>
 
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
-#include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
@@ -21,7 +20,7 @@
 namespace mlir::iree_compiler::IREE::VM {
 
 /// TODO(simon-camp): This struct grew from being a wrapper around the
-/// RegisterAllocation and ValueLiveness analyses to also cache other things
+/// RegisterAllocation analysis to also cache other things
 /// needed throughout the conversion. This led to hard to locate failures
 /// when only part of this struct was correctly initialized. This
 /// should be split into multiple structs each with a single responsibility.
@@ -37,7 +36,6 @@ struct FuncAnalysis {
       llvm::report_fatal_error("register allocation failed for emitc");
     }
     registerAllocation = std::move(regAlloc);
-    valueLiveness = ValueLiveness(funcOp.getOperation());
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
     refs = DenseMap<int64_t, Value>{};
@@ -104,10 +102,9 @@ struct FuncAnalysis {
 
   bool isMove(Value ref, Operation *op) {
     assert(isa<IREE::VM::RefType>(ref.getType()));
-    assert(valueLiveness.has_value());
     // NOTE: EmitC codegen doesn't support MOVE semantics - always use
-    // retain/assign instead of move. The && false disables MOVE intentionally.
-    return valueLiveness.value().isLastValueUse(ref, op) && false;
+    // retain/assign instead of move.
+    return false;
   }
 
   void cacheLocalRef(int64_t ordinal, Value ref) {
@@ -147,7 +144,6 @@ struct FuncAnalysis {
 
 private:
   std::optional<RegisterAllocation> registerAllocation;
-  std::optional<ValueLiveness> valueLiveness;
   std::optional<DenseMap<int64_t, Value>> refs;
   std::optional<FunctionType> originalFunctionType;
   std::optional<std::string> callingConvention;
