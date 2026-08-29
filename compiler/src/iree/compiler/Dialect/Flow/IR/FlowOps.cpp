@@ -605,6 +605,13 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   return success();
 }
 
+// These ops become tied Flow views after dispatch formation. Treat their
+// results as indirect now so a required tie cannot mutate an earlier source.
+static bool isPreConversionTensorView(Operation *op) {
+  return op && isa<tensor::BitcastOp, tensor::CastOp, tensor::CollapseShapeOp,
+                   tensor::ExpandShapeOp, tensor::ReshapeOp>(op);
+}
+
 Value getRequiredDirectTiedResultBase(Value value) {
   auto result = dyn_cast<OpResult>(value);
   if (!result) {
@@ -616,8 +623,8 @@ Value getRequiredDirectTiedResultBase(Value value) {
   }
   Value tiedOperand = tiedOp.getTiedResultOperand(result);
   Value tiedBase = tiedOp.getTiedResult(result.getResultNumber());
-  if (!tiedOperand || tiedOperand != tiedBase ||
-      tiedOperand.getType() != result.getType()) {
+  if (!tiedOperand || isPreConversionTensorView(tiedOperand.getDefiningOp()) ||
+      tiedOperand != tiedBase || tiedOperand.getType() != result.getType()) {
     return {};
   }
   return tiedBase;
@@ -674,9 +681,7 @@ bool hasObservableUseAfterDispatch(DispatchRegionOp regionOp, Value value,
       // These tensor view ops become tied Flow view ops after dispatch
       // formation. Track their source result here so the analysis does not
       // lose the alias before that conversion occurs.
-      if (use.getOperandNumber() == 0 &&
-          isa<tensor::BitcastOp, tensor::CastOp, tensor::CollapseShapeOp,
-              tensor::ExpandShapeOp, tensor::ReshapeOp>(useOwner)) {
+      if (use.getOperandNumber() == 0 && isPreConversionTensorView(useOwner)) {
         tiedValues.insert(useOwner->getResult(0));
       }
     }

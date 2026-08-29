@@ -1139,8 +1139,6 @@ util.func public @sort_does_not_tie_shape_changing_key(
 // CHECK-SAME:         outs(%[[LOADED_KEYS]], %{{.+}} : tensor<4xi64>, tensor<4xi64>)
 //      CHECK:   util.return %[[RESULT]] : tensor<4xi64>
 
-// -----
-
 util.func public @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : tensor<8xi32>)
     -> tensor<8xi32>{
   %cst = arith.constant dense<[0, 9, 0, 10, 11, 0, 0, 12]> : tensor<8xi32>
