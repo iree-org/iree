@@ -14,8 +14,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -51,30 +50,16 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-// Reports whether a value, or an alias exposed through TiedOpInterface, has a
-// use after the dispatch. This is not a general tensor alias analysis. Callers
-// moving operations into the dispatch can identify those operations with a
-// predicate. Queries with a custom predicate bypass the cache because the
-// predicate affects the result; the cached overload is valid only while the
-// tied-use graph is unchanged.
-class DispatchRegionTiedUseAnalysis {
-public:
-  explicit DispatchRegionTiedUseAnalysis(DispatchRegionOp regionOp)
-      : regionOp(regionOp) {}
+// Returns the storage base for an operation-required result that forms a
+// direct, type-compatible tie to its operand, or a null value otherwise.
+Value getRequiredDirectTiedResultBase(Value value);
 
-  bool hasUseAfterDispatch(Value value, Operation *ignoredOwner);
-  bool hasUseAfterDispatch(
-      Value value, Operation *ignoredOwner,
-      llvm::function_ref<bool(Operation *)> isMovingIntoDispatch);
-
-private:
-  bool computeHasUseAfterDispatch(
-      Value value, Operation *ignoredOwner,
-      llvm::function_ref<bool(Operation *)> isMovingIntoDispatch);
-
-  DispatchRegionOp regionOp;
-  llvm::SmallDenseMap<Value, llvm::SmallDenseMap<Operation *, bool>> cache;
-};
+// Returns whether |value| or a storage-sharing view has a post-dispatch use
+// that can observe data mutations. tensor.dim uses only observe shape and are
+// ignored. Operations in |movingIntoDispatch| are treated as dispatch-local.
+bool hasObservableUseAfterDispatch(
+    DispatchRegionOp regionOp, Value value, Operation *ignoredOwner,
+    ArrayRef<Operation *> movingIntoDispatch = {});
 
 } // namespace mlir::iree_compiler::IREE::Flow
 

@@ -1017,6 +1017,57 @@ util.func public @sort_does_not_tie_live_key_alias(
 
 // -----
 
+util.func public @sort_does_not_tie_live_tensor_key_alias(
+    %keys: tensor<2x2xi64>, %indices: tensor<2x2xi64>)
+    -> (tensor<2x2xi64>, tensor<4xi64>) {
+  %key_view = tensor.collapse_shape %keys [[0, 1]]
+      : tensor<2x2xi64> into tensor<4xi64>
+  %sorted:2 = iree_linalg_ext.sort dimension(1)
+      outs(%keys, %indices : tensor<2x2xi64>, tensor<2x2xi64>) {
+  ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+    %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+    iree_linalg_ext.yield %take_lhs : i1
+  } -> tensor<2x2xi64>, tensor<2x2xi64>
+  util.return %sorted#1, %key_view : tensor<2x2xi64>, tensor<4xi64>
+}
+//      CHECK: util.func public @sort_does_not_tie_live_tensor_key_alias(
+// CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<2x2xi64>
+// CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<2x2xi64>
+//      CHECK:   %[[KEY_VIEW:.+]] = flow.tensor.reshape %[[KEYS]] : tensor<2x2xi64> -> tensor<4xi64>
+//      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[KEYS]], %[[INDICES]])
+// CHECK-NEXT:       (%[[KEYS_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x2xi64>>,
+// CHECK-SAME:        %[[INDICES_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2x2xi64>>)
+//      CHECK:   util.return %[[RESULT]], %[[KEY_VIEW]] : tensor<2x2xi64>, tensor<4xi64>
+
+// -----
+
+util.func public @sort_ties_key_with_post_dispatch_dim(
+    %keys: tensor<?xi64>, %indices: tensor<?xi64>) -> (tensor<?xi64>, index) {
+  %c0 = arith.constant 0 : index
+  %sorted:2 = iree_linalg_ext.sort dimension(0)
+      outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+  ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+    %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+    iree_linalg_ext.yield %take_lhs : i1
+  } -> tensor<?xi64>, tensor<?xi64>
+  %dim = tensor.dim %keys, %c0 : tensor<?xi64>
+  util.return %sorted#1, %dim : tensor<?xi64>, index
+}
+//      CHECK: util.func public @sort_ties_key_with_post_dispatch_dim(
+// CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<?xi64>
+// CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?xi64>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[KEYS_DIM:.+]] = tensor.dim %[[KEYS]], %[[C0]]
+//  CHECK-DAG:   %[[INDICES_DIM:.+]] = tensor.dim %[[INDICES]], %[[C0]]
+//      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[KEYS]], %[[INDICES]], %[[KEYS_DIM]], %[[INDICES_DIM]])
+// CHECK-NEXT:       (%[[KEYS_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
+// CHECK-SAME:        %[[INDICES_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>,
+//      CHECK:   util.return %[[RESULT]]#1, %[[KEYS_DIM]] : tensor<?xi64>, index
+
+// -----
+
 util.func public @sort_with_unused_trailing_key_result(
     %indices: tensor<4xi64>, %keys: tensor<4xi64>) -> tensor<4xi64> {
   %sorted:2 = iree_linalg_ext.sort dimension(0)

@@ -605,61 +605,79 @@ LogicalResult DispatchRegionOp::reifyResultShapes(
   return success();
 }
 
-bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
-    Value value, Operation *ignoredOwner) {
-  auto &ownerCache = cache[value];
-  if (auto it = ownerCache.find(ignoredOwner); it != ownerCache.end()) {
-    return it->second;
+Value getRequiredDirectTiedResultBase(Value value) {
+  auto result = dyn_cast<OpResult>(value);
+  if (!result) {
+    return {};
   }
-  bool result = computeHasUseAfterDispatch(value, ignoredOwner,
-                                           [](Operation *) { return false; });
-  ownerCache[ignoredOwner] = result;
-  return result;
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
+  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
+    return {};
+  }
+  Value tiedOperand = tiedOp.getTiedResultOperand(result);
+  Value tiedBase = tiedOp.getTiedResult(result.getResultNumber());
+  if (!tiedOperand || tiedOperand != tiedBase ||
+      tiedOperand.getType() != result.getType()) {
+    return {};
+  }
+  return tiedBase;
 }
 
-bool DispatchRegionTiedUseAnalysis::hasUseAfterDispatch(
-    Value value, Operation *ignoredOwner,
-    llvm::function_ref<bool(Operation *)> isMovingIntoDispatch) {
-  return computeHasUseAfterDispatch(value, ignoredOwner, isMovingIntoDispatch);
-}
-
-bool DispatchRegionTiedUseAnalysis::computeHasUseAfterDispatch(
-    Value value, Operation *ignoredOwner,
-    llvm::function_ref<bool(Operation *)> isMovingIntoDispatch) {
+bool hasObservableUseAfterDispatch(DispatchRegionOp regionOp, Value value,
+                                   Operation *ignoredOwner,
+                                   ArrayRef<Operation *> movingIntoDispatch) {
   Block *dispatchBlock = regionOp->getBlock();
   llvm::SetVector<Value> tiedValues;
   tiedValues.insert(value);
   for (unsigned i = 0; i < tiedValues.size(); ++i) {
     for (OpOperand &use : tiedValues[i].getUses()) {
-      Operation *user = dispatchBlock->findAncestorOpInBlock(*use.getOwner());
+      Operation *useOwner = use.getOwner();
+
+      // Direct ties preserve the tensor shape, so dimension queries cannot
+      // observe the data mutation enabled by the tie.
+      if (isa<tensor::DimOp>(useOwner)) {
+        continue;
+      }
+
+      Operation *user = dispatchBlock->findAncestorOpInBlock(*useOwner);
       if (!user) {
         return true;
       }
-      bool isMovedIntoDispatch = user == regionOp || isMovingIntoDispatch(user);
+      bool isMovedIntoDispatch =
+          user == regionOp || llvm::is_contained(movingIntoDispatch, user);
       if (!isMovedIntoDispatch && regionOp->isBeforeInBlock(user)) {
         return true;
       }
 
       // The required operation itself is allowed to produce live results;
       // those results are not independent aliases of its input storage.
-      if (use.getOwner() == ignoredOwner) {
+      if (useOwner == ignoredOwner) {
         continue;
       }
 
       // A tied value yielded from inside the dispatch aliases storage after
       // the dispatch when the corresponding dispatch result is live.
       if (user == regionOp) {
-        if (isa<Flow::ReturnOp>(use.getOwner()) &&
+        if (isa<Flow::ReturnOp>(useOwner) &&
             !regionOp->getResult(use.getOperandNumber()).use_empty()) {
           return true;
         }
       }
 
-      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
+      if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(useOwner)) {
         for (Value result :
              tiedOp.getOperandTiedResults(use.getOperandNumber())) {
           tiedValues.insert(result);
         }
+      }
+
+      // These tensor view ops become tied Flow view ops after dispatch
+      // formation. Track their source result here so the analysis does not
+      // lose the alias before that conversion occurs.
+      if (use.getOperandNumber() == 0 &&
+          isa<tensor::BitcastOp, tensor::CastOp, tensor::CollapseShapeOp,
+              tensor::ExpandShapeOp, tensor::ReshapeOp>(useOwner)) {
+        tiedValues.insert(useOwner->getResult(0));
       }
     }
   }
@@ -667,24 +685,22 @@ bool DispatchRegionTiedUseAnalysis::computeHasUseAfterDispatch(
 }
 
 // Returns the external storage base for a required result when it forms a
-// direct, type-compatible tie and neither the base nor an alias exposed through
-// TiedOpInterface is used after the dispatch.
-static Value getRequiredExternalTiedResultBase(
-    Flow::DispatchRegionOp regionOp, Value value,
-    DispatchRegionTiedUseAnalysis &tiedUseAnalysis) {
+// direct, type-compatible tie and neither the base nor a storage-sharing view
+// has an observable use after the dispatch.
+static Value getRequiredExternalTiedResultBase(Flow::DispatchRegionOp regionOp,
+                                               Value value) {
   auto result = dyn_cast<OpResult>(value);
   if (!result || !regionOp->isProperAncestor(result.getOwner())) {
     return {};
   }
-  Value tiedBase =
-      IREE::Util::TiedOpInterface::getRequiredTiedResultBase(value);
+  Value tiedBase = getRequiredDirectTiedResultBase(value);
   if (!tiedBase) {
     return {};
   }
   Region *baseRegion = tiedBase.getParentRegion();
   Operation *baseParentOp = baseRegion ? baseRegion->getParentOp() : nullptr;
   if (!baseParentOp || regionOp->isAncestor(baseParentOp) ||
-      tiedUseAnalysis.hasUseAfterDispatch(tiedBase, result.getOwner())) {
+      hasObservableUseAfterDispatch(regionOp, tiedBase, result.getOwner())) {
     return {};
   }
   return tiedBase;
@@ -730,7 +746,6 @@ bool dropUnusedAndRedundantDispatchRegionResults(
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   llvm::SetVector<Value> preservedTiedBases;
   llvm::SmallDenseMap<Operation *, bool> liveOwnerResultUses;
-  DispatchRegionTiedUseAnalysis tiedUseAnalysis(regionOp);
 
   for (const auto &[index, value] : llvm::enumerate(regionOp.getResults())) {
     Type type = value.getType();
@@ -738,8 +753,8 @@ bool dropUnusedAndRedundantDispatchRegionResults(
     OpOperand &yieldedVal = returnOp->getOpOperand(index);
     bool preserveRequiredTie = false;
     if (value.use_empty()) {
-      Value tiedBase = getRequiredExternalTiedResultBase(
-          regionOp, yieldedVal.get(), tiedUseAnalysis);
+      Value tiedBase =
+          getRequiredExternalTiedResultBase(regionOp, yieldedVal.get());
       // Required carriers model an operation result, so base liveness must not
       // keep an otherwise dead owner alive.
       if (tiedBase && !preservedTiedBases.contains(tiedBase)) {

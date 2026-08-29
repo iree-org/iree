@@ -982,10 +982,6 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     // value may be a block argument and have no defining op.
     static Value findTiedBaseValue(Value derivedValue);
 
-    // Returns the storage base for a required result that forms a direct,
-    // type-compatible tie to its operand, or a null value otherwise.
-    static Value getRequiredTiedResultBase(Value value);
-
     // Returns true if any of |value|'s uses have tied it to a result.
     static bool hasAnyTiedUses(Value value);
   }];

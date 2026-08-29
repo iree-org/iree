@@ -396,8 +396,6 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
         regionOp->getBlock()->findAncestorOpInBlock(*definingOp);
     return !ancestor || !targetSet.contains(ancestor);
   };
-  DispatchRegionTiedUseAnalysis tiedUseAnalysis(regionOp);
-
   // Preserve at most one required carrier for each storage base.
   llvm::SetVector<Value> preservedTiedBases;
 
@@ -416,13 +414,11 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       bool hasExternalUses = hasUsesOutsideOfRegion(result);
       bool preserveRequiredTie = false;
       if (!hasExternalUses && hasAnyResultUses) {
-        Value tiedBase =
-            IREE::Util::TiedOpInterface::getRequiredTiedResultBase(result);
+        Value tiedBase = getRequiredDirectTiedResultBase(result);
         preserveRequiredTie =
             tiedBase && isExternalStorageBase(tiedBase) &&
-            !tiedUseAnalysis.hasUseAfterDispatch(
-                tiedBase, result.getDefiningOp(),
-                [&](Operation *user) { return targetSet.contains(user); }) &&
+            !hasObservableUseAfterDispatch(regionOp, tiedBase,
+                                           result.getDefiningOp(), targets) &&
             preservedTiedBases.insert(tiedBase);
       }
       if (hasExternalUses || preserveRequiredTie) {

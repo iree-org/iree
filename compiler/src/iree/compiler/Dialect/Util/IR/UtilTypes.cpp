@@ -496,25 +496,6 @@ Value TiedOpInterface::findTiedBaseValue(Value derivedValue) {
 }
 
 // static
-Value TiedOpInterface::getRequiredTiedResultBase(Value value) {
-  auto result = dyn_cast<OpResult>(value);
-  if (!result) {
-    return {};
-  }
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
-  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
-    return {};
-  }
-  Value tiedOperand = tiedOp.getTiedResultOperand(result);
-  Value tiedBase = tiedOp.getTiedResult(result.getResultNumber());
-  if (!tiedOperand || tiedOperand != tiedBase ||
-      tiedOperand.getType() != result.getType()) {
-    return {};
-  }
-  return tiedBase;
-}
-
-// static
 bool TiedOpInterface::hasAnyTiedUses(Value value) {
   return llvm::any_of(value.getUses(), [](auto &use) {
     if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner())) {
