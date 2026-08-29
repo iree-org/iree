@@ -51,11 +51,12 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-// Analyzes whether a value or one of its tied aliases remains live after a
-// dispatch. Callers moving operations into the dispatch can provide a
-// predicate for those operations. Queries with a custom predicate are not
-// cached because the predicate affects the result. The cached overload is
-// valid while the tied-use graph remains unchanged.
+// Reports whether a value, or an alias exposed through TiedOpInterface, has a
+// use after the dispatch. This is not a general tensor alias analysis. Callers
+// moving operations into the dispatch can identify those operations with a
+// predicate. Queries with a custom predicate bypass the cache because the
+// predicate affects the result; the cached overload is valid only while the
+// tied-use graph is unchanged.
 class DispatchRegionTiedUseAnalysis {
 public:
   explicit DispatchRegionTiedUseAnalysis(DispatchRegionOp regionOp)

@@ -666,9 +666,9 @@ bool DispatchRegionTiedUseAnalysis::computeHasUseAfterDispatch(
   return false;
 }
 
-// Returns the storage base for a required result when preserving the result can
-// form a direct, type-compatible tie to storage outside the dispatch and no
-// later use requires the original value.
+// Returns the external storage base for a required result when it forms a
+// direct, type-compatible tie and neither the base nor an alias exposed through
+// TiedOpInterface is used after the dispatch.
 static Value getRequiredExternalTiedResultBase(
     Flow::DispatchRegionOp regionOp, Value value,
     DispatchRegionTiedUseAnalysis &tiedUseAnalysis) {

@@ -830,9 +830,9 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns true if the operation requires the given result tie to remain
-        represented while the operation executes, even when the result has no
-        SSA uses. This does not require preserving an otherwise dead operation.
+        Returns true if the result-to-operand tie is required while the
+        operation executes, even when the result has no SSA uses. This
+        requirement does not keep an otherwise dead operation alive.
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isTiedResultRequired",
