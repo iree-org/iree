@@ -274,6 +274,26 @@ util.func private @CoalesceAdjacentFills(%arg0: !stream.resource<*>, %arg1: inde
 
 // -----
 
+// Coalesces a fill into the region immediately BEFORE the producer fill
+// (sourceOffset == fillEnd). The merged fill starts at the earlier (fill's)
+// offset; regression for adding the two absolute offsets instead.
+
+// CHECK-LABEL: @CoalesceAdjacentFillsReverse
+util.func private @CoalesceAdjacentFillsReverse(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c10 = arith.constant 10 : index
+  %c20 = arith.constant 20 : index
+  %c0_i8 = arith.constant 0 : i8
+  // Producer fills [10, 20); consumer fills [0, 10) -> merged fill of [0, 20).
+  // CHECK: %[[FILL:.+]] = stream.async.fill %c0_i8, %arg0[%c0 to %c20 for %{{.+}}] : i8 -> %arg0 as !stream.resource<*>{%arg1}
+  %0 = stream.async.fill %c0_i8, %arg0[%c10 to %c20 for %c10] : i8 -> %arg0 as !stream.resource<*>{%arg1}
+  %1 = stream.async.fill %c0_i8, %0[%c0 to %c10 for %c10] : i8 -> %0 as !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[FILL]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
 // If we can't analyze the resources we can't fold as the update may be required
 // to preserve an in-place update of an external resource.
 
