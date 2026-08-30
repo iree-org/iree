@@ -363,6 +363,10 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                    IREE::Flow::DispatchRegionOp regionOp) {
   // Values replaced by moving the `targets` into the dispatch region.
   SmallVector<Value> replacedValues;
+  // Keep the yielded-results position for each externally replaced result.
+  // `yieldedResults` may also contain required tie carriers with no external
+  // users, so the original target-result index is not the appended result
+  // position.
   SmallVector<unsigned> replacedResultPositions;
 
   // List of dynamic dimensions for each new results added to the dispatch
@@ -406,14 +410,16 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
     rewriter.setInsertionPointToStart(&body);
     Operation *clonedTarget = rewriter.clone(*target);
 
-    bool hasAnyResultUses = llvm::any_of(
-        target->getResults(), [](Value result) { return !result.use_empty(); });
+    bool isLive = !wouldOpBeTriviallyDead(target) ||
+                  llvm::any_of(target->getResults(), [](Value result) {
+                    return !result.use_empty();
+                  });
 
     // Gather all uses of `target`.
     for (auto [index, result] : llvm::enumerate(target->getResults())) {
       bool hasExternalUses = hasUsesOutsideOfRegion(result);
       bool preserveRequiredTie = false;
-      if (!hasExternalUses && hasAnyResultUses) {
+      if (!hasExternalUses && isLive) {
         Value tiedBase = getRequiredDirectTiedResultBase(result);
         preserveRequiredTie =
             tiedBase && isExternalStorageBase(tiedBase) &&

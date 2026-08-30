@@ -830,11 +830,13 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns true when an otherwise-unused result requires initialized
-        writable destination storage while the operation executes.
-        Transformations may retain its result-to-operand tie to provide that
-        storage when legal. This does not keep an otherwise dead operation
-        alive.
+        Returns true when the operation requires the result-to-operand tie for
+        the given result while it executes. The tie may provide initialized
+        writable destination storage even when the result has no SSA uses.
+        Transformations may retain the tie to provide that storage when legal,
+        but this requirement does not by itself keep an otherwise-dead
+        operation alive. Operation liveness and unrelated side effects are
+        analyzed separately.
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isTiedResultRequired",

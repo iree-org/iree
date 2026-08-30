@@ -148,6 +148,49 @@ util.func public @multiple_results_tied_to_same_input(%arg0: tensor<4x4xf32>)
 
 // -----
 
+// CHECK-LABEL: util.func public @keep_operand_backing_live_tied_result
+util.func public @keep_operand_backing_live_tied_result(
+    %arg0: tensor<4xf32>) -> tensor<4xf32> {
+  %c1 = arith.constant 1 : index
+  // CHECK: flow.dispatch.workgroups[%c1](%arg0) : (tensor<4xf32>) -> %arg0 =
+  // CHECK-NEXT: (%{{.+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>)
+  %0 = flow.dispatch.workgroups[%c1](%arg0) :
+      (tensor<4xf32>) -> %arg0 =
+      (%arg0_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>) {
+    flow.return
+  }
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @drop_untied_result_after_tied_result
+util.func public @drop_untied_result_after_tied_result(
+    %arg0: tensor<4xf32>) -> tensor<4xf32> {
+  %c1 = arith.constant 1 : index
+  // CHECK: flow.dispatch.workgroups[%c1](%arg0) : (tensor<4xf32>) -> %arg0 =
+  // CHECK-NEXT: (%{{.+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>)
+  // CHECK-NOT: !iree_tensor_ext.dispatch.tensor<writeonly
+  %0:2 = flow.dispatch.workgroups[%c1](%arg0) :
+      (tensor<4xf32>) -> (%arg0, tensor<4xf32>) =
+      (%arg0_capture: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>,
+       %unused_capture: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>) {
+    %loaded = iree_tensor_ext.dispatch.tensor.load %arg0_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>> -> tensor<4xf32>
+    iree_tensor_ext.dispatch.tensor.store %loaded, %arg0_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xf32>>
+    iree_tensor_ext.dispatch.tensor.store %loaded, %unused_capture,
+        offsets = [0], sizes = [4], strides = [1]
+        : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+    flow.return
+  }
+  util.return %0#0 : tensor<4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @drop_unused_dispatch_region_result
 util.func public @drop_unused_dispatch_region_result(
     %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
@@ -282,6 +325,32 @@ util.func public @drop_required_sort_carrier_with_tensor_view_input(
   }
   // CHECK: util.return %[[RESULT]], %[[KEYS]] : tensor<4xi64>, tensor<2x2xi64>
   util.return %result#1, %keys : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @keep_required_sort_carrier_with_effectful_comparator
+util.func public @keep_required_sort_carrier_with_effectful_comparator(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>,
+    %side_effect: memref<i64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:.+]]:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+  %result:3 = flow.dispatch.region ->
+      (tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
+    // CHECK: %[[SORTED:.+]] = iree_linalg_ext.sort
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      // CHECK: memref.store
+      memref.store %lhs_key, %side_effect[] : memref<i64>
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: flow.return %[[SORTED]], %{{.+}} : tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#0, %sorted#1, %indices
+        : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#1 : tensor<4xi64>
+  util.return %result#2 : tensor<4xi64>
 }
 
 // -----

@@ -487,6 +487,7 @@ def IREELinalgExt_MapStoreOp : IREELinalgExt_Op<"map_store",
 
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [AttrSizedOperandSegments,
+     RecursiveMemoryEffects,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
      DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",

@@ -354,6 +354,32 @@ LogicalResult optimizeClosureLikeOp(const ClosureOptimizationOptions &options,
     }
   }
 
+  // A retained tied result still depends on its backing closure operand.
+  // Removing that operand as unused or duplicate would untie the result while
+  // cloning and may also change the body ABI.
+  auto tiedOp = dyn_cast<TiedOpInterface>(closureOp.getOperation());
+  auto closureOperands = closureOp.getClosureOperands();
+  if (tiedOp && !closureOperands.empty()) {
+    unsigned closureOperandBegin = closureOperands.getBeginOperandIndex();
+    unsigned closureOperandEnd = closureOperandBegin + closureOperands.size();
+    for (Value result : preservedResults) {
+      auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(
+          cast<OpResult>(result).getResultNumber());
+      if (!tiedOperandIndex || *tiedOperandIndex < closureOperandBegin ||
+          *tiedOperandIndex >= closureOperandEnd) {
+        continue;
+      }
+      unsigned closureOperandIndex = *tiedOperandIndex - closureOperandBegin;
+      auto elidedIt = std::find(elidedOperands.begin(), elidedOperands.end(),
+                                closureOperandIndex);
+      if (elidedIt == elidedOperands.end()) {
+        continue;
+      }
+      elidedOperands.erase(elidedIt);
+      blockArgReplacements[closureOperandIndex] = std::nullopt;
+    }
+  }
+
   if (elidedOperands.empty() && elidedResults.empty()) {
     // No optimization required.
     return failure();

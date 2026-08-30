@@ -50,13 +50,18 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-// Returns the storage base for an operation-required result that forms a
-// direct, type-compatible tie to its operand, or a null value otherwise.
+// Returns the storage base for an operation-required result when its tied
+// operand is the base value itself, has the same type as the result, and is not
+// produced by a pre-conversion tensor view; returns a null value otherwise.
 Value getRequiredDirectTiedResultBase(Value value);
 
-// Returns whether |value| or a storage-sharing view has a post-dispatch use
-// that can observe data mutations. tensor.dim uses only observe shape and are
-// ignored. Operations in |movingIntoDispatch| are treated as dispatch-local.
+// Returns whether |value| or an alias exposed by TiedOpInterface, including a
+// supported pre-conversion tensor view, has a use after |regionOp| that can
+// observe data mutations. tensor.dim queries observe only shape and are
+// ignored. |ignoredOwner|'s use is ignored, and top-level operations in
+// |movingIntoDispatch| are treated as dispatch-local. This is a use/known-alias
+// analysis, not general tensor alias, side-effect, or operation-liveness
+// analysis.
 bool hasObservableUseAfterDispatch(
     DispatchRegionOp regionOp, Value value, Operation *ignoredOwner,
     ArrayRef<Operation *> movingIntoDispatch = {});

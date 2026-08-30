@@ -34,6 +34,42 @@ func.func @sort_keep_comparator_result(%keys : tensor<?x10xf32>,
 
 // -----
 
+func.func @sort_keep_lhs_only_comparator_result(%keys : tensor<?x10xf32>,
+    %indices : tensor<?x10xi64>) -> tensor<?x10xf32> {
+  %sorted:2 = iree_linalg_ext.sort dimension(1)
+      outs(%keys, %indices : tensor<?x10xf32>, tensor<?x10xi64>) {
+  ^bb0(%lhs_key: f32, %rhs_key: f32, %lhs_index: i64, %rhs_index: i64):
+    %zero = arith.constant 0 : i64
+    %take_lhs = arith.cmpi sge, %lhs_index, %zero : i64
+    iree_linalg_ext.yield %take_lhs : i1
+  } -> tensor<?x10xf32>, tensor<?x10xi64>
+  return %sorted#0 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func.func @sort_keep_lhs_only_comparator_result
+//       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort
+//  CHECK-SAME:       outs(%{{.+}}, %{{.+}} : tensor<?x10xf32>, tensor<?x10xi64>)
+//       CHECK:   return %[[SORT]]#0 : tensor<?x10xf32>
+
+// -----
+
+func.func @sort_keep_rhs_only_comparator_result(%keys : tensor<?x10xf32>,
+    %indices : tensor<?x10xi64>) -> tensor<?x10xf32> {
+  %sorted:2 = iree_linalg_ext.sort dimension(1)
+      outs(%keys, %indices : tensor<?x10xf32>, tensor<?x10xi64>) {
+  ^bb0(%lhs_key: f32, %rhs_key: f32, %lhs_index: i64, %rhs_index: i64):
+    %zero = arith.constant 0 : i64
+    %take_rhs = arith.cmpi sge, %rhs_index, %zero : i64
+    iree_linalg_ext.yield %take_rhs : i1
+  } -> tensor<?x10xf32>, tensor<?x10xi64>
+  return %sorted#0 : tensor<?x10xf32>
+}
+// CHECK-LABEL: func.func @sort_keep_rhs_only_comparator_result
+//       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort
+//  CHECK-SAME:       outs(%{{.+}}, %{{.+}} : tensor<?x10xf32>, tensor<?x10xi64>)
+//       CHECK:   return %[[SORT]]#0 : tensor<?x10xf32>
+
+// -----
+
 func.func @gather_to_extract_slice_expand(%source : tensor<1024x128xi32>, %indices : tensor<1x1xi32>) -> (tensor<1x1x128xi32>) {
   %empty = tensor.empty() : tensor<1x1x128xi32>
   %result = iree_linalg_ext.gather dimension_map = [0]

@@ -711,10 +711,12 @@ static Value getRequiredExternalTiedResultBase(Flow::DispatchRegionOp regionOp,
   return tiedBase;
 }
 
-// Returns true when an operation remains live without counting unused values
-// yielded solely to carry its required ties.
+// Returns true when effects or non-carrier result uses keep an operation live.
 static bool hasLiveOwnerResultUse(Flow::DispatchRegionOp regionOp,
                                   Flow::ReturnOp returnOp, Operation *owner) {
+  if (!wouldOpBeTriviallyDead(owner)) {
+    return true;
+  }
   for (Value result : owner->getResults()) {
     for (OpOperand &use : result.getUses()) {
       if (use.getOwner() != returnOp ||
@@ -1259,6 +1261,18 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   IREE::Util::excludeTiedOperandAndResultIndices(
       excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
 
+  // Output block arguments are packed and exist only for untied results.
+  // Resolve their old argument indices before rebuilding the op changes the
+  // result and tie mappings.
+  SmallVector<unsigned> excludedResultArgumentIndices;
+  for (unsigned resultIndex : excludedResultIndices) {
+    if (getTiedResultOperandIndex(resultIndex).has_value()) {
+      continue;
+    }
+    excludedResultArgumentIndices.push_back(
+        getOutputBlockArgument(resultIndex).getArgNumber());
+  }
+
   auto newOp = DispatchWorkgroupsOp::create(
       rewriter, getLoc(), getWorkload(), newResultTypes, newResultDims,
       newArguments, newArgumentDims, newTiedOperandIndices,
@@ -1277,16 +1291,11 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
-  unsigned baseResultIndex = getArguments().size(); // old index
   auto erasedArguments = llvm::to_vector(excludedOperandIndices);
-  for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
-       ++i) {
-    if (!is_contained(excludedResultIndices, i - baseResultIndex)) {
-      continue;
-    }
-    auto arg = newBody.front().getArgument(i);
+  for (unsigned argumentIndex : excludedResultArgumentIndices) {
+    auto arg = newBody.front().getArgument(argumentIndex);
     eraseArgUseTree(arg, rewriter);
-    erasedArguments.push_back(i);
+    erasedArguments.push_back(argumentIndex);
   }
   auto &block = newBody.front();
   BitVector eraseIndices(block.getNumArguments());
