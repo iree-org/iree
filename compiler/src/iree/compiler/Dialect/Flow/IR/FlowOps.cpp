@@ -726,8 +726,9 @@ static bool hasLiveOwnerResultUse(Flow::DispatchRegionOp regionOp,
   return false;
 }
 
-/// Canonicalizes a DispatchRegionOp: Drop all unused results. Returns `true`
-/// if the IR was modified.
+/// Canonicalizes a DispatchRegionOp by dropping unused and redundant results
+/// while retaining legal required tie carriers for live operations. Returns
+/// `true` if the IR was modified.
 bool dropUnusedAndRedundantDispatchRegionResults(
     RewriterBase &rewriter, Flow::DispatchRegionOp regionOp) {
   OpBuilder::InsertionGuard guard(rewriter);
