@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-abi-wrap-entry-points{invocation-model=sync})' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-abi-wrap-entry-points{invocation-model=sync})' --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // Tests basic dynamic tensor I/O marshaling.
 
@@ -337,3 +337,38 @@ util.func public @transientsBufferView(%arg0: tensor<4xf32>, %storage: !hal.buff
   %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
   util.return %0 : tensor<4xf32>
 }
+
+// -----
+
+// Tests that unranked tensor arguments in native ABI signatures are rejected.
+
+// expected-error@below {{unranked tensor types are not supported in native ABI function signatures}}
+util.func public @unrankedTensorArgument(%arg0: tensor<*xf32>) {
+  util.return
+}
+
+// -----
+
+// Tests that unranked tensor results in native ABI signatures are rejected.
+
+// expected-error@below {{unranked tensor types are not supported in native ABI function signatures}}
+util.func public @unrankedTensorResult(%arg0: tensor<1xf32>) -> tensor<*xf32> {
+  %0 = tensor.cast %arg0 : tensor<1xf32> to tensor<*xf32>
+  util.return %0 : tensor<*xf32>
+}
+
+// -----
+
+// Tests that unranked tensor arguments in external native ABI signatures are
+// rejected.
+
+// expected-error@below {{unranked tensor types are not supported in native ABI function signatures}}
+util.func private @externalUnrankedTensorArgument(tensor<*xf32>)
+
+// -----
+
+// Tests that unranked tensor results in external native ABI signatures are
+// rejected.
+
+// expected-error@below {{unranked tensor types are not supported in native ABI function signatures}}
+util.func private @externalUnrankedTensorResult(tensor<1xf32>) -> tensor<*xf32>

@@ -46,6 +46,20 @@ static Type mapToABIType(Type type) {
   return type;
 }
 
+// Verifies that |funcOp| does not contain unsupported unranked tensors.
+static LogicalResult verifyABISignature(FunctionOpInterface funcOp) {
+  auto hasUnrankedTensor = [](TypeRange types) {
+    return llvm::any_of(types, llvm::IsaPred<UnrankedTensorType>);
+  };
+  if (hasUnrankedTensor(funcOp.getArgumentTypes()) ||
+      hasUnrankedTensor(funcOp.getResultTypes())) {
+    return funcOp.emitError()
+           << "unranked tensor types are not supported in native ABI "
+              "function signatures";
+  }
+  return success();
+}
+
 // Returns true if the given |attr| is a known ABI attribute that is only used
 // by this pass.
 static bool isABIAttr(NamedAttribute attr) {
@@ -829,10 +843,17 @@ public:
       // Ignore functions already marked as having their ABI goo handled.
       if (funcOp->hasAttr("iree.abi.stub")) {
         continue;
-      } else if (funcOp.isExternal()) {
+      }
+      if (!funcOp.isExternal() && !funcOp.isPublic()) {
+        continue;
+      }
+      if (failed(verifyABISignature(funcOp))) {
+        return signalPassFailure();
+      }
+      if (funcOp.isExternal()) {
         // Imported function.
         importOps.push_back(funcOp);
-      } else if (funcOp.isPublic()) {
+      } else {
         // Exported function.
         exportOps.push_back(funcOp);
       }
