@@ -2,7 +2,7 @@
 
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch{{\(.+}}attributes {minimum_version = 7 : i32}
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch.indirect{{\(.+}}attributes {minimum_version = 7 : i32}
-// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {minimum_version = 7 : i32, nosideeffects}
+// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {nosideeffects, minimum_version = 7 : i32}
 
 // CHECK-LABEL: @command_buffer_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)

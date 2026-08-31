@@ -1068,8 +1068,8 @@ VER_0 {
     mlirSymbolTableCreate;
     mlirSymbolTableDestroy;
     mlirSymbolTableErase;
+    mlirSymbolTableGetDefaultVisibilityAttributeName;
     mlirSymbolTableGetSymbolAttributeName;
-    mlirSymbolTableGetVisibilityAttributeName;
     mlirSymbolTableInsert;
     mlirSymbolTableLookup;
     mlirSymbolTableReplaceAllSymbolUses;

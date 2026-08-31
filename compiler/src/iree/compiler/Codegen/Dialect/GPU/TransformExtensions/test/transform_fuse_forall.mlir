@@ -45,7 +45,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
-//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
 
 //       CHECK:     %[[BARRIER:.+]] = iree_gpu.barrier_region ins(%[[ALLOC]] : tensor<128x128xf32>)
@@ -121,7 +121,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
-//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
 //       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.barrier_region ins(%[[ALLOC]] : tensor<128x128xf32>)
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} iter_args(%[[INIT:.+]] = %{{.*}})
@@ -178,7 +178,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
-//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
 //       CHECK:     %[[BARRIER:.+]] = iree_gpu.barrier_region ins(%[[ALLOC]] : tensor<128x128xf32>)
 //       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
@@ -244,7 +244,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
-//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//   CHECK-DAG:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[W_IDX:.+]], %[[W_IDY:.+]]) in (2, 2) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
 //       CHECK:     scf.forall (%[[L_IDX:.+]], %[[L_IDY:.+]]) in (4, 4) {{.*}} -> (tensor<64x64xf32>)
 
@@ -306,7 +306,7 @@ module attributes { transform.with_named_sequence } {
 // CHECK-LABEL: func @fuse_forall_different_thread_count
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
-//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) {{.*}} -> (tensor<128x128xf32>) {
 //       CHECK:     iree_gpu.barrier_region ins(%[[ALLOC]]
 //       CHECK:       %[[LINEARID:.+]] = affine.apply #[[$MAP1]](%[[IDX]], %[[IDY]])
@@ -361,7 +361,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[Y:[A-Za-z0-9]+]]: index
 //  CHECK-SAME:   %[[Z:[A-Za-z0-9]+]]: index
 
-//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<128x128xf32>
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<128x128xf32>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) {{.*}} -> (tensor<128x128xf32>) {
 //       CHECK:     iree_gpu.barrier_region ins(%[[ALLOC]]
 //   CHECK-DAG:       %[[LINEARID:.+]] = affine.apply #[[$MAP1]](%[[IDX]], %[[IDY]])
@@ -413,7 +413,7 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<?x128xf32>
 //  CHECK-SAME:   %[[SIZE:[A-Za-z0-9]+]]: index
 
-//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor(%[[SIZE]])
-//  CHECK-SAME:     memory_space = #gpu.address_space<workgroup>} : tensor<?x128xf32>
+//       CHECK:   %[[ALLOC:.+]] = bufferization.alloc_tensor(%[[SIZE]]) <{
+//  CHECK-SAME:     memory_space = #gpu.address_space<workgroup>}> : tensor<?x128xf32>
 //       CHECK:   scf.forall ({{.*}}) in (8, 8) {{.*}} -> (tensor<128x128xf32>) {
 //       CHECK:     iree_gpu.barrier_region ins(%[[ALLOC]]

@@ -1213,7 +1213,7 @@ LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
 void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(name));
 }
 
@@ -1260,9 +1260,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                        ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
   StringRef executableOpSymName =
-      exportOp->getParentOp()
-          ->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName())
-          .getValue();
+      cast<ExecutableOp>(exportOp->getParentOp()).getName();
   auto entryPoint =
       SymbolRefAttr::get(builder.getContext(), executableOpSymName,
                          {SymbolRefAttr::get(exportOp)});
@@ -1389,9 +1387,9 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
                    ArrayRef<NamedAttribute> attrs,
                    ArrayRef<DictionaryAttr> argAttrs,
                    ArrayRef<DictionaryAttr> resAttrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
+  state.addAttribute(getSymNameAttrName(state.name),
                      builder.getStringAttr(name));
-  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+  state.addAttribute(getSymVisibilityAttrName(state.name),
                      builder.getStringAttr("private"));
   state.addAttribute("function_type", TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
