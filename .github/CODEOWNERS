@@ -39,8 +39,7 @@
 /tools/ @benvanik @devtbi @schuermans-roofline
 
 # Tests
-# TODO: Invite @roberto-laudani as a separate PR
-/tests/external/iree-test-suites @AGindinson @jschuhmacher @ziereis
+/tests/external/iree-test-suites @AGindinson @jschuhmacher @roberto-laudani @ziereis
 
 # Compiler
 /compiler/plugins/ @jschuhmacher @Manewing @schuermans-roofline
