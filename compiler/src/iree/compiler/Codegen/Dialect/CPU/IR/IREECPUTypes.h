@@ -93,10 +93,10 @@ int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr);
 std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
                                                 MMAIntrinsic intrinsic);
 
-// Returns the (M, N, K) tile shape for a row-major-tile intrinsic, or
-// nullopt otherwise (e.g. SVE).
+// Returns how many M/N/K elements one invocation of `intrinsic` computes.
+// Scalable intrinsics declare their base sizes.
 std::optional<std::tuple<int64_t, int64_t, int64_t>>
-getRowMajorTilesMNKShape(MMAIntrinsic intrinsic);
+getIntrinsicMNKShape(MMAIntrinsic intrinsic);
 
 // Idempotently attaches the bitcode for ukernel `name` as
 // `hal.executable.objects` on `op`, looking it up first in any

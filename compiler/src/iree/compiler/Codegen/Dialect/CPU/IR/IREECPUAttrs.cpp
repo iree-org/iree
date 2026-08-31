@@ -432,19 +432,12 @@ InnerTileAlignmentsAttr InnerTileAlignmentsAttr::getFromOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 // Helper function for getIntrinsicSwizzle.
-// Allows succinctly specifying the tiles for the common case of row-major tiles
-// i.e. when the TileSwizzle merely encodes the 2D tile shape and no further
-// expand/transpose.
-// This case is very common for CPU MMA intrinsics due to:
-// 1. CPU matmul instructions having simple tile layouts.
-// 2. The inner_tiled op RHS being transposed, meaning that the row-major RHS
-//    tile really is a column-major RHS matmul tile.
-//
-// If you're trying to add support for a new intrinsic that doesn't have a
-// row-major tile layout, don't look at this function, go directly to
-// getIntrinsicSwizzle.
+// Returns how many M/N/K elements one invocation of `intrinsic` computes,
+// independent of how those elements are laid out in registers. Every intrinsic
+// declares its shape here, including scalable ones, which declare their base
+// sizes.
 std::optional<std::tuple<int64_t, int64_t, int64_t>>
-getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
+getIntrinsicMNKShape(MMAIntrinsic intrinsic) {
   using Tuple = std::tuple<int64_t, int64_t, int64_t>;
   switch (intrinsic) {
   case MMAIntrinsic::None:
@@ -487,6 +480,11 @@ getRowMajorTilesMNKShape(MMAIntrinsic intrinsic) {
   // ACC tile has a non-row-major layout, hand-rolled in `getIntrinsicSwizzle`.
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return Tuple{16, 16, 2};
+  // Base sizes, i.e. the shape at the minimum vector length.
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32:
+    return Tuple{1, 4, 1};
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
+    return Tuple{4, 1, 1};
   default:
     if (isGenericScalar(intrinsic)) {
       return Tuple{1, 1, 1};
@@ -559,16 +557,18 @@ static Codegen::TileSwizzle fixupSwizzle(Codegen::TileSwizzle swizzle) {
   return swizzle;
 }
 
-Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
-                                         int operandIdx) {
+/// Helper for `getIntrinsicSwizzle`:
+/// Returns the hand-rolled TileSwizzle for the intrinsics whose tiles are not
+/// row-major, or nullopt for every other intrinsic.
+static std::optional<Codegen::TileSwizzle>
+getNonRowMajorIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma, int operandIdx) {
   using TileSwizzle = Codegen::TileSwizzle;
   using Dim = TileSwizzle::Dim;
 
-  // SVE has scalable dims that the row-major path below can't express, so we
-  // hand-roll the swizzle. The natural orientation is 1×4VL×1: 4VL lives on
-  // RHS dim 0 (N) and ACC dim 0 (the convention is `(N, M)` here). The
-  // transposed orientation 4VL×1×1 mirrors that: 4VL on LHS dim 0 (M) and
-  // ACC dim 0 (now `(M, N)`).
+  // SVE has scalable dims that the row-major path can't express. The natural
+  // orientation is 1×4VL×1: 4VL lives on RHS dim 0 (N) and ACC dim 0 (the
+  // convention is `(N, M)` here). The transposed orientation 4VL×1×1 mirrors
+  // that: 4VL on LHS dim 0 (M) and ACC dim 0 (now `(M, N)`).
   if (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32 ||
       mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32) {
     bool transposed = (mma == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32);
@@ -601,11 +601,30 @@ Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
     return swizzle;
   }
 
-  auto maybeMnkTuple = getRowMajorTilesMNKShape(mma);
+  return std::nullopt;
+}
+
+Codegen::TileSwizzle getIntrinsicSwizzle(IREE::CPU::MMAIntrinsic mma,
+                                         int operandIdx) {
+  using TileSwizzle = Codegen::TileSwizzle;
+  if (std::optional<TileSwizzle> swizzle =
+          getNonRowMajorIntrinsicSwizzle(mma, operandIdx)) {
+    return *swizzle;
+  }
+
+  // What follows specifies the tiles for the common case of row-major tiles,
+  // i.e. when the TileSwizzle merely encodes the 2D tile shape and no further
+  // expand/transpose. This case is very common for CPU MMA intrinsics due to:
+  // 1. CPU matmul instructions having simple tile layouts.
+  // 2. The inner_tiled op RHS being transposed, meaning that the row-major RHS
+  //    tile really is a column-major RHS matmul tile.
+  //
+  // If you're trying to add support for a new intrinsic that doesn't have a
+  // row-major tile layout, its swizzle belongs in
+  // `getNonRowMajorIntrinsicSwizzle`.
+  auto maybeMnkTuple = getIntrinsicMNKShape(mma);
   if (!maybeMnkTuple) {
-    // Whenever one adds support for a new intrinsic that doesn't have a
-    // row-major tile layout, new logic goes here.
-    assert(false && "Non-row-major-tile intrinsics not yet implemented.");
+    assert(false && "intrinsic does not declare an MNK shape.");
     return TileSwizzle();
   }
   auto [mSize, nSize, kSize] = *maybeMnkTuple;
