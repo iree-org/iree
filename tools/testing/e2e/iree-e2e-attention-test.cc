@@ -5,10 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <float.h>
+#include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
@@ -50,9 +53,9 @@ int index_3d(int i, int j, int k, int dim2, int dim3) {
 
 static void reference_attention_f32_f32_f32_f32(
     iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2, iree_hal_dim_t N,
-    iree_hal_dim_t B, const float* query_data, const float* key_data,
-    const float* value_data, float* result_data, iree_hal_dim_t b,
-    float* Attention, const uint8_t* mask_data) {
+    iree_hal_dim_t B, float scale, const float* query_data,
+    const float* key_data, const float* value_data, float* result_data,
+    iree_hal_dim_t b, float* Attention, const uint8_t* mask_data) {
   // Compute Q * K^T
   for (int m = 0; m < M; ++m) {
     for (int k2 = 0; k2 < K2; ++k2) {
@@ -64,7 +67,7 @@ static void reference_attention_f32_f32_f32_f32(
         sum += query_data[q_idx] * key_data[k_idx];
       }
       int att_idx = index_3d(0, m, k2, M, K2);
-      Attention[att_idx] = sum / sqrt(K1);  // Scale by sqrt(K1)
+      Attention[att_idx] = sum * scale;
     }
   }
 
@@ -101,7 +104,7 @@ static void reference_attention_f32_f32_f32_f32(
     // Apply softmax
     for (int k2 = 0; k2 < K2; ++k2) {
       int att_idx = index_3d(0, m, k2, M, K2);
-      Attention[att_idx] = exp(Attention[att_idx]) / sum;
+      Attention[att_idx] = exp(Attention[att_idx] - max_val) / sum;
     }
   }
 
@@ -122,17 +125,18 @@ static void reference_attention_f32_f32_f32_f32(
 
 static iree_status_t reference_attention_element(
     iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2, iree_hal_dim_t N,
-    iree_hal_dim_t B, iree_hal_element_type_t query_elem_type,
+    iree_hal_dim_t B, float scale, iree_hal_element_type_t query_elem_type,
     iree_hal_element_type_t key_elem_type,
     iree_hal_element_type_t value_elem_type, void* query_data, void* key_data,
-    void* value_data, void* actual_data, void* result_data, iree_hal_dim_t b,
-    float* Attention, const uint8_t* mask_data) {
+    void* value_data, void* result_data, iree_hal_dim_t b, float* Attention,
+    const uint8_t* mask_data) {
   if (query_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       key_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       value_elem_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_attention_f32_f32_f32_f32(
-        M, K1, K2, N, B, (const float*)query_data, (const float*)key_data,
-        (const float*)value_data, (float*)result_data, b, Attention, mask_data);
+        M, K1, K2, N, B, scale, (const float*)query_data,
+        (const float*)key_data, (const float*)value_data, (float*)result_data,
+        b, Attention, mask_data);
 
   } else {
     return iree_make_status(
@@ -146,12 +150,12 @@ static iree_status_t reference_attention_element(
 // against.
 static iree_status_t reference_attention(
     iree_hal_dim_t B, iree_hal_dim_t M, iree_hal_dim_t K1, iree_hal_dim_t K2,
-    iree_hal_dim_t N, iree_hal_element_type_t query_elem_type,
+    iree_hal_dim_t N, float scale, iree_hal_element_type_t query_elem_type,
     iree_hal_element_type_t key_elem_type,
     iree_hal_element_type_t value_elem_type, iree_byte_span_t query_contents,
     iree_byte_span_t key_contents, iree_byte_span_t value_contents,
-    iree_byte_span_t actual_contents, iree_byte_span_t result_contents,
-    iree_byte_span_t mask_contents, int compute_every) {
+    iree_byte_span_t result_contents, iree_byte_span_t mask_contents,
+    int compute_every) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, B);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, M);
@@ -168,12 +172,15 @@ static iree_status_t reference_attention(
   for (iree_hal_dim_t b = 0; b < B; ++b) {
     if (++count < compute_every) continue;
     count = 0;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, reference_attention_element(
-                M, K1, K2, N, B, query_elem_type, key_elem_type,
-                value_elem_type, query_contents.data, key_contents.data,
-                value_contents.data, actual_contents.data, result_contents.data,
-                b, Attention, mask_data));
+    iree_status_t status = reference_attention_element(
+        M, K1, K2, N, B, scale, query_elem_type, key_elem_type, value_elem_type,
+        query_contents.data, key_contents.data, value_contents.data,
+        result_contents.data, b, Attention, mask_data);
+    if (!iree_status_is_ok(status)) {
+      free_tensor(Attention);
+      IREE_TRACE_ZONE_END(z0);
+      return status;
+    }
   }
   free_tensor(Attention);
 
@@ -191,6 +198,9 @@ typedef struct {
   iree_hal_dim_t k1;
   iree_hal_dim_t k2;
   iree_hal_dim_t n;
+  // Scale applied to Q*K^T by the attention op under test. The reference must
+  // use the exact same value or the softmax distributions will not match.
+  float scale;
   iree_hal_element_type_t query_elem_type;
   iree_hal_element_type_t key_elem_type;
   iree_hal_element_type_t value_elem_type;
@@ -208,7 +218,7 @@ static void attention_results_deinitialize(attention_results_t* results);
 static iree_status_t attention_results_initialize(
     iree_hal_device_t* device, iree_hal_dim_t b_size, iree_hal_dim_t m_size,
     iree_hal_dim_t k1_size, iree_hal_dim_t k2_size, iree_hal_dim_t n_size,
-    iree_hal_buffer_view_t* query, iree_hal_buffer_view_t* key,
+    float scale, iree_hal_buffer_view_t* query, iree_hal_buffer_view_t* key,
     iree_hal_buffer_view_t* value, iree_hal_buffer_view_t* result,
     iree_hal_buffer_view_t* mask,  // Optional: can be nullptr.
     iree_allocator_t host_allocator, attention_results_t* out_results) {
@@ -222,6 +232,7 @@ static iree_status_t attention_results_initialize(
   out_results->k1 = k1_size;
   out_results->k2 = k2_size;
   out_results->n = n_size;
+  out_results->scale = scale;
 
   out_results->query_elem_type = iree_hal_buffer_view_element_type(query);
   out_results->key_elem_type = iree_hal_buffer_view_element_type(key);
@@ -338,13 +349,48 @@ static iree_status_t check_attention_results_impl(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, reference_attention(results->b, results->m, results->k1, results->k2,
-                              results->n, results->query_elem_type,
-                              results->key_elem_type, results->value_elem_type,
-                              results->query_contents, results->key_contents,
-                              results->value_contents, results->actual_contents,
-                              results->expected_contents,
-                              results->mask_contents, check_every));
+      z0, reference_attention(
+              results->b, results->m, results->k1, results->k2, results->n,
+              results->scale, results->query_elem_type, results->key_elem_type,
+              results->value_elem_type, results->query_contents,
+              results->key_contents, results->value_contents,
+              results->expected_contents, results->mask_contents, check_every));
+
+  iree_host_size_t count = 0;
+  for (iree_hal_dim_t b = 0; b < results->b; ++b) {
+    if (++count < check_every) continue;
+    count = 0;
+    for (iree_hal_dim_t m = 0; m < results->m; ++m) {
+      for (iree_hal_dim_t n = 0; n < results->n; ++n) {
+        iree_hal_dim_t idx = (b * results->m + m) * results->n + n;
+        iree_test_utils_e2e_value_t actual_value =
+            iree_test_utils_read_buffer_element(idx, results->result_elem_type,
+                                                results->actual_contents.data);
+        iree_test_utils_e2e_value_t expected_value =
+            iree_test_utils_read_buffer_element(
+                idx, results->result_elem_type,
+                results->expected_contents.data);
+        if (!iree_test_utils_result_elements_agree(expected_value,
+                                                   actual_value)) {
+          if (file) {
+            char actual_str[32];
+            char expected_str[32];
+            iree_test_utils_snprintf_value(actual_str, sizeof(actual_str),
+                                           actual_value);
+            iree_test_utils_snprintf_value(expected_str, sizeof(expected_str),
+                                           expected_value);
+            fprintf(file,
+                    "\n\nerror: the actual and expected attention results "
+                    "disagree at b %" PRIdim ", m %" PRIdim ", n %" PRIdim
+                    ": actual %s, expected %s\n\n",
+                    b, m, n, actual_str, expected_str);
+          }
+          IREE_TRACE_ZONE_END(z0);
+          return iree_make_status(IREE_STATUS_ABORTED);
+        }
+      }
+    }
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -443,8 +489,197 @@ class AttentionTestModuleState final {
     return std::move(result_view);
   }
 
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandom4dTensor(
+      iree_hal_device_t* device, int64_t dim0, int64_t dim1, int64_t dim2,
+      int64_t dim3, iree_hal_element_type_t element_type, int32_t seed) {
+    iree_hal_dim_t dims[4] = {
+        (iree_hal_dim_t)dim0,
+        (iree_hal_dim_t)dim1,
+        (iree_hal_dim_t)dim2,
+        (iree_hal_dim_t)dim3,
+    };
+    iree_hal_buffer_params_t buffer_params = {0};
+    buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+    buffer_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+    buffer_params.type = IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE;
+    vm::ref<iree_hal_buffer_view_t> result_view;
+    struct callback_state_t {
+      iree_hal_element_type_t element_type;
+      int32_t seed;
+    } callback_state = {element_type, seed};
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
+        device, iree_hal_device_allocator(device), IREE_ARRAYSIZE(dims), dims,
+        element_type, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
+        +[](iree_hal_buffer_mapping_t* mapping, void* user_data) {
+          callback_state_t callback_state = *(callback_state_t*)user_data;
+          iree_byte_span_t span = mapping->contents;
+          int32_t min = 0;
+          int32_t max = 0;
+          iree_test_utils_get_min_max_for_element_type(
+              callback_state.element_type, &min, &max);
+          uint32_t range = (max - min + 1);
+          iree_host_size_t element_byte_count =
+              iree_hal_element_dense_byte_count(callback_state.element_type);
+          uint8_t* data_end = span.data + span.data_length;
+          uint32_t state = callback_state.seed;
+          for (uint8_t* data = span.data; data < data_end;
+               data += element_byte_count) {
+            int32_t value =
+                (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
+                min;
+            iree_test_utils_write_element(callback_state.element_type, value,
+                                          data);
+          }
+          return iree_ok_status();
+        },
+        &callback_state, &result_view));
+    return std::move(result_view);
+  }
+
+  // Gathers the paged KV cache into dense key/value tensors and then defers to
+  // the shared attention reference and result checker.
+  Status CheckPagedAttentionResults(iree_hal_device_t* device, int64_t batch,
+                                    int64_t num_pages, int64_t page_size,
+                                    int64_t head_dim, float scale,
+                                    iree_hal_buffer_view_t* query,
+                                    iree_hal_buffer_view_t* kv_storage,
+                                    iree_hal_buffer_view_t* key_page_table,
+                                    iree_hal_buffer_view_t* value_page_table,
+                                    iree_hal_buffer_view_t* actual_result) {
+    iree_hal_buffer_t* query_buffer = iree_hal_buffer_view_buffer(query);
+    iree_hal_buffer_t* kv_buffer = iree_hal_buffer_view_buffer(kv_storage);
+    iree_hal_buffer_t* key_table_buffer =
+        iree_hal_buffer_view_buffer(key_page_table);
+    iree_hal_buffer_t* value_table_buffer =
+        iree_hal_buffer_view_buffer(value_page_table);
+    iree_hal_buffer_t* result_buffer =
+        iree_hal_buffer_view_buffer(actual_result);
+
+    const iree_host_size_t query_bytes =
+        iree_hal_buffer_byte_length(query_buffer);
+    const iree_host_size_t kv_bytes = iree_hal_buffer_byte_length(kv_buffer);
+    const iree_host_size_t key_table_bytes =
+        iree_hal_buffer_byte_length(key_table_buffer);
+    const iree_host_size_t value_table_bytes =
+        iree_hal_buffer_byte_length(value_table_buffer);
+    const iree_host_size_t result_bytes =
+        iree_hal_buffer_byte_length(result_buffer);
+
+    std::vector<uint8_t> query_data(query_bytes);
+    std::vector<uint8_t> kv_data(kv_bytes);
+    std::vector<uint8_t> key_table_data(key_table_bytes);
+    std::vector<uint8_t> value_table_data(value_table_bytes);
+    std::vector<uint8_t> result_data(result_bytes);
+
+    IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+        device, query_buffer, 0, query_data.data(), query_data.size(),
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+        device, kv_buffer, 0, kv_data.data(), kv_data.size(),
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+    IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+        device, key_table_buffer, 0, key_table_data.data(),
+        key_table_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout()));
+    IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+        device, value_table_buffer, 0, value_table_data.data(),
+        value_table_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout()));
+    IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+        device, result_buffer, 0, result_data.data(), result_data.size(),
+        IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+
+    if (iree_hal_buffer_view_element_type(query) !=
+            IREE_HAL_ELEMENT_TYPE_FLOAT_16 ||
+        iree_hal_buffer_view_element_type(kv_storage) !=
+            IREE_HAL_ELEMENT_TYPE_FLOAT_16 ||
+        iree_hal_buffer_view_element_type(key_page_table) !=
+            IREE_HAL_ELEMENT_TYPE_INT_64 ||
+        iree_hal_buffer_view_element_type(value_page_table) !=
+            IREE_HAL_ELEMENT_TYPE_INT_64 ||
+        iree_hal_buffer_view_element_type(actual_result) !=
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unexpected paged attention element types");
+    }
+
+    const int64_t pool_pages =
+        kv_bytes / (sizeof(uint16_t) * page_size * head_dim);
+    const uint16_t* query_f16 =
+        reinterpret_cast<const uint16_t*>(query_data.data());
+    const uint16_t* kv_f16 = reinterpret_cast<const uint16_t*>(kv_data.data());
+    const int64_t* key_pages =
+        reinterpret_cast<const int64_t*>(key_table_data.data());
+    const int64_t* value_pages =
+        reinterpret_cast<const int64_t*>(value_table_data.data());
+
+    if (query_bytes != batch * head_dim * sizeof(uint16_t) ||
+        key_table_bytes != batch * num_pages * sizeof(int64_t) ||
+        value_table_bytes != batch * num_pages * sizeof(int64_t) ||
+        result_bytes != batch * head_dim * sizeof(float) || pool_pages <= 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unexpected paged attention buffer sizes");
+    }
+
+    const int64_t sequence_length = num_pages * page_size;
+    std::vector<float> query_f32(batch * head_dim);
+    std::vector<float> key_f32(batch * sequence_length * head_dim);
+    std::vector<float> value_f32(batch * sequence_length * head_dim);
+    std::vector<float> expected(batch * head_dim);
+    for (int64_t b = 0; b < batch; ++b) {
+      for (int64_t d = 0; d < head_dim; ++d) {
+        query_f32[b * head_dim + d] =
+            iree_math_f16_to_f32(query_f16[b * head_dim + d]);
+      }
+      for (int64_t position = 0; position < sequence_length; ++position) {
+        const int64_t logical_page = position / page_size;
+        const int64_t page_offset = position % page_size;
+        const int64_t key_page = key_pages[b * num_pages + logical_page];
+        const int64_t value_page = value_pages[b * num_pages + logical_page];
+        if (key_page < 0 || key_page >= pool_pages || value_page < 0 ||
+            value_page >= pool_pages) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "paged attention page is out of bounds");
+        }
+        for (int64_t d = 0; d < head_dim; ++d) {
+          const int64_t dense_index =
+              (b * sequence_length + position) * head_dim + d;
+          key_f32[dense_index] = iree_math_f16_to_f32(
+              kv_f16[(key_page * page_size + page_offset) * head_dim + d]);
+          value_f32[dense_index] = iree_math_f16_to_f32(
+              kv_f16[(value_page * page_size + page_offset) * head_dim + d]);
+        }
+      }
+    }
+
+    // All spans below point at buffers owned by this function, so this struct
+    // must not be passed to attention_results_deinitialize.
+    attention_results_t results = {};
+    results.b = batch;
+    results.m = 1;
+    results.k1 = head_dim;
+    results.k2 = sequence_length;
+    results.n = head_dim;
+    results.scale = scale;
+    results.query_elem_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
+    results.key_elem_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
+    results.value_elem_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
+    results.result_elem_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
+    results.query_contents =
+        iree_make_byte_span(query_f32.data(), query_f32.size() * sizeof(float));
+    results.key_contents =
+        iree_make_byte_span(key_f32.data(), key_f32.size() * sizeof(float));
+    results.value_contents =
+        iree_make_byte_span(value_f32.data(), value_f32.size() * sizeof(float));
+    results.actual_contents =
+        iree_make_byte_span(result_data.data(), result_data.size());
+    results.expected_contents =
+        iree_make_byte_span(expected.data(), expected.size() * sizeof(float));
+    return check_attention_results(stderr, &results);
+  }
+
   Status CheckAttentionResults(iree_hal_device_t* device, int64_t b, int64_t m,
-                               int64_t k1, int64_t k2, int64_t n,
+                               int64_t k1, int64_t k2, int64_t n, float scale,
                                iree_hal_buffer_view_t* query,
                                iree_hal_buffer_view_t* key,
                                iree_hal_buffer_view_t* value,
@@ -452,7 +687,8 @@ class AttentionTestModuleState final {
     attention_results_t results = {};
     IREE_RETURN_IF_ERROR(attention_results_initialize(
         device, (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
-        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query, key, value, actual_result,
+        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, scale, query, key, value,
+        actual_result,
         nullptr,  // No mask
         host_allocator_, &results));
     iree_status_t status = check_attention_results(stderr, &results);
@@ -460,18 +696,16 @@ class AttentionTestModuleState final {
     return status;
   }
 
-  Status CheckAttentionResultsWithMask(iree_hal_device_t* device, int64_t b,
-                                       int64_t m, int64_t k1, int64_t k2,
-                                       int64_t n, iree_hal_buffer_view_t* query,
-                                       iree_hal_buffer_view_t* key,
-                                       iree_hal_buffer_view_t* value,
-                                       iree_hal_buffer_view_t* mask,
-                                       iree_hal_buffer_view_t* actual_result) {
+  Status CheckAttentionResultsWithMask(
+      iree_hal_device_t* device, int64_t b, int64_t m, int64_t k1, int64_t k2,
+      int64_t n, float scale, iree_hal_buffer_view_t* query,
+      iree_hal_buffer_view_t* key, iree_hal_buffer_view_t* value,
+      iree_hal_buffer_view_t* mask, iree_hal_buffer_view_t* actual_result) {
     attention_results_t results = {};
     IREE_RETURN_IF_ERROR(attention_results_initialize(
         device, (iree_hal_dim_t)b, (iree_hal_dim_t)m, (iree_hal_dim_t)k1,
-        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, query, key, value, actual_result,
-        mask, host_allocator_, &results));
+        (iree_hal_dim_t)k2, (iree_hal_dim_t)n, scale, query, key, value,
+        actual_result, mask, host_allocator_, &results));
     iree_status_t status = check_attention_results(stderr, &results);
     attention_results_deinitialize(&results);
     return status;
@@ -486,6 +720,12 @@ static const vm::NativeFunction<AttentionTestModuleState>
         vm::MakeNativeFunction(
             "generate_random_tensor",
             &AttentionTestModuleState::GenerateRandom3dTensor),
+        vm::MakeNativeFunction(
+            "generate_random_4d_tensor",
+            &AttentionTestModuleState::GenerateRandom4dTensor),
+        vm::MakeNativeFunction(
+            "check_paged_attention_results",
+            &AttentionTestModuleState::CheckPagedAttentionResults),
         vm::MakeNativeFunction(
             "check_attention_results",
             &AttentionTestModuleState::CheckAttentionResults),

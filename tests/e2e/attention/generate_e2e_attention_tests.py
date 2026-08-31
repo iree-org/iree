@@ -9,6 +9,7 @@
 import argparse
 import enum
 import dataclasses
+import struct
 import typing
 import math
 
@@ -80,47 +81,77 @@ class TestShapeAndScale:
     scale: float
 
 
+# Attention is only numerically well conditioned when the Q*K^T scores stay in a
+# reasonable range. With a scale of 1.0 the scores grow with k1, softmax
+# saturates towards one-hot, and near-ties let the device and the host reference
+# select different positions. Use the standard 1/sqrt(k1) scale instead.
+#
+# The value is pre-rounded to f16 because the kernel truncates the scale to f16.
+# Doing the rounding here keeps the host reference on the exact same value
+# without emitting f16 arithmetic into the host-side calls module.
+def default_scale(k1: int) -> float:
+    return struct.unpack("<e", struct.pack("<e", 1.0 / math.sqrt(k1)))[0]
+
+
 # Returns the list of TestShape's to use for the collection of shapes
 # identified by shapes_id.
 def get_test_shapes(shapes_id: ShapesId):
     if shapes_id == ShapesId.SMALL:
         return [
-            TestShapeAndScale(batch=2, m=256, k1=64, k2=32, n=16, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=256, k1=64, k2=32, n=16, scale=default_scale(64)
+            ),
         ]
     if shapes_id == ShapesId.MEDIUM:
         return [
-            TestShapeAndScale(batch=2, m=512, k1=128, k2=64, n=32, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=512, k1=128, k2=64, n=32, scale=default_scale(128)
+            ),
         ]
     if shapes_id == ShapesId.LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1024, k1=128, k2=128, n=64, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=1024, k1=128, k2=128, n=64, scale=default_scale(128)
+            ),
         ]
     # Decode: m = 1 (single token attending to cached KV)
     if shapes_id == ShapesId.DECODE_SMALL:
         return [
-            TestShapeAndScale(batch=2, m=1, k1=128, k2=128, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=1, k1=128, k2=128, n=128, scale=default_scale(128)
+            ),
         ]
     if shapes_id == ShapesId.DECODE_MEDIUM:
         return [
-            TestShapeAndScale(batch=2, m=1, k1=128, k2=2048, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=1, k1=128, k2=2048, n=128, scale=default_scale(128)
+            ),
         ]
     if shapes_id == ShapesId.DECODE_LARGE:
         return [
-            TestShapeAndScale(batch=2, m=1, k1=128, k2=16384, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=1, k1=128, k2=16384, n=128, scale=default_scale(128)
+            ),
         ]
     # Prefill: m = k2 (self-attention on full sequence)
     if shapes_id == ShapesId.PREFILL_SMALL:
         return [
-            TestShapeAndScale(batch=2, m=128, k1=128, k2=128, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=128, k1=128, k2=128, n=128, scale=default_scale(128)
+            ),
         ]
     if shapes_id == ShapesId.PREFILL_MEDIUM:
         return [
-            TestShapeAndScale(batch=2, m=2048, k1=128, k2=2048, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=2048, k1=128, k2=2048, n=128, scale=default_scale(128)
+            ),
         ]
     if shapes_id == ShapesId.PREFILL_LARGE:
         # Currently not used due to time-out.
         return [
-            TestShapeAndScale(batch=2, m=16384, k1=128, k2=16384, n=128, scale=1.0),
+            TestShapeAndScale(
+                batch=2, m=16384, k1=128, k2=16384, n=128, scale=default_scale(128)
+            ),
         ]
 
     raise ValueError(shapes_id)
@@ -393,7 +424,7 @@ def generate_call(
     mask_type: MaskType,
 ):
     global call_id
-    func_name = f"{function.name}_{shapes_scale.batch}_{shapes_scale.m}_{shapes_scale.k1}_{shapes_scale.k2}_{shapes_scale.n}_{shapes_scale.k1}_{shapes_scale.scale}"
+    func_name = f"{function.name}_{shapes_scale.batch}_{shapes_scale.m}_{shapes_scale.k1}_{shapes_scale.k2}_{shapes_scale.n}_{shapes_scale.k1}_{shapes_scale.scale:g}"
     func_name = f"{func_name}_{call_id}"
     call_id = call_id + 1
 
@@ -476,11 +507,11 @@ def generate_call(
         # Export mask as i8 for the reference implementation.
         op = op + (
             f"  %mask_i8_export = hal.tensor.export %mask_i8_reshaped : tensor<{batch}x{m}x{k2}xi8> -> !hal.buffer_view\n"
-            f"  call @attention_test.check_attention_results_with_mask(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %mask_i8_export, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+            f"  call @attention_test.check_attention_results_with_mask(%device, %batch, %m, %k1, %k2, %n, %scale, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %mask_i8_export, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, f32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
         )
     else:
         op = op + (
-            f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+            f"  call @attention_test.check_attention_results(%device, %batch, %m, %k1, %k2, %n, %scale, %queryExtBufferView, %keyExtBufferView, %valueExtBufferView, %resultExtBufferView) : (!hal.device, i64, i64, i64, i64, i64, f32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
         )
 
     op = op + "  return\n"
@@ -606,8 +637,8 @@ def write_calls_file(functions, calls, filename, requirements):
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
         "func.func private @attention_test.generate_random_tensor(%device: !hal.device, %dim0: i64, %dim1: i64, %dim2: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @attention_test.check_attention_results(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %result: !hal.buffer_view)\n"
-        "func.func private @attention_test.check_attention_results_with_mask(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %mask: !hal.buffer_view, %result: !hal.buffer_view)\n"
+        "func.func private @attention_test.check_attention_results(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %scale: f32, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %result: !hal.buffer_view)\n"
+        "func.func private @attention_test.check_attention_results_with_mask(%device: !hal.device, %batch: i64, %m: i64, %k1: i64, %k2: i64, %n: i64, %scale: f32, %query: !hal.buffer_view, %key: !hal.buffer_view, %value: !hal.buffer_view, %mask: !hal.buffer_view, %result: !hal.buffer_view)\n"
         "\n"
     )
 
