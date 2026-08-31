@@ -52,23 +52,23 @@
 /compiler/src/iree/compiler/Codegen/Common @AGindinson @egebeysel @phemashekar
 /compiler/src/iree/compiler/Codegen/**/*Vector* @Groverkss @hanhanW @sommerlukas
 /compiler/src/iree/compiler/Codegen/Common/GPU @AGindinson @egebeysel @ziereis
-/compiler/src/iree/compiler/Codegen/Dialect/CPU @AGindinson @egebeysel @hanhanW
+/compiler/src/iree/compiler/Codegen/Dialect/CPU @AGindinson @egebeysel @Manewing @hanhanW
 /compiler/src/iree/compiler/Codegen/Dialect/GPU @AGindinson @egebeysel @Groverkss @krzysz00
-/compiler/src/iree/compiler/Codegen/LLVMCPU/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/Codegen/LLVMCPU/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
 /compiler/src/iree/compiler/Codegen/LLVMGPU/ @AGindinson @egebeysel @Groverkss @krzysz00 @ziereis
 /compiler/src/iree/compiler/Codegen/SPIRV/ @AGindinson @devtbi @egebeysel
 /compiler/src/iree/compiler/ConstEval/ @AGindinson @jschuhmacher @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/Encoding/ @egebeysel @hanhanW @jschuhmacher @phemashekar
-/compiler/src/iree/compiler/Dialect/Flow/ @devtbi @jschuhmacher @mbknust @ziereis
+/compiler/src/iree/compiler/Dialect/Flow/ @devtbi @jschuhmacher @Manewing @mbknust @ziereis
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @AGindinson @egebeysel @jschuhmacher @ziereis
-/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @devtbi @ziereis
+/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @devtbi @Manewing @ziereis
 /compiler/src/iree/compiler/Dialect/TensorExt/ @devtbi @egebeysel @ziereis
 /compiler/src/iree/compiler/Dialect/Vulkan/ @AGindinson @devtbi
 /compiler/src/iree/compiler/DispatchCreation/ @AGindinson @egebeysel @phemashekar @ziereis
 /compiler/src/iree/compiler/GlobalOptimization/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
-/compiler/src/iree/compiler/InputConversion/ @AGindinson @jschuhmacher
-/compiler/src/iree/compiler/Pipelines/ @benvanik @jschuhmacher
-/compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/InputConversion/ @AGindinson @jschuhmacher @Manewing
+/compiler/src/iree/compiler/Pipelines/ @benvanik @jschuhmacher @Manewing
+/compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
 
 # Compiler Plugins
 /compiler/plugins/input/StableHLO/ @jschuhmacher @maxbartel
