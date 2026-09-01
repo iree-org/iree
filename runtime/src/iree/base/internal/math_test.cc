@@ -1085,19 +1085,19 @@ TEST(F8E8M0FNUConversionTest, F8E8M0FNUToF32) {
 //==============================================================================
 
 TEST(FPowITests, iree_math_float_powi_i64) {
-  EXPECT_EQ(1.0f, iree_math_float_powi_i64(12.0f, 0));
-  EXPECT_EQ(1.0f, iree_math_float_powi_i64(1.0f, 4));
-  EXPECT_EQ(27.0f, iree_math_float_powi_i64(3.0f, 3));
-  EXPECT_EQ(0.25f, iree_math_float_powi_i64(2.0f, -2));
+  EXPECT_FLOAT_EQ(1.0f, iree_math_float_powi_i64(12.0f, 0));
+  EXPECT_FLOAT_EQ(1.0f, iree_math_float_powi_i64(1.0f, 4));
+  EXPECT_FLOAT_EQ(27.0f, iree_math_float_powi_i64(3.0f, 3));
+  EXPECT_FLOAT_EQ(0.25f, iree_math_float_powi_i64(2.0f, -2));
   // No testcase for if iree_math_float_powi_i64 correctly behaves for
   // exp = -2 ^ 63, since the resulting value is too large.
 }
 
 TEST(FPowITests, iree_math_double_powi_i64) {
-  EXPECT_EQ((double)1.0, iree_math_float_powi_i64((double)12.0, 0));
-  EXPECT_EQ((double)1.0, iree_math_float_powi_i64((double)1.0, 4));
-  EXPECT_EQ((double)27.0, iree_math_float_powi_i64((double)3.0, 3));
-  EXPECT_EQ((double)0.25, iree_math_float_powi_i64((double)2.0, -2));
+  EXPECT_DOUBLE_EQ(1.0, iree_math_double_powi_i64(12.0, 0));
+  EXPECT_DOUBLE_EQ(1.0, iree_math_double_powi_i64(1.0, 4));
+  EXPECT_DOUBLE_EQ(27.0, iree_math_double_powi_i64(3.0, 3));
+  EXPECT_DOUBLE_EQ(0.25, iree_math_double_powi_i64(2.0, -2));
   // No testcase for if iree_math_double_powi_i64 correctly behaves for
   // exp = -2 ^ 63, since the resulting value is too large.
 }
