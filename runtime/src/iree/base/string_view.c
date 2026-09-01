@@ -182,14 +182,14 @@ iree_string_view_trim(iree_string_view_t value) {
   iree_host_size_t start = 0;
   iree_host_size_t end = value.size - 1;
   while (value.size > 0 && start <= end) {
-    if (isspace(value.data[start])) {
+    if (isspace((unsigned char)value.data[start])) {
       start++;
     } else {
       break;
     }
   }
   while (end > start) {
-    if (isspace(value.data[end])) {
+    if (isspace((unsigned char)value.data[end])) {
       --end;
     } else {
       break;
