@@ -167,7 +167,7 @@ bool llvm::cl::parser<TargetRegistryRef>::parse(Option &O, StringRef ArgName,
   // of target backends and create a new registry with just that subset but
   // ownership gets tricky.
   if (Arg != "global") {
-    llvm::errs() << "Cannot parse target registery: " << Arg
+    llvm::errs() << "Cannot parse target registry: " << Arg
                  << ". Defaulting to global.\n";
   }
   Val.value = &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
