@@ -6,21 +6,15 @@
 
 """C++ provider transforms for the renamed IREE compiler ABI.
 
-The compiler library renames every llvm/mlir C++ symbol to an IREE-private
-Itanium name before link (see gen_rename_map.py). Consumers that compile their
-own llvm/mlir-referencing objects and link against that library must apply the
-same rename to their own static archives, including undefined references into
-libIREECompiler.
+The compiler library renames every llvm/mlir C++ symbol before link (see
+gen_rename_map.py), so anything linking against it must rename to match,
+undefined references included.
 
-This file keeps Bazel's C++ provider graph intact. It declares rewritten
-archive outputs for selected LibraryToLink entries and recreates the
-corresponding provider values with cc_common.create_library_to_link. The
-original inputs are never mutated, and the actions use structured args instead
-of shell command strings.
+Rewritten archives are declared as new provider values rather than mutating the
+inputs, keeping Bazel's C++ provider graph intact.
 
-The public entry point for external compiler plugins is
-renamed_compiler_plugin. The lower-level ABI target and CcInfo transform remain
-small enough to test or reuse independently.
+External plugins want iree_compiler_register_dynamic_plugin. The ABI target and
+CcInfo transform stay separate so each can be tested alone.
 """
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
@@ -42,18 +36,15 @@ def _provided_by_compiler(owner):
     if "llvm-project" in workspace_name or "llvm-project" in owner_text:
         return True
 
-    # libbacktrace is in the compiler dylib closure and exports plain C symbols.
-    # Let consumers resolve those from libIREECompiler instead of force-loading
-    # their own copy of every platform backend.
+    # libbacktrace is already in the dylib and exports plain C, so let consumers
+    # resolve it there rather than carry every platform backend themselves.
     if "libbacktrace" in workspace_name or "libbacktrace" in owner_text:
         return True
 
-    # External consumers see this module as @iree_core (WORKSPACE mode) or
-    # under a bzlmod canonical name such as @@+_repo_rules+iree_core. The
-    # empty main-workspace name is deliberately NOT matched: in a plugin
-    # repository the main workspace is the plugin itself, whose archives must
-    # be renamed rather than skipped. In-repo consumers bypass this predicate
-    # with include_provided.
+    # External consumers see this module as @iree_core, or a bzlmod canonical
+    # name. The empty main-workspace name must not match: in a plugin repo that
+    # is the plugin, whose archives need renaming. In-repo callers pass
+    # include_provided instead.
     if workspace_name == "iree_core":
         return True
     return _bzlmod_repo_name_matches(workspace_name, "iree_core") or \
@@ -194,8 +185,7 @@ def _rename_library_to_link(
     object_static_library = None
     object_pic_static_library = None
 
-    # Static archives can be renamed directly. Bare object lists first become a
-    # deterministic archive because llvm-objcopy consumes one input file.
+    # llvm-objcopy takes one file, so bare object lists are archived first.
     if library.static_library:
         static_library = _rename_archive(
             ctx,
@@ -231,7 +221,7 @@ def _rename_library_to_link(
             defined_only,
         )
 
-    # Dynamic-only inputs do not need symbol rewriting.
+    # Nothing to rewrite.
     renamed_files = [
         f
         for f in [
@@ -247,17 +237,14 @@ def _rename_library_to_link(
 
     alwayslink = force_alwayslink or library.alwayslink
 
-    # For libraries Bazel built itself, LibraryToLink.dynamic_library is the
-    # mangled _solib_ symlink, and create_library_to_link rejects solib paths
-    # because it performs that mangling on its input. Hand it the resolved
-    # original so the recreated entry round-trips through the same mangling.
+    # create_library_to_link mangles its input, so it rejects the _solib_ symlink
+    # Bazel already mangled. Give it the original.
     dynamic_library = library.resolved_symlink_dynamic_library or library.dynamic_library
     interface_library = library.resolved_symlink_interface_library or library.interface_library
 
     libraries = []
 
-    # Preserve the original static/dynamic shape when recreating the linker
-    # input. Bare object lists are emitted as a second archive-backed entry.
+    # Recreate the same static/dynamic shape the input had.
     if (
         static_library != None or
         pic_static_library != None or
@@ -284,9 +271,8 @@ def _rename_library_to_link(
     return libraries, renamed_files
 
 def _renamed_cc_info_impl(ctx):
-    # Most callers take the prefix from the compiler ABI target so plugins and
-    # libIREECompiler agree. The explicit attr keeps the low-level transform
-    # usable on its own in tests or standalone BUILD wiring.
+    # Normally taken from the ABI target so plugins and the compiler agree. The
+    # attr keeps this usable alone, in tests or standalone wiring.
     symbol_prefix = ctx.attr.symbol_prefix
     if ctx.attr.compiler:
         symbol_prefix = ctx.attr.compiler[RenamedCompilerAbiInfo].symbol_prefix
@@ -312,8 +298,7 @@ def _renamed_cc_info_impl(ctx):
             if owner_label in excluded_owners:
                 continue
 
-            # direct_only is for plugin-local leaf deps. Their transitive MLIR
-            # dependencies should still resolve from the compiler dylib.
+            # Leaf deps only; their MLIR closure still comes from the dylib.
             if ctx.attr.direct_only and owner_label not in direct_owners:
                 continue
 
@@ -324,8 +309,7 @@ def _renamed_cc_info_impl(ctx):
             for library in linker_input.libraries:
                 library_id = _library_identity(library)
 
-                # None means the LibraryToLink carries only flags or additional
-                # inputs. Keep processing so those fields are preserved below.
+                # Flags-only entry. Keep going so those fields survive.
                 if library_id != None:
                     if library_id in seen_libraries:
                         continue
@@ -365,7 +349,7 @@ renamed_cc_info = rule(
     implementation = _renamed_cc_info_impl,
     doc = (
         "Low-level CcInfo transform that rewrites selected static archives to " +
-        "the IREE compiler ABI. Prefer renamed_compiler_plugin for plugin BUILD files."
+        "the IREE compiler ABI. Prefer iree_compiler_register_dynamic_plugin for plugin BUILD files."
     ),
     attrs = {
         "deps": attr.label_list(providers = [CcInfo], default = []),
@@ -444,21 +428,24 @@ iree_renamed_compiler_abi = rule(
     toolchains = use_cpp_toolchain(),
 )
 
-def renamed_compiler_plugin(name, deps, compiler, extra_deps = [], linkopts = [], **kwargs):
-    """Builds a compiler plugin whose static archives use the compiler ABI.
+def iree_compiler_register_dynamic_plugin(plugin_id, target, compiler, extra_deps = [], linkopts = [], **kwargs):
+    """Builds a compiler plugin, by id, against the renamed compiler ABI.
 
-    deps are the plugin-owned registration/codegen libraries. They are
-    whole-archive linked because plugin entry points and registration hooks are
-    found by dlopen/dlsym/static initialization, not by ordinary references from
-    the final link.
+    The dynamic counterpart of iree_compiler_register_plugin. Spelled the same
+    in both build systems so bazel_to_cmake can carry a declaration across.
 
-    extra_deps are plugin-local MLIR leaf archives that libIREECompiler does not
-    provide. They are linked into the plugin with the same symbol rename, while
-    their transitive LLVM/MLIR/IREE closure still resolves from libIREECompiler.
+    target is whole-archive linked: entry points are found by dlsym, not by
+    references from the link.
+
+    extra_deps are plugin-local MLIR archives libIREECompiler lacks. CMake
+    cannot express them, so such a plugin will not convert.
     """
+
+    # Same module name CMake emits.
+    name = "iree_compiler_plugin_" + plugin_id
     renamed_cc_info(
         name = name + "_renamed_deps",
-        deps = deps,
+        deps = [target],
         compiler = compiler,
         force_alwayslink = True,
     )
