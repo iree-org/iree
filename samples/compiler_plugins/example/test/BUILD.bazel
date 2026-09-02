@@ -1,0 +1,47 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = ["static_link.mlir"],
+    cfg = "//samples:lit.cfg.py",
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+# samples/lit.cfg.py gates the iree_dynamic_plugins feature on this variable.
+#
+# Manual until //tools link //lib:IREECompiler: they link the un-renamed static
+# compiler, which a renamed plugin cannot resolve against. CMake links the
+# shared library and runs this test.
+iree_lit_test_suite(
+    name = "lit_dynamic",
+    srcs = ["dynamic_link.mlir"],
+    cfg = "//samples:lit.cfg.py",
+    data = ["//samples/compiler_plugins/example:iree_compiler_plugin_example_dyn"],
+    env = {
+        "IREE_EXAMPLE_DYN_PLUGIN": "$(rootpath //samples/compiler_plugins/example:iree_compiler_plugin_example_dyn)",
+    },
+    tags = ["manual"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)

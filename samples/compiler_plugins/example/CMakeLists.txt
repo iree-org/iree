@@ -38,29 +38,25 @@ iree_compiler_register_plugin(
     ::registration
 )
 
+iree_cc_library(
+  NAME
+    registration_dyn
+  SRCS
+    "src/PluginRegistration.cpp"
+  DEPS
+    ::defs
+    MLIRIR
+    iree::compiler::PluginAPI
+  DEFINES
+    "IREE_EXAMPLE_PLUGIN_ID=example_dyn"
+  PUBLIC
+)
+
+iree_compiler_register_dynamic_plugin(
+  PLUGIN_ID
+    example_dyn
+  TARGET
+    ::registration_dyn
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-# The same source again as a loadable module, so both link modes can be tested.
-# The id must differ; see src/PluginRegistration.cpp.
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
-  iree_cc_library(
-    NAME
-      registration_dyn
-    SRCS
-      "src/PluginRegistration.cpp"
-    COPTS
-      "-DIREE_EXAMPLE_PLUGIN_ID=example_dyn"
-    DEPS
-      ::defs
-      MLIRIR
-      iree::compiler::PluginAPI
-    PUBLIC
-  )
-
-  iree_compiler_register_dynamic_plugin(
-    PLUGIN_ID
-      example_dyn
-    TARGET
-      ::registration_dyn
-  )
-endif()

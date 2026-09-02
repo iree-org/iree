@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Hand-written: the dynamic half has no Bazel counterpart yet.
+# Hand-written: bazel_to_cmake cannot express the test environment below.
 
 iree_lit_test_suite(
   NAME

@@ -30,8 +30,19 @@ config.environment.update(
     }
 )
 
-# Set by CMake only when the loadable example plugin was built.
-if config.environment.get("IREE_EXAMPLE_DYN_PLUGIN"):
+# Set by CMake, absolute, or by Bazel, relative to the runfiles root.
+_dyn_plugin = config.environment.get("IREE_EXAMPLE_DYN_PLUGIN")
+if _dyn_plugin and not os.path.isabs(_dyn_plugin):
+    _srcdir = os.environ.get("TEST_SRCDIR", "")
+    for _root in [_srcdir, os.path.join(_srcdir, "_main"), os.getcwd()]:
+        _candidate = os.path.join(_root, _dyn_plugin)
+        if os.path.exists(_candidate):
+            _dyn_plugin = os.path.abspath(_candidate)
+            config.environment["IREE_EXAMPLE_DYN_PLUGIN"] = _dyn_plugin
+            break
+    else:
+        _dyn_plugin = None
+if _dyn_plugin:
     config.available_features.add("iree_dynamic_plugins")
 
 # Use the most preferred temp directory.

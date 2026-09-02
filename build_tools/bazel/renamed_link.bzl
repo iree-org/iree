@@ -29,7 +29,7 @@ def _bzlmod_repo_name_matches(workspace_name, repo_name):
         workspace_name.endswith("~" + repo_name)
     )
 
-def _provided_by_compiler(owner):
+def _provided_by_compiler(owner, compiler_workspace_name):
     workspace_name = owner.workspace_name
     owner_text = str(owner)
 
@@ -41,10 +41,16 @@ def _provided_by_compiler(owner):
     if "libbacktrace" in workspace_name or "libbacktrace" in owner_text:
         return True
 
-    # External consumers see this module as @iree_core, or a bzlmod canonical
-    # name. The empty main-workspace name must not match: in a plugin repo that
-    # is the plugin, whose archives need renaming. In-repo callers pass
-    # include_provided instead.
+    # Whatever repository the compiler target came from is inside the dylib
+    # already. In-tree that is the main workspace; from a plugin repository it
+    # is @iree_core, and there the plugin's own main-workspace archives still
+    # need renaming. The caller keeps its direct deps regardless, so an in-tree
+    # plugin sharing the main workspace with the compiler is not mistaken for
+    # part of it.
+    if compiler_workspace_name != None and workspace_name == compiler_workspace_name:
+        return True
+
+    # Fallbacks for a consumer that names no compiler target.
     if workspace_name == "iree_core":
         return True
     return _bzlmod_repo_name_matches(workspace_name, "iree_core") or \
@@ -274,8 +280,10 @@ def _renamed_cc_info_impl(ctx):
     # Normally taken from the ABI target so plugins and the compiler agree. The
     # attr keeps this usable alone, in tests or standalone wiring.
     symbol_prefix = ctx.attr.symbol_prefix
+    compiler_workspace_name = None
     if ctx.attr.compiler:
         symbol_prefix = ctx.attr.compiler[RenamedCompilerAbiInfo].symbol_prefix
+        compiler_workspace_name = ctx.attr.compiler.label.workspace_name
     cc_toolchain = find_cpp_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -302,7 +310,11 @@ def _renamed_cc_info_impl(ctx):
             if ctx.attr.direct_only and owner_label not in direct_owners:
                 continue
 
-            if not ctx.attr.include_provided and _provided_by_compiler(owner):
+            # Direct deps are the plugin's own code, renamed even when they
+            # share a repository with the compiler.
+            if (not ctx.attr.include_provided and
+                owner_label not in direct_owners and
+                _provided_by_compiler(owner, compiler_workspace_name)):
                 continue
 
             libraries = []
@@ -449,10 +461,12 @@ def iree_compiler_register_dynamic_plugin(plugin_id, target, compiler, extra_dep
         compiler = compiler,
         force_alwayslink = True,
     )
-    plugin_deps = [
-        ":" + name + "_renamed_deps",
-        compiler,
-    ]
+
+    # The compiler is not linked in, only renamed against: its symbols stay
+    # undefined and resolve from whichever host dlopens the plugin. Linking it
+    # would give the plugin a second copy of the compiler, and with it a second
+    # llvm::cl registry the host never parses.
+    plugin_deps = [":" + name + "_renamed_deps"]
     if extra_deps:
         renamed_cc_info(
             name = name + "_renamed_extra_deps",
@@ -467,7 +481,11 @@ def iree_compiler_register_dynamic_plugin(plugin_id, target, compiler, extra_dep
         name = name,
         srcs = [],
         linkshared = True,
-        linkopts = linkopts,
+        linkopts = linkopts + select({
+            # ELF leaves undefined symbols alone; ld64 has to be told.
+            "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+            "//conditions:default": [],
+        }),
         deps = plugin_deps,
         **kwargs
     )
