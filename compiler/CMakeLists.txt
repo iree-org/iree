@@ -51,6 +51,11 @@ if(IREE_BUILD_COMPILER)
     PLUGIN_CMAKE_FILE
       "iree_compiler_plugin.cmake"
   )
+  if(IREE_COMPILER_DYNAMIC_PLUGINS)
+    message(STATUS "Dynamically loaded compiler plugins enabled (renamed LLVM/MLIR ABI)")
+  else()
+    message(STATUS "Dynamically loaded compiler plugins disabled (IREE_COMPILER_DYNAMIC_PLUGINS=OFF)")
+  endif()
   add_subdirectory(src)
 
   # Reset BUILD_SHARED_LIBS.

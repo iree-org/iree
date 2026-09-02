@@ -130,3 +130,94 @@ function(iree_include_cmake_plugin_dirs)
   message(STATUS "Configuring IREE ${_RULE_LOG_LABEL} plugins")
   add_subdirectory("${_RULE_BINARY_DIR}" "${_RULE_BINARY_DIR}")
 endfunction()
+
+# iree_compiler_register_dynamic_plugin()
+# Within a plugin package, builds the plugin by id as a loadable module whose
+# objects use the renamed compiler ABI, associating it with a registration
+# target. The dynamic counterpart of iree_compiler_register_plugin: the static
+# form hands the registration target to the compiler link, this one links it
+# into a module the compiler dlopens.
+#
+# The objects are whole-archive linked because the registration entry point is
+# found by dlsym, not by references from the final link. The registration
+# target's own dependencies are deliberately not linked in: those references
+# stay undefined and resolve from libIREECompiler in the host process.
+#
+# Args:
+#  PACKAGE: Package namespace override, as iree_compiler_register_plugin.
+#  PLUGIN_ID: Id the plugin registers itself under. Also names the module,
+#      as libiree_compiler_plugin_${PLUGIN_ID}.so.
+#  TARGET: The registration target.
+function(iree_compiler_register_dynamic_plugin)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "PACKAGE;PLUGIN_ID;TARGET"
+    ""
+    ${ARGN}
+  )
+
+  if(NOT IREE_COMPILER_DYNAMIC_PLUGINS)
+    return()
+  endif()
+  include(iree_renamed_link)
+
+  if(_RULE_PACKAGE)
+    set(_PACKAGE_NS "${_RULE_PACKAGE}")
+  else()
+    iree_package_ns(_PACKAGE_NS)
+  endif()
+
+  # Replace target passed by ::name with iree::package::name
+  list(TRANSFORM _RULE_TARGET REPLACE "^::" "${_PACKAGE_NS}::")
+
+  # The rename consumes objects, so reach through the alias to the object
+  # library iree_cc_library compiles them into. Header-only (INTERFACE)
+  # libraries have none and cannot carry a plugin.
+  get_target_property(_ALIASED_TARGET "${_RULE_TARGET}" ALIASED_TARGET)
+  if(_ALIASED_TARGET)
+    set(_TARGET_NAME "${_ALIASED_TARGET}")
+  else()
+    set(_TARGET_NAME "${_RULE_TARGET}")
+  endif()
+  set(_OBJECTS_NAME "${_TARGET_NAME}.objects")
+  if(NOT TARGET "${_OBJECTS_NAME}")
+    message(SEND_ERROR
+        "iree_compiler_register_dynamic_plugin: '${_RULE_TARGET}' has no compiled "
+        "objects (header-only libraries cannot carry a plugin)")
+    return()
+  endif()
+
+  message(STATUS "Registering dynamic compiler plugin '${_RULE_PLUGIN_ID}' (${_RULE_TARGET})")
+
+  set(_NAME "iree_compiler_plugin_${_RULE_PLUGIN_ID}")
+  iree_renamed_link_sanitize_name("${_NAME}" _BASE)
+  iree_renamed_archive_from_objects(_RENAMED
+    NAME
+      "${_BASE}"
+    TARGET
+      "${_OBJECTS_NAME}"
+  )
+
+  # MODULE libraries need at least one source; the payload arrives via
+  # whole-archive linking of the renamed archive.
+  set(_STUB "${CMAKE_CURRENT_BINARY_DIR}/${_NAME}_stub.c")
+  if(NOT EXISTS "${_STUB}")
+    file(WRITE "${_STUB}" "// Empty stub; content comes from the renamed archive.\n")
+  endif()
+  add_library(${_NAME} MODULE "${_STUB}")
+  if(APPLE)
+    target_link_options(${_NAME} PRIVATE
+      "-Wl,-force_load,${_RENAMED}"
+      "-Wl,-undefined,dynamic_lookup"
+    )
+  else()
+    # -shared leaves undefined symbols unresolved by default on ELF.
+    target_link_options(${_NAME} PRIVATE
+      "-Wl,--whole-archive" "${_RENAMED}" "-Wl,--no-whole-archive"
+    )
+  endif()
+  add_custom_target(${_NAME}_renamed_deps DEPENDS "${_RENAMED}")
+  add_dependencies(${_NAME} ${_NAME}_renamed_deps)
+  set_target_properties(${_NAME} PROPERTIES LINK_DEPENDS "${_RENAMED}")
+endfunction()

@@ -20,18 +20,28 @@ iree_lit_test_suite(
 # symbols only loads if libIREECompiler exports them under the renamed
 # spelling and the plugin archive was renamed to match.
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
-  include(iree_renamed_link)
-  iree_compiler_dynamic_plugin(
+  iree_cc_library(
     NAME
-      iree_compiler_PluginAPI_test_dynamic_plugin
+      dynamic_plugin
     SRCS
-      dynamic_plugin.cpp
+      "dynamic_plugin.cpp"
+    DEPS
+      MLIRIR
+    PUBLIC
   )
+
+  iree_compiler_register_dynamic_plugin(
+    PLUGIN_ID
+      dynamic_test_plugin
+    TARGET
+      ::dynamic_plugin
+  )
+
   add_test(
     NAME iree/compiler/PluginAPI/test/dynamic_plugin_load
     COMMAND
       iree-opt
-      "--iree-load-plugin=dynamic_test_plugin=$<TARGET_FILE:iree_compiler_PluginAPI_test_dynamic_plugin>"
+      "--iree-load-plugin=dynamic_test_plugin=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>"
       --help
   )
   set_tests_properties(iree/compiler/PluginAPI/test/dynamic_plugin_load

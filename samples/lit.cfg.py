@@ -30,6 +30,11 @@ config.environment.update(
     }
 )
 
+# The example plugin's loadable build only exists when the compiler was
+# configured with IREE_COMPILER_DYNAMIC_PLUGINS; CMake passes its path in.
+if config.environment.get("IREE_EXAMPLE_DYN_PLUGIN"):
+    config.available_features.add("iree_dynamic_plugins")
+
 # Use the most preferred temp directory.
 config.test_exec_root = (
     os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")

@@ -24,6 +24,22 @@ function(iree_renamed_link_sanitize_name VALUE OUT_VAR)
   set(${OUT_VAR} "${_result}" PARENT_SCOPE)
 endfunction()
 
+# Evaluates $<BOOL:...> by its own rules: false only for the empty string and
+# CMake's false constants, so a path is true. if() cannot stand in for this -
+# under CMP0054 a quoted argument that is not a known constant is false, which
+# would invert exactly the paths LLVM guards its link flags with.
+function(iree_renamed_link_genex_bool VALUE OUT_VAR)
+  string(TOUPPER "${VALUE}" _upper)
+  if(_upper STREQUAL "" OR _upper STREQUAL "0" OR _upper STREQUAL "FALSE"
+     OR _upper STREQUAL "OFF" OR _upper STREQUAL "N" OR _upper STREQUAL "NO"
+     OR _upper STREQUAL "IGNORE" OR _upper STREQUAL "NOTFOUND"
+     OR _upper MATCHES "-NOTFOUND$")
+    set(${OUT_VAR} FALSE PARENT_SCOPE)
+  else()
+    set(${OUT_VAR} TRUE PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Rewrites one static archive to the renamed ABI.
 #
 # Parameters:
@@ -147,6 +163,19 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
       list(APPEND _worklist "${CMAKE_MATCH_1}")
       continue()
     endif()
+    # LLVM guards platform link flags with $<$<BOOL:probe>:-lfoo>, where the
+    # probe is already a literal here (a found library path, or empty when the
+    # platform does not apply). Decide it now: an empty condition contributes
+    # nothing and is not worth warning about.
+    if(_item MATCHES "^\\$<\\$<BOOL:(.*)>:(.*)>$")
+      set(_bool_cond "${CMAKE_MATCH_1}")
+      set(_bool_value "${CMAKE_MATCH_2}")
+      iree_renamed_link_genex_bool("${_bool_cond}" _bool_true)
+      if(_bool_true)
+        list(APPEND _worklist "${_bool_value}")
+      endif()
+      continue()
+    endif()
     if(_item MATCHES "^\\$<")
       # An unevaluated generator expression on the link line corrupts the
       # generated build files; dropping it surfaces as an undefined-symbol
@@ -266,62 +295,4 @@ function(iree_renamed_shared_impl_finalize)
   set_property(TARGET ${_target} APPEND PROPERTY
     LINK_DEPENDS ${_whole_archives} ${_closure_archives}
   )
-endfunction()
-
-# Builds a dynamically loadable compiler plugin whose static archive uses the
-# renamed compiler ABI, mirroring the Bazel renamed_compiler_plugin macro.
-#
-# The plugin's objects are whole-archive linked because the registration entry
-# point is found by dlsym, not by references from the final link. Undefined
-# llvm/mlir/IREE references stay undefined and resolve from libIREECompiler in
-# the host process at dlopen time.
-#
-# Parameters:
-#   NAME: plugin target name (output is lib<NAME>.so / lib<NAME>.dylib layout
-#     of a MODULE library).
-#   SRCS: plugin sources.
-#   DEPS: targets consumed for usage requirements (include dirs, defines)
-#     only; nothing is linked into the plugin.
-#   COPTS: extra compile options.
-function(iree_compiler_dynamic_plugin)
-  cmake_parse_arguments(_RULE "" "NAME" "SRCS;DEPS;COPTS" ${ARGN})
-  set(_objects ${_RULE_NAME}_objects)
-  add_library(${_objects} OBJECT ${_RULE_SRCS})
-  if(_RULE_DEPS)
-    target_link_libraries(${_objects} PRIVATE ${_RULE_DEPS})
-  endif()
-  # Must match the flags the compiler ABI was built with.
-  target_compile_options(${_objects} PRIVATE
-    "$<$<COMPILE_LANGUAGE:CXX>:-fno-rtti;-fno-exceptions>"
-    ${_RULE_COPTS}
-  )
-  set_target_properties(${_objects} PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-  iree_renamed_link_sanitize_name("${_RULE_NAME}" _base)
-  iree_renamed_archive_from_objects(_renamed
-    NAME "${_base}"
-    TARGET ${_objects}
-  )
-
-  # MODULE libraries need at least one source; the payload arrives via
-  # whole-archive linking of the renamed archive.
-  set(_stub "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_stub.c")
-  if(NOT EXISTS "${_stub}")
-    file(WRITE "${_stub}" "// Empty stub; content comes from the renamed archive.\n")
-  endif()
-  add_library(${_RULE_NAME} MODULE "${_stub}")
-  if(APPLE)
-    target_link_options(${_RULE_NAME} PRIVATE
-      "-Wl,-force_load,${_renamed}"
-      "-Wl,-undefined,dynamic_lookup"
-    )
-  else()
-    # -shared leaves undefined symbols unresolved by default on ELF.
-    target_link_options(${_RULE_NAME} PRIVATE
-      "-Wl,--whole-archive" "${_renamed}" "-Wl,--no-whole-archive"
-    )
-  endif()
-  add_custom_target(${_RULE_NAME}_renamed_deps DEPENDS "${_renamed}")
-  add_dependencies(${_RULE_NAME} ${_RULE_NAME}_renamed_deps)
-  set_target_properties(${_RULE_NAME} PROPERTIES LINK_DEPENDS "${_renamed}")
 endfunction()

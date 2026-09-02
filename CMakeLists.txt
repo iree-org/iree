@@ -572,6 +572,14 @@ if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
       "be unloaded before Tracy finishes, static linking is one workaround)")
 endif()
 
+if(IREE_ENABLE_THIN_ARCHIVES AND IREE_COMPILER_DYNAMIC_PLUGINS)
+  message(SEND_ERROR
+      "IREE_COMPILER_DYNAMIC_PLUGINS requires -DIREE_ENABLE_THIN_ARCHIVES=OFF "
+      "(the symbol rename runs llvm-objcopy over every archive; on a thin "
+      "archive it cannot resolve the member objects, and the archive it "
+      "writes carries member paths relative to the wrong directory)")
+endif()
+
 option(IREE_ENABLE_CCACHE
     "[DEPRECATED: Use CMAKE_<LANG>_COMPILER_LAUNCHER configure options or environment variables instead.] Use ccache if installed."
     OFF)

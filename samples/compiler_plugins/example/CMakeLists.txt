@@ -39,3 +39,30 @@ iree_compiler_register_plugin(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# A second build of the same source as a loadable module, so the plugin can be
+# tested both statically linked and dynamically loaded. It needs a distinct id
+# because both copies are registered in one process; see
+# src/PluginRegistration.cpp.
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+  iree_cc_library(
+    NAME
+      registration_dyn
+    SRCS
+      "src/PluginRegistration.cpp"
+    COPTS
+      "-DIREE_EXAMPLE_PLUGIN_ID=example_dyn"
+    DEPS
+      ::defs
+      MLIRIR
+      iree::compiler::PluginAPI
+    PUBLIC
+  )
+
+  iree_compiler_register_dynamic_plugin(
+    PLUGIN_ID
+      example_dyn
+    TARGET
+      ::registration_dyn
+  )
+endif()

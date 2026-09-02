@@ -206,6 +206,14 @@ set_target_properties(iree_compiler_API_SharedImpl PROPERTIES
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
   include(iree_renamed_link)
 
+  # The renamed payload arrives as archive paths on the link line rather than
+  # as sources or link targets, so CMake only ever sees empty.c and would pick
+  # the C driver, which does not link libstdc++. The non-renamed branch below
+  # gets CXX inferred from the object sources it adds.
+  set_target_properties(iree_compiler_API_SharedImpl PROPERTIES
+    LINKER_LANGUAGE CXX
+  )
+
   # The renamed link assembly needs the transitive closure of these object
   # libraries, and most of the compiler tree is not configured yet when this
   # directory is processed (the non-renamed branch below defers the same

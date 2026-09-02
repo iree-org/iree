@@ -207,7 +207,7 @@ void DynamicPluginRegistry::loadPluginPathsFromEnv() {
   }
 }
 
-PluginManager::PluginManager() {}
+PluginManager::PluginManager() = default;
 
 bool PluginManager::loadAvailablePlugins() {
 // Initialize static plugins.
