@@ -5120,6 +5120,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
   ADD_GENERIC_PATTERN(IREE::VM::OrI32Op, "vm_or_i32");
   ADD_GENERIC_PATTERN(IREE::VM::OrI64Op, "vm_or_i64");
   ADD_GENERIC_PATTERN(IREE::VM::PowF32Op, "vm_pow_f32");
+  ADD_GENERIC_PATTERN(IREE::VM::FPowI32Op, "vm_fpowi_f32");
   ADD_GENERIC_PATTERN(IREE::VM::RemF32Op, "vm_rem_f32");
   ADD_GENERIC_PATTERN(IREE::VM::RemI32SOp, "vm_rem_i32s");
   ADD_GENERIC_PATTERN(IREE::VM::RemI32UOp, "vm_rem_i32u");
