@@ -6,12 +6,12 @@
 // for the linked copy. CMake passes the module path in IREE_EXAMPLE_DYN_PLUGIN.
 
 // Loaded via the command line flag.
-// RUN: iree-compile --iree-load-plugin=example_dyn=$IREE_EXAMPLE_DYN_PLUGIN \
+// RUN: iree-compile --iree-load-plugin=$IREE_EXAMPLE_DYN_PLUGIN \
 // RUN:   --iree-plugin=example_dyn --iree-example_dyn-flag \
 // RUN:   --compile-to=input %s 2>&1 | FileCheck %s
 
 // Loaded via the environment variable.
-// RUN: IREE_LOAD_PLUGINS=example_dyn=$IREE_EXAMPLE_DYN_PLUGIN \
+// RUN: IREE_LOAD_PLUGINS=$IREE_EXAMPLE_DYN_PLUGIN \
 // RUN:   iree-compile --iree-plugin=example_dyn --iree-example_dyn-flag \
 // RUN:   --compile-to=input %s 2>&1 | FileCheck %s
 

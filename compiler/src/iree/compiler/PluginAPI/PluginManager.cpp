@@ -6,7 +6,10 @@
 
 #include "iree/compiler/PluginAPI/PluginManager.h"
 
+#include <string>
 #include <utility>
+
+#include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
@@ -52,9 +55,8 @@ struct PluginOptionsSink {
     static llvm::cl::OptionCategory category("IREE dynamic plugin options");
     binder.list<std::string>(
         "iree-load-plugin", pluginOpts,
-        llvm::cl::desc(
-            "Dynamic plugins to load, specified as <plugin_id>=<path> where "
-            "path is the plugin shared library."),
+        llvm::cl::desc("Path of a plugin shared library to load. The plugin "
+                       "reports its own id, which --iree-plugin then names."),
         llvm::cl::cat(category));
   }
   using FromFlags = OptionsFromFlags<PluginOptionsSink>;
@@ -135,17 +137,9 @@ bool DynamicPluginRegistry::isValid() const {
 }
 
 DynamicPluginRegistry::Plugin
-DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
+DynamicPluginRegistry::Plugin::loadFromPath(std::string_view pathStr) {
   Plugin plugin;
-
-  auto equalPos = str.find('=');
-  if (equalPos == std::string_view::npos) {
-    plugin.error = "malformed plugin option '" + std::string(str) +
-                   "', expected <plugin_id>=<path>";
-    return plugin;
-  }
-  plugin.pluginId = std::string(str.substr(0, equalPos));
-  plugin.path = std::string(str.substr(equalPos + 1));
+  plugin.path = std::string(pathStr);
 
   std::string loadErrMsg;
   plugin.library = llvm::sys::DynamicLibrary::getPermanentLibrary(
@@ -156,47 +150,60 @@ DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
     return plugin;
   }
 
-  std::string symbolName = "iree_register_compiler_plugin_" + plugin.pluginId;
-  plugin.registerFunction = reinterpret_cast<RegisterFunction>(
-      plugin.library.getAddressOfSymbol(symbolName.c_str()));
-  if (!plugin.registerFunction) {
-    plugin.error = "could not find registration function '" + symbolName +
-                   "' in plugin '" + plugin.path + "'";
+  auto getInfo = reinterpret_cast<IreeCompilerPluginInfo (*)()>(
+      plugin.library.getAddressOfSymbol(IREE_COMPILER_PLUGIN_INFO_SYMBOL_NAME));
+  if (!getInfo) {
+    plugin.error = "plugin '" + plugin.path + "' defines no " +
+                   IREE_COMPILER_PLUGIN_INFO_SYMBOL_NAME +
+                   "; declare it with IREE_DEFINE_COMPILER_PLUGIN";
+    return plugin;
   }
 
+  IreeCompilerPluginInfo info = getInfo();
+  if (info.apiVersion != IREE_COMPILER_PLUGIN_API_VERSION) {
+    plugin.error = "plugin '" + plugin.path +
+                   "' was built against plugin API version " +
+                   std::to_string(info.apiVersion) + ", this compiler speaks " +
+                   std::to_string(IREE_COMPILER_PLUGIN_API_VERSION);
+    return plugin;
+  }
+  if (!info.pluginId || !info.registerPlugin) {
+    plugin.error = "plugin '" + plugin.path +
+                   "' reported no id or no "
+                   "registration function";
+    return plugin;
+  }
+
+  plugin.pluginId = info.pluginId;
+  plugin.registerFunction = info.registerPlugin;
   return plugin;
 }
 
 void DynamicPluginRegistry::loadPluginsFromCL(int argc, char **argv) {
-  // Format: --iree-load-plugin=<plugin_id>=<path>
+  // Format: --iree-load-plugin=<path>
+  constexpr llvm::StringRef pluginOptionPrefix = "--iree-load-plugin=";
 
   for (int i = 1; i < argc; ++i) {
-    StringRef argStr = argv[i];
-    constexpr StringRef pluginOptionPrefix = "--iree-load-plugin";
-    if (!argStr.starts_with(pluginOptionPrefix)) {
+    llvm::StringRef argStr = argv[i];
+    if (!argStr.consume_front(pluginOptionPrefix)) {
       continue;
     }
-    if (argStr.size() <= pluginOptionPrefix.size() ||
-        argStr[pluginOptionPrefix.size()] != '=') {
+    if (argStr.empty()) {
       Plugin plugin;
-      plugin.error =
-          "malformed iree-load-plugin option '" + std::string(argStr) +
-          "', expected format '--iree-load-plugin=<plugin_id>=<path>'";
+      plugin.error = "no path given to --iree-load-plugin";
       plugins.push_back(std::move(plugin));
       continue;
     }
-    StringRef pluginInfo = argStr.drop_front(pluginOptionPrefix.size() + 1);
-    plugins.push_back(Plugin::loadFromString(pluginInfo));
+    plugins.push_back(Plugin::loadFromPath(argStr));
   }
 }
 
 void DynamicPluginRegistry::loadPluginPathsFromEnv() {
   if (const char *envVar = std::getenv("IREE_LOAD_PLUGINS")) {
-    StringRef envVarStr = envVar;
-    SmallVector<StringRef, 4> pluginInfos;
-    envVarStr.split(pluginInfos, ',', -1, false);
-    for (StringRef pluginInfo : pluginInfos) {
-      plugins.push_back(Plugin::loadFromString(pluginInfo));
+    llvm::SmallVector<llvm::StringRef, 4> paths;
+    llvm::StringRef(envVar).split(paths, ',', -1, /*KeepEmpty=*/false);
+    for (llvm::StringRef path : paths) {
+      plugins.push_back(Plugin::loadFromPath(path));
     }
   }
 }

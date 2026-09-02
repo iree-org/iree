@@ -15,6 +15,7 @@ iree_cc_library(
     PluginAPI
   HDRS
     "Client.h"
+    "PluginEntryPoint.h"
   SRCS
     "Client.cpp"
   DEPS

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/PluginAPI/Client.h"
+#include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
@@ -60,8 +61,10 @@ struct MySession : public PluginSession<MySession, MyOptions> {
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(MyOptions);
 
-extern "C" bool IREE_EXAMPLE_REGISTER_PLUGIN(
+static bool registerExamplePlugin(
     mlir::iree_compiler::PluginRegistrar* registrar) {
   registrar->registerPlugin<MySession>(IREE_EXAMPLE_PLUGIN_ID_STR);
   return true;
 }
+
+IREE_DEFINE_COMPILER_PLUGIN(IREE_EXAMPLE_PLUGIN_ID, registerExamplePlugin)

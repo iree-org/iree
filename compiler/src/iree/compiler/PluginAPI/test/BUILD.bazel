@@ -19,6 +19,7 @@ iree_lit_test_suite(
             "invalid_options.txt",
             "invalid_plugin.c",
             "valid_plugin.c",
+            "version_mismatch.c",
         ],
         include = [
             "*.txt",

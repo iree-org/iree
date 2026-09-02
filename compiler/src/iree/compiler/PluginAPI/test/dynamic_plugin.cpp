@@ -9,13 +9,16 @@
 
 #include <cstdio>
 
+#include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 #include "mlir/IR/MLIRContext.h"
 
-extern "C" bool
-iree_register_compiler_plugin_dynamic_test_plugin(void *registrar) {
+static bool
+registerDynamicTestPlugin(mlir::iree_compiler::PluginRegistrar *registrar) {
   (void)registrar;
   mlir::MLIRContext context;
   (void)context.isMultithreadingEnabled();
   std::fprintf(stderr, "DYNAMIC_TEST_PLUGIN: renamed MLIRContext ok\n");
   return true;
 }
+
+IREE_DEFINE_COMPILER_PLUGIN(dynamic_test_plugin, registerDynamicTestPlugin)

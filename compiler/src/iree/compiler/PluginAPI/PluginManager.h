@@ -56,16 +56,14 @@ public:
 
 private:
   struct Plugin {
-    using RegisterFunction = bool (*)(mlir::iree_compiler::PluginRegistrar *);
-
     std::string path;
     std::string pluginId;
     llvm::sys::DynamicLibrary library;
     std::optional<std::string> error;
-    RegisterFunction registerFunction = nullptr;
+    PluginRegistrationFunction registerFunction = nullptr;
 
-    /// Takes `<plugin_id>=<path>`.
-    static Plugin loadFromString(std::string_view str);
+    /// The id comes from the library, so a caller needs only the path.
+    static Plugin loadFromPath(std::string_view path);
 
     bool isValid() const { return !error.has_value(); }
   };

@@ -15,7 +15,10 @@ package(
 iree_compiler_cc_library(
     name = "PluginAPI",
     srcs = ["Client.cpp"],
-    hdrs = ["Client.h"],
+    hdrs = [
+        "Client.h",
+        "PluginEntryPoint.h",
+    ],
     deps = [
         "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Utils",
