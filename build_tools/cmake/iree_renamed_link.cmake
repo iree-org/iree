@@ -6,28 +6,23 @@
 
 # CMake side of the renamed IREE compiler ABI (IREE_COMPILER_DYNAMIC_PLUGINS).
 #
-# libIREECompiler renames every llvm/mlir C++ symbol to an IREE-private
-# Itanium name before link so it can co-reside with another LLVM/MLIR copy in
-# the same process, while dynamic plugins rename their own archives the same
-# way and resolve the shared closure from the compiler library. The rename
-# decision and spelling live in build_tools/bazel/gen_rename_map.py, shared
-# with the Bazel implementation so both builds produce the same ABI.
+# Renaming every llvm/mlir C++ symbol lets libIREECompiler share a process with
+# a foreign LLVM/MLIR. Plugins rename to match so they resolve against it.
+# gen_rename_map.py decides the spelling, shared with Bazel so both builds land
+# on the same ABI.
 #
-# llvm-objcopy consumes archives, so everything to be renamed first becomes a
-# static archive. Renaming the linked shared library instead is not an option:
-# rewriting .dynsym would invalidate the ELF hash sections.
+# Everything becomes a static archive first, because that is what llvm-objcopy
+# takes. The linked library cannot be renamed instead: rewriting .dynsym breaks
+# the ELF hash sections.
 
-# Names a file after a target, safe for use in declared outputs
-# (object-library targets contain dots, e.g. `obj.MLIRCAPIIR`).
+# Target names reach declared outputs, and some contain dots (`obj.MLIRCAPIIR`).
 function(iree_renamed_link_sanitize_name VALUE OUT_VAR)
   string(REGEX REPLACE "[^A-Za-z0-9_]" "_" _result "${VALUE}")
   set(${OUT_VAR} "${_result}" PARENT_SCOPE)
 endfunction()
 
-# Evaluates $<BOOL:...> by its own rules: false only for the empty string and
-# CMake's false constants, so a path is true. if() cannot stand in for this -
-# under CMP0054 a quoted argument that is not a known constant is false, which
-# would invert exactly the paths LLVM guards its link flags with.
+# Evaluates $<BOOL:...>, where a path is true. if() would call it false under
+# CMP0054, inverting the very paths LLVM guards its link flags with.
 function(iree_renamed_link_genex_bool VALUE OUT_VAR)
   string(TOUPPER "${VALUE}" _upper)
   if(_upper STREQUAL "" OR _upper STREQUAL "0" OR _upper STREQUAL "FALSE"
@@ -76,9 +71,7 @@ function(iree_renamed_archive OUT_VAR)
   set(${OUT_VAR} "${_out}" PARENT_SCOPE)
 endfunction()
 
-# Archives an object library's objects, then rewrites the archive to the
-# renamed ABI. Same parameters as iree_renamed_archive with TARGET instead of
-# INPUT.
+# As iree_renamed_archive, but starting from an object library's objects.
 function(iree_renamed_archive_from_objects OUT_VAR)
   cmake_parse_arguments(_RULE "" "NAME;TARGET" "" ${ARGN})
   set(_dir "${CMAKE_CURRENT_BINARY_DIR}/renamed")
@@ -98,13 +91,9 @@ function(iree_renamed_archive_from_objects OUT_VAR)
   set(${OUT_VAR} "${_renamed}" PARENT_SCOPE)
 endfunction()
 
-# Walks LINK_LIBRARIES/INTERFACE_LINK_LIBRARIES transitively and partitions
-# the closure into:
-#   STATIC_LIBS_VAR: non-imported STATIC_LIBRARY targets (to be renamed);
-#   OTHER_VAR: everything else, passed through to the link line unchanged
-#     (imported targets, raw flags, paths, unhandled generator expressions).
-# Imported targets and plain C archives are safe to pass through: the rename
-# only affects mangled llvm/mlir C++ names, which those do not define.
+# Splits the transitive link closure into archives to rename (STATIC_LIBS_VAR)
+# and everything else, passed through untouched (OTHER_VAR). Imported targets
+# and C archives are safe to pass through: they define no mangled C++ names.
 function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
   set(_worklist ${ARGN})
   set(_visited "")
@@ -124,9 +113,7 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
       list(APPEND _worklist "${CMAKE_MATCH_1}")
       continue()
     endif()
-    # Target-existence conditionals (LLD uses these in its interface link
-    # libraries) are decidable now: all closure targets are defined by the
-    # time this walk runs.
+    # Decidable here: every closure target exists by the time this walk runs.
     if(_item MATCHES "^\\$<TARGET_NAME_IF_EXISTS:([^>]+)>$")
       if(TARGET "${CMAKE_MATCH_1}")
         list(APPEND _worklist "${CMAKE_MATCH_1}")
@@ -144,8 +131,7 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
       endif()
       continue()
     endif()
-    # iree_cc_library wires object libraries to their usage requirements via
-    # a TARGET_PROPERTY indirection; read the property now instead.
+    # iree_cc_library reaches usage requirements through this indirection.
     if(_item MATCHES "^\\$<TARGET_PROPERTY:([^,>]+),([A-Za-z_]+)>$")
       if(TARGET "${CMAKE_MATCH_1}")
         get_target_property(_prop_value "${CMAKE_MATCH_1}" "${CMAKE_MATCH_2}")
@@ -155,18 +141,14 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
       endif()
       continue()
     endif()
-    # MLIR's CAPI object libraries guard their deps on membership in an
-    # aggregate's MLIR_AGGREGATE_EXCLUDE_LIBS. The compiler dylib is not an
-    # MLIR aggregate, so the exclusion list is empty and the guard always
-    # includes the library.
+    # The compiler dylib is no MLIR aggregate, so this exclusion list is empty
+    # and the guard always admits the library.
     if(_item MATCHES "^\\$<\\$<NOT:\\$<IN_LIST:.*MLIR_AGGREGATE_EXCLUDE_LIBS.*>:([A-Za-z0-9_]+)>$")
       list(APPEND _worklist "${CMAKE_MATCH_1}")
       continue()
     endif()
-    # LLVM guards platform link flags with $<$<BOOL:probe>:-lfoo>, where the
-    # probe is already a literal here (a found library path, or empty when the
-    # platform does not apply). Decide it now: an empty condition contributes
-    # nothing and is not worth warning about.
+    # LLVM guards platform link flags this way. The probe is a literal by now,
+    # so decide it rather than warn; an empty one contributes nothing.
     if(_item MATCHES "^\\$<\\$<BOOL:(.*)>:(.*)>$")
       set(_bool_cond "${CMAKE_MATCH_1}")
       set(_bool_value "${CMAKE_MATCH_2}")
@@ -177,9 +159,8 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
       continue()
     endif()
     if(_item MATCHES "^\\$<")
-      # An unevaluated generator expression on the link line corrupts the
-      # generated build files; dropping it surfaces as an undefined-symbol
-      # link error instead, which is diagnosable.
+      # An unevaluated one would corrupt the build files. Dropping it yields an
+      # undefined symbol instead, which can be diagnosed.
       message(WARNING
         "iree_collect_static_link_closure: dropping unsupported generator "
         "expression link item: ${_item}")
@@ -219,22 +200,18 @@ function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
   set(${OTHER_VAR} "${_other}" PARENT_SCOPE)
 endfunction()
 
-# Assembles the renamed libIREECompiler link. Runs deferred at the end of the
-# top-level directory so the transitive closure walk sees every target: the
-# API directory is processed before most of the compiler tree, so aliases like
-# iree::compiler::Codegen::Common do not exist yet when it is configured (the
-# non-renamed assembly sidesteps the same problem with generate-time
-# GENEX_EVAL indirection).
+# Assembles the renamed libIREECompiler link.
 #
-# Consumes global properties set by compiler/src/iree/compiler/API:
-#   IREE_RENAMED_SHARED_IMPL_OBJECT_LIBS: the API-root object libraries.
-#   IREE_RENAMED_SHARED_IMPL_BINARY_DIR: directory owning the rename actions.
+# Deferred to the end of the top-level directory so the closure walk sees every
+# target: the API directory is configured before most of the compiler tree, so
+# aliases like iree::compiler::Codegen::Common do not exist yet.
+#
+# Reads IREE_RENAMED_SHARED_IMPL_OBJECT_LIBS, set by compiler/src/iree/compiler/API.
 function(iree_renamed_shared_impl_finalize)
   get_property(_object_libs GLOBAL PROPERTY IREE_RENAMED_SHARED_IMPL_OBJECT_LIBS)
   set(_target iree_compiler_API_SharedImpl)
 
-  # The API-root object libraries become renamed archives and are linked
-  # whole-archive: they are the exported surface, nothing references them.
+  # Whole-archive: these are the exported surface, so nothing references them.
   set(_whole_archives)
   foreach(_object_lib ${_object_libs})
     iree_renamed_link_sanitize_name("${_object_lib}" _base)
@@ -245,10 +222,8 @@ function(iree_renamed_shared_impl_finalize)
     list(APPEND _whole_archives "${_renamed}")
   endforeach()
 
-  # Everything the object libraries pull in transitively is renamed too;
-  # otherwise the renamed references above would not resolve. Selective
-  # archive extraction is preserved (no whole-archive), so the library
-  # contains the same objects the unrenamed link would select.
+  # The closure is renamed too, or the references above find nothing. It keeps
+  # selective extraction, so the same objects land as in an unrenamed link.
   iree_collect_static_link_closure(_closure_static_libs _closure_other
     ${_object_libs}
     MLIRExportSMTLIB
@@ -270,15 +245,14 @@ function(iree_renamed_shared_impl_finalize)
     foreach(_archive ${_whole_archives})
       list(APPEND _whole_archive_flags "-Wl,-force_load,${_archive}")
     endforeach()
-    # ld64 resolves archives independent of command-line order.
+    # ld64 ignores command-line order.
     target_link_options(${_target} PRIVATE ${_whole_archive_flags})
     target_link_libraries(${_target} PRIVATE
       ${_closure_archives}
       ${_closure_other}
     )
   else()
-    # Group the closure so single-pass ELF linkers are insensitive to the
-    # discovery order of the archives.
+    # Grouped so single-pass ELF linkers do not care about archive order.
     target_link_libraries(${_target} PRIVATE
       "-Wl,--whole-archive" ${_whole_archives} "-Wl,--no-whole-archive"
       "-Wl,--start-group" ${_closure_archives} "-Wl,--end-group"
@@ -286,8 +260,7 @@ function(iree_renamed_shared_impl_finalize)
     )
   endif()
 
-  # The archives live in this (deferred, top-level) directory's scope; a
-  # target-level dependency orders their generation before the link.
+  # Orders archive generation before the link.
   add_custom_target(${_target}_renamed_archives
     DEPENDS ${_whole_archives} ${_closure_archives}
   )

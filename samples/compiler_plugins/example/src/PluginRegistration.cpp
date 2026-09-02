@@ -9,12 +9,10 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 
-// The plugin id is a build parameter so that this one source can be both
-// linked into the compiler and dlopen'd by it within the same process, which
-// is what test/dynamic_link.mlir compares. Everything the process registers
-// globally has to be derived from it: registering one plugin id twice aborts,
-// and llvm::cl asserts on both a duplicate option name and a duplicate option
-// category name.
+// The id is a build parameter so one source can be both linked into the
+// compiler and dlopen'd by it, which test/dynamic_link.mlir compares. Every
+// global name derives from it, because a second registration of one id aborts,
+// as does a second llvm::cl option or category of one name.
 #ifndef IREE_EXAMPLE_PLUGIN_ID
 #define IREE_EXAMPLE_PLUGIN_ID example
 #endif
@@ -50,8 +48,7 @@ struct MyOptions {
 
 struct MySession : public PluginSession<MySession, MyOptions> {
   LogicalResult onActivate() override {
-    // Deliberately identical for every build of this source: the static and
-    // dynamic tests assert on the same text.
+    // Both tests assert on this text, so it must not vary by build.
     mlir::emitRemark(mlir::UnknownLoc::get(context))
         << "This remark is from the example plugin activation (flag="
         << options.flag << ")";

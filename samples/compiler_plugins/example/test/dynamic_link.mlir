@@ -1,11 +1,9 @@
 // REQUIRES: iree_dynamic_plugins
 
-// The same source as the statically linked example plugin, built as a loadable
-// module and resolved against the compiler's renamed LLVM/MLIR ABI. Reaching
-// the CHECK below proves the loaded copy binds its option through the host's
-// global option storage and that onActivate() runs, exactly as static_link.mlir
-// asserts for the linked-in copy. IREE_EXAMPLE_DYN_PLUGIN carries the module
-// path from CMake; the test is unsupported when it is unset.
+// The example plugin's source again, loaded rather than linked. Reaching the
+// CHECK proves the loaded copy binds its option through the host's option
+// storage and that onActivate() runs, which is what static_link.mlir asserts
+// for the linked copy. CMake passes the module path in IREE_EXAMPLE_DYN_PLUGIN.
 
 // Loaded via the command line flag.
 // RUN: iree-compile --iree-load-plugin=example_dyn=$IREE_EXAMPLE_DYN_PLUGIN \

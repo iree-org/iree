@@ -30,11 +30,11 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 # needed, but some of the deps are too large to enable by default for all
 # developers.
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-${OFF_IF_DARWIN}}"
-# Off by default: it relinks libIREECompiler through the symbol rename pipeline,
-# which is a large one-off cost for a feature most builds do not need.
+# Off by default: the rename relinks all of libIREECompiler, which most builds
+# have no use for.
 IREE_COMPILER_DYNAMIC_PLUGINS="${IREE_COMPILER_DYNAMIC_PLUGINS:-OFF}"
-# Thin archives store member paths, which the plugin symbol rename cannot
-# follow through llvm-objcopy, so the two settings are mutually exclusive.
+# Mutually exclusive with the rename: llvm-objcopy cannot follow a thin
+# archive's member paths.
 IREE_ENABLE_THIN_ARCHIVES="${IREE_ENABLE_THIN_ARCHIVES:-ON}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"

@@ -34,8 +34,7 @@ class NeedsRenameTest(unittest.TestCase):
         )
 
     def test_review_false_positive_good4mlir(self):
-        # https://github.com/RooflineAI/iree-fork/pull/184: `_Z9good4mlirv`
-        # contains the raw `4mlir` marker but is not an mlir:: symbol.
+        # `_Z9good4mlirv` has the raw `4mlir` marker but no mlir:: namespace.
         self.assertFalse(gen_rename_map._needs_rename("good4mlir()"))
 
     def test_namespace_suffix_does_not_match(self):
@@ -102,8 +101,7 @@ class RenamedTest(unittest.TestCase):
         )
 
     def test_free_function_with_mlir_argument(self):
-        # Plugin-owned free functions with MLIR types in the signature must be
-        # renamed consistently with their call sites.
+        # A plugin function naming MLIR types must agree with its call sites.
         self.assertEqual(
             gen_rename_map._renamed(
                 "_Z3fooN4mlir5ValueE", "foo(mlir::Value)", COMPONENT

@@ -17,30 +17,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# Linker scripts that hide the bundled runtime's `iree_*` C-API from the
-# compiler shared library's exports (see IREECompiler below for why).
+# Hide the bundled runtime's `iree_*` C-API from the compiler library's
+# exports. See IREECompiler below for why.
 exports_files([
     "hide_iree_runtime_capi.ld",
     "hide_iree_runtime_capi.macos.txt",
 ])
 
-# The IREE compiler shared library. Bazel prefixes "lib" to
-# cc_binary(linkshared=1) outputs, so naming this "IREECompiler" produces
-# "libIREECompiler.{dylib,so}" as intended.
+# The IREE compiler shared library. Named "IREECompiler" because Bazel prefixes
+# "lib" to cc_binary(linkshared=1) outputs.
 #
-# It co-resides safely with another bundled LLVM/MLIR in the same process
-# (e.g. TensorFlow's) while exporting the renamed compiler internals used by
-# dynamic plugins. Every llvm/mlir C++ symbol in the StaticImpl closure is
-# renamed by inserting the Itanium component `6IREE18` (`_ZN4mlir...` ->
-# `_ZN6IREE184mlir...`, demangling as `IREE18::mlir::...`) before link, so the
-# names cannot collide with a foreign copy or weak-coalesce with it on macOS.
+# Every llvm/mlir C++ symbol in the StaticImpl closure is renamed before link
+# (`_ZN4mlir...` -> `_ZN6IREE184mlir...`), so the library can share a process
+# with a foreign LLVM/MLIR without colliding, or weak-coalescing on macOS. The
+# renamed internals are exported for dynamic plugins.
 #
-# The bundled runtime's `extern "C"` C-API (iree_hal_*, iree_vm_*, ...) is
-# hidden from the dynamic export table. The symbol rename only covers mangled
-# llvm/mlir C++ names; plain C exports keep their ABI spelling and are better
-# controlled with linker export lists. The compiler C-API (camelCase
-# ireeCompiler*/mlir*) and the renamed C++ internals (_ZN6IREE18*/_Z6IREE18*)
-# do not match `iree_*`, so plugins and embedders are unaffected.
+# The runtime's `extern "C"` C-API is hidden by export list instead, the rename
+# reaching only mangled C++ names. Neither the compiler C-API (`ireeCompiler*`)
+# nor the renamed internals match `iree_*`, so nothing else is caught.
 iree_compiler_cc_binary(
     name = "IREECompiler",
     srcs = [
@@ -68,8 +62,8 @@ iree_compiler_cc_binary(
     ],
 )
 
-# Rename the StaticImpl CcInfo directly and let the final compiler dylib
-# consume the same linker-input shape a normal Bazel C++ link would see.
+# Renaming the CcInfo leaves the dylib the linker-input shape a normal Bazel
+# C++ link would see.
 renamed_cc_info(
     name = "IREEStaticImplRenamed",
     include_provided = True,
@@ -77,8 +71,8 @@ renamed_cc_info(
     deps = ["//compiler/src/iree/compiler/API:StaticImpl"],
 )
 
-# Entry point for out-of-tree plugin builds: carries the renamed shared
-# library plus the ABI prefix plugins must rename their own archives with.
+# Entry point for out-of-tree plugins: the library plus the prefix they must
+# rename to.
 iree_renamed_compiler_abi(
     name = "IREECompilerShared",
     shared_library = ":IREECompiler",
@@ -86,8 +80,7 @@ iree_renamed_compiler_abi(
     tags = ["skip-bazel_to_cmake"],
 )
 
-# Enforces the export invariants the version script / unexported-symbols list
-# rely on. See exported_symbols_test.py for the invariants.
+# Guards the export invariants the linker scripts above rely on.
 py_test(
     name = "exported_symbols_test",
     srcs = ["exported_symbols_test.py"],

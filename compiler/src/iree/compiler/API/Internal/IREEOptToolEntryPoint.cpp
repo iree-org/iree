@@ -51,7 +51,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
   InitLLVM y(argc, argv);
 
-  // Handle loading plugins before any initialization and CLI parsing
+  // Before CLI parsing: the plugins loaded here still have options to add.
   if (!mlir::iree_compiler::DynamicPluginRegistry::create(
           argc, argv, /*allowEnvPlugins=*/true)) {
     mlir::iree_compiler::DynamicPluginRegistry::get().reportErrors(

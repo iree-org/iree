@@ -16,9 +16,7 @@ iree_lit_test_suite(
     iree-opt
 )
 
-# End-to-end check of the renamed compiler ABI: a plugin referencing MLIR C++
-# symbols only loads if libIREECompiler exports them under the renamed
-# spelling and the plugin archive was renamed to match.
+# A plugin naming MLIR symbols loads only if both sides renamed alike.
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
   iree_cc_library(
     NAME

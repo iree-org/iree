@@ -21,10 +21,9 @@ else()
   set(IREE_COMPILER_DYLIB_INSTALL_PREFIX "lib/")
 endif()
 
-# Dynamic plugins resolve compiler C++ symbols from libIREECompiler by name;
-# hidden visibility would strip those symbols before the linker ever sees
-# them, and no link-time option can bring them back. Scoped to this directory
-# so the runtime keeps hidden visibility.
+# Plugins resolve compiler symbols by name, and hidden visibility would strip
+# them before the linker sees them, beyond recovery. Scoped here so the runtime
+# keeps hidden visibility.
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
   list(REMOVE_ITEM IREE_DEFAULT_COPTS "-fvisibility=hidden")
 endif()

@@ -43,11 +43,9 @@ namespace {
 
 std::optional<DynamicPluginRegistry> dynamicPluginRegistryInstance;
 
-// Since parsing the CLI options for the plugins happens manually to allow them
-// to register their own CLI options, we actually can not use the normal parsing
-// of the CLI options. However, we still need to consume the arguments to avoid
-// unknown argument errors and provide documentation on the command line option.
-// This class consumes the options but does nothing with them.
+// Plugin options are parsed by hand, before llvm::cl exists, so that plugins
+// can add their own. This swallows the flag afterwards so cl neither rejects it
+// nor leaves it out of --help.
 struct PluginOptionsSink {
   llvm::SmallVector<std::string> pluginOpts;
   void bindOptions(OptionsBinder &binder) {
@@ -69,11 +67,10 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(PluginOptionsSink);
 bool DynamicPluginRegistry::create(int argc, char **argv,
                                    bool allowEnvPlugins) {
   if (dynamicPluginRegistryInstance.has_value()) {
-    // We can not process the flags again, so just return false.
+    // The flags cannot be processed twice.
     return false;
   }
 
-  // Create the instance
   dynamicPluginRegistryInstance = DynamicPluginRegistry();
 
   if (argv) {
@@ -150,7 +147,6 @@ DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
   plugin.pluginId = std::string(str.substr(0, equalPos));
   plugin.path = std::string(str.substr(equalPos + 1));
 
-  // Load the dynamic library
   std::string loadErrMsg;
   plugin.library = llvm::sys::DynamicLibrary::getPermanentLibrary(
       plugin.path.c_str(), &loadErrMsg);
@@ -160,7 +156,6 @@ DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
     return plugin;
   }
 
-  // Look up the registration function
   std::string symbolName = "iree_register_compiler_plugin_" + plugin.pluginId;
   plugin.registerFunction = reinterpret_cast<RegisterFunction>(
       plugin.library.getAddressOfSymbol(symbolName.c_str()));
@@ -173,8 +168,7 @@ DynamicPluginRegistry::Plugin::loadFromString(std::string_view str) {
 }
 
 void DynamicPluginRegistry::loadPluginsFromCL(int argc, char **argv) {
-  // Plugin options must adhere to the following format:
-  //   --iree-load-plugin=<plugin_id>=<path to plugin shared library>
+  // Format: --iree-load-plugin=<plugin_id>=<path>
 
   for (int i = 1; i < argc; ++i) {
     StringRef argStr = argv[i];
@@ -217,7 +211,7 @@ bool PluginManager::loadAvailablePlugins() {
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
 
-  // Initialize dynamic plugins
+  // Initialize dynamic plugins.
   if (!DynamicPluginRegistry::get().registerPlugins(this)) {
     return false;
   }

@@ -1526,7 +1526,7 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
 }
 
 void ireeCompilerGlobalInitialize() {
-  // Ensure that dynamic plugins are loaded at global initialization time.
+  // No CLI here, so only IREE_LOAD_PLUGINS can name plugins.
   if (!mlir::iree_compiler::DynamicPluginRegistry::hasInstance()) {
     if (!mlir::iree_compiler::DynamicPluginRegistry::create(
             0, nullptr,

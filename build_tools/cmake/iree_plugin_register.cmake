@@ -132,21 +132,17 @@ function(iree_include_cmake_plugin_dirs)
 endfunction()
 
 # iree_compiler_register_dynamic_plugin()
-# Within a plugin package, builds the plugin by id as a loadable module whose
-# objects use the renamed compiler ABI, associating it with a registration
-# target. The dynamic counterpart of iree_compiler_register_plugin: the static
-# form hands the registration target to the compiler link, this one links it
-# into a module the compiler dlopens.
+# Builds a registration target into a module the compiler dlopens. The dynamic
+# counterpart of iree_compiler_register_plugin, which links the same kind of
+# target into the compiler instead.
 #
-# The objects are whole-archive linked because the registration entry point is
-# found by dlsym, not by references from the final link. The registration
-# target's own dependencies are deliberately not linked in: those references
-# stay undefined and resolve from libIREECompiler in the host process.
+# Whole-archive linked: the entry point is found by dlsym, not by references
+# from the link. The target's own deps are left out, to resolve from
+# libIREECompiler in the host process.
 #
 # Args:
 #  PACKAGE: Package namespace override, as iree_compiler_register_plugin.
-#  PLUGIN_ID: Id the plugin registers itself under. Also names the module,
-#      as libiree_compiler_plugin_${PLUGIN_ID}.so.
+#  PLUGIN_ID: Id the plugin registers under. Also names the module.
 #  TARGET: The registration target.
 function(iree_compiler_register_dynamic_plugin)
   cmake_parse_arguments(

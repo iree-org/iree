@@ -8,7 +8,6 @@ load("@rules_python//python:packaging.bzl", "py_package", "py_wheel")
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_compiler_cc_library", "iree_td_library")
 
-# Platform-specific rpath for shared library loading.
 # $ORIGIN is Linux-only; macOS needs @loader_path.
 MACOS_RPATH_LINKOPTS = select({
     "@platforms//os:linux": ["-Wl,-rpath,$ORIGIN"],

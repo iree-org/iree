@@ -30,8 +30,7 @@ config.environment.update(
     }
 )
 
-# The example plugin's loadable build only exists when the compiler was
-# configured with IREE_COMPILER_DYNAMIC_PLUGINS; CMake passes its path in.
+# Set by CMake only when the loadable example plugin was built.
 if config.environment.get("IREE_EXAMPLE_DYN_PLUGIN"):
     config.available_features.add("iree_dynamic_plugins")
 

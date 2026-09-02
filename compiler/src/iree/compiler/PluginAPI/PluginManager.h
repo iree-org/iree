@@ -35,29 +35,23 @@ public:
   using FromFlags = OptionsFromFlags<PluginManagerOptions>;
 };
 
-// Tracks dynamically loaded plugins and their registration callbacks.
-// Created once early so plugins can contribute CLI options.
+// Built before llvm::cl so plugins can contribute CLI options.
 class DynamicPluginRegistry {
 public:
-  /// Creates the singleton instance and returns true on success; may only be
-  /// called once.
+  /// True on success. Call at most once.
   [[nodiscard]] static bool create(int argc, char **argv,
                                    bool allowEnvPlugins = true);
 
-  /// Returns true if the singleton instance exists
   static bool hasInstance();
 
-  /// Returns the singleton instance (must be created first).
+  /// Requires create() first.
   static DynamicPluginRegistry &get();
 
 public:
-  /// Registers all loaded plugins with the given registrar.
   [[nodiscard]] bool registerPlugins(PluginRegistrar *registrar) const;
-  /// Returns the plugin identifiers that were loaded.
   llvm::SmallVector<std::string> getLoadedPlugins() const;
-  /// Emits any load/registration errors to the given stream.
   void reportErrors(llvm::raw_ostream &os) const;
-  /// True if all plugins loaded and resolved successfully.
+  /// True once every plugin has loaded and resolved.
   bool isValid() const;
 
 private:
@@ -70,18 +64,16 @@ private:
     std::optional<std::string> error;
     RegisterFunction registerFunction = nullptr;
 
-    /// Loads a plugin from a string of the form <plugin_id>=<path>.
+    /// Takes `<plugin_id>=<path>`.
     static Plugin loadFromString(std::string_view str);
 
     bool isValid() const { return !error.has_value(); }
   };
 
-  // Singleton instance, only allowed to be created via `create()`.
+  // Only `create()` may build one.
   DynamicPluginRegistry() = default;
 
-  // We need to manually parse out the plugin options before we initialize
-  // the PluginManager since it needs to load plugins before we can parse the
-  // full set of command line options.
+  // Runs before llvm::cl: the plugins it loads still have options to add.
   void loadPluginsFromCL(int argc, char **argv);
 
   void loadPluginPathsFromEnv();

@@ -6,22 +6,17 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Generates an llvm-objcopy --redefine-syms map for IREE ABI renaming.
 
-The IREE compiler shared library renames every llvm/mlir C++ symbol to an
-IREE-private Itanium name so it can co-reside with another LLVM/MLIR copy in
-the same process (e.g. TensorFlow's). Compiler plugins apply the same rename
-to their own archives, so shared symbols resolve from the compiler library and
-MLIR TypeIDs coalesce across the dlopen boundary.
+Renaming lets the compiler library share a process with another LLVM/MLIR copy,
+TensorFlow's say. Plugins rename to match, so shared symbols resolve against the
+library and MLIR TypeIDs coalesce across the dlopen boundary.
 
-Whether a symbol is renamed is decided on its *demangled* form: a symbol is in
-scope iff the demangled name mentions `llvm::` or `mlir::` as a namespace
-qualifier. Matching the raw mangled string is unsound: `_Z9good4mlirv`
-(`good4mlir()`) contains the encoded `4mlir` marker inside a longer
-source-name. Renaming covers symbols that merely mention llvm/mlir types in
-their signatures too — plugin-owned functions must be renamed consistently
-with their call sites.
+The decision is made on the demangled name, which must mention `llvm::` or
+`mlir::` as a namespace. Matching the mangled string instead would be unsound:
+`_Z9good4mlirv` (`good4mlir()`) contains `4mlir` inside a longer source-name.
+Symbols merely naming an llvm/mlir type in their signature are renamed too, or
+plugin functions would disagree with their call sites.
 
-The renamed spelling inserts a length-prefixed Itanium component (`6IREE18`)
-so the result still demangles:
+The inserted component is length-prefixed so the result still demangles:
 
   _ZN4mlir3fooEv        -> _ZN6IREE184mlir3fooEv    IREE18::mlir::foo()
   _ZTVN4mlir6WalkerE    -> _ZTVN6IREE184mlir6WalkerE  vtable for IREE18::...
