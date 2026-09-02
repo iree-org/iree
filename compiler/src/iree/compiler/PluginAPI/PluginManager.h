@@ -13,6 +13,7 @@
 
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/OptionUtils.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/DynamicLibrary.h"
@@ -38,16 +39,22 @@ public:
 // Built before llvm::cl so plugins can contribute CLI options.
 class DynamicPluginRegistry {
 public:
-  /// True on success. Call at most once.
-  [[nodiscard]] static bool create(int argc, char **argv,
-                                   bool allowEnvPlugins = true);
+  DynamicPluginRegistry(const DynamicPluginRegistry &) = delete;
+  DynamicPluginRegistry &operator=(const DynamicPluginRegistry &) = delete;
 
-  static bool hasInstance();
+  enum class EnvPlugins { Disabled, Enabled };
 
-  /// Requires create() first.
+  /// Empty until initialize(). Lives for the process, as do the libraries it
+  /// records: getPermanentLibrary cannot unload them.
   static DynamicPluginRegistry &get();
 
-public:
+  /// Loads every plugin named in |args| and, unless disabled, in
+  /// IREE_LOAD_PLUGINS. Call at most once. False if any failed, which
+  /// reportErrors() then describes.
+  [[nodiscard]] bool initialize(llvm::ArrayRef<const char *> args,
+                                EnvPlugins envPlugins);
+  bool isInitialized() const { return initialized; }
+
   [[nodiscard]] bool registerPlugins(PluginRegistrar *registrar) const;
   llvm::SmallVector<std::string> getLoadedPlugins() const;
   void reportErrors(llvm::raw_ostream &os) const;
@@ -68,17 +75,22 @@ private:
     bool isValid() const { return !error.has_value(); }
   };
 
-  // Only `create()` may build one.
   DynamicPluginRegistry() = default;
 
   // Runs before llvm::cl: the plugins it loads still have options to add.
-  void loadPluginsFromCL(int argc, char **argv);
+  void loadPluginsFromCL(llvm::ArrayRef<const char *> args);
 
   void loadPluginPathsFromEnv();
 
-private:
-  llvm::SmallVector<Plugin, 4> plugins;
+  bool initialized = false;
+  llvm::SmallVector<Plugin> plugins;
 };
+
+/// Loads the dynamic plugins named in |args| and in IREE_LOAD_PLUGINS, writing
+/// failures to |os|. False if one failed. Loads once, however often it is
+/// called.
+bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
+                              llvm::raw_ostream &os);
 
 // Manages global registrations for available plugins.
 // Typically, there will be one PluginManager globally for the compiler, and
@@ -118,7 +130,7 @@ public:
   void registerGlobalDialects(DialectRegistry &registry);
 
   // Gets a list of all loaded plugin names.
-  llvm::SmallVector<std::string> getLoadedPlugins();
+  llvm::SmallVector<std::string> getLoadedPlugins() const;
 
 private:
   friend class PluginManagerSession;

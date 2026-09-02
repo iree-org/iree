@@ -1526,15 +1526,10 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
 }
 
 void ireeCompilerGlobalInitialize() {
-  // No CLI here, so only IREE_LOAD_PLUGINS can name plugins.
-  if (!mlir::iree_compiler::DynamicPluginRegistry::hasInstance()) {
-    if (!mlir::iree_compiler::DynamicPluginRegistry::create(
-            0, nullptr,
-            /*allowEnvPlugins=*/true)) {
-      mlir::iree_compiler::DynamicPluginRegistry::get().reportErrors(
-          llvm::errs());
-    }
-  }
+  // No CLI here, so only IREE_LOAD_PLUGINS can name plugins. A failure is
+  // logged rather than fatal: a library must not kill its host.
+  (void)mlir::iree_compiler::initializeDynamicPlugins(/*args=*/{},
+                                                      llvm::errs());
 
   if (globalInit) {
     globalInit->refCount.fetch_add(1);

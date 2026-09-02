@@ -13,7 +13,9 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -44,8 +46,6 @@ void PluginManagerOptions::bindOptions(OptionsBinder &binder) {
 
 namespace {
 
-std::optional<DynamicPluginRegistry> dynamicPluginRegistryInstance;
-
 // Plugin options are parsed by hand, before llvm::cl exists, so that plugins
 // can add their own. This swallows the flag afterwards so cl neither rejects it
 // nor leaves it out of --help.
@@ -66,44 +66,50 @@ struct PluginOptionsSink {
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(PluginOptionsSink);
 
-bool DynamicPluginRegistry::create(int argc, char **argv,
-                                   bool allowEnvPlugins) {
-  if (dynamicPluginRegistryInstance.has_value()) {
-    // The flags cannot be processed twice.
+DynamicPluginRegistry &DynamicPluginRegistry::get() {
+  static DynamicPluginRegistry instance;
+  return instance;
+}
+
+bool DynamicPluginRegistry::initialize(llvm::ArrayRef<const char *> args,
+                                       EnvPlugins envPlugins) {
+  assert(!initialized && "flags cannot be processed twice");
+  initialized = true;
+
+  // Unconditional: registering the option documents it in --help and stops cl
+  // rejecting it, whether or not this process has a command line to scan.
+  (void)PluginOptionsSink::FromFlags::get();
+
+  loadPluginsFromCL(args);
+  if (envPlugins == EnvPlugins::Enabled) {
+    loadPluginPathsFromEnv();
+  }
+  return isValid();
+}
+
+bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
+                              llvm::raw_ostream &os) {
+  auto &registry = DynamicPluginRegistry::get();
+  if (registry.isInitialized()) {
+    return registry.isValid();
+  }
+  if (!registry.initialize(args, DynamicPluginRegistry::EnvPlugins::Enabled)) {
+    registry.reportErrors(os);
     return false;
   }
-
-  dynamicPluginRegistryInstance = DynamicPluginRegistry();
-
-  if (argv) {
-    dynamicPluginRegistryInstance->loadPluginsFromCL(argc, argv);
-
-    // Also consume the options to avoid unknown argument errors.
-    (void)PluginOptionsSink::FromFlags::get();
-  }
-
-  if (allowEnvPlugins) {
-    dynamicPluginRegistryInstance->loadPluginPathsFromEnv();
-  }
-
-  return dynamicPluginRegistryInstance->isValid();
-}
-
-bool DynamicPluginRegistry::hasInstance() {
-  return dynamicPluginRegistryInstance.has_value();
-}
-
-DynamicPluginRegistry &DynamicPluginRegistry::get() {
-  assert(dynamicPluginRegistryInstance.has_value() &&
-         "DynamicPluginRegistry not initialized, call create() first");
-  return dynamicPluginRegistryInstance.value();
+  return true;
 }
 
 bool DynamicPluginRegistry::registerPlugins(PluginRegistrar *registrar) const {
   bool success = true;
   for (const auto &plugin : plugins) {
-    if (plugin.isValid()) {
-      success = success && plugin.registerFunction(registrar);
+    if (!plugin.isValid()) {
+      continue;
+    }
+    if (!plugin.registerFunction(registrar)) {
+      llvm::errs() << "[IREE Dynamic Plugin ERROR]: registration function of '"
+                   << plugin.pluginId << "' (" << plugin.path << ") failed\n";
+      success = false;
     }
   }
   return success;
@@ -179,22 +185,45 @@ DynamicPluginRegistry::Plugin::loadFromPath(std::string_view pathStr) {
   return plugin;
 }
 
-void DynamicPluginRegistry::loadPluginsFromCL(int argc, char **argv) {
-  // Format: --iree-load-plugin=<path>
-  constexpr llvm::StringRef pluginOptionPrefix = "--iree-load-plugin=";
+void DynamicPluginRegistry::loadPluginsFromCL(
+    llvm::ArrayRef<const char *> args) {
+  // llvm::cl takes one dash or two, a separated value, and response files.
+  // Anything it accepts but this misses would be consumed by the option sink
+  // and never loaded.
+  llvm::BumpPtrAllocator alloc;
+  llvm::SmallVector<const char *> expanded(args.begin(), args.end());
+  llvm::cl::ExpansionContext expansion(alloc, llvm::cl::TokenizeGNUCommandLine);
+  if (llvm::Error e = expansion.expandResponseFiles(expanded)) {
+    Plugin plugin;
+    plugin.error =
+        "could not expand response files: " + llvm::toString(std::move(e));
+    plugins.push_back(std::move(plugin));
+  }
 
-  for (int i = 1; i < argc; ++i) {
-    llvm::StringRef argStr = argv[i];
-    if (!argStr.consume_front(pluginOptionPrefix)) {
+  for (size_t i = 1; i < expanded.size(); ++i) {
+    llvm::StringRef arg = expanded[i];
+    if (!arg.consume_front("--") && !arg.consume_front("-")) {
       continue;
     }
-    if (argStr.empty()) {
+    if (!arg.consume_front("iree-load-plugin")) {
+      continue;
+    }
+    llvm::StringRef path;
+    if (arg.consume_front("=")) {
+      path = arg;
+    } else if (arg.empty() && i + 1 < expanded.size()) {
+      path = expanded[++i];
+    } else {
+      // A longer flag that merely starts the same.
+      continue;
+    }
+    if (path.empty()) {
       Plugin plugin;
       plugin.error = "no path given to --iree-load-plugin";
       plugins.push_back(std::move(plugin));
       continue;
     }
-    plugins.push_back(Plugin::loadFromPath(argStr));
+    plugins.push_back(Plugin::loadFromPath(path));
   }
 }
 
@@ -218,12 +247,22 @@ bool PluginManager::loadAvailablePlugins() {
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
 
-  // Initialize dynamic plugins.
-  if (!DynamicPluginRegistry::get().registerPlugins(this)) {
+  // Registering one id twice aborts inside the registrar, and dynamic ids come
+  // from user input, so catch the collision here instead.
+  auto &registry = DynamicPluginRegistry::get();
+  bool unique = true;
+  for (const std::string &pluginId : registry.getLoadedPlugins()) {
+    if (registrations.count(pluginId)) {
+      llvm::errs() << "[IREE Dynamic Plugin ERROR]: '" << pluginId
+                   << "' has the same id as an already registered plugin\n";
+      unique = false;
+    }
+  }
+  if (!unique) {
     return false;
   }
 
-  return true;
+  return registry.registerPlugins(this);
 }
 
 void PluginManager::globalInitialize() {
@@ -250,7 +289,7 @@ void PluginManager::registerGlobalDialects(DialectRegistry &registry) {
   }
 }
 
-llvm::SmallVector<std::string> PluginManager::getLoadedPlugins() {
+llvm::SmallVector<std::string> PluginManager::getLoadedPlugins() const {
   llvm::SmallVector<std::string> plugins;
 #define HANDLE_PLUGIN_ID(plugin_id) plugins.push_back(#plugin_id);
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
