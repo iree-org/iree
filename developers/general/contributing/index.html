@@ -6930,15 +6930,25 @@ track of those who have made significant contributions to the project.</p>
   contributions.</li>
 </ul>
 <p>The
-<a href="https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS"><code>.github/CODEOWNERS</code> file</a>
-lets maintainers opt in to PR reviews modifying certain paths.</p>
-<ul>
-<li>Review is not required from a code owner, though it is recommended.</li>
-</ul>
-<p>The
 <a href="https://github.com/iree-org/iree/blob/main/MAINTAINERS.md"><code>MAINTAINERS.md</code> file</a>
 documents the Technical Steering Committee (TSC) and official maintainers for
 project components.</p>
+<p>The
+<a href="https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS"><code>.github/CODEOWNERS</code> file</a>
+designates reviewers for specific components of the project. Maintainers of the
+project are assigned as reviewers by default, so that they serve as the first
+point of contact and help find a reviewer in case they can't perform the review
+themselves.</p>
+<p>A strong, recent history of quality commits to a certain part of the project is
+generally enough to nominate oneself as a CODEOWNER - subject to maintainer
+approval, such participation in the project would be very welcome.</p>
+<p>An approval on the PR generally doesn't have to come from a designated code
+owner. A single approval by a project member with write access is technically
+sufficient to merge the change, however authors of larger PRs that affect
+multiple components should allow more time for several code owners and other
+project members to review. In such cases, preceding the change with a RFC and
+aligning with code owners/maintainers on the design is also a recommended
+practice - this allows to minimize time spent in the final PR review stage.</p>
 <h2 id="coding-policies"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.75.75 0 0 1 .734.215m-6.56 0a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.75.75 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z"/></svg></span> Coding policies<a class="headerlink" href="#coding-policies" title="Permanent link">link</a></h2>
 <h3 id="coding-style-guidelines"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.25.25 0 0 0-.064.108l-.558 1.953 1.953-.558a.25.25 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg></span> Coding style guidelines<a class="headerlink" href="#coding-style-guidelines" title="Permanent link">link</a></h3>
 <p>Our formatting rules are enforced by language-specific formatters like
