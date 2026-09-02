@@ -50,8 +50,12 @@ if platform.system() == "Darwin" and "SDKROOT" not in config.environment:
         ).strip()
         if sdkroot:
             config.environment["SDKROOT"] = sdkroot
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         pass
+
+# Tests that compile a plugin use the build's own C compiler, which CMake
+# passes in. Falling back to PATH keeps them runnable outside that.
+config.substitutions.append(("%host_cc", os.environ.get("IREE_HOST_CC") or "clang"))
 
 # Use the most preferred temp directory.
 config.test_exec_root = (

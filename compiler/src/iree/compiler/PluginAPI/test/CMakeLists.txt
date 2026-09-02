@@ -17,6 +17,16 @@ iree_lit_test_suite(
     iree-opt
 )
 
+# These build a plugin, so give lit the compiler this build used rather than
+# leaving %host_cc to whatever PATH offers.
+iree_package_ns(_PACKAGE_NS)
+string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
+foreach(_TEST_SRC "invalid_plugin.c" "valid_plugin.c" "version_mismatch.c")
+  set_property(TEST "${_PACKAGE_PATH}/${_TEST_SRC}.test"
+    APPEND PROPERTY ENVIRONMENT "IREE_HOST_CC=${CMAKE_C_COMPILER}"
+  )
+endforeach()
+
 # A plugin naming MLIR symbols loads only if both sides renamed alike.
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
   iree_cc_library(

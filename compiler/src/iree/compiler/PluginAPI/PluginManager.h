@@ -16,11 +16,12 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/Error.h"
 
 namespace mlir::iree_compiler {
 
-class PluginManager;
 class PluginManagerSession;
 
 // Command line options for the plugin manager.
@@ -49,30 +50,26 @@ public:
   static DynamicPluginRegistry &get();
 
   /// Loads every plugin named in |args| and, unless disabled, in
-  /// IREE_LOAD_PLUGINS. Call at most once. False if any failed, which
-  /// reportErrors() then describes.
-  [[nodiscard]] bool initialize(llvm::ArrayRef<const char *> args,
-                                EnvPlugins envPlugins);
+  /// IREE_LOAD_PLUGINS. Call at most once. The returned error joins every
+  /// failure, so one bad plugin does not hide the next.
+  [[nodiscard]] llvm::Error initialize(llvm::ArrayRef<const char *> args,
+                                       EnvPlugins envPlugins);
   bool isInitialized() const { return initialized; }
+  /// True once every plugin has loaded and resolved.
+  bool isValid() const { return !loadFailed; }
 
   [[nodiscard]] bool registerPlugins(PluginRegistrar *registrar) const;
   llvm::SmallVector<std::string> getLoadedPlugins() const;
-  void reportErrors(llvm::raw_ostream &os) const;
-  /// True once every plugin has loaded and resolved.
-  bool isValid() const;
 
 private:
   struct Plugin {
     std::string path;
     std::string pluginId;
     llvm::sys::DynamicLibrary library;
-    std::optional<std::string> error;
     PluginRegistrationFunction registerFunction = nullptr;
 
     /// The id comes from the library, so a caller needs only the path.
-    static Plugin loadFromPath(std::string_view path);
-
-    bool isValid() const { return !error.has_value(); }
+    static llvm::Expected<Plugin> loadFromPath(llvm::StringRef path);
   };
 
   DynamicPluginRegistry() = default;
@@ -82,7 +79,12 @@ private:
 
   void loadPluginPathsFromEnv();
 
+  /// Keeps a loaded plugin, or joins its failure onto loadErrors.
+  void addPlugin(llvm::Expected<Plugin> plugin);
+
   bool initialized = false;
+  llvm::Error loadErrors = llvm::Error::success();
+  bool loadFailed = false;
   llvm::SmallVector<Plugin> plugins;
 };
 
@@ -106,8 +108,6 @@ bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
 // an MLIRContext is available.
 class PluginManager : public PluginRegistrar {
 public:
-  PluginManager();
-
   // Initializes the plugin manager. Since this may do shared library opening
   // and use failable initializers, it can fail. There probably isn't much to
   // do in that case but crash, but the choice is left to the caller.

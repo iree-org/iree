@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: mkdir -p %t
-// RUN: clang -fPIC -shared -o %t/libvalid_plugin.so %s
+// RUN: %host_cc -fPIC -shared -o %t/libvalid_plugin.so %s
 // RUN: iree-opt --iree-load-plugin=%t/libvalid_plugin.so --help
 // clang-format on
 

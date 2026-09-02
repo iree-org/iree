@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: mkdir -p %t
-// RUN: clang -fPIC -shared -o %t/libversion_mismatch.so %s
+// RUN: %host_cc -fPIC -shared -o %t/libversion_mismatch.so %s
 // RUN: (iree-opt --iree-load-plugin=%t/libversion_mismatch.so 2>&1 || true) | FileCheck %s --check-prefix=VERSION_MISMATCH
 // clang-format on
 
