@@ -4,13 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Spells the ABI by hand rather than through IREE_DEFINE_COMPILER_PLUGIN, so
-// that a plugin written in plain C stays provably loadable.
+// A plugin claiming a header surface this compiler does not have. It must be
+// refused before its registration function is reached.
 
 #include <stdbool.h>
-
-// A bare #define, so plain C can take the one value it cannot know.
-#include "iree/compiler/PluginAPI/PluginABIHash.h"
 
 struct IreeCompilerPluginInfo {
   int apiVersion;
@@ -19,14 +16,14 @@ struct IreeCompilerPluginInfo {
   bool (*registerPlugin)(void *registrar);
 };
 
-static bool register_sample_plugin(void *registrar) {
+static bool register_other_headers_plugin(void *registrar) {
   (void)registrar;
   return true;
 }
 
 struct IreeCompilerPluginInfo iree_get_compiler_plugin_info(void) {
-  struct IreeCompilerPluginInfo info = {2, IREE_COMPILER_PLUGIN_ABI_HASH,
-                                        "sample_plugin",
-                                        register_sample_plugin};
+  struct IreeCompilerPluginInfo info = {2, "0000000000000000",
+                                        "from_other_headers",
+                                        register_other_headers_plugin};
   return info;
 }

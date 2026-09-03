@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_PLUGINAPI_PLUGINENTRYPOINT_H_
 #define IREE_COMPILER_PLUGINAPI_PLUGINENTRYPOINT_H_
 
+#include "iree/compiler/PluginAPI/PluginABIHash.h"
+
 namespace mlir::iree_compiler {
 class PluginRegistrar;
 } // namespace mlir::iree_compiler
@@ -16,10 +18,13 @@ extern "C" {
 // Bump on any change to IreeCompilerPluginInfo or to what a registration
 // function may do. A plugin built against another value is rejected at load
 // rather than left to fail on its first virtual call.
-#define IREE_COMPILER_PLUGIN_API_VERSION 1
+#define IREE_COMPILER_PLUGIN_API_VERSION 2
 
 struct IreeCompilerPluginInfo {
   int apiVersion;
+  // Hash of the headers the plugin compiled against. The version above covers
+  // this struct alone, so nothing else would catch a changed Client.h.
+  const char *abiHash;
   // Both owned by the plugin and valid for the life of the process.
   const char *pluginId;
   bool (*registerPlugin)(mlir::iree_compiler::PluginRegistrar *registrar);
@@ -62,6 +67,7 @@ struct IreeCompilerPluginInfo {
       iree_get_compiler_plugin_info(void) {                                    \
     IreeCompilerPluginInfo info = {                                            \
         IREE_COMPILER_PLUGIN_API_VERSION,                                      \
+        IREE_COMPILER_PLUGIN_ABI_HASH,                                         \
         #plugin_id,                                                            \
         &iree_register_compiler_plugin_##plugin_id,                            \
     };                                                                         \

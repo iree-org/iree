@@ -6,6 +6,7 @@
 
 #include "iree/compiler/PluginAPI/PluginManager.h"
 
+#include <cstring>
 #include <string>
 #include <utility>
 
@@ -185,6 +186,15 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
         "plugin '%s' was built against plugin API version %d, this compiler "
         "speaks %d",
         plugin.path.c_str(), info.apiVersion, IREE_COMPILER_PLUGIN_API_VERSION);
+  }
+
+  // Only reachable once the version matches: an older struct has no abiHash.
+  if (std::strcmp(info.abiHash, IREE_COMPILER_PLUGIN_ABI_HASH) != 0) {
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "plugin '%s' was built against plugin API headers %s, this compiler "
+        "has %s",
+        plugin.path.c_str(), info.abiHash, IREE_COMPILER_PLUGIN_ABI_HASH);
   }
   if (!info.pluginId || !info.registerPlugin) {
     return llvm::createStringError(
