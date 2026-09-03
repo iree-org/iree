@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:abi_prefix.bzl", "IREE_COMPILER_ABI_PREFIX")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary")
 load(
     "//build_tools/bazel:renamed_link.bzl",
@@ -77,7 +78,7 @@ iree_renamed_compiler_abi(
     name = "IREECompilerShared",
     shared_library = ":IREECompiler",
     static_closure = "//compiler/src/iree/compiler/API:StaticImpl",
-    symbol_prefix = "IREE18",
+    symbol_prefix = IREE_COMPILER_ABI_PREFIX,
     tags = ["skip-bazel_to_cmake"],
 )
 
@@ -88,6 +89,7 @@ py_test(
     args = [
         "--nm=$(location @llvm-project//llvm:llvm-nm)",
         "--library=$(location :IREECompiler)",
+        "--symbol-prefix=" + IREE_COMPILER_ABI_PREFIX,
     ],
     data = [
         ":IREECompiler",

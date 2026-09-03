@@ -18,6 +18,7 @@ CcInfo transform stay separate so each can be tested alone.
 """
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
+load("//build_tools/bazel:abi_prefix.bzl", "IREE_COMPILER_ABI_PREFIX")
 
 RenamedCompilerAbiInfo = provider(fields = {
     "symbol_prefix": "Logical ABI prefix inserted as an Itanium component.",
@@ -399,7 +400,7 @@ renamed_cc_info = rule(
             default = False,
             doc = "Force replacement static archives into whole-archive linking.",
         ),
-        "symbol_prefix": attr.string(default = "IREE18"),
+        "symbol_prefix": attr.string(default = IREE_COMPILER_ABI_PREFIX),
         "_nm": attr.label(default = "@llvm-project//llvm:llvm-nm", executable = True, cfg = "exec"),
         "_cxxfilt": attr.label(default = "@llvm-project//llvm:llvm-cxxfilt", executable = True, cfg = "exec"),
         "_objcopy": attr.label(default = "@llvm-project//llvm:llvm-objcopy", executable = True, cfg = "exec"),
@@ -458,7 +459,7 @@ iree_renamed_compiler_abi = rule(
             doc = "What the shared library was linked from, so a plugin can " +
                   "tell the compiler's archives from its own.",
         ),
-        "symbol_prefix": attr.string(default = "IREE18"),
+        "symbol_prefix": attr.string(default = IREE_COMPILER_ABI_PREFIX),
     },
     fragments = ["cpp"],
     toolchains = use_cpp_toolchain(),

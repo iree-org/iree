@@ -561,6 +561,10 @@ option(IREE_ENABLE_FUZZING "Enable libFuzzer-based fuzz targets" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
+# A plugin renames its symbols to match, so a consumer needs this value;
+# IREECompilerConfig.cmake exports it.
+set(IREE_COMPILER_ABI_PREFIX "IREE18" CACHE STRING
+    "Logical namespace the compiler's llvm/mlir symbols are renamed into")
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
 option(IREE_REVERSE_ITERATION "Reverse iteration over in unordered LLVM containers" OFF)

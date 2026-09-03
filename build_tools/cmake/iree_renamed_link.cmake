@@ -56,7 +56,7 @@ function(iree_renamed_archive OUT_VAR)
       --cxxfilt "$<TARGET_FILE:llvm-cxxfilt>"
       --input "${_RULE_INPUT}"
       --out "${_map}"
-      --symbol-prefix "IREE18"
+      --symbol-prefix "${IREE_COMPILER_ABI_PREFIX}"
     DEPENDS "${_RULE_INPUT}" "${_script}" llvm-nm llvm-cxxfilt ${_RULE_DEPENDS}
     COMMENT "Computing llvm/mlir rename map for ${_RULE_NAME}"
   )

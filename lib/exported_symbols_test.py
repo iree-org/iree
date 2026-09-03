@@ -13,8 +13,8 @@ symbol families apart:
      can never shadow a co-resident iree.runtime.
   2. camelCase `ireeCompiler*` -- the compiler embedding C-API; must stay
      exported.
-  3. `_ZN6IREE18*` / `_Z6IREE18*` -- the renamed llvm/mlir C++ internals used
-     by dynamic plugins; must stay exported.
+  3. the renamed llvm/mlir C++ internals, carrying the ABI prefix given by
+     --symbol-prefix; used by dynamic plugins and must stay exported.
 
 A convention violation (a snake_case export sneaking into the compiler, or the
 hide-script over-matching) silently binds the wrong symbol at load time, so
@@ -34,11 +34,13 @@ import unittest
 
 NM: str = ""
 LIBRARY: str = ""
+SYMBOL_PREFIX: str = ""
 
 # Mach-O adds a leading underscore to C-level names.
 _RUNTIME_CAPI_RE = re.compile(r"^_?iree_[a-z0-9_]+$")
 _COMPILER_CAPI_RE = re.compile(r"^_?ireeCompiler[A-Za-z0-9]+$")
-_RENAMED_CXX_RE = re.compile(r"^_?_Z(N|TVN|TTN|TIN|TSN|GVN)?6IREE18")
+# Built from the prefix, whose length is part of the mangled component.
+_RENAMED_CXX_RE: re.Pattern[str] | None = None
 
 
 def _exported_symbols() -> list[str]:
@@ -80,8 +82,8 @@ class ExportedSymbolsTest(unittest.TestCase):
     def test_renamed_internals_are_exported(self):
         self.assertTrue(
             any(_RENAMED_CXX_RE.match(s) for s in self.symbols),
-            msg="no renamed (6IREE18) llvm/mlir C++ symbol exported; the "
-            "rename pipeline or export scripts are broken",
+            msg=f"no renamed ({SYMBOL_PREFIX}) llvm/mlir C++ symbol exported; "
+            "the rename pipeline or export scripts are broken",
         )
 
 
@@ -89,7 +91,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--nm", required=True)
     parser.add_argument("--library", required=True)
+    parser.add_argument("--symbol-prefix", required=True)
     args, remaining = parser.parse_known_args()
     NM = args.nm
     LIBRARY = args.library
+    SYMBOL_PREFIX = args.symbol_prefix
+    _RENAMED_CXX_RE = re.compile(
+        r"^_?_Z(N|TVN|TTN|TIN|TSN|GVN)?%d%s"
+        % (len(SYMBOL_PREFIX), re.escape(SYMBOL_PREFIX))
+    )
     unittest.main(argv=[sys.argv[0]] + remaining)

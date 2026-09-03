@@ -21,6 +21,22 @@ class ItaniumComponentTest(unittest.TestCase):
     def test_component_is_length_prefixed(self):
         self.assertEqual(COMPONENT, "6IREE18")
 
+    def test_length_digit_follows_the_prefix(self):
+        # A fork setting its own prefix gets the right length digit, so the
+        # prefix is never spelled out with the digit attached.
+        self.assertEqual(gen_rename_map._itanium_component("AB"), "2AB")
+        self.assertEqual(
+            gen_rename_map._itanium_component("LONGERPREFIX"), "12LONGERPREFIX"
+        )
+
+    def test_rename_uses_the_given_component(self):
+        self.assertEqual(
+            gen_rename_map._renamed(
+                "_ZN4mlir3fooEv", "mlir::foo()", gen_rename_map._itanium_component("AB")
+            ),
+            "_ZN2AB4mlir3fooEv",
+        )
+
 
 class NeedsRenameTest(unittest.TestCase):
     def test_namespace_qualifiers_match(self):

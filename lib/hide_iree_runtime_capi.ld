@@ -8,8 +8,8 @@
 #
 # So hide every snake_case `iree_*` from the export table. Nothing else resolves
 # here by that spelling: the embedding C-API is camelCase, the MLIR C-API is
-# mlir*, and the renamed internals are _ZN6IREE18*. exported_symbols_test.py
-# keeps it that way.
+# mlir*, and the renamed internals carry the ABI prefix.
+# exported_symbols_test.py keeps it that way.
 {
   global: *;
   local: iree_*;
