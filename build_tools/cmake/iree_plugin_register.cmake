@@ -188,6 +188,25 @@ function(iree_compiler_register_dynamic_plugin)
 
   set(_NAME "iree_compiler_plugin_${_RULE_PLUGIN_ID}")
   iree_renamed_link_sanitize_name("${_NAME}" _BASE)
+  # The target's own libraries are not in libIREECompiler, so the plugin has to
+  # carry them, renamed alike. The walk skips whatever the compiler holds.
+  iree_collect_static_link_closure(_CLOSURE_LIBS _CLOSURE_OTHER "${_TARGET_NAME}")
+  get_property(_COMPILER_LIBS GLOBAL PROPERTY
+    IREE_RENAMED_SHARED_IMPL_OBJECT_LIBS)
+  set(_CLOSURE_ARCHIVES)
+  foreach(_LIB ${_CLOSURE_LIBS})
+    if(_LIB IN_LIST _COMPILER_LIBS)
+      continue()
+    endif()
+    iree_renamed_link_sanitize_name("${_NAME}_${_LIB}" _CLOSURE_BASE)
+    iree_renamed_archive(_CLOSURE_RENAMED
+      NAME "${_CLOSURE_BASE}"
+      INPUT "$<TARGET_FILE:${_LIB}>"
+      DEPENDS "${_LIB}"
+    )
+    list(APPEND _CLOSURE_ARCHIVES "${_CLOSURE_RENAMED}")
+  endforeach()
+
   iree_renamed_archive_from_objects(_RENAMED
     NAME
       "${_BASE}"
@@ -205,15 +224,19 @@ function(iree_compiler_register_dynamic_plugin)
   if(APPLE)
     target_link_options(${_NAME} PRIVATE
       "-Wl,-force_load,${_RENAMED}"
+      ${_CLOSURE_ARCHIVES}
       "-Wl,-undefined,dynamic_lookup"
     )
   else()
     # -shared leaves undefined symbols unresolved by default on ELF.
     target_link_options(${_NAME} PRIVATE
       "-Wl,--whole-archive" "${_RENAMED}" "-Wl,--no-whole-archive"
+      "-Wl,--start-group" ${_CLOSURE_ARCHIVES} "-Wl,--end-group"
     )
   endif()
-  add_custom_target(${_NAME}_renamed_deps DEPENDS "${_RENAMED}")
+  add_custom_target(${_NAME}_renamed_deps
+    DEPENDS "${_RENAMED}" ${_CLOSURE_ARCHIVES})
   add_dependencies(${_NAME} ${_NAME}_renamed_deps)
-  set_target_properties(${_NAME} PROPERTIES LINK_DEPENDS "${_RENAMED}")
+  set_target_properties(${_NAME} PROPERTIES
+    LINK_DEPENDS "${_RENAMED};${_CLOSURE_ARCHIVES}")
 endfunction()

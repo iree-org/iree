@@ -65,6 +65,9 @@ for _key, _value in list(config.environment.items()):
             config.environment[_key] = os.path.abspath(_candidate)
             break
 
+if config.environment.get("IREE_TEST_DEPS_PLUGIN"):
+    config.available_features.add("iree_dynamic_plugins")
+
 # Use the most preferred temp directory.
 config.test_exec_root = (
     os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")

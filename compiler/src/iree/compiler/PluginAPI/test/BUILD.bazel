@@ -41,21 +41,13 @@ cc_binary(
     deps = ["//compiler/src/iree/compiler/PluginAPI"],
 )
 
-# Registers a session, so loading it twice reaches the registrar.
-cc_binary(
-    name = "registering_plugin",
-    testonly = True,
-    srcs = ["plugins/registering_plugin.cpp"],
-    linkshared = True,
-    deps = ["//compiler/src/iree/compiler/PluginAPI"],
-)
-
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
             "invalid_options.txt",
             "invalid_plugin.txt",
+            "plugin_with_deps.txt",
             "hidden_visibility.txt",
             "undefined_symbol.txt",
             "valid_plugin.txt",
