@@ -76,6 +76,7 @@ renamed_cc_info(
 iree_renamed_compiler_abi(
     name = "IREECompilerShared",
     shared_library = ":IREECompiler",
+    static_closure = "//compiler/src/iree/compiler/API:StaticImpl",
     symbol_prefix = "IREE18",
     tags = ["skip-bazel_to_cmake"],
 )

@@ -21,6 +21,7 @@ load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_c
 
 RenamedCompilerAbiInfo = provider(fields = {
     "symbol_prefix": "Logical ABI prefix inserted as an Itanium component.",
+    "provided_owners": "Labels, as strings, of the archives inside the library.",
 })
 
 def _bzlmod_repo_name_matches(workspace_name, repo_name):
@@ -281,9 +282,12 @@ def _renamed_cc_info_impl(ctx):
     # attr keeps this usable alone, in tests or standalone wiring.
     symbol_prefix = ctx.attr.symbol_prefix
     compiler_workspace_name = None
+    provided_owners = {}
     if ctx.attr.compiler:
-        symbol_prefix = ctx.attr.compiler[RenamedCompilerAbiInfo].symbol_prefix
+        abi = ctx.attr.compiler[RenamedCompilerAbiInfo]
+        symbol_prefix = abi.symbol_prefix
         compiler_workspace_name = ctx.attr.compiler.label.workspace_name
+        provided_owners = abi.provided_owners or {}
     cc_toolchain = find_cpp_toolchain(ctx)
     feature_configuration = cc_common.configure_features(
         ctx = ctx,
@@ -310,12 +314,16 @@ def _renamed_cc_info_impl(ctx):
             if ctx.attr.direct_only and owner_label not in direct_owners:
                 continue
 
-            # Direct deps are the plugin's own code, renamed even when they
-            # share a repository with the compiler.
-            if (not ctx.attr.include_provided and
-                owner_label not in direct_owners and
-                _provided_by_compiler(owner, compiler_workspace_name)):
-                continue
+            # The compiler names what it holds, so anything else belongs to
+            # the plugin however deep in its graph it sits. Direct deps are
+            # kept outright, and the workspace test is the fallback for a
+            # consumer that named no compiler.
+            if not ctx.attr.include_provided and owner_label not in direct_owners:
+                if provided_owners:
+                    if owner_label in provided_owners:
+                        continue
+                elif _provided_by_compiler(owner, compiler_workspace_name):
+                    continue
 
             libraries = []
             for library in linker_input.libraries:
@@ -410,6 +418,14 @@ def _renamed_compiler_abi_impl(ctx):
         requested_features = ctx.features,
         unsupported_features = ctx.disabled_features,
     )
+
+    # What the library already holds. A plugin resolves these rather than
+    # carrying its own copy, and anything absent here is the plugin's own.
+    provided_owners = {}
+    if ctx.attr.static_closure:
+        for linker_input in ctx.attr.static_closure[CcInfo].linking_context.linker_inputs.to_list():
+            provided_owners[str(linker_input.owner)] = True
+
     library_to_link = cc_common.create_library_to_link(
         actions = ctx.actions,
         dynamic_library = ctx.file.shared_library,
@@ -425,7 +441,10 @@ def _renamed_compiler_abi_impl(ctx):
     )
     return [
         DefaultInfo(files = depset([ctx.file.shared_library])),
-        RenamedCompilerAbiInfo(symbol_prefix = ctx.attr.symbol_prefix),
+        RenamedCompilerAbiInfo(
+            symbol_prefix = ctx.attr.symbol_prefix,
+            provided_owners = provided_owners,
+        ),
         CcInfo(linking_context = linking_context),
     ]
 
@@ -434,6 +453,11 @@ iree_renamed_compiler_abi = rule(
     doc = "Wraps the renamed libIREECompiler shared library and its ABI prefix.",
     attrs = {
         "shared_library": attr.label(allow_single_file = True, mandatory = True),
+        "static_closure": attr.label(
+            providers = [CcInfo],
+            doc = "What the shared library was linked from, so a plugin can " +
+                  "tell the compiler's archives from its own.",
+        ),
         "symbol_prefix": attr.string(default = "IREE18"),
     },
     fragments = ["cpp"],
