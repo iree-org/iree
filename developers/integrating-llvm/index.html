@@ -5473,6 +5473,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#publishing-the-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing the integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pushing-changes-to-other-forked-submodules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5484,10 +5495,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#after-the-integrate" class="md-nav__link">
+  <a href="#after-the-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        After the integrate
+        After the integration
       
     </span>
   </a>
@@ -6224,6 +6235,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#publishing-the-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing the integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pushing-changes-to-other-forked-submodules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6235,10 +6257,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#after-the-integrate" class="md-nav__link">
+  <a href="#after-the-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        After the integrate
+        After the integration
       
     </span>
   </a>
@@ -6271,10 +6293,10 @@
 
 
 <h1 id="integrating-newer-llvm-in-iree">Integrating newer LLVM in IREE<a class="headerlink" href="#integrating-newer-llvm-in-iree" title="Permanent link">link</a></h1>
-<p>IREE tracks LLVM closely via a submodule at <code>third_party/llvm-project</code>. This page
-walks through the process of integrating a newer LLVM revision into IREE,
-including building and verifying the result and pushing any required adaptions to
-IREE's forked submodules.</p>
+<p>IREE tracks LLVM closely via a submodule at <code>third_party/llvm-project</code>. This
+page walks through the process of integrating a newer LLVM revision into IREE,
+including building and verifying the result and pushing any required adaptations
+to IREE's forked submodules.</p>
 <h2 id="general-points">General points<a class="headerlink" href="#general-points" title="Permanent link">link</a></h2>
 <p>The commands shown on this page assume a Linux environment.</p>
 <h2 id="setup-environment">Setup environment<a class="headerlink" href="#setup-environment" title="Permanent link">link</a></h2>
@@ -6309,16 +6331,16 @@ git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </
 git<span class="w"> </span>submodule<span class="w"> </span>update<span class="w"> </span>--init
 </code></pre></div>
 <p>Take a note of the git hash of the LLVM repository currently used by IREE.
-Check if there are any fixup commit from the earlier integrations:</p>
+Check if there are any fixup commits from the earlier integrations:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>status<span class="w">  </span><span class="c1"># should show detached HEAD pointing to the commit used in IREE's submodule</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">CURRENT_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
 git<span class="w"> </span>fetch<span class="w"> </span>-pP<span class="w"> </span>upstream
 <span class="nb">export</span><span class="w"> </span><span class="nv">BASE_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>merge-base<span class="w"> </span><span class="nv">$CURRENT_LLVM_HASH</span><span class="w"> </span>upstream/main<span class="k">)</span>
-git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span><span class="nv">$BASE_LLVM_HASH</span>
+git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span><span class="s2">"</span><span class="nv">$BASE_LLVM_HASH</span><span class="s2">..</span><span class="nv">$CURRENT_LLVM_HASH</span><span class="s2">"</span>
 </code></pre></div>
 <p>If there are no commits shown, the current LLVM integration is clean. If any
-commits are shown, those were needed in one of the previous integration to get
+commits are shown, those were needed in one of the previous integrations to get
 IREE to compile. Those commits should be checked in the ongoing integration
 (i.e. in the following steps) if those are still needed. The goal should be to
 drop those and go back to a clean LLVM integration. If that's not possible, it
@@ -6329,11 +6351,11 @@ upstream <code>main</code>:</p>
 git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 git<span class="w"> </span>rebase<span class="w"> </span>upstream/main
 </code></pre></div>
-<p>This will move the fixes shown above (if any) tot the top of the current LLVM
+<p>This will move the fixes shown above (if any) to the top of the current LLVM
 upstream main branch. Several things can happen with each of those commits:</p>
 <ul>
 <li>The commit might be dropped automatically: This means the same fix has been
-  applied upstream and git recognized it. All is good, nothing need to be done.</li>
+  applied upstream and git recognized it. All is good, nothing needs to be done.</li>
 <li>The commit becomes empty: If the commit had fixed an issue in upstream LLVM
   during the last integration and the issue has been fixed in LLVM in the
   same way, the commit might become empty. The rebase commit might halt due to
@@ -6350,7 +6372,7 @@ upstream main branch. Several things can happen with each of those commits:</p>
   this means in general. It might mean the issue got fixed in a different way.
   It might mean LLVM upstream moved further ahead and the fix does not work any
   more. It might also be something else. This needs to be investigated. An easy
-  try is to drop the commit and try if the integrate works anyways. Otherwise,
+  try is to drop the commit and try if the integrate works anyway. Otherwise,
   debugging is needed.</li>
 </ul>
 <p>Verify the new LLVM version by doing a trial build and run a few tests. This
@@ -6388,7 +6410,7 @@ bazel<span class="w"> </span>build<span class="w"> </span>-j<span class="w"> </s
 <h2 id="applying-fixes">Applying fixes<a class="headerlink" href="#applying-fixes" title="Permanent link">link</a></h2>
 <p>If anything goes wrong, try to fix it.</p>
 <p>If there is a build failure in an IREE file, it is usually using a type or a
-function from LLVM/MLIR that has just changes upstream. Try to identify the
+function from LLVM/MLIR that has just changed upstream. Try to identify the
 type or function and look up its definition in the LLVM repository. Then, find
 out if the LLVM file that defines it has been updated in the additional LLVM
 commits that are being added. It is usually helpful to check the new commits
@@ -6397,19 +6419,19 @@ function:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span><span class="nv">$BASE_LLVM_HASH</span>..<span class="w"> </span>--<span class="w"> </span>relative/path/of/llvm/file.h
 </code></pre></div>
-<p>If any commits are listed here, those have usually changed a type of a function
+<p>If any commits are listed here, those have usually changed a type or function
 in upstream LLVM. Try to understand the change and see what needs to be adapted
 in IREE. In some cases, it might be helpful to utilize an AI tool and ask it to
 analyze the surfaced commit and suggest the required changes to the IREE
 codebase. Always double-check the suggestions, because it might go wrong and
 make the problem worse.</p>
-<p>Serval approaches can be used to make the LLVM integration continue:</p>
+<p>Several approaches can be used to make the LLVM integration continue:</p>
 <ul>
 <li>Update the code in the IREE repo to adapt to the changed type or function.
   This is the most desired outcome, because it allows a clean LLVM integration.
   This does not cause any extra work in the following LLVM integrations.</li>
 <li>Cherry-pick a revert or a fixup from LLVM upstream. LLVM is moving fast. By
-  the time a problematic LLVM commit has been identified during a LLVM
+  the time a problematic LLVM commit has been identified during an LLVM
   integration into IREE, the issue might have been identified in LLVM upstream
   already. If so, there might already be a revert of the faulty commit or a
   fixup commit of the issue available upstream. If so, cherry-pick it.</li>
@@ -6426,8 +6448,15 @@ or torch-mlir, push the changes to branches there. (See
 below for copy-and-paste-able commands.)</p>
 <p>Please re-run all the verification steps in order to make sure that the LLVM
 integration works.</p>
+<h2 id="publishing-the-integration">Publishing the integration<a class="headerlink" href="#publishing-the-integration" title="Permanent link">link</a></h2>
 <p>If all the verification steps are successful, submit the branches to the IREE
 upstream repos:</p>
+<pre><code>The following push commands require write access to both
+`iree-org/llvm-project` and `iree-org/iree`. Contributors without write
+access should push the branches to personal forks, open the IREE pull
+request from their fork, and ask an IREE maintainer to mirror the LLVM
+integration branch into `iree-org/llvm-project`.
+</code></pre>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/llvm-project"</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>:sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 <span class="nb">export</span><span class="w"> </span><span class="nv">NEW_LLVM_HASH</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">' '</span><span class="w"> </span>-f<span class="w"> </span><span class="m">1</span><span class="k">)</span>
@@ -6436,7 +6465,7 @@ git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </
 <span class="nb">cd</span><span class="w"> </span>iree
 git<span class="w"> </span>add<span class="w"> </span>third_party/llvm-project
 git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Integrate LLVM to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2">"</span>
-git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message if any fixes / cherry-picks / reverts had been needed, mention LLVM commits that caused the need for adaptions</span>
+git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message if any fixes / cherry-picks / reverts had been needed, mention LLVM commits that caused the need for adaptations</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>integrates/llvm-<span class="nv">$DATE</span>:integrates/llvm-<span class="nv">$DATE</span>
 </code></pre></div>
 <p>Open a PR to IREE upstream <code>main</code>. Get it through CI. Get it merged.</p>
@@ -6449,24 +6478,25 @@ required changes to an integration branch in the IREE fork:</p>
 <div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span><span class="s2">"</span><span class="nv">$WORK_DIR</span><span class="s2">/iree/third_party/stablehlo"</span>
 git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 git<span class="w"> </span>add<span class="w"> </span>-p<span class="w">  </span><span class="c1"># confirm changes</span>
-git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Adaptions to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2"> for integrating LLVM into IREE"</span>
-git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message, mention what has been fixed and why, mention LLVM commits that caused the need for adaptions</span>
-git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>integrates/llvm-<span class="nv">$DATE</span>:integrates/llvm-<span class="nv">$DATE</span>
+git<span class="w"> </span>commit<span class="w"> </span>-s<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Adaptations to llvm/llvm-project@</span><span class="nv">$NEW_LLVM_HASH</span><span class="s2"> for integrating LLVM into IREE"</span>
+git<span class="w"> </span>commit<span class="w"> </span>--amend<span class="w">  </span><span class="c1"># add notes to body of commit message, mention what has been fixed and why, mention LLVM commits that caused the need for adaptations</span>
+git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>sm-iree-integrates/llvm-<span class="nv">$DATE</span>:sm-iree-integrates/llvm-<span class="nv">$DATE</span>
 </code></pre></div>
 <p>If such a patch to a submodule is required, a follow-up needs to be done once
 the LLVM integration into IREE is completed. It shall be checked in the upstream
 of the respective project, if it has already integrated a new LLVM version
 and potentially adapted to the issue that required patching already. If so, the
 submodule shall be updated to a more recent upstream version. The process is
-similar as described above for LLVM integrations. In general, going to a clean
-upstream version for the submodule is most desirable. Cherry-picking a fix from
-upstream or reverting a single commit is more desirable than a custom fix.</p>
+similar to the process described above for LLVM integrations. In general, going
+to a clean upstream version for the submodule is most desirable. Cherry-picking
+a fix from upstream or reverting a single commit is more desirable than a custom
+fix.</p>
 <p>If a custom fix is needed because the submodule project has not integrated with
 a recent LLVM version yet, it is recommended to open an LLVM integration PR for
 the submodule project and push the developed fix to the project's upstream in
 order to support the community and help IREE's fork to stay aligned with
 upstream.</p>
-<h2 id="after-the-integrate">After the integrate<a class="headerlink" href="#after-the-integrate" title="Permanent link">link</a></h2>
+<h2 id="after-the-integration">After the integration<a class="headerlink" href="#after-the-integration" title="Permanent link">link</a></h2>
 <p>If the integration required reverting a commit or implementing a custom fix in
 LLVM or any other submodule, the issue needs to be analyzed as a follow-up. It
 is possible that LLVM or other submodules have bugs, but it might also be that
@@ -6479,7 +6509,7 @@ surfaced by a newer submodule version and that there currently is a revert or
 fixup commit in IREE's fork of the submodule. In case of a fix PR, please
 consider performing another submodule integration after the fix PR is merged.</p>
 <p>If the bug is in the upstream of the submodule, please report the issue in the
-submodule' upstream github project. If you can fix the issue, please open a pull
+submodule's upstream github project. If you can fix the issue, please open a pull
 request to the submodule's upstream.</p>
 
 
