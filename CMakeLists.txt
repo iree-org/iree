@@ -572,6 +572,15 @@ if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
       "be unloaded before Tracy finishes, static linking is one workaround)")
 endif()
 
+if(IREE_COMPILER_DYNAMIC_PLUGINS AND NOT IREE_LINK_COMPILER_SHARED_LIBRARY)
+  message(SEND_ERROR
+      "IREE_COMPILER_DYNAMIC_PLUGINS requires "
+      "-DIREE_LINK_COMPILER_SHARED_LIBRARY=ON: a plugin resolves the renamed "
+      "ABI from libIREECompiler, which statically linked tools do not carry. "
+      "IREE_ENABLE_COMPILER_TRACING forces static linking, so it cannot be "
+      "combined with dynamic plugins")
+endif()
+
 if(IREE_ENABLE_THIN_ARCHIVES AND IREE_COMPILER_DYNAMIC_PLUGINS)
   message(SEND_ERROR
       "IREE_COMPILER_DYNAMIC_PLUGINS requires -DIREE_ENABLE_THIN_ARCHIVES=OFF "
