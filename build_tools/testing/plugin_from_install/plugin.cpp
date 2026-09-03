@@ -10,6 +10,7 @@
 
 #include <cstdio>
 
+#include "helper.h"
 #include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 #include "mlir/IR/MLIRContext.h"
 
@@ -17,7 +18,9 @@ static bool registerInstallTreePlugin(
     mlir::iree_compiler::PluginRegistrar* registrar) {
   (void)registrar;
   mlir::MLIRContext context;
-  (void)context.isMultithreadingEnabled();
+  if (!helperTouchesContext(&context)) {
+    return false;
+  }
   std::fprintf(stderr, "INSTALL_TREE_PLUGIN: renamed MLIRContext ok\n");
   return true;
 }

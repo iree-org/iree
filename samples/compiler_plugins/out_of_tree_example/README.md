@@ -92,6 +92,9 @@ cmake --install <build> --prefix <prefix> --component Compiler
 ```
 
 ```cmake
+set(CMAKE_CXX_STANDARD 17)               # what the llvm/mlir headers need
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(IREECompiler REQUIRED)      # -DIREECompiler_DIR=<prefix>/lib/cmake/IREE
 find_package(MLIR REQUIRED CONFIG)       # -DMLIR_DIR=..., -DLLVM_DIR=...
 
