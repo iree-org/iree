@@ -52,4 +52,4 @@ static bool registerOotexPlugin(
   return true;
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(ootex, registerOotexPlugin)
+IREE_DEFINE_COMPILER_PLUGIN(ootex, registerOotexPlugin, "0.1")

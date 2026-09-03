@@ -183,8 +183,8 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
   if (info.apiVersion != IREE_COMPILER_PLUGIN_API_VERSION) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
-        "plugin '%s' was built against plugin API version %d, this compiler "
-        "speaks %d",
+        "plugin '%s' was built against plugin API version %u, this compiler "
+        "speaks %u",
         plugin.path.c_str(), info.apiVersion, IREE_COMPILER_PLUGIN_API_VERSION);
   }
 
@@ -192,9 +192,10 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
   if (std::strcmp(info.abiHash, IREE_COMPILER_PLUGIN_ABI_HASH) != 0) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
-        "plugin '%s' was built against plugin API headers %s, this compiler "
-        "has %s",
-        plugin.path.c_str(), info.abiHash, IREE_COMPILER_PLUGIN_ABI_HASH);
+        "plugin '%s' (%s) was built against plugin API headers %s, this "
+        "compiler has %s",
+        plugin.path.c_str(), info.pluginVersion, info.abiHash,
+        IREE_COMPILER_PLUGIN_ABI_HASH);
   }
   if (!info.pluginId || !info.registerPlugin) {
     return llvm::createStringError(

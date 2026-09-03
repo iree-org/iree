@@ -8,11 +8,13 @@
 // refused before its registration function is reached.
 
 #include <stdbool.h>
+#include <stdint.h>
 
 struct IreeCompilerPluginInfo {
-  int apiVersion;
+  uint32_t apiVersion;
   const char *abiHash;
   const char *pluginId;
+  const char *pluginVersion;
   bool (*registerPlugin)(void *registrar);
 };
 
@@ -22,8 +24,8 @@ static bool register_other_headers_plugin(void *registrar) {
 }
 
 struct IreeCompilerPluginInfo iree_get_compiler_plugin_info(void) {
-  struct IreeCompilerPluginInfo info = {2, "0000000000000000",
-                                        "from_other_headers",
+  struct IreeCompilerPluginInfo info = {3, "0000000000000000",
+                                        "from_other_headers", "test",
                                         register_other_headers_plugin};
   return info;
 }

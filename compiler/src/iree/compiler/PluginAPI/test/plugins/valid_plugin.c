@@ -8,14 +8,16 @@
 // that a plugin written in plain C stays provably loadable.
 
 #include <stdbool.h>
+#include <stdint.h>
 
 // A bare #define, so plain C can take the one value it cannot know.
 #include "iree/compiler/PluginAPI/PluginABIHash.h"
 
 struct IreeCompilerPluginInfo {
-  int apiVersion;
+  uint32_t apiVersion;
   const char *abiHash;
   const char *pluginId;
+  const char *pluginVersion;
   bool (*registerPlugin)(void *registrar);
 };
 
@@ -25,8 +27,8 @@ static bool register_sample_plugin(void *registrar) {
 }
 
 struct IreeCompilerPluginInfo iree_get_compiler_plugin_info(void) {
-  struct IreeCompilerPluginInfo info = {2, IREE_COMPILER_PLUGIN_ABI_HASH,
-                                        "sample_plugin",
+  struct IreeCompilerPluginInfo info = {3, IREE_COMPILER_PLUGIN_ABI_HASH,
+                                        "sample_plugin", "test",
                                         register_sample_plugin};
   return info;
 }

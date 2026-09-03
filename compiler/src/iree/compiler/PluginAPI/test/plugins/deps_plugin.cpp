@@ -14,4 +14,4 @@ static bool registerDepsPlugin(mlir::iree_compiler::PluginRegistrar *r) {
   return iree_plugin_test::helperSucceeded();
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(deps_plugin, registerDepsPlugin)
+IREE_DEFINE_COMPILER_PLUGIN(deps_plugin, registerDepsPlugin, "test")

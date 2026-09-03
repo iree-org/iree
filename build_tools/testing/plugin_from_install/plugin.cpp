@@ -25,4 +25,5 @@ static bool registerInstallTreePlugin(
   return true;
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(install_tree_probe, registerInstallTreePlugin)
+IREE_DEFINE_COMPILER_PLUGIN(install_tree_probe, registerInstallTreePlugin,
+                            "0.1")

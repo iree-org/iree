@@ -14,4 +14,4 @@ static bool registerHiddenPlugin(mlir::iree_compiler::PluginRegistrar *r) {
   return true;
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(hidden_plugin, registerHiddenPlugin)
+IREE_DEFINE_COMPILER_PLUGIN(hidden_plugin, registerHiddenPlugin, "test")

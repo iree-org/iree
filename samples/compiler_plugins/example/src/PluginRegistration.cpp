@@ -67,4 +67,5 @@ static bool registerExamplePlugin(
   return true;
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(IREE_EXAMPLE_PLUGIN_ID, registerExamplePlugin)
+IREE_DEFINE_COMPILER_PLUGIN(IREE_EXAMPLE_PLUGIN_ID, registerExamplePlugin,
+                            "0.1")

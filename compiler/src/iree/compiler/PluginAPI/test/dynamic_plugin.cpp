@@ -21,4 +21,5 @@ registerDynamicTestPlugin(mlir::iree_compiler::PluginRegistrar *registrar) {
   return true;
 }
 
-IREE_DEFINE_COMPILER_PLUGIN(dynamic_test_plugin, registerDynamicTestPlugin)
+IREE_DEFINE_COMPILER_PLUGIN(dynamic_test_plugin, registerDynamicTestPlugin,
+                            "test")

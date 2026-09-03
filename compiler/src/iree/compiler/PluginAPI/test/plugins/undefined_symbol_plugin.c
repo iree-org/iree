@@ -8,10 +8,13 @@
 // mid-compilation instead.
 
 #include <stdbool.h>
+#include <stdint.h>
 
 struct IreeCompilerPluginInfo {
-  int apiVersion;
+  uint32_t apiVersion;
+  const char *abiHash;
   const char *pluginId;
+  const char *pluginVersion;
   bool (*registerPlugin)(void *registrar);
 };
 
@@ -23,7 +26,7 @@ static bool register_undefined_plugin(void *registrar) {
 }
 
 struct IreeCompilerPluginInfo iree_get_compiler_plugin_info(void) {
-  struct IreeCompilerPluginInfo info = {1, "undefined_plugin",
+  struct IreeCompilerPluginInfo info = {3, "", "undefined_plugin", "test",
                                         register_undefined_plugin};
   return info;
 }

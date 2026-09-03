@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_PLUGINAPI_PLUGINENTRYPOINT_H_
 #define IREE_COMPILER_PLUGINAPI_PLUGINENTRYPOINT_H_
 
+#include <cstdint>
+
 #include "iree/compiler/PluginAPI/PluginABIHash.h"
 
 namespace mlir::iree_compiler {
@@ -18,15 +20,23 @@ extern "C" {
 // Bump on any change to IreeCompilerPluginInfo or to what a registration
 // function may do. A plugin built against another value is rejected at load
 // rather than left to fail on its first virtual call.
-#define IREE_COMPILER_PLUGIN_API_VERSION 2
+#define IREE_COMPILER_PLUGIN_API_VERSION 3
 
+// Shaped after llvm::PassPluginLibraryInfo and mlir::DialectPluginLibraryInfo,
+// so a plugin author meets the arrangement they already know.
+//
+// apiVersion stays first and stays four bytes: it is the one field that must
+// be readable from a struct written to any other version of this contract.
 struct IreeCompilerPluginInfo {
-  int apiVersion;
+  uint32_t apiVersion;
   // Hash of the headers the plugin compiled against. The version above covers
   // this struct alone, so nothing else would catch a changed Client.h.
   const char *abiHash;
-  // Both owned by the plugin and valid for the life of the process.
+  // All three owned by the plugin and valid for the life of the process.
   const char *pluginId;
+  // The plugin's own version, reported back in diagnostics. Free-form, and
+  // never interpreted, as in LLVM and MLIR.
+  const char *pluginVersion;
   bool (*registerPlugin)(mlir::iree_compiler::PluginRegistrar *registrar);
 };
 
@@ -53,10 +63,11 @@ struct IreeCompilerPluginInfo {
 //
 // Indirect so that a caller may pass a macro as the id: ## does not expand its
 // own argument.
-#define IREE_DEFINE_COMPILER_PLUGIN(plugin_id, register_fn)                    \
-  IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn)
+#define IREE_DEFINE_COMPILER_PLUGIN(plugin_id, register_fn, plugin_version)    \
+  IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn, plugin_version)
 
-#define IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn)               \
+#define IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn,               \
+                                         plugin_version)                       \
   extern "C" IREE_COMPILER_PLUGIN_EXPORT bool                                  \
   iree_register_compiler_plugin_##plugin_id(                                   \
       mlir::iree_compiler::PluginRegistrar *registrar) {                       \
@@ -69,6 +80,7 @@ struct IreeCompilerPluginInfo {
         IREE_COMPILER_PLUGIN_API_VERSION,                                      \
         IREE_COMPILER_PLUGIN_ABI_HASH,                                         \
         #plugin_id,                                                            \
+        plugin_version,                                                        \
         &iree_register_compiler_plugin_##plugin_id,                            \
     };                                                                         \
     return info;                                                               \
