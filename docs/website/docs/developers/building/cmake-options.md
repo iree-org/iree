@@ -136,6 +136,16 @@ Individual options enabling each set of input dialects:
 * `IREE_INPUT_TORCH`
 * `IREE_INPUT_TOSA`
 
+### `IREE_COMPILER_DYNAMIC_PLUGINS`
+
+* type: BOOL
+
+Builds compiler plugins as shared libraries that `iree-compile` loads at run
+time through `--iree-load-plugin`. Defaults to `OFF`. Requires
+`-DIREE_ENABLE_THIN_ARCHIVES=OFF`, because the plugins resolve against a
+renamed copy of the compiler's symbols and the rename cannot rewrite a thin
+archive. See `compiler/src/iree/compiler/PluginAPI/README.md`.
+
 ### `IREE_OUTPUT_FORMAT_C`
 
 * type: BOOL

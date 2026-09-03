@@ -28,8 +28,11 @@ iree-compile --iree-load-plugin=/path/to/libiree_compiler_plugin_ootex.so \
 ```
 
 ```mlir
-util.func public @marked() attributes {ootex.tag = "hello"} {
+util.func private @_marked() attributes {..., ootex.tag = "hello"} {
 ```
+
+The tag lands on the private function because IREE's ABI pass has already moved
+the marked body there.
 
 `--ootex-tag` is an ordinary compiler flag. The plugin registers it before
 `llvm::cl` parses, which is why a plugin can add options at all.
@@ -66,21 +69,17 @@ same way and resolves against the compiler, which means it must match the
 compiler's build:
 
 - The host's RTTI and exception settings. A plugin compiled with RTTI against
-  a `-fno-rtti` compiler emits typeinfo references nothing resolves. The two
-  build systems disagree here: CMake compiles IREE with `-fno-rtti
-  -fno-exceptions`, Bazel with neither flag, so `OOTEX_COPTS` in `BUILD.bazel`
-  matches the CMake-built host this example is loaded into.
+  a `-fno-rtti` compiler emits typeinfo references nothing resolves. Building
+  the plugin in the same tree as the compiler gets this right for free: CMake
+  compiles both with `-fno-rtti -fno-exceptions`, Bazel compiles both with
+  neither flag. An out-of-tree build has to match its host by hand.
 - The same IREE revision. `IREE_COMPILER_PLUGIN_API_VERSION` catches a changed
   entry point, not a changed `Client.h`.
-- A host built with `IREE_COMPILER_DYNAMIC_PLUGINS=ON`. A stock `iree-compile`
-  exports no compiler symbols, so a plugin touching MLIR cannot load into it.
+- Under CMake, a host built with `IREE_COMPILER_DYNAMIC_PLUGINS=ON`: without it
+  `iree-compile` exports no compiler symbols, and a plugin touching MLIR has
+  nothing to bind to. Bazel exports them either way.
 
 ## Limits worth knowing
-
-Bazel's `//tools:iree-compile` links the un-renamed static compiler, so it
-cannot host a renamed plugin. The Bazel-built plugin above is loaded into a
-CMake-built `iree-compile`. Making Bazel's tools link `//lib:IREECompiler`
-would close that.
 
 There is no installed CMake package for out-of-tree consumers yet: building a
 plugin needs the IREE source tree, through `IREE_CMAKE_PLUGIN_PATHS`.
