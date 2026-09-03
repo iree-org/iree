@@ -24,6 +24,7 @@ target_compile_options(iree_compiler_PluginAPI_test_hidden_visibility_plugin
 target_link_libraries(iree_compiler_PluginAPI_test_hidden_visibility_plugin
   PRIVATE iree::compiler::PluginAPI)
 
+
 iree_lit_test_suite(
   NAME
     lit

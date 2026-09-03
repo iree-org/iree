@@ -90,11 +90,19 @@ llvm::Error DynamicPluginRegistry::initialize(llvm::ArrayRef<const char *> args,
 }
 
 void DynamicPluginRegistry::addPlugin(llvm::Expected<Plugin> plugin) {
-  if (plugin) {
-    plugins.push_back(std::move(*plugin));
+  if (!plugin) {
+    loadErrors = llvm::joinErrors(std::move(loadErrors), plugin.takeError());
     return;
   }
-  loadErrors = llvm::joinErrors(std::move(loadErrors), plugin.takeError());
+  // Naming one library twice is ordinary, and a second registration of an id
+  // aborts inside the registrar.
+  for (const Plugin &existing : plugins) {
+    if (existing.path == plugin->path ||
+        existing.pluginId == plugin->pluginId) {
+      return;
+    }
+  }
+  plugins.push_back(std::move(*plugin));
 }
 
 bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,

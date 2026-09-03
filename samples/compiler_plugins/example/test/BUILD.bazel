@@ -28,7 +28,10 @@ iree_lit_test_suite(
 # shared library and runs this test.
 iree_lit_test_suite(
     name = "lit_dynamic",
-    srcs = ["dynamic_link.mlir"],
+    srcs = [
+        "duplicate_link.mlir",
+        "dynamic_link.mlir",
+    ],
     cfg = "//samples:lit.cfg.py",
     data = ["//samples/compiler_plugins/example:iree_compiler_plugin_example_dyn"],
     env = {

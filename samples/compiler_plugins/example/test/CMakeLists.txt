@@ -22,6 +22,7 @@ if(IREE_COMPILER_DYNAMIC_PLUGINS)
       lit_dynamic
     SRCS
       "dynamic_link.mlir"
+      "duplicate_link.mlir"
     TOOLS
       FileCheck
       iree-compile
@@ -34,9 +35,11 @@ if(IREE_COMPILER_DYNAMIC_PLUGINS)
   if(IREE_BUILD_TESTS)
     iree_package_ns(_PACKAGE_NS)
     string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-    set_property(TEST "${_PACKAGE_PATH}/dynamic_link.mlir.test"
-      APPEND PROPERTY ENVIRONMENT
-      "IREE_EXAMPLE_DYN_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_example_dyn>"
-    )
+    foreach(_TEST_SRC "dynamic_link.mlir" "duplicate_link.mlir")
+      set_property(TEST "${_PACKAGE_PATH}/${_TEST_SRC}.test"
+        APPEND PROPERTY ENVIRONMENT
+        "IREE_EXAMPLE_DYN_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_example_dyn>"
+      )
+    endforeach()
   endif()
 endif()
