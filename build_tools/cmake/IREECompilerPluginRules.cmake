@@ -15,11 +15,18 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # LLVM's own tools, not binutils: the rename decides from demangled text, and
 # the two demanglers disagree on a handful of symbols. A symbol either side
-# misses is one the plugin cannot resolve at load. Override if yours are named
-# differently.
-find_program(IREE_LLVM_NM NAMES llvm-nm REQUIRED)
-find_program(IREE_LLVM_CXXFILT NAMES llvm-cxxfilt REQUIRED)
-find_program(IREE_LLVM_OBJCOPY NAMES llvm-objcopy REQUIRED)
+# misses is one the plugin cannot resolve at load.
+#
+# Looked up on first use, by which point the caller has found LLVM, so these
+# come from the same LLVM the compiler was built with. Set them to override.
+macro(_iree_find_rename_tools)
+  find_program(IREE_LLVM_NM
+    NAMES llvm-nm HINTS "${LLVM_TOOLS_BINARY_DIR}" REQUIRED)
+  find_program(IREE_LLVM_CXXFILT
+    NAMES llvm-cxxfilt HINTS "${LLVM_TOOLS_BINARY_DIR}" REQUIRED)
+  find_program(IREE_LLVM_OBJCOPY
+    NAMES llvm-objcopy HINTS "${LLVM_TOOLS_BINARY_DIR}" REQUIRED)
+endmacro()
 
 # Parameters:
 # PLUGIN_ID: Id the plugin reports and --iree-plugin= activates.
@@ -31,6 +38,8 @@ function(iree_compiler_register_dynamic_plugin)
   if(NOT _RULE_PLUGIN_ID OR NOT _RULE_TARGET)
     message(FATAL_ERROR "PLUGIN_ID and TARGET are required")
   endif()
+
+  _iree_find_rename_tools()
 
   set(_name "iree_compiler_plugin_${_RULE_PLUGIN_ID}")
   set(_dir "${CMAKE_CURRENT_BINARY_DIR}/${_name}.renamed")
