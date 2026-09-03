@@ -96,6 +96,36 @@ module @all_bindings_dropped {
 }
 
 // -----
+// Verify duplicate bindings are only materialized once.
+// CHECK-LABEL: @duplicate_binding
+module @duplicate_binding {
+  func.func @main(%arg0: !torch.vtensor<[1,?],si64>) -> !torch.vtensor<[1,?],si64> attributes {torch.assume_strict_symbolic_shapes} {
+    // CHECK-COUNT-1: torch_c.to_builtin_tensor %arg0
+    // CHECK-COUNT-1: flow.tensor.tie_shape
+    // CHECK-COUNT-1: torch_c.from_builtin_tensor
+    // CHECK-NOT: torch.bind_symbolic_shape
+    %0 = torch.symbolic_int "s0" {min_val = 2, max_val = 65} : !torch.int
+    torch.bind_symbolic_shape %arg0, [%0], affine_map<()[s0] -> (1, s0 * 32)> : !torch.vtensor<[1,?],si64>
+    %int1 = torch.constant.int 1
+    %1 = torch.aten.add.Scalar %arg0, %int1, %int1 : !torch.vtensor<[1,?],si64>, !torch.int, !torch.int -> !torch.vtensor<[1,?],si64>
+    torch.bind_symbolic_shape %arg0, [%0], affine_map<()[s0] -> (1, s0 * 32)> : !torch.vtensor<[1,?],si64>
+    return %1 : !torch.vtensor<[1,?],si64>
+  }
+}
+
+// -----
+module @conflicting_duplicate_binding {
+  func.func @main(%arg0: !torch.vtensor<[1,?],si64>) {
+    %0 = torch.symbolic_int "s0" {min_val = 2, max_val = 65} : !torch.int
+    // expected-note@+1 {{previous binding is here}}
+    torch.bind_symbolic_shape %arg0, [%0], affine_map<()[s0] -> (1, s0 * 32)> : !torch.vtensor<[1,?],si64>
+    // expected-error@+1 {{conflicting symbolic shape bindings for the same value}}
+    torch.bind_symbolic_shape %arg0, [%0], affine_map<()[s0] -> (1, s0 * 16)> : !torch.vtensor<[1,?],si64>
+    return
+  }
+}
+
+// -----
 // CHECK-LABEL: @add_expr
 module @add_expr {
   func.func @main(%arg0: !torch.vtensor<[?,?],f32>, %arg1: !torch.vtensor<[?,?],f32>) {
