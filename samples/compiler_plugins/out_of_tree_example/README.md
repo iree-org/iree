@@ -79,7 +79,32 @@ compiler's build:
   `iree-compile` exports no compiler symbols, and a plugin touching MLIR has
   nothing to bind to. Bazel exports them either way.
 
-## Limits worth knowing
+## Building against an install tree
 
-There is no installed CMake package for out-of-tree consumers yet: building a
-plugin needs the IREE source tree, through `IREE_CMAKE_PLUGIN_PATHS`.
+This sample lives in the IREE tree and is reached through
+`IREE_CMAKE_PLUGIN_PATHS`. A plugin in another repository instead installs IREE
+and finds it:
+
+```sh
+cmake --install <build> --prefix <prefix> --component IREECMakeExports
+cmake --install <build> --prefix <prefix> --component IREEDevLibraries-Compiler
+cmake --install <build> --prefix <prefix> --component Compiler
+```
+
+```cmake
+find_package(IREECompiler REQUIRED)      # -DIREECompiler_DIR=<prefix>/lib/cmake/IREE
+find_package(MLIR REQUIRED CONFIG)       # -DMLIR_DIR=..., -DLLVM_DIR=...
+
+add_library(registration STATIC "plugin.cpp")
+target_link_libraries(registration PRIVATE iree_compiler_PluginAPI_headers)
+
+iree_compiler_register_dynamic_plugin(
+  PLUGIN_ID my_plugin
+  TARGET registration
+)
+```
+
+`find_package(IREECompiler)` brings the plugin headers, the rename script and
+`IREE_COMPILER_ABI_PREFIX`. IREE installs no llvm/mlir headers, so MLIR has to
+come from wherever the compiler was built from — the build tree serves, as in
+`build_tools/testing/test_plugin_from_install.sh`.

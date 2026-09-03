@@ -68,7 +68,10 @@ take the compiler down with it. Registration is otherwise identical to the
 static case, and the same source can serve both.
 
 Both build systems provide `iree_compiler_register_dynamic_plugin`, which
-builds the library and applies the ABI rename described below.
+builds the library and applies the ABI rename described below. An install tree
+provides the same rule through `find_package(IREECompiler)`, so a plugin in
+another repository needs no IREE sources; see
+`samples/compiler_plugins/out_of_tree_example/README.md`.
 
 #### What a dynamic plugin has to agree with
 
@@ -87,8 +90,11 @@ constrains its build:
 * The plugin's RTTI and exception settings must match the compiler's.
   Building the plugin in the IREE tree gets this right on its own; an
   out-of-tree build has to match its host by hand.
-* The same IREE revision. The API version catches a changed entry point, not
-  a changed `Client.h`.
+* The same plugin API headers. `IREE_COMPILER_PLUGIN_ABI_HASH` covers
+  `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h` and
+  `Utils/OptionUtils.h`; a plugin reporting another hash is refused at load.
+  The llvm/mlir headers behind them are not hashed — building from the same
+  tree is what makes those agree, and the rename is what enforces it.
 
 ## Extension points
 
