@@ -18,7 +18,7 @@ import tempfile
 import lit.formats
 
 config.name = "IREE"
-config.suffixes = [".mlir", ".txt", ".c"]
+config.suffixes = [".mlir", ".txt"]
 config.test_format = lit.formats.ShTest(
     execute_external=True, force_execute_external=True
 )
