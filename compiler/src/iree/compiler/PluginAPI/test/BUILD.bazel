@@ -26,6 +26,7 @@ package(
         "valid_plugin",
         "invalid_plugin",
         "version_mismatch_plugin",
+        "undefined_symbol_plugin",
     ]
 ]
 
@@ -56,6 +57,7 @@ iree_lit_test_suite(
             "invalid_options.txt",
             "invalid_plugin.txt",
             "hidden_visibility.txt",
+            "undefined_symbol.txt",
             "valid_plugin.txt",
             "version_mismatch.txt",
         ],
@@ -65,6 +67,7 @@ iree_lit_test_suite(
     data = [
         ":hidden_visibility_plugin",
         ":invalid_plugin",
+        ":undefined_symbol_plugin",
         ":valid_plugin",
         ":version_mismatch_plugin",
     ],
@@ -73,6 +76,7 @@ iree_lit_test_suite(
         "IREE_TEST_INVALID_PLUGIN": "$(rootpath :invalid_plugin)",
         "IREE_TEST_VERSION_MISMATCH_PLUGIN": "$(rootpath :version_mismatch_plugin)",
         "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN": "$(rootpath :hidden_visibility_plugin)",
+        "IREE_TEST_UNDEFINED_SYMBOL_PLUGIN": "$(rootpath :undefined_symbol_plugin)",
     },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//os:macos"],

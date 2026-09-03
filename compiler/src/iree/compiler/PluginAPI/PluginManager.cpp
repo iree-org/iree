@@ -11,6 +11,10 @@
 
 #include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
+
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/CommandLine.h"
@@ -148,19 +152,24 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
   Plugin plugin;
   plugin.path = path.str();
 
-  std::string loadErrMsg;
-  plugin.library = llvm::sys::DynamicLibrary::getPermanentLibrary(
-      plugin.path.c_str(), &loadErrMsg);
-  if (!plugin.library.isValid()) {
+#if defined(_WIN32)
+  return llvm::createStringError(
+      llvm::inconvertibleErrorCode(),
+      "dynamic plugins are not supported on Windows");
+#else
+  // Not llvm::sys::DynamicLibrary: it dlopens RTLD_LAZY, which defers a missing
+  // symbol to the first call.
+  plugin.library = ::dlopen(plugin.path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  if (!plugin.library) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "could not load plugin library '%s': %s",
-                                   plugin.path.c_str(), loadErrMsg.c_str());
+                                   plugin.path.c_str(), ::dlerror());
   }
 
   // Casting a symbol address to a function pointer is guaranteed by POSIX,
   // and only conditionally supported by the standard.
   auto getInfo = reinterpret_cast<IreeCompilerPluginInfo (*)()>(
-      plugin.library.getAddressOfSymbol(IREE_COMPILER_PLUGIN_INFO_SYMBOL_NAME));
+      ::dlsym(plugin.library, IREE_COMPILER_PLUGIN_INFO_SYMBOL_NAME));
   if (!getInfo) {
     return llvm::createStringError(llvm::inconvertibleErrorCode(),
                                    "plugin '%s' defines no %s; declare it with "
@@ -187,6 +196,7 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
   plugin.pluginId = info.pluginId;
   plugin.registerFunction = info.registerPlugin;
   return plugin;
+#endif // _WIN32
 }
 
 void DynamicPluginRegistry::loadPluginsFromCL(

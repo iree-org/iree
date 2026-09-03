@@ -17,7 +17,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Error.h"
 
 namespace mlir::iree_compiler {
@@ -65,7 +64,9 @@ private:
   struct Plugin {
     std::string path;
     std::string pluginId;
-    llvm::sys::DynamicLibrary library;
+    // RTLD_NOW, so a missing symbol fails here and not mid-compilation. Never
+    // closed: a registered plugin's code must outlive every session.
+    void *library = nullptr;
     PluginRegistrationFunction registerFunction = nullptr;
 
     /// The id comes from the library, so a caller needs only the path.
