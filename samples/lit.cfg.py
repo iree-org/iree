@@ -30,19 +30,19 @@ config.environment.update(
     }
 )
 
-# Set by CMake, absolute, or by Bazel, relative to the runfiles root.
-_dyn_plugin = config.environment.get("IREE_EXAMPLE_DYN_PLUGIN")
-if _dyn_plugin and not os.path.isabs(_dyn_plugin):
-    _srcdir = os.environ.get("TEST_SRCDIR", "")
-    for _root in [_srcdir, os.path.join(_srcdir, "_main"), os.getcwd()]:
-        _candidate = os.path.join(_root, _dyn_plugin)
+# Bazel hands these over relative to the runfiles root, CMake absolute. Resolve
+# so one RUN line serves both.
+_test_srcdir = os.environ.get("TEST_SRCDIR", "")
+for _key, _value in list(config.environment.items()):
+    if not _key.endswith("_PLUGIN") or not _value or os.path.isabs(_value):
+        continue
+    for _root in (_test_srcdir, os.path.join(_test_srcdir, "_main"), os.getcwd()):
+        _candidate = os.path.join(_root, _value)
         if os.path.exists(_candidate):
-            _dyn_plugin = os.path.abspath(_candidate)
-            config.environment["IREE_EXAMPLE_DYN_PLUGIN"] = _dyn_plugin
+            config.environment[_key] = os.path.abspath(_candidate)
             break
-    else:
-        _dyn_plugin = None
-if _dyn_plugin:
+
+if config.environment.get("IREE_EXAMPLE_DYN_PLUGIN"):
     config.available_features.add("iree_dynamic_plugins")
 
 # Use the most preferred temp directory.

@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -12,21 +13,44 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Built rather than compiled inside a RUN line, so the tests need no compiler of
+# their own. Plain C, and deliberately not renamed: they are never registered.
+[
+    cc_binary(
+        name = plugin,
+        testonly = True,
+        srcs = ["plugins/%s.c" % plugin],
+        linkshared = True,
+    )
+    for plugin in [
+        "valid_plugin",
+        "invalid_plugin",
+        "version_mismatch_plugin",
+    ]
+]
+
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
             "invalid_options.txt",
-            "invalid_plugin.c",
-            "valid_plugin.c",
-            "version_mismatch.c",
+            "invalid_plugin.txt",
+            "valid_plugin.txt",
+            "version_mismatch.txt",
         ],
-        include = [
-            "*.txt",
-            "*.c",
-        ],
+        include = ["*.txt"],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = [
+        ":invalid_plugin",
+        ":valid_plugin",
+        ":version_mismatch_plugin",
+    ],
+    env = {
+        "IREE_TEST_VALID_PLUGIN": "$(rootpath :valid_plugin)",
+        "IREE_TEST_INVALID_PLUGIN": "$(rootpath :invalid_plugin)",
+        "IREE_TEST_VERSION_MISMATCH_PLUGIN": "$(rootpath :version_mismatch_plugin)",
+    },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//os:macos"],
         "@platforms//os:linux": ["@platforms//os:linux"],
@@ -35,7 +59,6 @@ iree_lit_test_suite(
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",
-        "@llvm-project//clang",
         "@llvm-project//llvm:FileCheck",
     ],
 )

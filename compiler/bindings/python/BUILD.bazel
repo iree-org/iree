@@ -373,6 +373,8 @@ cc_binary(
         # Added for upstream LLVM commit 5a112dedff3b (Oct 2025).
         # IREECompilerDialectsModule.cpp includes "mlir-c/Target/LLVMIR.h" for translate_module_to_llvmir.
         "@llvm-project//mlir:CAPITarget",
+        # The same file includes "mlir-c/Target/ExportSMTLIB.h".
+        "@llvm-project//mlir:CAPISMTHeaders",
         "@nanobind",
     ],
 )

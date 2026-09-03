@@ -53,9 +53,17 @@ if platform.system() == "Darwin" and "SDKROOT" not in config.environment:
     except (OSError, subprocess.CalledProcessError):
         pass
 
-# Tests that compile a plugin use the build's own C compiler, which CMake
-# passes in. Falling back to PATH keeps them runnable outside that.
-config.substitutions.append(("%host_cc", os.environ.get("IREE_HOST_CC") or "clang"))
+# Bazel hands these over relative to the runfiles root, CMake absolute. Resolve
+# so one RUN line serves both.
+_test_srcdir = os.environ.get("TEST_SRCDIR", "")
+for _key, _value in list(config.environment.items()):
+    if not _key.endswith("_PLUGIN") or not _value or os.path.isabs(_value):
+        continue
+    for _root in (_test_srcdir, os.path.join(_test_srcdir, "_main"), os.getcwd()):
+        _candidate = os.path.join(_root, _value)
+        if os.path.exists(_candidate):
+            config.environment[_key] = os.path.abspath(_candidate)
+            break
 
 # Use the most preferred temp directory.
 config.test_exec_root = (

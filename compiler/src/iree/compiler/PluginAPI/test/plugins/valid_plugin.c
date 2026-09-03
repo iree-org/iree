@@ -1,8 +1,11 @@
-// clang-format off
-// RUN: mkdir -p %t
-// RUN: %host_cc -fPIC -shared -o %t/libvalid_plugin.so %s
-// RUN: iree-opt --iree-load-plugin=%t/libvalid_plugin.so --help
-// clang-format on
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// Spells the ABI by hand rather than through IREE_DEFINE_COMPILER_PLUGIN, so
+// that a plugin written in plain C stays provably loadable.
 
 #include <stdbool.h>
 
