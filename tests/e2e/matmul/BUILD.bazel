@@ -176,7 +176,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
                                        "arm_64:dotprod:+dotprod",
                                        "arm_64:i8mm:+i8mm",
                                        "x86_64:avx512vnni:" + ",".join(X86_64_AVX512_VNNI),
-                                       "riscv_64:ime:+v,+zvl256b,+xsmtvdot",
+                                       "riscv_64:ime:+m,+a,+f,+d,+c,+v,+zvl256b,+xsmtvdot",
                                    ] if lhs_rhs_type == "i8" and acc_type == "i32" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
@@ -473,10 +473,8 @@ iree_generated_e2e_runner_test(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    # The riscv_64: prefix enables this variant only on RISC-V builds; the
-    # actual RVV cpu features are supplied by the toolchain's default test
-    # flags, so the features listed here are only a label.
-    target_cpu_features_variants = ["riscv_64:rvv:+v,+zvl512b"],
+    # RISC-V only.
+    target_cpu_features_variants = ["riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
 ) for (variant_prefix, extra_compiler_flags) in [
