@@ -13,6 +13,17 @@ foreach(_PLUGIN "valid_plugin" "invalid_plugin" "version_mismatch_plugin")
     POSITION_INDEPENDENT_CODE ON)
 endforeach()
 
+# Hidden visibility is what an out-of-tree plugin is normally built with, so
+# the macro must export the entry point without help.
+add_library(iree_compiler_PluginAPI_test_hidden_visibility_plugin MODULE
+  "plugins/hidden_visibility_plugin.cpp")
+set_target_properties(iree_compiler_PluginAPI_test_hidden_visibility_plugin
+  PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_compile_options(iree_compiler_PluginAPI_test_hidden_visibility_plugin
+  PRIVATE "-fvisibility=hidden")
+target_link_libraries(iree_compiler_PluginAPI_test_hidden_visibility_plugin
+  PRIVATE iree::compiler::PluginAPI)
+
 iree_lit_test_suite(
   NAME
     lit
@@ -21,6 +32,7 @@ iree_lit_test_suite(
     "invalid_plugin.txt"
     "valid_plugin.txt"
     "version_mismatch.txt"
+    "hidden_visibility.txt"
   TOOLS
     FileCheck
     iree-compile
@@ -29,12 +41,14 @@ iree_lit_test_suite(
 
 iree_package_ns(_PACKAGE_NS)
 string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
-foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt")
+foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt"
+                  "hidden_visibility.txt")
   set_property(TEST "${_PACKAGE_PATH}/${_TEST_SRC}.test" APPEND PROPERTY
     ENVIRONMENT
       "IREE_TEST_VALID_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_valid_plugin>"
       "IREE_TEST_INVALID_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_invalid_plugin>"
       "IREE_TEST_VERSION_MISMATCH_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_version_mismatch_plugin>"
+      "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_hidden_visibility_plugin>"
   )
 endforeach()
 endif()

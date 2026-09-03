@@ -33,8 +33,12 @@ struct IreeCompilerPluginInfo {
 
 #if defined(_MSC_VER)
 #define IREE_COMPILER_PLUGIN_WEAK
+#define IREE_COMPILER_PLUGIN_EXPORT __declspec(dllexport)
 #else
 #define IREE_COMPILER_PLUGIN_WEAK __attribute__((weak))
+// A plugin is normally built with hidden visibility, which would leave dlsym
+// nothing to find.
+#define IREE_COMPILER_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
 } // extern "C"
@@ -48,12 +52,14 @@ struct IreeCompilerPluginInfo {
   IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn)
 
 #define IREE_DEFINE_COMPILER_PLUGIN_IMPL(plugin_id, register_fn)               \
-  extern "C" bool iree_register_compiler_plugin_##plugin_id(                   \
+  extern "C" IREE_COMPILER_PLUGIN_EXPORT bool                                  \
+  iree_register_compiler_plugin_##plugin_id(                                   \
       mlir::iree_compiler::PluginRegistrar *registrar) {                       \
     return register_fn(registrar);                                             \
   }                                                                            \
-  extern "C" IREE_COMPILER_PLUGIN_WEAK IreeCompilerPluginInfo                  \
-  iree_get_compiler_plugin_info(void) {                                        \
+  extern "C" IREE_COMPILER_PLUGIN_EXPORT IREE_COMPILER_PLUGIN_WEAK             \
+      IreeCompilerPluginInfo                                                   \
+      iree_get_compiler_plugin_info(void) {                                    \
     IreeCompilerPluginInfo info = {                                            \
         IREE_COMPILER_PLUGIN_API_VERSION,                                      \
         #plugin_id,                                                            \

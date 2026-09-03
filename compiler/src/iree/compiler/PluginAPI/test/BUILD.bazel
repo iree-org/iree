@@ -29,12 +29,24 @@ package(
     ]
 ]
 
+# Hidden visibility is what an out-of-tree plugin is normally built with, so
+# the macro must export the entry point without help.
+cc_binary(
+    name = "hidden_visibility_plugin",
+    testonly = True,
+    srcs = ["plugins/hidden_visibility_plugin.cpp"],
+    copts = ["-fvisibility=hidden"],
+    linkshared = True,
+    deps = ["//compiler/src/iree/compiler/PluginAPI"],
+)
+
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
             "invalid_options.txt",
             "invalid_plugin.txt",
+            "hidden_visibility.txt",
             "valid_plugin.txt",
             "version_mismatch.txt",
         ],
@@ -42,6 +54,7 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
+        ":hidden_visibility_plugin",
         ":invalid_plugin",
         ":valid_plugin",
         ":version_mismatch_plugin",
@@ -50,6 +63,7 @@ iree_lit_test_suite(
         "IREE_TEST_VALID_PLUGIN": "$(rootpath :valid_plugin)",
         "IREE_TEST_INVALID_PLUGIN": "$(rootpath :invalid_plugin)",
         "IREE_TEST_VERSION_MISMATCH_PLUGIN": "$(rootpath :version_mismatch_plugin)",
+        "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN": "$(rootpath :hidden_visibility_plugin)",
     },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//os:macos"],
