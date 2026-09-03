@@ -1209,7 +1209,7 @@ HALDispatchABI::packIntoParameterStruct(Operation *forOp, TypeRange resultTypes,
 
   auto ptrStructType = LLVM::LLVMPointerType::get(context);
   Value one = LLVM::ConstantOp::create(builder, loc, builder.getI64Type(),
-                                       builder.getIndexAttr(1));
+                                       builder.getI64IntegerAttr(1));
   Value paramsPtr =
       LLVM::AllocaOp::create(builder, loc, ptrStructType, *structType, one,
                              /*alignment=*/0);
