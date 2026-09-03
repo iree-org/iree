@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "hidden_visibility.txt"
     "undefined_symbol.txt"
     "plugin_with_deps.txt"
+    "dynamic_plugin.txt"
   TOOLS
     FileCheck
     iree-compile
@@ -47,7 +48,7 @@ iree_package_ns(_PACKAGE_NS)
 string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
 foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt"
                   "hidden_visibility.txt" "undefined_symbol.txt"
-                  "plugin_with_deps.txt")
+                  "plugin_with_deps.txt" "dynamic_plugin.txt")
   set_property(TEST "${_PACKAGE_PATH}/${_TEST_SRC}.test" APPEND PROPERTY
     ENVIRONMENT
       "IREE_TEST_VALID_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_valid_plugin>"
@@ -56,6 +57,7 @@ foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt"
       "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_hidden_visibility_plugin>"
       "IREE_TEST_UNDEFINED_SYMBOL_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_undefined_symbol_plugin>"
       $<$<BOOL:${IREE_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DEPS_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_deps_plugin>>
+      $<$<BOOL:${IREE_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DYNAMIC_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>>
   )
 endforeach()
 endif()
@@ -109,17 +111,6 @@ if(IREE_COMPILER_DYNAMIC_PLUGINS)
       ::dynamic_plugin
   )
 
-  add_test(
-    NAME iree/compiler/PluginAPI/test/dynamic_plugin_load
-    COMMAND
-      iree-opt
-      "--iree-load-plugin=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>"
-      --help
-  )
-  set_tests_properties(iree/compiler/PluginAPI/test/dynamic_plugin_load
-    PROPERTIES
-      PASS_REGULAR_EXPRESSION "DYNAMIC_TEST_PLUGIN: renamed MLIRContext ok"
-  )
 endif()
 
 endif()
