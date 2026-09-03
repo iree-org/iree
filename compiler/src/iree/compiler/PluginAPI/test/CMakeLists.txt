@@ -5,6 +5,7 @@ if (NOT WIN32)
 
 # Built rather than compiled inside a RUN line, so the tests need no compiler of
 # their own. Plain C, and deliberately not renamed: they are never registered.
+if(IREE_BUILD_TESTS)
 foreach(_PLUGIN "valid_plugin" "invalid_plugin" "version_mismatch_plugin")
   add_library(iree_compiler_PluginAPI_test_${_PLUGIN} MODULE
     "plugins/${_PLUGIN}.c")
@@ -36,6 +37,7 @@ foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt"
       "IREE_TEST_VERSION_MISMATCH_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_version_mismatch_plugin>"
   )
 endforeach()
+endif()
 
 # A plugin naming MLIR symbols loads only if both sides renamed alike.
 if(IREE_COMPILER_DYNAMIC_PLUGINS)
