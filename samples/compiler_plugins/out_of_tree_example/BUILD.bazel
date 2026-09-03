@@ -14,13 +14,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# Matches the CMake-built compiler this loads into, which disables both. Bazel
-# builds IREE with them on, so these flip once Bazel can host a plugin.
-OOTEX_COPTS = [
-    "-fno-rtti",
-    "-fno-exceptions",
-]
-
 cc_library(
     name = "defs",
     includes = ["src"],
@@ -90,7 +83,6 @@ cc_library(
         "src/ootex/IR/OotexDialect.h",
         "src/ootex/IR/OotexOps.h.inc",
     ],
-    copts = OOTEX_COPTS,
     deps = [
         ":OotexOpsGen",
         ":defs",
@@ -105,7 +97,6 @@ cc_library(
         "src/ootex/Transforms/Passes.h",
         "src/ootex/Transforms/Passes.h.inc",
     ],
-    copts = OOTEX_COPTS,
     deps = [
         ":IR",
         ":PassesGen",
@@ -119,7 +110,6 @@ cc_library(
 cc_library(
     name = "registration",
     srcs = ["src/PluginRegistration.cpp"],
-    copts = OOTEX_COPTS,
     deps = [
         ":IR",
         ":Transforms",

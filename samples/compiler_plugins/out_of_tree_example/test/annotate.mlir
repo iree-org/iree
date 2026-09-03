@@ -7,7 +7,10 @@
 // RUN:   --iree-plugin=ootex --ootex-tag=from_out_of_tree \
 // RUN:   --compile-to=preprocessing %s | FileCheck %s
 
-// CHECK: util.func public @marked
+// The ABI pass has by now moved the body into a private function, which is
+// where the mark was, so that is what carries the tag.
+
+// CHECK: util.func private @_marked
 // CHECK-SAME: ootex.tag = "from_out_of_tree"
 // CHECK-NOT: ootex.mark
 func.func @marked() {

@@ -43,9 +43,6 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     IR
-  COPTS
-    "-fno-rtti"
-    "-fno-exceptions"
   HDRS
     "src/ootex/IR/OotexDialect.h"
     "src/ootex/IR/OotexOps.h.inc"
@@ -62,9 +59,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Transforms
-  COPTS
-    "-fno-rtti"
-    "-fno-exceptions"
   HDRS
     "src/ootex/Transforms/Passes.h"
     "src/ootex/Transforms/Passes.h.inc"
@@ -83,9 +77,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     registration
-  COPTS
-    "-fno-rtti"
-    "-fno-exceptions"
   SRCS
     "src/PluginRegistration.cpp"
   DEPS

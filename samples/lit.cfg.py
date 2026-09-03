@@ -42,7 +42,9 @@ for _key, _value in list(config.environment.items()):
             config.environment[_key] = os.path.abspath(_candidate)
             break
 
-if config.environment.get("IREE_EXAMPLE_DYN_PLUGIN"):
+if any(
+    _key.endswith("_PLUGIN") and _value for _key, _value in config.environment.items()
+):
     config.available_features.add("iree_dynamic_plugins")
 
 # Use the most preferred temp directory.

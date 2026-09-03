@@ -60,9 +60,11 @@ iree_compiler_cc_library(
     tags = ["skip-bazel_to_cmake"],
 )
 
+# Shared by default, as CMake links it: a dynamically loaded plugin resolves the
+# renamed ABI from libIREECompiler, and statically linked tools carry none.
 bool_flag(
     name = "link_shared",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(
