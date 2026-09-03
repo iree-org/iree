@@ -13,10 +13,13 @@
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
-# Any recent LLVM will do: the rename only reads and rewrites symbol tables.
-find_program(IREE_LLVM_NM NAMES llvm-nm nm REQUIRED)
-find_program(IREE_LLVM_CXXFILT NAMES llvm-cxxfilt c++filt REQUIRED)
-find_program(IREE_LLVM_OBJCOPY NAMES llvm-objcopy objcopy REQUIRED)
+# LLVM's own tools, not binutils: the rename decides from demangled text, and
+# the two demanglers disagree on a handful of symbols. A symbol either side
+# misses is one the plugin cannot resolve at load. Override if yours are named
+# differently.
+find_program(IREE_LLVM_NM NAMES llvm-nm REQUIRED)
+find_program(IREE_LLVM_CXXFILT NAMES llvm-cxxfilt REQUIRED)
+find_program(IREE_LLVM_OBJCOPY NAMES llvm-objcopy REQUIRED)
 
 # Parameters:
 # PLUGIN_ID: Id the plugin reports and --iree-plugin= activates.
