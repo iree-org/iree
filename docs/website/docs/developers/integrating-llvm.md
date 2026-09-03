@@ -4,10 +4,10 @@ icon: octicons/git-merge-16
 
 # Integrating newer LLVM in IREE
 
-IREE tracks LLVM closely via a submodule at `third_party/llvm-project`. This page
-walks through the process of integrating a newer LLVM revision into IREE,
-including building and verifying the result and pushing any required adaptions to
-IREE's forked submodules.
+IREE tracks LLVM closely via a submodule at `third_party/llvm-project`. This
+page walks through the process of integrating a newer LLVM revision into IREE,
+including building and verifying the result and pushing any required adaptations
+to IREE's forked submodules.
 
 ## General points
 
@@ -59,7 +59,7 @@ git submodule update --init
 ```
 
 Take a note of the git hash of the LLVM repository currently used by IREE.
-Check if there are any fixup commit from the earlier integrations:
+Check if there are any fixup commits from the earlier integrations:
 
 ```bash
 cd "$WORK_DIR/iree/third_party/llvm-project"
@@ -67,11 +67,11 @@ git status  # should show detached HEAD pointing to the commit used in IREE's su
 export CURRENT_LLVM_HASH=$(git log --oneline -1 | cut -d ' ' -f 1)
 git fetch -pP upstream
 export BASE_LLVM_HASH=$(git merge-base $CURRENT_LLVM_HASH upstream/main)
-git log --oneline $BASE_LLVM_HASH
+git log --oneline "$BASE_LLVM_HASH..$CURRENT_LLVM_HASH"
 ```
 
 If there are no commits shown, the current LLVM integration is clean. If any
-commits are shown, those were needed in one of the previous integration to get
+commits are shown, those were needed in one of the previous integrations to get
 IREE to compile. Those commits should be checked in the ongoing integration
 (i.e. in the following steps) if those are still needed. The goal should be to
 drop those and go back to a clean LLVM integration. If that's not possible, it
@@ -86,11 +86,11 @@ git checkout -b sm-iree-integrates/llvm-$DATE
 git rebase upstream/main
 ```
 
-This will move the fixes shown above (if any) tot the top of the current LLVM
+This will move the fixes shown above (if any) to the top of the current LLVM
 upstream main branch. Several things can happen with each of those commits:
 
 - The commit might be dropped automatically: This means the same fix has been
-  applied upstream and git recognized it. All is good, nothing need to be done.
+  applied upstream and git recognized it. All is good, nothing needs to be done.
 - The commit becomes empty: If the commit had fixed an issue in upstream LLVM
   during the last integration and the issue has been fixed in LLVM in the
   same way, the commit might become empty. The rebase commit might halt due to
@@ -107,7 +107,7 @@ upstream main branch. Several things can happen with each of those commits:
   this means in general. It might mean the issue got fixed in a different way.
   It might mean LLVM upstream moved further ahead and the fix does not work any
   more. It might also be something else. This needs to be investigated. An easy
-  try is to drop the commit and try if the integrate works anyways. Otherwise,
+  try is to drop the commit and try if the integrate works anyway. Otherwise,
   debugging is needed.
 
 Verify the new LLVM version by doing a trial build and run a few tests. This
@@ -153,7 +153,7 @@ bazel build -j $WORKERS //tools/...
 If anything goes wrong, try to fix it.
 
 If there is a build failure in an IREE file, it is usually using a type or a
-function from LLVM/MLIR that has just changes upstream. Try to identify the
+function from LLVM/MLIR that has just changed upstream. Try to identify the
 type or function and look up its definition in the LLVM repository. Then, find
 out if the LLVM file that defines it has been updated in the additional LLVM
 commits that are being added. It is usually helpful to check the new commits
@@ -165,20 +165,20 @@ cd "$WORK_DIR/iree/third_party/llvm-project"
 git log --oneline $BASE_LLVM_HASH.. -- relative/path/of/llvm/file.h
 ```
 
-If any commits are listed here, those have usually changed a type of a function
+If any commits are listed here, those have usually changed a type or function
 in upstream LLVM. Try to understand the change and see what needs to be adapted
 in IREE. In some cases, it might be helpful to utilize an AI tool and ask it to
 analyze the surfaced commit and suggest the required changes to the IREE
 codebase. Always double-check the suggestions, because it might go wrong and
 make the problem worse.
 
-Serval approaches can be used to make the LLVM integration continue:
+Several approaches can be used to make the LLVM integration continue:
 
 - Update the code in the IREE repo to adapt to the changed type or function.
   This is the most desired outcome, because it allows a clean LLVM integration.
   This does not cause any extra work in the following LLVM integrations.
 - Cherry-pick a revert or a fixup from LLVM upstream. LLVM is moving fast. By
-  the time a problematic LLVM commit has been identified during a LLVM
+  the time a problematic LLVM commit has been identified during an LLVM
   integration into IREE, the issue might have been identified in LLVM upstream
   already. If so, there might already be a revert of the faulty commit or a
   fixup commit of the issue available upstream. If so, cherry-pick it.
@@ -197,8 +197,16 @@ below for copy-and-paste-able commands.)
 Please re-run all the verification steps in order to make sure that the LLVM
 integration works.
 
+## Publishing the integration
+
 If all the verification steps are successful, submit the branches to the IREE
 upstream repos:
+
+    The following push commands require write access to both
+    `iree-org/llvm-project` and `iree-org/iree`. Contributors without write
+    access should push the branches to personal forks, open the IREE pull
+    request from their fork, and ask an IREE maintainer to mirror the LLVM
+    integration branch into `iree-org/llvm-project`.
 
 ```bash
 cd "$WORK_DIR/iree/third_party/llvm-project"
@@ -209,7 +217,7 @@ source venv/bin/activate
 cd iree
 git add third_party/llvm-project
 git commit -s -m "Integrate LLVM to llvm/llvm-project@$NEW_LLVM_HASH"
-git commit --amend  # add notes to body of commit message if any fixes / cherry-picks / reverts had been needed, mention LLVM commits that caused the need for adaptions
+git commit --amend  # add notes to body of commit message if any fixes / cherry-picks / reverts had been needed, mention LLVM commits that caused the need for adaptations
 git push origin integrates/llvm-$DATE:integrates/llvm-$DATE
 ```
 
@@ -228,9 +236,9 @@ required changes to an integration branch in the IREE fork:
 cd "$WORK_DIR/iree/third_party/stablehlo"
 git checkout -b sm-iree-integrates/llvm-$DATE
 git add -p  # confirm changes
-git commit -s -m "Adaptions to llvm/llvm-project@$NEW_LLVM_HASH for integrating LLVM into IREE"
-git commit --amend  # add notes to body of commit message, mention what has been fixed and why, mention LLVM commits that caused the need for adaptions
-git push origin integrates/llvm-$DATE:integrates/llvm-$DATE
+git commit -s -m "Adaptations to llvm/llvm-project@$NEW_LLVM_HASH for integrating LLVM into IREE"
+git commit --amend  # add notes to body of commit message, mention what has been fixed and why, mention LLVM commits that caused the need for adaptations
+git push origin sm-iree-integrates/llvm-$DATE:sm-iree-integrates/llvm-$DATE
 ```
 
 If such a patch to a submodule is required, a follow-up needs to be done once
@@ -238,9 +246,10 @@ the LLVM integration into IREE is completed. It shall be checked in the upstream
 of the respective project, if it has already integrated a new LLVM version
 and potentially adapted to the issue that required patching already. If so, the
 submodule shall be updated to a more recent upstream version. The process is
-similar as described above for LLVM integrations. In general, going to a clean
-upstream version for the submodule is most desirable. Cherry-picking a fix from
-upstream or reverting a single commit is more desirable than a custom fix.
+similar to the process described above for LLVM integrations. In general, going
+to a clean upstream version for the submodule is most desirable. Cherry-picking
+a fix from upstream or reverting a single commit is more desirable than a custom
+fix.
 
 If a custom fix is needed because the submodule project has not integrated with
 a recent LLVM version yet, it is recommended to open an LLVM integration PR for
@@ -248,7 +257,7 @@ the submodule project and push the developed fix to the project's upstream in
 order to support the community and help IREE's fork to stay aligned with
 upstream.
 
-## After the integrate
+## After the integration
 
 If the integration required reverting a commit or implementing a custom fix in
 LLVM or any other submodule, the issue needs to be analyzed as a follow-up. It
@@ -264,5 +273,5 @@ fixup commit in IREE's fork of the submodule. In case of a fix PR, please
 consider performing another submodule integration after the fix PR is merged.
 
 If the bug is in the upstream of the submodule, please report the issue in the
-submodule' upstream github project. If you can fix the issue, please open a pull
+submodule's upstream github project. If you can fix the issue, please open a pull
 request to the submodule's upstream.
