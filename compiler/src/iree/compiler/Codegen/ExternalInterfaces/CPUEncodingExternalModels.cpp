@@ -434,6 +434,8 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
     return {"+avx512vnni"};
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16:
     return {"+v"};
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
@@ -441,6 +443,9 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
     return {"+v", "+zvfhmin"};
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16:
+    return {"+v", "+zvfbfwma"};
   default:
     return {};
   }
@@ -634,6 +639,10 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16,
+        MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16,
+        MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16,
     };
     checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
   }

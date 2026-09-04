@@ -400,3 +400,51 @@ func.func @cpu_riscv_v_vfmacc_f16_castf32(
 //       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32, vlen = 256>
 //  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+
+// -----
+
+#contraction_accesses = [
+  affine_map<(i, j, k) -> (i, k)>,
+  affine_map<(i, j, k) -> (k, j)>,
+  affine_map<(i, j, k) -> (i, j)>
+]
+// MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16 at vlen = 256, intrinsics 1x1x1
+func.func @cpu_riscv_v_vfwmaccbf16(
+    %lhs: vector<1x1x1xbf16>, %rhs: vector<1x1x32xbf16>, %acc: vector<1x1x32xf32>)
+    -> vector<1x1x32xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<1x1x1xbf16>, vector<1x1x32xbf16> into vector<1x1x32xf32>
+  return %0 : vector<1x1x32xf32>
+}
+// CHECK-LABEL: func @cpu_riscv_v_vfwmaccbf16
+//       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, vlen = 256>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+
+// -----
+
+#contraction_accesses = [
+  affine_map<(i, j, k) -> (i, k)>,
+  affine_map<(i, j, k) -> (k, j)>,
+  affine_map<(i, j, k) -> (i, j)>
+]
+// MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16 at vlen = 256, intrinsics 1x1x1
+func.func @cpu_riscv_v_vwmacc_i8(
+    %lhs: vector<1x1x1xi8>, %rhs: vector<1x1x32xi8>, %acc: vector<1x1x32xi32>)
+    -> vector<1x1x32xi32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : vector<1x1x1xi8>, vector<1x1x32xi8> into vector<1x1x32xi32>
+  return %0 : vector<1x1x32xi32>
+}
+// CHECK-LABEL: func @cpu_riscv_v_vwmacc_i8
+//       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16, vlen = 256>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>

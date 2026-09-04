@@ -198,6 +198,18 @@ def MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32
 def MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32
     : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32", 0x3123>;
 
+// vfwmaccbf16.vf, N=vlen/8 (bf16m2→f32m4). Requires +zvfbfwma.
+def MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16", 0x3130>;
+def MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16", 0x3131>;
+
+// vsext.vf2 (i8m1→i16m2) then vwmacc.vx into i32m4. N=vlen/8. Requires +v.
+def MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16", 0x31C0>;
+def MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16", 0x31C1>;
+
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
 // unrolled (`intrinsics_m`, `intrinsics_n`, `intrinsics_k`) tile. Unlike
@@ -253,6 +265,10 @@ def IREECPU_MMAIntrinsic
            MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
            MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
            MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+           MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16,
+           MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16,
+           MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16,
+           MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;

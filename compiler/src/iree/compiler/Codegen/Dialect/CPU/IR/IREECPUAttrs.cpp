@@ -491,7 +491,11 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
-  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32: {
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16: {
     int64_t vl = vlen / 8;
     bool transposed = (static_cast<uint32_t>(intrinsic) & 1) != 0;
     return transposed ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
@@ -755,6 +759,8 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
     return {f16, f16, f16};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16:
     return {bf16, bf16, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
@@ -766,6 +772,8 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
   case MMAIntrinsic::MMA_X86_AVX512_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16:
     return {i8, i8, i32};
   // vpdpbusd: returned types preserve signedness for the cost model to
   // match against the encoding's `element_types`; tile types in IR are
@@ -1024,6 +1032,68 @@ static Value lowerRiscvVFmaccLike(OpBuilder &b, Location loc,
                                            /*pos=*/0);
 }
 
+// i8→i32: vsext.vf2 (i8m1→i16m2) then vwmacc.vx into i32m4. Scalar is
+// sign-extended to i16. nxv8 insert; vl is vlen/8; policy=0 (tail undisturbed).
+static Value lowerRiscvVWmaccCastI16(OpBuilder &b, Location loc,
+                                     MMAIntrinsic intrinsic, int64_t vlen,
+                                     Value lhs, Value rhs, Value acc) {
+  bool lhsIsScalar = (static_cast<uint32_t>(intrinsic) & 1) == 0;
+  Value scalarSrc = lhsIsScalar ? lhs : rhs;
+  Value vec = lhsIsScalar ? rhs : lhs;
+
+  auto flattenIfNeeded = [&](Value v) -> Value {
+    auto vt = dyn_cast<VectorType>(v.getType());
+    if (!vt || vt.getRank() <= 1) {
+      return v;
+    }
+    return vector::ShapeCastOp::create(
+        b, loc, VectorType::get({vt.getNumElements()}, vt.getElementType()), v);
+  };
+  vec = flattenIfNeeded(vec);
+  acc = flattenIfNeeded(acc);
+  scalarSrc = flattenIfNeeded(scalarSrc);
+
+  auto scalarTy = cast<VectorType>(scalarSrc.getType());
+  SmallVector<int64_t> zeros(scalarTy.getRank(), 0);
+  Value scalarI8 = vector::ExtractOp::create(b, loc, scalarSrc, zeros);
+  Value scalar = arith::ExtSIOp::create(b, loc, b.getI16Type(), scalarI8);
+
+  auto insertNxv8 = [&](Value v) {
+    auto fixedTy = cast<VectorType>(v.getType());
+    auto scalableTy = VectorType::get({8}, fixedTy.getElementType(), {true});
+    Value pad = vector::BroadcastOp::create(
+        b, loc, scalableTy,
+        arith::ConstantOp::create(b, loc,
+                                  b.getZeroAttr(fixedTy.getElementType())));
+    Value scalable =
+        vector::ScalableInsertOp::create(b, loc, v, pad, /*pos=*/0);
+    return std::pair<Value, VectorType>{scalable, fixedTy};
+  };
+  auto [vecI8Scalable, vecFixedTy] = insertNxv8(vec);
+  (void)vecFixedTy;
+  auto [accScalable, accFixedTy] = insertNxv8(acc);
+
+  int64_t lanes = vlen / 8;
+  Value vl = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(lanes));
+  auto i16ScalableTy = VectorType::get({8}, b.getI16Type(), {true});
+  Value i16Pad = vector::BroadcastOp::create(
+      b, loc, i16ScalableTy,
+      arith::ConstantOp::create(b, loc, b.getZeroAttr(b.getI16Type())));
+  Value vecI16Scalable =
+      LLVM::CallIntrinsicOp::create(b, loc, i16ScalableTy,
+                                    b.getStringAttr("llvm.riscv.vsext"),
+                                    ValueRange{i16Pad, vecI8Scalable, vl})
+          .getResult(0);
+  Value policy = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(0));
+  Value resultScalable =
+      LLVM::CallIntrinsicOp::create(
+          b, loc, accScalable.getType(), b.getStringAttr("llvm.riscv.vwmacc"),
+          ValueRange{accScalable, scalar, vecI16Scalable, vl, policy})
+          .getResult(0);
+  return vector::ScalableExtractOp::create(b, loc, accFixedTy, resultScalable,
+                                           /*pos=*/0);
+}
+
 // Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
 // additional ops (potentially broadcasting or widening LHS/RHS or creating an
 // add op if the intrinsic isn't already adding the accumulator).
@@ -1052,6 +1122,16 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     };
     return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, widenF16(lhs),
                                 widenF16(rhs), acc, "llvm.riscv.vfmacc");
+  }
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16) {
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
+                                "llvm.riscv.vfwmaccbf16");
+  }
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16) {
+    return lowerRiscvVWmaccCastI16(builder, loc, intrinsic, vlen, lhs, rhs,
+                                   acc);
   }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
