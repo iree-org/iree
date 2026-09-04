@@ -1151,6 +1151,35 @@ static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
   return DenseElementsAttr::get(targetType, targetValues);
 }
 
+// Returns true if the `update` region placed at `startIndicesAttrs` lies
+// entirely within `target`. The op verifier only checks dynamic dimension
+// counts, so a well-formed op may still describe an out-of-range region.
+static bool isUpdateInBounds(ElementsAttr update, ElementsAttr target,
+                             ArrayRef<Attribute> startIndicesAttrs) {
+  auto updateType = cast<ShapedType>(update.getType());
+  auto targetType = cast<ShapedType>(target.getType());
+  // These cases write nothing, so there is nothing to bound.
+  if (updateType.getNumElements() == 0 || targetType.getNumElements() == 0) {
+    return true;
+  }
+  int64_t rank = targetType.getRank();
+  if (rank == 0) {
+    return true;
+  }
+  if (static_cast<int64_t>(startIndicesAttrs.size()) != rank) {
+    return false;
+  }
+  for (int64_t j = 0; j < rank; ++j) {
+    uint64_t start =
+        cast<IntegerAttr>(startIndicesAttrs[j]).getValue().getZExtValue();
+    if (static_cast<int64_t>(start) + updateType.getDimSize(j) >
+        targetType.getDimSize(j)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
   bool allIndicesConstant =
       llvm::count(operands.getStartIndices(), nullptr) == 0;
@@ -1159,6 +1188,11 @@ OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
     auto update = dyn_cast<ElementsAttr>(operands.getUpdate());
     auto target = dyn_cast<ElementsAttr>(operands.getTarget());
     if (!update || !target) {
+      return {};
+    }
+    // Only fold when the update region is fully in range; tensorUpdate would
+    // otherwise write past the target constant (out-of-bounds).
+    if (!isUpdateInBounds(update, target, operands.getStartIndices())) {
       return {};
     }
     return tensorUpdate(update, target, operands.getStartIndices());
