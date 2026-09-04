@@ -43,6 +43,12 @@ class RankedTensorOrScalarType<list<Type> allowedTypes> :
 def AnyRankedTensorOrScalarType :
   RankedTensorOrScalarType<[AnySignlessIntegerOrIndex, AnyFloat]>;
 
+// A shaped value, tensor or memref, or a scalar. Used for operands that are
+// invariant over some of an op's iteration space, where a rank 0 value and a
+// scalar carry the same information.
+def AnyShapedOrScalarType :
+  AnyTypeOf<[AnyShaped, AnySignlessIntegerOrIndex, AnyFloat]>;
+
 //===----------------------------------------------------------------------===//
 // Enum definitions
 //===----------------------------------------------------------------------===//
