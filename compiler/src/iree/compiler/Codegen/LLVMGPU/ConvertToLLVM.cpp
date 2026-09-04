@@ -349,14 +349,82 @@ public:
 
     // Set argument attributes.
     Attribute unit = rewriter.getUnitAttr();
+
+    // Build a map from HAL binding index to correlation group and noalias
+    // bindings. This allows us to determine which bindings are in the same
+    // correlation group (i.e., point to the same resource but with different
+    // offsets) and which bindings point to different resources (noalias).
+    //
+    // Two carriers are supported:
+    //   * In Stream dialect (`util.func`) the bindings are real arguments, so
+    //     we read per-arg attributes (`stream.binding_correlation` /
+    //     `stream.binding_noalias`).
+    //   * In HAL dialect (`func.func`) there are no arguments. The information
+    //     is carried as a single function-level array-of-arrays attribute,
+    //     where the outer index matches the HAL binding index and each inner
+    //     array lists the related binding indices.
+    DenseMap<int64_t, SmallVector<int64_t>> bindingCorrelationMap;
+    DenseMap<int64_t, SmallVector<int64_t>> bindingNoaliasMap;
+    auto correlationGroups =
+        funcOp->getAttrOfType<ArrayAttr>("stream.binding_correlation");
+    auto noaliasGroups =
+        funcOp->getAttrOfType<ArrayAttr>("stream.binding_noalias");
+    auto lookupGroupForBinding = [](ArrayAttr groups,
+                                    int64_t binding) -> ArrayAttr {
+      if (!groups || binding < 0 ||
+          static_cast<size_t>(binding) >= groups.size()) {
+        return nullptr;
+      }
+      return dyn_cast<ArrayAttr>(groups[binding]);
+    };
+    unsigned numFuncArgs = funcOp.getNumArguments();
+    auto lookupPerArgAttr = [&](int64_t binding, StringRef name) -> ArrayAttr {
+      if (binding < 0 || static_cast<unsigned>(binding) >= numFuncArgs) {
+        return nullptr;
+      }
+      return funcOp.getArgAttrOfType<ArrayAttr>(binding, name);
+    };
+    for (IREE::HAL::InterfaceBindingSubspanOp subspan : subspans) {
+      int64_t binding = subspan.getBinding().getSExtValue();
+      ArrayAttr correlationAttr =
+          lookupPerArgAttr(binding, "stream.binding_correlation");
+      if (!correlationAttr) {
+        correlationAttr = lookupGroupForBinding(correlationGroups, binding);
+      }
+      if (correlationAttr) {
+        auto correlatedBindings =
+            llvm::map_to_vector(correlationAttr.getAsRange<IntegerAttr>(),
+                                [](IntegerAttr attr) { return attr.getInt(); });
+        if (!correlatedBindings.empty()) {
+          bindingCorrelationMap[binding] = std::move(correlatedBindings);
+        }
+      }
+      ArrayAttr noaliasAttr =
+          lookupPerArgAttr(binding, "stream.binding_noalias");
+      if (!noaliasAttr) {
+        noaliasAttr = lookupGroupForBinding(noaliasGroups, binding);
+      }
+      if (noaliasAttr) {
+        auto noaliasBindings =
+            llvm::map_to_vector(noaliasAttr.getAsRange<IntegerAttr>(),
+                                [](IntegerAttr attr) { return attr.getInt(); });
+        if (!noaliasBindings.empty()) {
+          bindingNoaliasMap[binding] = std::move(noaliasBindings);
+        }
+      }
+    }
+
     for (auto [idx, info] : llvm::enumerate(bindingsInfo)) {
       // As a convention with HAL all the kernel argument pointers are 16Bytes
       // aligned.
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getAlignAttrName(),
                            rewriter.getI32IntegerAttr(16));
-      // It is safe to set the noalias attribute as it is guaranteed that the
-      // ranges within bindings won't alias.
-      newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(), unit);
+      // Only set noalias if this binding has explicit noalias relationships
+      // with other bindings (i.e., it's in bindingNoaliasMap).
+      if (bindingNoaliasMap.count(idx) && !bindingNoaliasMap[idx].empty()) {
+        newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoAliasAttrName(),
+                             unit);
+      }
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNonNullAttrName(), unit);
       newFuncOp.setArgAttr(idx, LLVM::LLVMDialect::getNoUndefAttrName(), unit);
       if (info.unused) {
