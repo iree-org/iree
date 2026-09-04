@@ -88,7 +88,7 @@ function(iree_bytecode_module)
   # This crude check for target backend llvm-cpu is borrowed from
   # iree_compile_flags_for_platform(). This should be made more robust and
   # shared in a common helper.
-  if (_RULE_FLAGS MATCHES "iree-hal-target-backends=llvm-cpu")
+  if (_RULE_FLAGS MATCHES "iree-hal-local-target-device-backends=llvm-cpu")
     if (IREE_LLD_BINARY)
       # Pass build-system-dependent linker paths.
       list(APPEND _ARGS "--iree-llvmcpu-embedded-linker-path=\"${IREE_LLD_BINARY}\"")

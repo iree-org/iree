@@ -1169,20 +1169,6 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
 
-    // TODO: move to someplace centralized; erroring here is not great.
-    // InlineStatic (currently) only supports the `vmvx-inline` backend.
-    if (session.schedulingOptions.executionModel ==
-        SchedulingOptions::ExecutionModel::InlineStatic) {
-      for (auto target : session.halTargetOptions.legacyTargetBackends) {
-        if (target != "vmvx-inline") {
-          parsedModule->emitError() << "InlineStatic execution model is not "
-                                       "compatible with hal target '"
-                                    << target << "'";
-          return false;
-        }
-      }
-    }
-
     buildIREEVMTransformPassPipeline(
         session.targetRegistry, session.pipelineOptions, session.bindingOptions,
         session.inputOptions, session.preprocessingOptions,
