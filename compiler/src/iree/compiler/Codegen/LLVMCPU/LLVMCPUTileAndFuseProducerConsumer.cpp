@@ -187,9 +187,16 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
   tileSizes.resize(numLoops, 0);
   tileScalableFlags.resize(numLoops, false);
 
+  // Lets a scalable pack/unpack's tiled outer dims fold to a static single
+  // inner tile, using the alignment hints tile-size selection recorded on the
+  // op.
+  scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
+      makeInnerTileAlignmentFn(tilingLevel);
+
   scf::SCFTilingOptions tilingOptions;
   setSCFTileSizes(tilingOptions, rootOp, std::move(tileSizes),
                   std::move(tileScalableFlags));
+  tilingOptions.setInnerTileAlignmentFn(innerTileAlignmentFn);
 
   // onlyFuseProducerInputOperands implies reduction tiling.
   if (!onlyFuseProducerInputOperands) {
@@ -262,7 +269,8 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
             [&tiledAndFusedOps, &unfusableOps](Operation *op) {
               return tiledAndFusedOps.contains(op) &&
                      !unfusableOps.contains(op);
-            });
+            },
+            innerTileAlignmentFn);
 
     if (failed(newFusionOpportunities)) {
       LDBG() << "failed to fuse consumers, skip";
