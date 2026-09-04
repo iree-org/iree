@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -185,27 +186,46 @@ static bool areAllStaticLoopBounds(scf::ForallOp forallOp) {
   return true;
 }
 
-/// Returns true if it is allowed to leave the `op` outside distribution loops,
-/// i.e., scf.forall loops. The consumer fusion could fail even the `op`
-/// implements TilingInterface. E.g., linalg.pack op can only be fused as a
-/// consumer in perfect tiling scenario.
-static bool isAllowedToFailOnCunsumerFusion(Operation *op) {
-  return isa<linalg::PackOp>(op);
+/// Returns true if it is allowed to leave the `op` outside the distribution
+/// loop. Consumer fusion can fail even when the `op` implements
+/// TilingInterface. E.g., linalg.pack can only be fused as a consumer in the
+/// perfect tiling case. Producers used exclusively inside the distribution
+/// loop may also remain outside until a later tiling level fuses them.
+static bool isAllowedOutsideDistribution(Operation *op,
+                                         scf::ForallOp forallOp) {
+  if (isa<linalg::PackOp>(op)) {
+    return true;
+  }
+  if (op->use_empty()) {
+    return false;
+  }
+  return llvm::all_of(op->getUsers(), [&](Operation *user) {
+    return forallOp->isProperAncestor(user);
+  });
 }
 
-/// Returns true if all the compute ops are within scf.forall distribution
-/// loops, except the ops that are allowed to stay outside.
-static bool verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp) {
+/// Verifies that all the compute ops are within scf.forall distribution loops,
+/// except the ops that are allowed to stay outside.
+static LogicalResult
+verifyComputeOpsAfterDistribution(FunctionOpInterface funcOp,
+                                  scf::ForallOp forallOp) {
   WalkResult res = funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (isa<scf::ForallOp>(op) || !isComputeOp(op)) {
-      return WalkResult::skip();
+    if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
+      if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+              forallOp)) {
+        return WalkResult::skip();
+      }
     }
-    if (!isAllowedToFailOnCunsumerFusion(op)) {
+    if (!isComputeOp(op)) {
+      return WalkResult::advance();
+    }
+    if (!isAllowedOutsideDistribution(op, forallOp)) {
+      op->emitOpError("failed to fuse consumers");
       return WalkResult::interrupt();
     }
     return WalkResult::advance();
   });
-  return !res.wasInterrupted();
+  return res.wasInterrupted() ? failure() : success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -373,14 +393,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
             tilingLoops, [&tiledAndFusedOps](Operation *op) {
               return tiledAndFusedOps.contains(op);
             });
-    if (failed(newFusionOpportunities)) {
-      // Continue the work if the failure is allowed.
-      if (!verifyComputeOpsAfterDistribution(funcOp)) {
-        tileAndFuseResult->tiledAndFusedOps.front()->emitOpError(
-            "failed to fuse consumers");
-        return signalPassFailure();
-      }
-    } else {
+    // Continue on failure so cleanup can remove the original, now-unused root
+    // op before verifying which compute ops remain outside the distribution
+    // loop.
+    if (succeeded(newFusionOpportunities)) {
       // Because we restrict to at most a single tilable consumer for yielding
       // a replacement, no new fusion opportunities will yield a replacement,
       // meaning there is no need to run consumer fusion again afterwards.
@@ -418,6 +434,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     populateFoldExtractSliceOfBroadcastPattern(patterns);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
+    tensor::DimOp::getCanonicalizationPatterns(patterns, context);
     context->getOrLoadDialect<tensor::TensorDialect>()
         ->getCanonicalizationPatterns(patterns);
     context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()
@@ -428,6 +445,22 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       funcOp.emitOpError("tiling canonicalization failed");
       return signalPassFailure();
     }
+  }
+
+  // Cleanup may replace the distribution loop or fold it away when it has a
+  // single iteration, so do not use the pre-cleanup LoopLikeOpInterface here.
+  scf::ForallOp distributionLoop;
+  funcOp.walk<WalkOrder::PreOrder>([&](scf::ForallOp forallOp) {
+    if (!forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr>(
+            forallOp)) {
+      return WalkResult::advance();
+    }
+    distributionLoop = forallOp;
+    return WalkResult::interrupt();
+  });
+  if (distributionLoop &&
+      failed(verifyComputeOpsAfterDistribution(funcOp, distributionLoop))) {
+    return signalPassFailure();
   }
 
   return;

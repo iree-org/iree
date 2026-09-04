@@ -128,6 +128,7 @@ iree_lit_test_suite(
     "strip_compilation_info.mlir"
     "test_partitionable_loops_interface.mlir"
     "tile_and_distribute_workgroups_using_forall.mlir"
+    "tile_and_distribute_workgroups_using_forall_invalid.mlir"
     "tile_large_tensors.mlir"
     "transform_buffer_opt.mlir"
     "transform_collapse_forall_dest.mlir"
