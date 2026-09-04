@@ -1,0 +1,8 @@
+# -unexported_symbols_list for libIREECompiler (macOS/Mach-O).
+#
+# See hide_iree_runtime_capi.ld for why.
+#
+# Mach-O prefixes C names with an underscore, so the runtime C-API is `_iree_*`
+# here. The embedding C-API and renamed internals do not match, and stay
+# exported.
+_iree_*

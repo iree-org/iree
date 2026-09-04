@@ -140,6 +140,10 @@ set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 option(IREE_VISIBILITY_HIDDEN "Builds all C/C++ libraries with hidden visibility" ON)
+option(IREE_COMPILER_DYNAMIC_PLUGINS "Builds libIREECompiler with a renamed, exported LLVM/MLIR ABI so dynamically loaded compiler plugins can resolve compiler symbols" OFF)
+if(IREE_COMPILER_DYNAMIC_PLUGINS AND WIN32)
+  message(FATAL_ERROR "IREE_COMPILER_DYNAMIC_PLUGINS is not supported on Windows")
+endif()
 
 #-------------------------------------------------------------------------------
 # Custom runtime allocator configuration
@@ -557,6 +561,10 @@ option(IREE_ENABLE_FUZZING "Enable libFuzzer-based fuzz targets" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
+# A plugin renames its symbols to match, so a consumer needs this value;
+# IREECompilerConfig.cmake exports it.
+set(IREE_COMPILER_ABI_PREFIX "IREE18" CACHE STRING
+    "Logical namespace the compiler's llvm/mlir symbols are renamed into")
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
 option(IREE_REVERSE_ITERATION "Reverse iteration over in unordered LLVM containers" OFF)
@@ -566,6 +574,23 @@ if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
       "IREE_ENABLE_COMPILER_TRACING requires "
       "-DIREE_LINK_COMPILER_SHARED_LIBRARY=OFF (the compiler library must not "
       "be unloaded before Tracy finishes, static linking is one workaround)")
+endif()
+
+if(IREE_COMPILER_DYNAMIC_PLUGINS AND NOT IREE_LINK_COMPILER_SHARED_LIBRARY)
+  message(SEND_ERROR
+      "IREE_COMPILER_DYNAMIC_PLUGINS requires "
+      "-DIREE_LINK_COMPILER_SHARED_LIBRARY=ON: a plugin resolves the renamed "
+      "ABI from libIREECompiler, which statically linked tools do not carry. "
+      "IREE_ENABLE_COMPILER_TRACING forces static linking, so it cannot be "
+      "combined with dynamic plugins")
+endif()
+
+if(IREE_ENABLE_THIN_ARCHIVES AND IREE_COMPILER_DYNAMIC_PLUGINS)
+  message(SEND_ERROR
+      "IREE_COMPILER_DYNAMIC_PLUGINS requires -DIREE_ENABLE_THIN_ARCHIVES=OFF "
+      "(the symbol rename runs llvm-objcopy over every archive; on a thin "
+      "archive it cannot resolve the member objects, and the archive it "
+      "writes carries member paths relative to the wrong directory)")
 endif()
 
 option(IREE_ENABLE_CCACHE

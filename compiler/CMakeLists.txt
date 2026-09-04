@@ -21,6 +21,13 @@ else()
   set(IREE_COMPILER_DYLIB_INSTALL_PREFIX "lib/")
 endif()
 
+# Plugins resolve compiler symbols by name, and hidden visibility would strip
+# them before the linker sees them, beyond recovery. Scoped here so the runtime
+# keeps hidden visibility.
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+  list(REMOVE_ITEM IREE_DEFAULT_COPTS "-fvisibility=hidden")
+endif()
+
 # Always build the C bindings, since the API is available apart from
 # actually building the compiler.
 add_subdirectory(bindings/c)
@@ -43,6 +50,11 @@ if(IREE_BUILD_COMPILER)
     PLUGIN_CMAKE_FILE
       "iree_compiler_plugin.cmake"
   )
+  if(IREE_COMPILER_DYNAMIC_PLUGINS)
+    message(STATUS "Dynamically loaded compiler plugins enabled (renamed LLVM/MLIR ABI)")
+  else()
+    message(STATUS "Dynamically loaded compiler plugins disabled (IREE_COMPILER_DYNAMIC_PLUGINS=OFF)")
+  endif()
   add_subdirectory(src)
 
   # Reset BUILD_SHARED_LIBS.

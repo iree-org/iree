@@ -1,0 +1,12 @@
+// Invocation via command line option
+// RUN: (iree-opt --iree-load-plugin= 2>&1 || true) | FileCheck %s --check-prefix=NO_PATH
+// RUN: (iree-compile --iree-load-plugin= 2>&1 || true) | FileCheck %s --check-prefix=NO_PATH
+// RUN: (iree-opt --iree-load-plugin=non_existent_path 2>&1 || true) | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+// RUN: (iree-compile --iree-load-plugin=non_existent_path 2>&1 || true) | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+
+// Alternative invocation via environment variable
+// RUN: (IREE_LOAD_PLUGINS=non_existent_path iree-opt || true) 2>&1 | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+// RUN: (IREE_LOAD_PLUGINS=non_existent_path iree-compile || true) 2>&1 | FileCheck %s --check-prefix=NON_EXISTENT_PATH
+
+// NO_PATH: [IREE Dynamic Plugin ERROR]: no path given to --iree-load-plugin
+// NON_EXISTENT_PATH: [IREE Dynamic Plugin ERROR]: could not load plugin library 'non_existent_path'

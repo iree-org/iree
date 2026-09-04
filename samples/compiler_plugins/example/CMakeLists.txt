@@ -38,4 +38,29 @@ iree_compiler_register_plugin(
     ::registration
 )
 
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+
+iree_cc_library(
+  NAME
+    registration_dyn
+  SRCS
+    "src/PluginRegistration.cpp"
+  DEPS
+    ::defs
+    MLIRIR
+    iree::compiler::PluginAPI
+  DEFINES
+    "IREE_EXAMPLE_PLUGIN_ID=example_dyn"
+  PUBLIC
+)
+
+iree_compiler_register_dynamic_plugin(
+  PLUGIN_ID
+    example_dyn
+  TARGET
+    ::registration_dyn
+)
+
+endif()
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

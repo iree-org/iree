@@ -30,6 +30,12 @@ IREE_TARGET_BACKEND_ROCM="${IREE_TARGET_BACKEND_ROCM:-${OFF_IF_DARWIN}}"
 # needed, but some of the deps are too large to enable by default for all
 # developers.
 IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-${OFF_IF_DARWIN}}"
+# Off by default: the rename relinks all of libIREECompiler, which most builds
+# have no use for.
+IREE_COMPILER_DYNAMIC_PLUGINS="${IREE_COMPILER_DYNAMIC_PLUGINS:-OFF}"
+# Mutually exclusive with the rename: llvm-objcopy cannot follow a thin
+# archive's member paths.
+IREE_ENABLE_THIN_ARCHIVES="${IREE_ENABLE_THIN_ARCHIVES:-ON}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 # If set to 1, exit after CMake configure (useful for generating compile_commands.json).
@@ -58,7 +64,7 @@ declare -a CMAKE_ARGS=(
   # Enable split dwarf and thin archives for smaller object files and faster
   # linking (for builds with debug info).
   "-DIREE_ENABLE_SPLIT_DWARF=ON"
-  "-DIREE_ENABLE_THIN_ARCHIVES=ON"
+  "-DIREE_ENABLE_THIN_ARCHIVES=${IREE_ENABLE_THIN_ARCHIVES}"
 
   # Enable docs build on the CI. The additional builds are pretty fast and
   # give us early warnings for some types of website publication errors.
@@ -74,6 +80,7 @@ declare -a CMAKE_ARGS=(
   "-DIREE_TARGET_BACKEND_CUDA=${IREE_TARGET_BACKEND_CUDA}"
   "-DIREE_TARGET_BACKEND_ROCM=${IREE_TARGET_BACKEND_ROCM}"
   "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
+  "-DIREE_COMPILER_DYNAMIC_PLUGINS=${IREE_COMPILER_DYNAMIC_PLUGINS}"
 )
 
 # Force /Z7 (embedded per-.obj debug info) instead of /Zi (shared per-target
