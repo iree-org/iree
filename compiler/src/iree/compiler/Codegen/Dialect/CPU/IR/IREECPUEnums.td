@@ -83,6 +83,8 @@ class IREECPU_I32EnumAttr<string name, string summary,
 //     - 1 is NEON.
 //     - 2 is SVE/SVE2.
 //     - 3 is SME/SME2.
+//   - For RISC-V:
+//     - 1 is V (RVV).
 // * C denotes the element type of the A-matrix (LHS):
 //   * 0 = float64 (IEEE754 half precision).
 //   * 1 = float32 (IEEE754 half precision).
@@ -172,6 +174,16 @@ def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
 def MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32
     : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32", 0x2211>;
 
+// RISC-V V `vfmacc.vf` (f16, f16): a 1x8VLsx1 matmul tile, or 8VLsx1x1 in the
+// M<->N-swapped orientation. `8VLs` is 8 f16 elements per 64-bit vector-length
+// unit, i.e. one LMUL=2 register group, and s stands for static. The LHS is a
+// scalar broadcast out of an FP register (`.vf` variant), not a vector operand.
+// Requires Zvfh for native half-precision arithmetic.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16", 0x3120>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16", 0x3121>;
+
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
 // unrolled (`intrinsics_m`, `intrinsics_n`, `intrinsics_k`) tile. Unlike
@@ -219,6 +231,10 @@ def IREECPU_MMAIntrinsic
 
            // Arm SVE
            MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
+
+           // RISC-V V
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;
