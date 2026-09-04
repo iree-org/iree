@@ -415,4 +415,5 @@ func.func @i4_dequant_matvec() attributes {hal.executable.target = #executable_t
 //         CHECK:     arith.uitofp %{{.*}} : vector<1x1x1x1x1x1x1x1x4xi4> to vector<1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.subf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>
 //         CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>
-//         CHECK:     vector.contract {{.*}} : vector<1x1x1x1x1x1x1x1x4xf16>, vector<1x1x1x1x1x1x1x1x1x1x1x4xf16> into vector<1x1x1x1x1x1x1x1x1xf16>
+//         CHECK:     vector.contract {{.*}} : vector<1x1x4xf16>, vector<1x1x1x4xf16> into vector<1x1x1xf16>
+//    CHECK-NEXT:     vector.shape_cast %{{.*}} : vector<1x1x1xf16> to vector<1x1x1x1x1x1x1x1x1xf16>
