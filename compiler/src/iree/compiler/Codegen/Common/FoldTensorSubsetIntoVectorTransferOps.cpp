@@ -157,7 +157,7 @@ static bool isDestinationFullyOverwritten(vector::TransferWriteOp writeOp) {
   if (vecType.isScalable()) {
     auto targetAttr =
         iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(writeOp);
-    vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+    vscaleRange = iree_compiler::getVscaleRange(targetAttr);
   }
 
   Value dest = writeOp.getBase();
