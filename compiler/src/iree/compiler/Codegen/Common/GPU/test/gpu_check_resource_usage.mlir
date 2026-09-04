@@ -85,7 +85,7 @@ module {
 module {
   func.func @shared_mem_alloc_alignment_overflow() {
     // expected-error @+1 {{shared memory allocation size overflows 64 bits}}
-    memref.alloc() {alignment = 64 : i64} : memref<1152921504606846975xi8, #gpu.address_space<workgroup>>
+    memref.alloc() alignment = 64 : memref<1152921504606846975xi8, #gpu.address_space<workgroup>>
     return
   }
 }

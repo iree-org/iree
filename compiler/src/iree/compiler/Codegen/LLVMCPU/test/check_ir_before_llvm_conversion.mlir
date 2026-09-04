@@ -80,7 +80,7 @@ func.func @cumulative_overflowing_allocas() {
 
 func.func @overflowing_aligned_alloca() {
   // expected-error @+1 {{stack allocation size overflows 64 bits}}
-  %0 = memref.alloca() {alignment = 64 : i64} : memref<1152921504606846975xi8>
+  %0 = memref.alloca() alignment = 64 : memref<1152921504606846975xi8>
   return
 }
 
