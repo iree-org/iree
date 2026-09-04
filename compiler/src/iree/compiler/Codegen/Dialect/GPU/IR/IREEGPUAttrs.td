@@ -210,6 +210,12 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
   let assemblyFormat = "$value";
 }
 
+def IREEGPU_SharedMemoryModelAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_SharedMemoryModel, "shared_mem_model"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
 //===----------------------------------------------------------------------===//
 // InnerTiledSemantics
 //===----------------------------------------------------------------------===//
@@ -764,10 +770,13 @@ def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
     OptionalParameter<"std::optional<int32_t>">:$simds_per_wgp,
     // VGPR register space size in bits. TODO(#18849): populate on all GPUs.
     OptionalParameter<"std::optional<int32_t>">:$vgpr_space_bits,
-    // Available bit-widths for direct load from global to LDS memory.
+    // Available bit-widths for direct load from global to shared memory.
     OptionalParameter<"DenseI64ArrayAttr">:$dma_sizes,
-    // Number of banks in LDS.
-    OptionalParameter<"std::optional<int32_t>">:$workgroup_memory_bank_count,
+    // Shared memory hardware model encoding bank count, phase scheduling, and
+    // bank width for the target architecture. Use getter functions in
+    // KnownTargets.h to query derived values from the model.
+    DefaultValuedParameter<"SharedMemoryModelAttr",
+      "SharedMemoryModelAttr::get($_ctxt, SharedMemoryModel::None)">:$shared_mem_model,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
