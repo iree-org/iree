@@ -267,10 +267,15 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
           context, funcOp.getLoc(), deviceMappingAttribute))) {
     return signalPassFailure();
   }
+  // Forward the distribution-level inner-tile alignment hints recorded, if any.
+  scf::InnerTileAlignmentFnTy innerTileAlignmentFn =
+      makeInnerTileAlignmentFn(IREE::CPU::TilingLevel::DistributionTiles);
+
   scf::SCFTilingOptions tilingOptions;
   tilingOptions.setTileSizes(tilingInfo->tileSizes);
   tilingOptions.setInterchange(tilingInfo->interchange);
   tilingOptions.setMapping(deviceMappingAttribute);
+  tilingOptions.setInnerTileAlignmentFn(innerTileAlignmentFn);
 
   IREE::Codegen::WorkgroupReorderingAttrInterface workgroupReorderingStrategy =
       getLoweringConfig(tilingInfo->tilableOp).getWorkgroupReorderingStrategy();
@@ -370,9 +375,11 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     FailureOr<std::queue<Operation *>> newFusionOpportunities =
         fuseConsumersIntoForall(
             rewriter, tileAndFuseResult->tiledAndFusedOps.getArrayRef(),
-            tilingLoops, [&tiledAndFusedOps](Operation *op) {
+            tilingLoops,
+            [&tiledAndFusedOps](Operation *op) {
               return tiledAndFusedOps.contains(op);
-            });
+            },
+            innerTileAlignmentFn);
     if (failed(newFusionOpportunities)) {
       // Continue the work if the failure is allowed.
       if (!verifyComputeOpsAfterDistribution(funcOp)) {

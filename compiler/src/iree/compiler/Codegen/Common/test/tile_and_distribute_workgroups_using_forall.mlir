@@ -1498,3 +1498,178 @@ func.func @arg_compare_fold_broadcast(
 //   CHECK-NOT:     linalg.broadcast
 //       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
 //       CHECK:       iree_linalg_ext.arg_compare
+
+// -----
+
+// Distribution of a scalable linalg.pack (inner tiles [8*vscale, 1]) with an
+// elementwise-add producer. Expects the pack to fuse into the workgroup forall,
+// with its outer packed dim sliced as `128 ceildiv (8 * vscale)`.
+
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34", vscale_range = [1, 16]}>
+#config = #iree_cpu.lowering_config<distribution = [128, 64], vector_common_parallel = [[8], 1]>
+#config1 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @scalable_pack_distribute_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor<384x512xf32>) -> tensor<?x512x?x1xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = tensor.empty() : tensor<384x512xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<384x512xf32>, tensor<384x512xf32>) outs(%0 : tensor<384x512xf32>) attrs = {lowering_config = #config} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.addf %in, %in_0 : f32
+    linalg.yield %3 : f32
+  } -> tensor<384x512xf32>
+  %mouter = affine.apply affine_map<()[s0] -> (384 ceildiv s0)>()[%c8_vscale]
+  %2 = tensor.empty(%mouter, %c8_vscale) : tensor<?x512x?x1xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%c8_vscale, 1] into %2 {inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Multiple, Unknown], vector_common_parallel = [Equal, Unknown]>, lowering_config = #config1} : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
+  return %pack : tensor<?x512x?x1xf32>
+}
+// CHECK-LABEL: func.func @scalable_pack_distribute_with_producer
+// CHECK:         %[[VS:.+]] = vector.vscale
+// CHECK:         %[[C8VS:.+]] = arith.muli %[[VS]], %{{.+}}
+// CHECK:         scf.forall {{.*}} = (0, 0) to (384, 512) step (128, 64)
+// CHECK:           linalg.generic
+// CHECK:             arith.addf
+// CHECK:           %[[OUTER:.+]] = affine.apply affine_map<()[s0] -> (128 ceildiv s0)>()[%[[C8VS]]]
+// CHECK:           tensor.extract_slice %{{.+}}[%{{.+}}, %{{.+}}, 0, 0] [%[[OUTER]], 64, %[[C8VS]], 1]
+// CHECK:           linalg.pack
+// CHECK-SAME:        inner_tiles = [%[[C8VS]], 1]
+// CHECK-SAME:        inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Multiple, Unknown], vector_common_parallel = [Equal, Unknown]>
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Distribution of a scalable linalg.unpack (inner tiles [7, 8*vscale]) fused as
+// the producer of an elementwise-add consumer. Expects the unpack to fuse into
+// the workgroup forall, slicing its packed source on the scalable dim.
+
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34", vscale_range = [1, 16]}>
+#config = #iree_cpu.lowering_config<vector_common_parallel = [7, [8]]>
+#config1 = #iree_cpu.lowering_config<distribution = [84, 128], vector_common_parallel = [7, [8]]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @scalable_unpack_distribute_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: tensor<80x320xf32>) -> tensor<80x320xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %0 = tensor.empty() : tensor<80x320xf32>
+  %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [7, %c8_vscale] into %0 {inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>, lowering_config = #config} : tensor<12x?x7x?xf32> -> tensor<80x320xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1, %unpack : tensor<80x320xf32>, tensor<80x320xf32>) outs(%0 : tensor<80x320xf32>) attrs = {lowering_config = #config1} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %2 = arith.addf %in, %in_0 : f32
+    linalg.yield %2 : f32
+  } -> tensor<80x320xf32>
+  return %1 : tensor<80x320xf32>
+}
+// CHECK-LABEL: func.func @scalable_unpack_distribute_with_consumer
+// CHECK:         %[[VS:.+]] = vector.vscale
+// CHECK:         %[[C8VS:.+]] = arith.muli %[[VS]], %{{.+}}
+// CHECK:         scf.forall {{.*}} = (0, 0) to (80, 320) step (84, 128)
+// CHECK:           %[[NSIZE:.+]] = affine.min affine_map<(d0) -> (-d0 + 320, 128)>
+// CHECK:           %[[NOUTER:.+]] = affine.apply affine_map<(d0)[s0] -> (d0 ceildiv s0)>(%[[NSIZE]])[%[[C8VS]]]
+// CHECK:           tensor.extract_slice %{{.+}}[0, %{{.+}}, 0, 0] [12, %[[NOUTER]], 7, %[[C8VS]]]
+// CHECK:           linalg.unpack
+// CHECK-SAME:        inner_tiles = [7, %[[C8VS]]]
+// CHECK-SAME:        inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
+// CHECK:           linalg.generic
+// CHECK:             arith.addf
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Distribution of a scalable linalg.mmt4d (M0 = N0 = 8*vscale) with fused
+// generic, unpack and pack consumers. Expects the whole chain in one workgroup
+// forall, with the pack's scalable outer dim folded to a static 1.
+
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34", vscale_range = [1, 16]}>
+#config = #iree_cpu.lowering_config<distribution = [1, 1, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, [8], [8], 0]>
+#config1 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, [8], [8]]>
+#config2 = #iree_cpu.lowering_config<vector_common_parallel = [[8], [8]]>
+#config3 = #iree_cpu.lowering_config<vector_common_parallel = [[8], 1]>
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @scalable_mmt4d_generic_unpack_pack_distribute(%lhs: tensor<5x512x?x1xf32>, %rhs: tensor<7x512x?x1xf32>) -> tensor<?x?x?x1xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c5 = arith.constant 5 : index
+  %c7 = arith.constant 7 : index
+  %c8 = arith.constant 8 : index
+  %vscale = vector.vscale
+  %c8_vscale = arith.muli %vscale, %c8 : index
+  %acc = tensor.empty(%c8_vscale, %c8_vscale) : tensor<5x7x?x?xf32>
+  %fill = linalg.fill {lowering_config = #config1} ins(%cst : f32) outs(%acc : tensor<5x7x?x?xf32>) -> tensor<5x7x?x?xf32>
+  %mmt4d = linalg.mmt4d {lowering_config = #config}
+    ins(%lhs, %rhs : tensor<5x512x?x1xf32>, tensor<7x512x?x1xf32>)
+    outs(%fill : tensor<5x7x?x?xf32>) -> tensor<5x7x?x?xf32>
+  %genout = tensor.empty(%c8_vscale, %c8_vscale) : tensor<5x7x?x?xf32>
+  %gen = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+    ins(%mmt4d : tensor<5x7x?x?xf32>) outs(%genout : tensor<5x7x?x?xf32>)
+    attrs = {lowering_config = #config1} {
+  ^bb0(%in: f32, %out: f32):
+    %v = arith.maximumf %in, %cst : f32
+    linalg.yield %v : f32
+  } -> tensor<5x7x?x?xf32>
+  %m = arith.muli %c5, %c8_vscale : index
+  %n = arith.muli %c7, %c8_vscale : index
+  %uout = tensor.empty(%m, %n) : tensor<?x?xf32>
+  %unpack = linalg.unpack %gen outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
+    inner_tiles = [%c8_vscale, %c8_vscale] into %uout
+    {inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Equal, Equal], vector_common_parallel = [Equal, Equal]>,
+    lowering_config = #config2} : tensor<5x7x?x?xf32> -> tensor<?x?xf32>
+  %mouter = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%m, %c8_vscale]
+  %pout = tensor.empty(%mouter, %n, %c8_vscale) : tensor<?x?x?x1xf32>
+  %pack = linalg.pack %unpack padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
+    inner_tiles = [%c8_vscale, 1] into %pout
+    {inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Equal, Multiple], vector_common_parallel = [Equal, Multiple]>,
+    lowering_config = #config3} : tensor<?x?xf32> -> tensor<?x?x?x1xf32>
+  return %pack : tensor<?x?x?x1xf32>
+}
+// CHECK-LABEL: func.func @scalable_mmt4d_generic_unpack_pack_distribute
+// CHECK:         %[[VS:.+]] = vector.vscale
+// CHECK:         %[[C8VS:.+]] = arith.muli %[[VS]], %{{.+}}
+// CHECK:         scf.forall {{.*}} in (5, 7)
+// CHECK:           %[[FILL:.+]] = linalg.fill
+// CHECK:           %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:        outs(%[[FILL]]
+// CHECK:           %[[GEN:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[MMT4D]]
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack %[[GEN]]
+// CHECK-SAME:        inner_tiles = [%[[C8VS]], %[[C8VS]]]
+// CHECK-SAME:        tensor<1x1x?x?xf32> -> tensor<?x?xf32>
+// CHECK:           linalg.pack %[[UNPACK]]
+// CHECK-SAME:        inner_tiles = [%[[C8VS]], 1]
+// CHECK-SAME:        tensor<?x?xf32> -> tensor<1x?x?x1xf32>
+// CHECK:           scf.forall.in_parallel
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// A dynamic (non-vscale) inner tile: the tiling driver cannot infer the multiple
+// relationship from the IR, so the `distribution = [Multiple, Unknown]` hint is
+// what lets the pack be tiled and fused into the workgroup forall (its outer
+// packed dim becomes `64 ceildiv %d`). Without the hint the pack stays untiled.
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64]]>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @dyn_pack_distribute_multiple_hint(%arg0: tensor<384x512xf32>, %arg1: tensor<384x512xf32>, %d: index) -> tensor<?x512x?x1xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %0 = tensor.empty() : tensor<384x512xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<384x512xf32>, tensor<384x512xf32>) outs(%0 : tensor<384x512xf32>) attrs = {lowering_config = #config} {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %3 = arith.addf %in, %in_0 : f32
+    linalg.yield %3 : f32
+  } -> tensor<384x512xf32>
+  %mouter = affine.apply affine_map<()[s0] -> (384 ceildiv s0)>()[%d]
+  %2 = tensor.empty(%mouter, %d) : tensor<?x512x?x1xf32>
+  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [%d, 1] into %2 {inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Multiple, Unknown]>} : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
+  return %pack : tensor<?x512x?x1xf32>
+}
+// CHECK-LABEL: func.func @dyn_pack_distribute_multiple_hint
+// CHECK-SAME:      %[[D:[A-Za-z0-9_]+]]: index
+// CHECK:         scf.forall {{.*}} = (0, 0) to (384, 512) step (64, 64)
+// CHECK:           linalg.generic
+// CHECK:             arith.addf
+// CHECK:           %[[OUTER:.+]] = affine.apply affine_map<()[s0] -> (64 ceildiv s0)>()[%[[D]]]
+// CHECK:           tensor.extract_slice %{{.+}}[%{{.+}}, %{{.+}}, 0, 0] [%[[OUTER]], 64, %[[D]], 1]
+// CHECK:           linalg.pack
+// CHECK-SAME:        inner_tiles = [%[[D]], 1]
+// CHECK-SAME:        inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Multiple, Unknown]>
+// CHECK:           scf.forall.in_parallel
+// CHECK:         mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
