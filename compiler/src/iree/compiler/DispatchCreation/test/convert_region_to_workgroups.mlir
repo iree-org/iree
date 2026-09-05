@@ -47,3 +47,125 @@ util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: te
   //      CHECK: util.return %[[r0]], %[[r1]]
   util.return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>
 }
+
+// -----
+
+// CHECK-LABEL: util.func public @sort_with_internal_key_use
+util.func public @sort_with_internal_key_use(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups
+  // CHECK-NEXT: (%[[KEYS:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>,
+  // CHECK-SAME: %{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    // CHECK: %[[SORTED:[a-zA-Z0-9_]+]]:2 = iree_linalg_ext.sort
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    %combined = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        ins(%sorted#0 : tensor<4xi64>)
+        outs(%sorted#1 : tensor<4xi64>) {
+    ^bb0(%key: i64, %index: i64):
+      %sum = arith.addi %key, %index : i64
+      linalg.yield %sum : i64
+    } -> tensor<4xi64>
+    // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#0, %[[KEYS]]
+    flow.return %combined : tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0 : tensor<4xi64>
+  util.return %result : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @sort_with_escaping_key_alias
+util.func public @sort_with_escaping_key_alias(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<2x2xi64>) {
+    %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#1, %key_view : tensor<4xi64>, tensor<2x2xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<4xi64>, tensor<2x2xi64>
+  util.return %result#0, %result#1 : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @sort_with_tensor_view_input
+util.func public @sort_with_tensor_view_input(
+    %keys: tensor<2x2xi64>, %indices: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<2x2xi64>) {
+  %key_view = tensor.collapse_shape %keys [[0, 1]]
+      : tensor<2x2xi64> into tensor<4xi64>
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]] = flow.dispatch.workgroups
+  // CHECK-NEXT: (%{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi64>>,
+  // CHECK-SAME: %{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%key_view, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#1 : tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]], %{{.+}} : tensor<4xi64>, tensor<2x2xi64>
+  util.return %result, %keys : tensor<4xi64>, tensor<2x2xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @sort_without_live_results
+// CHECK-NOT: iree_linalg_ext.sort
+util.func public @sort_without_live_results(
+    %keys: tensor<4xi64>, %indices: tensor<4xi64>) -> tensor<4xi64> {
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %indices : tensor<4xi64>
+  }
+  // CHECK: util.return
+  util.return %result : tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @generic_with_unused_result
+util.func public @generic_with_unused_result(
+    %first: tensor<4xi64>, %second: tensor<4xi64>) -> tensor<4xi64> {
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]] = flow.dispatch.workgroups
+  // CHECK-NEXT: (%{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi64>>,
+  // CHECK-SAME: %{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %generic:2 = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>,
+                         affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]}
+        outs(%first, %second : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64):
+      %sum = arith.addi %lhs, %rhs : i64
+      %difference = arith.subi %sum, %rhs : i64
+      linalg.yield %sum, %difference : i64, i64
+    } -> (tensor<4xi64>, tensor<4xi64>)
+    flow.return %generic#1 : tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]] : tensor<4xi64>
+  util.return %result : tensor<4xi64>
+}

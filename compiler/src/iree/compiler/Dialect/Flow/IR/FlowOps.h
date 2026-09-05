@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -47,25 +46,5 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc" // IWYU pragma: export
-
-namespace mlir::iree_compiler::IREE::Flow {
-
-// Returns the storage base for an operation-required result when its tied
-// operand is the base value itself, has the same type as the result, and is not
-// produced by a pre-conversion tensor view; returns a null value otherwise.
-Value getRequiredDirectTiedResultBase(Value value);
-
-// Returns whether |value| or an alias exposed by TiedOpInterface, including a
-// supported pre-conversion tensor view, has a use after |regionOp| that can
-// observe data mutations. tensor.dim queries observe only shape and are
-// ignored. |ignoredOwner|'s use is ignored, and top-level operations in
-// |movingIntoDispatch| are treated as dispatch-local. This is a use/known-alias
-// analysis, not general tensor alias, side-effect, or operation-liveness
-// analysis.
-bool hasObservableUseAfterDispatch(
-    DispatchRegionOp regionOp, Value value, Operation *ignoredOwner,
-    ArrayRef<Operation *> movingIntoDispatch = {});
-
-} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_IR_FLOWOPS_H_

@@ -645,7 +645,11 @@ struct LinalgOpTiedOpInterface
 
   bool isTiedResultRequired(Operation *op, unsigned resultIndex) const {
     if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(op)) {
-      return sortOp.isResultUsedInComparator(resultIndex);
+      // Comparator lanes need initialized writable storage even when their
+      // sorted results have no SSA users.
+      auto blockArgs = sortOp.getRegion().front().getArguments();
+      return !blockArgs[2 * resultIndex].use_empty() ||
+             !blockArgs[2 * resultIndex + 1].use_empty();
     }
     return false;
   }

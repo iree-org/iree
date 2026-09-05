@@ -75,16 +75,31 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
   return value;
 }
 
-// Returns true when |value| is an operation-required result that ties directly
-// to |tiedArgument|. Required carriers take precedence when several results
-// reach the same external storage base.
-static bool isRequiredDirectTiedResult(IREE::Flow::DispatchRegionOp regionOp,
-                                       Value value, Value tiedArgument) {
+// These ops become tied Flow views after dispatch formation. Treat their
+// results as indirect now so a required tie cannot mutate an earlier source.
+static bool isPreConversionTensorView(Operation *op) {
+  return op && isa<tensor::BitcastOp, tensor::CastOp, tensor::CollapseShapeOp,
+                   tensor::ExpandShapeOp, tensor::ReshapeOp>(op);
+}
+
+// A required tie can reuse storage only through a direct, type-identical base.
+static Value getRequiredDirectTiedResultBase(DispatchRegionOp regionOp,
+                                             Value value) {
   auto result = dyn_cast<OpResult>(value);
   if (!result || !regionOp->isProperAncestor(result.getOwner())) {
-    return false;
+    return {};
   }
-  return getRequiredDirectTiedResultBase(value) == tiedArgument;
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
+  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
+    return {};
+  }
+  Value tiedOperand = tiedOp.getTiedResultOperand(result);
+  if (!tiedOperand || isPreConversionTensorView(tiedOperand.getDefiningOp()) ||
+      tiedOperand.getType() != result.getType() ||
+      tiedOperand != tiedOp.getTiedResult(result.getResultNumber())) {
+    return {};
+  }
+  return tiedOperand;
 }
 
 } // namespace
@@ -129,6 +144,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Find tied results.
+  SmallVector<Value> requiredResults;
   DenseSet<Value> tiedArgumentsSet;
   SmallVector<int64_t> tiedArguments(numResults,
                                      IREE::Util::TiedOpInterface::kUntiedIndex);
@@ -152,8 +168,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       }
       assert(argumentsSet.contains(*tiedArgument) &&
              "expected that tiedArgument is already an argument");
-      bool isRequired =
-          isRequiredDirectTiedResult(regionOp, it.value(), *tiedArgument);
+      bool isRequired = getRequiredDirectTiedResultBase(regionOp, it.value()) ==
+                        *tiedArgument;
       auto &candidates = isRequired ? requiredTies : otherTies;
       candidates.emplace_back(it.index(), *tiedArgument);
     }
@@ -167,7 +183,50 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
             argumentsSet.begin(), llvm::find(argumentsSet, tiedArgument));
       }
     };
+    // Required bindings claim shared storage before optional result ties.
     assignTies(requiredTies);
+
+    // An operation-required result may have no users outside the dispatch, but
+    // still needs initialized writable storage. Materialize its binding here,
+    // where capture access and output stores are established, so region
+    // formation and canonicalization need only preserve ordinary SSA uses.
+    auto returnOp = origTerminators.front();
+    // A base with multiple data consumers is unavailable to every candidate.
+    DenseSet<Value> checkedBases;
+    for (Operation &op : region.front().without_terminator()) {
+      if (!isa<IREE::Util::TiedOpInterface>(op)) {
+        continue;
+      }
+      bool hasLiveResult = llvm::any_of(op.getResults(), [&](Value result) {
+        return llvm::any_of(result.getUses(), [&](OpOperand &use) {
+          return use.getOwner() != returnOp ||
+                 !regionOp->getResult(use.getOperandNumber()).use_empty();
+        });
+      });
+      if (!hasLiveResult) {
+        continue;
+      }
+      for (Value result : op.getResults()) {
+        Value tiedBase = getRequiredDirectTiedResultBase(regionOp, result);
+        if (!tiedBase || !argumentsSet.contains(tiedBase) ||
+            tiedArgumentsSet.contains(tiedBase) ||
+            !checkedBases.insert(tiedBase).second) {
+          continue;
+        }
+        // Limit reuse to one data consumer instead of requiring alias/liveness
+        // analysis. Shape queries cannot observe a type-identical tie's writes.
+        if (!llvm::all_of(tiedBase.getUses(), [&](OpOperand &use) {
+              return use.getOwner() == &op ||
+                     isa<tensor::DimOp>(use.getOwner());
+            })) {
+          continue;
+        }
+        tiedArgumentsSet.insert(tiedBase);
+        tiedArguments.push_back(std::distance(
+            argumentsSet.begin(), llvm::find(argumentsSet, tiedBase)));
+        requiredResults.push_back(result);
+      }
+    }
     assignTies(otherTies);
   }
 
@@ -183,10 +242,21 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     }
   }
 
+  // Required results are appended so existing dispatch result indices remain
+  // unchanged. Direct type-identical ties reuse the captured storage's shape.
+  SmallVector<Type> resultTypes(regionOp.getResultTypes());
+  SmallVector<Value> resultDims(regionOp.getResultDims());
+  for (auto [index, result] : llvm::enumerate(requiredResults)) {
+    resultTypes.push_back(result.getType());
+    auto dims = IREE::Util::findDynamicDimsInList(
+        tiedArguments[numResults + index], arguments, argumentDims);
+    resultDims.append(dims.begin(), dims.end());
+  }
+
   // Create the shell dispatch.workgroup ops.
   auto workgroupsOp = IREE::Flow::DispatchWorkgroupsOp::create(
-      rewriter, loc, regionOp.getWorkload(), regionOp.getResultTypes(),
-      regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
+      rewriter, loc, regionOp.getWorkload(), resultTypes, resultDims, arguments,
+      argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Populate the workgroup count region.
@@ -250,7 +320,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       [&](IREE::Flow::ReturnOp returnOp) { terminators.push_back(returnOp); });
   for (auto terminator : terminators) {
     rewriter.setInsertionPoint(terminator);
-    for (const auto &it : llvm::enumerate(terminator->getOperands())) {
+    for (const auto &it : llvm::enumerate(
+             llvm::concat<Value>(terminator.getOperands(), requiredResults))) {
       auto outputBbArg = workgroupsOp.getOutputBlockArgument(it.index());
       ValueRange dims;
       if (tiedArguments[it.index()] ==
@@ -278,7 +349,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     rewriter.eraseOp(terminator);
   }
 
-  rewriter.replaceOp(regionOp, workgroupsOp.getResults());
+  rewriter.replaceOp(regionOp,
+                     workgroupsOp.getResults().take_front(numResults));
   return workgroupsOp;
 }
 

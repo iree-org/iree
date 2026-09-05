@@ -1060,20 +1060,12 @@ SortOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-bool SortOp::isResultUsedInComparator(unsigned resultIndex) {
-  assert(resultIndex < getNumResults() && "result index out of bounds");
-  auto blockArgs = getRegion().front().getArguments();
-  return !blockArgs[2 * resultIndex].use_empty() ||
-         !blockArgs[2 * resultIndex + 1].use_empty();
-}
-
 namespace {
 
 /// This pattern removes unused results from SortOp. The SortOp uses the
-/// Destination Passing Style interface, so each result is tied to its
-/// corresponding output operand. Its comparator also has two block arguments
-/// for each result. Removing a result therefore requires removing the
-/// corresponding operand and comparator block arguments.
+/// Destination Passing Style interface so it's results are tied to it's
+/// operands as well as it's comparator block arguments. So, to remove unused
+/// results we must also remove the associated operands and block arguments.
 ///
 /// For example:
 ///
@@ -1092,8 +1084,9 @@ namespace {
 ///    iree_linalg_ext.yield %42 : i1
 /// } -> tensor<?x10xf32>
 ///
-/// An unused result is retained when either associated block argument is used
-/// because the comparator depends on that output's values.
+/// Note: that we will not remove unused results if their associated block
+/// arguments are used within the comparator because that's needed for op
+/// functionality.
 struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
@@ -1111,12 +1104,15 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
       return failure();
     }
 
-    SmallVector<Value> usedOperands, usedResults;
+    Block &block = sortOp.getRegion().front();
+    auto blockArgs = block.getArguments();
+    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
     SmallVector<Type> usedResultTypes;
     BitVector eraseArg(numRes * 2, false);
     for (auto idx : llvm::seq<unsigned>(numRes)) {
       // If result or associated block arg is used, do not erase.
-      if (!results[idx].use_empty() || sortOp.isResultUsedInComparator(idx)) {
+      if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
+          !blockArgs[2 * idx + 1].use_empty()) {
         usedOperands.push_back(operands[idx]);
         usedResults.push_back(results[idx]);
         usedResultTypes.push_back(results[idx].getType());

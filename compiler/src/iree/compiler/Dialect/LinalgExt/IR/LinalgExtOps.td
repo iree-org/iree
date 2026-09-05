@@ -529,10 +529,6 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
       return getOperandType(0).getShape();
     }
 
-    // Returns true if the comparator reads either block argument associated
-    // with the result.
-    bool isResultUsedInComparator(unsigned resultIndex);
-
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
