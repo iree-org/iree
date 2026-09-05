@@ -830,6 +830,23 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true when the operation requires the result-to-operand tie for
+        the given result while it executes. The tie may provide initialized
+        writable destination storage even when the result has no SSA uses.
+        Transformations may retain the tie to provide that storage when legal,
+        but this requirement does not by itself keep an otherwise-dead
+        operation alive.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isTiedResultRequired",
+      /*args=*/(ins "unsigned":$resultIndex),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Walks up the SSA use-def chain to find the first defined value reachable
         from the given value by traversing tied ops. The returned value may be
         in another block if that block dominates the one the result is defined
