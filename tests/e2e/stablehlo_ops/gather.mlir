@@ -167,3 +167,43 @@ func.func @reordered_start_index() {
      [ 9, 10, 11]]]> : tensor<2x2x3xi32>) : tensor<2x2x3xi32>
   return
 }
+
+// Out-of-range start indices are clamped into [0, operand_dim - slice_size],
+// not read out of bounds. This shape takes the torch_index_select lowering.
+func.func @out_of_bounds_indices_are_clamped() {
+  %operand = util.unfoldable_constant dense<[10, 20, 30]> : tensor<3xi32>
+  %start_indices = util.unfoldable_constant dense<[
+    [-5], [0], [2], [100]]> : tensor<4x1xi32>
+  %result = "stablehlo.gather"(%operand, %start_indices) {
+    dimension_numbers = #stablehlo.gather<
+      collapsed_slice_dims = [0],
+      index_vector_dim = 1,
+      offset_dims = [],
+      start_index_map = [0]
+    >,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1>
+  } : (tensor<3xi32>, tensor<4x1xi32>) -> tensor<4xi32>
+  check.expect_eq_const(%result, dense<[10, 10, 30, 30]> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+// Same, with the gathered dimension dynamic: the clamp bound comes from
+// stablehlo.get_dimension_size instead of a constant.
+func.func @out_of_bounds_indices_are_clamped_dynamic() {
+  %operand = flow.tensor.dynamic_constant dense<[10, 20, 30]> : tensor<3xi32> -> tensor<?xi32>
+  %start_indices = util.unfoldable_constant dense<[
+    [-5], [0], [2], [100]]> : tensor<4x1xi32>
+  %result = "stablehlo.gather"(%operand, %start_indices) {
+    dimension_numbers = #stablehlo.gather<
+      collapsed_slice_dims = [0],
+      index_vector_dim = 1,
+      offset_dims = [],
+      start_index_map = [0]
+    >,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1>
+  } : (tensor<?xi32>, tensor<4x1xi32>) -> tensor<4xi32>
+  check.expect_eq_const(%result, dense<[10, 10, 30, 30]> : tensor<4xi32>) : tensor<4xi32>
+  return
+}

@@ -8,6 +8,7 @@
 
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -106,11 +107,69 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "collapsed_slice_dims != [0]");
     }
 
+    // `gather` clamps every start index into `[0, operand_dim - slice_size]`
+    // (https://openxla.org/stablehlo/spec#gather); `slice_sizes[0]` is 1 here,
+    // so the bound is `operand.dim(0) - 1`. `torch_index_select` promises no
+    // such thing -- it lowers to a bare `tensor.extract` -- so the clamp has to
+    // be materialized here, or an out-of-range index reads unrelated memory.
+    auto indexElemTy = dyn_cast<IntegerType>(startIndicesTy.getElementType());
+    if (!indexElemTy) {
+      return rewriter.notifyMatchFailure(gather, "non-integer start_indices");
+    }
+
+    ImplicitLocOpBuilder b(gather.getLoc(), rewriter);
+    auto indexScalarTy = RankedTensorType::get({}, indexElemTy);
+    unsigned indexWidth = indexElemTy.getWidth();
+
+    Value upperBound;
+    if (!operandTy.isDynamicDim(0)) {
+      // `slice_sizes[0]` is 1 and the verifier bounds it by the dimension, so
+      // a well-formed gather always has an element here. Bail rather than let a
+      // negative bound through the unsigned arithmetic below.
+      int64_t maxIndex = operandTy.getDimSize(0) - 1;
+      if (maxIndex < 0) {
+        return rewriter.notifyMatchFailure(gather, "operand dimension 0 empty");
+      }
+      // An index type too narrow to name element `maxIndex` can never reach
+      // past the end, so saturate the bound instead of truncating it into a
+      // nonsensical (possibly negative) value.
+      uint64_t indexTypeMax =
+          (indexElemTy.isUnsigned() ? APInt::getMaxValue(indexWidth)
+                                    : APInt::getSignedMaxValue(indexWidth))
+              .getLimitedValue();
+      APInt bound(indexWidth, std::min<uint64_t>(maxIndex, indexTypeMax));
+      upperBound = mlir::stablehlo::ConstantOp::create(
+          b, DenseElementsAttr::get(indexScalarTy,
+                                    b.getIntegerAttr(indexElemTy, bound)));
+    } else if (indexWidth >= 32) {
+      // `get_dimension_size` yields an i32, so only index types wide enough to
+      // hold one can carry the bound without wrapping.
+      Value dimSize = mlir::stablehlo::GetDimensionSizeOp::create(
+          b, RankedTensorType::get({}, b.getI32Type()), operand,
+          b.getI64IntegerAttr(0));
+      if (dimSize.getType() != indexScalarTy) {
+        dimSize = mlir::stablehlo::ConvertOp::create(b, indexScalarTy, dimSize);
+      }
+      Value one = mlir::stablehlo::ConstantOp::create(
+          b, DenseElementsAttr::get(
+                 indexScalarTy,
+                 b.getIntegerAttr(indexElemTy, APInt(indexWidth, 1))));
+      upperBound =
+          mlir::stablehlo::SubtractOp::create(b, indexScalarTy, dimSize, one);
+    } else {
+      return rewriter.notifyMatchFailure(
+          gather, "start_indices too narrow to bound a dynamic dimension");
+    }
+
+    Value lowerBound = mlir::stablehlo::ConstantOp::create(
+        b, DenseElementsAttr::get(indexScalarTy, b.getZeroAttr(indexElemTy)));
+    Value clampedIndices = mlir::stablehlo::ClampOp::create(
+        b, startIndicesTy, lowerBound, startIndices, upperBound);
+
     auto torchIndexSelect = mlir::stablehlo::TorchIndexSelectOp::create(
-        rewriter, gather.getLoc(),
-        RankedTensorType::get(indexSelectShape, operandTy.getElementType()),
-        operand, gather.getStartIndices(), rewriter.getI64IntegerAttr(0),
-        rewriter.getI64IntegerAttr(0));
+        b, RankedTensorType::get(indexSelectShape, operandTy.getElementType()),
+        operand, clampedIndices, b.getI64IntegerAttr(0),
+        b.getI64IntegerAttr(0));
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(
         gather, gather.getType(), torchIndexSelect);
