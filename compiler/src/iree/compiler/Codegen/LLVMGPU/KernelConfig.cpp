@@ -906,13 +906,14 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   std::optional<std::pair<GPUMMASchedule, GPUMMASchedule>> attSchedule =
       deduceAttentionSchedule(qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds,
                               maxSharedMemoryBytes, targetSubgroupSize,
-                              transposedQ, transposedK, transposedV);
+                              transposedQ, transposedK, transposedV,
+                              /*canUpcastAcc=*/false, /*mustBeAligned=*/false);
   if (!attSchedule) {
     // Then try again by allowing upcasting accumulator.
     attSchedule = deduceAttentionSchedule(
         qkMatmul, pvMatmul, intrinsics, pvMatmulSeeds, maxSharedMemoryBytes,
         targetSubgroupSize, transposedQ, transposedK, transposedV,
-        /*canUpcastAcc=*/true);
+        /*canUpcastAcc=*/true, /*mustBeAligned=*/false);
   }
 
   if (!attSchedule) {
