@@ -88,8 +88,10 @@ util.func public @sort_with_escaping_key_alias(
     %keys: tensor<4xi64>, %indices: tensor<4xi64>)
     -> (tensor<4xi64>, tensor<2x2xi64>) {
   // CHECK: %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups
+  // CHECK-NEXT: (%{{[a-zA-Z0-9_]+}}: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi64>>,
   %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<2x2xi64>) {
-    %key_view = flow.tensor.reshape %keys : tensor<4xi64> -> tensor<2x2xi64>
+    %key_view = tensor.expand_shape %keys [[0, 1]] output_shape [2, 2]
+        : tensor<4xi64> into tensor<2x2xi64>
     %sorted:2 = iree_linalg_ext.sort dimension(0)
         outs(%keys, %indices : tensor<4xi64>, tensor<4xi64>) {
     ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
