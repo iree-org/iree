@@ -115,3 +115,6 @@ cpu/cpu7/cache/index2/type=Unified
 cpu/cpu7/topology/core_id=3
 cpu/cpu7/topology/physical_package_id=1
 cpu/present=0-7
+node/node0/cpulist=0-3
+node/node1/cpulist=4-7
+node/online=0,1

@@ -34,7 +34,8 @@ extern "C" {
 // NUMA topology
 //===----------------------------------------------------------------------===//
 
-// Returns the total number of NUMA nodes in the system.
+// Returns an exclusive upper bound on NUMA node ids: the highest online node
+// id plus one. Includes memory-only nodes.
 // Returns 1 if NUMA information is unavailable (single-node system).
 iree_host_size_t iree_hal_platform_query_numa_node_count(void);
 

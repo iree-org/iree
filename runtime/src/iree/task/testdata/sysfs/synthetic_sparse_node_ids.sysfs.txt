@@ -1,0 +1,70 @@
+# SYNTHETIC machine (not a hardware capture): SPARSE NUMA node ids. Two
+# CPU-bearing nodes numbered 0 and 4, with no nodes 1-3 -- node/online reads
+# "0,4". Linux allows this (memory hotplug leaves gaps, and some ppc64 systems
+# number nodes sparsely), which is why node/online is a list rather than a
+# count.
+#
+# Node ids must pass through as the KERNEL's ids, not as indices into the
+# enumerated set: an index would make "1" mean node 4, diverge from what
+# numactl/lscpu report, make node 4 unreachable by name, and feed
+# set_mempolicy a node that does not exist through the affinity group hint.
+cpu/cpu0/cache/index0/level=1
+cpu/cpu0/cache/index0/shared_cpu_list=0
+cpu/cpu0/cache/index0/size=32K
+cpu/cpu0/cache/index0/type=Data
+cpu/cpu0/topology/core_cpus_list=0
+cpu/cpu0/topology/core_id=0
+cpu/cpu0/topology/physical_package_id=0
+cpu/cpu1/cache/index0/level=1
+cpu/cpu1/cache/index0/shared_cpu_list=1
+cpu/cpu1/cache/index0/size=32K
+cpu/cpu1/cache/index0/type=Data
+cpu/cpu1/topology/core_cpus_list=1
+cpu/cpu1/topology/core_id=1
+cpu/cpu1/topology/physical_package_id=0
+cpu/cpu2/cache/index0/level=1
+cpu/cpu2/cache/index0/shared_cpu_list=2
+cpu/cpu2/cache/index0/size=32K
+cpu/cpu2/cache/index0/type=Data
+cpu/cpu2/topology/core_cpus_list=2
+cpu/cpu2/topology/core_id=2
+cpu/cpu2/topology/physical_package_id=0
+cpu/cpu3/cache/index0/level=1
+cpu/cpu3/cache/index0/shared_cpu_list=3
+cpu/cpu3/cache/index0/size=32K
+cpu/cpu3/cache/index0/type=Data
+cpu/cpu3/topology/core_cpus_list=3
+cpu/cpu3/topology/core_id=3
+cpu/cpu3/topology/physical_package_id=0
+cpu/cpu4/cache/index0/level=1
+cpu/cpu4/cache/index0/shared_cpu_list=4
+cpu/cpu4/cache/index0/size=32K
+cpu/cpu4/cache/index0/type=Data
+cpu/cpu4/topology/core_cpus_list=4
+cpu/cpu4/topology/core_id=4
+cpu/cpu4/topology/physical_package_id=0
+cpu/cpu5/cache/index0/level=1
+cpu/cpu5/cache/index0/shared_cpu_list=5
+cpu/cpu5/cache/index0/size=32K
+cpu/cpu5/cache/index0/type=Data
+cpu/cpu5/topology/core_cpus_list=5
+cpu/cpu5/topology/core_id=5
+cpu/cpu5/topology/physical_package_id=0
+cpu/cpu6/cache/index0/level=1
+cpu/cpu6/cache/index0/shared_cpu_list=6
+cpu/cpu6/cache/index0/size=32K
+cpu/cpu6/cache/index0/type=Data
+cpu/cpu6/topology/core_cpus_list=6
+cpu/cpu6/topology/core_id=6
+cpu/cpu6/topology/physical_package_id=0
+cpu/cpu7/cache/index0/level=1
+cpu/cpu7/cache/index0/shared_cpu_list=7
+cpu/cpu7/cache/index0/size=32K
+cpu/cpu7/cache/index0/type=Data
+cpu/cpu7/topology/core_cpus_list=7
+cpu/cpu7/topology/core_id=7
+cpu/cpu7/topology/physical_package_id=0
+cpu/present=0-7
+node/node0/cpulist=0-3
+node/node4/cpulist=4-7
+node/online=0,4
