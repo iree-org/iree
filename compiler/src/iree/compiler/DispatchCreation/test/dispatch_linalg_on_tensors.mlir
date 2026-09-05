@@ -1022,30 +1022,30 @@ util.func public @sort_does_not_tie_live_tensor_key_alias(
 // -----
 
 util.func public @sort_with_unused_trailing_key_result(
-    %indices: tensor<4xi64>, %keys: tensor<4xi64>) -> tensor<4xi64> {
+    %indices: tensor<4xi32>, %keys: tensor<4xi64>) -> tensor<4xi32> {
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%indices, %keys : tensor<4xi64>, tensor<4xi64>) {
-  ^bb0(%lhs_index: i64, %rhs_index: i64, %lhs_key: i64, %rhs_key: i64):
+      outs(%indices, %keys : tensor<4xi32>, tensor<4xi64>) {
+  ^bb0(%lhs_index: i32, %rhs_index: i32, %lhs_key: i64, %rhs_key: i64):
     %zero = arith.constant 0 : i64
     %take_lhs = arith.cmpi sge, %rhs_key, %zero : i64
     iree_linalg_ext.yield %take_lhs : i1
-  } -> tensor<4xi64>, tensor<4xi64>
-  util.return %sorted#0 : tensor<4xi64>
+  } -> tensor<4xi32>, tensor<4xi64>
+  util.return %sorted#0 : tensor<4xi32>
 }
 // CHECK-LABEL: util.func public @sort_with_unused_trailing_key_result(
-// CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi64>
+// CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi32>
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
 // CHECK-SAME:       (%[[INDICES]], %[[KEYS]])
-// CHECK-NEXT:       (%[[INDICES_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>,
+// CHECK-NEXT:       (%[[INDICES_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi32>>,
 // CHECK-SAME:        %[[KEYS_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
 //  CHECK-DAG:     %[[LOADED_INDICES:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES_CAPTURE]]
 //  CHECK-DAG:     %[[LOADED_KEYS:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[KEYS_CAPTURE]]
 //      CHECK:     %[[SORTED:[a-zA-Z0-9_]+]]:2 = iree_linalg_ext.sort dimension(0)
-// CHECK-SAME:         outs(%[[LOADED_INDICES]], %[[LOADED_KEYS]] : tensor<4xi64>, tensor<4xi64>)
+// CHECK-SAME:         outs(%[[LOADED_INDICES]], %[[LOADED_KEYS]] : tensor<4xi32>, tensor<4xi64>)
 //  CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#0, %[[INDICES_CAPTURE]]
 //  CHECK-DAG:     iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#1, %[[KEYS_CAPTURE]]
-//      CHECK:   util.return %[[RESULT]]#0 : tensor<4xi64>
+//      CHECK:   util.return %[[RESULT]]#0 : tensor<4xi32>
 
 // -----
 
