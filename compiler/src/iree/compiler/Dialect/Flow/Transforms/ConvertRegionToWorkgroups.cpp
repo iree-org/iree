@@ -78,8 +78,9 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
 // These ops become tied Flow views after dispatch formation. Treat their
 // results as indirect now so a required tie cannot mutate an earlier source.
 static bool isPreConversionTensorView(Operation *op) {
-  return op && isa<tensor::BitcastOp, tensor::CastOp, tensor::CollapseShapeOp,
-                   tensor::ExpandShapeOp, tensor::ReshapeOp>(op);
+  return isa_and_nonnull<tensor::BitcastOp, tensor::CastOp,
+                         tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+                         tensor::ReshapeOp>(op);
 }
 
 // A required tie can reuse storage only through a direct, type-identical base.
