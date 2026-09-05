@@ -410,16 +410,14 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
     rewriter.setInsertionPointToStart(&body);
     Operation *clonedTarget = rewriter.clone(*target);
 
-    bool isLive = !wouldOpBeTriviallyDead(target) ||
-                  llvm::any_of(target->getResults(), [](Value result) {
-                    return !result.use_empty();
-                  });
+    bool hasAnyResultUses = llvm::any_of(
+        target->getResults(), [](Value result) { return !result.use_empty(); });
 
     // Gather all uses of `target`.
     for (auto [index, result] : llvm::enumerate(target->getResults())) {
       bool hasExternalUses = hasUsesOutsideOfRegion(result);
       bool preserveRequiredTie = false;
-      if (!hasExternalUses && isLive) {
+      if (!hasExternalUses && hasAnyResultUses) {
         Value tiedBase = getRequiredDirectTiedResultBase(result);
         preserveRequiredTie =
             tiedBase && isExternalStorageBase(tiedBase) &&

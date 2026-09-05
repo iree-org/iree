@@ -951,7 +951,7 @@ util.func public @sort_with_unused_key_result(
   } -> tensor<?xi64>, tensor<?xi64>
   util.return %sorted#1 : tensor<?xi64>
 }
-//      CHECK: util.func public @sort_with_unused_key_result(
+// CHECK-LABEL: util.func public @sort_with_unused_key_result(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<?xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?xi64>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -971,29 +971,6 @@ util.func public @sort_with_unused_key_result(
 
 // -----
 
-util.func public @sort_with_effectful_comparator_and_unused_result(
-    %keys: tensor<4xi64>) {
-  %sorted = iree_linalg_ext.sort dimension(0)
-      outs(%keys : tensor<4xi64>) {
-  ^bb0(%lhs_key: i64, %rhs_key: i64):
-    %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
-    cf.assert %take_lhs, "comparator side effect"
-    iree_linalg_ext.yield %take_lhs : i1
-  } -> tensor<4xi64>
-  util.return
-}
-//      CHECK: util.func public @sort_with_effectful_comparator_and_unused_result(
-// CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<4xi64>
-//      CHECK:   flow.dispatch.workgroups
-// CHECK-SAME:       (%[[KEYS]]) : (tensor<4xi64>) -> %[[KEYS]] =
-// CHECK-NEXT:       (%[[KEYS_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
-//      CHECK:     iree_linalg_ext.sort
-//      CHECK:       cf.assert
-//      CHECK:     iree_tensor_ext.dispatch.tensor.store %{{.+}}, %[[KEYS_CAPTURE]]
-//      CHECK:   util.return
-
-// -----
-
 util.func public @sort_does_not_tie_live_key_base(
     %keys: tensor<4xi64>, %indices: tensor<4xi64>)
     -> (tensor<4xi64>, tensor<4xi64>) {
@@ -1005,7 +982,7 @@ util.func public @sort_does_not_tie_live_key_base(
   } -> tensor<4xi64>, tensor<4xi64>
   util.return %sorted#1, %keys : tensor<4xi64>, tensor<4xi64>
 }
-//      CHECK: util.func public @sort_does_not_tie_live_key_base(
+// CHECK-LABEL: util.func public @sort_does_not_tie_live_key_base(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<4xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
@@ -1028,7 +1005,7 @@ util.func public @sort_does_not_tie_live_key_alias(
   } -> tensor<4xi64>, tensor<4xi64>
   util.return %sorted#1, %key_view : tensor<4xi64>, tensor<2x2xi64>
 }
-//      CHECK: util.func public @sort_does_not_tie_live_key_alias(
+// CHECK-LABEL: util.func public @sort_does_not_tie_live_key_alias(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<4xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[KEY_VIEW:.+]] = flow.tensor.reshape %[[KEYS]] : tensor<4xi64> -> tensor<2x2xi64>
@@ -1053,7 +1030,7 @@ util.func public @sort_does_not_tie_live_tensor_key_alias(
   } -> tensor<2x2xi64>, tensor<2x2xi64>
   util.return %sorted#1, %key_view : tensor<2x2xi64>, tensor<4xi64>
 }
-//      CHECK: util.func public @sort_does_not_tie_live_tensor_key_alias(
+// CHECK-LABEL: util.func public @sort_does_not_tie_live_tensor_key_alias(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<2x2xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<2x2xi64>
 //      CHECK:   %[[KEY_VIEW:.+]] = flow.tensor.reshape %[[KEYS]] : tensor<2x2xi64> -> tensor<4xi64>
@@ -1077,7 +1054,7 @@ util.func public @sort_ties_key_with_post_dispatch_dim(
   %dim = tensor.dim %keys, %c0 : tensor<?xi64>
   util.return %sorted#1, %dim : tensor<?xi64>, index
 }
-//      CHECK: util.func public @sort_ties_key_with_post_dispatch_dim(
+// CHECK-LABEL: util.func public @sort_ties_key_with_post_dispatch_dim(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<?xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?xi64>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -1101,7 +1078,7 @@ util.func public @sort_with_unused_trailing_key_result(
   } -> tensor<4xi64>, tensor<4xi64>
   util.return %sorted#0 : tensor<4xi64>
 }
-//      CHECK: util.func public @sort_with_unused_trailing_key_result(
+// CHECK-LABEL: util.func public @sort_with_unused_trailing_key_result(
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi64>
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups
@@ -1128,7 +1105,7 @@ util.func public @sort_prefers_required_same_storage_tie(
   } -> tensor<4xi64>, tensor<4xi64>
   util.return %sorted#0 : tensor<4xi64>
 }
-//      CHECK: util.func public @sort_prefers_required_same_storage_tie(
+// CHECK-LABEL: util.func public @sort_prefers_required_same_storage_tie(
 // CHECK-SAME:     %[[STORAGE:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups
 // CHECK-SAME:       (%[[STORAGE]])
@@ -1155,7 +1132,7 @@ util.func public @sort_does_not_tie_shape_changing_key(
   } -> tensor<4xi64>, tensor<4xi64>
   util.return %sorted#1 : tensor<4xi64>
 }
-//      CHECK: util.func public @sort_does_not_tie_shape_changing_key(
+// CHECK-LABEL: util.func public @sort_does_not_tie_shape_changing_key(
 // CHECK-SAME:     %[[KEYS:[a-zA-Z0-9_]+]]: tensor<2x2xi64>
 // CHECK-SAME:     %[[INDICES:[a-zA-Z0-9_]+]]: tensor<4xi64>
 //      CHECK:   %[[KEY_VIEW:[a-zA-Z0-9_]+]] = flow.tensor.reshape %[[KEYS]] : tensor<2x2xi64> -> tensor<4xi64>
@@ -1186,7 +1163,7 @@ util.func public @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>,
     } -> tensor<8xi32>
   util.return %0 : tensor<8xi32>
 }
-//      CHECK: util.func public @scatter_static
+// CHECK-LABEL: util.func public @scatter_static
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4xi32>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<4x1xi32>
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<8xi32>

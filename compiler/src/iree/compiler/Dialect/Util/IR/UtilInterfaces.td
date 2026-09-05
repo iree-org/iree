@@ -835,8 +835,7 @@ def Util_TiedOpInterface : Util_OpInterface<"TiedOpInterface"> {
         writable destination storage even when the result has no SSA uses.
         Transformations may retain the tie to provide that storage when legal,
         but this requirement does not by itself keep an otherwise-dead
-        operation alive. Operation liveness and unrelated side effects are
-        analyzed separately.
+        operation alive.
       }],
       /*retTy=*/"bool",
       /*methodName=*/"isTiedResultRequired",
