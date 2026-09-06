@@ -130,6 +130,74 @@ util.func public @sort_with_tensor_view_input(
 
 // -----
 
+// CHECK-LABEL: util.func public @sort_prefers_returned_required_tie(
+// CHECK-SAME: %[[STORAGE:[a-zA-Z0-9_]+]]: tensor<4xi64>
+util.func public @sort_prefers_returned_required_tie(
+    %storage: tensor<4xi64>) -> (tensor<4xi64>, tensor<4xi64>) {
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups(%[[STORAGE]])
+  // CHECK-SAME: -> (tensor<4xi64>, %[[STORAGE]]) =
+  // CHECK-NEXT: (%[[CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>,
+  // CHECK-SAME: %[[OUTPUT:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi64>>)
+  // CHECK: %[[LOADED:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[CAPTURE]]
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    // CHECK: %[[SORTED:[a-zA-Z0-9_]+]]:2 = iree_linalg_ext.sort dimension(0)
+    // CHECK-SAME: outs(%[[LOADED]], %[[LOADED]] : tensor<4xi64>, tensor<4xi64>)
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%storage, %storage : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_value: i64, %rhs_value: i64, %lhs_key: i64, %rhs_key: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#0, %[[OUTPUT]]
+    // CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[SORTED]]#1, %[[CAPTURE]]
+    // CHECK-NEXT: flow.return
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<4xi64>, tensor<4xi64>
+  util.return %result#0, %result#1 : tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @sorts_with_shared_keys(
+util.func public @sorts_with_shared_keys(
+    %keys: tensor<4xi64>, %indices_a: tensor<4xi64>, %indices_b: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<4xi64>) {
+  // CHECK: %[[RESULT:[a-zA-Z0-9_]+]]:2 = flow.dispatch.workgroups
+  // CHECK-NEXT: (%[[KEYS:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi64>>,
+  // CHECK-SAME: %[[INDICES_A:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>,
+  // CHECK-SAME: %[[INDICES_B:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi64>>)
+  // CHECK-DAG: %[[LOADED_KEYS:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[KEYS]]
+  // CHECK-DAG: %[[LOADED_A:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES_A]]
+  // CHECK-DAG: %[[LOADED_B:[a-zA-Z0-9_]+]] = iree_tensor_ext.dispatch.tensor.load %[[INDICES_B]]
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    // CHECK: %[[SORTED_A:[a-zA-Z0-9_]+]]:2 = iree_linalg_ext.sort dimension(0)
+    // CHECK-SAME: outs(%[[LOADED_KEYS]], %[[LOADED_A]] : tensor<4xi64>, tensor<4xi64>)
+    %sorted_a:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices_a : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: %[[SORTED_B:[a-zA-Z0-9_]+]]:2 = iree_linalg_ext.sort dimension(0)
+    // CHECK-SAME: outs(%[[LOADED_KEYS]], %[[LOADED_B]] : tensor<4xi64>, tensor<4xi64>)
+    %sorted_b:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %indices_b : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
+      %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
+      iree_linalg_ext.yield %take_lhs : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORTED_A]]#1, %[[INDICES_A]]
+    // CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[SORTED_B]]#1, %[[INDICES_B]]
+    // CHECK-NEXT: flow.return
+    flow.return %sorted_a#1, %sorted_b#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  // CHECK: util.return %[[RESULT]]#0, %[[RESULT]]#1 : tensor<4xi64>, tensor<4xi64>
+  util.return %result#0, %result#1 : tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @sort_without_live_results
 // CHECK-NOT: iree_linalg_ext.sort
 util.func public @sort_without_live_results(
