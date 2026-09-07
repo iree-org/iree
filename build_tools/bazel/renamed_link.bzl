@@ -13,8 +13,8 @@ undefined references included.
 Rewritten archives are declared as new provider values rather than mutating the
 inputs, keeping Bazel's C++ provider graph intact.
 
-The ABI target and the CcInfo transform stay separate so each can be tested
-alone.
+Plugins use iree_compiler_register_dynamic_plugin. The ABI target and CcInfo
+transform stay separate so each can be tested alone.
 """
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
@@ -464,3 +464,52 @@ iree_renamed_compiler_abi = rule(
     fragments = ["cpp"],
     toolchains = use_cpp_toolchain(),
 )
+
+def iree_compiler_register_dynamic_plugin(plugin_id, target, compiler, extra_deps = [], linkopts = [], **kwargs):
+    """Builds a compiler plugin against the renamed compiler ABI.
+
+    The dynamic counterpart of iree_compiler_register_plugin, spelled the same
+    in both build systems for bazel_to_cmake.
+
+    target is whole-archive linked: nothing references the entry points before
+    dlsym.
+
+    extra_deps are MLIR archives libIREECompiler lacks. CMake cannot express
+    them.
+    """
+
+    # Same module name CMake emits.
+    name = "iree_compiler_plugin_" + plugin_id
+    renamed_cc_info(
+        name = name + "_renamed_deps",
+        deps = [target],
+        compiler = compiler,
+        force_alwayslink = True,
+    )
+
+    # The compiler's symbols stay undefined and resolve from the host. Linking
+    # it in would give the plugin a second llvm::cl registry the host never
+    # parses.
+    plugin_deps = [":" + name + "_renamed_deps"]
+    if extra_deps:
+        renamed_cc_info(
+            name = name + "_renamed_extra_deps",
+            deps = extra_deps,
+            compiler = compiler,
+            direct_only = True,
+            include_provided = True,
+        )
+        plugin_deps.append(":" + name + "_renamed_extra_deps")
+
+    native.cc_binary(
+        name = name,
+        srcs = [],
+        linkshared = True,
+        linkopts = linkopts + select({
+            # ELF leaves undefined symbols alone; ld64 has to be told.
+            "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+            "//conditions:default": [],
+        }),
+        deps = plugin_deps,
+        **kwargs
+    )
