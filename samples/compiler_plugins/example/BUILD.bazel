@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_register_plugin")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_compiler_register_plugin")
+load("//build_tools/bazel:renamed_link.bzl", "iree_compiler_register_dynamic_plugin")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -33,4 +34,44 @@ cc_library(
 iree_compiler_register_plugin(
     plugin_id = "example",
     target = ":registration",
+)
+
+# The same source again as a loadable module, so both link modes can be tested.
+# The id must differ; see src/PluginRegistration.cpp.
+#
+# Bazel always builds it, for the test tagged manual there. CMake wants it only
+# in a renamed build, hence the guard around the generated block.
+iree_cmake_extra_content(
+    content = """
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+""",
+    inline = True,
+)
+
+cc_library(
+    name = "registration_dyn",
+    srcs = [
+        "src/PluginRegistration.cpp",
+    ],
+    defines = [
+        "IREE_EXAMPLE_PLUGIN_ID=example_dyn",
+    ],
+    deps = [
+        ":defs",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_register_dynamic_plugin(
+    compiler = "//lib:IREECompilerShared",
+    plugin_id = "example_dyn",
+    target = ":registration_dyn",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
