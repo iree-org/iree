@@ -140,11 +140,16 @@ Individual options enabling each set of input dialects:
 
 * type: BOOL
 
-Experimental. Builds compiler plugins as shared libraries that `iree-compile`
-loads at run time through `--iree-load-plugin`. Defaults to `OFF`. Requires
-`-DIREE_ENABLE_THIN_ARCHIVES=OFF`, because the plugins resolve against a
-renamed copy of the compiler's symbols and the rename cannot rewrite a thin
-archive. See `compiler/src/iree/compiler/PluginAPI/README.md`.
+Enables experimental dynamic compiler plugins and exports the compiler symbols
+that they need. Defaults to `OFF`. Requires
+`IREE_LINK_COMPILER_SHARED_LIBRARY=ON` and `IREE_ENABLE_THIN_ARCHIVES=OFF`.
+Load a plugin with `--iree-load-plugin=<path>` and activate it with
+`--iree-plugin=<id>`.
+
+Plugins must use the host compiler's IREE and LLVM/MLIR revisions and matching
+ABI-affecting build settings. See the
+[compiler plugin documentation](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md)
+for build requirements and compatibility checks.
 
 ### `IREE_OUTPUT_FORMAT_C`
 

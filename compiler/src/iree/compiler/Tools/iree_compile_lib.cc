@@ -6,12 +6,14 @@
 
 #include "iree/compiler/Tools/iree_compile_lib.h"
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
 
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -198,7 +200,19 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         exit(0);
       }));
 
+  // Before CLI parsing: the plugins loaded here still have options to add.
+  if (!mlir::iree_compiler::initializeDynamicPlugins(
+          llvm::ArrayRef<const char *>(const_cast<const char **>(argv), argc),
+          llvm::errs())) {
+    return EXIT_FAILURE;
+  }
+
   ireeCompilerGlobalInitialize();
+  if (mlir::iree_compiler::DynamicPluginRegistry::get()
+          .hasRegistrationFailures()) {
+    ireeCompilerGlobalShutdown();
+    return EXIT_FAILURE;
+  }
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
   ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
                             "IREE compilation driver\n",

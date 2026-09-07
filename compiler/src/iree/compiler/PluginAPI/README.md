@@ -2,13 +2,14 @@
 
 This is a work in progress to enable IREE compiler plugin support per
 [RFC - Proposal to Build IREE Compiler Plugin Mechanism](https://github.com/iree-org/iree/issues/12520).
-This document will be replaced with a more comprehensive single-source once
-the work is complete.
+
+Dynamic loading is experimental: the API and C++ ABI may change without
+backward compatibility. Rebuild plugins with the compiler they will run in.
 
 ## Interim Developer Docs
 
 The `PluginManager` mirrors the execution hierarchy of the C API bindings
-(`compiler/bindings/c/iree/compiler/embedding_api`):
+(`compiler/bindings/c/iree/compiler/embedding_api.h`):
 
 * Global Initialization
 * Global CLI setup
@@ -36,8 +37,9 @@ specified `OptionsTy` class will be available in the `PluginSession` as
 
 ### Static linking
 
-Plugins can be statically linked into the compiler by way of the
-`-DIREE_COMPILER_PLUGINS=` option. This does two things:
+In CMake, select statically linked compiler plugins with
+`-DIREE_COMPILER_PLUGINS=<id1;id2>`. In Bazel, use
+`--iree_compiler_plugins=<id1,id2>`. Selection does two things:
 
 * Causes the generated `PluginAPI/Config/StaticLinkedPlugins.inc` to have
   a `HANDLE_PLUGIN_ID(plugin_id)` line.
@@ -51,16 +53,99 @@ by the plugin and completes registration.
 
 ### Dynamic linking
 
-(Not yet implemented)
+Dynamic compiler plugins are experimental and supported on Linux and macOS.
+In CMake, enable compiler symbol exports with
+`-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`. Bazel's compiler shared
+library exports these symbols without an additional option.
+Each library is opened with `dlopen()` and queried through one exported
+symbol for its ID and compatibility metadata. A header hash mismatch is
+rejected before registration. Plugins are named on the command line or in the environment:
 
-Dynamic linking proceeds similarly, driven by a combination of environment
-variables, API calls to load plugin libs or pre-parsed CLI flags. For each
-plugin library located in such a way, it will be `dlopen()`'d and the
-corresponding entry point found and used, similar to the static linking case.
+```sh
+iree-compile --iree-load-plugin=/path/to/libmy_plugin.so --iree-plugin=my_id ...
+IREE_LOAD_PLUGINS=/path/to/libmy_plugin.so \
+  iree-compile --iree-plugin=my_id ...
+```
 
-Note that only compilers built with `-DIREE_COMPILER_BUILD_SHARED_LIBS=ON` is
-supported for this case. That carries a number of restrictions and other issues
-that are outside of the immediate scope of plugins.
+Repeat `--iree-load-plugin=<path>` to load multiple libraries, or set
+`IREE_LOAD_PLUGINS` to a comma-separated list of paths. Loading makes a plugin
+available; `--iree-plugin=<id>` activates an explicitly selected plugin for a
+session. Use `--iree-print-plugin-info` during compilation to list available
+and activated IDs.
+
+Embedded users must set `IREE_LOAD_PLUGINS` before the first
+`ireeCompilerGlobalInitialize()` call. Loading happens once per process;
+subsequent initialization calls do not reread the environment or load new
+plugins. `ireeCompilerSessionSetFlags` can select an already registered plugin
+with `--iree-plugin=<id>`, but cannot load a library with `--iree-load-plugin`.
+
+The loader reports load and registration errors. The command-line tools exit
+on these errors. An embedded compiler keeps successful registrations and skips
+failed dynamic plugins. Registrations from a failed callback are discarded;
+callbacks must clean up any other side effects before returning failure.
+Registering the same ID twice within a callback is a programming error and
+aborts the process. `IREE_DEFINE_COMPILER_PLUGIN` defines both entry points so
+one source can support static and dynamic linking.
+
+Both build systems provide `iree_compiler_register_dynamic_plugin`, which
+builds the library and applies the rename described below. An install tree
+provides it through `find_package(IREECompiler)`; see
+`samples/compiler_plugins/out_of_tree_example/README.md`.
+
+#### Build requirements
+
+Build the plugin against the host compiler's exact IREE and LLVM/MLIR revisions,
+including generated headers from that build. Match these compilation settings:
+
+* Target architecture, pointer width, and platform C++ ABI. Using the host's
+  C++ compiler and toolchain is the simplest way to keep these aligned.
+* C++ standard library and its ABI options, such as `_GLIBCXX_USE_CXX11_ABI`,
+  `_GLIBCXX_DEBUG`, or libc++ ABI configuration macros.
+* RTTI and exception handling (`LLVM_ENABLE_RTTI`, `LLVM_ENABLE_EH`, and the
+  effective `-frtti`/`-fno-rtti` and `-fexceptions`/`-fno-exceptions` flags).
+* Assertions (`NDEBUG`) and LLVM options that change header definitions or
+  layouts, such as `LLVM_ENABLE_ABI_BREAKING_CHECKS`. Check the actual compiler
+  flags: `IREE_ENABLE_ASSERTIONS` can enable assertions in a release build.
+* Sanitizer instrumentation and its runtime requirements, when enabled.
+
+In-tree plugins inherit the build settings. External plugins must match them
+explicitly. Matching only `CMAKE_BUILD_TYPE` is insufficient. Optimization levels
+and debug information need not match unless they change one of the settings
+above.
+
+The tools must link the shared compiler library, the default in both build
+systems (`IREE_LINK_COMPILER_SHARED_LIBRARY` in CMake,
+`//compiler/src/iree/compiler/API:link_shared` in Bazel). CMake also requires
+`IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON` and
+`IREE_ENABLE_THIN_ARCHIVES=OFF`. Plugin archives must contain position-independent
+code and must not be thin archives: `llvm-objcopy` rewrites their members.
+
+The build rules rename the plugin's `llvm::` and `mlir::` symbols to match the
+compiler and resolve references against its shared library. Do not link another
+copy of LLVM, MLIR, or the IREE compiler into the plugin.
+
+#### Compatibility checks and versions
+
+Use `IREE_DEFINE_COMPILER_PLUGIN(id, register_fn, "version")`. It fills in the
+compatibility fields from the host headers; plugin authors do not maintain
+compatibility version numbers. The supplied version string identifies the
+plugin's own release; it is not checked for compatibility.
+
+`IREE_COMPILER_PLUGIN_ABI_HASH` is the single compatibility ID. The build
+calculates it from `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h`, and
+`Utils/OptionUtils.h`, covering both the entry-point layout and the selected
+C++ API headers. There is no manual API or ABI version to bump. IREE maintainers
+must keep the registration contract in `PluginEntryPoint.h` current so contract
+changes also change the ID.
+
+`IREE_COMPILER_ABI_PREFIX` is a symbol namespace, not a compatibility version.
+Keep its default value; the installed CMake package supplies the host's value.
+It does not need a bump when the plugin API changes.
+
+The loader checks the fixed-width header hash before reading the remaining
+entry-point fields or calling registration. The hash does not cover LLVM/MLIR
+headers or build settings. A matching hash and successful symbol resolution do not guarantee ABI compatibility: a mismatched plugin can
+still load and crash or corrupt memory.
 
 ## Extension points
 
@@ -73,17 +158,22 @@ provide the means for further customization. This will be extended over time:
   from `globalInitialize()` below, but it is intended for regular use and
   called out separately to avoid triggering warnings related to use of
   global initialization.
+* `onRegisterDialects(DialectRegistry&)`: Registers the session's dialects before
+  context initialization and activation.
 * `onActivate()` : Called when a plugin is activated for a session, having
   both `options` and `context` available. This is the recommended point to
-  provide a `DialectRegistry` and configure appropriate context hooks for
-  configuring MLIR prior to any parsing or operation creation.
+  configure appropriate context hooks for configuring MLIR prior to any
+  parsing or operation creation.
 
 HAL targets:
 
+* `populateHALTargetDevices()`
 * `populateHALTargetBackends()`
 
 Input dialects:
 
+* `extendInputConversionPreprocessingPassPipeline()`: Adds preprocessing passes
+  for a built-in input type.
 * `extendCustomInputConversionPassPipeline()`: Called to extend a pass pipeline
   with conversion passes for a given conversion type.
 * `populateCustomInputConversionTypes()`: Called to get a list of all
@@ -91,22 +181,31 @@ Input dialects:
 * `populateDetectedCustomInputConversionTypes()`: Called to get a list of all
   conversion types this plugin _found_ within a given module
 
+Preprocessing:
+
+* `extendPreprocessingPassPipeline()`: Adds passes at the end of preprocessing.
+
 Less frequently used extension points:
 
 * `static globalInitialize()` : Perform once-only process level initialization,
   regardless of whether a plugin will be activated. This happens before command
   line processing and should only be used to massage process-wide static
   registration like things, as third party libraries may require.
-* `static registerDialects(DialectRegistry&)` : Extends the process wide
-  initial dialect registry. This should not be used unless if absolutely
-  necessary or if interfacing to legacy codebases that require it.
+* `static registerGlobalDialects(DialectRegistry&)` : Extends the process wide
+  initial dialect registry. Prefer `onRegisterDialects()` unless interfacing
+  to legacy codebases that require global registration.
 
 ## Current Status
 
 * Statically linked, named plugins are supported in CMake (with optional
   inclusion).
-* Statically linked, named plugins are hardcoded in Bazel (no optionality).
-* An example in-tree plugin is under `compiler/plugins/example`.
+* Statically linked, named plugins are supported in Bazel (with optional
+  inclusion).
+* Dynamic compiler plugins are experimental and supported on Linux and macOS.
+* An example in-tree plugin is under `samples/compiler_plugins/example` and
+  supports static and dynamic linking from the same source.
 * See `iree_compiler_plugin.cmake` for the CMake integration. Specifically,
   the `-DIREE_COMPILER_PLUGINS=example` flag can be used to statically link
   the example plugin.
+* [out_of_tree_example](../../../../../samples/compiler_plugins/out_of_tree_example/README.md)
+  adds a dialect and pass, with instructions for building against an install tree.

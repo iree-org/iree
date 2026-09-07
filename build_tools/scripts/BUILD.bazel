@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@rules_python//python:defs.bzl", "py_binary")
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -14,10 +14,20 @@ package(
 exports_files([
     "amdgpu_device_binaries.py",
     "amdgpu_target_map.py",
+    "gen_plugin_abi_hash.py",
     "generate_vm_isa.py",
 ])
 
 py_binary(
     name = "generate_vm_isa",
     srcs = ["generate_vm_isa.py"],
+)
+
+py_test(
+    name = "gen_plugin_abi_hash_test",
+    srcs = [
+        "gen_plugin_abi_hash.py",
+        "gen_plugin_abi_hash_test.py",
+    ],
+    main = "gen_plugin_abi_hash_test.py",
 )

@@ -6,8 +6,7 @@
 
 """The logical namespace the compiler's llvm/mlir symbols are renamed into."""
 
-# Any identifier no real namespace uses will do; the 18 is arbitrary and tracks
-# nothing. A plugin resolves against these names, so changing it invalidates
-# every plugin already built: bump it only to force that. CMake takes the same
-# value from IREE_COMPILER_ABI_PREFIX.
+# This is a symbol namespace, not a compatibility version; 18 has no version
+# meaning. Keep it stable across plugin API changes. CMake uses the same default
+# for IREE_COMPILER_ABI_PREFIX and exports the host's value to plugin builds.
 IREE_COMPILER_ABI_PREFIX = "IREE18"

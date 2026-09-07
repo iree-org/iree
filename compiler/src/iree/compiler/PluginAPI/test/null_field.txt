@@ -1,0 +1,3 @@
+// RUN: not iree-opt --iree-load-plugin=%iree_test_null_field_plugin 2>&1 | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: plugin{{.*}}left a field of IreeCompilerPluginInfo null
