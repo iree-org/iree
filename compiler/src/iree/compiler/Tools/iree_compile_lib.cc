@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include "iree/compiler/Pipelines/Pipelines.h"
+#include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/embedding_api.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -197,6 +198,13 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
             nullptr);
         exit(0);
       }));
+
+  // Before CLI parsing: the plugins loaded here still have options to add.
+  if (!mlir::iree_compiler::initializeDynamicPlugins(
+          llvm::ArrayRef<const char *>(const_cast<const char **>(argv), argc),
+          llvm::errs())) {
+    return 1;
+  }
 
   ireeCompilerGlobalInitialize();
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
