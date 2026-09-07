@@ -78,3 +78,64 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# Install the plugin API headers and their IREE header dependencies. A plugin
+# using other compiler APIs may need additional headers from the matching tree.
+add_library(iree_compiler_PluginAPI_headers INTERFACE)
+iree_install_targets(
+  TARGETS iree_compiler_PluginAPI_headers
+  HDRS "Client.h" "PluginEntryPoint.h" "PluginABIHash.h"
+    "../Pipelines/Options.h" "../Utils/OptionUtils.h"
+  COMPONENT IREEDevLibraries-Compiler
+  EXPORT_SET Compiler
+)
+
+# Export the host's configured C++ flags on a separate, opt-in plugin target.
+# Clear the consumer's NDEBUG first, then replay the host flags in their order.
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
+  add_library(iree_compiler_PluginAPI_build_options INTERFACE)
+  target_link_libraries(iree_compiler_PluginAPI_build_options INTERFACE
+    iree_compiler_PluginAPI_headers)
+  target_compile_features(iree_compiler_PluginAPI_build_options INTERFACE
+    cxx_std_${CMAKE_CXX_STANDARD})
+  set_property(TARGET iree_compiler_PluginAPI_build_options PROPERTY
+    INTERFACE_POSITION_INDEPENDENT_CODE ON)
+  iree_install_targets(
+    TARGETS iree_compiler_PluginAPI_build_options
+    COMPONENT IREEDevLibraries-Compiler
+    EXPORT_SET Compiler
+  )
+
+  separate_arguments(_plugin_flags NATIVE_COMMAND "${CMAKE_CXX_FLAGS}")
+  set(_plugin_flags "-UNDEBUG;${_plugin_flags}")
+  foreach(_config Debug Release RelWithDebInfo MinSizeRel ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE})
+    if(_config IN_LIST _plugin_configs)
+      continue()
+    endif()
+    list(APPEND _plugin_configs "${_config}")
+    string(TOUPPER "${_config}" _upper_config)
+    separate_arguments(_config_flags NATIVE_COMMAND
+      "${CMAKE_CXX_FLAGS_${_upper_config}}")
+    list(APPEND _plugin_flags "$<$<CONFIG:${_config}>:${_config_flags}>")
+  endforeach()
+  get_directory_property(_directory_flags COMPILE_OPTIONS)
+  get_directory_property(_directory_definitions COMPILE_DEFINITIONS)
+  list(APPEND _plugin_flags ${_directory_flags})
+  foreach(_definition IN LISTS _directory_definitions)
+    list(APPEND _plugin_flags "-D${_definition}")
+  endforeach()
+  # Keep IREE's ABI options without imposing its warning policy on plugins.
+  foreach(_flag IN LISTS IREE_DEFAULT_COPTS)
+    if(_flag MATCHES "rtti|exceptions|sanitize|^-D")
+      string(REPLACE "$<$<COMPILE_LANGUAGE:CXX>:" "" _flag "${_flag}")
+      string(REGEX REPLACE ">$" "" _flag "${_flag}")
+      list(APPEND _plugin_flags "${_flag}")
+    endif()
+  endforeach()
+  set(_plugin_config "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/IREECompilerPluginBuildOptions.cmake")
+  file(GENERATE OUTPUT "${_plugin_config}" CONTENT
+    "set(IREE_COMPILER_PLUGIN_COMPILE_OPTIONS [==[${_plugin_flags}]==])\n")
+  install(FILES "${_plugin_config}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/IREE"
+    COMPONENT IREECMakeExports)
+endif()

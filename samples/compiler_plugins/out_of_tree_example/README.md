@@ -84,3 +84,64 @@ CMake requires a host built with
 `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`. Bazel exports compiler symbols
 without a separate gate. Both builds require tools linked to the shared compiler
 library and plugin archives built with position-independent code.
+
+## Building against an install tree
+
+To build a plugin in another repository, first install a compiler built with
+dynamic plugin support:
+
+```sh
+cmake --install <build> --prefix <prefix> --component IREECMakeExports
+cmake --install <build> --prefix <prefix> --component IREEDevLibraries-Compiler
+cmake --install <build> --prefix <prefix> --component Compiler
+```
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(my_iree_plugin LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(IREECompiler REQUIRED)
+find_package(MLIR REQUIRED CONFIG)
+
+add_library(registration STATIC "plugin.cpp")
+set_target_properties(registration PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(registration PRIVATE iree_compiler_PluginAPI_build_options)
+target_include_directories(registration PRIVATE
+  ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
+
+iree_compiler_register_dynamic_plugin(
+  PLUGIN_ID my_plugin
+  TARGET registration
+)
+```
+
+`find_package(IREECompiler)` brings the plugin headers, the rename script and
+`IREE_COMPILER_ABI_PREFIX`. `plugin.cpp` must define the `my_plugin` entry point
+with `IREE_DEFINE_COMPILER_PLUGIN` and register the corresponding session.
+IREE does not install LLVM/MLIR C++ headers. Point CMake at the packages from
+the host compiler's build:
+
+```sh
+cmake -S <plugin-source> -B <plugin-build> \
+  -DIREECompiler_DIR=<prefix>/lib/cmake/IREE \
+  -DMLIR_DIR=<iree-build>/lib/cmake/mlir \
+  -DLLVM_DIR=<iree-build>/llvm-project/lib/cmake/llvm
+cmake --build <plugin-build> --target iree_compiler_plugin_my_plugin
+```
+
+The `iree_compiler_PluginAPI_build_options` target supplies the installed host's
+configured C++ flags, assertion state, RTTI and exception options, and headers.
+Link it to each plugin helper library as well. These options apply only to the
+targets that use it. Use a compatible compiler and the host's toolchain settings;
+the SDK does not select a compiler or sysroot for the enclosing project.
+
+If the plugin has additional static libraries, list their archive paths under `EXTRA_ARCHIVES`,
+for example `$<TARGET_FILE:helper>`; the installed rule does not collect
+transitive dependencies automatically.
+
+See the complete [install-tree test project](../../../build_tools/testing/plugin_from_install/CMakeLists.txt)
+and [test script](../../../build_tools/testing/test_plugin_from_install.sh),
+which build, activate, and incrementally rebuild a plugin against an install.
