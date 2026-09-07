@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:iree_genrule.bzl", "iree_genrule")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,11 +13,43 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# A plugin reports this hash and is refused when it differs, catching a changed
+# header surface that the API version integer does not cover.
+iree_genrule(
+    name = "PluginABIHash_h__generate",
+    srcs = [
+        "Client.h",
+        "PluginEntryPoint.h",
+        "//build_tools/scripts:gen_plugin_abi_hash.py",
+        "//compiler/src/iree/compiler/Pipelines:Options.h",
+        "//compiler/src/iree/compiler/Utils:OptionUtils.h",
+    ],
+    outs = ["PluginABIHash.h"],
+    cmd = " ".join([
+        "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py)",
+        "--input $(rootpath Client.h)",
+        "--input $(rootpath PluginEntryPoint.h)",
+        "--input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h)",
+        "--input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h)",
+        "--out $(execpath PluginABIHash.h)",
+    ]),
+)
+
+# Separate so a plain-C plugin can take the hash without the C++ headers.
+iree_compiler_cc_library(
+    name = "PluginABIHash",
+    hdrs = ["PluginABIHash.h"],
+)
+
 iree_compiler_cc_library(
     name = "PluginAPI",
     srcs = ["Client.cpp"],
-    hdrs = ["Client.h"],
+    hdrs = [
+        "Client.h",
+        "PluginEntryPoint.h",
+    ],
     deps = [
+        ":PluginABIHash",
         "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",

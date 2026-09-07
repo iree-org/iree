@@ -1,0 +1,4 @@
+// RUN: not iree-opt --iree-load-plugin=%iree_test_undefined_symbol_plugin 2>&1 | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: could not load plugin library
+// CHECK-SAME: iree_test_absent_function
