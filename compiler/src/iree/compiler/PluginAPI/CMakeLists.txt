@@ -78,3 +78,13 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# All an out-of-tree plugin needs from IREE; the rest resolves from the host at
+# load.
+add_library(iree_compiler_PluginAPI_headers INTERFACE)
+iree_install_targets(
+  TARGETS iree_compiler_PluginAPI_headers
+  HDRS "Client.h" "PluginEntryPoint.h" "PluginABIHash.h"
+  COMPONENT IREEDevLibraries-Compiler
+  EXPORT_SET Compiler
+)
