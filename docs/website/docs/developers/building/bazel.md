@@ -451,6 +451,13 @@ helpers for local development.
 
 All three files are loaded automatically by Bazel in this order.
 
+### Dynamic compiler plugins
+
+Dynamic plugins resolve against the compiler's shared library, so the tools
+link it shared by default (`--//compiler/src/iree/compiler/API:link_shared`).
+With it `False`, no plugin can load. See
+`compiler/src/iree/compiler/PluginAPI/README.md`.
+
 ### GPU test targets
 
 GPU tests and samples need a target chip architecture (e.g., `gfx1100` for AMD
