@@ -51,16 +51,43 @@ by the plugin and completes registration.
 
 ### Dynamic linking
 
-(Not yet implemented)
+A build with `-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON` also loads
+plugins at run time. Each library is `dlopen()`'d and asked through one exported
+symbol for its id, API version and header hash; a mismatch in version or hash is
+refused. Plugins are named on the command line or in the environment:
 
-Dynamic linking proceeds similarly, driven by a combination of environment
-variables, API calls to load plugin libs or pre-parsed CLI flags. For each
-plugin library located in such a way, it will be `dlopen()`'d and the
-corresponding entry point found and used, similar to the static linking case.
+```sh
+iree-compile --iree-load-plugin=/path/to/libmy_plugin.so --iree-plugin=my_id ...
+IREE_LOAD_PLUGINS=/path/to/libmy_plugin.so   # comma-separated, same effect
+```
 
-Note that only compilers built with `-DIREE_COMPILER_BUILD_SHARED_LIBS=ON` is
-supported for this case. That carries a number of restrictions and other issues
-that are outside of the immediate scope of plugins.
+Every failed load is reported. The tools then exit; a host of the compiler
+library carries on with what did load. `IREE_DEFINE_COMPILER_PLUGIN` serves
+static and dynamic registration from one source.
+
+Both build systems provide `iree_compiler_register_dynamic_plugin`, which
+builds the library and applies the rename described below. An install tree
+provides it through `find_package(IREECompiler)`; see
+`samples/compiler_plugins/out_of_tree_example/README.md`.
+
+#### Build requirements
+
+The compiler renames every `llvm::` and `mlir::` symbol so it can share a
+process with another LLVM. A plugin is renamed the same way and resolves against
+the compiler's shared library, so:
+
+* The tools link the compiler as a shared library, the default in both build
+  systems (`IREE_LINK_COMPILER_SHARED_LIBRARY` in CMake,
+  `//compiler/src/iree/compiler/API:link_shared` in Bazel). A static tool
+  exports nothing to resolve against.
+* `-DIREE_ENABLE_THIN_ARCHIVES=OFF`, the default. `llvm-objcopy` cannot rewrite
+  a thin archive's members.
+* RTTI and exception settings match the compiler's. In-tree builds inherit
+  them; out-of-tree builds set them by hand.
+* The same plugin API headers. `IREE_COMPILER_PLUGIN_ABI_HASH` covers
+  `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h` and
+  `Utils/OptionUtils.h`. The llvm/mlir headers behind them are not hashed; the
+  rename already forces one tree.
 
 ## Extension points
 
@@ -103,10 +130,13 @@ Less frequently used extension points:
 
 ## Current Status
 
-* Statically linked, named plugins are supported in CMake (with optional
-  inclusion).
-* Statically linked, named plugins are hardcoded in Bazel (no optionality).
-* An example in-tree plugin is under `compiler/plugins/example`.
-* See `iree_compiler_plugin.cmake` for the CMake integration. Specifically,
-  the `-DIREE_COMPILER_PLUGINS=example` flag can be used to statically link
-  the example plugin.
+* Statically linked, named plugins are supported in both build systems, with
+  optional inclusion through `IREE_COMPILER_PLUGINS`.
+* Dynamic plugins are supported in both build systems behind
+  `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`.
+* `samples/compiler_plugins/example` is registered both ways from one source.
+  `samples/compiler_plugins/out_of_tree_example` has its own dialect and pass,
+  as a plugin in another repository would.
+* See `iree_compiler_plugin.cmake` and
+  `build_tools/cmake/iree_plugin_register.cmake` for the CMake integration,
+  and `build_tools/bazel/renamed_link.bzl` for Bazel.

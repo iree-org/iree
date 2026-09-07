@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:iree_genrule.bzl", "iree_genrule")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,11 +13,46 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# The API version covers only IreeCompilerPluginInfo; this hash covers the
+# headers.
+iree_genrule(
+    name = "PluginABIHash_h__generate",
+    srcs = [
+        "Client.h",
+        "PluginEntryPoint.h",
+        "//build_tools/scripts:gen_plugin_abi_hash.py",
+        "//compiler/src/iree/compiler/Pipelines:Options.h",
+        "//compiler/src/iree/compiler/Utils:OptionUtils.h",
+    ],
+    outs = ["PluginABIHash.h"],
+    cmd = " ".join([
+        "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py)",
+        "--input $(rootpath Client.h)",
+        "--input $(rootpath PluginEntryPoint.h)",
+        "--input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h)",
+        "--input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h)",
+        "--out $(execpath PluginABIHash.h)",
+    ]),
+)
+
+iree_compiler_cc_library(
+    name = "PluginABIHash",
+    hdrs = ["PluginABIHash.h"],
+)
+
+# Plain C and header-only, so a C plugin can use it.
+iree_compiler_cc_library(
+    name = "PluginEntryPoint",
+    hdrs = ["PluginEntryPoint.h"],
+    deps = [":PluginABIHash"],
+)
+
 iree_compiler_cc_library(
     name = "PluginAPI",
     srcs = ["Client.cpp"],
     hdrs = ["Client.h"],
     deps = [
+        ":PluginEntryPoint",
         "//compiler/src/iree/compiler/Pipelines:Options",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
@@ -33,6 +69,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PluginAPI",
+        ":PluginEntryPoint",
         "//compiler/src/iree/compiler/PluginAPI/Config:StaticLinkedPlugins",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",

@@ -10,6 +10,41 @@
 
 iree_add_all_subdirs()
 
+iree_genrule(
+  NAME
+    PluginABIHash_h__generate
+  SRCS
+    "${PROJECT_SOURCE_DIR}/build_tools/scripts/gen_plugin_abi_hash.py"
+    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Pipelines/Options.h"
+    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Utils/OptionUtils.h"
+    "Client.h"
+    "PluginEntryPoint.h"
+  OUTS
+    PluginABIHash.h
+  CMD
+    "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py) --input $(rootpath Client.h) --input $(rootpath PluginEntryPoint.h) --input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h) --input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h) --out $(execpath PluginABIHash.h)"
+)
+
+iree_cc_library(
+  NAME
+    PluginABIHash
+  HDRS
+    "PluginABIHash.h"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    PluginEntryPoint
+  HDRS
+    "PluginEntryPoint.h"
+  DEPS
+    ::PluginABIHash
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     PluginAPI
@@ -18,6 +53,7 @@ iree_cc_library(
   SRCS
     "Client.cpp"
   DEPS
+    ::PluginEntryPoint
     LLVMSupport
     iree::compiler::Pipelines::Options
     iree::compiler::Utils
@@ -33,6 +69,7 @@ iree_cc_library(
     "PluginManager.cpp"
   DEPS
     ::PluginAPI
+    ::PluginEntryPoint
     LLVMSupport
     MLIRIR
     iree::compiler::PluginAPI::Config::StaticLinkedPlugins

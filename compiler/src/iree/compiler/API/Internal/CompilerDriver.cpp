@@ -1531,9 +1531,18 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
   }
 
   llvm::cl::ParseCommandLineOptions(argc, argv, banner);
+  // cl has already exited on any flag it rejected; this one it accepted.
+  if (!mlir::iree_compiler::verifyDynamicPluginFlags(llvm::errs())) {
+    exit(1);
+  }
 }
 
 void ireeCompilerGlobalInitialize() {
+  // No argv here, so only IREE_LOAD_PLUGINS names plugins. Failures are
+  // logged: a library must not kill its host.
+  (void)mlir::iree_compiler::initializeDynamicPlugins(/*args=*/{},
+                                                      llvm::errs());
+
   if (globalInit) {
     globalInit->refCount.fetch_add(1);
     return;
