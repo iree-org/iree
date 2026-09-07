@@ -1,0 +1,1 @@
+// RUN: iree-opt --iree-load-plugin=%iree_test_hidden_visibility_plugin --help

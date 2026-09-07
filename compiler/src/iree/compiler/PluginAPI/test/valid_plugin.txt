@@ -1,0 +1,4 @@
+// A plugin built as a module rather than compiled here, so the test needs no
+// compiler of its own.
+
+// RUN: iree-opt --iree-load-plugin=%iree_test_valid_plugin --help

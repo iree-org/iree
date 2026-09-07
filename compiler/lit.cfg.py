@@ -38,6 +38,26 @@ config.environment.update(
     }
 )
 
+# The build system passes plugin paths in the environment, Bazel's relative to
+# the runfiles root and CMake's absolute. Resolve them and offer each as a
+# substitution: lit's internal shell does not expand $VAR.
+_test_srcdir = os.environ.get("TEST_SRCDIR", "")
+for _key, _value in sorted(config.environment.items(), key=lambda kv: -len(kv[0])):
+    if not _key.endswith("_PLUGIN") or not _value:
+        continue
+    if not os.path.isabs(_value):
+        for _root in (_test_srcdir, os.path.join(_test_srcdir, "_main"), os.getcwd()):
+            _candidate = os.path.join(_root, _value)
+            if os.path.exists(_candidate):
+                config.environment[_key] = os.path.abspath(_candidate)
+                break
+    config.substitutions.append(("%" + _key.lower(), config.environment[_key]))
+
+# Only set when the build carries the loadable test plugins.
+if config.environment.get("IREE_TEST_DEPS_PLUGIN"):
+    config.available_features.add("iree_dynamic_plugins")
+
+
 # Use the most preferred temp directory.
 config.test_exec_root = (
     os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR")
