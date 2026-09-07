@@ -136,6 +136,12 @@ settings can improve compile and link times substantially.
         -DIREE_ENABLE_ASSERTIONS=ON
     ```
 
+!!! Note "Note - thin archives and dynamic compiler plugins"
+    `-DIREE_ENABLE_THIN_ARCHIVES=ON` cannot be combined with
+    `-DIREE_COMPILER_DYNAMIC_PLUGINS=ON`; configuring both fails. Dynamic
+    plugins resolve against a renamed copy of the compiler's symbols, and the
+    rename cannot rewrite a thin archive.
+
 ???+ Tip "Tip - CMAKE_BUILD_TYPE values"
     We recommend using the `RelWithDebInfo` build type by default for a good
     balance of debug info and performance. The `Debug`, `Release`, and
