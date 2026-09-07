@@ -1,0 +1,143 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:renamed_link.bzl", "iree_compiler_register_dynamic_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "defs",
+    includes = ["src"],
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = [
+        "src/ootex/IR/OotexOps.td",
+        "src/ootex/Transforms/Passes.td",
+    ],
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:PassBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "OotexOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "src/ootex/IR/OotexOpsDialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "src/ootex/IR/OotexOpsDialect.cpp.inc",
+        ),
+        (
+            ["--gen-op-decls"],
+            "src/ootex/IR/OotexOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "src/ootex/IR/OotexOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/ootex/IR/OotexOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-pass-decls",
+                "-name=Ootex",
+            ],
+            "src/ootex/Transforms/Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "src/ootex/Transforms/Passes.td",
+    deps = [":td_files"],
+)
+
+cc_library(
+    name = "IR",
+    srcs = [
+        "src/ootex/IR/OotexDialect.cpp",
+        "src/ootex/IR/OotexOps.cpp.inc",
+    ],
+    hdrs = [
+        "src/ootex/IR/OotexDialect.h",
+        "src/ootex/IR/OotexOps.h.inc",
+    ],
+    deps = [
+        ":OotexOpsGen",
+        ":defs",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_library(
+    name = "Transforms",
+    srcs = ["src/ootex/Transforms/AnnotateMarkedFunctions.cpp"],
+    hdrs = [
+        "src/ootex/Transforms/Passes.h",
+        "src/ootex/Transforms/Passes.h.inc",
+    ],
+    deps = [
+        ":IR",
+        ":PassesGen",
+        ":defs",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+cc_library(
+    name = "registration",
+    srcs = ["src/PluginRegistration.cpp"],
+    deps = [
+        ":IR",
+        ":Transforms",
+        ":defs",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+# Out of tree this is the whole integration: one rule, naming the registration
+# target and the compiler to rename against.
+iree_cmake_extra_content(
+    content = """
+if(IREE_COMPILER_DYNAMIC_PLUGINS)
+""",
+    inline = True,
+)
+
+iree_compiler_register_dynamic_plugin(
+    compiler = "//lib:IREECompilerShared",
+    plugin_id = "ootex",
+    target = ":registration",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
