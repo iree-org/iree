@@ -295,6 +295,12 @@ jobs:
     uses: ./.github/workflows/ci_linux_x64_clang_debug.yml
     secrets: inherit
 
+  linux_x64_clang_dynamic_plugins:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_dynamic_plugins')
+    uses: ./.github/workflows/ci_linux_x64_clang_dynamic_plugins.yml
+    secrets: inherit
+
   linux_x64_clang_asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
@@ -351,6 +357,7 @@ jobs:
       - linux_x64_gcc
       - linux_arm64_clang
       - linux_x64_clang_debug
+      - linux_x64_clang_dynamic_plugins
       - linux_x64_clang_asan
       - linux_x64_clang_ubsan
       - linux_x64_clang_tsan

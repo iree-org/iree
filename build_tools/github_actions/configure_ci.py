@@ -160,6 +160,16 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
         [".github/workflows/ci_linux_x64_clang_debug.yml"],
     ),
     (
+        "linux_x64_clang_dynamic_plugins",
+        [
+            ".github/workflows/ci_linux_x64_clang_dynamic_plugins.yml",
+            "build_tools/bazel/gen_rename_map.py",
+            "build_tools/cmake/iree_renamed_link.cmake",
+            "build_tools/cmake/iree_plugin_register.cmake",
+            "compiler/src/iree/compiler/PluginAPI/*",
+        ],
+    ),
+    (
         "linux_x64_clang_tsan",
         [".github/workflows/ci_linux_x64_clang_tsan.yml"],
     ),
