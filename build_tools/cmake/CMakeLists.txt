@@ -30,6 +30,13 @@ if(IREE_BUILD_COMPILER)
     DESTINATION ${_cmake_installdir}
     COMPONENT IREECMakeExports
   )
+  # An out-of-tree plugin renames its own archives.
+  install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/IREECompilerPluginRules.cmake
+    ${IREE_ROOT_DIR}/build_tools/bazel/gen_rename_map.py
+    DESTINATION ${_cmake_installdir}
+    COMPONENT IREECMakeExports
+  )
 endif()
 
 configure_file(
