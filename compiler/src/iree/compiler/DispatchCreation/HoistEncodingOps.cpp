@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include <queue>
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -22,6 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -329,36 +329,37 @@ void HoistEncodingOpsPass::runOnOperation() {
       return;
     }
 
+    // Every op within the dispatch that the SetEncodingOp transitively depends
+    // on (data and metadata) has to be hoisted along with it. While computing
+    // the slice, record the ops on the data path, i.e. the transitive defs of
+    // the source. The source operand is traversed before the encoding dims.
+    Operation *sourceOp = setEncodingOp.getSource().getDefiningOp();
+    DenseSet<Operation *> dataPathOps;
+    BackwardSliceOptions sliceOptions;
     bool isHoistable = true;
-    SetVector<Operation *> opsWithinDispatch, seen;
-    std::queue<Operation *> worklist;
-    worklist.push(setEncodingOp);
-    seen.insert(setEncodingOp);
-    while (!worklist.empty()) {
-      Operation *op = worklist.front();
-      worklist.pop();
-      opsWithinDispatch.insert(op);
-      // For SetEncodingOp, the encoding_dims operands are metadata and should
-      // not block hoistability. We still add their defining ops to the worklist
-      // so they get hoisted, but only the source operand affects hoistability.
-      auto setEnc = dyn_cast<IREE::Encoding::SetEncodingOp>(op);
-      for (Value input : op->getOperands()) {
-        auto inputOp = input.getDefiningOp();
-        if (inputOp &&
-            inputOp->getParentOfType<IREE::Flow::DispatchRegionOp>() &&
-            !seen.contains(inputOp)) {
-          // For SetEncodingOp, only the source operand affects hoistability.
-          bool affectsHoistability = !setEnc || input == setEnc.getSource();
-          if (affectsHoistability && !isHoistableOp(inputOp)) {
-            isHoistable = false;
-          }
-          worklist.push(inputOp);
-          seen.insert(inputOp);
-        }
+    sliceOptions.inclusive = true;
+    sliceOptions.omitBlockArguments = true;
+    sliceOptions.filter = [&](Operation *op) {
+      if (!op->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+        return false;
       }
-    }
+      if (op == sourceOp || llvm::any_of(op->getUsers(), [&](Operation *user) {
+            return dataPathOps.contains(user);
+          })) {
+        dataPathOps.insert(op);
+        // Only the ops on the data path gate hoistability. Ops that are only
+        // reachable through `encoding_dims` are metadata and come along for
+        // free.
+        isHoistable &= isHoistableOp(op);
+      }
+      return true;
+    };
+    SetVector<Operation *> opsWithinDispatch;
+    (void)getBackwardSlice(setEncodingOp.getOperation(), &opsWithinDispatch,
+                           sliceOptions);
+
     if (isHoistable) {
-      candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
+      candidates.push_back(llvm::to_vector(opsWithinDispatch));
       return;
     }
 
@@ -371,7 +372,7 @@ void HoistEncodingOpsPass::runOnOperation() {
     }
     if (policy.getDecision(constInfo)->getOutcome() ==
         IREE::Util::ConstExprHoistingPolicy::ENABLE_HOIST) {
-      candidates.push_back(llvm::to_vector(llvm::reverse(opsWithinDispatch)));
+      candidates.push_back(llvm::to_vector(opsWithinDispatch));
       return;
     }
     LDBG() << "Non-hoistable op: " << setEncodingOp;
