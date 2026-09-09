@@ -224,13 +224,12 @@ iree_uk_bf16x4_to_f32x4_arm_64(const iree_uk_uint16_t* IREE_UK_RESTRICT ptr) {
   return vreinterpretq_f32_u32(vshll_n_u16(vld1_u16(ptr), 16));
 }
 
-// Narrows 4 f32 values to bf16, matching iree_uk_f32_to_bf16: round to nearest
-// even for finite values, quiet NaN for NaN, and flush f32 subnormals to zero.
-// Only runs once per output tile, so the extra selects cost nothing measurable.
+// Narrows 4 f32 values to bf16. Both formats share an exponent field, so one
+// round-to-nearest-even bias over the whole word covers normals and subnormals
+// alike. Runs once per output tile.
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline uint16x4_t
 iree_uk_f32x4_to_bf16x4_arm_64(float32x4_t value) {
   uint32x4_t bits = vreinterpretq_u32_f32(value);
-  uint32x4_t sign = vandq_u32(bits, vdupq_n_u32(0x80000000u));
   uint32x4_t exp = vandq_u32(bits, vdupq_n_u32(0x7F800000u));
   uint32x4_t mantissa = vandq_u32(bits, vdupq_n_u32(0x007FFFFFu));
   // Round to nearest even: bias by half an interval plus the low bit of the
@@ -238,17 +237,14 @@ iree_uk_f32x4_to_bf16x4_arm_64(float32x4_t value) {
   uint32x4_t keep_lsb = vandq_u32(vshrq_n_u32(bits, 16), vdupq_n_u32(1));
   uint32x4_t rounded =
       vaddq_u32(bits, vaddq_u32(vdupq_n_u32(0x7FFFu), keep_lsb));
-  // Inf/NaN keep the all-ones exponent; NaN becomes a quiet NaN rather than
-  // rounding up into an infinity.
-  uint32x4_t is_exp_all_ones = vceqq_u32(exp, vdupq_n_u32(0x7F800000u));
-  uint32x4_t is_nan =
-      vandq_u32(is_exp_all_ones, vmvnq_u32(vceqzq_u32(mantissa)));
-  uint32x4_t nan_or_inf =
-      vorrq_u32(vorrq_u32(sign, vdupq_n_u32(0x7F800000u)),
-                vandq_u32(is_nan, vdupq_n_u32(0x007FFFFFu)));
-  rounded = vbslq_u32(is_exp_all_ones, nan_or_inf, rounded);
-  // f32 subnormals (and zeroes) become a signed zero.
-  rounded = vbslq_u32(vceqzq_u32(exp), sign, rounded);
+  // Inf needs no case of its own: a zero mantissa cannot carry into the
+  // exponent. NaN does, or a payload held entirely in the truncated bits would
+  // round up into an infinity. Setting the quiet bit keeps the mantissa
+  // nonzero while preserving whatever payload survives, as compiler-rt does.
+  uint32x4_t is_nan = vandq_u32(vceqq_u32(exp, vdupq_n_u32(0x7F800000u)),
+                                vmvnq_u32(vceqzq_u32(mantissa)));
+  uint32x4_t quiet_nan = vorrq_u32(bits, vdupq_n_u32(0x00400000u));
+  rounded = vbslq_u32(is_nan, quiet_nan, rounded);
   return vshrn_n_u32(rounded, 16);
 }
 
