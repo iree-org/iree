@@ -344,4 +344,4 @@ builtin.module {
 }
 
 // CHECK-LABEL: llvm.func @global_subgroup_barrier
-//       CHECK:   llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES{{.*}}s_barrier"
+//       CHECK:   llvm.inline_asm has_side_effects convergent asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES{{.*}}s_barrier"
