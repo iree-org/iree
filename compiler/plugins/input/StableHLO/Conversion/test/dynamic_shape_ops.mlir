@@ -210,3 +210,229 @@ func.func @dynamic_conv_lhs_dilation_nhwc(%a: tensor<2x4x3x3xf32>, %k: tensor<3x
   } : (tensor<2x4x3x3xf32>, tensor<3x2x3x5xf32>, tensor<2x2xi64>) -> tensor<2x5x6x5xf32>
   return %r : tensor<2x5x6x5xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dynamic_gather
+// CHECK: linalg.generic
+// CHECK: tensor.extract %{{.+}} : tensor<3x4x2xi32>
+// CHECK: return %{{.+}} : tensor<2x3x2x2xi32>
+func.func @dynamic_gather(%a: tensor<3x4x2xi32>, %i: tensor<2x3x2xi64>, %s: tensor<3xi64>) -> tensor<2x3x2x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<3x4x2xi32>, tensor<2x3x2xi64>, tensor<3xi64>) -> tensor<2x3x2x2xi32>
+  return %r : tensor<2x3x2x2xi32>
+}
+
+// -----
+
+// A dynamic result: the offset dims come from the slice_sizes operand.
+// CHECK-LABEL: @dynamic_gather_dynamic_result
+// CHECK: tensor.empty(%{{.+}}, %{{.+}}) : tensor<2x3x?x?xi32>
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<2x3x?x?xi32>
+func.func @dynamic_gather_dynamic_result(%a: tensor<3x4x2xi32>, %i: tensor<2x3x2xi64>, %s: tensor<3xi64>) -> tensor<2x3x?x?xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<3x4x2xi32>, tensor<2x3x2xi64>, tensor<3xi64>) -> tensor<2x3x?x?xi32>
+  return %r : tensor<2x3x?x?xi32>
+}
+
+// -----
+
+// Every operand dim distinct. The clamp bound per start dim is
+// operand_dim - slice_size: 5 - 1 for the collapsed dim, 8 - 3 for the
+// offset dim of size 3. i32 indices.
+// CHECK-LABEL: @dynamic_gather_distinct
+// CHECK-DAG: arith.constant 4 : index
+// CHECK-DAG: arith.constant 5 : index
+// CHECK: linalg.generic
+// CHECK: tensor.extract %{{.+}} : tensor<5x8x2xi32>
+// CHECK: return %{{.+}} : tensor<2x7x3x2xi32>
+func.func @dynamic_gather_distinct(%a: tensor<5x8x2xi32>, %i: tensor<2x7x2xi32>, %s: tensor<3xi64>) -> tensor<2x7x3x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<5x8x2xi32>, tensor<2x7x2xi32>, tensor<3xi64>) -> tensor<2x7x3x2xi32>
+  return %r : tensor<2x7x3x2xi32>
+}
+
+// -----
+
+// A dynamic operand: the clamp bound for the dynamic start dim is read at
+// runtime. Dim 2 is not a start dim and gets no clamp.
+// CHECK-LABEL: @dynamic_gather_dynamic_operand
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x8x?xi32>,
+// CHECK: linalg.generic
+// CHECK: %[[D0:.+]] = tensor.dim %[[ARG0]], %c0
+// CHECK: arith.subi %[[D0]], %c1
+// CHECK-NOT: tensor.dim
+// CHECK: return %{{.+}} : tensor<2x7x3x2xi32>
+func.func @dynamic_gather_dynamic_operand(%a: tensor<?x8x?xi32>, %i: tensor<2x7x2xi64>, %s: tensor<3xi64>) -> tensor<2x7x3x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<?x8x?xi32>, tensor<2x7x2xi64>, tensor<3xi64>) -> tensor<2x7x3x2xi32>
+  return %r : tensor<2x7x3x2xi32>
+}
+
+// -----
+
+// A dynamic batch dim in the indices flows into the result.
+// CHECK-LABEL: @dynamic_gather_dynamic_indices
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<5x8x2xi32>, %[[IDX:.+]]: tensor<2x?x2xi64>,
+// CHECK: %[[N:.+]] = tensor.dim %[[IDX]], %c1
+// CHECK: tensor.empty(%[[N]]) : tensor<2x?x3x2xi32>
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<2x?x3x2xi32>
+func.func @dynamic_gather_dynamic_indices(%a: tensor<5x8x2xi32>, %i: tensor<2x?x2xi64>, %s: tensor<3xi64>) -> tensor<2x?x3x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<5x8x2xi32>, tensor<2x?x2xi64>, tensor<3xi64>) -> tensor<2x?x3x2xi32>
+  return %r : tensor<2x?x3x2xi32>
+}
+
+// -----
+
+// index_vector_dim equal to the indices rank: one scalar index per element.
+// The collapsed dim 1 has bound 8 - 1.
+// CHECK-LABEL: @dynamic_gather_implicit_index_vector
+// CHECK-DAG: arith.constant 7 : index
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<2x7x5x2xi32>
+func.func @dynamic_gather_implicit_index_vector(%a: tensor<5x8x2xi32>, %i: tensor<2x7xi64>, %s: tensor<3xi64>) -> tensor<2x7x5x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [1], start_index_map = [1], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<5x8x2xi32>, tensor<2x7xi64>, tensor<3xi64>) -> tensor<2x7x5x2xi32>
+  return %r : tensor<2x7x5x2xi32>
+}
+
+// -----
+
+// Batching dims pair operand dim 0 with indices dim 0.
+// CHECK-LABEL: @dynamic_gather_batching
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<3x7x5xi32>
+func.func @dynamic_gather_batching(%a: tensor<3x8x5xi32>, %i: tensor<3x7x1xi64>, %s: tensor<3xi64>) -> tensor<3x7x5xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2], collapsed_slice_dims = [1], operand_batching_dims = [0], start_indices_batching_dims = [0], start_index_map = [1], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<3x8x5xi32>, tensor<3x7x1xi64>, tensor<3xi64>) -> tensor<3x7x5xi32>
+  return %r : tensor<3x7x5xi32>
+}
+
+// -----
+
+// No annotation and a dynamic operand dim: whether it expands is decided
+// per element at runtime.
+// CHECK-LABEL: @dynamic_broadcast_undecidable
+// CHECK: linalg.generic
+// CHECK: arith.cmpi eq
+// CHECK: arith.select
+// CHECK: tensor.extract %{{.+}} : tensor<?xf32>
+// CHECK: return %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_undecidable(%a: tensor<?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1] : (tensor<?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// The annotated form decides expansion statically, so upstream's own lowering applies.
+// CHECK-LABEL: @dynamic_broadcast_annotated
+// CHECK: linalg.generic
+// CHECK-NOT: arith.select
+// CHECK-NOT: tensor.extract
+// CHECK: return %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_annotated(%a: tensor<?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1] {known_nonexpanding_dimensions = array<i64: 0>} : (tensor<?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// Rank 3 into rank 4: the two dynamic operand dims each get a select, the
+// static 1 indexes zero without one.
+// CHECK-LABEL: @dynamic_broadcast_mixed
+// CHECK: linalg.generic
+// CHECK-COUNT-2: arith.select
+// CHECK-NOT: arith.select
+// CHECK: tensor.extract %{{.+}} : tensor<?x1x?xf32>
+// CHECK: return %{{.+}} : tensor<?x?x?x?xf32>
+func.func @dynamic_broadcast_mixed(%a: tensor<?x1x?xf32>, %s: tensor<4xi32>) -> tensor<?x?x?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1, 2, 3] : (tensor<?x1x?xf32>, tensor<4xi32>) -> tensor<?x?x?x?xf32>
+  return %r : tensor<?x?x?x?xf32>
+}
+
+// -----
+
+// A static non-1 dim indexes directly; only the dynamic dim gets a select.
+// CHECK-LABEL: @dynamic_broadcast_static_non1
+// CHECK: linalg.generic
+// CHECK: arith.select
+// CHECK-NOT: arith.select
+// CHECK: tensor.extract %{{.+}} : tensor<3x?xf32>
+func.func @dynamic_broadcast_static_non1(%a: tensor<3x?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [0, 1] : (tensor<3x?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// Permuted broadcast_dimensions with an i64 shape: operand dim 0 reads result
+// index 2 and operand dim 1 reads result index 0.
+// CHECK-LABEL: @dynamic_broadcast_permuted
+// CHECK: linalg.generic
+// CHECK-DAG: linalg.index 2
+// CHECK-DAG: linalg.index 0
+// CHECK-NOT: linalg.index 1
+// CHECK: tensor.extract %{{.+}} : tensor<?x?xf32>
+// CHECK: return %{{.+}} : tensor<?x?x?xf32>
+func.func @dynamic_broadcast_permuted(%a: tensor<?x?xf32>, %s: tensor<3xi64>) -> tensor<?x?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [2, 0] : (tensor<?x?xf32>, tensor<3xi64>) -> tensor<?x?x?xf32>
+  return %r : tensor<?x?x?xf32>
+}
+
+// -----
+
+// One dynamic dim annotated, one not: the unannotated dim keeps this path.
+// CHECK-LABEL: @dynamic_broadcast_partial_annotation
+// CHECK: linalg.generic
+// CHECK: arith.select
+// CHECK-NOT: arith.select
+// CHECK: tensor.extract %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_partial_annotation(%a: tensor<?x?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [0, 1] {known_nonexpanding_dimensions = array<i64: 0>} : (tensor<?x?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// Both dynamic dims annotated, one each way: decidable, upstream path.
+// CHECK-LABEL: @dynamic_broadcast_annotated_both
+// CHECK: linalg.generic
+// CHECK-NOT: arith.select
+// CHECK-NOT: tensor.extract
+// CHECK: return %{{.+}} : tensor<?x?x?xf32>
+func.func @dynamic_broadcast_annotated_both(%a: tensor<?x?xf32>, %s: tensor<3xi32>) -> tensor<?x?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1, 2] {known_expanding_dimensions = array<i64: 0>, known_nonexpanding_dimensions = array<i64: 1>} : (tensor<?x?xf32>, tensor<3xi32>) -> tensor<?x?x?xf32>
+  return %r : tensor<?x?x?xf32>
+}
+
+// -----
+
+// Removing a leading index-vector dimension shifts the batching dimension down.
+// CHECK-LABEL: @dynamic_gather_leading_index_vector
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<3x2xf32>
+func.func @dynamic_gather_leading_index_vector(%a: tensor<3x8xf32>, %i: tensor<1x3x2xi64>, %s: tensor<2xi64>) -> tensor<3x2xf32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [], collapsed_slice_dims = [1], operand_batching_dims = [0], start_indices_batching_dims = [1], start_index_map = [1], index_vector_dim = 0>,
+    indices_are_sorted = false
+  } : (tensor<3x8xf32>, tensor<1x3x2xi64>, tensor<2xi64>) -> tensor<3x2xf32>
+  return %r : tensor<3x2xf32>
+}
