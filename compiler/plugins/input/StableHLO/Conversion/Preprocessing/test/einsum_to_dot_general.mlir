@@ -15,6 +15,19 @@ func.func @einsum_diag(%arg0: tensor<6x6xf32>) -> tensor<6xf32> {
 // CHECK:         %[[CST:.+]] = stablehlo.constant dense<{{.*}} : tensor<f32>
 // CHECK:         stablehlo.einsum
 
+// NOTE: unary_einsum's scalar-lhs rewrite ("ab->a" becomes ",ab->a") leaves
+// lhs with no contracting dims and rhs with one; not expressible as
+// dot_general.
+//
+// CHECK-LABEL: func @einsum_contracting_dims_mismatch
+func.func @einsum_contracting_dims_mismatch(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
+  %0 = stablehlo.constant dense<1.000000e+00> : tensor<f32>
+  %1 = "stablehlo.einsum"(%0, %arg0) {einsum_config = ",ab->a"} : (tensor<f32>, tensor<4x8xf32>) -> tensor<4xf32>
+  func.return %1 : tensor<4xf32>
+}
+// CHECK:         %[[CST:.+]] = stablehlo.constant dense<{{.*}} : tensor<f32>
+// CHECK:         stablehlo.einsum
+
 // CHECK-LABEL: func @einsum_batched_matrix_high_rank_vector_mul
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]

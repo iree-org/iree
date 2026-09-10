@@ -96,6 +96,14 @@ struct EinsumToDotGeneralPattern final
     collectOperandDims(rhsType, rhsTokens, lhsTokens, rhsContractingDims,
                        rhsBatchingDims, dotResultTokens, dotResultShape);
 
+    // A degenerate einsum (e.g. unary_einsum's scalar-lhs rewrite) can leave
+    // lhs and rhs with differing contracting-dim counts, which dot_general
+    // has no way to express.
+    if (lhsContractingDims.size() != rhsContractingDims.size()) {
+      return rewriter.notifyMatchFailure(
+          einsum, "einsum lhs/rhs contracting dim counts disagree");
+    }
+
     // Prepend batch tokens.
     for (auto [idx, dim] : llvm::enumerate(lhsBatchingDims)) {
       char batchingToken = lhsTokens[dim];
