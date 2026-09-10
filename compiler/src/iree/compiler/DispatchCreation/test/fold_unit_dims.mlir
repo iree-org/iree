@@ -756,3 +756,51 @@ util.func public @online_attention_remap_index_after_unit_dim_drop(
 //       CHECK:   %[[EXPAND2:.+]] = tensor.expand_shape %[[ATTN]]#2
 //  CHECK-SAME:     tensor<8x64xf32> into tensor<1x8x64xf32>
 //       CHECK:   util.return %[[EXPAND0]], %[[EXPAND1]], %[[EXPAND2]]
+
+// -----
+
+// A unit batch dim on a dequantize is dropped alongside the one on its consumer,
+// so the reshape ends up above the dequantize on the quantized input rather than
+// between the two. Keeping the two adjacent is what lets the QDQ-to-integer-math
+// rewrite still see the dequantize as the convolution's producer. The
+// convolution is spelled as a generic because that is the form it has by the
+// time this pass runs.
+util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<f32>,
+    %z: tensor<i8>, %filter: tensor<2x2x2x2xf32>) -> tensor<1x3x3x2xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %dqinit = tensor.empty() : tensor<1x4x4x2xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                        affine_map<(d0, d1, d2, d3) -> ()>,
+                        affine_map<(d0, d1, d2, d3) -> ()>,
+                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]}
+      ins(%q, %s, %z : tensor<1x4x4x2xi8>, tensor<f32>, tensor<i8>)
+      outs(%dqinit : tensor<1x4x4x2xf32>) -> tensor<1x4x4x2xf32>
+  %init = tensor.empty() : tensor<1x3x3x2xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<1x3x3x2xf32>) -> tensor<1x3x3x2xf32>
+  %conv = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d4, d5, d6, d3)>,
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+                        "reduction", "reduction", "reduction"]}
+      ins(%dq, %filter : tensor<1x4x4x2xf32>, tensor<2x2x2x2xf32>)
+      outs(%fill : tensor<1x3x3x2xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %m = arith.mulf %in, %in_0 : f32
+    %a = arith.addf %out, %m : f32
+    linalg.yield %a : f32
+  } -> tensor<1x3x3x2xf32>
+  util.return %conv : tensor<1x3x3x2xf32>
+}
+// CHECK-LABEL: util.func public @dequantize_conv_unit_batch
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[INPUT:.+]] = tensor.collapse_shape %[[ARG0]]
+//  CHECK-SAME:       tensor<1x4x4x2xi8> into tensor<4x4x2xi8>
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//  CHECK-SAME:       ins(%[[INPUT]],
+//  CHECK-SAME:       -> tensor<4x4x2xf32>
+// The dequantize feeds the convolution directly, with no reshape in between.
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[DQ]],

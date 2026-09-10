@@ -33,6 +33,7 @@ iree_lit_test_suite(
     "linalg_quantized_matmul_to_matmul.mlir"
     "optimize_numerics.mlir"
     "propagate_linalg_transpose.mlir"
+    "propagate_quantization_toward_contractions.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
     "strided_contraction_to_contraction.mlir"

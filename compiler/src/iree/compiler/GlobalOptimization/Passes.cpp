@@ -206,8 +206,16 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
-      // Match direct dequantize producers after reshape/transpose propagation,
-      // before encoding selection chooses layouts for the integer contraction.
+      // Establish the adjacency the rewrite below matches on, rather than
+      // relying on the general purpose propagation passes to have gotten there
+      // first.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createPropagateQuantizationTowardContractionsPass)
+      // Turn dequantize -> contraction into an integer contraction. This
+      // requires the dequantize to be the contraction's immediate producer, so
+      // it runs after the passes that move reshapes and transposes out from
+      // between the two, and before encoding selection so that the integer form
+      // is what data tiling sees.
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)
