@@ -398,6 +398,22 @@ vm.func @test_pow_f64() -> () {
   vm.fail %i0, "pow(3.0,2.0)=9.0"
 }
 
+vm.export @test_fpowi_f64
+vm.func @test_fpowi_f64() -> () {
+^bb0:
+  %i0 = vm.const.i32 8  // 0x00000008
+  %i2:3 = vm.const.f64 8
+  %i4:5 = vm.const.i64 3
+  %i6:7 = vm.const.f64 2
+  %i4:5 = vm.fpowi.f64 %i6:7, %i4:5
+  %i1 = vm.cmp.ne.f64.o %i4:5, %i2:3
+  vm.cond_br %i1, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  vm.fail %i0, "fpowi(2.0,3.0)=8.0"
+}
+
 vm.export @test_rsqrt_f64
 vm.func @test_rsqrt_f64() -> () {
 ^bb0:
