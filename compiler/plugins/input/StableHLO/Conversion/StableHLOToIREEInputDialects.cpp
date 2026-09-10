@@ -527,6 +527,7 @@ struct ConvertStableHloToIreeInputDialects final
     patterns.add<ConcatenateOpConversion, FftOpConversion,
                  OptimizationBarrierOpConversion>(*typeConverter, context,
                                                   PatternBenefit{1000});
+    populateDynamicShapeConversionPatterns(context, *typeConverter, &patterns);
 
     // Run upstream stablehlo patterns with a default benefit.
     ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
