@@ -49,3 +49,26 @@ func.func @main(%arg0: !torch.vtensor<[2,3,4],f32>) -> (!torch.vtensor<[2,3,4],f
   %3 = torch.aten.copy %arg0, %2, %false_2 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>, !torch.bool -> !torch.vtensor<[2,3,4],f32>
   return %3, %3 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>
 }
+
+// -----
+
+// PT2E quantization must remain named after Torch input conversion so the
+// global optimization pipeline can move it next to a consuming contraction.
+// CHECK-LABEL: util.func public @dequantize$async(
+// CHECK: iree_linalg_ext.dequantize_affine
+func.func @dequantize(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4],f32>) -> !torch.vtensor<[4,8],f32> {
+  %axis = torch.constant.int 0
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 2
+  %none = torch.constant.none
+  %out_dtype = torch.derefine %none : !torch.none to !torch.optional<int>
+  %result = torch.quantized_decomposed.dequantize_per_channel
+      %input, %scales, %none, %axis, %minimum, %maximum, %dtype, %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4],f32>, !torch.none,
+        !torch.int, !torch.int, !torch.int, !torch.int, !torch.optional<int>
+        -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
