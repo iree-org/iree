@@ -87,6 +87,7 @@ iree_lit_test_suite(
     "materialize_encoding_conv_x86_64.mlir"
     "materialize_encoding_for_iree_ops.mlir"
     "materialize_encoding_gfx1100.mlir"
+    "materialize_encoding_gfx1201.mlir"
     "materialize_encoding_gfx908.mlir"
     "materialize_encoding_gfx90a.mlir"
     "materialize_encoding_gfx942.mlir"
