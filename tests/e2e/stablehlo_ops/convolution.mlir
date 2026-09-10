@@ -432,3 +432,464 @@ func.func @depthwise_conv_non_1_channel_multiplier() {
   check.expect_almost_eq_const(%res, dense<4.0> : tensor<2x3x4x6xf32>) : tensor<2x3x4x6xf32>
   return
 }
+
+// Dynamic spatial convolution follows StableHLO C25, including empty windows.
+func.func @dynamic_conv_plain() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 5, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]], [[3.0]]]> : tensor<3x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, padding = dense<[[0, 0]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<3x1x1xf32>) -> tensor<1x?x1xf32>
+  %expected = arith.constant dense<[[[14.0], [20.0], [26.0]]]> : tensor<1x3x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<3> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x3x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x1xf32>
+  return
+}
+
+func.func @dynamic_conv_dilated() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 4, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]]]> : tensor<2x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 2>, padding = dense<[[1, 2]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 2>, rhs_dilation = array<i64: 2>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
+  %expected = arith.constant dense<[[[0.0], [0.0], [0.0], [0.0]]]> : tensor<1x4x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<4> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x4x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
+  return
+}
+
+func.func @dynamic_conv_crop() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 6, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]]]> : tensor<2x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, padding = dense<[[-1, -2]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
+  %expected = arith.constant dense<[[[8.0], [11.0]]]> : tensor<1x2x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<2> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x2x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x2x1xf32>
+  return
+}
+
+func.func @dynamic_conv_empty_window() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0]> : tensor<2xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 2, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]], [[3.0]], [[4.0]]]> : tensor<4x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 2>, padding = dense<[[0, 0]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<4x1x1xf32>) -> tensor<1x?x1xf32>
+  %dim = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
+
+func.func @dynamic_conv_overcrop() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0]> : tensor<2xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 2, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]]]> : tensor<2x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, padding = dense<[[-4, 0]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
+  %dim = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
+
+func.func @dynamic_conv_empty_input() {
+  %a = flow.tensor.dynamic_constant dense<> : tensor<0xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 0, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]]]> : tensor<2x1x1xf32>
+  %r = "stablehlo.convolution"(%a3, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, padding = dense<[[2, 2]]> : tensor<1x2xi64>,
+    lhs_dilation = array<i64: 3>, rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
+  %expected = arith.constant dense<[[[0.0], [0.0], [0.0]]]> : tensor<1x3x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<3> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x3x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x1xf32>
+  return
+}
+
+func.func @dynamic_conv_2d() {
+  %a = flow.tensor.dynamic_constant dense<1.0> : tensor<1x4x4x1xf32> -> tensor<1x?x?x1xf32>
+  %w = flow.tensor.dynamic_constant dense<1.0> : tensor<2x2x1x1xf32> -> tensor<?x?x1x1xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64
+  } : (tensor<1x?x?x1xf32>, tensor<?x?x1x1xf32>) -> tensor<1x?x?x1xf32>
+  %expected = arith.constant dense<4.0> : tensor<1x3x3x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<3> : tensor<i32>) : tensor<i32>
+  %dim2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<1x?x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim2, dense<3> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x?x1xf32> to tensor<1x3x3x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x3x1xf32>
+  return
+}
+
+func.func @dynamic_conv_3d() {
+  %a = flow.tensor.dynamic_constant dense<1.0> : tensor<1x4x4x4x1xf32> -> tensor<1x?x?x?x1xf32>
+  %w = flow.tensor.dynamic_constant dense<1.0> : tensor<2x2x2x1x1xf32> -> tensor<?x?x?x1x1xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, 2, f]x[0, 1, 2, i, o]->[b, 0, 1, 2, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64
+  } : (tensor<1x?x?x?x1xf32>, tensor<?x?x?x1x1xf32>) -> tensor<1x?x?x?x1xf32>
+  %expected = arith.constant dense<8.0> : tensor<1x3x3x3x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x?x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<3> : tensor<i32>) : tensor<i32>
+  %dim2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<1x?x?x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim2, dense<3> : tensor<i32>) : tensor<i32>
+  %dim3 = stablehlo.get_dimension_size %r, dim = 3 : (tensor<1x?x?x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim3, dense<3> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x?x?x1xf32> to tensor<1x3x3x3x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x3x3x1xf32>
+  return
+}
+
+func.func @dynamic_conv_runtime_padding() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32> -> tensor<?xf32>
+  %shape = util.unfoldable_constant dense<[1, 4, 1]> : tensor<3xi64>
+  %a3 = "stablehlo.dynamic_reshape"(%a, %shape) : (tensor<?xf32>, tensor<3xi64>) -> tensor<1x?x1xf32>
+  %w = util.unfoldable_constant dense<[[[1.0]], [[2.0]]]> : tensor<2x1x1xf32>
+  %padding = util.unfoldable_constant dense<[[1, 2]]> : tensor<1x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a3, %w, %padding) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 2>,
+    lhs_dilation = array<i64: 2>, rhs_dilation = array<i64: 2>,
+    window_reversal = array<i1: false>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>, tensor<1x2xi64>) -> tensor<1x?x1xf32>
+  %expected = arith.constant dense<[[[0.0], [0.0], [0.0], [0.0]]]> : tensor<1x4x1xf32>
+  %dim1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%dim1, dense<4> : tensor<i32>) : tensor<i32>
+  %rs = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x4x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
+  return
+}
+
+// Group dimensions and padding operands remain dynamic through input conversion.
+func.func @conv_feature_groups_1d() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0, 4.0, 7.0, 3.0], [3.0, 6.0, 2.0, 5.0], [5.0, 1.0, 4.0, 7.0], [7.0, 3.0, 6.0, 2.0]], [[2.0, 5.0, 1.0, 4.0], [4.0, 7.0, 3.0, 6.0], [6.0, 2.0, 5.0, 1.0], [1.0, 4.0, 7.0, 3.0]]]> : tensor<2x4x4xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0, 2.0, 1.0, 0.0, -1.0, -2.0], [1.0, 0.0, -1.0, -2.0, 2.0, 1.0]], [[0.0, -1.0, -2.0, 2.0, 1.0, 0.0], [-2.0, 2.0, 1.0, 0.0, -1.0, -2.0]]]> : tensor<2x2x6xf32> -> tensor<?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 2 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>,
+    padding = dense<[[0, 0]]> : tensor<1x2xi64>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<2> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<3> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<6> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-10.0, 11.0, -3.0, -2.0, -4.0, -21.0], [-2.0, 3.0, -12.0, -2.0, 5.0, -13.0], [-15.0, 9.0, -7.0, -2.0, 14.0, -5.0]], [[-13.0, 14.0, -4.0, -2.0, 4.0, -10.0], [-5.0, 6.0, -13.0, -2.0, 13.0, -2.0], [-18.0, 19.0, 6.0, 12.0, 1.0, -15.0]]]> : tensor<2x3x6xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<2x3x6xf32>
+  check.expect_eq(%rs, %expected) : tensor<2x3x6xf32>
+  return
+}
+
+func.func @conv_depthwise_multiplier() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0, 4.0, 7.0], [3.0, 6.0, 2.0], [5.0, 1.0, 4.0], [7.0, 3.0, 6.0]]]> : tensor<1x4x3xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0, 2.0, 1.0, 0.0, -1.0, -2.0]], [[0.0, -1.0, -2.0, 2.0, 1.0, 0.0]]]> : tensor<2x1x6xf32> -> tensor<?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 3 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>,
+    padding = dense<[[0, 0]]> : tensor<1x2xi64>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<3> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<6> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-2.0, -1.0, -8.0, 12.0, -5.0, -14.0], [-6.0, 1.0, 4.0, 2.0, 2.0, -4.0], [-10.0, 3.0, -5.0, 6.0, 2.0, -8.0]]]> : tensor<1x3x6xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<1x3x6xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x6xf32>
+  return
+}
+
+func.func @conv_batch_groups() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0, 4.0], [3.0, 6.0], [5.0, 1.0], [7.0, 3.0]], [[2.0, 5.0], [4.0, 7.0], [6.0, 2.0], [1.0, 4.0]], [[3.0, 6.0], [5.0, 1.0], [7.0, 3.0], [2.0, 5.0]], [[4.0, 7.0], [6.0, 2.0], [1.0, 4.0], [3.0, 6.0]]]> : tensor<4x4x2xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0, 2.0, 1.0, 0.0], [1.0, 0.0, -1.0, -2.0]], [[0.0, -1.0, -2.0, 2.0], [-2.0, 2.0, 1.0, 0.0]]]> : tensor<2x2x4xf32> -> tensor<?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 2 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>,
+    padding = dense<[[0, 0]]> : tensor<1x2xi64>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<2> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<3> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<4> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-10.0, 11.0, -12.0, -2.0], [-2.0, 3.0, -7.0, 12.0], [-15.0, 9.0, 5.0, -2.0]], [[-13.0, 14.0, -13.0, -2.0], [-5.0, 6.0, 6.0, -2.0], [-18.0, 19.0, -3.0, -2.0]]]> : tensor<2x3x4xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<2x3x4xf32>
+  check.expect_eq(%rs, %expected) : tensor<2x3x4xf32>
+  return
+}
+
+func.func @conv_feature_groups_2d() {
+  %a = flow.tensor.dynamic_constant dense<[[[[1.0, 5.0, 2.0, 6.0], [4.0, 1.0, 5.0, 2.0], [7.0, 4.0, 1.0, 5.0]], [[3.0, 7.0, 4.0, 1.0], [6.0, 3.0, 7.0, 4.0], [2.0, 6.0, 3.0, 7.0]], [[5.0, 2.0, 6.0, 3.0], [1.0, 5.0, 2.0, 6.0], [4.0, 1.0, 5.0, 2.0]]]]> : tensor<1x3x3x4xf32> -> tensor<?x?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[[-2.0, -2.0, -2.0, -2.0], [2.0, 2.0, 2.0, 2.0]], [[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]]], [[[0.0, 0.0, 0.0, 0.0], [-1.0, -1.0, -1.0, -1.0]], [[-2.0, -2.0, -2.0, -2.0], [2.0, 2.0, 2.0, 2.0]]]]> : tensor<2x2x2x4xf32> -> tensor<?x?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 2 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>,
+    lhs_dilation = array<i64: 1, 1>,
+    rhs_dilation = array<i64: 1, 1>,
+    window_reversal = array<i1: false, false>,
+    padding = dense<[[0, 0], [0, 0]]> : tensor<2x2xi64>
+  } : (tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<2> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<2> : tensor<i32>) : tensor<i32>
+  %d3 = stablehlo.get_dimension_size %r, dim = 3 : (tensor<?x?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d3, dense<4> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[[-1.0, -1.0, 6.0, 6.0], [6.0, 6.0, -1.0, -1.0]], [[20.0, 20.0, 6.0, 6.0], [-15.0, -15.0, -15.0, -15.0]]]]> : tensor<1x2x2x4xf32>
+  %rs = tensor.cast %r : tensor<?x?x?x?xf32> to tensor<1x2x2x4xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x2x2x4xf32>
+  return
+}
+
+func.func @conv_depthwise_3d() {
+  %a = flow.tensor.dynamic_constant dense<[[[[[1, 6], [5, 3]], [[4, 2], [1, 6]]], [[[3, 1], [7, 5]], [[6, 4], [3, 1]]]]]> : tensor<1x2x2x2x2xi32> -> tensor<?x?x?x?x?xi32>
+  %w = flow.tensor.dynamic_constant dense<[[[[[-2, -1]], [[2, -2]]]], [[[[0, 1]], [[-1, 0]]]]]> : tensor<2x1x2x1x2xi32> -> tensor<?x?x?x?x?xi32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, 2, f]x[0, 1, 2, i, o]->[b, 0, 1, 2, f]>,
+    feature_group_count = 2 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1, 1>,
+    lhs_dilation = array<i64: 1, 1, 1>,
+    rhs_dilation = array<i64: 1, 1, 1>,
+    window_reversal = array<i1: false, false, false>,
+    padding = dense<[[0, 0], [0, 0], [0, 0]]> : tensor<3x2xi64>
+  } : (tensor<?x?x?x?x?xi32>, tensor<?x?x?x?x?xi32>) -> tensor<?x?x?x?x?xi32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?x?x?xi32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?x?x?xi32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<1> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?x?x?xi32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<2> : tensor<i32>) : tensor<i32>
+  %d3 = stablehlo.get_dimension_size %r, dim = 3 : (tensor<?x?x?x?x?xi32>) -> tensor<i32>
+  check.expect_eq_const(%d3, dense<1> : tensor<i32>) : tensor<i32>
+  %d4 = stablehlo.get_dimension_size %r, dim = 4 : (tensor<?x?x?x?x?xi32>) -> tensor<i32>
+  check.expect_eq_const(%d4, dense<2> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[[[1, -11]], [[-9, -10]]]]]> : tensor<1x1x2x1x2xi32>
+  %rs = tensor.cast %r : tensor<?x?x?x?x?xi32> to tensor<1x1x2x1x2xi32>
+  check.expect_eq(%rs, %expected) : tensor<1x1x2x1x2xi32>
+  return
+}
+
+func.func @conv_groups_dilated_reversed() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0, 4.0, 7.0, 3.0], [3.0, 6.0, 2.0, 5.0], [5.0, 1.0, 4.0, 7.0], [7.0, 3.0, 6.0, 2.0]]]> : tensor<1x4x4xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0, 2.0, 1.0, 0.0], [1.0, 0.0, -1.0, -2.0]], [[0.0, -1.0, -2.0, 2.0], [-2.0, 2.0, 1.0, 0.0]]]> : tensor<2x2x4xf32> -> tensor<?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 2 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 2>,
+    lhs_dilation = array<i64: 2>,
+    rhs_dilation = array<i64: 2>,
+    window_reversal = array<i1: true>,
+    padding = dense<[[1, 2]]> : tensor<1x2xi64>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<4> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<4> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]]> : tensor<1x4x4xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<1x4x4xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x4x4xf32>
+  return
+}
+
+func.func @conv_window_reversal() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0], [3.0], [5.0], [7.0]]]> : tensor<1x4x1xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0]], [[0.0]]]> : tensor<2x1x1xf32> -> tensor<?x?x?xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: true>,
+    padding = dense<[[0, 1]]> : tensor<1x2xi64>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<4> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-6.0], [-10.0], [-14.0], [0.0]]]> : tensor<1x4x1xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<1x4x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
+  return
+}
+
+func.func @conv_runtime_crop_low_empty() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0], [3.0]]]> : tensor<1x2x1xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0]], [[0.0]]]> : tensor<2x1x1xf32> -> tensor<?x?x?xf32>
+  %p = util.unfoldable_constant dense<[[-1000000000, 0]]> : tensor<1x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a, %w, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<1x2xi64>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<0> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
+  return
+}
+
+func.func @conv_runtime_crop_high_empty() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0], [3.0]]]> : tensor<1x2x1xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0]], [[0.0]]]> : tensor<2x1x1xf32> -> tensor<?x?x?xf32>
+  %p = util.unfoldable_constant dense<[[0, -1000000000]]> : tensor<1x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a, %w, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<1x2xi64>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<0> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
+  return
+}
+
+func.func @conv_runtime_crop_into_padding() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0], [3.0]]]> : tensor<1x2x1xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0]], [[0.0]]]> : tensor<2x1x1xf32> -> tensor<?x?x?xf32>
+  %p = util.unfoldable_constant dense<[[-8, 10]]> : tensor<1x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a, %w, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: false>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<1x2xi64>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<3> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[0.0], [0.0], [0.0]]]> : tensor<1x3x1xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<1x3x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x3x1xf32>
+  return
+}
+
+func.func @conv_runtime_groups_padding() {
+  %a = flow.tensor.dynamic_constant dense<[[[1.0, 4.0], [3.0, 6.0], [5.0, 1.0], [7.0, 3.0]]]> : tensor<1x4x2xf32> -> tensor<?x?x?xf32>
+  %w = flow.tensor.dynamic_constant dense<[[[-2.0, 2.0, 1.0, 0.0]], [[0.0, -1.0, -2.0, 2.0]]]> : tensor<2x1x4xf32> -> tensor<?x?x?xf32>
+  %p = util.unfoldable_constant dense<[[-1, 2]]> : tensor<1x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a, %w, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 2 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 2>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: true>
+  } : (tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<1x2xi64>) -> tensor<?x?x?xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<7> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<?x?x?xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<4> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-6.0, 6.0, 6.0, 0.0], [0.0, -3.0, -12.0, 12.0], [-10.0, 10.0, 1.0, 0.0], [0.0, -5.0, -2.0, 2.0], [-14.0, 14.0, 3.0, 0.0], [0.0, -7.0, -6.0, 6.0], [0.0, 0.0, 0.0, 0.0]]]> : tensor<1x7x4xf32>
+  %rs = tensor.cast %r : tensor<?x?x?xf32> to tensor<1x7x4xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x7x4xf32>
+  return
+}
+
+func.func @conv_static_window_reversal() {
+  %a = util.unfoldable_constant dense<[[[1.0], [3.0], [5.0], [7.0]]]> : tensor<1x4x1xf32>
+  %w = util.unfoldable_constant dense<[[[-2.0]], [[0.0]]]> : tensor<2x1x1xf32>
+  %r = "stablehlo.convolution"(%a, %w) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>,
+    lhs_dilation = array<i64: 1>,
+    rhs_dilation = array<i64: 1>,
+    window_reversal = array<i1: true>,
+    padding = dense<[[0, 1]]> : tensor<1x2xi64>
+  } : (tensor<1x4x1xf32>, tensor<2x1x1xf32>) -> tensor<1x4x1xf32>
+  %d0 = stablehlo.get_dimension_size %r, dim = 0 : (tensor<1x4x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%d0, dense<1> : tensor<i32>) : tensor<i32>
+  %d1 = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x4x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%d1, dense<4> : tensor<i32>) : tensor<i32>
+  %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<1x4x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
+  %expected = arith.constant dense<[[[-6.0], [-10.0], [-14.0], [0.0]]]> : tensor<1x4x1xf32>
+  %rs = tensor.cast %r : tensor<1x4x1xf32> to tensor<1x4x1xf32>
+  check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
+  return
+}
