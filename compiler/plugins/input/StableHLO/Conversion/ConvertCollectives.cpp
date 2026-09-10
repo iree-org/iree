@@ -476,6 +476,11 @@ struct AllGatherOpConversion final
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllGatherOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // Everything below reads a single operand and replaces a single result.
+    if (op.getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "variadic operands");
+    }
+
     if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
@@ -542,6 +547,11 @@ struct AllReduceOpConversion final
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllReduceOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // Everything below reads a single operand and replaces a single result.
+    if (op.getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "variadic operands");
+    }
+
     if (checkCollectiveAttrs(op, rewriter).failed()) {
       return failure();
     }
@@ -681,6 +691,11 @@ struct AllToAllOpConversion final
   LogicalResult
   matchAndRewrite(mlir::stablehlo::AllToAllOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // Everything below reads a single operand and replaces a single result.
+    if (op.getOperands().size() != 1) {
+      return rewriter.notifyMatchFailure(op, "variadic operands");
+    }
+
     Location loc = op.getLoc();
 
     auto moduleOp = op->getParentOfType<ModuleOp>();
