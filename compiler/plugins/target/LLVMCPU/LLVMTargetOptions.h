@@ -97,6 +97,11 @@ struct LLVMTarget {
   const std::string &getCpu() const { return cpu; }
   const std::string &getCpuFeatures() const { return cpuFeatures; }
 
+  // Returns the vscale range implied by this target, or nullopt if it does not
+  // specify one. RVV's `+zvl*b`/`+v` features guarantee a minimum VLEN, so they
+  // raise the minimum of the configured range.
+  std::optional<std::pair<unsigned, unsigned>> getEffectiveVscaleRange() const;
+
   // Overrides the data layout of the target.
   std::string dataLayout = DEFAULT_DATA_LAYOUT;
   // Overrides the vector width (in bytes) of the target.

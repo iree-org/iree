@@ -16,10 +16,12 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/RISCVTargetParser.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/IR/Builders.h"
 
@@ -90,6 +92,31 @@ std::optional<LLVMTarget> LLVMTarget::createForHost() {
     target->populateDefaultsFromTargetMachine();
   }
   return target;
+}
+
+std::optional<std::pair<unsigned, unsigned>>
+LLVMTarget::getEffectiveVscaleRange() const {
+  if (vscaleRangeMax == DEFAULT_VSCALE_RANGE) {
+    return std::nullopt;
+  }
+  auto vscaleMin = static_cast<unsigned>(vscaleRangeMin);
+  auto vscaleMax = static_cast<unsigned>(vscaleRangeMax);
+  SmallVector<StringRef> features;
+  StringRef(cpuFeatures)
+      .split(features, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  for (StringRef feature : features) {
+    if (feature.consume_front("+zvl") && feature.consume_back("b")) {
+      unsigned bits = 0;
+      if (!feature.getAsInteger(10, bits) &&
+          bits >= llvm::RISCV::RVVBitsPerBlock) {
+        vscaleMin = std::max(vscaleMin, bits / llvm::RISCV::RVVBitsPerBlock);
+      }
+    } else if (feature == "+v") {
+      // `+v` implies `+zvl128b`, i.e. a minimum RVV VLEN of 128 bits.
+      vscaleMin = std::max(vscaleMin, 128u / llvm::RISCV::RVVBitsPerBlock);
+    }
+  }
+  return std::make_pair(vscaleMin, vscaleMax);
 }
 
 void LLVMTarget::print(llvm::raw_ostream &os) const {
@@ -291,6 +318,27 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   if (auto vscaleRange = getConfigVscaleRange(config)) {
     target.vscaleRangeMin = vscaleRange->first;
     target.vscaleRangeMax = vscaleRange->second;
+  }
+  // The range reaches LLVM as a `vscale_range` function attribute, which the
+  // backends assert on and the IR verifier rejects if it is not a valid range
+  // of powers of two.
+  if (auto vscaleRange = target.getEffectiveVscaleRange()) {
+    auto [vscaleMin, vscaleMax] = *vscaleRange;
+    if (vscaleMin > vscaleMax) {
+      InFlightDiagnostic diag = emitError(loc)
+                                << "invalid vscale range [" << vscaleMin << ", "
+                                << vscaleMax << "]: minimum exceeds maximum";
+      if (vscaleMin > static_cast<unsigned>(target.vscaleRangeMin)) {
+        diag << "; the minimum is raised to " << vscaleMin
+             << " by the target's RVV VLEN features";
+      }
+      return {};
+    }
+    if (!llvm::isPowerOf2_32(vscaleMin) || !llvm::isPowerOf2_32(vscaleMax)) {
+      emitError(loc) << "'vscale_range' [" << vscaleMin << ", " << vscaleMax
+                     << "] must consist of powers of two";
+      return {};
+    }
   }
 
   target.debugSymbols = getBool("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
