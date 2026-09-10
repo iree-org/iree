@@ -216,6 +216,173 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64,
     iree_uk_mmt4d_tile_f16f16f16_8x8x1_arm_64, 8)
 
+// Widens 4 bf16 values to f32. A bf16 value is the top 16 bits of the f32 with
+// the same value, so widening is a shift by the element width, which SHLL does
+// for 4 lanes at once.
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline float32x4_t
+iree_uk_bf16x4_to_f32x4_arm_64(const iree_uk_uint16_t* IREE_UK_RESTRICT ptr) {
+  return vreinterpretq_f32_u32(vshll_n_u16(vld1_u16(ptr), 16));
+}
+
+// Narrows 4 f32 values to bf16. Both formats share an exponent field, so one
+// round-to-nearest-even bias over the whole word covers normals and subnormals
+// alike. Runs once per output tile.
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline uint16x4_t
+iree_uk_f32x4_to_bf16x4_arm_64(float32x4_t value) {
+  uint32x4_t bits = vreinterpretq_u32_f32(value);
+  uint32x4_t exp = vandq_u32(bits, vdupq_n_u32(0x7F800000u));
+  uint32x4_t mantissa = vandq_u32(bits, vdupq_n_u32(0x007FFFFFu));
+  // Round to nearest even: bias by half an interval plus the low bit of the
+  // result that is about to be kept, then truncate.
+  uint32x4_t keep_lsb = vandq_u32(vshrq_n_u32(bits, 16), vdupq_n_u32(1));
+  uint32x4_t rounded =
+      vaddq_u32(bits, vaddq_u32(vdupq_n_u32(0x7FFFu), keep_lsb));
+  // Inf needs no case of its own: a zero mantissa cannot carry into the
+  // exponent. NaN does, or a payload held entirely in the truncated bits would
+  // round up into an infinity. Setting the quiet bit keeps the mantissa
+  // nonzero while preserving whatever payload survives, as compiler-rt does.
+  uint32x4_t is_nan = vandq_u32(vceqq_u32(exp, vdupq_n_u32(0x7F800000u)),
+                                vmvnq_u32(vceqzq_u32(mantissa)));
+  uint32x4_t quiet_nan = vorrq_u32(bits, vdupq_n_u32(0x00400000u));
+  rounded = vbslq_u32(is_nan, quiet_nan, rounded);
+  return vshrn_n_u32(rounded, 16);
+}
+
+// Shared implementation for bf16bf16bf16 and bf16bf16f32 on arm_64 cores
+// without the BF16 extension: widen both operands to f32 and use FMLA. The
+// widening is one SHLL per 4 elements, so the inner loop still runs at the FMLA
+// throughput the f32 tile achieves while reading half as many bytes.
+// In the bf16bf16bf16 case, intermediate roundings are skipped, as in the
+// f16f16f16 tile above: the accumulator stays f32 and is rounded once on store.
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_bf16bf16fXX_1x8x1_to_8x8x1_arm_64(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, iree_uk_type_t acc_type, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
+  const iree_uk_uint16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_uint16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+  float32x4_t acc[16];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    if (acc_type == IREE_UK_TYPE_FLOAT_32) {
+      const float* IREE_UK_RESTRICT out_ptr = out_tile;
+      IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
+        acc[i] = vld1q_f32(out_ptr + 4 * i);
+      }
+    } else {
+      const iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
+      IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
+        acc[i] = iree_uk_bf16x4_to_f32x4_arm_64(out_ptr + 4 * i);
+      }
+    }
+  } else {
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) { acc[i] = vdupq_n_f32(0); }
+  }
+  for (int k = 0; k < params->K; ++k) {
+    float32x4_t rhs[2];
+    IREE_UK_UNROLL for (int i = 0; i < 2; ++i) {
+      rhs[i] = iree_uk_bf16x4_to_f32x4_arm_64(rhs_ptr + 4 * i);
+    }
+    rhs_ptr += 8;
+
+    if (M0 == 1) {
+      float32x4_t lhs =
+          vreinterpretq_f32_u32(vshll_n_u16(vld1_dup_u16(lhs_ptr), 16));
+      ++lhs_ptr;
+      acc[0] = vfmaq_lane_f32(acc[0], rhs[0], vget_low_f32(lhs), 0);
+      acc[1] = vfmaq_lane_f32(acc[1], rhs[1], vget_low_f32(lhs), 0);
+    } else if (M0 == 2) {
+      uint16x4_t lhs_bf16 = vld1_dup_u16(lhs_ptr);
+      lhs_bf16 = vld1_lane_u16(lhs_ptr + 1, lhs_bf16, 1);
+      lhs_ptr += 2;
+      float32x4_t lhs = vreinterpretq_f32_u32(vshll_n_u16(lhs_bf16, 16));
+      acc[0] = vfmaq_lane_f32(acc[0], rhs[0], vget_low_f32(lhs), 0);
+      acc[1] = vfmaq_lane_f32(acc[1], rhs[1], vget_low_f32(lhs), 0);
+      acc[2] = vfmaq_lane_f32(acc[2], rhs[0], vget_low_f32(lhs), 1);
+      acc[3] = vfmaq_lane_f32(acc[3], rhs[1], vget_low_f32(lhs), 1);
+    } else {
+      float32x4_t lhs[2];
+      IREE_UK_UNROLL for (int i = 0; i < M0 / 4; ++i) {
+        lhs[i] = iree_uk_bf16x4_to_f32x4_arm_64(lhs_ptr + 4 * i);
+      }
+      lhs_ptr += M0;
+      acc[0] = vfmaq_lane_f32(acc[0], rhs[0], vget_low_f32(lhs[0]), 0);
+      acc[1] = vfmaq_lane_f32(acc[1], rhs[1], vget_low_f32(lhs[0]), 0);
+      acc[2] = vfmaq_lane_f32(acc[2], rhs[0], vget_low_f32(lhs[0]), 1);
+      acc[3] = vfmaq_lane_f32(acc[3], rhs[1], vget_low_f32(lhs[0]), 1);
+      acc[4] = vfmaq_lane_f32(acc[4], rhs[0], vget_high_f32(lhs[0]), 0);
+      acc[5] = vfmaq_lane_f32(acc[5], rhs[1], vget_high_f32(lhs[0]), 0);
+      acc[6] = vfmaq_lane_f32(acc[6], rhs[0], vget_high_f32(lhs[0]), 1);
+      acc[7] = vfmaq_lane_f32(acc[7], rhs[1], vget_high_f32(lhs[0]), 1);
+      if (M0 == 8) {
+        acc[8] = vfmaq_lane_f32(acc[8], rhs[0], vget_low_f32(lhs[1]), 0);
+        acc[9] = vfmaq_lane_f32(acc[9], rhs[1], vget_low_f32(lhs[1]), 0);
+        acc[10] = vfmaq_lane_f32(acc[10], rhs[0], vget_low_f32(lhs[1]), 1);
+        acc[11] = vfmaq_lane_f32(acc[11], rhs[1], vget_low_f32(lhs[1]), 1);
+        acc[12] = vfmaq_lane_f32(acc[12], rhs[0], vget_high_f32(lhs[1]), 0);
+        acc[13] = vfmaq_lane_f32(acc[13], rhs[1], vget_high_f32(lhs[1]), 0);
+        acc[14] = vfmaq_lane_f32(acc[14], rhs[0], vget_high_f32(lhs[1]), 1);
+        acc[15] = vfmaq_lane_f32(acc[15], rhs[1], vget_high_f32(lhs[1]), 1);
+      }
+    }
+  }
+  if (acc_type == IREE_UK_TYPE_FLOAT_32) {
+    float* IREE_UK_RESTRICT out_ptr = out_tile;
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
+      vst1q_f32(out_ptr + 4 * i, acc[i]);
+    }
+  } else {
+    iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
+      vst1_u16(out_ptr + 4 * i, iree_uk_f32x4_to_bf16x4_arm_64(acc[i]));
+    }
+  }
+}
+
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_to_8x8x1_arm_64(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  iree_uk_mmt4d_tile_bf16bf16fXX_1x8x1_to_8x8x1_arm_64(
+      out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_BFLOAT_16, M0);
+}
+
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_to_8x8x1_arm_64(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  iree_uk_mmt4d_tile_bf16bf16fXX_1x8x1_to_8x8x1_arm_64(
+      out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_FLOAT_32, M0);
+}
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_arm_64, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16f32_2x8x1_arm_64, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16f32_4x8x1_arm_64, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16f32_8x8x1_arm_64, 8)
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_arm_64, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16bf16_2x8x1_arm_64, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16bf16_4x8x1_arm_64, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x1_to_8x8x1_arm_64,
+    iree_uk_mmt4d_tile_bf16bf16bf16_8x8x1_arm_64, 8)
+
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_s8s8s32_1x8x1_to_8x8x1_arm_64(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,

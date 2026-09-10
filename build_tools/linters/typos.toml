@@ -25,6 +25,8 @@ hsa = "hsa"
 valu = "valu"
 # ARM Scalable Matrix Extension.
 sme = "sme"
+# AArch64 Shift Left Long instruction.
+shll = "shll"
 # MLIR OpFoldResult abbreviation.
 ofr = "ofr"
 # GPU instruction conversion suffix (dp4xi8toi32).
