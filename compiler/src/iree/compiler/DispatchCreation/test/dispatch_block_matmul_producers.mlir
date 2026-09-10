@@ -1,11 +1,11 @@
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions{aggressive=true}))" \
 // RUN:   --iree-dispatch-creation-block-matmul-producer-fusion=true \
-// RUN:   %s | FileCheck %s --check-prefix=CHECK-BLOCK
+// RUN:   %s | FileCheck %s --check-prefixes=CHECK,BLOCK
 // RUN: iree-opt --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions{aggressive=true}))" \
 // RUN:   --iree-dispatch-creation-block-matmul-producer-fusion=false \
-// RUN:   %s | FileCheck %s --check-prefix=CHECK-NO-BLOCK
+// RUN:   %s | FileCheck %s --check-prefixes=CHECK,NO-BLOCK
 
 // -----
 // Base case: CPU target, ukernels are enabled,
@@ -29,24 +29,23 @@ util.func public @bitextend_feeds_matmul_blocked(%src : tensor<1x8xi8>, %rhs : t
   }
   util.return %0 : tensor<1x1xf32>
 }
+// CHECK-LABEL: util.func public @bitextend_feeds_matmul_blocked
 // Blocking forces two dispatch regions
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_blocked
-//       CHECK-BLOCK:   %[[GENDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     linalg.generic
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     linalg.matmul
-//  CHECK-BLOCK-SAME:       ins(%[[GENDISP]]
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   util.return %[[MATMULDISP]]
+//          BLOCK:   %[[GENDISP:.+]] = flow.dispatch.region
+//          BLOCK:     linalg.generic
+//          BLOCK:     flow.return
+//          BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
+//          BLOCK:     linalg.matmul
+//     BLOCK-SAME:       ins(%[[GENDISP]]
+//          BLOCK:     flow.return
+//          BLOCK:   util.return %[[MATMULDISP]]
 
 // Without blocking both ops are fused into the same region
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_blocked
-//       CHECK-NO-BLOCK:   %[[DISPATCH:.+]] = flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     linalg.matmul
-//  CHECK-NO-BLOCK-SAME:       ins(%[[CAST]]
-//       CHECK-NO-BLOCK:   util.return %[[DISPATCH]]
+//       NO-BLOCK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       NO-BLOCK:     %[[CAST:.+]] = linalg.generic
+//       NO-BLOCK:     linalg.matmul
+//  NO-BLOCK-SAME:       ins(%[[CAST]]
+//       NO-BLOCK:   util.return %[[DISPATCH]]
 
 // -----
 // No ukernels, no blocking
@@ -70,16 +69,11 @@ util.func public @bitextend_feeds_matmul_no_ukernel_not_blocked(%src : tensor<1x
   }
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_no_ukernel_not_blocked
-//       CHECK-BLOCK:   flow.dispatch.region
-//       CHECK-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-BLOCK:     linalg.matmul
-//  CHECK-BLOCK-SAME:       ins(%[[CAST]]
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_no_ukernel_not_blocked
-//       CHECK-NO-BLOCK:   flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     linalg.matmul
-//  CHECK-NO-BLOCK-SAME:       ins(%[[CAST]]
+// CHECK-LABEL: util.func public @bitextend_feeds_matmul_no_ukernel_not_blocked
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[CAST:.+]] = linalg.generic
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:       ins(%[[CAST]]
 
 // -----
 // No CPU, no blocking
@@ -103,16 +97,11 @@ util.func public @bitextend_feeds_matmul_non_llvmcpu_not_blocked(%src : tensor<1
   }
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_non_llvmcpu_not_blocked
-//       CHECK-BLOCK:   flow.dispatch.region
-//       CHECK-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-BLOCK:     linalg.matmul
-//  CHECK-BLOCK-SAME:       ins(%[[CAST]]
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_non_llvmcpu_not_blocked
-//       CHECK-NO-BLOCK:   flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     linalg.matmul
-//  CHECK-NO-BLOCK-SAME:       ins(%[[CAST]]
+// CHECK-LABEL: util.func public @bitextend_feeds_matmul_non_llvmcpu_not_blocked
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[CAST:.+]] = linalg.generic
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:       ins(%[[CAST]]
 
 // -----
 // Multiple devices, no blocking
@@ -139,16 +128,11 @@ util.func public @bitextend_feeds_matmul_heterogeneous_devices_not_blocked(%src 
   }
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_heterogeneous_devices_not_blocked
-//       CHECK-BLOCK:   flow.dispatch.region
-//       CHECK-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-BLOCK:     linalg.matmul
-//  CHECK-BLOCK-SAME:       ins(%[[CAST]]
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_heterogeneous_devices_not_blocked
-//       CHECK-NO-BLOCK:   flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     linalg.matmul
-//  CHECK-NO-BLOCK-SAME:       ins(%[[CAST]]
+// CHECK-LABEL: util.func public @bitextend_feeds_matmul_heterogeneous_devices_not_blocked
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[CAST:.+]] = linalg.generic
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:       ins(%[[CAST]]
 
 // -----
 // No contraction consumer, no blocking
@@ -179,16 +163,11 @@ util.func public @bitextend_feeds_non_contraction_consumer_not_blocked(%src : te
   }
   util.return %0 : tensor<1x8xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_non_contraction_consumer_not_blocked
-//       CHECK-BLOCK:   flow.dispatch.region
-//       CHECK-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-BLOCK:     linalg.generic
-//  CHECK-BLOCK-SAME:       ins(%[[CAST]]
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_non_contraction_consumer_not_blocked
-//       CHECK-NO-BLOCK:   flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[CAST:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     linalg.generic
-//  CHECK-NO-BLOCK-SAME:       ins(%[[CAST]]
+// CHECK-LABEL: util.func public @bitextend_feeds_non_contraction_consumer_not_blocked
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[CAST:.+]] = linalg.generic
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%[[CAST]]
 
 // -----
 // matmul consumer through reshape
@@ -214,25 +193,24 @@ util.func public @bitextend_feeds_matmul_through_reshape_chain_blocked(%src : te
   }
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_through_reshape_chain_blocked
-//       CHECK-BLOCK:   %[[GENDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     linalg.generic
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     tensor.collapse_shape
-//  CHECK-BLOCK-SAME:       %[[GENDISP]]
-//       CHECK-BLOCK:     linalg.matmul
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   util.return %[[MATMULDISP]]
+// CHECK-LABEL: util.func public @bitextend_feeds_matmul_through_reshape_chain_blocked
+//          BLOCK:   %[[GENDISP:.+]] = flow.dispatch.region
+//          BLOCK:     linalg.generic
+//          BLOCK:     flow.return
+//          BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
+//          BLOCK:     tensor.collapse_shape
+//     BLOCK-SAME:       %[[GENDISP]]
+//          BLOCK:     linalg.matmul
+//          BLOCK:     flow.return
+//          BLOCK:   util.return %[[MATMULDISP]]
 
-// CHECK-NO-BLOCK-LABEL: util.func public @bitextend_feeds_matmul_through_reshape_chain_blocked
-//       CHECK-NO-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[GEN:.+]] = linalg.generic
-//       CHECK-NO-BLOCK:     tensor.collapse_shape
-//  CHECK-NO-BLOCK-SAME:       %[[GEN]]
-//       CHECK-NO-BLOCK:     linalg.matmul
-//       CHECK-NO-BLOCK:     flow.return
-//       CHECK-NO-BLOCK:   util.return %[[MATMULDISP]]
+//       NO-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
+//       NO-BLOCK:     %[[GEN:.+]] = linalg.generic
+//       NO-BLOCK:     tensor.collapse_shape
+//  NO-BLOCK-SAME:       %[[GEN]]
+//       NO-BLOCK:     linalg.matmul
+//       NO-BLOCK:     flow.return
+//       NO-BLOCK:   util.return %[[MATMULDISP]]
 
 // -----
 // gather feeds into matmul
@@ -252,25 +230,24 @@ util.func public @gather_feeds_matmul_blocked(%source : tensor<2x2x8xf32>, %indi
   }
   util.return %0 : tensor<1x1xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @gather_feeds_matmul_blocked
-//       CHECK-BLOCK:   %[[GATHERDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     iree_linalg_ext.gather
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
-//       CHECK-BLOCK:     tensor.expand_shape
-//  CHECK-BLOCK-SAME:       %[[GATHERDISP]]
-//       CHECK-BLOCK:     linalg.matmul
-//       CHECK-BLOCK:     flow.return
-//       CHECK-BLOCK:   util.return %[[MATMULDISP]]
+// CHECK-LABEL: util.func public @gather_feeds_matmul_blocked
+//          BLOCK:   %[[GATHERDISP:.+]] = flow.dispatch.region
+//          BLOCK:     iree_linalg_ext.gather
+//          BLOCK:     flow.return
+//          BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
+//          BLOCK:     tensor.expand_shape
+//     BLOCK-SAME:       %[[GATHERDISP]]
+//          BLOCK:     linalg.matmul
+//          BLOCK:     flow.return
+//          BLOCK:   util.return %[[MATMULDISP]]
 
-// CHECK-NO-BLOCK-LABEL: util.func public @gather_feeds_matmul_blocked
-//       CHECK-NO-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[GATHER:.+]] = iree_linalg_ext.gather
-//       CHECK-NO-BLOCK:     tensor.expand_shape
-//  CHECK-NO-BLOCK-SAME:       %[[GATHER]]
-//       CHECK-NO-BLOCK:     linalg.matmul
-//       CHECK-NO-BLOCK:     flow.return
-//       CHECK-NO-BLOCK:   util.return %[[MATMULDISP]]
+//       NO-BLOCK:   %[[MATMULDISP:.+]] = flow.dispatch.region
+//       NO-BLOCK:     %[[GATHER:.+]] = iree_linalg_ext.gather
+//       NO-BLOCK:     tensor.expand_shape
+//  NO-BLOCK-SAME:       %[[GATHER]]
+//       NO-BLOCK:     linalg.matmul
+//       NO-BLOCK:     flow.return
+//       NO-BLOCK:   util.return %[[MATMULDISP]]
 
 // -----
 // gather feeds to non-contraction
@@ -296,14 +273,8 @@ util.func public @gather_feeds_non_contraction_consumer_not_blocked(%source : te
   }
   util.return %0 : tensor<8xf32>
 }
-// CHECK-BLOCK-LABEL: util.func public @gather_feeds_non_contraction_consumer_not_blocked
-//       CHECK-BLOCK:   flow.dispatch.region
-//       CHECK-BLOCK:     %[[GATHERED:.+]] = iree_linalg_ext.gather
-//       CHECK-BLOCK:     linalg.generic
-//  CHECK-BLOCK-SAME:       ins(%[[GATHERED]]
-
-// CHECK-NO-BLOCK-LABEL: util.func public @gather_feeds_non_contraction_consumer_not_blocked
-//       CHECK-NO-BLOCK:   flow.dispatch.region
-//       CHECK-NO-BLOCK:     %[[GATHERED:.+]] = iree_linalg_ext.gather
-//       CHECK-NO-BLOCK:     linalg.generic
-//  CHECK-NO-BLOCK-SAME:       ins(%[[GATHERED]]
+// CHECK-LABEL: util.func public @gather_feeds_non_contraction_consumer_not_blocked
+//       CHECK:   flow.dispatch.region
+//       CHECK:     %[[GATHERED:.+]] = iree_linalg_ext.gather
+//       CHECK:     linalg.generic
+//  CHECK-SAME:       ins(%[[GATHERED]]
