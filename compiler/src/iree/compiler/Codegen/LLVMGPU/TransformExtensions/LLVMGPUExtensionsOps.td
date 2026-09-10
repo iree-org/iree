@@ -13,11 +13,12 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def MapNestedForallToGpuThreadsOp
-    : Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def MapNestedForallToGpuThreadsOp :
+  Op<Transform_Dialect, "iree.map_nested_forall_to_gpu_threads",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target the whole hal.executable_variant op and rewrite all scf.forall
     to distributed gpu.thread_id and translation_info attribute.
@@ -88,9 +89,9 @@ def MapNestedForallToGpuThreadsOp
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
-      DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size,
-      DefaultValuedOptionalAttr<BoolAttr, "true">:$sync_after_distribution);
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
+                   DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size,
+                   DefaultValuedOptionalAttr<BoolAttr, "true">:$sync_after_distribution);
   let results = (outs);
 
   let assemblyFormat = [{
@@ -112,11 +113,12 @@ def MapNestedForallToGpuThreadsOp
   }];
 }
 
-def VectorToWarpExecuteOnLane0Op
-    : Op<Transform_Dialect, "iree.vector.to_warp_execute_on_lane_0",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_execute_on_lane_0",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Given an scf.if target predicated by `if (threadIdx.x == 0)`, rewrite its
     body to vector.execute_on_lane_0 running ***on a single warp***.
@@ -200,14 +202,15 @@ def VectorToWarpExecuteOnLane0Op
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-      DefaultValuedAttr<I64Attr, "{}">:$warp_size);
+                   DefaultValuedAttr<I64Attr, "{}">:$warp_size);
   let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat =
-      "$target prop-dict attr-dict `:` functional-type($target, $result)";
+  let assemblyFormat = "$target prop-dict attr-dict `:` functional-type($target, $result)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [OpBuilder<(ins "Value":$target, "int64_t":$warpSize)>];
+  let builders = [
+    OpBuilder<(ins "Value":$target, "int64_t":$warpSize)>
+  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
@@ -217,11 +220,11 @@ def VectorToWarpExecuteOnLane0Op
   }];
 }
 
-def VectorWarpDistributionOp
-    : Op<Transform_Dialect, "iree.vector.warp_distribute",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribute",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Given a vector.warp_execute_on_lane_0, apply the patterns to rewrite into
     distributed form with warp synchronization. This produces IR that runs
@@ -319,7 +322,9 @@ def VectorWarpDistributionOp
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<(ins "Value":$target)>];
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
@@ -329,11 +334,11 @@ def VectorWarpDistributionOp
   }];
 }
 
-def VectorToMMAConversionOp
-    : Op<Transform_Dialect, "iree.vector.vector_to_mma_conversion",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_conversion",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This converts slices of operations containing vector.contract op into
     mma operations, targeting warp level tensorcore operations. If the vector
@@ -348,7 +353,8 @@ def VectorToMMAConversionOp
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-      UnitAttr:$use_mma_sync, UnitAttr:$use_wmma);
+                       UnitAttr:$use_mma_sync,
+                       UnitAttr:$use_wmma);
   let results = (outs);
 
   let assemblyFormat = [{
@@ -367,11 +373,13 @@ def VectorToMMAConversionOp
   }];
 }
 
-def PromoteOperandsOp
-    : Op<Transform_Dialect, "iree.promote_operands",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def PromoteOperandsOp :
+  Op<Transform_Dialect, "iree.promote_operands",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This op promotes the specified operands of the provided target handle.
 
@@ -384,11 +392,10 @@ def PromoteOperandsOp
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
+                   DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$indices);
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
-  let assemblyFormat =
-      [{ $target $indices attr-dict `:` functional-type(operands, results)}];
+  let assemblyFormat = [{ $target $indices attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
@@ -400,11 +407,13 @@ def PromoteOperandsOp
   }];
 }
 
-def PipelineSharedMemoryCopiesOp
-    : Op<Transform_Dialect, "iree.pipeline_shared_memory_copies",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def PipelineSharedMemoryCopiesOp : Op<
+    Transform_Dialect, "iree.pipeline_shared_memory_copies", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This applies software pipelining to a given scf.for loop. The pipelining
     strategy will look for a copy to shared memory and pipeline it to overlap
@@ -422,8 +431,11 @@ def PipelineSharedMemoryCopiesOp
     existing scf.for loop (failure case).
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$for_op, I64Attr:$depth,
-      UnitAttr:$peel_epilogue, UnitAttr:$use_mma_sync);
+  let arguments = (
+      ins TransformHandleTypeInterface:$for_op,
+          I64Attr:$depth,
+          UnitAttr:$peel_epilogue,
+          UnitAttr:$use_mma_sync);
   let results = (outs TransformHandleTypeInterface:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -442,10 +454,12 @@ def PipelineSharedMemoryCopiesOp
   }];
 }
 
-def SynchronizeLoopOp : Op<Transform_Dialect, "iree.synchronize_loop",
-                           [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-                            TransformEachOpTrait, TransformOpInterface,
-                            ReportTrackingListenerFailuresOpTrait]> {
+def SynchronizeLoopOp : Op<
+    Transform_Dialect, "iree.synchronize_loop", [
+      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+      TransformEachOpTrait,
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     This inserts a gpu.barrier after a given scf.for loop.
 
@@ -455,7 +469,8 @@ def SynchronizeLoopOp : Op<Transform_Dialect, "iree.synchronize_loop",
     cannot be pipelined or if there are no shared memory copies.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$for_op);
+  let arguments = (
+      ins TransformHandleTypeInterface:$for_op);
   let results = (outs);
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -474,11 +489,12 @@ def SynchronizeLoopOp : Op<Transform_Dialect, "iree.synchronize_loop",
   }];
 }
 
-def CreateAsyncGroupsOp
-    : Op<Transform_Dialect, "iree.create_async_groups",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def CreateAsyncGroupsOp :
+  Op<Transform_Dialect, "iree.create_async_groups",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Convert copies to shared memory to async copies. This creates groups
     of consecutive copies and emit wait operation right after.
@@ -493,7 +509,7 @@ def CreateAsyncGroupsOp
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-      UnitAttr:$use_mma_sync);
+                   UnitAttr:$use_mma_sync);
   let results = (outs);
 
   let assemblyFormat = [{
@@ -511,11 +527,13 @@ def CreateAsyncGroupsOp
   }];
 }
 
-def ReorderTransposeOp
-    : Op<Transform_Dialect, "iree.reorder_transpose",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ReorderTransposeOp :
+  Op<Transform_Dialect, "iree.reorder_transpose",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Targets the whole func op and finds transpose ops whose source
     comes from an elementwise op. For each of those transpose ops,
@@ -538,8 +556,7 @@ def ReorderTransposeOp
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
-  let assemblyFormat =
-      [{ $target attr-dict `:` functional-type(operands, results)}];
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
@@ -549,13 +566,16 @@ def ReorderTransposeOp
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
+
 }
 
-def EliminateGpuBarriersOp
-    : Op<Transform_Dialect, "iree.eliminate_gpu_barriers",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def EliminateGpuBarriersOp :
+  Op<Transform_Dialect, "iree.eliminate_gpu_barriers",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Removes unnecessary GPU barriers from the function. If a barrier does not
     enforce any conflicting pair of memory effects, including a pair that is
@@ -570,11 +590,12 @@ def EliminateGpuBarriersOp
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat =
-      [{ $target attr-dict `:` functional-type(operands, results)}];
+  let assemblyFormat = [{ $target attr-dict `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let builders = [OpBuilder<(ins "Value":$target)>];
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
@@ -585,11 +606,11 @@ def EliminateGpuBarriersOp
   }];
 }
 
-def PackSharedMemoryAllocOp
-    : Op<Transform_Dialect, "iree.pack_shared_memory_alloc",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_alloc",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let summary = [{Pack shared memory allocation to reduce memory usage.}];
   let description = [{
     Looks for allocs in shared memory space with overlapping liveness and
@@ -602,11 +623,12 @@ def PackSharedMemoryAllocOp
     It does not consume the target handle and always return success.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target);
+  let arguments = (
+      ins TransformHandleTypeInterface:$target
+  );
   let results = (outs);
 
-  let assemblyFormat =
-      "$target attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
@@ -618,11 +640,13 @@ def PackSharedMemoryAllocOp
   }];
 }
 
-def PrefetchSharedMemoryCopiesOp
-    : Op<Transform_Dialect, "iree.prefetch_shared_memory_copies",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def PrefetchSharedMemoryCopiesOp : Op<
+    Transform_Dialect, "iree.prefetch_shared_memory_copies", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     #### Return modes
     This transform consumes the scf.for handle and produces a result handle
@@ -649,11 +673,12 @@ def PrefetchSharedMemoryCopiesOp
   }];
 }
 
-def AMDGPUDistributeVectorsOp
-    : Op<Transform_Dialect, "iree.amdgpu_distribute_vectors",
-         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformEachOpTrait, TransformOpInterface,
-          ReportTrackingListenerFailuresOpTrait]> {
+def AMDGPUDistributeVectorsOp :
+  Op<Transform_Dialect, "iree.amdgpu_distribute_vectors",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Run AMDGPU Vector Contraction distribution on the target as the root.
 
@@ -669,19 +694,19 @@ def AMDGPUDistributeVectorsOp
     This transform does not consume the target handle and always return success.
     }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target,
-      UnitAttr:$test_conversion,
-      DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_size,
-      DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
-  let results = (outs TransformHandleTypeInterface:$result);
+    let arguments = (ins TransformHandleTypeInterface:$target,
+                         UnitAttr:$test_conversion,
+                         DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_size,
+                         DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
+    let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = [{
+    let assemblyFormat = [{
       $target (`test_conversion` $test_conversion^)?
       prop-dict attr-dict `:` functional-type(operands, results)
     }];
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let extraClassDeclaration = [{
+    let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
           ::mlir::FunctionOpInterface funcOp,
@@ -690,11 +715,11 @@ def AMDGPUDistributeVectorsOp
     }];
 }
 
-def CreateMatmulMfmaTileSizesOp
-    : Op<Transform_Dialect, "iree.create_matmul_mfma_tile_sizes",
-         [MemoryEffectsOpInterface,
-          DeclareOpInterfaceMethods<TransformOpInterface>,
-          ParamProducerTransformOpTrait]> {
+def CreateMatmulMfmaTileSizesOp :
+  Op<Transform_Dialect, "iree.create_matmul_mfma_tile_sizes",
+    [MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ParamProducerTransformOpTrait]> {
   let description = [{
     Create param of tile sizes based on the matmul sizes.
     This operation won't succeed if the matmul shape size is not 2.
@@ -703,10 +728,9 @@ def CreateMatmulMfmaTileSizesOp
 
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs TransformParamTypeInterface:$workgroup_tile_sizes,
-      TransformParamTypeInterface:$problem_specific_sizes);
+                      TransformParamTypeInterface:$problem_specific_sizes);
 
-  let assemblyFormat =
-      "$target attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 

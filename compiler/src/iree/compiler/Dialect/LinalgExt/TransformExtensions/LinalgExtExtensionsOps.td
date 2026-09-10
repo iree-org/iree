@@ -12,18 +12,21 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def DecomposeAggregateOp
-    : Op<Transform_Dialect, "iree.decompose_aggregate_op",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformOpInterface, TransformEachOpTrait,
-          ReportTrackingListenerFailuresOpTrait]> {
+def DecomposeAggregateOp : Op<Transform_Dialect, "iree.decompose_aggregate_op",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target iree_linalg_ext.attention ops and decompose them.
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target,
-      OptionalAttr<I64Attr>:$tile_size);
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          OptionalAttr<I64Attr>:$tile_size
+  );
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
@@ -41,21 +44,23 @@ def DecomposeAggregateOp
   }];
 }
 
-def ConvertToOnlineAttention
-    : Op<Transform_Dialect, "iree.convert_to_online_attention",
-         [FunctionalStyleTransformOpTrait, MemoryEffectsOpInterface,
-          TransformOpInterface, TransformEachOpTrait,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ConvertToOnlineAttention : Op<Transform_Dialect, "iree.convert_to_online_attention",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Target iree_linalg_ext.attention ops and decompose them.
     This transform consumes the target handle and produces a result handle.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target);
+  let arguments = (
+      ins TransformHandleTypeInterface:$target
+  );
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
-  let assemblyFormat =
-      "attr-dict $target `:` functional-type(operands, results)";
+  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let assemblyFormat = [{

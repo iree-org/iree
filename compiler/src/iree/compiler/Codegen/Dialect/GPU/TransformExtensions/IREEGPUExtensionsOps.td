@@ -16,10 +16,10 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def ApplyDropInnerTiledOpUnitDims
-    : Op<Transform_Dialect, "apply_patterns.iree.drop_inner_tiled_unit_dims",
-         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ApplyDropInnerTiledOpUnitDims : Op<Transform_Dialect,
+    "apply_patterns.iree.drop_inner_tiled_unit_dims",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to drop the unit dims from inner_tiled ops with
     only unit iteration bounds.
@@ -29,10 +29,10 @@ def ApplyDropInnerTiledOpUnitDims
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerInnerTiledOp
-    : Op<Transform_Dialect, "apply_patterns.iree.lower_inner_tiled",
-         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ApplyLowerInnerTiledOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_inner_tiled",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to lowering inner_tiled ops to the intrinsic specified by
     the |kind| attribute.
@@ -42,10 +42,10 @@ def ApplyLowerInnerTiledOp
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerBarrierRegionPatternsOp
-    : Op<Transform_Dialect, "apply_patterns.iree.lower_barrier_region",
-         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ApplyLowerBarrierRegionPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_barrier_region",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns that lowers iree_gpu.barrier_region ops to allocations
     and copies.
@@ -55,10 +55,10 @@ def ApplyLowerBarrierRegionPatternsOp
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLowerValueBarrierOp
-    : Op<Transform_Dialect, "apply_patterns.iree.lower_value_barrier",
-         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ApplyLowerValueBarrierOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_value_barrier",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to convert value barriers on vectors into gpu.barrier ops.
     Barriers on tensors are ignored.
@@ -68,10 +68,10 @@ def ApplyLowerValueBarrierOp
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyUnrollMultiMmaOp
-    : Op<Transform_Dialect, "apply_patterns.iree.unroll_multi_mma",
-         [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def ApplyUnrollMultiMmaOp : Op<Transform_Dialect,
+    "apply_patterns.iree.unroll_multi_mma",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Populate patterns to unroll iree_gpu.multi_mma ops to a single intrinsic.
   }];
@@ -80,11 +80,11 @@ def ApplyUnrollMultiMmaOp
   let assemblyFormat = "attr-dict";
 }
 
-def ConvertToMultiMmaOp
-    : Op<Transform_Dialect, "iree.convert_to_multi_mma",
-         [TransformEachOpTrait,
-          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformOpInterface, ReportTrackingListenerFailuresOpTrait]> {
+def ConvertToMultiMmaOp : Op<Transform_Dialect, "iree.convert_to_multi_mma",
+    [TransformEachOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Converts the target linalg op to a multi_mma operation based on the
     given intrinsic kind.
@@ -94,8 +94,9 @@ def ConvertToMultiMmaOp
     op or the conversion to the target mma fails.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target,
-      IREEGPU_AnyMmaAttr:$intrinsic_kind);
+  let arguments = (ins
+    TransformHandleTypeInterface:$target,
+    IREEGPU_AnyMmaAttr:$intrinsic_kind);
   let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = [{
@@ -113,11 +114,11 @@ def ConvertToMultiMmaOp
   }];
 }
 
-def DistributeInnerTiledOp
-    : Op<Transform_Dialect, "iree.distribute_inner_tiled",
-         [TransformEachOpTrait,
-          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          TransformOpInterface, ReportTrackingListenerFailuresOpTrait]> {
+def DistributeInnerTiledOp : Op<Transform_Dialect, "iree.distribute_inner_tiled",
+    [TransformEachOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Distributes the target inner_tiled op to lanes.
 
@@ -143,10 +144,12 @@ def DistributeInnerTiledOp
   }];
 }
 
-def ForallToLanesOp : Op<Transform_Dialect, "iree.forall_to_lanes",
-                         [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-                          TransformEachOpTrait, TransformOpInterface,
-                          ReportTrackingListenerFailuresOpTrait]> {
+def ForallToLanesOp : Op<Transform_Dialect,
+    "iree.forall_to_lanes",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Collect all of the scf.forall ops in the target that are distributed to
     lanes.
@@ -158,8 +161,7 @@ def ForallToLanesOp : Op<Transform_Dialect, "iree.forall_to_lanes",
   let arguments = (ins TransformHandleTypeInterface:$target);
   let results = (outs);
 
-  let assemblyFormat =
-      "$target attr-dict `:` functional-type($target, results)";
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
@@ -172,10 +174,10 @@ def ForallToLanesOp : Op<Transform_Dialect, "iree.forall_to_lanes",
 }
 
 def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
-                      [FunctionalStyleTransformOpTrait,
-                       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-                       DeclareOpInterfaceMethods<TransformOpInterface>,
-                       ReportTrackingListenerFailuresOpTrait]> {
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Fuses a producer-consumer pair of scf.forall ops that share the same
     iterator mapping types and trip counts. An allocation is created to
@@ -199,9 +201,11 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
     scf.forall ops.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$producer,
-      TransformHandleTypeInterface:$consumer,
-      OptionalAttr<AnyAttr>:$address_space);
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer,
+          OptionalAttr<AnyAttr>:$address_space
+  );
   let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = [{
@@ -211,12 +215,11 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def FuseCollapseShapeIntoForallOp
-    : Op<Transform_Dialect, "iree.fuse_collapse_shape_into_forall",
-         [FunctionalStyleTransformOpTrait,
-          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          DeclareOpInterfaceMethods<TransformOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def FuseCollapseShapeIntoForallOp : Op<Transform_Dialect, "iree.fuse_collapse_shape_into_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Fuses a consumer tensor.collapse_shape op into a producer scf.forall op.
     The users of the block argument for the corresponding forall output operand
@@ -233,8 +236,10 @@ def FuseCollapseShapeIntoForallOp
     if the consumer is not a tensor.collapse_shape op.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$producer,
-      TransformHandleTypeInterface:$consumer);
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer
+  );
   let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = [{
@@ -244,12 +249,11 @@ def FuseCollapseShapeIntoForallOp
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
-def FuseExtractSliceIntoForallOp
-    : Op<Transform_Dialect, "iree.fuse_extract_slice_into_forall",
-         [FunctionalStyleTransformOpTrait,
-          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-          DeclareOpInterfaceMethods<TransformOpInterface>,
-          ReportTrackingListenerFailuresOpTrait]> {
+def FuseExtractSliceIntoForallOp : Op<Transform_Dialect, "iree.fuse_extract_slice_into_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
     Fuses a consumer tensor.extract_slice op into a producer scf.forall op.
     This transform is supported if the extract_slice op has all zero offsets,
@@ -266,8 +270,10 @@ def FuseExtractSliceIntoForallOp
     if the consumer is not a tensor.extract_slice op.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$producer,
-      TransformHandleTypeInterface:$consumer);
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer
+  );
   let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = [{
