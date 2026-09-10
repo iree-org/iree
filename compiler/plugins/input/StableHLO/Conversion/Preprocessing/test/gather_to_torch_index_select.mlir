@@ -54,3 +54,18 @@ func.func @gather_no_lowering_multidim(%arg0 : tensor<5x4xf32>, %arg1 : tensor<1
   } : (tensor<5x4xf32>, tensor<1x3x2xi32>) -> tensor<1x3x4xf32>
   func.return %0 : tensor<1x3x4xf32>
 }
+
+// CHECK-LABEL: @gather_no_lowering_dynamic_result
+func.func @gather_no_lowering_dynamic_result(%arg0: tensor<?x4xf32>,
+                                              %arg1: tensor<?x1xi64>) -> tensor<?x4xf32> {
+  // CHECK: "stablehlo.gather"
+  %0 = "stablehlo.gather"(%arg0, %arg1) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1],
+                                          collapsed_slice_dims = [0],
+                                          start_index_map = [0],
+                                          index_vector_dim = 1>,
+    slice_sizes = array<i64: 1, 4>,
+    indices_are_sorted = false
+  } : (tensor<?x4xf32>, tensor<?x1xi64>) -> tensor<?x4xf32>
+  func.return %0 : tensor<?x4xf32>
+}
