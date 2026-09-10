@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "auto_input_conversion.mlir"
+    "canonicalize_dynamism.mlir"
     "convert_collectives.mlir"
     "convert_collectives_variadic.mlir"
     "legalize_chlo_decomposition.mlir"
