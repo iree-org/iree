@@ -425,20 +425,21 @@ func.func @infusible_pack(%arg0 : tensor<30xf32>) -> tensor<5x6xf32> {
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [[8], 1]>
 #config1 = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @scalable_pack_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor<384x512xf32>) -> tensor<?x512x?x1xf32> {
+func.func @scalable_pack_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor<384x512xf32>, %arg2 : tensor<384x512xf32>) -> tensor<?x512x?x1xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c8 = arith.constant 8 : index
   %vscale = vector.vscale
   %c8_vscale = arith.muli %vscale, %c8 : index
-  %0 = tensor.empty() : tensor<384x512xf32>
-  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg0, %arg1 : tensor<384x512xf32>, tensor<384x512xf32>) outs(%0 : tensor<384x512xf32>) attrs = {lowering_config = #config} {
+  %generic = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %arg1 : tensor<384x512xf32>, tensor<384x512xf32>)
+    outs(%arg2 : tensor<384x512xf32>) attrs = {lowering_config = #config} {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %3 = arith.addf %in, %in_0 : f32
     linalg.yield %3 : f32
   } -> tensor<384x512xf32>
   %mouter = affine.apply affine_map<()[s0] -> (384 ceildiv s0)>()[%c8_vscale]
   %2 = tensor.empty(%mouter, %c8_vscale) : tensor<?x512x?x1xf32>
-  %pack = linalg.pack %1 padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
+  %pack = linalg.pack %generic padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
     inner_tiles = [%c8_vscale, 1] into %2
     {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Equal, Unknown]>,
     lowering_config = #config1} : tensor<384x512xf32> -> tensor<?x512x?x1xf32>
@@ -451,6 +452,7 @@ func.func @scalable_pack_with_producer(%arg0: tensor<384x512xf32>, %arg1: tensor
 // CHECK:           %[[GEN:.+]] = linalg.generic
 // CHECK:           linalg.pack %[[GEN]]
 // CHECK-SAME:        inner_tiles = [%[[C8VS]], 1]
+// The outermost dimension has to equal 1 to confirm the Equal hint is taken into account.
 // CHECK-SAME:        -> tensor<1x1x?x1xf32>
 // CHECK:           scf.forall.in_parallel
 
@@ -471,12 +473,14 @@ func.func @scalable_unpack_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: ten
     inner_tiles = [7, %c8_vscale] into %0
     {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>,
     lowering_config = #config} : tensor<12x?x7x?xf32> -> tensor<80x320xf32>
-  %1 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%arg1, %unpack : tensor<80x320xf32>, tensor<80x320xf32>) outs(%0 : tensor<80x320xf32>) attrs = {lowering_config = #config1} {
+  %generic = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]}
+    ins(%arg1, %unpack : tensor<80x320xf32>, tensor<80x320xf32>)
+    outs(%0 : tensor<80x320xf32>) attrs = {lowering_config = #config1} {
   ^bb0(%in: f32, %in_0: f32, %out: f32):
     %2 = arith.addf %in, %in_0 : f32
     linalg.yield %2 : f32
   } -> tensor<80x320xf32>
-  return %1 : tensor<80x320xf32>
+  return %generic : tensor<80x320xf32>
 }
 // CHECK-LABEL: func.func @scalable_unpack_with_consumer
 // CHECK:         %[[VSCALE:.+]] = vector.vscale
@@ -484,6 +488,7 @@ func.func @scalable_unpack_with_consumer(%arg0: tensor<12x?x7x?xf32>, %arg1: ten
 // CHECK:         scf.forall {{.*}} = (0, 0) to (80, 320) step (7, %[[C8VS]])
 // CHECK:           %[[UNPACK:.+]] = linalg.unpack
 // CHECK-SAME:        inner_tiles = [7, %[[C8VS]]]
+// The outermost dimensions have to equal 1 to confirm the Equal hint is taken into account.
 // CHECK-SAME:        tensor<1x1x7x?xf32> -> tensor<?x?xf32>
 // CHECK:           linalg.generic
 // CHECK-SAME:        ins(%{{.*}}, %[[UNPACK]]
@@ -520,6 +525,7 @@ func.func @scalable_mmt4d_with_unpack_consumer(%lhs: tensor<55x512x7x1xf32>, %rh
 // CHECK-SAME:        outs(%[[FILL]]
 // CHECK:           linalg.unpack %[[MMT4D]]
 // CHECK-SAME:        inner_tiles = [7, %[[C8VS]]]
+// The outermost dimensions have to equal 1 to confirm the Equal hint is taken into account.
 // CHECK-SAME:        tensor<1x1x7x?xf32> -> tensor<7x?xf32>
 // CHECK:           scf.forall.in_parallel
 
@@ -560,8 +566,8 @@ func.func @scalable_mmt4d_generic_unpack_pack(%lhs: tensor<5x512x?x1xf32>, %rhs:
     inner_tiles = [%c8_vscale, %c8_vscale] into %uout
     {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Equal, Equal]>,
     lowering_config = #config2} : tensor<5x7x?x?xf32> -> tensor<?x?xf32>
-  %mouter = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%m, %c8_vscale]
-  %pout = tensor.empty(%mouter, %n, %c8_vscale) : tensor<?x?x?x1xf32>
+  %m_outer = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%m, %c8_vscale]
+  %pout = tensor.empty(%m_outer, %n, %c8_vscale) : tensor<?x?x?x1xf32>
   %pack = linalg.pack %unpack padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1]
     inner_tiles = [%c8_vscale, 1] into %pout
     {inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Equal, Multiple]>,
@@ -580,5 +586,6 @@ func.func @scalable_mmt4d_generic_unpack_pack(%lhs: tensor<5x512x?x1xf32>, %rhs:
 // CHECK-SAME:        tensor<1x1x?x?xf32> -> tensor<?x?xf32>
 // CHECK:           linalg.pack %[[UNPACK]]
 // CHECK-SAME:        inner_tiles = [%[[C8VS]], 1]
+// The outermost dimension has to equal 1 to confirm the Equal hint is taken into account.
 // CHECK-SAME:        tensor<?x?xf32> -> tensor<1x?x?x1xf32>
 // CHECK:           scf.forall.in_parallel
