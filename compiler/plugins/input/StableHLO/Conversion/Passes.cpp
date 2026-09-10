@@ -58,6 +58,13 @@ void buildStableHLOInputConversionPassPipelineImpl(
       ::mlir::stablehlo::createStablehloLegalizeCompositeToCallPass(
           ::mlir::stablehlo::StablehloLegalizeCompositeToCallPassOptions{
               /*exceptListOption=*/{}}));
+  // The v1.0 cleanup RFC removes these ops; rewriting them onto their
+  // long-term counterparts means the conversions below need only the latter.
+  // `fail-on-unused` would reject `map` and `rng`, which IREE supports.
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloLegalizeDeprecatedOpsPass(
+          ::mlir::stablehlo::StablehloLegalizeDeprecatedOpsPassOptions{
+              /*failOnUnusedOps=*/false}));
   passManager.addNestedPass<func::FuncOp>(
       ::mlir::stablehlo::createStablehloLegalizeQuantToMathPass());
   passManager.addNestedPass<func::FuncOp>(
