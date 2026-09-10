@@ -827,6 +827,249 @@ struct DynamicBroadcastInDimGatherConversion final
   }
 };
 
+// Returns the reduction op combining the resultIndex-th and the
+// (resultIndex + numInputs)-th block arguments, or null if the body does not
+// have that shape. Mirrors upstream's ReduceWindowOpConversion::getReductionOp.
+Operation *getReduceWindowReductionOp(mlir::stablehlo::ReduceWindowOp op,
+                                      int64_t resultIndex) {
+  auto returnOp =
+      cast<mlir::stablehlo::ReturnOp>(op.getBody().front().getTerminator());
+  Operation *computeOp = returnOp.getResults()[resultIndex].getDefiningOp();
+  if (!computeOp || computeOp->getNumOperands() != 2) {
+    return nullptr;
+  }
+  auto arg0 = dyn_cast<BlockArgument>(computeOp->getOperand(0));
+  auto arg1 = dyn_cast<BlockArgument>(computeOp->getOperand(1));
+  if (!arg0 || !arg1) {
+    return nullptr;
+  }
+  int64_t otherArgIndex = resultIndex + op.getInputs().size();
+  if (arg0.getArgNumber() == resultIndex &&
+      arg1.getArgNumber() == otherArgIndex) {
+    return computeOp;
+  }
+  if (arg0.getArgNumber() == otherArgIndex &&
+      arg1.getArgNumber() == resultIndex &&
+      computeOp->hasTrait<OpTrait::IsCommutative>()) {
+    return computeOp;
+  }
+  return nullptr;
+}
+
+// Upstream's ReduceWindowOpConversion (StablehloToLinalgReduce.cpp) lowers
+// these to a named pooling op, dynamic result dims included, so this pattern
+// stands aside.
+bool matchesUpstreamPooling(mlir::stablehlo::ReduceWindowOp op) {
+  int64_t rank = cast<ShapedType>(op.getResultTypes()[0]).getRank();
+  if (rank != 4 && rank != 5) {
+    return false;
+  }
+  if (op.getPadding() && !mlir::stablehlo::isSplatValue(*op.getPadding(), 0)) {
+    return false;
+  }
+  if (auto bd = op.getBaseDilations();
+      bd && !llvm::all_of(*bd, [](int64_t v) { return v == 1; })) {
+    return false;
+  }
+  int64_t lastDim = rank - 1;
+  if (op.getWindowDimensions()[0] != 1 ||
+      op.getWindowDimensions()[lastDim] != 1) {
+    return false;
+  }
+  if (auto ws = op.getWindowStrides();
+      ws && (ws.value()[0] != 1 || ws.value()[lastDim] != 1)) {
+    return false;
+  }
+  for (auto [index, input] : llvm::enumerate(op.getInputs())) {
+    if (!cast<ShapedType>(input.getType()).getElementType().isF32()) {
+      return false;
+    }
+    Operation *reduceOp = getReduceWindowReductionOp(op, index);
+    if (!reduceOp || !isa<mlir::stablehlo::MinOp, mlir::stablehlo::MaxOp,
+                          mlir::stablehlo::AddOp>(*reduceOp)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Copied from StablehloToLinalgReduce.cpp's
+// ReduceWindowOpOnTensorsGenericConversion; the seed and the result dims
+// differ.
+//
+// Upstream's reduce_window converter needs a static result only to seed the
+// output.
+struct DynamicReduceWindowOpConversion final
+    : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ReduceWindowOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (matchesUpstreamPooling(op)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "upstream pooling lowering applies");
+    }
+    MLIRContext *ctx = op->getContext();
+    Location loc = op.getLoc();
+    SmallVector<Type> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
+                                                resultTypes))) {
+      return failure();
+    }
+    // Static results take the upstream path.
+    if (llvm::all_of(resultTypes, [](Type t) {
+          return cast<ShapedType>(t).hasStaticShape();
+        })) {
+      return rewriter.notifyMatchFailure(op, "static result");
+    }
+    SmallVector<Value> initValues = adaptor.getInitValues();
+    size_t numOperands = initValues.size();
+
+    SmallVector<int64_t> windowDimensions(op.getWindowDimensions());
+    int64_t rank = windowDimensions.size();
+    SmallVector<int64_t> padding(2 * rank, 0);
+    if (op.getPadding()) {
+      padding = llvm::to_vector(op.getPadding()->getValues<int64_t>());
+    }
+    SmallVector<int64_t> baseDilations(rank, 1);
+    if (op.getBaseDilations()) {
+      baseDilations = llvm::to_vector(*op.getBaseDilations());
+    }
+    SmallVector<int64_t> windowStrides(rank, 1);
+    if (op.getWindowStrides()) {
+      windowStrides = llvm::to_vector(*op.getWindowStrides());
+    }
+    SmallVector<int64_t> windowDilations(rank, 1);
+    if (op.getWindowDilations()) {
+      windowDilations = llvm::to_vector(*op.getWindowDilations());
+    }
+
+    SmallVector<AffineExpr> srcExprs, windowExprs, dstExprs;
+    SmallVector<int64_t> filteredWindowDims;
+    int windowDim = 0;
+    for (int64_t i = 0; i < rank; ++i) {
+      AffineExpr srcExpr = getAffineDimExpr(i, ctx);
+      if (windowStrides[i] != 1) {
+        srcExpr = srcExpr * windowStrides[i];
+      }
+      if (windowDimensions[i] != 1) {
+        filteredWindowDims.push_back(windowDimensions[i]);
+        AffineExpr windowExpr = getAffineDimExpr(rank + windowDim, ctx);
+        windowExprs.push_back(windowExpr);
+        if (windowDilations[i] != 1) {
+          windowExpr = windowExpr * windowDilations[i];
+        }
+        srcExpr = srcExpr + windowExpr;
+        ++windowDim;
+      }
+      srcExprs.push_back(srcExpr);
+      dstExprs.push_back(getAffineDimExpr(i, ctx));
+    }
+    SmallVector<AffineMap> inferredMaps(3, AffineMap::get(ctx));
+    if (rank > 0) {
+      inferredMaps =
+          AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs}, ctx);
+    }
+    SmallVector<AffineMap> indexingMaps;
+    indexingMaps.append(numOperands, inferredMaps[0]);
+    indexingMaps.push_back(inferredMaps[1]);
+    indexingMaps.append(numOperands, inferredMaps[2]);
+
+    // Pad and dilate through stablehlo.pad, as upstream does; it accepts
+    // dynamic operands.
+    SmallVector<Value> inputs = llvm::to_vector(adaptor.getInputs());
+    bool needsPad =
+        llvm::any_of(padding, [](int64_t v) { return v != 0; }) ||
+        llvm::any_of(baseDilations, [](int64_t v) { return v != 1; });
+    if (needsPad) {
+      SmallVector<int64_t> lows(rank), highs(rank), interiors(rank);
+      for (int64_t i = 0; i < rank; ++i) {
+        lows[i] = padding[2 * i];
+        highs[i] = padding[2 * i + 1];
+        interiors[i] = baseDilations[i] - 1;
+      }
+      for (auto [input, initValue] : llvm::zip(inputs, initValues)) {
+        input = mlir::stablehlo::PadOp::create(rewriter, loc, input, initValue,
+                                               lows, highs, interiors);
+      }
+    }
+
+    // Seed each output: result dim i is (padded_i - dilated_window_i) /
+    // stride_i + 1 where the type leaves it dynamic.
+    SmallVector<Value> seeds;
+    for (auto [initValue, resultTypeIt, input] :
+         llvm::zip(initValues, resultTypes, inputs)) {
+      auto resultTy = cast<RankedTensorType>(resultTypeIt);
+      SmallVector<Value> dynamicDims;
+      for (int64_t i = 0; i < rank; ++i) {
+        if (!resultTy.isDynamicDim(i)) {
+          continue;
+        }
+        Value padded = rewriter.createOrFold<tensor::DimOp>(loc, input, i);
+        int64_t dilatedWindow =
+            (windowDimensions[i] - 1) * windowDilations[i] + 1;
+        if (dilatedWindow == 1 && windowStrides[i] == 1) {
+          dynamicDims.push_back(padded);
+          continue;
+        }
+        Value span = arith::SubIOp::create(
+            rewriter, loc, padded,
+            arith::ConstantIndexOp::create(rewriter, loc, dilatedWindow));
+        Value steps = arith::DivSIOp::create(
+            rewriter, loc, span,
+            arith::ConstantIndexOp::create(rewriter, loc, windowStrides[i]));
+        Value count = arith::AddIOp::create(
+            rewriter, loc, steps,
+            arith::ConstantIndexOp::create(rewriter, loc, 1));
+        // No window fits when the padded input is smaller than the dilated
+        // window. In particular, truncating division alone would produce one
+        // window when -stride < span < 0, or a negative size for smaller
+        // inputs.
+        Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+        Value fits = arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::sge, span, zero);
+        dynamicDims.push_back(
+            arith::SelectOp::create(rewriter, loc, fits, count, zero));
+      }
+      Value empty =
+          tensor::EmptyOp::create(rewriter, loc, resultTy, dynamicDims);
+      Value scalarInit =
+          rewriter.createOrFold<tensor::ExtractOp>(loc, initValue);
+      seeds.push_back(
+          linalg::FillOp::create(rewriter, loc, scalarInit, empty).result());
+    }
+
+    inputs.push_back(tensor::EmptyOp::create(rewriter, loc, filteredWindowDims,
+                                             rewriter.getF32Type()));
+    auto linalgOp = linalg::GenericOp::create(
+        rewriter, loc, resultTypes, inputs, seeds, indexingMaps,
+        mlir::stablehlo::getParallelAndReductionIterators(
+            rank + filteredWindowDims.size(), filteredWindowDims.size()),
+        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
+
+    Region &region = linalgOp.getRegion();
+    rewriter.cloneRegionBefore(op.getBody(), region, region.end());
+    TypeConverter::SignatureConversion signatureConverter(
+        inputs.size() + op->getNumResults() - 1);
+    for (auto [i, type] : llvm::enumerate(resultTypes)) {
+      signatureConverter.addInputs(inputs.size() + i - 1,
+                                   cast<ShapedType>(type).getElementType());
+    }
+    signatureConverter.addInputs(
+        cast<ShapedType>(inputs.back().getType()).getElementType());
+    for (auto [i, input] :
+         llvm::enumerate(ArrayRef<Value>(inputs).drop_back())) {
+      signatureConverter.addInputs(
+          i, cast<ShapedType>(input.getType()).getElementType());
+    }
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
+                                      getTypeConverter());
+    rewriter.replaceOp(op, linalgOp.getResults());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateDynamicShapeConversionPatterns(MLIRContext *context,
@@ -835,8 +1078,9 @@ void populateDynamicShapeConversionPatterns(MLIRContext *context,
   // Prefer these lowerings for runtime shapes over upstream fallbacks.
   patterns->add<DynamicReshapeOpConversion, DynamicPadOpConversion,
                 DynamicConvolutionOpConversion, DynamicGatherOpConversion,
-                DynamicBroadcastInDimGatherConversion>(typeConverter, context,
-                                                       PatternBenefit{1000});
+                DynamicBroadcastInDimGatherConversion,
+                DynamicReduceWindowOpConversion>(typeConverter, context,
+                                                 PatternBenefit{1000});
 }
 
 } // namespace mlir::iree_compiler::stablehlo
