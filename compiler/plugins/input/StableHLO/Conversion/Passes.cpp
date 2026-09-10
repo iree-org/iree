@@ -74,6 +74,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
     passManager.addPass(createFlattenTuplesInCFG());
   }
 
+  // Frontends emit the dynamic ops with constant shape operands; folding them
+  // to their static forms is the only lowering IREE has for several of them.
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloCanonicalizeDynamismPass());
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
