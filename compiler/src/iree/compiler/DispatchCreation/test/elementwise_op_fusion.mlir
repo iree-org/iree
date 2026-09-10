@@ -841,3 +841,45 @@ util.func public @fuse_transpose_with_index_flip(%arg0: tensor<64x3x3x64xbf16>) 
 //       CHECK:       %[[EXTRACT:.+]] = tensor.extract %[[ARG0]][%[[IDX0]], %[[SUB0]], %[[SUB1]], %[[IDX1]]] : tensor<64x3x3x64xbf16>
 //       CHECK:       linalg.yield %[[EXTRACT]] : bf16
 //       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+// The widening operation must fuse into the conditional extraction rather than
+// materializing an unbounded temporary for the whole dynamic tensor.
+// CHECK-LABEL: util.func public @fuse_extend_inside_if
+// CHECK-SAME: %[[INPUT:[^:]+]]: tensor<?xi32>
+// CHECK: linalg.generic
+// CHECK-NOT: linalg.generic
+// CHECK: scf.if
+// CHECK: %[[ELEMENT:.+]] = tensor.extract %[[INPUT]][%{{.+}}] : tensor<?xi32>
+// CHECK-NEXT: %[[EXT:.+]] = arith.extsi %[[ELEMENT]] : i32 to i64
+// CHECK-NEXT: scf.yield %[[EXT]] : i64
+// CHECK: util.return
+util.func public @fuse_extend_inside_if(%input: tensor<?xi32>, %condition: i1) -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %zero = arith.constant 0 : i64
+  %n = tensor.dim %input, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%n) : tensor<?xi64>
+  %extended = linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%input : tensor<?xi32>) outs(%empty : tensor<?xi64>) {
+  ^bb0(%in: i32, %out: i64):
+    %ext = arith.extsi %in : i32 to i64
+    linalg.yield %ext : i64
+  } -> tensor<?xi64>
+  %result = linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]
+  } outs(%empty : tensor<?xi64>) {
+  ^bb0(%out: i64):
+    %index = linalg.index 0 : index
+    %value = scf.if %condition -> i64 {
+      %element = tensor.extract %extended[%index] : tensor<?xi64>
+      scf.yield %element : i64
+    } else {
+      scf.yield %zero : i64
+    }
+    linalg.yield %value : i64
+  } -> tensor<?xi64>
+  util.return %result : tensor<?xi64>
+}
