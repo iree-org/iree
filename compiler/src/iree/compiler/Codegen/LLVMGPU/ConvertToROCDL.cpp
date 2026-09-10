@@ -78,6 +78,7 @@ struct LowerGlobalSubgroupBarrier
           /*asm_string=*/asmStr, /*constraints=*/"",
           /*has_side_effects=*/true,
           /*is_align_stack=*/false, LLVM::TailCallKind::None,
+          /*convergent=*/true,
           /*asm_dialect=*/asmDialectAttr,
           /*operand_attrs=*/ArrayAttr());
     } else if (chipset.majorVersion < 12) {
