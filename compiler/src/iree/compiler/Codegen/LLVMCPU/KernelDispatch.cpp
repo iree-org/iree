@@ -2091,14 +2091,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // For scalable inner tiles, the distribution tile on the packed dim must be a
   // multiple of the largest possible inner tile (base * vscaleMax).
   int64_t vscaleMax = getVscaleMax(target);
-  if (vscaleMax > 0) {
-    for (auto [pos, size, scalable] :
-         llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
-      if (!scalable || distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
-        continue;
-      }
-      distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * vscaleMax);
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+    if (!scalable || distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
+      continue;
     }
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * vscaleMax);
   }
 
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
@@ -3675,11 +3673,9 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
       SmallVector<bool> packScalableFlags = nonRootOpScalableFlags.lookup(op);
       SmallVector<int64_t> distAlignTiles(vecTileSize.begin(),
                                           vecTileSize.end());
-      if (vscaleMax > 0) {
-        for (auto [i, scalable] : llvm::enumerate(packScalableFlags)) {
-          if (scalable && i < distAlignTiles.size() && distAlignTiles[i] > 0) {
-            distAlignTiles[i] *= vscaleMax;
-          }
+      for (auto [i, scalable] : llvm::enumerate(packScalableFlags)) {
+        if (scalable && i < distAlignTiles.size() && distAlignTiles[i] > 0) {
+          distAlignTiles[i] *= vscaleMax;
         }
       }
       adjust(op, distAlignTiles, IREE::CPU::TilingLevel::DistributionTiles,
