@@ -228,6 +228,29 @@ struct OptimizationBarrierOpConversion final
   }
 };
 
+// IREE has no ordering token, and every token it can see carries no data
+// because the ops that produce a meaningful one are unsupported.
+struct AfterAllOpConversion final
+    : OpConversionPattern<mlir::stablehlo::AfterAllOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::AfterAllOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Joining existing tokens needs no new value: any one of them stands in
+    // for the rest.
+    if (!adaptor.getInputs().empty()) {
+      rewriter.replaceOp(op, adaptor.getInputs().front());
+      return success();
+    }
+    auto resultType =
+        getTypeConverter()->convertType<RankedTensorType>(op.getType());
+    rewriter.replaceOpWithNewOp<arith::ConstantOp>(
+        op, resultType, DenseElementsAttr::get(resultType, false));
+    return success();
+  }
+};
+
 // Returns true if all attributes in the given dictionary are valid for IREE
 // input dialects.
 static bool isValidFuncAttr(DictionaryAttr attrs) {
@@ -518,13 +541,16 @@ struct ConvertStableHloToIreeInputDialects final
         std::make_unique<::mlir::stablehlo::LinalgTypeConverter>();
     typeConverter->addSourceMaterialization(scalarToTensor);
     typeConverter->addTargetMaterialization(scalarToTensor);
+    typeConverter->addConversion([](mlir::stablehlo::TokenType type) -> Type {
+      return RankedTensorType::get({}, IntegerType::get(type.getContext(), 1));
+    });
 
     // Run stablehlo canonicalization patterns with a high benefit to avoid some
     // expensive expansions.
     populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
 
     // Run custom patterns with a high benefit to override stablehlo patterns.
-    patterns.add<ConcatenateOpConversion, FftOpConversion,
+    patterns.add<AfterAllOpConversion, ConcatenateOpConversion, FftOpConversion,
                  OptimizationBarrierOpConversion>(*typeConverter, context,
                                                   PatternBenefit{1000});
 
