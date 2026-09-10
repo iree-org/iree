@@ -65,6 +65,11 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "unranked result");
     }
 
+    // The rewrite ends in a reshape, which cannot express a dynamic result.
+    if (!resultTy.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(gather, "dynamic result shape");
+    }
+
     // Offset dimensions should be the defaults.
     if (static_cast<int64_t>(dimensionNumbers.getOffsetDims().size()) !=
         resultTy.getRank() - indexVectorDim) {
