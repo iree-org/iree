@@ -190,7 +190,7 @@ func.func @reduction(%in: memref<2048xf32>, %out: memref<f32>) {
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func  {workgroup_size = array<i64: 512, 1, 1>}
+    transform.iree.test_gpu_vector_distribution %top_level_func  <{workgroup_size = array<i64: 512, 1, 1>}>
     : !transform.any_op
     transform.yield
   }

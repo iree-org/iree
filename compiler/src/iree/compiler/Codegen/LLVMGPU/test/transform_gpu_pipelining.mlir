@@ -60,7 +60,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %for = transform.structured.match ops{["scf.for"]} in %root : (!transform.any_op) -> !transform.any_op
     %1 = transform.cast %for : !transform.any_op to !transform.op<"scf.for">
-    %2 = transform.iree.pipeline_shared_memory_copies %1 { depth = 4 } : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
+    %2 = transform.iree.pipeline_shared_memory_copies %1 <{ depth = 4 }> : (!transform.op<"scf.for">) -> !transform.op<"scf.for">
     transform.yield
   } // @__transform_main
 } // module
