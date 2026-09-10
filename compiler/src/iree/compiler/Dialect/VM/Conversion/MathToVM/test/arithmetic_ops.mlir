@@ -76,22 +76,25 @@ func.func @arithmetic_f32(%arg0: f32) -> f32 {
   // CHECK: vm.erf.f32
   %15 = math.erf %14 : f32
 
+  // CHECK: vm.fma.f32
+  %16 = math.fma %arg0, %arg0, %15 : f32
+
   // CHECK: vm.abs.f32
-  %16 = math.absf %15 : f32
+  %17 = math.absf %16 : f32
 
   // CHECK: vm.ceil.f32
-  %17 = math.ceil %16 : f32
+  %18 = math.ceil %17 : f32
 
   // CHECK: vm.floor.f32
-  %18 = math.floor %17 : f32
+  %19 = math.floor %18 : f32
 
   // CHECK: vm.round.f32
-  %19 = math.round %18 : f32
+  %20 = math.round %19 : f32
 
   // CHECK: vm.round.f32.even
-  %20 = math.roundeven %19 : f32
+  %21 = math.roundeven %20 : f32
 
-  return %20 : f32
+  return %21 : f32
 }
 
 // -----
