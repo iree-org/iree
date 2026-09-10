@@ -339,7 +339,8 @@ void HoistEncodingOpsPass::runOnOperation() {
     bool isHoistable = true;
     sliceOptions.inclusive = true;
     sliceOptions.omitBlockArguments = true;
-    sliceOptions.filter = [&](Operation *op) {
+    sliceOptions.filter = [&dataPathOps, &isHoistable,
+                           &sourceOp](Operation *op) {
       if (!op->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
         return false;
       }
