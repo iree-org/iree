@@ -87,10 +87,22 @@ jobs:
           key: ${{ github.job }}
       - name: Building documentation files
         run: ./docs/website/generate_extra_files.sh
+      # Release candidate releases (tags like `iree-3.6.0rc20250910`) are
+      # published automatically by the candidate release workflows. Deploying
+      # the website from them would overwrite the site last published from
+      # main, so for those runs everything above only serves to verify that
+      # the website still builds and the deployment steps are skipped.
+      - name: Skipping deployment (release candidate)
+        if: ${{ github.event_name == 'release' && contains(github.event.release.tag_name, 'rc') }}
+        run: |
+          echo "Triggered by a release candidate release; skipping deploy to gh-pages."
+
       - name: Setting git config
+        if: ${{ github.event_name != 'release' || !contains(github.event.release.tag_name, 'rc') }}
         run: |
           git config --local user.email "iree-github-actions-bot@google.com"
           git config --local user.name "Website Publish Action"
       - name: Deploying to gh-pages
+        if: ${{ github.event_name != 'release' || !contains(github.event.release.tag_name, 'rc') }}
         working-directory: docs/website
         run: mkdocs gh-deploy
