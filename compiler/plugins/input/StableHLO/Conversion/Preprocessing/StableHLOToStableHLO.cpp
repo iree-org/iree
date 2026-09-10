@@ -635,11 +635,11 @@ bool getUpdatedIndicesAreSorted(bool indicesAreSorted,
          llvm::is_sorted(updatedIndexMap);
 }
 
-// Returns an updated indices tensor such that an `IotaOp` is prepended for each
-// dim in `indicesBatchingDims` with a `ConcatenateOp`.
+// Returns `indices` with one iota column per batching dim concatenated along
+// `indexVectorDim`.
 //
 // If `indexVectorDim` is equal to the rank of `indices`, it is reshaped to have
-// a trailing dimension of size 1 so it can be concatenated with the `IotaOp`s.
+// a trailing dimension of size 1 so it can be concatenated with the iotas.
 Value createConcatIndices(Value indices, int64_t indexVectorDim,
                           ArrayRef<int64_t> indicesBatchingDims,
                           PatternRewriter &rewriter) {
@@ -648,8 +648,12 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
   Type elementType = indicesType.getElementType();
 
   // The batching dim sizes might not fit in the existing element type, in which
-  // case we need to promote it.
+  // case we need to promote it. A dynamic size promotes to i64, which fits.
   for (int64_t batchingDim : indicesBatchingDims) {
+    if (indicesType.isDynamicDim(batchingDim)) {
+      elementType = rewriter.getI64Type();
+      break;
+    }
     elementType = promoteTypeForSize(
         elementType, indicesType.getDimSize(batchingDim), rewriter);
   }
@@ -668,16 +672,47 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
   }
   auto iotaType = RankedTensorType::get(iotaShape, elementType);
 
+  // The iota shape as a runtime vector, for the dynamic case: every dim from
+  // the indices except the index-vector slot, which is 1.
+  Value iotaShapeValue;
+  if (!iotaType.hasStaticShape()) {
+    Type i64 = rewriter.getI64Type();
+    auto scalarShape = RankedTensorType::get({1}, i64);
+    SmallVector<Value> parts;
+    for (auto [d, size] : llvm::enumerate(iotaShape)) {
+      if (!ShapedType::isDynamic(size)) {
+        parts.push_back(mlir::stablehlo::ConstantOp::create(
+            rewriter, loc, DenseIntElementsAttr::get(scalarShape, size)));
+        continue;
+      }
+      Value dim = mlir::stablehlo::GetDimensionSizeOp::create(rewriter, loc,
+                                                              indices, d);
+      dim = mlir::stablehlo::ConvertOp::create(
+          rewriter, loc, RankedTensorType::get({}, i64), dim);
+      parts.push_back(
+          mlir::stablehlo::ReshapeOp::create(rewriter, loc, scalarShape, dim));
+    }
+    iotaShapeValue =
+        mlir::stablehlo::ConcatenateOp::create(rewriter, loc, parts, 0);
+  }
+
   if (indexVectorDimOnLastDim) {
-    indices =
-        mlir::stablehlo::ReshapeOp::create(rewriter, loc, iotaType, indices);
+    indices = iotaShapeValue
+                  ? Value(mlir::stablehlo::DynamicReshapeOp::create(
+                        rewriter, loc, iotaType, indices, iotaShapeValue))
+                  : Value(mlir::stablehlo::ReshapeOp::create(
+                        rewriter, loc, iotaType, indices));
   }
 
   SmallVector<Value> indicesToConcat;
   indicesToConcat.reserve(indicesBatchingDims.size() + 1);
   for (int64_t batchingDim : indicesBatchingDims) {
     indicesToConcat.push_back(
-        mlir::stablehlo::IotaOp::create(rewriter, loc, iotaType, batchingDim));
+        iotaShapeValue
+            ? Value(mlir::stablehlo::DynamicIotaOp::create(
+                  rewriter, loc, iotaType, iotaShapeValue, batchingDim))
+            : Value(mlir::stablehlo::IotaOp::create(rewriter, loc, iotaType,
+                                                    batchingDim)));
   }
   indicesToConcat.push_back(indices);
   return mlir::stablehlo::ConcatenateOp::create(rewriter, loc, indicesToConcat,
@@ -704,9 +739,8 @@ struct ScatterBatchingDimsExpander final
       return rewriter.notifyMatchFailure(op, "scatter op has no batching dims");
     }
 
-    if (!cast<ShapedType>(op.getScatterIndices().getType()).hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          op, "scatter indices have dynamic shape, can't expand");
+    if (!isa<RankedTensorType>(op.getScatterIndices().getType())) {
+      return rewriter.notifyMatchFailure(op, "unranked scatter indices");
     }
 
     SmallVector<int64_t> newInsertedWindowDims =
