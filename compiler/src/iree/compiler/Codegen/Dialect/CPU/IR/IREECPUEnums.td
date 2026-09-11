@@ -174,6 +174,13 @@ def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
 def MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32
     : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32", 0x2211>;
 
+// RISC-V V `vfmacc.vf` (f32, f32). 1x8VLsx1 or swapped 8VLsx1x1.
+// 8VLs = LMUL=4; lane count is DataTiledMMAAttr.vlen/8. Requires +v.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32", 0x3110>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32", 0x3111>;
+
 // RISC-V V `vfmacc.vf` (f16, f16): a 1x8VLsx1 matmul tile, or 8VLsx1x1 in the
 // M<->N-swapped orientation. `8VLs` is 8 f16 elements per 64-bit vector-length
 // unit, i.e. one LMUL=2 register group, and s stands for static. The LHS is a
@@ -183,6 +190,25 @@ def MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16
     : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16", 0x3120>;
 def MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16
     : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16", 0x3121>;
+
+// f16→f32: extf then f32 vfmacc.vf (LMUL=4). Requires +zvfhmin (implied by
+// +zvfh). Native Zvfh f16 ACC still matches f16f16f16 encodings first.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32", 0x3122>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32", 0x3123>;
+
+// vfwmaccbf16.vf, N=vlen/8 (bf16m2→f32m4). Requires +zvfbfwma.
+def MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16", 0x3130>;
+def MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16", 0x3131>;
+
+// vsext.vf2 (i8m1→i16m2) then vwmacc.vx into i32m4. N=vlen/8. Requires +v.
+def MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16", 0x31C0>;
+def MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16
+    : I32EnumAttrCase<"MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16", 0x31C1>;
 
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
@@ -233,8 +259,16 @@ def IREECPU_MMAIntrinsic
            MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
 
            // RISC-V V
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
            MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
            MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+           MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16,
+           MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16,
+           MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16,
+           MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;

@@ -432,9 +432,20 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return {"+avx512vnni"};
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16:
+  case MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16:
+    return {"+v"};
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
     return {"+v", "+zvfh"};
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
+    return {"+v", "+zvfhmin"};
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16:
+    return {"+v", "+zvfbfwma"};
   default:
     return {};
   }
@@ -566,8 +577,13 @@ checkIntrinsicRequiredFeatures(DictionaryAttr config,
     if (required.empty()) {
       continue;
     }
-    if (llvm::all_of(required,
-                     [&](StringRef f) { return hasFeature(config, f); })) {
+    if (llvm::all_of(required, [&](StringRef f) {
+          if (hasFeature(config, f)) {
+            return true;
+          }
+          // Zvfh includes Zvfhmin; IREE matches feature strings exactly.
+          return f == "+zvfhmin" && hasFeature(config, "+zvfh");
+        })) {
       out.push_back(intr);
     }
   }
@@ -617,8 +633,16 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
   }
   if (isRISCV64(config)) {
     static const MMAIntrinsic kAllRiscvV[] = {
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16,
+        MMAIntrinsic::MMA_RISCV_V_VWMACC_1x8VLsx1_I32_I8_CASTI16,
+        MMAIntrinsic::MMA_RISCV_V_VWMACC_8VLsx1x1_I32_I8_CASTI16,
     };
     checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
   }
