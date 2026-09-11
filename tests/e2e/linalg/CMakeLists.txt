@@ -109,6 +109,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_check_single_backend_test_suite(
@@ -136,6 +138,7 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-vulkan-target=vp_android_baseline_2022"
 )
 
 iree_check_single_backend_test_suite(

@@ -98,10 +98,7 @@ private:
 };
 
 struct VulkanSPIRVTargetOptions {
-  // Use vp_android_baseline_2022 profile as the default target--it's a good
-  // lowest common denominator to guarantee the generated SPIR-V is widely
-  // accepted for now. Eventually we want to use a list for multi-targeting.
-  std::string target = "vp_android_baseline_2022";
+  std::string target;
   std::string targetFeatures;
   VulkanDispatchAbi dispatchAbi = VulkanDispatchAbi::Descriptors;
 
@@ -316,14 +313,22 @@ public:
       const final {
     switch (options_.dispatchAbi) {
     case VulkanDispatchAbi::Descriptors:
-      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      if (auto target = getExecutableTarget(context, /*useBdaRootAbi=*/false)) {
+        executableTargetAttrs.push_back(target);
+      }
       break;
     case VulkanDispatchAbi::Bda:
-      executableTargetAttrs.push_back(getExecutableTarget(context, true));
+      if (auto target = getExecutableTarget(context, /*useBdaRootAbi=*/true)) {
+        executableTargetAttrs.push_back(target);
+      }
       break;
     case VulkanDispatchAbi::All:
-      executableTargetAttrs.push_back(getExecutableTarget(context, true));
-      executableTargetAttrs.push_back(getExecutableTarget(context, false));
+      if (auto target = getExecutableTarget(context, /*useBdaRootAbi=*/true)) {
+        executableTargetAttrs.push_back(target);
+      }
+      if (auto target = getExecutableTarget(context, /*useBdaRootAbi=*/false)) {
+        executableTargetAttrs.push_back(target);
+      }
       break;
     }
   }
@@ -332,6 +337,10 @@ public:
   getExecutableTarget(MLIRContext *context, bool useBdaRootAbi) const {
     Builder b(context);
     SmallVector<NamedAttribute, 1> configItems;
+    if (options_.target.empty()) {
+      emitError(b.getUnknownLoc(), "Vulkan target not specified");
+      return nullptr;
+    }
     if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
       if (!options_.targetFeatures.empty()) {
         target = IREE::GPU::TargetAttr::get(context, target.getArch(),

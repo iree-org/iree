@@ -134,6 +134,7 @@ iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
+    compiler_flags = ["--iree-vulkan-target=vp_android_baseline_2022"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

@@ -152,6 +152,7 @@ VULKAN_SRCS = enforce_glob(
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
+    compiler_flags = ["--iree-vulkan-target=vp_android_baseline_2022"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -176,6 +177,7 @@ iree_check_single_backend_test_suite(
     srcs = WINOGRAD_CONV_SRCS,
     compiler_flags = [
         "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
+        "--iree-vulkan-target=vp_android_baseline_2022",
     ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
