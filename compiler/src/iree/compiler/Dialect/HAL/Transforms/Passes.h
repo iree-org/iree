@@ -47,13 +47,6 @@ struct PipelineHooks {
 };
 
 struct AssignmentOptions : PassPipelineOptions<AssignmentOptions> {
-  // TODO(benvanik): remove the legacy flag once users are switched to devices.
-  ListOption<std::string> legacyTargetBackends{
-      *this,
-      "legacy-target-backends",
-      llvm::cl::desc("DEPRECATED: Target backend names."),
-      llvm::cl::ZeroOrMore,
-  };
   ListOption<std::string> targetDevices{
       *this,
       "target-devices",

@@ -32,6 +32,32 @@
 #       'Not Run'.
 #   WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 #   TIMEOUT: Test timeout in seconds. Defaults to the iree_native_test default.
+
+function(_iree_target_backend_to_compiler_flags OUT_VAR TARGET_BACKEND)
+  if(TARGET_BACKEND STREQUAL "llvm-cpu" OR
+     TARGET_BACKEND STREQUAL "vmvx" OR
+     TARGET_BACKEND STREQUAL "vmvx-inline")
+    set(_FLAGS
+      "--iree-hal-target-device=local"
+      "--iree-hal-local-target-device-backends=${TARGET_BACKEND}"
+    )
+  elseif(TARGET_BACKEND STREQUAL "rocm")
+    set(_FLAGS "--iree-hal-target-device=hip")
+  elseif(TARGET_BACKEND STREQUAL "vulkan-spirv")
+    set(_FLAGS "--iree-hal-target-device=vulkan")
+  elseif(TARGET_BACKEND STREQUAL "cuda")
+    set(_FLAGS "--iree-hal-target-device=cuda")
+  elseif(TARGET_BACKEND STREQUAL "metal-spirv")
+    set(_FLAGS "--iree-hal-target-device=metal")
+  elseif(TARGET_BACKEND STREQUAL "webgpu-spirv")
+    set(_FLAGS "--iree-hal-target-device=webgpu")
+  else()
+    message(FATAL_ERROR "Unsupported target backend: ${TARGET_BACKEND}")
+  endif()
+
+  set(${OUT_VAR} "${_FLAGS}" PARENT_SCOPE)
+endfunction()
+
 function(iree_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -58,8 +84,9 @@ function(iree_e2e_runner_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_BASE_COMPILER_FLAGS
-    "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+  _iree_target_backend_to_compiler_flags(
+    _BASE_COMPILER_FLAGS
+    "${_RULE_TARGET_BACKEND}"
   )
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
   string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
