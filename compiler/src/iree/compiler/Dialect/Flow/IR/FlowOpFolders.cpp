@@ -864,6 +864,20 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.encode
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorEncodeOp::fold(FoldAdaptor operands) {
+  // Encoding into the same type is a no-op. Folding two *different* encodings
+  // that resolve to the same layout requires layout resolvers and is handled
+  // by the equivalent fold on stream.tensor.encode.
+  if (getOperand().getType() == getResult().getType()) {
+    return getOperand();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
