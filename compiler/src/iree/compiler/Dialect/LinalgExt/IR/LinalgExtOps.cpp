@@ -2810,6 +2810,14 @@ LogicalResult Im2colOp::verify() {
   int64_t expectedMInner = mPos.size();
   int64_t expectedKInner = mPos.size() + kPos.size();
 
+  // Batch output dims are a prefix of the output dims, so output_sizes must have
+  // at least one entry for each batch dim.
+  if (numBatchOutputDims > static_cast<int64_t>(sizesAttr.size())) {
+    return op->emitOpError("expected batch_pos size (")
+           << numBatchOutputDims << ") to not exceed output rank (" << outputRank
+           << ")";
+  }
+
   // Count batch inner dims.
   int64_t batchInnerTotal = 0;
   for (int64_t i = 0; i < numBatchOutputDims; ++i) {
