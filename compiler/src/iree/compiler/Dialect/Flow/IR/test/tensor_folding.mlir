@@ -1041,7 +1041,7 @@ util.func public @foldTensorEncodeSameType(%arg0: tensor<4x4xf32, #encoding>) ->
 #encoding = #iree_encoding.testing<>
 
 // CHECK-LABEL: @foldTensorEncodeSameTypeDynamic
-// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x4xf32, #encoding>)
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x4xf32, #encoding>
 util.func public @foldTensorEncodeSameTypeDynamic(%arg0: tensor<?x4xf32, #encoding>, %dim: index) -> tensor<?x4xf32, #encoding> {
   // CHECK-NOT: flow.tensor.encode
   %0 = flow.tensor.encode %arg0 : tensor<?x4xf32, #encoding>{%dim} -> tensor<?x4xf32, #encoding>{%dim}
