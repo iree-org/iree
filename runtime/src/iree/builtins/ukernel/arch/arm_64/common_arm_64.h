@@ -8,6 +8,9 @@
 #define IREE_BUILTINS_UKERNEL_ARCH_ARM_64_COMMON_ARM_64_H_
 
 #include <arm_neon.h>
+#ifdef __ARM_FEATURE_SVE
+#include <arm_sve.h>
+#endif /* __ARM_FEATURE_SVE */
 
 #include "iree/builtins/ukernel/common.h"
 #include "iree/schemas/cpu_data.h"
@@ -19,6 +22,7 @@
 #define IREE_UK_BUILD_ARM_64_BF16
 #define IREE_UK_BUILD_ARM_64_DOTPROD
 #define IREE_UK_BUILD_ARM_64_I8MM
+#define IREE_UK_BUILD_ARM_64_SVE_I8MM
 #else
 // Compiling with the system toolchain. Include the configured header.
 #include "iree/builtins/ukernel/arch/arm_64/config_arm_64.h"
@@ -50,6 +54,12 @@ static inline bool iree_uk_cpu_arm_64_dotprod(
 
 static inline bool iree_uk_cpu_arm_64_i8mm(const iree_uk_uint64_t* cpu_data) {
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_I8MM);
+}
+
+static inline bool iree_uk_cpu_arm_64_sve_i8mm(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(
+      cpu_data[0], IREE_CPU_DATA0_ARM_64_SVE | IREE_CPU_DATA0_ARM_64_I8MM);
 }
 
 static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
