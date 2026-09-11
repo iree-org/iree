@@ -29,6 +29,21 @@ util.func public @stride2_no_passthrough(%src: tensor<4x4xf16>) -> tensor<9x9xf1
 
 // -----
 
+// A rank-reduced strided insert_slice (source rank < dest rank) must not be
+// converted: the conversion indexes the source with dest-derived dims and would
+// read past the source. Regression test.
+util.func public @rank_reduced_source_not_converted(%src: tensor<4x8xf32>) -> tensor<8x1x16xf32> {
+  %cst = arith.constant dense<0.000000e+00> : tensor<8x1x16xf32>
+  %0 = tensor.insert_slice %src into %cst[0, 0, 0] [4, 1, 8] [2, 1, 2] : tensor<4x8xf32> into tensor<8x1x16xf32>
+  util.return %0 : tensor<8x1x16xf32>
+}
+
+// CHECK-LABEL: @rank_reduced_source_not_converted
+// CHECK:       tensor.insert_slice
+// CHECK-NOT:   linalg.generic
+
+// -----
+
 // Converted: stride-3 with non-zero offsets.
 util.func public @stride3_no_passthrough(%src: tensor<3x3xf32>) -> tensor<10x10xf32> {
   %cst = arith.constant dense<0.000000e+00> : tensor<10x10xf32>
