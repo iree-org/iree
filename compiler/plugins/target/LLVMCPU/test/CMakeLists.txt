@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "materialize_homogeneous_encodings.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
+    "vscale_range_validation.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck

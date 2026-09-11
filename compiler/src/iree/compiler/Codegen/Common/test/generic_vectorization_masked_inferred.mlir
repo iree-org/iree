@@ -358,7 +358,7 @@ func.func @val_defined_by_scf_for(%arg0: index, %arg1: index) -> tensor<?x?xf32>
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 #map = affine_map<()[s0] -> (-(176 mod s0) + 176)>
 
 func.func @dynamic_fill_with_scalable_tiling_infer_vector_size(%arg0: tensor<1x67x120x176xf32>) -> tensor<1x67x120x176xf32>
@@ -423,7 +423,7 @@ func.func @pad_lowered_as_masked_transfer_read(%arg0: tensor<?x?xf32>, %arg1: in
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 
 func.func @dynamic_fill_with_scalable_tiling_infer_remainder_vector_size(%arg0: tensor<1x67x120x100xf32>) -> tensor<1x67x120x100xf32>
   attributes {hal.executable.target = #aarch64_sve}
