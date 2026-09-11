@@ -308,6 +308,22 @@ func.func @pack(%arg0: tensor<20x48xf32>) -> tensor<2x?x16x?xf32> attributes {ha
 
 // -----
 
+// SVE supports vector masking, so pack ops with static inner tiles are not
+// decomposed either.
+#executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
+func.func @pack_static_inner_tiles(%arg0: tensor<20x48xf32>) -> tensor<3x48x8x1xf32> attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<3x48x8x1xf32>
+  %pack = linalg.pack %arg0 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %empty : tensor<20x48xf32> -> tensor<3x48x8x1xf32>
+  return %pack : tensor<3x48x8x1xf32>
+}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
+//      CHECK: func.func @pack_static_inner_tiles(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.pack
+
+// -----
+
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+v9a,+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34"}>
 #map_elem_pack = affine_map<()[s0] -> (384 ceildiv s0)>
 #map = affine_map<(d0, d1) -> (d0, d1)>
