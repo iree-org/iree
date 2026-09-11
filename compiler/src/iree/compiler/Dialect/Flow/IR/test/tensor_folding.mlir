@@ -1022,3 +1022,40 @@ util.func public @innermost_unit_dim(%4: !iree_tensor_ext.dispatch.tensor<readon
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
 //       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @foldTensorEncodeSameType
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x4xf32, #encoding>)
+util.func public @foldTensorEncodeSameType(%arg0: tensor<4x4xf32, #encoding>) -> tensor<4x4xf32, #encoding> {
+  // CHECK-NOT: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32, #encoding> -> tensor<4x4xf32, #encoding>
+  // CHECK: util.return %[[ARG0]]
+  util.return %0 : tensor<4x4xf32, #encoding>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @foldTensorEncodeSameTypeDynamic
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x4xf32, #encoding>)
+util.func public @foldTensorEncodeSameTypeDynamic(%arg0: tensor<?x4xf32, #encoding>, %dim: index) -> tensor<?x4xf32, #encoding> {
+  // CHECK-NOT: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<?x4xf32, #encoding>{%dim} -> tensor<?x4xf32, #encoding>{%dim}
+  // CHECK: util.return %[[ARG0]]
+  util.return %0 : tensor<?x4xf32, #encoding>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @dontFoldTensorEncodeDifferentEncoding
+util.func public @dontFoldTensorEncodeDifferentEncoding(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32, #encoding> {
+  // CHECK: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
+  util.return %0 : tensor<4x4xf32, #encoding>
+}
