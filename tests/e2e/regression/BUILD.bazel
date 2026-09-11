@@ -34,6 +34,7 @@ iree_lit_test_suite(
         "globals.mlir",
         "libm_linking.mlir",
         "scalar.mlir",
+        "stream_reference_counting_aliased_loop_results.mlir",
         "trace_dispatch_tensors.mlir",
         "transients_test.mlir",
         "unused_args.mlir",

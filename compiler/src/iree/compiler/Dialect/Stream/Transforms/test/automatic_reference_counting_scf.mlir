@@ -840,3 +840,630 @@ util.func private @if_yielded_then_dropped(%cond: i1, %input_tp: !stream.timepoi
   // CHECK: util.return
   util.return %if_tp : !stream.timepoint
 }
+
+// -----
+
+// Tests that ARC emits no deallocation for two control-flow results that denote
+// the same buffer at runtime. A resource allocated inside an scf.if is yielded
+// into two of that if's results, and the surrounding scf.for carries them into
+// two loop results. On the true path both results are that local-scope allocation, on the
+// fall-through path both are the same iter_arg. Deallocating each result
+// would free the buffer twice and let the free race a still-live reader in 
+// out-of-order executor.
+
+// CHECK-LABEL: @sibling_aliased_control_flow_results
+util.func private @sibling_aliased_control_flow_results(%cond: i1, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %resource, %alloca_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: scf.for
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%a0 = %resource, %a1 = %resource, %itp = %alloca_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    // CHECK: scf.if
+    %if:2 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>) {
+      %local, %ltp = stream.resource.alloca uninitialized await(%itp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %u = stream.test.timeline_op await(%ltp) =>
+        with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+      // Both results are %local on this path, so %loop#0 and %loop#1 are one buffer.
+      scf.yield %local, %local : !stream.resource<transient>, !stream.resource<transient>
+    } else {
+      scf.yield %a0, %a1 : !stream.resource<transient>, !stream.resource<transient>
+    }
+    scf.yield %if#0, %if#1, %itp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // The two results are one buffer, so neither may be deallocated (double-free).
+  // CHECK-NOT: stream.resource.dealloca
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC still detects aliasing when the two results are produced by
+// *different* ops (not two results of a single op). Two independent scf.if ops
+// each forward the same in-loop %shared allocation on their then-branch, so on
+// any execution that enters those branches the two results denote the same
+// buffer - even though nothing syntactically connects them (different ops,
+// different SSA values, no tie). ARC cannot know at compile time which branch a
+// conditional will take, so it must treat the two results as a possible alias
+// and deallocate neither independently; doing so would double-free %shared on
+// the executions where they coincide.
+
+// CHECK-LABEL: @cross_op_aliased_loop_results
+util.func private @cross_op_aliased_loop_results(%cond: i1, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[LOOP:.+]]:3 = scf.for
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%a0 = %init, %a1 = %init, %itp = %init_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %shared, %stp = stream.resource.alloca uninitialized await(%itp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %u = stream.test.timeline_op await(%stp) =>
+      with(%shared) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    // %if0 forwards %shared into loop result 0...
+    %if0:2 = scf.if %cond -> (!stream.resource<transient>, !stream.timepoint) {
+      scf.yield %shared, %u : !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %a0, %itp : !stream.resource<transient>, !stream.timepoint
+    }
+    // ...and an unrelated %if1 forwards the same %shared into loop result 1.
+    %if1:2 = scf.if %cond -> (!stream.resource<transient>, !stream.timepoint) {
+      scf.yield %shared, %u : !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %a1, %itp : !stream.resource<transient>, !stream.timepoint
+    }
+    %j = stream.timepoint.join max(%if0#1, %if1#1) => !stream.timepoint
+    scf.yield %if0#0, %if1#0, %j : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // Both results are %shared, so neither may be deallocated (double-free).
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[LOOP]]#0
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[LOOP]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC detects the same aliasing across an scf.while. The loop carries
+// %shared in two loop-carried slots and scf.condition forwards both to the while
+// results, so both results are that one buffer at runtime. ARC must not
+// deallocate them independently.
+
+// CHECK-LABEL: @while_aliased_results
+util.func private @while_aliased_results(%input_tp: !stream.timepoint, %size: index, %bound: index, %shared: !stream.resource<transient>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[W:.+]]:4 = scf.while
+  %w:4 = scf.while (%i = %c0, %r0 = %shared, %r1 = %shared, %tp = %input_tp) : (index, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) -> (index, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %continue = arith.cmpi slt, %i, %bound : index
+    scf.condition(%continue) %i, %r0, %r1, %tp : index, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } do {
+  ^bb0(%bi: index, %b0: !stream.resource<transient>, %b1: !stream.resource<transient>, %btp: !stream.timepoint):
+    %u = stream.test.timeline_op await(%btp) =>
+      with(%b0) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    %ni = arith.addi %bi, %c1 : index
+    scf.yield %ni, %b0, %b1, %u : index, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%w#3) =>
+    with(%w#1, %w#2) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // Both while results are %shared, so neither may be deallocated (double-free).
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[W]]#1
+  // CHECK-NOT: stream.resource.dealloca {{.*}}=> %[[W]]#2
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC still frees two results of one multi-result op when they are
+// *distinct* buffers on every path (the precision counterpart to the aliasing
+// cases). Each branch of the scf.if carries a separately-allocated, separately-
+// initialized resource into each result, so the two results never denote the
+// same buffer. ARC must deallocate each - being conservative about aliasing must
+// not degrade into never freeing control-flow results, which would leak.
+
+// CHECK-LABEL: @distinct_sibling_results_precise
+util.func private @distinct_sibling_results_precise(%cond: i1, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %init0, %tp_a = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %init1, %tp_b = stream.resource.alloca uninitialized await(%tp_a) => !stream.resource<transient>{%size} => !stream.timepoint
+  %itp0 = stream.timepoint.join max(%tp_a, %tp_b) => !stream.timepoint
+  // CHECK: %[[LOOP:.+]]:3 = scf.for
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%a0 = %init0, %a1 = %init1, %itp = %itp0)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    // Each result is a distinct buffer regardless of which branch runs: the then
+    // branch yields two separately-allocated resources; the else branch forwards
+    // two distinctly-initialized iter_args.
+    %inner:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %l0, %ltp0 = stream.resource.alloca uninitialized await(%itp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %l1, %ltp1 = stream.resource.alloca uninitialized await(%itp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %jj = stream.timepoint.join max(%ltp0, %ltp1) => !stream.timepoint
+      %uu = stream.test.timeline_op await(%jj) =>
+        with(%l0, %l1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+      scf.yield %l0, %l1, %uu : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %a0, %a1, %itp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %inner#0, %inner#1, %inner#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // Distinct buffers, so each result must still be freed (not leaked).
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[LOOP]]#0
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[LOOP]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+// -----
+
+// Tests that a resource used only as an scf.while init is not deallocated before
+// the loop that consumes it. The init is passed as an operand (not referenced
+// inside either region) and is carried through the loop, then read after it via
+// the while results; because the while results are the inits on a zero-trip, the
+// init's lifetime extends to the results. Freeing it right after its alloca
+// would leave the loop body and the post-loop reader using freed memory. This is
+// the scf.while counterpart of @loop_iter_arg_initial_alloca_lifetime.
+
+// CHECK-LABEL: @while_init_arg_lifetime
+util.func private @while_init_arg_lifetime(%input_tp: !stream.timepoint, %size: index, %bound: index) -> (!stream.resource<transient>, !stream.timepoint) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %w:2 = scf.while (%iter = %init, %tp = %init_tp) : (!stream.resource<transient>, !stream.timepoint) -> (!stream.resource<transient>, !stream.timepoint) {
+    %cond = arith.cmpi slt, %c0, %bound : index
+    scf.condition(%cond) %iter, %tp : !stream.resource<transient>, !stream.timepoint
+  } do {
+  ^bb0(%body_res: !stream.resource<transient>, %body_tp: !stream.timepoint):
+    %cmd_tp = stream.test.timeline_op await(%body_tp) =>
+      with(%body_res) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %body_res, %cmd_tp : !stream.resource<transient>, !stream.timepoint
+  }
+  // CHECK: util.return
+  util.return %w#0, %w#1 : !stream.resource<transient>, !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC tracks aliasing across an scf.while when the values are
+// reordered and the arities differ: 4 inits feed 3 results, and scf.condition
+// swaps the two aliasing values (result 0 comes from init 1, result 1 from
+// init 0). Both results still trace back to %shared, so ARC must not deallocate
+// them independently - it cannot assume a result lines up with the same-indexed
+// init, and must follow the actual operand routing.
+
+// CHECK-LABEL: @while_asymmetric_reordered_aliased_results
+util.func private @while_asymmetric_reordered_aliased_results(%input_tp: !stream.timepoint, %size: index, %bound: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %shared, %shared_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %other, %other_tp = stream.resource.alloca uninitialized await(%shared_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %w:3 = scf.while (%i0 = %shared, %i1 = %shared, %i2 = %other, %t = %other_tp)
+      : (!stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint)
+     -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %cond = arith.cmpi slt, %c0, %bound : index
+    // Reordered and narrowed: result 0 <- %i1, result 1 <- %i0, %i2 dropped.
+    scf.condition(%cond) %i1, %i0, %t : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } do {
+  ^bb0(%a0: !stream.resource<transient>, %a1: !stream.resource<transient>, %at: !stream.timepoint):
+    %cmd_tp = stream.test.timeline_op await(%at) =>
+      with(%a0) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %a1, %a0, %other, %cmd_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%w#2) =>
+    with(%w#0, %w#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC tracks aliasing transitively through three levels of nesting
+// (scf.if inside scf.while inside scf.for). One allocation made in the innermost
+// branch escapes into two distinct outer loop results, so the two results denote
+// the same buffer only after that allocation is traced out through all three
+// nested ops. ARC must still find the alias and not deallocate them independently.
+
+// CHECK-LABEL: @deep_transitive_aliased_results
+util.func private @deep_transitive_aliased_results(%cond: i1, %input_tp: !stream.timepoint, %size: index, %bound: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%f0 = %init, %f1 = %init, %ft = %init_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %w:3 = scf.while (%w0 = %f0, %w1 = %f1, %wt = %ft)
+        : (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint)
+       -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %continue = arith.cmpi slt, %c0, %bound : index
+      scf.condition(%continue) %w0, %w1, %wt : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } do {
+    ^bb0(%b0: !stream.resource<transient>, %b1: !stream.resource<transient>, %bt: !stream.timepoint):
+      %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+        %deep, %deep_tp = stream.resource.alloca uninitialized await(%bt) => !stream.resource<transient>{%size} => !stream.timepoint
+        %deep_use = stream.test.timeline_op await(%deep_tp) =>
+          with(%deep) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+        // One allocation into BOTH results, three levels down.
+        scf.yield %deep, %deep, %deep_use : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+      } else {
+        scf.yield %b0, %b1, %bt : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+      }
+      scf.yield %if#0, %if#1, %if#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %w#0, %w#1, %w#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC unifies an alias established by a tied result before comparing
+// loop results. One loop slot carries %local; the other carries the resource
+// result of stream.timepoint.await on %local, which is tied to (the same
+// allocation as) %local. The two loop results are distinct SSA values but one
+// buffer, so ARC must not deallocate them independently.
+
+// CHECK-LABEL: @tie_chain_aliased_across_loop_phi
+util.func private @tie_chain_aliased_across_loop_phi(%cond: i1, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%f0 = %init, %f1 = %init, %ft = %init_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %local, %local_tp = stream.resource.alloca uninitialized await(%ft) => !stream.resource<transient>{%size} => !stream.timepoint
+      %use_tp = stream.test.timeline_op await(%local_tp) =>
+        with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+      // Tied result: %awaited is the same allocation as %local.
+      %awaited = stream.timepoint.await %use_tp => %local : !stream.resource<transient>{%size}
+      scf.yield %local, %awaited, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %f0, %f1, %ft : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %if#0, %if#1, %if#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC treats a stream.resource.subview as an alias of its source
+// across a loop. One loop slot carries %local, the other a subview of %local. A
+// subview is a view into its source allocation, so both loop results denote the
+// same underlying buffer; freeing either would free that buffer, so ARC must not
+// deallocate them independently.
+
+// CHECK-LABEL: @subview_aliased_across_loop_phi
+util.func private @subview_aliased_across_loop_phi(%cond: i1, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 64 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%f0 = %init, %f1 = %init, %ft = %init_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %local, %local_tp = stream.resource.alloca uninitialized await(%ft) => !stream.resource<transient>{%size} => !stream.timepoint
+      %use_tp = stream.test.timeline_op await(%local_tp) =>
+        with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+      %sub = stream.resource.subview %local[%c64] : !stream.resource<transient>{%size} -> !stream.resource<transient>{%c64}
+      scf.yield %local, %sub, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %f0, %f1, %ft : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %if#0, %if#1, %if#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%c64}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that the double-free is avoided for a multi-region branch beyond the
+// scf.for/if/while forms: an scf.index_switch yields one allocation into two of
+// its results from a case region. The two results are that one buffer on the
+// case path, so ARC must not deallocate them independently - whether it reasons
+// about the switch precisely or conservatively leaves such results alone, the
+// requirement is the same: no double-free.
+
+// CHECK-LABEL: @index_switch_aliased_results
+util.func private @index_switch_aliased_results(%flag: index, %input_tp: !stream.timepoint, %size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %init, %init_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%f0 = %init, %f1 = %init, %ft = %init_tp)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %sw:3 = scf.index_switch %flag -> !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    case 0 {
+      %local, %local_tp = stream.resource.alloca uninitialized await(%ft) => !stream.resource<transient>{%size} => !stream.timepoint
+      %use_tp = stream.test.timeline_op await(%local_tp) =>
+        with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+      scf.yield %local, %local, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    default {
+      scf.yield %f0, %f1, %ft : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %sw#0, %sw#1, %sw#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC stays precise under deep nesting (the distinct-buffer
+// counterpart of @deep_transitive_aliased_results). Two results are carried
+// through scf.if inside scf.while inside scf.for, but their backings are distinct
+// on every path (separate in-branch allocas, separate inits). ARC must still
+// deallocate each - deep nesting must not make it give up and leave carried
+// results unfreed.
+
+// CHECK-LABEL: @deeply_nested_distinct_results_precise
+util.func private @deeply_nested_distinct_results_precise(%cond: i1, %input_tp: !stream.timepoint, %size: index, %bound: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %init0, %tp_a = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %init1, %tp_b = stream.resource.alloca uninitialized await(%tp_a) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[LOOP:.+]]:3 = scf.for
+  %loop:3 = scf.for %i = %c0 to %c4 step %c1 iter_args(%f0 = %init0, %f1 = %init1, %ft = %tp_b)
+      -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %w:3 = scf.while (%w0 = %f0, %w1 = %f1, %wt = %ft)
+        : (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint)
+       -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %continue = arith.cmpi slt, %c0, %bound : index
+      scf.condition(%continue) %w0, %w1, %wt : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } do {
+    ^bb0(%b0: !stream.resource<transient>, %b1: !stream.resource<transient>, %bt: !stream.timepoint):
+      %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+        %d0, %d0_tp = stream.resource.alloca uninitialized await(%bt) => !stream.resource<transient>{%size} => !stream.timepoint
+        %d1, %d1_tp = stream.resource.alloca uninitialized await(%bt) => !stream.resource<transient>{%size} => !stream.timepoint
+        %joined = stream.timepoint.join max(%d0_tp, %d1_tp) => !stream.timepoint
+        %deep_use = stream.test.timeline_op await(%joined) =>
+          with(%d0, %d1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+        scf.yield %d0, %d1, %deep_use : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+      } else {
+        scf.yield %b0, %b1, %bt : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+      }
+      scf.yield %if#0, %if#1, %if#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %w#0, %w#1, %w#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%loop#2) =>
+    with(%loop#0, %loop#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // Distinct backings on every path => both results are still freed.
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[LOOP]]#0
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[LOOP]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that the double-free is avoided with no loop at all - the minimal shape
+// is two nested scf.if ops. The inner scf.if yields the same %local into two of
+// its results (where the alias is visible as the same SSA value); the outer
+// scf.if forwards those two inner results - now distinct SSA values with no tie -
+// into two of its own results. On any execution that enters both inner branches
+// the two outer results are %local; ARC cannot know the branch outcomes, so it
+// must treat them as a possible alias and not deallocate them independently. Two
+// levels are what expose the defect: the outer op re-presents the inner alias as
+// two different values that still denote one buffer.
+//
+// Paired with @nested_ifs_distinct_results_no_loop (same shape, genuinely
+// distinct buffers, still freed) to show the merge here is driven by the
+// aliasing rather than by ARC refusing to free control-flow results.
+
+// CHECK-LABEL: @nested_ifs_aliased_results_no_loop
+util.func private @nested_ifs_aliased_results_no_loop(%cond0: i1, %cond1: i1, %input_tp: !stream.timepoint, %size: index, %fallback0: !stream.resource<transient>, %fallback1: !stream.resource<transient>) -> !stream.timepoint {
+  // CHECK-NOT: stream.resource.dealloca
+  %outer:3 = scf.if %cond0 -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %inner:3 = scf.if %cond1 -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %local, %local_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %use_tp = stream.test.timeline_op await(%local_tp) =>
+        with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+      // Same %local into both inner results.
+      scf.yield %local, %local, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    // Forward the two inner results: distinct SSA values, same buffer on this path.
+    scf.yield %inner#0, %inner#1, %inner#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } else {
+    scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%outer#2) =>
+    with(%outer#0, %outer#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC still frees both results in the distinct-buffer control for
+// @nested_ifs_aliased_results_no_loop: the same two-level nested scf.if shape,
+// but the inner branch allocates two separate resources, so the two outer
+// results never denote the same buffer. Both must still be deallocated.
+
+// CHECK-LABEL: @nested_ifs_distinct_results_no_loop
+util.func private @nested_ifs_distinct_results_no_loop(%cond0: i1, %cond1: i1, %input_tp: !stream.timepoint, %size: index, %fallback0: !stream.resource<transient>, %fallback1: !stream.resource<transient>) -> !stream.timepoint {
+  // CHECK: %[[OUTER:.+]]:3 = scf.if
+  %outer:3 = scf.if %cond0 -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %inner:3 = scf.if %cond1 -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+      %local0, %local0_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %local1, %local1_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+      %joined = stream.timepoint.join max(%local0_tp, %local1_tp) => !stream.timepoint
+      %use_tp = stream.test.timeline_op await(%joined) =>
+        with(%local0, %local1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+      scf.yield %local0, %local1, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    } else {
+      scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+    }
+    scf.yield %inner#0, %inner#1, %inner#2 : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } else {
+    scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%outer#2) =>
+    with(%outer#0, %outer#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // Distinct backings => both results are still freed.
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[OUTER]]#0
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[OUTER]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC emits no deallocation when the same SSA resource is yielded
+// into two results of a single scf.if - both results are that one buffer, so
+// freeing each independently would double-free it.
+
+// CHECK-LABEL: @if_same_resource_into_multiple_results
+util.func private @if_same_resource_into_multiple_results(%cond: i1, %input_tp: !stream.timepoint, %size: index, %fallback0: !stream.resource<transient>, %fallback1: !stream.resource<transient>) -> !stream.timepoint {
+  // CHECK-NOT: stream.resource.dealloca
+  %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %local, %local_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %use_tp = stream.test.timeline_op await(%local_tp) =>
+      with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %local, %local, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } else {
+    scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%if#2) =>
+    with(%if#0, %if#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC still frees both results in the distinct-buffer counterpart of
+// @if_same_resource_into_multiple_results: one scf.if yields two separately
+// allocated resources into its two results, which never denote the same buffer.
+
+// CHECK-LABEL: @if_distinct_resources_into_multiple_results
+util.func private @if_distinct_resources_into_multiple_results(%cond: i1, %input_tp: !stream.timepoint, %size: index, %fallback0: !stream.resource<transient>, %fallback1: !stream.resource<transient>) -> !stream.timepoint {
+  // CHECK: %[[IF:.+]]:3 = scf.if
+  %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %local0, %local0_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %local1, %local1_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %joined = stream.timepoint.join max(%local0_tp, %local1_tp) => !stream.timepoint
+    %use_tp = stream.test.timeline_op await(%joined) =>
+      with(%local0, %local1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %local0, %local1, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } else {
+    scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%if#2) =>
+    with(%if#0, %if#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[IF]]#0
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[IF]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC recognizes a tied alias yielded alongside its source into two
+// results of one scf.if: %local and the resource result of
+// stream.timepoint.await on %local (tied to it, hence the same allocation) are
+// distinct SSA values but one buffer, so neither may be deallocated independently.
+
+// CHECK-LABEL: @if_tied_alias_into_multiple_results
+util.func private @if_tied_alias_into_multiple_results(%cond: i1, %input_tp: !stream.timepoint, %size: index, %fallback0: !stream.resource<transient>, %fallback1: !stream.resource<transient>) -> !stream.timepoint {
+  // CHECK-NOT: stream.resource.dealloca
+  %if:3 = scf.if %cond -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %local, %local_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+    %use_tp = stream.test.timeline_op await(%local_tp) =>
+      with(%local) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    %awaited = stream.timepoint.await %use_tp => %local : !stream.resource<transient>{%size}
+    scf.yield %local, %awaited, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } else {
+    scf.yield %fallback0, %fallback1, %input_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%if#2) =>
+    with(%if#0, %if#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC emits no deallocation when scf.condition forwards the same
+// before-region argument into two while results - both are that one buffer, so
+// freeing each independently would double-free it.
+
+// CHECK-LABEL: @while_same_resource_into_multiple_results
+util.func private @while_same_resource_into_multiple_results(%input_tp: !stream.timepoint, %size: index, %bound: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  // CHECK-NOT: stream.resource.dealloca
+  %shared, %shared_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %w:3 = scf.while (%iter = %shared, %tp = %shared_tp) : (!stream.resource<transient>, !stream.timepoint) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %continue = arith.cmpi slt, %c0, %bound : index
+    scf.condition(%continue) %iter, %iter, %tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } do {
+  ^bb0(%a0: !stream.resource<transient>, %a1: !stream.resource<transient>, %at: !stream.timepoint):
+    %use_tp = stream.test.timeline_op await(%at) =>
+      with(%a0) : (!stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %a0, %use_tp : !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%w#2) =>
+    with(%w#0, %w#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}
+
+// -----
+
+// Tests that ARC still frees both results in the distinct-buffer counterpart of
+// @while_same_resource_into_multiple_results: scf.condition forwards two
+// distinct-init before-region arguments into two while results, which never
+// denote the same buffer.
+
+// CHECK-LABEL: @while_distinct_resources_into_multiple_results
+util.func private @while_distinct_resources_into_multiple_results(%input_tp: !stream.timepoint, %size: index, %bound: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %res0, %res0_tp = stream.resource.alloca uninitialized await(%input_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  %res1, %res1_tp = stream.resource.alloca uninitialized await(%res0_tp) => !stream.resource<transient>{%size} => !stream.timepoint
+  // CHECK: %[[W:.+]]:3 = scf.while
+  %w:3 = scf.while (%i0 = %res0, %i1 = %res1, %tp = %res1_tp) : (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) -> (!stream.resource<transient>, !stream.resource<transient>, !stream.timepoint) {
+    %continue = arith.cmpi slt, %c0, %bound : index
+    scf.condition(%continue) %i0, %i1, %tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  } do {
+  ^bb0(%a0: !stream.resource<transient>, %a1: !stream.resource<transient>, %at: !stream.timepoint):
+    %use_tp = stream.test.timeline_op await(%at) =>
+      with(%a0, %a1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+    scf.yield %a0, %a1, %use_tp : !stream.resource<transient>, !stream.resource<transient>, !stream.timepoint
+  }
+  %fin = stream.test.timeline_op await(%w#2) =>
+    with(%w#0, %w#1) : (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) -> () => !stream.timepoint
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[W]]#0
+  // CHECK-DAG: stream.resource.dealloca {{.*}}=> %[[W]]#1
+  // CHECK: util.return
+  util.return %fin : !stream.timepoint
+}

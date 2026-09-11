@@ -23,6 +23,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -673,26 +674,186 @@ static void extendCapturedResourceLifetimes(Region &region,
   }
 }
 
+// An *underlying resource* of a resource SSA value is a terminal value of the
+// backward walk below: a value this analysis cannot see *through*, which
+// therefore stands in as the identity of a distinct backing allocation. (The
+// term follows upstream MLIR's LocalAliasAnalysis, which calls these the
+// "underlying values" of an address.) A value is underlying when it is:
+//   - the result of a producer with no visible source (stream.resource.alloca,
+//     a dispatch result, ...);
+//   - a block argument that is not a region-entry argument of a structured
+//     control-flow op (a function argument, an unstructured cf block arg);
+//   - any successor input a RegionBranchOpInterface op declines to map back to
+//     predecessor operands (conservative bail-out).
+//
+// An underlying resource need NOT be an allocation. These sets are only ever
+// compared for shared membership between two results, so all an underlying
+// value must provide is a stable SSA value with the property: *if two
+// results can denote the same backing buffer at runtime, their underlying sets
+// intersect*. Aliasing is consequently discovered only through SSA
+// connectivity.
+//
+// Collects every underlying value the |value| may resolve to at runtime:
+//   - tied-operand chains (findTiedBaseValue; e.g. stream.timepoint.await,
+//     transfers, and stream.resource.subview which is tied) and view ops;
+//   - control-flow phis of any RegionBranchOpInterface op:
+//     An op result or a region-entry block argument
+//     is resolved *through the interface* to the operands feeding it on every
+//     incoming edge (loop init and back edge, if then/else, while condition).
+//
+// This is a conservative may-analysis used to decide whether two distinct
+// yielded results *may* share a backing allocation on some path. It unions
+// every reachable incoming value.
+static void collectUnderlyingResources(Value value, DenseSet<Value> &visited,
+                                       DenseSet<Value> &underlyingValues);
+
+// Collects underlying resources for a RegionBranchOpInterface successor input.
+// Falls back to treating it as underlying if it is not a mapped successor input
+// (e.g. an scf.for induction variable) or has no predecessors.
+static void collectRegionBranchUnderlyingResources(
+    RegionBranchOpInterface branch, RegionSuccessor successor,
+    Value successorInputValue, DenseSet<Value> &visited,
+    DenseSet<Value> &underlyingValues) {
+  // The i-th successor input is fed by the i-th predecessor value, so map
+  // |successorInputValue| to its position within the inputs. A miss covers
+  // both the out-of-range and the scf.for induction-variable cases.
+  ValueRange inputs = branch.getSuccessorInputs(successor);
+  auto it = llvm::find(inputs, successorInputValue);
+  if (it == inputs.end()) {
+    underlyingValues.insert(successorInputValue);
+    return;
+  }
+  int inputIndex = static_cast<int>(std::distance(inputs.begin(), it));
+  SmallVector<Value> predecessorValues;
+  branch.getPredecessorValues(successor, inputIndex, predecessorValues);
+  if (predecessorValues.empty()) {
+    underlyingValues.insert(successorInputValue);
+    return;
+  }
+  // Descend into every incoming edge.
+  for (Value predecessorValue : predecessorValues) {
+    collectUnderlyingResources(predecessorValue, visited, underlyingValues);
+  }
+}
+
+static void collectUnderlyingResources(Value value, DenseSet<Value> &visited,
+                                       DenseSet<Value> &underlyingValues) {
+  if (!value || !isa<IREE::Stream::ResourceType>(value.getType())) {
+    return;
+  }
+  if (!visited.insert(value).second) {
+    return; // already visited (breaks loop back-edge cycles)
+  }
+
+  // Follow tied-operand chains to a base (await/transfer/tied dispatch results,
+  // and stream.resource.subview which is tied). Non-tied values resolve to
+  // themselves and fall through.
+  Value base = IREE::Util::TiedOpInterface::findTiedBaseValue(value);
+  if (base && base != value) {
+    collectUnderlyingResources(base, visited, underlyingValues);
+    return;
+  }
+
+  // Region-entry block argument of a structured control-flow op: resolve
+  // through the branch edges into that region (loop init + back edge, etc.).
+  if (auto blockArg = dyn_cast<BlockArgument>(value)) {
+    Block *block = blockArg.getOwner();
+    if (block->isEntryBlock()) {
+      if (auto branch = dyn_cast_or_null<RegionBranchOpInterface>(
+              block->getParentOp())) {
+        Region *region = block->getParent();
+        SmallVector<RegionSuccessor> successors;
+        branch.getSuccessorRegions(RegionBranchPoint::parent(), successors);
+        for (RegionSuccessor &successor : successors) {
+          if (successor.getSuccessor() == region) {
+            collectRegionBranchUnderlyingResources(branch, successor, value,
+                                                   visited, underlyingValues);
+            return;
+          }
+        }
+      }
+    }
+    // Unstructured / unknown block argument: underlying.
+    underlyingValues.insert(value);
+    return;
+  }
+
+  auto opResult = cast<OpResult>(value);
+  Operation *op = opResult.getOwner();
+
+  // View op (e.g. a non-tied resource view): unwrap to its source.
+  if (auto view = dyn_cast<ViewLikeOpInterface>(op)) {
+    if (value == view.getViewDest()) {
+      collectUnderlyingResources(view.getViewSource(), visited,
+                                 underlyingValues);
+      return;
+    }
+  }
+
+  // Result of a structured control-flow op: resolve through the branch edges
+  // back to the parent (if then/else; loop last-yield and zero-trip init;
+  // while condition).
+  if (auto branch = dyn_cast<RegionBranchOpInterface>(op)) {
+    collectRegionBranchUnderlyingResources(
+        branch, RegionSuccessor(branch.getOperation()), value, visited,
+        underlyingValues);
+    return;
+  }
+
+  // Producer we cannot see through (alloca, dispatch, ...): underlying.
+  underlyingValues.insert(value);
+}
+
 // Notes that |parentResult| may carry |yieldedResource| out of a region.
 //
-// A region can yield the same resource into multiple result positions. Those
-// parent results alias on that path, but this local ARC analysis cannot express
-// path-dependent aliases between control-flow results. Marking the whole alias
-// group indeterminate is conservative and prevents a deallocation through a
-// seemingly dropped sibling result while another sibling is still live.
+// A control-flow op result is an SSA phi over its incoming values (loop init /
+// back edge, if then/else) and may therefore share a backing allocation with a
+// *different* result on some path. This local analysis cannot express such
+// path-dependent aliases between control-flow results, so it detects them
+//  with two checks:
+//
+//   (1) Same base resource: the identical SSA value (or values unified by a
+//       tie chain via regionLastUseSet.lookupResource) yielded into multiple
+//       result positions.
+//   (2) Shared backing: two *distinct* yielded results that resolve to a common
+//       underlying resource (through nested scf results, loop-carried block
+//       args, or tie chains; see collectUnderlyingResources).
+//
+// Whenever a result collides with an earlier one under either check the whole
+// group is marked indeterminate; deallocating each independently would
+// otherwise double-free the shared backing and may race with a sibling reader.
+// A lone result never shares with another and is left deallocatable; the resulting leak is bounded to the
+// loop-exit results of an aliasing group.
 static void noteYieldedResourceResult(
     Value yieldedResource, Value parentResult, LastUseSet &regionLastUseSet,
     LastUseSet &parentLastUseSet, DenseMap<Value, Value> &yieldedBaseResultMap,
+    DenseMap<Value, Value> &yieldedUnderlyingResultMap,
     DenseSet<Value> &indeterminateResources,
     DenseSet<Value> &handledResources) {
   Value yieldedBaseResource = regionLastUseSet.lookupResource(yieldedResource);
   handledResources.insert(yieldedBaseResource);
 
+  // (1) Same base resource (identical SSA / region alias) yielded into multiple
+  // result positions.
   auto [it, inserted] =
       yieldedBaseResultMap.try_emplace(yieldedBaseResource, parentResult);
   if (!inserted) {
     indeterminateResources.insert(parentLastUseSet.lookupResource(it->second));
     indeterminateResources.insert(parentResult);
+  }
+
+  // (2) Distinct results that may share a backing allocation on some path.
+  DenseSet<Value> visited;
+  DenseSet<Value> underlyingValues;
+  collectUnderlyingResources(yieldedResource, visited, underlyingValues);
+  for (Value underlyingValue : underlyingValues) {
+    auto [uit, uinserted] =
+        yieldedUnderlyingResultMap.try_emplace(underlyingValue, parentResult);
+    if (!uinserted) {
+      indeterminateResources.insert(
+          parentLastUseSet.lookupResource(uit->second));
+      indeterminateResources.insert(parentResult);
+    }
   }
 }
 
@@ -759,13 +920,15 @@ static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
     auto *terminator = block.getTerminator();
     if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
       DenseMap<Value, Value> yieldedBaseResultMap;
+      DenseMap<Value, Value> yieldedUnderlyingResultMap;
       for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
         if (isa<IREE::Stream::ResourceType>(operand.getType())) {
           // Mark as handled to prevent local deallocation.
           Value forResult = forOp.getResult(index);
           noteYieldedResourceResult(operand, forResult, blockLastUseSet,
                                     lastUseSet, yieldedBaseResultMap,
-                                    indeterminateResources, handledResources);
+                                    yieldedUnderlyingResultMap, indeterminateResources,
+                                    handledResources);
           LLVM_DEBUG({
             llvm::dbgs() << "[arc]   resource ";
             operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -855,13 +1018,15 @@ static bool analyzeIfOp(scf::IfOp ifOp, AsmState *asmState,
       auto *terminator = block.getTerminator();
       if (auto yieldOp = dyn_cast<scf::YieldOp>(terminator)) {
         DenseMap<Value, Value> yieldedBaseResultMap;
+        DenseMap<Value, Value> yieldedUnderlyingResultMap;
         for (auto [index, operand] : llvm::enumerate(yieldOp.getOperands())) {
           if (isa<IREE::Stream::ResourceType>(operand.getType())) {
             // Mark as handled to prevent local deallocation.
             Value ifResult = ifOp.getResult(index);
             noteYieldedResourceResult(operand, ifResult, blockLastUseSet,
                                       lastUseSet, yieldedBaseResultMap,
-                                      indeterminateResources, handledResources);
+                                      yieldedUnderlyingResultMap, indeterminateResources,
+                                      handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -924,6 +1089,24 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
     llvm::dbgs() << "[arc] recognized scf.while with timepoint result\n";
   });
 
+  // Resource inits are phi-like exactly as scf.for's iter_args are (see
+  // analyzeForLoop): a while result may be the initial resource when the loop
+  // runs zero times, or a value produced by the body otherwise. Ownership
+  // therefore transfers to the while results and the parent scope must not
+  // independently deallocate an init.
+  //
+  // NOTE: unlike a captured resource, an init is *passed as an operand* rather
+  // than referenced inside the regions, so extendCapturedResourceLifetimes()
+  //  does not see it. Without this marking an init that is only forwarded
+  // through the loop has no recorded use beyond its own alloca and would be
+  // deallocated immediately after being allocated - a use-after-free of a
+  // buffer the loop (and anything reading the while results) still could need.
+  for (Value init : whileOp.getInits()) {
+    if (isa<IREE::Stream::ResourceType>(init.getType())) {
+      indeterminateResources.insert(lastUseSet.lookupResource(init));
+    }
+  }
+
   // Step 1: Find captured resources (defined outside, used inside either
   // region).
   extendCapturedResourceLifetimes(whileOp.getBefore(), whileResultTimepoint,
@@ -954,12 +1137,14 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
       if (auto conditionOp = dyn_cast<scf::ConditionOp>(terminator)) {
         // "before" region ends with scf.condition - args become while results.
         DenseMap<Value, Value> yieldedBaseResultMap;
+        DenseMap<Value, Value> yieldedUnderlyingResultMap;
         for (auto [index, operand] : llvm::enumerate(conditionOp.getArgs())) {
           if (isa<IREE::Stream::ResourceType>(operand.getType())) {
             Value whileResult = whileOp.getResult(index);
             noteYieldedResourceResult(operand, whileResult, blockLastUseSet,
                                       lastUseSet, yieldedBaseResultMap,
-                                      indeterminateResources, handledResources);
+                                      yieldedUnderlyingResultMap, indeterminateResources,
+                                      handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);
