@@ -161,6 +161,12 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
     }
     auto tilingLevelAttr = cast<IREE::Codegen::LoweringConfigTilingLevelAttr>(
         loweringConfig.getTilingLevelAttr(llvm::to_underlying(level)));
+    if (tilingLevelAttr.getSizes().size() > shapeAfterTiling.size()) {
+      return op->emitOpError("expected no more than ")
+             << shapeAfterTiling.size() << " tile sizes in the "
+             << IREE::CPU::getTilingLevelName(level) << " tiling level, but "
+             << tilingLevelAttr.getSizes().size() << " were set";
+    }
     for (size_t i = 0, e = tilingLevelAttr.getSizes().size(); i < e; ++i) {
       auto [size, scalableFlag] = getTileSizeAtIndex(
           tilingLevelAttr.getSizes(), tilingLevelAttr.getScalableFlags(), i);
