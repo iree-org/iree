@@ -10,10 +10,13 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/SmallSet.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/IRMapping.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchOps.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchTypes.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionDialect.h"
@@ -461,6 +464,18 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
     builtinTensorType = cast<Torch::NonValueTensorType>(torchType)
                             .getWithValueSemantics()
                             .toBuiltinTensor();
+    // Strip signedness from integer element types so that the import side
+    // matches the overwrite/alias side (which goes through
+    // `convertToBuiltinTensor` and folds to signless). Without this,
+    // signed-integer storage args produce a `tensor<NxsiNN>` import that
+    // can't legalize against the signless tensor flowing into the
+    // shape-query companion's `IREE::HAL::TensorAliasOp`. Mirrors
+    // convertImmutableTensorArg.
+    if (auto intTy =
+            dyn_cast<IntegerType>(builtinTensorType.getElementType())) {
+      builtinTensorType = builtinTensorType.clone(
+          builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+    }
   }
 
   // Propagate explicit affinities and ABI behavior to the read and write.
@@ -513,6 +528,315 @@ void retainFunctionAttributes(Operation *srcOp, IREE::Util::FuncOp destOp) {
       destOp->setAttr(attrName, attr);
     }
   }
+}
+
+//===----------------------------------------------------------------------===//
+// Output Shape Query Companion
+//===----------------------------------------------------------------------===//
+// A sibling public function `<name>$shape_query` -- the single source of
+// truth for querying the dynamic output shapes.
+// Runtime callers find it via the reflection attribute on the main func.
+//
+// ABI: data args from the main func, in original order, followed by one
+// extra mutable `!torch.tensor<[rank],si64>` arg per dynamic-shape result,
+// in result-index order.
+// The shape-query companion writes only the dynamic-slot indices with
+// runtime-resolved dim values; static slots are untouched. Therefore the
+// caller should pre-fill the static slots with the declared shape.
+//
+// Storage-arg handling: a mutable `!torch.tensor` arg ("storage arg") is
+// dropped from the companion's signature only if it is a pure write-only
+// output binding - every read of it (`Torch::CopyToValueTensorOp`) follows
+// every write (`Torch::OverwriteTensorContentsOp`) in source order. The
+// body rewrite then short-circuits each such read to the cloned write
+// source. Read-before-write storage args are kept in the signature; the
+// cloned read resolves to a load from the companion's own block arg, and
+// runtime callers must pass the storage buffer view alongside the regular
+// data inputs at companion-call time.
+//===----------------------------------------------------------------------===//
+
+/// Returns true if any vtensor result of `f` has at least one dynamic dim.
+static bool hasDynamicShapeResult(func::FuncOp f) {
+  for (Type t : f.getFunctionType().getResults()) {
+    auto vtType = dyn_cast<Torch::ValueTensorType>(t);
+    if (!vtType || !vtType.hasSizes()) {
+      continue;
+    }
+    for (int64_t s : vtType.getSizes()) {
+      if (s == Torch::kUnknownSize) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/// Returns the indices of mutable !torch.tensor args that the shape-query
+/// companion can drop from its signature.
+///
+/// An arg is droppable if it is written, and if there is any read, the read
+/// is after the write. Equivalently: every read can be replaced with the
+/// just-written value, so the arg itself is no longer needed.
+static llvm::SmallSet<unsigned, 4>
+getDroppableStorageArgIndices(func::FuncOp f) {
+  Block &entry = f.getBody().front();
+  // First-occurrence source-order positions of overwrites and copies, keyed
+  // by the storage arg.
+  llvm::DenseMap<Value, unsigned> firstOverwritePos;
+  llvm::DenseMap<Value, unsigned> firstCopyPos;
+  unsigned pos = 0;
+  for (Operation &op : entry.without_terminator()) {
+    if (auto ov = dyn_cast<Torch::OverwriteTensorContentsOp>(&op)) {
+      firstOverwritePos.try_emplace(ov.getOverwritten(), pos);
+    } else if (auto cp = dyn_cast<Torch::CopyToValueTensorOp>(&op)) {
+      firstCopyPos.try_emplace(cp.getOperand(), pos);
+    }
+    ++pos;
+  }
+  llvm::SmallSet<unsigned, 4> result;
+  for (unsigned i = 0; i < f.getNumArguments(); ++i) {
+    Value arg = f.getArgument(i);
+    if (!isa<Torch::NonValueTensorType>(arg.getType())) {
+      continue;
+    }
+    auto ovIt = firstOverwritePos.find(arg);
+    if (ovIt == firstOverwritePos.end()) {
+      continue;
+    }
+    auto cpIt = firstCopyPos.find(arg);
+    if (cpIt != firstCopyPos.end() && cpIt->second < ovIt->second) {
+      // Copy precedes overwrite -> the body's read can't be short-circuited;
+      // keep the arg so the companion's clone of the read remains in-region.
+      continue;
+    }
+    result.insert(i);
+  }
+  return result;
+}
+
+/// One dynamic-shape result of the main func: its position in the result
+/// list and the indices of its dynamic dims.
+struct DynResult {
+  unsigned resultIdx;
+  SmallVector<unsigned> dynamicDims;
+};
+
+/// The shape-query companion's signature pieces, derived from the main func.
+struct ShapeQueryCompanionSignature {
+  FunctionType type;
+  SmallVector<DictionaryAttr> argAttrs;
+  /// Indices into `mainFunc`'s arg list that map to shape-query companion
+  /// data args.
+  SmallVector<unsigned> mainDataArgIndices;
+};
+
+/// Returns the dynamic-shape results of `mainFunc`, in result-index order.
+static SmallVector<DynResult>
+collectDynamicShapeResults(func::FuncOp mainFunc) {
+  SmallVector<DynResult> dynResults;
+  FunctionType ft = mainFunc.getFunctionType();
+  for (unsigned r = 0; r < ft.getNumResults(); ++r) {
+    auto vtType = dyn_cast<Torch::ValueTensorType>(ft.getResult(r));
+    if (!vtType || !vtType.hasSizes()) {
+      continue;
+    }
+    SmallVector<unsigned> dynamicDims;
+    auto sizes = vtType.getSizes();
+    for (unsigned d = 0; d < sizes.size(); ++d) {
+      if (sizes[d] == Torch::kUnknownSize) {
+        dynamicDims.push_back(d);
+      }
+    }
+    if (!dynamicDims.empty()) {
+      dynResults.push_back({r, std::move(dynamicDims)});
+    }
+  }
+  return dynResults;
+}
+
+/// Builds the shape-query companion's FunctionType + arg attrs: main func's
+/// data args (droppable storage args) followed by one mutable
+/// `!torch.tensor<[rank],si64>` per dynamic-shape result. No return values.
+static ShapeQueryCompanionSignature
+buildShapeQueryCompanionSignature(func::FuncOp mainFunc,
+                                  ArrayRef<DynResult> dynResults) {
+  MLIRContext *ctx = mainFunc.getContext();
+  llvm::SmallSet<unsigned, 4> droppable =
+      getDroppableStorageArgIndices(mainFunc);
+
+  ShapeQueryCompanionSignature sig;
+  SmallVector<Type> inputTypes;
+  SmallVector<DictionaryAttr> mainArgAttrs;
+  mainFunc.getAllArgAttrs(mainArgAttrs);
+
+  for (unsigned i = 0; i < mainFunc.getNumArguments(); ++i) {
+    if (droppable.contains(i)) {
+      continue;
+    }
+    inputTypes.push_back(mainFunc.getArgument(i).getType());
+    if (!mainArgAttrs.empty()) {
+      sig.argAttrs.push_back(mainArgAttrs[i]);
+    }
+    sig.mainDataArgIndices.push_back(i);
+  }
+
+  Type si64 = IntegerType::get(ctx, 64, IntegerType::Signed);
+  FunctionType ft = mainFunc.getFunctionType();
+  for (const DynResult &dr : dynResults) {
+    auto resVt = cast<Torch::ValueTensorType>(ft.getResult(dr.resultIdx));
+    int64_t rank = static_cast<int64_t>(resVt.getSizes().size());
+    inputTypes.push_back(
+        Torch::NonValueTensorType::get(ctx, ArrayRef<int64_t>{rank}, si64));
+    if (!sig.argAttrs.empty()) {
+      sig.argAttrs.push_back(DictionaryAttr::get(ctx, {}));
+    }
+  }
+
+  sig.type = FunctionType::get(ctx, inputTypes, /*results=*/{});
+  return sig;
+}
+
+/// Clones every op in `srcEntry` into the companion body, in source order,
+/// while peeling away the in-place output binding pattern:
+///   - `Torch::OverwriteTensorContentsOp` is dropped; we remember which
+///     value was just written into which storage arg.
+///   - A later `Torch::CopyToValueTensorOp` of that same storage is also
+///     skipped, and its result is mapped to the remembered value.
+/// Reads with no matching prior overwrite clone normally; they resolve to the
+/// companion's own block arg via `mapping`.
+static void cloneBodyShortCircuitingStorage(Block *srcEntry, OpBuilder &builder,
+                                            IRMapping &mapping) {
+  llvm::DenseMap<Value, Value> storageToSrc;
+  for (Operation &op : srcEntry->without_terminator()) {
+    if (auto overwriteOp = dyn_cast<Torch::OverwriteTensorContentsOp>(&op)) {
+      storageToSrc[overwriteOp.getOverwritten()] =
+          mapping.lookupOrDefault(overwriteOp.getValue());
+      continue;
+    }
+    if (auto copyOp = dyn_cast<Torch::CopyToValueTensorOp>(&op)) {
+      auto it = storageToSrc.find(copyOp.getOperand());
+      if (it != storageToSrc.end()) {
+        // %src and the copy's result share a vtensor type by construction
+        // of `Torch::OverwriteTensorContentsOp`, so this substitution is
+        // type-safe.
+        mapping.map(copyOp.getResult(), it->second);
+        continue;
+      }
+    }
+    builder.clone(op, mapping);
+  }
+}
+
+/// Emits the partial-write sequence for one dynamic-shape result:
+///   read:  shape_buf -> vtensor -> builtin tensor
+///   per dynamic dim d: `tensor::InsertOp` (i64 of `tensor::DimOp`) at d
+///   write: builtin -> vtensor -> `Torch::OverwriteTensorContentsOp`
+/// Static slots are untouched.
+static void emitShapeBufferWriteback(OpBuilder &builder, Location loc,
+                                     const DynResult &dr, Value resultClone,
+                                     Value shapeArg) {
+  Type i64Type = builder.getI64Type();
+  auto shapeTorchTy = cast<Torch::NonValueTensorType>(shapeArg.getType());
+
+  // Bridge the cloned result tensor to a builtin tensor for tensor.dim.
+  auto vtType = cast<Torch::ValueTensorType>(resultClone.getType());
+  TensorType resBuiltinTy = vtType.toBuiltinTensor();
+  if (auto intTy = dyn_cast<IntegerType>(resBuiltinTy.getElementType())) {
+    resBuiltinTy = resBuiltinTy.clone(
+        builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+  }
+  Value resultBuiltin = TorchConversion::ToBuiltinTensorOp::create(
+      builder, loc, resBuiltinTy, resultClone);
+
+  Type shapeVtType = shapeTorchTy.getWithValueSemantics();
+  Value shapeVt =
+      Torch::CopyToValueTensorOp::create(builder, loc, shapeVtType, shapeArg);
+  int64_t rank = shapeTorchTy.getSizes()[0];
+  auto shapeBuiltinTy = RankedTensorType::get({rank}, i64Type);
+  Value shapeBuiltin = TorchConversion::ToBuiltinTensorOp::create(
+      builder, loc, shapeBuiltinTy, shapeVt);
+
+  Value cur = shapeBuiltin;
+  for (unsigned d : dr.dynamicDims) {
+    Value idx = arith::ConstantIndexOp::create(builder, loc, d);
+    Value dim = tensor::DimOp::create(builder, loc, resultBuiltin, idx);
+    Value dimI64 = arith::IndexCastOp::create(builder, loc, i64Type, dim);
+    cur = tensor::InsertOp::create(builder, loc, dimI64, cur, ValueRange{idx});
+  }
+
+  Value newShapeVt = TorchConversion::FromBuiltinTensorOp::create(
+      builder, loc, shapeVtType, cur);
+  Torch::OverwriteTensorContentsOp::create(builder, loc, newShapeVt, shapeArg);
+}
+
+/// Stamps `iree.abi.output_shape_query="<shapeQueryCompanionName>"` on
+/// `mainFunc`'s iree.reflection dict so runtime callers can discover the
+/// shape-query companion. Merges into any existing iree.reflection entries.
+static void stampOutputShapeQueryReflection(func::FuncOp mainFunc,
+                                            StringRef shapeQueryCompanionName,
+                                            OpBuilder &builder) {
+  MLIRContext *ctx = builder.getContext();
+  SmallVector<NamedAttribute> entries;
+  if (auto existing =
+          mainFunc->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+    llvm::append_range(entries, existing.getValue());
+  }
+  entries.emplace_back(builder.getStringAttr("iree.abi.output_shape_query"),
+                       builder.getStringAttr(shapeQueryCompanionName));
+  mainFunc->setAttr("iree.reflection", DictionaryAttr::get(ctx, entries));
+}
+
+/// Builds and inserts `<name>$shape_query` next to `mainFunc`, and stamps
+/// the `iree.abi.output_shape_query` reflection attribute on `mainFunc` so
+/// runtime callers can discover the shape-query companion.
+static func::FuncOp createTorchShapeQueryCompanion(func::FuncOp mainFunc,
+                                                   OpBuilder &builder) {
+  MLIRContext *ctx = builder.getContext();
+  Location loc = mainFunc.getLoc();
+
+  SmallVector<DynResult> dynResults = collectDynamicShapeResults(mainFunc);
+  ShapeQueryCompanionSignature sig =
+      buildShapeQueryCompanionSignature(mainFunc, dynResults);
+
+  std::string shapeQueryCompanionName =
+      mainFunc.getName().str() + "$shape_query";
+  auto shapeQueryCompanion =
+      func::FuncOp::create(builder, loc, shapeQueryCompanionName, sig.type);
+  shapeQueryCompanion.setPublic();
+  if (!sig.argAttrs.empty()) {
+    shapeQueryCompanion.setAllArgAttrs(sig.argAttrs);
+  }
+  Block *newEntry = shapeQueryCompanion.addEntryBlock();
+
+  // Map main func's data args to the shape-query companion's data args.
+  Block *srcEntry = &mainFunc.getBody().front();
+  IRMapping mapping;
+  for (unsigned k = 0; k < sig.mainDataArgIndices.size(); ++k) {
+    mapping.map(srcEntry->getArgument(sig.mainDataArgIndices[k]),
+                newEntry->getArgument(k));
+  }
+
+  // Phase A: clone the main func's body, short-circuiting the storage
+  // write-back path.
+  OpBuilder body(ctx);
+  body.setInsertionPointToEnd(newEntry);
+  cloneBodyShortCircuitingStorage(srcEntry, body, mapping);
+
+  // Phase B: per dynamic-shape result, partial-write its runtime dim values
+  // into the matching shape buffer arg.
+  Operation *srcReturn = srcEntry->getTerminator();
+  for (unsigned k = 0; k < dynResults.size(); ++k) {
+    Value resultClone =
+        mapping.lookupOrDefault(srcReturn->getOperand(dynResults[k].resultIdx));
+    Value shapeArg = newEntry->getArgument(sig.mainDataArgIndices.size() + k);
+    emitShapeBufferWriteback(body, loc, dynResults[k], resultClone, shapeArg);
+  }
+
+  func::ReturnOp::create(body, loc, ValueRange{});
+
+  stampOutputShapeQueryReflection(mainFunc, shapeQueryCompanion.getName(),
+                                  builder);
+  return shapeQueryCompanion;
 }
 
 void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
@@ -587,6 +911,7 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -595,6 +920,33 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
+
+    // Pre-pass: for every public torch func with a dynamic-shape result,
+    // synthesize a sibling `<name>$shape_query` companion and stamp
+    // `iree.abi.output_shape_query="<name>$shape_query"` on the main func's
+    // iree.reflection dict. We do this *before* the main conversion loop so
+    // the shape-query companion rides the same coarse-fences pipeline and
+    // emerges as a regular public sync wrapper, and so
+    // retainFunctionAttributes carries the reflection entry onto both the
+    // async and sync wrappers.
+    SmallVector<func::FuncOp> mainFuncsForShapeQueryCompanion;
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+      if (!shouldConvertFunc(funcOp)) {
+        continue;
+      }
+      // Don't recurse if this pass has already placed shape-query companions
+      // in the module from a prior run.
+      if (funcOp.getName().ends_with("$shape_query")) {
+        continue;
+      }
+      if (hasDynamicShapeResult(funcOp)) {
+        mainFuncsForShapeQueryCompanion.push_back(funcOp);
+      }
+    }
+    for (auto mainFunc : mainFuncsForShapeQueryCompanion) {
+      OpBuilder builder(mainFunc);
+      createTorchShapeQueryCompanion(mainFunc, builder);
+    }
 
     // Convert all functions in the module to IREE funcs. In this stage,
     // we convert contained return ops and argument/result types, but we have

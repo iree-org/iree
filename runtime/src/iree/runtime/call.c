@@ -123,3 +123,52 @@ IREE_API_EXPORT iree_status_t iree_runtime_call_outputs_pop_front_buffer_view(
   IREE_RETURN_IF_ERROR(iree_vm_list_pop_front_ref_move(call->outputs, &value));
   return iree_hal_buffer_view_check_deref(value, out_buffer_view);
 }
+
+//===----------------------------------------------------------------------===//
+// Output shape query
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_runtime_call_lookup_output_shape_query(
+    iree_runtime_session_t* session, iree_vm_function_t function,
+    iree_vm_function_t* out_query_function) {
+  IREE_ASSERT_ARGUMENT(session);
+  IREE_ASSERT_ARGUMENT(out_query_function);
+  memset(out_query_function, 0, sizeof(*out_query_function));
+
+  iree_string_view_t companion_name = iree_vm_function_lookup_attr_by_name(
+      &function, IREE_SV("iree.abi.output_shape_query"));
+  if (iree_string_view_is_empty(companion_name)) {
+    return iree_status_from_code(IREE_STATUS_NOT_FOUND);
+  }
+  if (function.module == NULL) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "function has no owning module to resolve "
+                            "shape-query companion '%.*s'",
+                            (int)companion_name.size, companion_name.data);
+  }
+  return iree_vm_module_lookup_function_by_name(
+      function.module, IREE_VM_FUNCTION_LINKAGE_EXPORT, companion_name,
+      out_query_function);
+}
+
+IREE_API_EXPORT iree_status_t iree_runtime_call_invoke_output_shape_query(
+    iree_runtime_session_t* session, iree_vm_function_t function,
+    iree_vm_list_t* inputs) {
+  IREE_ASSERT_ARGUMENT(session);
+  IREE_ASSERT_ARGUMENT(inputs);
+
+  iree_vm_function_t companion;
+  IREE_RETURN_IF_ERROR(iree_runtime_call_lookup_output_shape_query(
+      session, function, &companion));
+
+  iree_allocator_t host_allocator =
+      iree_runtime_session_host_allocator(session);
+  iree_vm_list_t* outputs = NULL;
+  IREE_RETURN_IF_ERROR(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                           /*initial_capacity=*/0,
+                                           host_allocator, &outputs));
+  iree_status_t status =
+      iree_runtime_session_call(session, &companion, inputs, outputs);
+  iree_vm_list_release(outputs);
+  return status;
+}

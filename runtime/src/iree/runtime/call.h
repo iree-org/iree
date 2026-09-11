@@ -111,6 +111,30 @@ IREE_API_EXPORT iree_status_t iree_runtime_call_inputs_push_back_buffer_view(
 IREE_API_EXPORT iree_status_t iree_runtime_call_outputs_pop_front_buffer_view(
     iree_runtime_call_t* call, iree_hal_buffer_view_t** out_buffer_view);
 
+//===----------------------------------------------------------------------===//
+// Output shape query
+//===----------------------------------------------------------------------===//
+// Helpers to resolve and invoke the `<name>$shape_query` companion the
+// compiler emits next to entry points with dynamic-shape results. The
+// companion writes runtime dim values into caller-supplied i64 shape
+// buffers (one per dynamic-shape result, rank-sized, pre-filled with the
+// declared shape; only dynamic-slot indices are touched). Discovery is via
+// the `iree.abi.output_shape_query` reflection attribute.
+
+// Resolves the shape-query companion for |function|.
+// Returns IREE_STATUS_NOT_FOUND if |function| has no dynamic-shape results.
+IREE_API_EXPORT iree_status_t iree_runtime_call_lookup_output_shape_query(
+    iree_runtime_session_t* session, iree_vm_function_t function,
+    iree_vm_function_t* out_query_function);
+
+// Invokes |function|'s shape-query companion with the supplied |inputs|.
+// |inputs| must hold |function|'s data inputs followed by one rank-sized
+// i64 HAL buffer view per dynamic-shape result, in result-index order.
+// Returns IREE_STATUS_NOT_FOUND if |function| has no dynamic-shape results.
+IREE_API_EXPORT iree_status_t iree_runtime_call_invoke_output_shape_query(
+    iree_runtime_session_t* session, iree_vm_function_t function,
+    iree_vm_list_t* inputs);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
