@@ -52,6 +52,7 @@ iree_lit_test_suite(
     "smoketest.mlir"
     "smoketest_hsaco.mlir"
     "target_device_features.mlir"
+    "target_feature_serialization.mlir"
   TOOLS
     FileCheck
     iree-opt

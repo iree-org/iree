@@ -210,6 +210,63 @@ const WgpDetails *getLLVMPIPEWgpDetails() {
 // to 64-bits.
 //===----------------------------------------------------------------------===//
 
+// CDNA5 WGP limits: sections 1 and 3 of the architecture white paper and
+// sections 3.2, 3.3.2, and 11.1 of the ISA reference.
+// https://www.amd.com/content/dam/amd/en/documents/products/technologies/cdna/amd-cdna5-whitepaper.pdf
+// https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/instruction-set-architectures/amd-instinct-cdna5-instruction-set-architecture.pdf
+const WgpDetails *getCDNA5WgpDetails() {
+  static const MMAIntrinsic cdna5MMAOps[] = {
+      // K=4.
+      MMAIntrinsic::WMMA_F32_16x16x4_F32,
+      // K=32.
+      MMAIntrinsic::WMMA_F32_16x16x32_F16,
+      MMAIntrinsic::WMMA_F32_16x16x32_BF16,
+      MMAIntrinsic::WMMA_F16_16x16x32_F16,
+      MMAIntrinsic::WMMA_BF16_16x16x32_BF16,
+      // K=64.
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_I32_16x16x64_I8,
+      // K=128.
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN,
+      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN,
+      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2,
+  };
+
+  // Scaled WMMA and asynchronous global-to-LDS lowering are not enabled yet.
+  static const WgpDetails cdna5Wgp = {allComputeBits,
+                                      allStorageBits,
+                                      allSubgroupOps,
+                                      DotProductOps::None,
+                                      /*mmaCount=*/std::size(cdna5MMAOps),
+                                      /*mmaOps=*/cdna5MMAOps,
+                                      /*scaledMmaCount=*/0,
+                                      /*scaledMmaOps=*/nullptr,
+                                      {32, 32},
+                                      {1024, 1024, 1024},
+                                      1024,
+                                      320 * 1024,
+                                      {0x7fffffff, 0x7fffffff, 0x7fffffff},
+                                      /*maxLoadInstructionBits=*/128,
+                                      /*simdsPerWgp=*/4,
+                                      // Up to 1024 32-bit VGPRs per thread.
+                                      /*vgprSpaceBits=*/1024 * 32,
+                                      /*dmaSizes=*/std::nullopt,
+                                      /*workgroupMemoryBankCount=*/64};
+  return &cdna5Wgp;
+}
+
 const WgpDetails *getCDNA4WgpDetails() {
   static const MMAIntrinsic cdna4MMAOps[] = {
       // Introduced in CDNA4
@@ -539,60 +596,8 @@ const WgpDetails *getRDNA1WgpDetails() {
   return &rdna1Wgp;
 }
 
-// Experimental gfx1250 WGP details.
-const WgpDetails *getGfx1250WgpDetails() {
-  static const MMAIntrinsic gfx1250MMAOps[] = {
-      // K=4.
-      MMAIntrinsic::WMMA_F32_16x16x4_F32,
-      // K=32.
-      MMAIntrinsic::WMMA_F32_16x16x32_F16,
-      MMAIntrinsic::WMMA_F32_16x16x32_BF16,
-      MMAIntrinsic::WMMA_F16_16x16x32_F16,
-      MMAIntrinsic::WMMA_BF16_16x16x32_BF16,
-      // K=64.
-      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN,
-      MMAIntrinsic::WMMA_F32_16x16x64_F8E4M3FN_F8E5M2,
-      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2,
-      MMAIntrinsic::WMMA_F32_16x16x64_F8E5M2_F8E4M3FN,
-      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN,
-      MMAIntrinsic::WMMA_F16_16x16x64_F8E4M3FN_F8E5M2,
-      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2,
-      MMAIntrinsic::WMMA_F16_16x16x64_F8E5M2_F8E4M3FN,
-      MMAIntrinsic::WMMA_I32_16x16x64_I8,
-      // K=128.
-      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2,
-      MMAIntrinsic::WMMA_F32_16x16x128_F8E5M2_F8E4M3FN,
-      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN,
-      MMAIntrinsic::WMMA_F32_16x16x128_F8E4M3FN_F8E5M2,
-      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2,
-      MMAIntrinsic::WMMA_F16_16x16x128_F8E5M2_F8E4M3FN,
-      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN,
-      MMAIntrinsic::WMMA_F16_16x16x128_F8E4M3FN_F8E5M2,
-  };
-
-  static const WgpDetails gfx1250Wgp = {allComputeBits,
-                                        allStorageBits,
-                                        allSubgroupOps,
-                                        DotProductOps::None,
-                                        /*mmaCount=*/std::size(gfx1250MMAOps),
-                                        /*mmaOps=*/gfx1250MMAOps,
-                                        /*scaledMmaCount=*/0,
-                                        /*scaledMmaOps=*/nullptr,
-                                        {32, 32},
-                                        {1024, 1024, 1024},
-                                        1024,
-                                        320 * 1024,
-                                        {0x7fffffff, 0x7fffffff, 0x7fffffff},
-                                        /*maxLoadInstructionBits=*/128,
-                                        /*simdsPerWgp=*/4,
-                                        // 4 banks of 256 32-bit registers.
-                                        /*vgprSpaceBits=*/256 * 4 * 32,
-                                        /*dmaSizes=*/std::nullopt,
-                                        /*workgroupMemoryBankCount=*/64};
-  return &gfx1250Wgp;
-}
-
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
+  const WgpDetails *cdna5Wgp = getCDNA5WgpDetails();
   const WgpDetails *cdna4Wgp = getCDNA4WgpDetails();
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
@@ -601,9 +606,21 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
   const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
   const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
-  const WgpDetails *gfx1250Wgp = getGfx1250WgpDetails(); // Experimental.
 
   // --- CDNA --- //
+  // "AMD Instinct MI455X GPU" feature summary in the CDNA5 white paper:
+  // https://www.amd.com/content/dam/amd/en/documents/products/technologies/cdna/amd-cdna5-whitepaper.pdf
+  // Matrix rates are converted from PFLOPs/s to TFLOPs/s. The white paper
+  // does not specify an INT8 rate.
+  static const ChipDetails mi455xChip = {256,
+                                         "mi455x",
+                                         23.3f,
+                                         {{ComputeBitwidths::FP32, 315.0f},
+                                          {ComputeBitwidths::FP16, 5030.0f},
+                                          {ComputeBitwidths::FP8, 20130.0f},
+                                          {ComputeBitwidths::FP6, 20130.0f},
+                                          {ComputeBitwidths::FP4, 40260.0f}}};
+
   // "AMD Instinct MI350 Series Product Offerings" in Page 18 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-4-architecture-whitepaper.pdf
   static const ChipDetails mi350xChip = {256,
@@ -798,6 +815,8 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Case("mi455x", TargetDetails{cdna5Wgp, &mi455xChip})
+      .Cases({"cdna5", "gfx1250"}, TargetDetails{cdna5Wgp, nullptr})
       .Case("mi355x", TargetDetails{cdna4Wgp, &mi355xChip})
       .Case("mi350x", TargetDetails{cdna4Wgp, &mi350xChip})
       .Cases({"cdna4", "gfx950"}, TargetDetails{cdna4Wgp, nullptr})
@@ -851,12 +870,12 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
              TargetDetails{rdna2Wgp, nullptr})
       .Cases({"rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013"},
              TargetDetails{rdna1Wgp, nullptr})
-      .Case("gfx1250", TargetDetails{gfx1250Wgp, nullptr})
       .Default(std::nullopt);
 }
 
 StringRef normalizeAMDGPUTarget(StringRef target) {
   return llvm::StringSwitch<StringRef>(target.lower())
+      .Cases({"mi455x", "cdna5", "gfx1250"}, /*Value=*/"gfx1250")
       .Cases({"mi350x", "mi355x", "gfx950"}, /*Value=*/"gfx950")
       .Cases({"mi300a", "mi300x", "mi308x", "mi325x", "gfx942"},
              /*Value=*/"gfx942")
@@ -872,7 +891,6 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases({"phoenix", "gfx1103"}, /*Value=*/"gfx1103")
       .Cases({"strix-point", "gfx1150"}, /*Value=*/"gfx1150")
       .Cases({"strix-halo", "gfx1151"}, /*Value=*/"gfx1151")
-      .Case("gfx1250", /*Value=*/"gfx1250")
       .Default("");
 }
 
@@ -1645,8 +1663,8 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
     return kCDNA4Seeds;
   }
 
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor<=1). Note: gfx1250 (minor=50)
-  // is a separate experimental target and should not use RDNA4 seeds.
+  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). CDNA5 is gfx1250
+  // (major=12, minor=5) and should not use RDNA4 seeds.
   bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
                  chipset->minorVersion <= 1;
   if (isRDNA4 || arch == "rdna4") {
