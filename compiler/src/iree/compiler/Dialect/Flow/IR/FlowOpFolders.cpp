@@ -864,6 +864,17 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.encode
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorEncodeOp::fold(FoldAdaptor operands) {
+  if (getOperand().getType() == getResult().getType()) {
+    return getOperand();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.barrier
 //===----------------------------------------------------------------------===//
 
