@@ -1180,3 +1180,35 @@ vm.module @my_module {
     vm.return
   }
 }
+
+// -----
+
+// A ref dying on a critical edge (multi-successor pred, multi-predecessor
+// succ) forces the pass to split the edge and place the discard in a new
+// block, with the other ref forwarded through it. Regression test: the pass
+// used to query liveness on the block it had just created, which the
+// analysis does not cover.
+// CHECK-LABEL: @discard_on_critical_edge
+// CHECK-SAME: (%[[FWD:[a-z0-9]+]]: !vm.buffer, %[[DEAD:[a-z0-9]+]]: !vm.buffer, %[[COND:[a-z0-9]+]]: i32)
+vm.module @my_module {
+  vm.import private @consume(!vm.buffer)
+  vm.func @discard_on_critical_edge(%fwd: !vm.buffer, %dead: !vm.buffer, %cond: i32) {
+    // CHECK: vm.cond_br %[[COND]], ^[[BB1:[a-zA-Z0-9]+]], ^[[SPLIT:[a-zA-Z0-9]+]](%[[FWD]] : !vm.buffer)
+    vm.cond_br %cond, ^bb1, ^bb2(%fwd : !vm.buffer)
+  ^bb1:
+    // CHECK: ^[[BB1]]:
+    // CHECK: vm.call @consume(%[[DEAD]])
+    // CHECK: vm.br ^[[JOIN:[a-zA-Z0-9]+]](%[[FWD]] : !vm.buffer)
+    vm.call @consume(%dead) : (!vm.buffer) -> ()
+    vm.br ^bb2(%fwd : !vm.buffer)
+  ^bb2(%arg: !vm.buffer):
+    // The split block discards the dead ref and forwards the live one.
+    // CHECK: ^[[SPLIT]](%[[SPLITARG:[a-z0-9]+]]: !vm.buffer):
+    // CHECK-NEXT: vm.discard.refs %[[DEAD]]
+    // CHECK-NEXT: vm.br ^[[JOIN]](%[[SPLITARG]] : !vm.buffer)
+    // CHECK: ^[[JOIN]](%[[JOINARG:[a-z0-9]+]]: !vm.buffer):
+    // CHECK: vm.call @consume(%[[JOINARG]])
+    vm.call @consume(%arg) : (!vm.buffer) -> ()
+    vm.return
+  }
+}

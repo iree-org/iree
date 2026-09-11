@@ -296,30 +296,27 @@ uint32_t LiveIntervals::findLastUse(Value value, ValueLiveness &liveness) {
   for (auto *block : blockOrder_) {
     // Check if value is live-in to this block (means it's live-out of
     // predecessor).
-    for (auto liveIn : liveness.getBlockLiveIns(block)) {
-      if (liveIn == value) {
-        // Value is live into this block, so it must be live until some use
-        // in this block or a successor. Find the last use in this block,
-        // including discards (see comment above about why).
-        for (auto &op : block->getOperations()) {
-          for (auto &operand : op.getOpOperands()) {
-            if (operand.get() == value) {
-              lastIndex = std::max(lastIndex, opToIndex_[&op]);
-            }
-          }
+    if (!liveness.isLiveIn(block, value)) {
+      continue;
+    }
+    // Value is live into this block, so it must be live until some use
+    // in this block or a successor. Find the last use in this block,
+    // including discards (see comment above about why).
+    for (auto &op : block->getOperations()) {
+      for (auto &operand : op.getOpOperands()) {
+        if (operand.get() == value) {
+          lastIndex = std::max(lastIndex, opToIndex_[&op]);
         }
-        // If the value is still needed (live-out), extend to block terminator.
-        // We check by seeing if any successor also has this value in liveIn.
-        Operation *terminator = block->getTerminator();
-        for (auto *successor : terminator->getSuccessors()) {
-          for (auto succLiveIn : liveness.getBlockLiveIns(successor)) {
-            if (succLiveIn == value) {
-              // Value is live-out of this block.
-              lastIndex = std::max(lastIndex, opToIndex_[terminator]);
-              break;
-            }
-          }
-        }
+      }
+    }
+    // If the value is still needed (live-out), extend to block terminator.
+    // We check by seeing if any successor also has this value in liveIn.
+    Operation *terminator = block->getTerminator();
+    for (auto *successor : terminator->getSuccessors()) {
+      if (liveness.isLiveIn(successor, value)) {
+        // Value is live-out of this block.
+        lastIndex = std::max(lastIndex, opToIndex_[terminator]);
+        break;
       }
     }
   }
