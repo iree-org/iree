@@ -984,3 +984,114 @@ util.func public @multiAffinityLotsOfDevices(%wait_timepoint: !stream.timepoint)
 
   util.return
 }
+
+// -----
+
+// Tests that constants are split into multiple batches when their total size
+// exceeds the max allocation size from the resource config. With a 16-byte
+// limit and an 8-byte + 16-byte constant, the second spills to a new batch.
+
+#splitConstantsBySize = #stream.resource_config<{
+  max_allocation_size = 16,
+  min_buffer_offset_alignment = 16,
+  max_buffer_range = 1073741824,
+  min_buffer_range_alignment = 16,
+  index_bits = 32
+}>
+
+// CHECK-LABEL: @splitConstantsByMaxAllocationSize
+util.func public @splitConstantsByMaxAllocationSize(%timepoint: !stream.timepoint)
+    attributes {stream.resources = #splitConstantsBySize} {
+  %c8 = arith.constant 8 : index
+  %c16 = arith.constant 16 : index
+
+  // An 8-byte and a 16-byte constant. The bucket logic adds raw sizes:
+  // bucket has 8, adding 16 = 24 > 16, so the second spills to a new batch.
+
+  // CHECK: %[[CST0:.+]], %[[CST0_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+
+  // CHECK: %[[CST1:.+]], %[[CST1_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<4> : tensor<16xi8>
+
+  %results:2, %result_timepoint = stream.async.execute await(%timepoint) => with() -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}) {
+    %cst0 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
+    %cst1 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<16xi8>
+    stream.yield %cst0, %cst1 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+
+  util.optimization_barrier %results#0 : !stream.resource<constant>
+  util.optimization_barrier %results#1 : !stream.resource<constant>
+  util.return
+}
+
+// -----
+
+// Tests that a single constant exceeding the max allocation size still gets
+// allocated (does not cause an infinite loop).
+
+#singleConstantExceedsSize = #stream.resource_config<{
+  max_allocation_size = 4,
+  min_buffer_offset_alignment = 16,
+  max_buffer_range = 1073741824,
+  min_buffer_range_alignment = 16,
+  index_bits = 32
+}>
+
+// CHECK-LABEL: @singleConstantExceedsMaxAllocationSize
+util.func public @singleConstantExceedsMaxAllocationSize(%timepoint: !stream.timepoint)
+    attributes {stream.resources = #singleConstantExceedsSize} {
+  %c16 = arith.constant 16 : index
+
+  // The constant is 16 bytes but the limit is 4 bytes.
+  // It still gets its own batch (the bucket starts empty so it's added).
+  // CHECK: %[[CST:.+]], %[[CST_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<5> : tensor<16xi8>
+
+  %result, %result_timepoint = stream.async.execute await(%timepoint) => with() -> (!stream.resource<constant>{%c16}) {
+    %cst = stream.async.constant : !stream.resource<constant>{%c16} = dense<5> : tensor<16xi8>
+    stream.yield %cst : !stream.resource<constant>{%c16}
+  } => !stream.timepoint
+
+  util.optimization_barrier %result : !stream.resource<constant>
+  util.return
+}
+
+// -----
+
+// Tests that results are split into multiple allocations when their total size
+// exceeds the max allocation size from the resource config.
+
+#splitResultsBySize = #stream.resource_config<{
+  max_allocation_size = 100,
+  min_buffer_offset_alignment = 16,
+  max_buffer_range = 1073741824,
+  min_buffer_range_alignment = 16,
+  index_bits = 32
+}>
+
+// CHECK-LABEL: @splitResultsByMaxAllocationSize
+util.func public @splitResultsByMaxAllocationSize()
+    attributes {stream.resources = #splitResultsBySize} {
+  %c64 = arith.constant 64 : index
+  %c128 = arith.constant 128 : index
+  %c254_i32 = arith.constant 254 : i32
+  %c255_i32 = arith.constant 255 : i32
+
+  // Two results: 64 bytes and 128 bytes. The first fits (64 <= 100), but
+  // adding the second would exceed (64 + 128 = 192 > 100). So they should be
+  // allocated separately, each getting its own alloca.
+  // CHECK: stream.resource.alloca uninitialized
+  // CHECK: stream.resource.alloca uninitialized
+
+  %results:2, %result_timepoint = stream.async.execute with() -> (!stream.resource<transient>{%c64}, !stream.resource<transient>{%c128}) {
+    %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%c64}
+    %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c128}
+    stream.yield %0, %1 : !stream.resource<transient>{%c64}, !stream.resource<transient>{%c128}
+  } => !stream.timepoint
+
+  util.optimization_barrier %result_timepoint : !stream.timepoint
+  util.optimization_barrier %results#0 : !stream.resource<transient>
+  util.optimization_barrier %results#1 : !stream.resource<transient>
+  util.return
+}
