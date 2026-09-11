@@ -250,6 +250,93 @@ func.func @scatter_rank_mismatch(
 
 // -----
 
+func.func @group_matmul_invalid_dimensions(
+    %input: tensor<4x8xf32>, %weights: tensor<2x7x3xf32>,
+    %offsets: tensor<2xi64>, %output: tensor<4x3xf32>) -> tensor<4x3xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{input's N dimension must match expert_weights' N}}
+  %result = iree_linalg_ext.group_matmul ins(
+      %input, %weights, %offsets, %c0 : tensor<4x8xf32>, tensor<2x7x3xf32>,
+      tensor<2xi64>, index) outs(%output : tensor<4x3xf32>)
+      -> tensor<4x3xf32>
+  return %result : tensor<4x3xf32>
+}
+
+// -----
+
+func.func @group_matmul_invalid_expert_count(
+    %input: tensor<4x8xf32>, %weights: tensor<2x8x3xf32>,
+    %offsets: tensor<3xi64>, %output: tensor<4x3xf32>) -> tensor<4x3xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{expert_offsets' E dimension must match expert_weights' E}}
+  %result = iree_linalg_ext.group_matmul ins(
+      %input, %weights, %offsets, %c0 : tensor<4x8xf32>, tensor<2x8x3xf32>,
+      tensor<3xi64>, index) outs(%output : tensor<4x3xf32>)
+      -> tensor<4x3xf32>
+  return %result : tensor<4x3xf32>
+}
+
+// -----
+
+func.func @group_mmt4d_invalid_dimensions(
+    %input: tensor<2x3x4x5xf32>, %weights: tensor<2x6x3x7x4xf32>,
+    %offsets: tensor<2xi64>, %output: tensor<2x6x4x7xf32>)
+    -> tensor<2x6x4x7xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{operand dimensions must match mmt4d}}
+  %result = iree_linalg_ext.group_mmt4d ins(
+      %input, %weights, %offsets, %c0 : tensor<2x3x4x5xf32>,
+      tensor<2x6x3x7x4xf32>, tensor<2xi64>, index)
+      outs(%output : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+  return %result : tensor<2x6x4x7xf32>
+}
+
+// -----
+
+func.func @group_mmt4d_invalid_expert_count(
+    %input: tensor<2x3x4x5xf32>, %weights: tensor<2x6x3x7x5xf32>,
+    %offsets: tensor<3xi64>, %output: tensor<2x6x4x7xf32>)
+    -> tensor<2x6x4x7xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{expert_offsets' E dimension must match expert_weights' E}}
+  %result = iree_linalg_ext.group_mmt4d ins(
+      %input, %weights, %offsets, %c0 : tensor<2x3x4x5xf32>,
+      tensor<2x6x3x7x5xf32>, tensor<3xi64>, index)
+      outs(%output : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+  return %result : tensor<2x6x4x7xf32>
+}
+
+// -----
+
+func.func @group_matmul_invalid_element_types(
+    %input: tensor<4x8xf32>, %weights: tensor<2x8x3xf16>,
+    %offsets: tensor<2xi64>, %output: tensor<4x3xf32>) -> tensor<4x3xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{input, expert_weights, and output element types must match}}
+  %result = iree_linalg_ext.group_matmul ins(
+      %input, %weights, %offsets, %c0 : tensor<4x8xf32>, tensor<2x8x3xf16>,
+      tensor<2xi64>, index) outs(%output : tensor<4x3xf32>)
+      -> tensor<4x3xf32>
+  return %result : tensor<4x3xf32>
+}
+
+// -----
+
+func.func @group_mmt4d_invalid_element_types(
+    %input: tensor<2x3x4x5xf32>, %weights: tensor<2x6x3x7x5xf16>,
+    %offsets: tensor<2xi64>, %output: tensor<2x6x4x7xf32>)
+    -> tensor<2x6x4x7xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{input, expert_weights, and output element types must match}}
+  %result = iree_linalg_ext.group_mmt4d ins(
+      %input, %weights, %offsets, %c0 : tensor<2x3x4x5xf32>,
+      tensor<2x6x3x7x5xf16>, tensor<2xi64>, index)
+      outs(%output : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+  return %result : tensor<2x6x4x7xf32>
+}
+
+// -----
+
 func.func @scatter_rank_mismatch(
     %update : tensor<?x?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {

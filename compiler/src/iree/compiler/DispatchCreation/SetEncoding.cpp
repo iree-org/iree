@@ -58,16 +58,94 @@ static Value unsetEncoding(OpBuilder &builder, Location loc, Value source,
       encodingDims);
 }
 
-static SmallVector<linalg::LinalgOp>
+static SmallVector<Operation *>
 getDataTilingCandidates(FunctionOpInterface funcOp) {
-  SmallVector<linalg::LinalgOp> result;
-  funcOp.walk([&](linalg::LinalgOp op) {
+  SmallVector<Operation *> result;
+  funcOp.walk([&](Operation *op) {
     if (!IREE::Encoding::hasDataTilingHint(op)) {
       return;
     }
     result.push_back(op);
   });
   return result;
+}
+
+static LogicalResult
+setGroupMatmulDataTilingEncodings(RewriterBase &rewriter,
+                                  IREE::LinalgExt::GroupMatmulOp groupMatmul) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(groupMatmul);
+  MLIRContext *ctx = rewriter.getContext();
+  Location loc = groupMatmul.getLoc();
+
+  auto inputType = cast<RankedTensorType>(groupMatmul.getInput().getType());
+  auto weightsType =
+      cast<RankedTensorType>(groupMatmul.getExpertWeights().getType());
+  auto outputType = cast<RankedTensorType>(groupMatmul.getOutput().getType());
+  Type elementType = inputType.getElementType();
+  SmallVector<Type> elementTypes{elementType, elementType, elementType};
+
+  AffineExpr d0 = rewriter.getAffineDimExpr(0);
+  AffineExpr d1 = rewriter.getAffineDimExpr(1);
+  AffineExpr d2 = rewriter.getAffineDimExpr(2);
+  SmallVector<AffineMap> matmulMaps{AffineMap::get(3, 0, {d0, d2}, ctx),
+                                    AffineMap::get(3, 0, {d1, d2}, ctx),
+                                    AffineMap::get(3, 0, {d0, d1}, ctx)};
+  int64_t mSize = inputType.getDimSize(0);
+  int64_t nSize = outputType.getDimSize(1);
+  int64_t kSize = inputType.getDimSize(1);
+  SmallVector<int64_t> matmulIterationSizes{mSize, nSize, kSize};
+
+  AffineExpr d3 = rewriter.getAffineDimExpr(3);
+  SmallVector<AffineMap> batchMatmulMaps{
+      AffineMap::get(4, 0, {d0, d1, d3}, ctx),
+      AffineMap::get(4, 0, {d0, d3, d2}, ctx),
+      AffineMap::get(4, 0, {d0, d1, d2}, ctx)};
+
+  SmallVector<int64_t> batchMatmulIterationSizes{weightsType.getDimSize(0),
+                                                 mSize, nSize, kSize};
+
+  auto makeEncoding = [&](int64_t operandIndex, ArrayRef<AffineMap> maps,
+                          ArrayRef<int64_t> iterationSizes) {
+    return IREE::Encoding::EncodingAttr::get(
+        ctx, operandIndex, IREE::Encoding::EncodingOpType::matmul, elementTypes,
+        /*originalElementType=*/{}, maps, iterationSizes);
+  };
+  auto inputEncoding = makeEncoding(IREE::Encoding::MATMUL_LHS, matmulMaps,
+                                    matmulIterationSizes);
+  auto weightsEncoding = makeEncoding(
+      IREE::Encoding::MATMUL_RHS, batchMatmulMaps, batchMatmulIterationSizes);
+  auto outputEncoding = makeEncoding(IREE::Encoding::MATMUL_RESULT, matmulMaps,
+                                     matmulIterationSizes);
+
+  SmallVector<Value> inputEncodingDims;
+  if (inputType.isDynamicDim(0)) {
+    inputEncodingDims.push_back(
+        tensor::DimOp::create(rewriter, loc, groupMatmul.getInput(), 0));
+  }
+  SmallVector<Value> outputEncodingDims;
+  if (outputType.isDynamicDim(0)) {
+    outputEncodingDims.push_back(
+        tensor::DimOp::create(rewriter, loc, groupMatmul.getOutput(), 0));
+  }
+  Value input = setEncoding(rewriter, loc, groupMatmul.getInput(),
+                            inputEncoding, inputEncodingDims);
+  Value weights = setEncoding(rewriter, loc, groupMatmul.getExpertWeights(),
+                              weightsEncoding, inputEncodingDims);
+  Value output = setEncoding(rewriter, loc, groupMatmul.getOutput(),
+                             outputEncoding, outputEncodingDims);
+
+  IREE::Encoding::removeDataTilingHint(groupMatmul);
+  Operation *tiledOp = mlir::clone(
+      rewriter, groupMatmul.getOperation(), TypeRange{output.getType()},
+      ValueRange{input, weights, groupMatmul.getExpertOffsets(),
+                 groupMatmul.getRowOffset(), output});
+  SmallVector<OpFoldResult> outputSizes =
+      tensor::getMixedSizes(rewriter, loc, groupMatmul.getOutput());
+  Value result = unsetEncoding(rewriter, loc, tiledOp->getResult(0),
+                               outputSizes, outputEncodingDims);
+  rewriter.replaceOp(groupMatmul, result);
+  return success();
 }
 
 /// Set data tiling encodings using the SerializableAttr interface.
@@ -412,12 +490,17 @@ struct SetEncodingPass final : impl::SetEncodingPassBase<SetEncodingPass> {
 
     switch (encodingOption) {
     case EncodingOptions::Generic: {
-      SmallVector<linalg::LinalgOp> candidates =
-          getDataTilingCandidates(funcOp);
-      for (linalg::LinalgOp linalgOp : candidates) {
-        IREE::Encoding::removeDataTilingHint(linalgOp);
-        if (failed(
-                setDataTilingEncodings(rewriter, linalgOp, encodingOption))) {
+      SmallVector<Operation *> candidates = getDataTilingCandidates(funcOp);
+      for (Operation *op : candidates) {
+        LogicalResult result = failure();
+        if (auto groupMatmul = dyn_cast<IREE::LinalgExt::GroupMatmulOp>(op)) {
+          result = setGroupMatmulDataTilingEncodings(rewriter, groupMatmul);
+        } else {
+          auto linalgOp = cast<linalg::LinalgOp>(op);
+          IREE::Encoding::removeDataTilingHint(linalgOp);
+          result = setDataTilingEncodings(rewriter, linalgOp, encodingOption);
+        }
+        if (failed(result)) {
           return signalPassFailure();
         }
       }
