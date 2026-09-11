@@ -6578,13 +6578,14 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <h3 id="datatiledmmaattr">DataTiledMMAAttr<a class="headerlink" href="#datatiledmmaattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_cpu.data_tiled_mma_layout&lt;
-  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`,   # intrinsic
+  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16` | `MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`,   # intrinsic
   int64_t,   # intrinsics_m
   int64_t,   # intrinsics_n
   int64_t,   # intrinsics_k
   ::mlir::Type,   # lhs_type
   ::mlir::Type,   # rhs_type
-  ::mlir::Type   # acc_type
+  ::mlir::Type,   # acc_type
+  int64_t   # vlen
 &gt;
 </code></pre></div>
 <p>CPU analogue of IREEGPU_DataTiledMMAAttr, for use with
@@ -6652,6 +6653,11 @@ here but are unused.</p>
 <td style="text-align: center;">acc_type</td>
 <td style="text-align: center;"><code>::mlir::Type</code></td>
 <td>ACC element type, used only by type-polymorphic intrinsics such as MMA_GENERIC_SCALAR_1x1x1.</td>
+</tr>
+<tr>
+<td style="text-align: center;">vlen</td>
+<td style="text-align: center;"><code>int64_t</code></td>
+<td>Vector register length in bits, for intrinsics whose tile shape and register budget are a function of an implementation-defined vector length (RISC-V V).</td>
 </tr>
 </tbody>
 </table>
@@ -6729,7 +6735,7 @@ they are not disjoint.</p>
 <p><em>Descriptor for different MMA intrinsics</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_cpu.mma_intrinsic&lt;
-  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`   # value
+  `None` | `MMA_X86_AVX2_FMA_1x8x1_F32_F32` | `MMA_X86_AVX2_FMA_8x1x1_F32_F32` | `MMA_X86_AVX512_1x8x1_F64_F64` | `MMA_X86_AVX512_8x1x1_F64_F64` | `MMA_X86_AVX512_1x16x1_F32_F32` | `MMA_X86_AVX512_16x1x1_F32_F32` | `MMA_X86_AVX512_1x16x1_F32_F16_CASTF32` | `MMA_X86_AVX512_16x1x1_F32_F16_CASTF32` | `MMA_X86_AVX512FP16_1x32x1_F16_F16` | `MMA_X86_AVX512FP16_32x1x1_F16_F16` | `MMA_X86_AVX512BF16_1x16x2_F32_BF16` | `MMA_X86_AVX512BF16_16x1x2_F32_BF16` | `MMA_X86_AVX512_1x16x2_I32_I16` | `MMA_X86_AVX512_16x1x2_I32_I16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I16` | `MMA_X86_AVX512_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_16x1x2_I32_I8_CASTI16` | `MMA_X86_AVX512VNNI_1x16x4_I32_UI8_I8` | `MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8` | `MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16` | `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` | `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` | `MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16` | `MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16` | `MMA_GENERIC_SCALAR_1x1x1_REG8` | `MMA_GENERIC_SCALAR_1x1x1_REG16`   # value
 &gt;
 </code></pre></div>
 <h5 id="parameters_4">Parameters:<a class="headerlink" href="#parameters_4" title="Permanent link">link</a></h5>
@@ -7009,6 +7015,16 @@ mechanism See the implementation in compiler/Codegen/ExternalInterfaces/*.</p>
 <td style="text-align: center;">MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32</td>
 <td style="text-align: center;"><code>8721</code></td>
 <td>MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16</td>
+<td style="text-align: center;"><code>12576</code></td>
+<td>MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16</td>
+</tr>
+<tr>
+<td style="text-align: center;">MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16</td>
+<td style="text-align: center;"><code>12577</code></td>
+<td>MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16</td>
 </tr>
 <tr>
 <td style="text-align: center;">MMA_GENERIC_SCALAR_1x1x1_REG8</td>
