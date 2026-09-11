@@ -663,14 +663,35 @@ void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // flow.tensor.load
 //===----------------------------------------------------------------------===//
 
+// Returns true if |index| is a valid in-bounds multidimensional index into a
+// statically shaped |type| (the rank matches and every component is within
+// its dimension). The op verifiers do not range-check constant indices, so a
+// parseable flow.tensor.load/store may index past the constant; folding such
+// an access would read or write out of bounds of the constant's storage.
+static bool isInBoundsIndex(ShapedType type, ArrayRef<uint64_t> index) {
+  if (!type.hasStaticShape())
+    return false;
+  auto shape = type.getShape();
+  if (static_cast<int64_t>(index.size()) != type.getRank())
+    return false;
+  for (int64_t i = 0; i < type.getRank(); ++i) {
+    if (index[i] >= static_cast<uint64_t>(shape[i]))
+      return false;
+  }
+  return true;
+}
+
 OpFoldResult TensorLoadOp::fold(FoldAdaptor operands) {
   if (auto source = dyn_cast_if_present<ElementsAttr>(operands.getSource())) {
     // Load directly from the constant source tensor.
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
-      return source.getValues<Attribute>()[llvm::map_to_vector(
-          operands.getIndices(), [](Attribute value) {
+      auto index =
+          llvm::map_to_vector(operands.getIndices(), [](Attribute value) {
             return cast<IntegerAttr>(value).getValue().getZExtValue();
-          })];
+          });
+      if (!isInBoundsIndex(cast<ShapedType>(source.getType()), index))
+        return {};
+      return source.getValues<Attribute>()[index];
     }
   }
   return {};
@@ -717,11 +738,13 @@ OpFoldResult TensorStoreOp::fold(FoldAdaptor operands) {
       return DenseElementsAttr::get(targetType, {value});
     }
     if (llvm::count(operands.getIndices(), nullptr) == 0) {
-      uint64_t offset = getFlattenedIndex(
-          targetType,
+      auto index =
           llvm::map_to_vector(operands.getIndices(), [](Attribute value) {
             return cast<IntegerAttr>(value).getValue().getZExtValue();
-          }));
+          });
+      if (!isInBoundsIndex(targetType, index))
+        return {};
+      uint64_t offset = getFlattenedIndex(targetType, index);
       SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
       newContents[offset] = value;
       return DenseElementsAttr::get(targetType, newContents);
