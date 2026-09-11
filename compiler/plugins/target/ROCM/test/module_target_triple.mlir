@@ -12,7 +12,7 @@
 // Therefore, the ROCMTargetBackend validation checks for the target triple to
 // be set and emits an explicit error if that is not the case.
 
-// CHECK: target triple = "amdgcn-amd-amdhsa"
+// CHECK: target triple = "amdgpu9.42-amd-amdhsa"
 
 #pipeline_layout = #hal.pipeline.layout<bindings = []>
 hal.executable.source public @exe {

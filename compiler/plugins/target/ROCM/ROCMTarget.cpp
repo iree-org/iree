@@ -6,6 +6,7 @@
 
 #include "ROCMTargetUtils.h"
 
+#include <cstddef>
 #include <cstdint>
 
 #include "compiler/plugins/target/ROCM/Dialect/ROCM/IR/ROCMAttrs.h"
@@ -37,6 +38,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/Constants.h"
@@ -48,9 +50,11 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Endian.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/AMDGPUTargetParser.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -165,9 +169,16 @@ static void appendAMDGPUTargetFeatureSuffix(std::string &targetID,
   }
 }
 
-static FailureOr<std::string> buildAMDGPUTargetID(Location loc,
-                                                  StringRef targetArch,
-                                                  StringRef targetFeatures) {
+static llvm::Triple getAMDGPUTargetTriple(StringRef targetArch) {
+  llvm::Triple triple("amdgcn-amd-amdhsa");
+  triple.setArch(llvm::Triple::amdgpu,
+                 llvm::AMDGPU::getSubArchFromGPUName(targetArch));
+  return triple;
+}
+
+static FailureOr<llvm::AMDGPU::TargetID>
+parseAMDGPUTargetID(Location loc, StringRef targetArch,
+                    StringRef targetFeatures) {
   FailureOr<AMDGPUTargetFeatureModes> modes =
       parseAMDGPUTargetFeatureModes(loc, targetFeatures);
   if (failed(modes)) {
@@ -176,7 +187,12 @@ static FailureOr<std::string> buildAMDGPUTargetID(Location loc,
   std::string targetID = targetArch.str();
   appendAMDGPUTargetFeatureSuffix(targetID, "sramecc", modes->sramecc);
   appendAMDGPUTargetFeatureSuffix(targetID, "xnack", modes->xnack);
-  return targetID;
+  auto parsedTargetID = llvm::AMDGPU::TargetID::parse(
+      getAMDGPUTargetTriple(targetArch), targetID);
+  if (!parsedTargetID) {
+    return emitError(loc) << "invalid ROCM target ID '" << targetID << "'";
+  }
+  return *parsedTargetID;
 }
 
 struct ROCMOptions {
@@ -310,8 +326,9 @@ struct ROCMOptions {
       return emitError(builder.getUnknownLoc(), "Unknown ROCM target '")
              << target << "'";
     }
-    if (failed(parseAMDGPUTargetFeatureModes(builder.getUnknownLoc(),
-                                             targetFeatures))) {
+    if (failed(parseAMDGPUTargetID(builder.getUnknownLoc(),
+                                   GPU::normalizeHIPTarget(target),
+                                   targetFeatures))) {
       return failure();
     }
     return success();
@@ -425,13 +442,13 @@ public:
     if (targetOptions.useAmdgcnSpirv) {
       format = "rocm-spirv-fb";
     } else if (deviceID == "amdgpu") {
-      FailureOr<std::string> targetID =
-          buildAMDGPUTargetID(b.getUnknownLoc(), targetOptions.target,
-                              targetOptions.targetFeatures);
+      auto targetID = parseAMDGPUTargetID(
+          b.getUnknownLoc(), GPU::normalizeHIPTarget(targetOptions.target),
+          targetOptions.targetFeatures);
       if (failed(targetID)) {
         return nullptr;
       }
-      format = *targetID;
+      format = targetID->getCanonicalFeatureString();
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
@@ -708,6 +725,12 @@ public:
       preferredSubgroupSize = attr.getPreferredSubgroupSize();
     }
 
+    auto targetID =
+        parseAMDGPUTargetID(variantOp.getLoc(), targetArch, targetFeatures);
+    if (failed(targetID)) {
+      return failure();
+    }
+
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
     // intermediate code/binary files), and at runtime (loaded
@@ -805,7 +828,7 @@ public:
       std::unique_ptr<llvm::TargetMachine> targetMachine;
       bool isWave64 = true;
       {
-        llvm::Triple triple("amdgcn-amd-amdhsa");
+        llvm::Triple triple = getAMDGPUTargetTriple(targetArch);
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -850,10 +873,6 @@ public:
           features.emplace_back("-fma-mix-insts");
         }
 
-        if (!targetFeatures.empty()) {
-          features.emplace_back(targetFeatures.str());
-        }
-
         std::string featureStr = llvm::join(features, ",");
 
         targetMachine.reset(target->createTargetMachine(
@@ -883,6 +902,21 @@ public:
         // that our CI or users may not be prepared for.
         llvmModule->addModuleFlag(llvm::Module::Error,
                                   "amdhsa_code_object_version", abiVersion);
+
+        // XNACK and SRAM ECC describe the whole code object. LLVM requires
+        // module flags for explicit settings, not subtarget features. Leave
+        // unspecified/unsupported settings absent to preserve their defaults.
+        auto addTargetIDFlag = [&](StringRef name,
+                                   llvm::AMDGPU::TargetIDSetting setting) {
+          using llvm::AMDGPU::TargetIDSetting;
+          if (setting == TargetIDSetting::On ||
+              setting == TargetIDSetting::Off) {
+            llvmModule->addModuleFlag(llvm::Module::Error, name,
+                                      setting == TargetIDSetting::On);
+          }
+        };
+        addTargetIDFlag("amdgpu.xnack", targetID->getXnackSetting());
+        addTargetIDFlag("amdgpu.sramecc", targetID->getSramEccSetting());
 
         // Set the buffer OOB mode to "relaxed", since IREE does its own, more
         // precise, mitigations for partially OOB buffer reads of underalligned
@@ -953,7 +987,7 @@ public:
       // For example 'gfx942'.
       StringRef targetCPU = targetMachine->getTargetCPU();
 
-      // For example 'amdgcn-amd-amdhsa'.
+      // For example 'amdgpu9.42-amd-amdhsa'.
       std::string targetTriple = targetMachine->getTargetTriple().str();
 
       // Run LLVM optimization passes.
@@ -1098,6 +1132,19 @@ public:
           return failure();
         }
 
+        // LLVM a86b58566a25 started encoding gfx1250's hardwired XNACK as
+        // XNACK_ON in ELF e_flags. ROCm then looks for a gfx1250:xnack+
+        // target, which the runtime does not register. Keep the pre-existing
+        // encoding for this non-selectable feature until LLVM's ELF emission
+        // is corrected. This does not change the kernel's XNACK codegen.
+        if (targetArch == "gfx1250") {
+          char *flags =
+              targetHSACO.data() + offsetof(llvm::ELF::Elf64_Ehdr, e_flags);
+          llvm::support::endian::write32le(
+              flags, llvm::support::endian::read32le(flags) &
+                         ~llvm::ELF::EF_AMDGPU_FEATURE_XNACK_V4);
+        }
+
         if (targetOptions.enableRegSpillWarning) {
           checkRegisterSpilling(variantOp, targetObj);
         }
@@ -1131,14 +1178,12 @@ public:
       break;
     }
     case ContainerType::AMDGPU: {
-      FailureOr<std::string> targetID =
-          buildAMDGPUTargetID(variantOp.getLoc(), targetArch, targetFeatures);
-      if (failed(targetID)) {
-        return failure();
-      }
-      executableBinaryFormat = executableBuilder.getStringAttr(*targetID);
+      std::string canonicalTargetID = targetID->getCanonicalFeatureString();
+      executableBinaryFormat =
+          executableBuilder.getStringAttr(canonicalTargetID);
       binaryContainer = serializeAMDGPUBinaryContainer(
-          serializationOptions, variantOp, exportOps, *targetID, targetHSACO);
+          serializationOptions, variantOp, exportOps, canonicalTargetID,
+          targetHSACO);
       break;
     }
     case ContainerType::HIP: {

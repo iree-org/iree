@@ -195,6 +195,7 @@ architectures:
 | AMD MI325X               | `mi325x`      | `gfx942`            | `cdna3`                |
 | AMD MI350X               | `mi350x`      | `gfx950`            | `cdna4`                |
 | AMD MI355X               | `mi355x`      | `gfx950`            | `cdna4`                |
+| AMD MI455X               | `mi455x`      | `gfx1250`           | `cdna5`                |
 | AMD PRO V710             | `v710`        | `gfx1101`           | `rdna3`                |
 | AMD PRO W7700            | `w7700`       | `gfx1101`           | `rdna3`                |
 | AMD PRO W7800            | `w7800`       | `gfx1100`           | `rdna3`                |

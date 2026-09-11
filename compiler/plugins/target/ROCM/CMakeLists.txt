@@ -28,6 +28,7 @@ iree_cc_library(
   DEPS
     LLVMAMDGPUCodeGen
     LLVMAnalysis
+    LLVMBinaryFormat
     LLVMBitWriter
     LLVMCore
     LLVMFrontendOffloading
@@ -38,6 +39,7 @@ iree_cc_library(
     LLVMSPIRVCodeGen
     LLVMSupport
     LLVMTarget
+    LLVMTargetParser
     LLVMTransformUtils
     LLVMipo
     MLIRAMDGPUDialect
