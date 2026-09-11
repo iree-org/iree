@@ -45,6 +45,11 @@ OpFoldResult subOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
 OpFoldResult mulAddOfrs(OpBuilder &builder, Location loc, OpFoldResult a,
                         OpFoldResult b, OpFoldResult c);
 
+/// Clamp a softmax row-sum tensor to at least 1. Used before masked softmax
+/// finalization: fully-masked rows have `sum == 0` and a zero numerator, while
+/// rows with at least one unmasked score have `sum >= 1`.
+Value createSafeSoftmaxDenominator(OpBuilder &builder, Location loc, Value sum);
+
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
