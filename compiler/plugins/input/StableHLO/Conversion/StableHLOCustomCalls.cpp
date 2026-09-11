@@ -7,6 +7,7 @@
 // Implements logic for lowering CHLO ops to StableHLO and Shape dialect ops,
 // taking care of CHLO's broadcasting semantics
 
+#include <llvm/Support/Casting.h>
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
@@ -15,6 +16,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -239,6 +241,50 @@ struct ShapeAssertionDrop final
   }
 };
 
+struct NoOpShardingDrop final
+    : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
+  using Base::Base;
+  using OpAdaptor = mlir::stablehlo::CustomCallOp::Adaptor;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
+                                PatternRewriter &rewriter) const final {
+    if (op.getCallTargetName() != "Sharding") {
+      return rewriter.notifyMatchFailure(op, "not ShardingCustomCall");
+    }
+    unsigned numOperands = op.getNumOperands();
+    if (numOperands != 1) {
+      return rewriter.notifyMatchFailure(
+          op, "ShardingCustomCall with more than one operand");
+    }
+
+    // Get root of the operations
+    mlir::Operation *root = op.getOperation();
+    while (root->getParentOp() != nullptr) {
+      root = root->getParentOp();
+    }
+    auto rootAttrs =
+        llvm::dyn_cast<mlir::DictionaryAttr>(root->getAttrDictionary());
+    auto numPartitions = llvm::dyn_cast_if_present<mlir::IntegerAttr>(
+        rootAttrs.get("mhlo.num_partitions"));
+    auto numReplicas = llvm::dyn_cast_if_present<mlir::IntegerAttr>(
+        rootAttrs.get("mhlo.num_replicas"));
+    if (numPartitions == nullptr || numReplicas == nullptr) {
+      return rewriter.notifyMatchFailure(
+          op,
+          "ShardingCustomCall: Number of partitions or replicas not specified");
+    }
+
+    if (numPartitions.getInt() == 1 && numReplicas.getInt() == 1) {
+      // Remove sharding as number of partitions and replicas is 1
+      rewriter.replaceOp(op, op.getOperands()[0]);
+      return success();
+    }
+    // There is more than one partition or replica
+    return rewriter.notifyMatchFailure(
+        op, "Sharding with multiple partitions or replicas is not supported");
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass Definition.
 //===----------------------------------------------------------------------===//
@@ -255,7 +301,8 @@ struct LegalizeStableHLOCustomCalls final
     MLIRContext *ctx = f.getContext();
 
     RewritePatternSet patterns(ctx);
-    patterns.add<HouseholderReflectorRewriter, ShapeAssertionDrop>(ctx);
+    patterns.add<HouseholderReflectorRewriter, ShapeAssertionDrop,
+                 NoOpShardingDrop>(ctx);
     if (failed(applyPatternsGreedily(f, std::move(patterns)))) {
       signalPassFailure();
     }
