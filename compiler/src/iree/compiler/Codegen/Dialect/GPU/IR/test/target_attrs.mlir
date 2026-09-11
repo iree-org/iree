@@ -14,7 +14,7 @@ func.func @test_target_wgp() attributes {
   // CHECK-SAME: max_workgroup_memory_bytes = 65536,
   // CHECK-SAME: max_workgroup_counts = [2147483647, 2147483647, 2147483647],
   // CHECK-SAME: dma_sizes = [32, 128],
-  // CHECK-SAME: workgroup_memory_bank_count = 32>
+  // CHECK-SAME: shared_mem_model = cdna3>
   wgp = #iree_gpu.target_wgp<
     compute = fp16|fp32|int8, storage = b16|b32,
     subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
@@ -25,7 +25,7 @@ func.func @test_target_wgp() attributes {
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647],
     dma_sizes = [32, 128],
-    workgroup_memory_bank_count = 32
+    shared_mem_model = cdna3
   >
 } { return }
 
@@ -42,6 +42,42 @@ func.func @test_target_wgp_none() attributes {
     max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536,
     max_workgroup_counts = [2147483647, 2147483647, 2147483647]
+  >
+} { return }
+
+// Verify that shared_mem_model = none round-trips and is not printed
+// (it is the default).
+// CHECK-LABEL: func.func @test_target_wgp_shared_mem_model_none()
+func.func @test_target_wgp_shared_mem_model_none() attributes {
+  // CHECK: #iree_gpu.target_wgp<
+  // CHECK-NOT:  shared_mem_model
+  wgp = #iree_gpu.target_wgp<
+    compute = fp16|fp32|int8, storage = b16|b32,
+    subgroup = shuffle|arithmetic,
+    subgroup_size_choices = [64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    shared_mem_model = none
+  >
+} { return }
+
+// CHECK-LABEL: func.func @test_target_wgp_shared_mem_model_cdna4()
+func.func @test_target_wgp_shared_mem_model_cdna4() attributes {
+  // CHECK: #iree_gpu.target_wgp<
+  // CHECK-SAME: shared_mem_model = cdna4>
+  wgp = #iree_gpu.target_wgp<
+    compute = fp16|fp32|int8, storage = b16|b32,
+    subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+    mma = [<MFMA_F32_16x16x16_F16>, <MFMA_F32_32x32x8_F16>],
+    subgroup_size_choices = [64],
+    max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024,
+    max_workgroup_memory_bytes = 163840,
+    max_workgroup_counts = [2147483647, 2147483647, 2147483647],
+    dma_sizes = [32, 128],
+    shared_mem_model = cdna4
   >
 } { return }
 
