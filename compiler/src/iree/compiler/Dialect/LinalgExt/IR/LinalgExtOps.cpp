@@ -574,7 +574,13 @@ struct ConvertGatherToExtract : OpRewritePattern<IREE::LinalgExt::GatherOp> {
                        .getResult();
     }
 
-    applyPermutationToVector(offsets, gatherOp.getDimensionMap());
+    // `dimension_map` maps each index component `i` to the source dimension it
+    // indexes: generateScalarImplementation sets `starts[dimensionMap[i]] =
+    // indexValue[i]`. Building the source offsets from the (in-order) index
+    // values is therefore the *inverse* permutation; applying `dimension_map`
+    // directly only happens to be correct when it is an involution.
+    applyPermutationToVector(
+        offsets, invertPermutationVector(gatherOp.getDimensionMap()));
     int64_t sourceRank = gatherOp.getSourceType().getRank();
     offsets.resize(sourceRank, rewriter.getIndexAttr(0));
 

@@ -79,6 +79,37 @@ func.func @gather_to_extract_slice_perm(%source : tensor<10x1024x128xi32>, %indi
 
 // -----
 
+// Non-involutive dimension_map: index component `i` sets the source offset at
+// dimension `dimension_map[i]` (see GatherOp::generateScalarImplementation), so
+// the extract_slice offsets are the *inverse* permutation of the loaded index
+// values. For dimension_map = [1, 2, 0] the offsets in source-dim order are
+// [idx2, idx0, idx1]; applying the map directly would (wrongly) give
+// [idx1, idx2, idx0].
+func.func @gather_to_extract_slice_perm3(%source : tensor<10x20x30x128xi32>, %indices : tensor<1x1x1x3xi32>) -> (tensor<1x1x1x128xi32>) {
+  %empty = tensor.empty() : tensor<1x1x1x128xi32>
+  %result = iree_linalg_ext.gather dimension_map = [1, 2, 0]
+    ins(%source, %indices : tensor<10x20x30x128xi32>, tensor<1x1x1x3xi32>)
+    outs(%empty: tensor<1x1x1x128xi32>) -> tensor<1x1x1x128xi32>
+  return %result : tensor<1x1x1x128xi32>
+}
+// CHECK-LABEL: @gather_to_extract_slice_perm3
+//  CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+//  CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[IDX0:.+]] = tensor.extract %[[ARG1]][%[[C0]], %[[C0]], %[[C0]], %[[C0]]]
+//   CHECK-DAG:   %[[IDX1:.+]] = tensor.extract %[[ARG1]][%[[C0]], %[[C0]], %[[C0]], %[[C1]]]
+//   CHECK-DAG:   %[[IDX2:.+]] = tensor.extract %[[ARG1]][%[[C0]], %[[C0]], %[[C0]], %[[C2]]]
+//   CHECK-DAG:   %[[CAST0:.+]] = arith.index_cast %[[IDX0]]
+//   CHECK-DAG:   %[[CAST1:.+]] = arith.index_cast %[[IDX1]]
+//   CHECK-DAG:   %[[CAST2:.+]] = arith.index_cast %[[IDX2]]
+//       CHECK:   %[[SLICE:.+]] = tensor.extract_slice %[[ARG0]]
+//  CHECK-SAME:     [%[[CAST2]], %[[CAST0]], %[[CAST1]], 0] [1, 1, 1, 128] [1, 1, 1, 1]
+//  CHECK-SAME:     tensor<10x20x30x128xi32> to tensor<1x1x1x128xi32>
+
+// -----
+
 func.func @gather_to_extract_slice_full_collapse(%source : tensor<2x2x1xi32>, %indices : tensor<2xi32>) -> (tensor<1xi32>) {
   %empty = tensor.empty() : tensor<1xi32>
   %result = iree_linalg_ext.gather dimension_map = [0, 1]
