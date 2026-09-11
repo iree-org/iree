@@ -108,7 +108,11 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
     }
   }
 
-  // Set tile sizes for full tiles to zero. This prevents single trip loops from
+  // Set tile sizes that cover the whole static loop extent to zero. A tile
+  // equal to the extent yields a single-trip distribution loop; a tile *larger*
+  // than the extent additionally bakes a partial tile into the loop.
+  // Either way the dimension is not really distributed, so drop its tile.
+  // This prevents single trip loops from
   // being created, which can sometimes block certain cleanup patterns from
   // applying during producer fusion.
   if (auto tilingInterfaceOp = dyn_cast<TilingInterface>(tilableOp)) {
@@ -130,8 +134,9 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
       if (numNonZero <= 1) {
         break;
       }
-      if (loopId < staticLoopSizes.size() &&
-          staticLoopSizes[loopId] == tileSizesInt[loopId]) {
+      if (loopId < staticLoopSizes.size() && tileSizesInt[loopId] != 0 &&
+          !ShapedType::isDynamic(staticLoopSizes[loopId]) &&
+          staticLoopSizes[loopId] <= tileSizesInt[loopId]) {
         tileSizes[loopId] = zero;
         --numNonZero;
       }
