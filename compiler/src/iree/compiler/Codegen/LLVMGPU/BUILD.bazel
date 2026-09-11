@@ -123,6 +123,7 @@ iree_compiler_cc_library(
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
+        "FP8Lowering.cpp",
         "KernelConfig.cpp",
         "LLVMGPU1DVectorCanonicalizations.cpp",
         "LLVMGPUAssignConstantOrdinals.cpp",
@@ -152,6 +153,7 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "ConvertToLLVM.h",
+        "FP8Lowering.h",
         "KernelConfig.h",
         "Passes.h",
         "ROCDLPasses.h",
