@@ -30,27 +30,38 @@ LogicalResult verifyLLVMGPUVectorDistributePipeline(
   size = reductionTileSizes.size();
 
   if (size > numLoops) {
-    return op->emitOpError("expected number of reduction tile size is equal "
-                           "or less than number of loops");
+    return op->emitOpError("expected no more than ")
+           << numLoops << " tile sizes in the reduction tiling level, but "
+           << size << " were set";
   }
   for (size_t i = 0; i < size; ++i) {
     if (reductionTileSizes[i] > 0 &&
         cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
             utils::IteratorType::reduction) {
       return op->emitOpError(
-          "expected to non-zero reduction tile has reduction iterator");
+                 "expected only reduction dims to be set in the reduction "
+                 "tiling level, but tile size at index (")
+             << i << ") was also set";
     }
   }
 
   SmallVector<int64_t> workgroupTileSizes =
       loweringConfig.getWorkgroupTileSizes();
   size = workgroupTileSizes.size();
+
+  if (size > numLoops) {
+    return op->emitOpError("expected no more than ")
+           << numLoops << " tile sizes in the workgroup tiling level, but "
+           << size << " were set";
+  }
   for (size_t i = 0; i < size; ++i) {
     if (workgroupTileSizes[i] > 0 &&
         cast<linalg::LinalgOp>(op).getIteratorTypesArray()[i] !=
             utils::IteratorType::parallel) {
       return op->emitOpError(
-          "expected to non-zero workgroup tile has parallel iterator");
+                 "expected only parallel dims to be set in the workgroup "
+                 "tiling level, but tile size at index (")
+             << i << ") was also set";
     }
   }
 
