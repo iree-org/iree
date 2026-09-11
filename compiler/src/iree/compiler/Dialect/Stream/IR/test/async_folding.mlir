@@ -274,10 +274,6 @@ util.func private @CoalesceAdjacentFills(%arg0: !stream.resource<*>, %arg1: inde
 
 // -----
 
-// Coalesces a fill into the region immediately BEFORE the producer fill
-// (sourceOffset == fillEnd). The merged fill starts at the earlier (fill's)
-// offset; regression for adding the two absolute offsets instead.
-
 // CHECK-LABEL: @CoalesceAdjacentFillsReverse
 util.func private @CoalesceAdjacentFillsReverse(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
