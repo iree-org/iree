@@ -294,8 +294,8 @@ TEST_P(ErrorPropagationTest, ConnectFailureCarriesCorrectStatus) {
                        CompletionTracker::Callback, &tracker);
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
 
-  PollUntil(/*min_completions=*/1,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  PollUntil(/*min_completions=*/1, /*total_budget=*/kRefusedConnectBudget);
+  ReapIfPending(&connect_op.base, &tracker);
 
   EXPECT_EQ(tracker.call_count, 1);
   // Should be an error - typically CONNECTION_REFUSED or similar.
@@ -384,8 +384,11 @@ TEST_P(ErrorPropagationTest, ConnectFailurePropagatesThroughLinkedChain) {
   iree_async_operation_list_t list = {operations, 2};
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
 
-  PollUntil(/*min_completions=*/2,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  PollUntil(/*min_completions=*/2, /*total_budget=*/kRefusedConnectBudget);
+  // Reap in submission order: cancelling the connect also cancels its LINKED
+  // continuation, so the send completion is guaranteed to follow.
+  ReapIfPending(&connect_op.base, &connect_tracker);
+  ReapIfPending(&send_op.base, &send_tracker);
 
   // Connect should have failed.
   EXPECT_EQ(connect_tracker.call_count, 1);
