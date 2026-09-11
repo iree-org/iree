@@ -159,7 +159,7 @@ def ApplyPrepareVectorToMMAPatternsOp : Op<Transform_Dialect,
 
   let arguments = (ins DefaultValuedAttr<BoolAttr, "true">:$useNvGpu);
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "prop-dict attr-dict";
 }
 
 def ApplyUnrollVectorsGpuMmaSyncPatternsOp : Op<Transform_Dialect,
@@ -435,7 +435,7 @@ def IREEBufferizeOp : Op<Transform_Dialect, "iree.bufferize",
   );
   let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "attr-dict $target `:` functional-type($target, results)";
+  let assemblyFormat = "prop-dict attr-dict $target `:` functional-type($target, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -561,7 +561,7 @@ def ReduceSharedMemoryBankConflictsOp :  Op<Transform_Dialect, "iree.reduce_shar
   );
   let results = (outs);
 
-  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$target prop-dict attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
@@ -675,7 +675,7 @@ def TestGpuVectorDistribution :
                          DefaultValuedOptionalAttr<I64Attr, "64">:$subgroup_size);
     let results = (outs);
 
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let assemblyFormat = [{ $target prop-dict attr-dict `:` type($target)}];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
     let extraClassDeclaration = [{

@@ -26,7 +26,7 @@ builtin.module {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.create_async_groups %top_level_func {use_mma_sync} : (!transform.any_op) -> ()
+    transform.iree.create_async_groups %top_level_func <{use_mma_sync}> : (!transform.any_op) -> ()
     transform.yield
   }
 } // module

@@ -242,7 +242,9 @@ def IREEGPU_InnerTiledSemanticsAttr
 //===----------------------------------------------------------------------===//
 
 class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
-  : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
+  : EnumAttr<IREEGPU_Dialect, enumInfo, name> {
+  let assemblyFormat = "$value";
+}
 
 def IREEGPU_MMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;

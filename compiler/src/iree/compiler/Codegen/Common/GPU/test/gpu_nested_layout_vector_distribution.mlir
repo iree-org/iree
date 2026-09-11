@@ -1504,7 +1504,7 @@ func.func @lanes_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_spa
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func {workgroup_size = array<i64: 256, 1, 1>} : !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func <{workgroup_size = array<i64: 256, 1, 1>}> : !transform.any_op
     transform.yield
   }
 }
@@ -1538,7 +1538,7 @@ func.func @threads_fully_distributed(%out: memref<100x100xf32, #amdgpu.address_s
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func {workgroup_size = array<i64: 64, 1, 1>} : !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func <{workgroup_size = array<i64: 64, 1, 1>}> : !transform.any_op
     transform.yield
   }
 }
