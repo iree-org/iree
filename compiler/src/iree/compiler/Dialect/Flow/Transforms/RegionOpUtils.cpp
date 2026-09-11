@@ -6,9 +6,11 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
@@ -36,6 +38,8 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 
+#include <queue>
+
 #define DEBUG_TYPE "iree-flow-region-op-utils"
 
 // NOTE: These flags are added for experimental purposes only
@@ -46,6 +50,11 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
     llvm::cl::desc("Maximum byte-length of tensor constant that can be inlined "
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
+
+static llvm::cl::opt<bool> clBlockMatmulProducerFusion(
+    "iree-dispatch-creation-block-matmul-producer-fusion",
+    llvm::cl::desc("Blocks matmul-producer fusion on CPU"), llvm::cl::Hidden,
+    llvm::cl::init(true));
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -783,6 +792,75 @@ static bool hasExplicitNonFusableUsers(Operation *op) {
   return llvm::any_of(op->getUsers(), llvm::IsaPred<IREE::LinalgExt::ScanOp>);
 }
 
+// Returns true if an op is used by a matmul-like operation, skipping through
+// cast, reshapes, and encoding ops.
+static bool hasContractionConsumer(Operation *op) {
+  std::queue<Operation *> users;
+  auto appendUsers = [&users](Operation *op) {
+    for (Operation *user : op->getResult(0).getUsers()) {
+      users.push(user);
+    }
+  };
+  appendUsers(op);
+
+  while (!users.empty()) {
+    Operation *user = users.front();
+    users.pop();
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp, tensor::CastOp,
+            IREE::Encoding::SetEncodingOp>(user)) {
+      appendUsers(user);
+      continue;
+    }
+    if (linalg::isaContractionOpInterface(dyn_cast<linalg::LinalgOp>(user))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static std::optional<IREE::HAL::ExecutableTargetAttr>
+getSingleStaticExecutableTarget(ModuleOp moduleOp) {
+  llvm::SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
+  for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+    if (!isa<IREE::HAL::DeviceType>(globalOp.getGlobalType())) {
+      continue;
+    }
+    auto deviceTargetAttr = dyn_cast_if_present<IREE::HAL::DeviceTargetAttr>(
+        globalOp.getGlobalInitialValue());
+    if (!deviceTargetAttr) {
+      return std::nullopt;
+    }
+    deviceTargetAttr.getExecutableTargets(executableTargets);
+  }
+  if (executableTargets.size() != 1) {
+    return std::nullopt;
+  }
+  return executableTargets.front();
+}
+
+// On CPU, in cases when tiling and ukernels are enabled, fused matmul producers
+// are materialized on the stack in the same workgroup, which may lead to stack
+// overflow issues. At this level, it's unclear whether the target is a CPU and
+// whether ukernels are enabled, so it's a best effort implementation.
+static bool shouldBlockMatmulProducerFusion(Operation *op) {
+  if (!(isa<IREE::LinalgExt::GatherOp>(op) || LinalgExt::isBitExtendOp(op)) ||
+      !hasContractionConsumer(op)) {
+    return false;
+  }
+  auto moduleOp = op->getParentOfType<ModuleOp>();
+  std::optional<IREE::HAL::ExecutableTargetAttr> maybeTargetAttr =
+      getSingleStaticExecutableTarget(moduleOp);
+  if (!maybeTargetAttr) {
+    return false;
+  }
+  IREE::HAL::ExecutableTargetAttr targetAttr = *maybeTargetAttr;
+  if (isLLVMCPUBackend(targetAttr) &&
+      hasUkernel(targetAttr.getConfiguration(), "mmt4d")) {
+    return true;
+  }
+  return false;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isCloneableIntoDispatchOp(Operation *op,
@@ -798,6 +876,9 @@ bool isCloneableIntoDispatchOp(Operation *op,
           tensor::EmptyOp, tensor::ExtractOp, tensor::ExtractSliceOp,
           complex::CreateOp, IREE::Encoding::UnsetEncodingOp>(op)) {
     return true;
+  }
+  if (clBlockMatmulProducerFusion && shouldBlockMatmulProducerFusion(op)) {
+    return false;
   }
   // TODO: Tune the cases excluded through hasExplicitNonFusableUsers
   // condition in a more targeted manner, then remove the condition.
