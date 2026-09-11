@@ -798,3 +798,14 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-input-type=stablehlo"
 )
+
+if(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1250")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/stablehlo_ops/check_rocm_hip_stream_scatter.mlir"
+    "iree/tests/e2e/stablehlo_ops/check_rocm-rocm_scatter.mlir"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+endif()

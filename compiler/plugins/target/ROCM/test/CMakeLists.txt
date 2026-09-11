@@ -45,6 +45,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "default_subgroup_size.mlir"
     "emit_debug_info.mlir"
     "external_function_validation.mlir"
     "module_target_triple.mlir"

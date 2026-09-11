@@ -79,6 +79,8 @@ option(IREE_ENABLE_LIBBACKTRACE "Enables libbacktrace for Linux stack traces." $
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+set(IREE_NATIVE_TEST_TIMEOUT_DEFAULT 60 CACHE STRING
+    "Default timeout in seconds for native tests")
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
