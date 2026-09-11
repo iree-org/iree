@@ -104,6 +104,26 @@ LogicalResult UnsetEncodingOp::verify() {
   return success();
 }
 
+OpFoldResult UnsetEncodingOp::fold(FoldAdaptor operands) {
+  // unset_encoding(set_encoding(x)) -> x, so long as the round-trip lands back
+  // on the exact type it started from. Comparing the type that went into the
+  // set_encoding against the type coming out of this op covers both the shape
+  // and the encoding in one check; the intermediate types match by definition
+  // as this op's source *is* the set_encoding result.
+  auto setEncodingOp = getSource().getDefiningOp<SetEncodingOp>();
+  if (!setEncodingOp) {
+    return {};
+  }
+  if (setEncodingOp.getSourceType() != getResultType()) {
+    return {};
+  }
+  // Both ops must agree on the dynamic values the encoding is resolved with.
+  if (!llvm::equal(setEncodingOp.getEncodingDims(), getEncodingDims())) {
+    return {};
+  }
+  return setEncodingOp.getSource();
+}
+
 LogicalResult UnsetEncodingOp::reifyResultShapes(
     OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   OpBuilder::InsertionGuard g(builder);
