@@ -9,29 +9,14 @@
 
 // Microkernel for `iree_codegen.inner_tiled` with
 // `#iree_cpu.data_tiled_mma_layout<intrinsic =
-//     MMA_X86_AVX512BF16_1x16x2_F32_BF16>`. Function name matches the
-// intrinsic name verbatim (lowercased, with the `iree_uk_` prefix), in line
-// with the AMDGPU C ukernel convention.
+//     MMA_X86_AVX512BF16_1x16x2_F32_BF16>`. See README.md for the framework
+// design: the `iree_uk_<lowercased-intrinsic>` naming, why the
+// `intrinsics_{m,n,k}` parameters fully specialize the body after inlining,
+// and how the inner K loop relates to IREE tiling.
 //
-// Adapted from the AMDGPU C ukernel
-// `iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8`: same shape — accumulators
-// held in registers, an outer loop over the K dimension, and inside it the
-// `(intrinsics_m, intrinsics_n, intrinsics_k)` unrolling — minus the
-// GPU-specific shared-memory / subgroup machinery.
-//
-// The "inner K loop" the ukernel owns is the loop over the K *tiles*
-// (`k_outer` below) that sits *inside* the outer M/N loops; those outer M/N
-// loops are tiled away by ordinary IREE tiling before this ukernel runs.
-// This is NOT a restriction to `intrinsics_{m,n,k} = 1`: the ukernel handles
-// arbitrary positive `intrinsics_{m,n,k}` via the `for` loops below.
-//
-// `intrinsics_{m,n,k}` are passed as function arguments and so look like
-// runtime values inside this translation unit, but the ukernel is always
-// inlined into its caller (a bug otherwise) and the caller always passes the
-// matching `DataTiledMMAAttr` constants. Together with post-inline IR
-// optimization on the linked bitcode, the `for` loops fully unroll and the
-// `acc_regs` VLA becomes a fixed register array specialized to each call
-// site's `intrinsics_{m,n,k}` — the bitcode-LTO equivalent of C++ templates.
+// Structure: accumulators stay in registers; an outer loop over the K *tiles*
+// (`k_outer`) wraps the unrolled `(intrinsics_m, intrinsics_n, intrinsics_k)`
+// grid (arbitrary positive values, fully unrolled at the inlined call site).
 //
 // ABI: each shaped operand is passed as (base pointer, element offset) so the
 // caller doesn't need a GEP before the call (the offset is added here). No
@@ -39,8 +24,7 @@
 // each fragment from `intrinsics_{m,n}` and its fixed fragment size. Offsets
 // are in units of the operand element type (bf16 for LHS/RHS, f32 for ACC).
 //
-// Data-tiled operand layout (matching the `DataTiledMMAAttr` swizzle, same as
-// the AMDGPU ukernel):
+// Data-tiled operand layout (matching the `DataTiledMMAAttr` swizzle):
 //   - ACC: one `__m512` (= M0=1 x N0=16 f32) per (m, n) intrinsic, tightly
 //     packed row-major over the (m, n) grid, so fragment (m, n) is at
 //     `acc + (m * intrinsics_n + n) * 16`.
