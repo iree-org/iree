@@ -1,0 +1,3 @@
+// RUN: (iree-opt --iree-load-plugin=$IREE_TEST_INVALID_PLUGIN 2>&1 || true) | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: plugin{{.*}}defines no iree_get_compiler_plugin_info

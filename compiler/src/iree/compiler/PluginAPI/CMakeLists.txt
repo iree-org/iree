@@ -10,14 +10,41 @@
 
 iree_add_all_subdirs()
 
+iree_genrule(
+  NAME
+    PluginABIHash_h__generate
+  SRCS
+    "${PROJECT_SOURCE_DIR}/build_tools/scripts/gen_plugin_abi_hash.py"
+    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Pipelines/Options.h"
+    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Utils/OptionUtils.h"
+    "Client.h"
+    "PluginEntryPoint.h"
+  OUTS
+    PluginABIHash.h
+  CMD
+    "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py) --input $(rootpath Client.h) --input $(rootpath PluginEntryPoint.h) --input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h) --input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h) --out $(execpath PluginABIHash.h)"
+)
+
+iree_cc_library(
+  NAME
+    PluginABIHash
+  HDRS
+    "PluginABIHash.h"
+  DEPS
+
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     PluginAPI
   HDRS
     "Client.h"
+    "PluginEntryPoint.h"
   SRCS
     "Client.cpp"
   DEPS
+    ::PluginABIHash
     LLVMSupport
     iree::compiler::Pipelines::Options
     iree::compiler::Utils
@@ -41,3 +68,14 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# A plugin compiles against these headers and resolves everything else from the
+# host at load, so they are all an out-of-tree build needs from IREE.
+# iree_install_targets supplies the install-tree include directory.
+add_library(iree_compiler_PluginAPI_headers INTERFACE)
+iree_install_targets(
+  TARGETS iree_compiler_PluginAPI_headers
+  HDRS "Client.h" "PluginEntryPoint.h" "PluginABIHash.h"
+  COMPONENT IREEDevLibraries-Compiler
+  EXPORT_SET Compiler
+)

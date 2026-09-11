@@ -1,0 +1,3 @@
+// RUN: (iree-opt --iree-load-plugin=$IREE_TEST_VERSION_MISMATCH_PLUGIN 2>&1 || true) | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: plugin{{.*}}was built against plugin API version 999

@@ -1,0 +1,8 @@
+// REQUIRES: iree_dynamic_plugins
+
+// Proves host and plugin renamed alike: registration constructs an MLIRContext,
+// whose symbols only resolve if both sides agree.
+
+// RUN: iree-opt --iree-load-plugin=$IREE_TEST_DYNAMIC_PLUGIN --help 2>&1 | FileCheck %s
+
+// CHECK: DYNAMIC_TEST_PLUGIN: renamed MLIRContext ok

@@ -17,7 +17,7 @@ exports_files([
     "api_exports.c",
     "api_exports.def",
     "api_exports.ld",
-    "api_exports.lst",
+    "api_exports.macos.lst",
 ])
 
 # IMPORTANT: If modifying the list of dependencies, mirror the changes
@@ -56,15 +56,15 @@ iree_compiler_cc_library(
 
 iree_compiler_cc_library(
     name = "SharedImpl",
-    srcs = [
-        "//lib:libIREECompiler.so",
-    ],
+    srcs = ["//lib:IREECompiler"],
     tags = ["skip-bazel_to_cmake"],
 )
 
+# Shared by default, as CMake links it: a dynamically loaded plugin resolves the
+# renamed ABI from libIREECompiler, and statically linked tools carry none.
 bool_flag(
     name = "link_shared",
-    build_setting_default = False,
+    build_setting_default = True,
 )
 
 config_setting(

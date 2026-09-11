@@ -1,0 +1,3 @@
+// REQUIRES: iree_dynamic_plugins
+
+// RUN: iree-opt --iree-load-plugin=$IREE_TEST_DEPS_PLUGIN --help

@@ -1,0 +1,5 @@
+// The version matches, so the load reaches the header check behind it.
+
+// RUN: (iree-opt --iree-load-plugin=$IREE_TEST_ABI_HASH_MISMATCH_PLUGIN 2>&1 || true) | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: plugin{{.*}}was built against plugin API headers 0000000000000000

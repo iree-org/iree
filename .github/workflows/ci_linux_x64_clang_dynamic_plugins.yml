@@ -1,0 +1,51 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Linux x64 clang dynamic plugins
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  linux_x64_clang_dynamic_plugins:
+    runs-on: azure-linux-scale
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_dynamic_plugins"
+      # The rename cannot rewrite a thin archive, and a plugin resolves the
+      # renamed ABI from libIREECompiler.
+      IREE_COMPILER_DYNAMIC_PLUGINS: ON
+      IREE_ENABLE_THIN_ARCHIVES: OFF
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - name: Install Python requirements
+        run: |
+          python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+          python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
+      - name: Build IREE
+        run: |
+          source ./build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: Test dynamic plugins
+        run: |
+          ctest --test-dir "${BUILD_DIR}" -R "PluginAPI|compiler_plugins" \
+            --output-on-failure --timeout 900
+      - name: Test a plugin built against the install tree
+        run: ./build_tools/testing/test_plugin_from_install.sh "${BUILD_DIR}"
+
+      # Alerting on failure is the responsibility of the calling job.
