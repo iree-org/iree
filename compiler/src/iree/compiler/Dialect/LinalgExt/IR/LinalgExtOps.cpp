@@ -2636,6 +2636,82 @@ LogicalResult DequantizeAffineOp::verify() {
   return success();
 }
 
+namespace {
+
+/// True when every byte of `data` is zero.
+static bool isAllZeroBytes(ArrayRef<char> data) {
+  return llvm::all_of(data, [](char byte) { return byte == 0; });
+}
+
+/// True when `value` is a constant that is zero in every element.
+static bool isKnownZero(Value value) {
+  Attribute constant;
+  if (!matchPattern(value, m_Constant(&constant))) {
+    return false;
+  }
+  if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
+    return intAttr.getValue().isZero();
+  }
+  // A splat answers from its one stored element rather than scanning a
+  // blockwise operand that has an entry per block.
+  auto elements = dyn_cast<ElementsAttr>(constant);
+  if (elements && elements.isSplat()) {
+    return elements.getSplatValue<APInt>().isZero();
+  }
+  if (auto dense = dyn_cast<DenseElementsAttr>(constant)) {
+    return isAllZeroBytes(dense.getRawData());
+  }
+  if (auto resource = dyn_cast<DenseResourceElementsAttr>(constant)) {
+    const AsmResourceBlob *blob = resource.getRawHandle().getBlob();
+    return blob && isAllZeroBytes(blob->getData());
+  }
+  return false;
+}
+
+/// Drops a zero point that is known to be zero: the ops treat a missing zero
+/// point as symmetric, and adding or subtracting zero changes nothing, so the
+/// operand and its indexing map go away.
+template <typename OpTy>
+struct DropZeroZeroPoint : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    Value zeroPoint = op.getZeroPoint();
+    if (!zeroPoint) {
+      return rewriter.notifyMatchFailure(op, "already symmetric");
+    }
+    if (!isKnownZero(zeroPoint)) {
+      return rewriter.notifyMatchFailure(op, "zero point is not known to be 0");
+    }
+
+    SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+    maps.erase(maps.begin() + 2);
+
+    // `zero_point` is the only optional operand, so there is no operand
+    // segment attribute to update and its map is the only other bookkeeping.
+    rewriter.modifyOpInPlace(op, [&] {
+      op.getZeroPointMutable().clear();
+      op.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(maps));
+      // The verifier rejects zp_unsigned without the operand it describes.
+      op.removeZpUnsignedAttr();
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void QuantizeAffineOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.add<DropZeroZeroPoint<QuantizeAffineOp>>(context);
+}
+
+void DequantizeAffineOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
+  results.add<DropZeroZeroPoint<DequantizeAffineOp>>(context);
+}
+
 // Both ops implement LinalgFusionInterface and IndexingMapOpInterface, which
 // declare overlapping methods. Defining them on the op itself resolves the
 // ambiguity between the two sets of defaults.
