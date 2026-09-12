@@ -657,6 +657,7 @@ public:
 
       auto kernelNameRef =
           builder.createString(sanitizeSymbolName(exportOp.getName()));
+      auto exportNameRef = builder.createString(exportOp.getName());
 
       iree_hal_cuda_BlockDims_t blockDims = {0};
       if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
@@ -700,6 +701,7 @@ public:
       iree_hal_cuda_ExportDef_binding_flags_add(builder, bindingFlagsRef);
       iree_hal_cuda_ExportDef_debug_info_add(builder,
                                              exportDebugInfos[ordinal]);
+      iree_hal_cuda_ExportDef_export_name_add(builder, exportNameRef);
       exportRefs[ordinal] = iree_hal_cuda_ExportDef_end(builder);
     }
     auto exportsRef = builder.createOffsetVecDestructive(exportRefs);
