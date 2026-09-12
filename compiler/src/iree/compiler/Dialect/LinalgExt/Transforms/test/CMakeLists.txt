@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "decompose_aggregated_ops_noop.mlir"
     "decompose_im2col.mlir"
     "decompose_map_store.mlir"
+    "decompose_quantization.mlir"
     "decompose_winograd.mlir"
     "distribution.mlir"
     "fold_unit_dims.mlir"
