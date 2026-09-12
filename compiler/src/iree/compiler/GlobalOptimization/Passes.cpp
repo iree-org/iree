@@ -24,6 +24,12 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
+    "iree-global-opt-enable-qdq-to-integer-math",
+    llvm::cl::desc("Rewrites contractions over dequantized operands into "
+                   "integer contractions with zero point corrections ("
+                   "changes floating-point rounding)."),
+    llvm::cl::init(true));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -200,6 +206,10 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
+      // Match direct dequantize producers after reshape/transpose propagation,
+      // before encoding selection chooses layouts for the integer contraction.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(
