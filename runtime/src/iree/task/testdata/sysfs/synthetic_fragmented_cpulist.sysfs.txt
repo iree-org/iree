@@ -1,9 +1,7 @@
 # SYNTHETIC machine (not a hardware capture): 200 CPUs on one NUMA node whose
 # node0/cpulist enumerates every cpu INDIVIDUALLY ("0,1,2,...") as seen on
 # some POWER/AMD/SNC systems -- a ~690-character line that overflows small
-# read buffers. If the reader's buffer is too small the node lookup fails
-# closed and silently degrades to the package fallback, detectable here
-# because physical_package_id (7) differs from the node id (0).
+# read buffers. A buffer too small to hold it aborts on the out-of-range guard.
 # Trimmed to the files the node-table queries read (present, node/*, and
 # per-cpu physical_package_id); this fixture never constructs topologies,
 # so core_id and cache files are omitted.

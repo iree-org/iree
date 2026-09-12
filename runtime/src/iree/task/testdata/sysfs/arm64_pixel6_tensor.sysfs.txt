@@ -1,7 +1,4 @@
 # Google Pixel 6 (Google Tensor GS101) sysfs topology snapshot.
-# Format: one 'relative/path=content' line per sysfs file; expand with
-#   ./capture_sysfs.sh --expand <this file> <destdir>
-# or point --task_topology_sysfs_root= at an expansion.
 cpu/cpu0/cache/index0/level=1
 cpu/cpu0/cache/index0/shared_cpu_list=0
 cpu/cpu0/cache/index0/size=32K

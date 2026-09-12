@@ -98,14 +98,27 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+add_subdirectory(testdata/sysfs)
+
+set(_IREE_TASK_TOPOLOGY_TEST_ARGS)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(APPEND _IREE_TASK_TOPOLOGY_TEST_ARGS
+       "--task_topology_test_snapshots=${CMAKE_CURRENT_BINARY_DIR}/testdata/sysfs/expanded_sysfs_snapshots")
+endif()
+
 iree_cc_test(
   NAME
     topology_test
   SRCS
     "topology_test.cc"
+  ARGS
+    ${_IREE_TASK_TOPOLOGY_TEST_ARGS}
   DEPS
+    ::api
     ::task
     iree::base
+    iree::base::core_headers
+    iree::base::tooling::flags
     iree::testing::gtest
     iree::testing::gtest_main
 )

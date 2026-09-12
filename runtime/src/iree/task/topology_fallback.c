@@ -40,7 +40,25 @@ void iree_task_topology_query_default_caches(
   // No platform-specific cache query available.
 }
 
-iree_host_size_t iree_task_topology_query_node_count(void) { return 1; }
+iree_status_t iree_task_topology_set_snapshot_path(const char* path) {
+  (void)path;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "the fallback topology backend reads no "
+                          "redirectable data source");
+}
+
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer) {
+  (void)processor;
+  (void)buffer_capacity;
+  (void)buffer;
+  return 0;
+}
+
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids) {
+  return iree_task_topology_dense_node_ids(/*count=*/1, capacity, out_ids);
+}
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   return 0;
@@ -99,8 +117,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_performance_level_t performance_level,
     iree_task_topology_distribution_t distribution,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  (void)node_id;
   iree_task_topology_initialize_fallback(max_core_count, out_topology);
-  out_topology->node_id = node_id;
   return iree_ok_status();
 }
 

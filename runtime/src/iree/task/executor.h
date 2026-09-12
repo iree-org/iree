@@ -111,10 +111,10 @@ void iree_task_executor_retain(iree_task_executor_t* executor);
 // Releases the given |executor| from the caller.
 void iree_task_executor_release(iree_task_executor_t* executor);
 
-// Returns the NUMA node this executor's workers are pinned to, or
+// Returns the NUMA node this executor's workers should allocate from, or
 // IREE_TASK_TOPOLOGY_NODE_ID_ANY if the executor was created without a
 // specific NUMA node assignment.
-iree_task_topology_node_id_t iree_task_executor_node_id(
+iree_task_topology_node_id_t iree_task_executor_numa_node_id(
     iree_task_executor_t* executor);
 
 // Trims pools and caches used by the executor and its workers.

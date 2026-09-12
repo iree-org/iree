@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2026 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -106,12 +106,59 @@ iree_runtime_cc_test(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+add_subdirectory(testdata/sysfs)
+
+set(_IREE_TASK_TOPOLOGY_TEST_ARGS)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(APPEND _IREE_TASK_TOPOLOGY_TEST_ARGS
+       "--task_topology_test_snapshots=${CMAKE_CURRENT_BINARY_DIR}/testdata/sysfs/expanded_sysfs_snapshots")
+endif()
+
+iree_cc_test(
+  NAME
+    topology_test
+  SRCS
+    "topology_test.cc"
+  ARGS
+    ${_IREE_TASK_TOPOLOGY_TEST_ARGS}
+  DEPS
+    ::api
+    ::task
+    iree::base
+    iree::base::core_headers
+    iree::base::tooling::flags
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+""",
+    inline = True,
+)
+
 iree_runtime_cc_test(
     name = "topology_test",
     srcs = ["topology_test.cc"],
+    # The sysfs snapshot tests only compile in on Linux.
+    args = select({
+        "@platforms//os:linux": [
+            "--task_topology_test_snapshots=$(rootpath //runtime/src/iree/task/testdata/sysfs:expanded_sysfs_snapshots)",
+        ],
+        "//conditions:default": [],
+    }),
+    data = select({
+        "@platforms//os:linux": ["//runtime/src/iree/task/testdata/sysfs:expanded_sysfs_snapshots"],
+        "//conditions:default": [],
+    }),
+    # Declared in CMake via iree_cmake_extra_content: the
+    # conditional args/rootpath expansion is not convertible.
+    tags = ["skip-bazel_to_cmake"],
     deps = [
+        ":api",
         ":task",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
+        "//runtime/src/iree/base/tooling:flags",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

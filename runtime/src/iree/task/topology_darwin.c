@@ -68,7 +68,23 @@ void iree_task_topology_query_default_caches(
   }
 }
 
-iree_host_size_t iree_task_topology_query_node_count(void) {
+iree_status_t iree_task_topology_set_snapshot_path(const char* path) {
+  (void)path;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "the darwin topology backend reads no "
+                          "redirectable data source");
+}
+
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer) {
+  (void)processor;
+  (void)buffer_capacity;
+  (void)buffer;
+  return 0;
+}
+
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids) {
   int32_t packages = 1;
 #if !defined(IREE_PLATFORM_IOS)
   if (!iree_task_sysctlbyname_int32("hw.packages", &packages) ||
@@ -76,11 +92,12 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
     packages = 1;  // failed to fetch or invalid value
   }
 #endif  // !IREE_PLATFORM_IOS
-  return packages;
+  // Package ordinals are dense, so ids are [0, count).
+  return iree_task_topology_dense_node_ids((iree_host_size_t)packages, capacity,
+                                           out_ids);
 }
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
-  // AFAICT there's no way to query the system for this information.
   // AFAICT there's also no dual-package systems? Maybe the M2 Ultra?
   return (iree_task_topology_node_id_t)0;
 }
@@ -171,7 +188,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 
   iree_task_topology_initialize(out_topology);
-  out_topology->node_id = node_id;
+  // numa_node_id is left unspecified: |node_id| is a package index and macOS
+  // exposes no NUMA nodes to bind against.
 
   // Total number of physical cores in the system of all types.
   int32_t total_physicalcpu_max = 0;
