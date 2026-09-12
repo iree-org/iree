@@ -948,6 +948,27 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_compiler_register_dynamic_plugin(
+        self, plugin_id, target, compiler=None, extra_deps=None, linkopts=None, **kwargs
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        # CMake resolves the compiler itself. It cannot express the other two.
+        if extra_deps:
+            self._convert_unimplemented_function("extra_deps", plugin_id)
+        if linkopts:
+            self._convert_unimplemented_function("linkopts", plugin_id)
+        plugin_id_block = self._convert_string_arg_block(
+            "PLUGIN_ID", plugin_id, quote=False
+        )
+        target_block = self._convert_single_target_block("TARGET", target)
+        self._converter.body += (
+            f"iree_compiler_register_dynamic_plugin(\n"
+            f"{plugin_id_block}"
+            f"{target_block}"
+            f")\n\n"
+        )
+
     def cc_test(
         self,
         name,
