@@ -4,7 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:abi_prefix.bzl", "IREE_COMPILER_ABI_PREFIX")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary")
+load(
+    "//build_tools/bazel:renamed_link.bzl",
+    "iree_renamed_compiler_abi",
+    "renamed_cc_info",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,19 +18,82 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Hide the bundled runtime's `iree_*` C-API from the compiler library's
+# exports. See IREECompiler below for why.
+exports_files([
+    "hide_iree_runtime_capi.ld",
+    "hide_iree_runtime_capi.macos.txt",
+])
+
+# The IREE compiler shared library. Named "IREECompiler" because Bazel prefixes
+# "lib" to cc_binary(linkshared=1) outputs.
+#
+# Every llvm/mlir C++ symbol in the StaticImpl closure is renamed before link
+# (`_ZN4mlir...` -> `_ZN6IREE184mlir...`), so the library can share a process
+# with a foreign LLVM/MLIR without colliding, or weak-coalescing on macOS. The
+# renamed internals are exported for dynamic plugins.
+#
+# The runtime's `extern "C"` C-API is hidden by export list instead, the rename
+# reaching only mangled C++ names. Neither the compiler C-API (`ireeCompiler*`)
+# nor the renamed internals match `iree_*`, so nothing else is caught.
 iree_compiler_cc_binary(
-    name = "libIREECompiler.so",
+    name = "IREECompiler",
     srcs = [
         "//compiler/src/iree/compiler/API:api_exports.c",
     ],
-    linkopts = [
-        "-Wl,--version-script=$(location //compiler/src/iree/compiler/API:api_exports.ld)",
-        "-Wl,--no-undefined",
-    ],
+    additional_linker_inputs = select({
+        "//conditions:default": [":hide_iree_runtime_capi.ld"],
+        "@platforms//os:macos": [":hide_iree_runtime_capi.macos.txt"],
+    }),
+    linkopts = select({
+        "//conditions:default": [
+            "-Wl,--no-undefined",
+            "-Wl,--version-script=$(location :hide_iree_runtime_capi.ld)",
+        ],
+        "@platforms//os:macos": [
+            "-Wl,-install_name,@rpath/libIREECompiler.dylib",
+            "-Wl,-unexported_symbols_list,$(location :hide_iree_runtime_capi.macos.txt)",
+        ],
+    }),
     linkshared = 1,
+    tags = ["skip-bazel_to_cmake"],
     deps = [
+        ":IREEStaticImplRenamed",
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:StaticImpl",
-        "//compiler/src/iree/compiler/API:api_exports.ld",
     ],
+)
+
+# Renaming the CcInfo leaves the dylib the linker-input shape a normal Bazel
+# C++ link would see.
+renamed_cc_info(
+    name = "IREEStaticImplRenamed",
+    include_provided = True,
+    tags = ["skip-bazel_to_cmake"],
+    deps = ["//compiler/src/iree/compiler/API:StaticImpl"],
+)
+
+# Entry point for out-of-tree plugins: the library plus the prefix they must
+# rename to.
+iree_renamed_compiler_abi(
+    name = "IREECompilerShared",
+    shared_library = ":IREECompiler",
+    static_closure = "//compiler/src/iree/compiler/API:StaticImpl",
+    symbol_prefix = IREE_COMPILER_ABI_PREFIX,
+    tags = ["skip-bazel_to_cmake"],
+)
+
+# Guards the export invariants the linker scripts above rely on.
+py_test(
+    name = "exported_symbols_test",
+    srcs = ["exported_symbols_test.py"],
+    args = [
+        "--nm=$(location @llvm-project//llvm:llvm-nm)",
+        "--library=$(location :IREECompiler)",
+        "--symbol-prefix=" + IREE_COMPILER_ABI_PREFIX,
+    ],
+    data = [
+        ":IREECompiler",
+        "@llvm-project//llvm:llvm-nm",
+    ],
+    tags = ["skip-bazel_to_cmake"],
 )
