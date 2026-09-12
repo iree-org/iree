@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_GPUNESTEDLAYOUTUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_GPU_GPUNESTEDLAYOUTUTILS_H_
 
+#include <optional>
+
 #include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
@@ -40,6 +42,14 @@ FailureOr<IREE::VectorExt::NestedLayoutAttr>
 getDerivedThreadLayout(MLIRContext *context, ArrayRef<int64_t> workgroupSize,
                        ArrayRef<int64_t> logicalShape,
                        ArrayRef<int64_t> elementTile);
+
+/// Computes the nested layout used for global-load DMA lowering. Returns
+/// failure if no DMA size can evenly distribute the transfer across the
+/// subgroup/thread layout.
+FailureOr<IREE::VectorExt::NestedLayoutAttr> getGlobalLoadDMALayout(
+    MLIRContext *context, ArrayRef<int64_t> shape, int64_t numThreads,
+    int64_t subgroupSize, int64_t elementBitWidth, ArrayRef<int64_t> dmaSizes,
+    std::optional<int64_t> swizzleAccessElems = std::nullopt);
 
 } // namespace mlir::iree_compiler
 

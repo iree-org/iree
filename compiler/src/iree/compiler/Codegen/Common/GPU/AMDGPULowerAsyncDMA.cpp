@@ -36,134 +36,6 @@ using namespace IREE::VectorExt;
 
 namespace {
 
-/// Distribute |total| across |shape| from the innermost dimension.
-/// |shape| is updated in place to reflect the remaining shape after
-/// distribution. Returns failure if any dimension doesn't divide evenly.
-static FailureOr<SmallVector<int64_t>>
-distributeFromInnermost(int64_t total, MutableArrayRef<int64_t> shape) {
-  int64_t rank = shape.size();
-  SmallVector<int64_t> result(rank, 1);
-  int64_t remaining = total;
-  for (int64_t i = rank - 1; i >= 0 && remaining > 1; --i) {
-    int64_t take = std::min(remaining, shape[i]);
-    if (shape[i] % take != 0) {
-      return failure();
-    }
-    result[i] = take;
-    shape[i] /= take;
-    remaining /= take;
-  }
-  if (remaining != 1) {
-    return failure();
-  }
-  return result;
-}
-
-/// Distribute |total| across |shape| from the outermost dimension.
-/// |shape| is updated in place to reflect the remaining shape after
-/// distribution. Returns failure if any dimension doesn't divide evenly.
-static FailureOr<SmallVector<int64_t>>
-distributeFromOutermost(int64_t total, MutableArrayRef<int64_t> shape) {
-  int64_t rank = shape.size();
-  SmallVector<int64_t> result(rank, 1);
-  int64_t remaining = total;
-  for (int64_t i = 0; i < rank && remaining > 1; ++i) {
-    int64_t take = std::min(remaining, shape[i]);
-    if (shape[i] % take != 0) {
-      return failure();
-    }
-    result[i] = take;
-    shape[i] /= take;
-    remaining /= take;
-  }
-  if (remaining != 1) {
-    return failure();
-  }
-  return result;
-}
-
-/// Try to compute a DMA-optimized NestedLayoutAttr for a single DMA size.
-/// Returns failure if the layout is not compatible.
-static FailureOr<NestedLayoutAttr>
-getGlobalLoadDMALayoutForSize(MLIRContext *context, ArrayRef<int64_t> shape,
-                              int64_t numThreads, int64_t subgroupSize,
-                              int64_t elementBitWidth, int64_t dmaSize) {
-  int64_t rank = shape.size();
-  int64_t elementsPerDMA = dmaSize / elementBitWidth;
-  if (elementsPerDMA == 0 || dmaSize % elementBitWidth != 0) {
-    return failure();
-  }
-
-  // Check that the total number of elements is divisible by the number of
-  // elements transferred per subgroup (subgroupSize * elementsPerDMA).
-  int64_t totalElements = ShapedType::getNumElements(shape);
-  int64_t elementsPerSubgroup = subgroupSize * elementsPerDMA;
-  if (totalElements % elementsPerSubgroup != 0) {
-    return failure();
-  }
-
-  // Track the remaining shape as we distribute each tile level.
-  SmallVector<int64_t> remainingShape(shape);
-
-  // Element tile: distribute elementsPerDMA from innermost.
-  auto elementResult = distributeFromInnermost(elementsPerDMA, remainingShape);
-  if (failed(elementResult)) {
-    return failure();
-  }
-  SmallVector<int64_t> elementTile = *elementResult;
-
-  // Thread tile: distribute subgroupSize from innermost over remaining shape.
-  auto threadResult = distributeFromInnermost(subgroupSize, remainingShape);
-  if (failed(threadResult)) {
-    return failure();
-  }
-  SmallVector<int64_t> threadTile = *threadResult;
-
-  // Subgroup tile: distribute numSubgroups from outermost. All subgroups must
-  // participate - partial subgroup participation would cause non-participating
-  // subgroups to compute out-of-bounds indices.
-  int64_t numSubgroups = numThreads / subgroupSize;
-  auto subgroupResult = distributeFromOutermost(numSubgroups, remainingShape);
-  if (failed(subgroupResult)) {
-    return failure();
-  }
-  SmallVector<int64_t> subgroupTile = *subgroupResult;
-
-  // Batch tile: whatever remains.
-  SmallVector<int64_t> batchTile(remainingShape);
-
-  // Outer tile: always 1 for DMA layouts.
-  SmallVector<int64_t> outerTile(rank, 1);
-
-  // Strides: computed from innermost (suffix products), so the innermost
-  // non-trivial dimension always has stride 1.
-  SmallVector<int64_t> subgroupStrides = computeStrides(subgroupTile);
-  SmallVector<int64_t> threadStrides = computeStrides(threadTile);
-
-  return NestedLayoutAttr::get(context, subgroupTile, batchTile, outerTile,
-                               threadTile, elementTile, subgroupStrides,
-                               threadStrides);
-}
-
-/// Try DMA sizes in descending order, take first success.
-static FailureOr<NestedLayoutAttr>
-getGlobalLoadDMALayout(MLIRContext *context, ArrayRef<int64_t> shape,
-                       int64_t numThreads, int64_t subgroupSize,
-                       int64_t elementBitWidth, ArrayRef<int64_t> dmaSizes) {
-  SmallVector<int64_t> sorted(dmaSizes);
-  llvm::sort(sorted, std::greater<>());
-  for (int64_t dmaSize : sorted) {
-    FailureOr<NestedLayoutAttr> layout = getGlobalLoadDMALayoutForSize(
-        context, shape, numThreads, subgroupSize, elementBitWidth, dmaSize);
-    if (succeeded(layout)) {
-      LDBG() << "  Selected DMA size: " << dmaSize << " bits";
-      LDBG() << "  DMA layout: " << *layout;
-      return layout;
-    }
-  }
-  return failure();
-}
-
 static IREE::Codegen::XORShuffleAttr getDestXorSwizzleAttr(Value dest) {
   while (auto viewOp = dest.getDefiningOp<ViewLikeOpInterface>()) {
     dest = viewOp.getViewSource();
@@ -258,28 +130,18 @@ struct LowerAsyncDMA final : OpRewritePattern<IREE::GPU::AsyncDMAOp> {
 
     IREE::Codegen::XORShuffleAttr destSwizzle =
         getDestXorSwizzleAttr(op.getDest());
-    // When dest has a swizzle_hint, filter DMA sizes to those where
-    // elementsPerDMA fits within one swizzle access block. This ensures
-    // gather_to_lds writes contiguous dest elements that all map to contiguous
-    // source elements under the XOR permutation.
-    SmallVector<int64_t> filteredDmaSizes(dmaSizes);
+    std::optional<int64_t> swizzleAccessElems;
     if (destSwizzle) {
-      int64_t accessElems = destSwizzle.getAccessElementCount();
-      llvm::erase_if(filteredDmaSizes, [&](int64_t dmaSize) {
-        if (dmaSize % elementBitWidth != 0) {
-          return true;
-        }
-        int64_t elemsPerDMA = dmaSize / elementBitWidth;
-        if (elemsPerDMA == 0) {
-          return true;
-        }
-        return accessElems % elemsPerDMA != 0;
-      });
+      // When dest has a swizzle_hint, only use DMA sizes where elementsPerDMA
+      // fits within one swizzle access block. This ensures gather_to_lds writes
+      // contiguous dest elements that all map to contiguous source elements
+      // under the XOR permutation.
+      swizzleAccessElems = destSwizzle.getAccessElementCount();
     }
 
     FailureOr<NestedLayoutAttr> dmaLayoutOrFailure =
         getGlobalLoadDMALayout(context, transferShape, numThreads, subgroupSize,
-                               elementBitWidth, filteredDmaSizes);
+                               elementBitWidth, dmaSizes, swizzleAccessElems);
     if (failed(dmaLayoutOrFailure)) {
       return rewriter.notifyMatchFailure(op, "failed to compute DMA layout");
     }
