@@ -460,6 +460,98 @@ static iree_status_t iree_tooling_parse_buffer_view_file(
   return status;
 }
 
+// Loads an ndarray from the NPY file reference in |string| and applies the
+// explicitly specified |metadata|. The shape must match the NPY shape and the
+// element type must either match or override a same-width signed integer with
+// a signless integer, which NPY cannot represent.
+static iree_status_t iree_tooling_parse_buffer_view_npy_file(
+    iree_string_view_t metadata, iree_string_view_t string,
+    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_io_stream_list_t* stream_list, iree_allocator_t host_allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, string.data, string.size);
+  *out_buffer_view = NULL;
+
+  iree_hal_element_type_t explicit_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  iree_host_size_t explicit_shape_rank = 0;
+  iree_hal_dim_t explicit_shape[128] = {0};
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_parse_shape_and_element_type(
+              metadata, IREE_ARRAYSIZE(explicit_shape), &explicit_shape_rank,
+              explicit_shape, &explicit_element_type));
+
+  bool is_append = !iree_string_view_starts_with(string, IREE_SV("@"));
+  iree_string_view_t path =
+      iree_string_view_substr(string, 1, IREE_HOST_SIZE_MAX);
+  iree_io_stream_t* stream = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_io_stream_list_open(stream_list, path, is_append, &stream));
+
+  iree_hal_buffer_params_t buffer_params = {
+      .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
+      .access = IREE_HAL_MEMORY_ACCESS_READ,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+  };
+  iree_hal_buffer_view_t* npy_view = NULL;
+  iree_status_t status = iree_numpy_npy_load_ndarray(
+      stream, IREE_NUMPY_NPY_LOAD_OPTION_DEFAULT, buffer_params, device,
+      device_allocator, &npy_view);
+
+  if (iree_status_is_ok(status)) {
+    iree_host_size_t npy_shape_rank = iree_hal_buffer_view_shape_rank(npy_view);
+    const iree_hal_dim_t* npy_shape = iree_hal_buffer_view_shape_dims(npy_view);
+    if (explicit_shape_rank != npy_shape_rank) {
+      status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "explicit shape rank %" PRIhsz
+                                " does not match NPY shape rank %" PRIhsz,
+                                explicit_shape_rank, npy_shape_rank);
+    }
+    for (iree_host_size_t i = 0;
+         i < explicit_shape_rank && iree_status_is_ok(status); ++i) {
+      if (explicit_shape[i] != npy_shape[i]) {
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "explicit shape dimension %" PRIhsz " value %" PRIdim
+            " does not match NPY shape dimension %" PRIdim,
+            i, explicit_shape[i], npy_shape[i]);
+      }
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_element_type_t npy_element_type =
+        iree_hal_buffer_view_element_type(npy_view);
+    bool is_same_type = explicit_element_type == npy_element_type;
+    bool is_signless_override =
+        iree_hal_element_bit_count(explicit_element_type) ==
+            iree_hal_element_bit_count(npy_element_type) &&
+        iree_hal_element_numerical_type(explicit_element_type) ==
+            IREE_HAL_NUMERICAL_TYPE_INTEGER &&
+        iree_hal_element_numerical_type(npy_element_type) ==
+            IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
+    if (!is_same_type && !is_signless_override) {
+      status = iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "explicit element type is incompatible with NPY element type");
+    } else if (is_same_type) {
+      *out_buffer_view = npy_view;
+      npy_view = NULL;
+    } else {
+      status = iree_hal_buffer_view_create(
+          iree_hal_buffer_view_buffer(npy_view), explicit_shape_rank,
+          explicit_shape, explicit_element_type,
+          iree_hal_buffer_view_encoding_type(npy_view), host_allocator,
+          out_buffer_view);
+    }
+  }
+
+  iree_hal_buffer_view_release(npy_view);
+  iree_io_stream_release(stream);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 // Parses a shaped tensor type into a HAL buffer view.
 static iree_status_t iree_tooling_parse_tensor(
     iree_string_view_t string, iree_hal_device_t* device,
@@ -471,6 +563,13 @@ static iree_status_t iree_tooling_parse_tensor(
   if (iree_string_view_split(string, '=', &metadata, &contents) != -1) {
     if (iree_string_view_starts_with(contents, IREE_SV("@")) ||
         iree_string_view_starts_with(contents, IREE_SV("+"))) {
+      iree_string_view_t path =
+          iree_string_view_substr(contents, 1, IREE_HOST_SIZE_MAX);
+      if (iree_string_view_ends_with(path, IREE_SV(".npy"))) {
+        return iree_tooling_parse_buffer_view_npy_file(
+            metadata, contents, device, device_allocator, stream_list,
+            host_allocator, out_buffer_view);
+      }
       return iree_tooling_parse_buffer_view_file(metadata, contents, device,
                                                  device_allocator, stream_list,
                                                  out_buffer_view);
