@@ -151,7 +151,8 @@ func.func @pack_sme(%arg0: tensor<512x512xf32>) -> tensor<64x512x8x1xf32> attrib
   %pack = linalg.pack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 1] into %empty : tensor<512x512xf32> -> tensor<64x512x8x1xf32>
   return %pack : tensor<64x512x8x1xf32>
 }
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
+// No `enable_decomposition` in the translation info.
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>{{$}}
 //       CHECK: func.func @pack_sme(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.pack
@@ -164,7 +165,8 @@ func.func @unpack_sme(%arg0: tensor<64x64x8x8xf32>) -> tensor<512x512xf32> attri
   %unpack = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %empty : tensor<64x64x8x8xf32> -> tensor<512x512xf32>
   return %unpack : tensor<512x512xf32>
 }
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
+// No `enable_decomposition` in the translation info.
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>{{$}}
 //       CHECK: func.func @unpack_sme(
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.unpack

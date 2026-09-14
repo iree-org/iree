@@ -317,7 +317,8 @@ func.func @pack_static_inner_tiles(%arg0: tensor<20x48xf32>) -> tensor<3x48x8x1x
   %pack = linalg.pack %arg0 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %empty : tensor<20x48xf32> -> tensor<3x48x8x1xf32>
   return %pack : tensor<3x48x8x1xf32>
 }
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
+// No `enable_decomposition` in the translation info.
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>{{$}}
 //      CHECK: func.func @pack_static_inner_tiles(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pack

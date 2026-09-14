@@ -169,3 +169,83 @@ module {
 // CHECK-LABEL:     func.func @unaligned_pack_aarch64_sve
 // CHECK:             vector.maskedload {{.+}} vector<8xf32>
 // CHECK:             vector.store {{.+}} vector<8xf32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+module {
+  func.func @unaligned_unpack_aarch64_sme() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<511x509xf32>>
+    %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>> -> tensor<64x64x8x8xf32>
+    %3 = tensor.empty() : tensor<511x509xf32>
+    %unpack = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 : tensor<64x64x8x8xf32> -> tensor<511x509xf32>
+    iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [511, 509], strides = [1, 1] : tensor<511x509xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<511x509xf32>>
+    return
+  }
+}
+
+// AArch64 with SME (and no classic SVE, e.g., Apple M4) supports vector
+// masking, so the padded unpack op is vectorized with masked stores instead
+// of being decomposed.
+// CHECK-LABEL:     func.func @unaligned_unpack_aarch64_sme
+// CHECK:             vector.load {{.+}} vector<8xf32>
+// CHECK:             vector.maskedstore {{.+}} vector<8xf32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+module {
+  func.func @aligned_unpack_aarch64_sme() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512x512xf32>>
+    %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>> -> tensor<64x64x8x8xf32>
+    %3 = tensor.empty() : tensor<512x512xf32>
+    %unpack = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 : tensor<64x64x8x8xf32> -> tensor<512x512xf32>
+    iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [512, 512], strides = [1, 1] : tensor<512x512xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<512x512xf32>>
+    return
+  }
+}
+
+// AArch64 with SME (and no classic SVE, e.g., Apple M4) supports vector
+// masking, so the aligned unpack op is vectorized instead of being
+// decomposed.
+// CHECK-LABEL:     func.func @aligned_unpack_aarch64_sme
+// CHECK:             vector.load {{.+}} vector<8xf32>
+// CHECK:             vector.store {{.+}} vector<8xf32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
+module {
+  func.func @unaligned_unpack_aarch64_sve() attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) flags(ReadOnly) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>>
+    %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<511x509xf32>>
+    %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [64, 64, 8, 8], strides = [1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<64x64x8x8xf32>> -> tensor<64x64x8x8xf32>
+    %3 = tensor.empty() : tensor<511x509xf32>
+    %unpack = linalg.unpack %2 inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %3 : tensor<64x64x8x8xf32> -> tensor<511x509xf32>
+    iree_tensor_ext.dispatch.tensor.store %unpack, %1, offsets = [0, 0], sizes = [511, 509], strides = [1, 1] : tensor<511x509xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<511x509xf32>>
+    return
+  }
+}
+
+// AArch64 with SVE supports vector masking, so the padded unpack op is
+// vectorized with masked stores instead of being decomposed.
+// CHECK-LABEL:     func.func @unaligned_unpack_aarch64_sve
+// CHECK:             vector.load {{.+}} vector<8xf32>
+// CHECK:             vector.maskedstore {{.+}} vector<8xf32>

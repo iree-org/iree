@@ -2033,18 +2033,16 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
   return tileSizes;
 }
 
-/// Returns true if the target prefers decomposing pack/unpack ops over
-/// vectorizing them directly. Targets that support vector masking (x86,
-/// RISC-V, and AArch64 with SVE or SME) can vectorize the ops as-is, while the
-/// decomposed form can't be vectorized.
+/// Returns true if pack/unpack ops with static inner tiles should be
+/// decomposed (into pad/reshape/transpose and slice ops) before
+/// GenericVectorization, instead of being vectorized directly.
 static bool preferPackUnPackDecomposition(DictionaryAttr targetConfig) {
   if (isX86(targetConfig) || isRISCV(targetConfig)) {
     return false;
   }
-  bool isAArch64WithMasking =
-      isAArch64(targetConfig) &&
-      (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig));
-  return !isAArch64WithMasking;
+  // AArch64 only supports vector masking with SVE or SME.
+  return !(isAArch64(targetConfig) &&
+           (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig)));
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2150,8 +2148,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
   // by tensor.pad op), so we do not decompose the cases. Targets with vector
-  // masking support, as well as the aarch64 backend in case of scalable inner
-  // tiles, prefer to not decompose the ops.
+  // masking support prefer to not decompose the ops.
   // TODO: Enable scalable vectorization of unpack ops and adjust the below
   // condition to account for dynamic and scalable inner tiles separately.
   DictionaryAttr pipelineConfig;
