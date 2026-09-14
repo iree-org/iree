@@ -51,7 +51,7 @@ jobs:
           python3 -m venv "${sdk_venv}"
           "${sdk_venv}/bin/python" -m pip install --pre \
             --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
-            "rocm[libraries,devel]==10.1.0a20260909"
+            "rocm[libraries,devel]==10.2.0a20260914"
           "${sdk_venv}/bin/rocm-sdk" init
           "${sdk_venv}/bin/rocm-sdk" version
           rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
@@ -62,7 +62,7 @@ jobs:
         timeout-minutes: 120
         run: |
           ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
-            "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1201 gfx1250
+            "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
         env:
           IREE_ROCJITSU_RUN_ID: ci
           CTEST_PARALLEL_LEVEL: 8
