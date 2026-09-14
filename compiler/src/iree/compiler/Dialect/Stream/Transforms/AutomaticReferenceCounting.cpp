@@ -759,8 +759,8 @@ static void collectUnderlyingResources(Value value, DenseSet<Value> &visited,
   if (auto blockArg = dyn_cast<BlockArgument>(value)) {
     Block *block = blockArg.getOwner();
     if (block->isEntryBlock()) {
-      if (auto branch = dyn_cast_or_null<RegionBranchOpInterface>(
-              block->getParentOp())) {
+      if (auto branch =
+              dyn_cast_or_null<RegionBranchOpInterface>(block->getParentOp())) {
         Region *region = block->getParent();
         SmallVector<RegionSuccessor> successors;
         branch.getSuccessorRegions(RegionBranchPoint::parent(), successors);
@@ -810,7 +810,7 @@ static void collectUnderlyingResources(Value value, DenseSet<Value> &visited,
 // back edge, if then/else) and may therefore share a backing allocation with a
 // *different* result on some path. This local analysis cannot express such
 // path-dependent aliases between control-flow results, so it detects them
-//  with two checks:
+// with two checks:
 //
 //   (1) Same base resource: the identical SSA value (or values unified by a
 //       tie chain via regionLastUseSet.lookupResource) yielded into multiple
@@ -822,8 +822,8 @@ static void collectUnderlyingResources(Value value, DenseSet<Value> &visited,
 // Whenever a result collides with an earlier one under either check the whole
 // group is marked indeterminate; deallocating each independently would
 // otherwise double-free the shared backing and may race with a sibling reader.
-// A lone result never shares with another and is left deallocatable; the resulting leak is bounded to the
-// loop-exit results of an aliasing group.
+// A lone result never shares with another and is left deallocatable; the
+// resulting leak is bounded to the loop-exit results of an aliasing group.
 static void noteYieldedResourceResult(
     Value yieldedResource, Value parentResult, LastUseSet &regionLastUseSet,
     LastUseSet &parentLastUseSet, DenseMap<Value, Value> &yieldedBaseResultMap,
@@ -927,8 +927,8 @@ static bool analyzeForLoop(scf::ForOp forOp, AsmState *asmState,
           Value forResult = forOp.getResult(index);
           noteYieldedResourceResult(operand, forResult, blockLastUseSet,
                                     lastUseSet, yieldedBaseResultMap,
-                                    yieldedUnderlyingResultMap, indeterminateResources,
-                                    handledResources);
+                                    yieldedUnderlyingResultMap,
+                                    indeterminateResources, handledResources);
           LLVM_DEBUG({
             llvm::dbgs() << "[arc]   resource ";
             operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -1025,8 +1025,8 @@ static bool analyzeIfOp(scf::IfOp ifOp, AsmState *asmState,
             Value ifResult = ifOp.getResult(index);
             noteYieldedResourceResult(operand, ifResult, blockLastUseSet,
                                       lastUseSet, yieldedBaseResultMap,
-                                      yieldedUnderlyingResultMap, indeterminateResources,
-                                      handledResources);
+                                      yieldedUnderlyingResultMap,
+                                      indeterminateResources, handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);
@@ -1097,7 +1097,7 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
   //
   // NOTE: unlike a captured resource, an init is *passed as an operand* rather
   // than referenced inside the regions, so extendCapturedResourceLifetimes()
-  //  does not see it. Without this marking an init that is only forwarded
+  // does not see it. Without this marking an init that is only forwarded
   // through the loop has no recorded use beyond its own alloca and would be
   // deallocated immediately after being allocated - a use-after-free of a
   // buffer the loop (and anything reading the while results) still could need.
@@ -1143,8 +1143,8 @@ static bool analyzeWhileOp(scf::WhileOp whileOp, AsmState *asmState,
             Value whileResult = whileOp.getResult(index);
             noteYieldedResourceResult(operand, whileResult, blockLastUseSet,
                                       lastUseSet, yieldedBaseResultMap,
-                                      yieldedUnderlyingResultMap, indeterminateResources,
-                                      handledResources);
+                                      yieldedUnderlyingResultMap,
+                                      indeterminateResources, handledResources);
             LLVM_DEBUG({
               llvm::dbgs() << "[arc]   resource ";
               operand.printAsOperand(llvm::dbgs(), *asmState);

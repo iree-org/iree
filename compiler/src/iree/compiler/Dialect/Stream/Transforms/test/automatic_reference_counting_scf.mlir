@@ -848,7 +848,7 @@ util.func private @if_yielded_then_dropped(%cond: i1, %input_tp: !stream.timepoi
 // into two of that if's results, and the surrounding scf.for carries them into
 // two loop results. On the true path both results are that local-scope allocation, on the
 // fall-through path both are the same iter_arg. Deallocating each result
-// would free the buffer twice and let the free race a still-live reader in 
+// would free the buffer twice and let the free race a still-live reader in
 // out-of-order executor.
 
 // CHECK-LABEL: @sibling_aliased_control_flow_results
