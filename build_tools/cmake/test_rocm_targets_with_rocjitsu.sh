@@ -29,11 +29,12 @@ if [[ ! -f "${SOURCE_DIR}/CMakeLists.txt" ||
   exit 2
 fi
 
-readonly -a ALL_TARGETS=(gfx942 gfx950 gfx1100 gfx1201 gfx1250)
+readonly -a ALL_TARGETS=(gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250)
 declare -Ar ROCJITSU_CONFIGS=(
   [gfx942]="gfx942_cdna3.json"
   [gfx950]="gfx950_mi355x.json"
   [gfx1100]="gfx1100_w7900.json"
+  [gfx1151]="gfx1151.json"
   [gfx1201]="gfx1201_r9700.json"
   [gfx1250]="gfx1250_mi455x.json"
 )
@@ -41,6 +42,7 @@ declare -Ar INCOMPATIBLE_GPU_LABELS=(
   [gfx942]='^requires-gpu-(cdna4|rdna3|rdna4|gfx1250)$'
   [gfx950]='^requires-gpu-(cdna3|rdna3|rdna4|gfx1250)$'
   [gfx1100]='^requires-gpu-(cdna3|cdna4|rdna4|gfx1250)$'
+  [gfx1151]='^requires-gpu-(cdna3|cdna4|rdna4|gfx1250)$'
   [gfx1201]='^requires-gpu-(cdna3|cdna4|rdna3|gfx1250)$'
   [gfx1250]='^requires-gpu-(cdna3|cdna4|rdna3|rdna4|wave64)$'
 )
@@ -51,7 +53,7 @@ Usage: build_tools/cmake/test_rocm_targets_with_rocjitsu.sh [BUILD_DIR] [TARGET 
 
 Reconfigures an existing regular IREE build and runs its ROCm e2e tests under
 rocjitsu. Supported targets:
-  gfx942 gfx950 gfx1100 gfx1201 gfx1250
+  gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
 
 BUILD_DIR defaults to IREE_BUILD_DIR or "build". With no target arguments, all
 supported targets are built and tested sequentially in the same build tree.
