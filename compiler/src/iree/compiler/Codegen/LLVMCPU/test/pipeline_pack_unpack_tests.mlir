@@ -136,9 +136,10 @@ module {
   }
 }
 
-// AArch64 with SME (and no classic SVE, e.g., Apple M4) supports vector
-// masking, so the padded pack op is vectorized with masked loads instead of
-// being decomposed.
+// IREE enables vector masking for SME (and no classic SVE, e.g., Apple M4),
+// so the padded pack op is vectorized with masked loads instead of being
+// decomposed. Outside streaming mode this is not real Zn/Pn predication:
+// LLVM scalarizes the masked load.
 // CHECK-LABEL:     func.func @unaligned_pack_aarch64_sme
 // CHECK:             vector.maskedload {{.+}} vector<8xf32>
 // CHECK:             vector.store {{.+}} vector<8xf32>
@@ -164,8 +165,9 @@ module {
   }
 }
 
-// AArch64 with SVE supports vector masking, so the padded pack op is
-// vectorized with masked loads instead of being decomposed.
+// IREE enables vector masking for SVE, so the padded pack op is vectorized
+// with masked loads instead of being decomposed (also scalarized by LLVM,
+// same as SME above).
 // CHECK-LABEL:     func.func @unaligned_pack_aarch64_sve
 // CHECK:             vector.maskedload {{.+}} vector<8xf32>
 // CHECK:             vector.store {{.+}} vector<8xf32>
@@ -190,9 +192,9 @@ module {
   }
 }
 
-// AArch64 with SME (and no classic SVE, e.g., Apple M4) supports vector
-// masking, so the padded unpack op is vectorized with masked stores instead
-// of being decomposed.
+// IREE enables vector masking for SME (and no classic SVE, e.g., Apple M4),
+// so the padded unpack op is vectorized with masked stores instead of being
+// decomposed (scalarized by LLVM, same as the pack case above).
 // CHECK-LABEL:     func.func @unaligned_unpack_aarch64_sme
 // CHECK:             vector.load {{.+}} vector<8xf32>
 // CHECK:             vector.maskedstore {{.+}} vector<8xf32>
@@ -217,9 +219,8 @@ module {
   }
 }
 
-// AArch64 with SME (and no classic SVE, e.g., Apple M4) supports vector
-// masking, so the aligned unpack op is vectorized instead of being
-// decomposed.
+// IREE enables vector masking for SME (and no classic SVE, e.g., Apple M4),
+// so the aligned unpack op is vectorized instead of being decomposed.
 // CHECK-LABEL:     func.func @aligned_unpack_aarch64_sme
 // CHECK:             vector.load {{.+}} vector<8xf32>
 // CHECK:             vector.store {{.+}} vector<8xf32>
@@ -244,8 +245,8 @@ module {
   }
 }
 
-// AArch64 with SVE supports vector masking, so the padded unpack op is
-// vectorized with masked stores instead of being decomposed.
+// IREE enables vector masking for SVE, so the padded unpack op is vectorized
+// with masked stores instead of being decomposed (also scalarized by LLVM).
 // CHECK-LABEL:     func.func @unaligned_unpack_aarch64_sve
 // CHECK:             vector.load {{.+}} vector<8xf32>
 // CHECK:             vector.maskedstore {{.+}} vector<8xf32>

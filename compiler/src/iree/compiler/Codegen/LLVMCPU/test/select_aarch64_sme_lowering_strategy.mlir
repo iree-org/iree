@@ -143,8 +143,9 @@ func.func @matmul_tensors_i8i8_i32_with_sme(%7: tensor<?x?xi8>, %8: tensor<?x?xi
 
 // -----
 
-// SME implies vector masking support (even without classic SVE, e.g., Apple
-// M4), so static inner tile pack ops are not decomposed and can be vectorized.
+// IREE enables vector masking for SME (even without classic SVE, e.g., Apple
+// M4), so static inner tile pack ops are not decomposed. Outside streaming
+// mode this is not real Zn/Pn predication: LLVM scalarizes the masked ops.
 #executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sme", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf"}>
 func.func @pack_sme(%arg0: tensor<512x512xf32>) -> tensor<64x512x8x1xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
   %empty = tensor.empty() : tensor<64x512x8x1xf32>
