@@ -25,7 +25,7 @@ jobs:
       SCCACHE_CACHE_ZSTD_LEVEL: 10
       SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_dynamic_plugins"
       # The rename cannot rewrite a thin archive.
-      IREE_COMPILER_DYNAMIC_PLUGINS: ON
+      IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS: ON
       IREE_ENABLE_THIN_ARCHIVES: OFF
     steps:
       - name: "Checking out repository"
