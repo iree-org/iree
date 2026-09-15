@@ -480,3 +480,137 @@ func.func @fold_output_pad_compose(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1
 //  CHECK-SAME:     outs(%[[EMPTY]] : tensor<2x1056x5760xf32>)
 //   CHECK-NOT:   tensor.pad
 //       CHECK:   return %[[IM2COL]]
+
+// -----
+
+func.func @dequantize_affine_drop_zero_zero_point(%q: tensor<32x64xi8>,
+    %s: tensor<32xf32>, %init: tensor<32x64xf32>) -> tensor<32x64xf32> {
+  %zp = arith.constant dense<0> : tensor<32xi64>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %s, %zp : tensor<32x64xi8>, tensor<32xf32>, tensor<32xi64>)
+      outs(%init : tensor<32x64xf32>) -> tensor<32x64xf32>
+  return %0 : tensor<32x64xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_drop_zero_zero_point
+//   CHECK-NOT:   arith.constant dense<0>
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#{{[^,]+}}, #{{[^,]+}}, #{{[^],]+}}]
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<32x64xi8>, tensor<32xf32>)
+
+// -----
+
+// Zeros that are not spelled as a splat, and a zp_unsigned flag that has to go
+// with the operand it describes.
+func.func @dequantize_affine_drop_nonsplat_zeros(%q: tensor<4x2xi8>,
+    %s: tensor<4xf32>, %init: tensor<4x2xf32>) -> tensor<4x2xf32> {
+  %zp = arith.constant dense<[0, 0, 0, 0]> : tensor<4xi32>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>], zp_unsigned}
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi32>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_drop_nonsplat_zeros
+//   CHECK-NOT:   zp_unsigned
+//       CHECK:   ins(%{{.+}}, %{{.+}} : tensor<4x2xi8>, tensor<4xf32>)
+
+// -----
+
+func.func @quantize_affine_drop_zero_scalar_zero_point(%x: tensor<8xf32>, %s: f32,
+    %init: tensor<8xi8>) -> tensor<8xi8> {
+  %zp = arith.constant 0 : i64
+  %0 = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+       quant_min = 0 : i64, quant_max = 255 : i64, storage_unsigned,
+       zp_unsigned}
+      ins(%x, %s, %zp : tensor<8xf32>, f32, i64)
+      outs(%init : tensor<8xi8>) -> tensor<8xi8>
+  return %0 : tensor<8xi8>
+}
+// CHECK-LABEL: func.func @quantize_affine_drop_zero_scalar_zero_point
+//       CHECK:   iree_linalg_ext.quantize_affine
+//  CHECK-SAME:     quant_max = 255 : i64
+//  CHECK-SAME:     quant_min = 0 : i64
+//  CHECK-SAME:     storage_unsigned
+//   CHECK-NOT:     zp_unsigned
+//       CHECK:     ins(%{{.+}}, %{{.+}} : tensor<8xf32>, f32)
+
+// A nonzero element keeps the operand.
+func.func @dequantize_affine_keep_nonzero_zero_point(%q: tensor<4x2xi8>,
+    %s: tensor<4xf32>, %init: tensor<4x2xf32>) -> tensor<4x2xf32> {
+  %zp = arith.constant dense<[0, 3, 0, 0]> : tensor<4xi32>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi32>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_keep_nonzero_zero_point
+//       CHECK:   arith.constant dense<[0, 3, 0, 0]>
+//       CHECK:   ins(%{{.+}}, %{{.+}}, %{{.+}} :
+
+// A dynamic zero point cannot be proven zero.
+func.func @dequantize_affine_keep_dynamic_zero_point(%q: tensor<4x2xi8>,
+    %s: tensor<4xf32>, %zp: tensor<4xi32>, %init: tensor<4x2xf32>) -> tensor<4x2xf32> {
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi32>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_keep_dynamic_zero_point
+//       CHECK:   ins(%{{.+}}, %{{.+}}, %{{.+}} :
+
+func.func @dequantize_affine_drop_zero_resource_zero_point(%q: tensor<4x2xi8>,
+    %s: tensor<4xf32>, %init: tensor<4x2xf32>) -> tensor<4x2xf32> {
+  %zp = arith.constant dense_resource<zero_zero_points> : tensor<4xi64>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi64>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_drop_zero_resource_zero_point
+//       CHECK:   ins(%{{.+}}, %{{.+}} : tensor<4x2xi8>, tensor<4xf32>)
+
+// A resource blob with a nonzero byte keeps the operand.
+func.func @dequantize_affine_keep_nonzero_resource_zero_point(%q: tensor<4x2xi8>,
+    %s: tensor<4xf32>, %init: tensor<4x2xf32>) -> tensor<4x2xf32> {
+  %zp = arith.constant dense_resource<nonzero_zero_points> : tensor<4xi64>
+  %0 = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi64>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_keep_nonzero_resource_zero_point
+//       CHECK:   ins(%{{.+}}, %{{.+}}, %{{.+}} :
+
+{-#
+  dialect_resources: {
+    builtin: {
+      zero_zero_points: "0x080000000000000000000000000000000000000000000000000000000000000000000000",
+      nonzero_zero_points: "0x080000000000000000000000000000000000000000000000000000000000000000000500"
+    }
+  }
+#-}
