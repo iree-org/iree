@@ -80,6 +80,35 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 };
 
+template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
+class TernaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+  using OpConversionPattern<SrcOpTy>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // TODO(benvanik): support vectors.
+    if (isa<VectorType>(srcOp.getResult().getType())) {
+      return failure();
+    }
+
+    Type type = adaptor.getA().getType();
+    switch (type.getIntOrFloatBitWidth()) {
+    case 32:
+      rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, type, adaptor.getA(),
+                                             adaptor.getB(), adaptor.getC());
+      break;
+    case 64:
+      rewriter.replaceOpWithNewOp<Dst64OpTy>(srcOp, type, adaptor.getA(),
+                                             adaptor.getB(), adaptor.getC());
+      break;
+    default:
+      return rewriter.notifyMatchFailure(srcOp, "unsupported bit width");
+    }
+    return success();
+  }
+};
+
 } // namespace
 
 void populateMathToVMPatterns(MLIRContext *context,
@@ -127,6 +156,8 @@ void populateMathToVMPatterns(MLIRContext *context,
       // so far. So a check of lhs (the float value) is sufficient.
       BinaryArithmeticOpConversion<math::FPowIOp, IREE::VM::FPowI32Op,
                                    IREE::VM::FPowI64Op>,
+      TernaryArithmeticOpConversion<math::FmaOp, IREE::VM::FMAF32Op,
+                                    IREE::VM::FMAF64Op>,
       UnaryArithmeticOpConversion<math::RsqrtOp, IREE::VM::RsqrtF32Op,
                                   IREE::VM::RsqrtF64Op>,
       UnaryArithmeticOpConversion<math::SqrtOp, IREE::VM::SqrtF32Op,
