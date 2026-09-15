@@ -36,12 +36,18 @@ iree_lit_test_suite(
 iree_check_test_suite(
     name = "check",
     srcs = ["success.mlir"],
-    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-vulkan-target=vp_android_baseline_2022",
+    ],
 )
 
 iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
-    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-vulkan-target=vp_android_baseline_2022",
+    ],
     runner_args = ["--expect_failure"],
 )
