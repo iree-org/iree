@@ -269,7 +269,7 @@ void GenericVectorizationPass::runOnOperation() {
     // vectors that use dynamic tensor shapes.
     auto targetAttr =
         iree_compiler::IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    auto vscaleRange = iree_compiler::getDefaultVscaleRange(targetAttr);
+    auto vscaleRange = iree_compiler::getVscaleRange(targetAttr);
     vector::eliminateVectorMasks(rewriter, funcOp, vscaleRange);
   }
 

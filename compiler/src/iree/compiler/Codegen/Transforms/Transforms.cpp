@@ -151,7 +151,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
   // information.
   if (!vscaleRange.has_value()) {
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    vscaleRange = getDefaultVscaleRange(targetAttr);
+    vscaleRange = getVscaleRange(targetAttr);
   }
 
   auto computeAllocationBound = [&](Value value) -> FailureOr<OpFoldResult> {
