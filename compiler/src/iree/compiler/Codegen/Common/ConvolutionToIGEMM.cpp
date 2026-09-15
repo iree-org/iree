@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
@@ -23,6 +24,17 @@ namespace mlir::iree_compiler {
 namespace {
 
 using iree_compiler::IREE::LinalgExt::IREELinalgExtDialect;
+
+/// Generalize a specific named op to a linalg.generic.
+template <typename OpTy>
+struct GeneralizeNamedOp : OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  LogicalResult matchAndRewrite(OpTy op,
+                                PatternRewriter &rewriter) const override {
+    return linalg::generalizeNamedOp(rewriter,
+                                     cast<linalg::LinalgOp>(op.getOperation()));
+  }
+};
 
 /// Pattern to set a lowering configuration on an IGEMM convolution. Searches
 /// for a contraction with a linalg_ext.im2col producer, and calls the configFn
@@ -108,6 +120,21 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
     }
   }
 
+  // Materialize implicit broadcasts in element-wise consumer ops. Consumer
+  // generics with non-identity indexing maps (e.g., per-row bias with map
+  // (d0,d1,d2,d3) -> (d1)) cannot be folded through by the reshape
+  // propagation patterns below. Materialize the broadcasts explicitly to
+  // turn consumers into pure element-wise ops with identity maps.
+  {
+    RewritePatternSet materializeBroadcastPatterns(context);
+    linalg::populateDecomposeProjectedPermutationPatterns(
+        materializeBroadcastPatterns);
+    if (failed(applyPatternsGreedily(
+            funcOp, std::move(materializeBroadcastPatterns)))) {
+      return failure();
+    }
+  }
+
   // The im2col transformation collapses some of the dimensions of the
   // convolution operands. Try to push the reshape ops towards the boundaries
   // of the function and fold with interface tensor ops.
@@ -152,6 +179,24 @@ convertToIGEMMAndSetConfig(FunctionOpInterface funcOp,
     populateCollapseDestinationForallPatterns(bubbleCollapseShapePatterns);
     if (failed(applyPatternsGreedily(funcOp,
                                      std::move(bubbleCollapseShapePatterns)))) {
+      return failure();
+    }
+  }
+  // Re-fuse the materialized broadcasts back into their element-wise
+  // consumers. The decomposition above created explicit linalg.broadcast
+  // and linalg.transpose ops so reshape propagation could fold through
+  // identity-map generics. Now that reshapes have been pushed to the
+  // boundaries, generalize those named ops to generics and fuse them back
+  // into their consumers to produce compact element-wise generics.
+  {
+    RewritePatternSet fusionPatterns(context);
+    // Generalize only broadcast/transpose to generics so elementwise
+    // fusion can fold them into their consumers.
+    fusionPatterns.add<GeneralizeNamedOp<linalg::BroadcastOp>,
+                       GeneralizeNamedOp<linalg::TransposeOp>>(context);
+    linalg::populateElementwiseOpsFusionPatterns(
+        fusionPatterns, [](OpOperand *) { return true; });
+    if (failed(applyPatternsGreedily(funcOp, std::move(fusionPatterns)))) {
       return failure();
     }
   }
