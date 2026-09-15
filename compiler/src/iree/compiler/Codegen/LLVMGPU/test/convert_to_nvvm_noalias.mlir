@@ -1,0 +1,210 @@
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(iree-stream-fuse-dispatch-bindings)' \
+// RUN:   %s | FileCheck %s --check-prefix=STREAM
+
+// Test that stream.binding_noalias attributes are correctly generated in Stream
+// dialect by the FuseDispatchBindings pass.
+//
+// This test verifies that:
+// Stream dialect: After FuseDispatchBindings pass, stream.binding_noalias
+// attributes are generated on util.func arguments for distinct bindings
+// (different resources)
+
+// Test case: Two distinct bindings that use different resources.
+// With alias_mutable_bindings = false, each mutable binding gets its own
+// equivalence class, so they should be in different correlation groups.
+stream.executable private @sort_3d_dispatch {
+  stream.executable.export public @dispatch
+    attributes {stream.resources = #stream.resource_config<{alias_mutable_bindings = false}>}
+  builtin.module {
+    util.func public @dispatch(
+      %arg0: !stream.binding,
+      %arg1: !stream.binding
+    ) {
+      %c0 = arith.constant 0 : index
+      %c16 = arith.constant 16 : index
+      %subspan0 = stream.binding.subspan %arg0[%c0]
+        : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16xi32>>{%c16}
+      %subspan1 = stream.binding.subspan %arg1[%c0]
+        : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<16xf32>>{%c16}
+      util.return
+    }
+  }
+}
+
+// Create multiple dispatches where each binding consistently uses a different
+// resource. This ensures FuseDispatchBindings recognizes them as distinct
+// correlation groups and generates stream.binding_noalias attributes.
+util.func public @test() {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  // Create distinct resources - each binding will use a different resource
+  %alloc0 = stream.resource.alloc uninitialized
+    : !stream.resource<transient>{%c32}
+  %alloc1 = stream.resource.alloc uninitialized
+    : !stream.resource<transient>{%c32}
+  %alloc2 = stream.resource.alloc uninitialized
+    : !stream.resource<transient>{%c32}
+  %alloc3 = stream.resource.alloc uninitialized
+    : !stream.resource<transient>{%c32}
+  %timepoint = stream.cmd.execute
+      with(%alloc0 as %r0: !stream.resource<transient>{%c32},
+           %alloc1 as %r1: !stream.resource<transient>{%c32},
+           %alloc2 as %r2: !stream.resource<transient>{%c32},
+           %alloc3 as %r3: !stream.resource<transient>{%c32}) {
+    // First dispatch: binding 0 uses r0, binding 1 uses r1 (different resources)
+    stream.cmd.dispatch @sort_3d_dispatch::@dispatch[%c1, %c1, %c1] {
+      rw %r0[%c0 for %c16] : !stream.resource<transient>{%c32},
+      rw %r1[%c0 for %c16] : !stream.resource<transient>{%c32}
+    }
+    // Second dispatch: binding 0 uses r2, binding 1 uses r3 (different resources)
+    // This pattern ensures binding 0 and binding 1 always use different resources
+    stream.cmd.dispatch @sort_3d_dispatch::@dispatch[%c1, %c1, %c1] {
+      rw %r2[%c0 for %c16] : !stream.resource<transient>{%c32},
+      rw %r3[%c0 for %c16] : !stream.resource<transient>{%c32}
+    }
+  } => !stream.timepoint
+  util.return
+}
+
+// After FuseDispatchBindings pass: stream.binding_noalias attributes should be
+// generated for distinct bindings (different correlation groups).
+// With alias_mutable_bindings = false, each mutable binding is in its own
+// equivalence class, so binding 0 and binding 1 are in different correlation
+// groups and should have stream.binding_noalias attributes.
+//
+// STREAM-LABEL: util.func public @dispatch
+// STREAM-SAME: (%[[ARG0:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]},
+// STREAM-SAME:  %[[ARG1:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]}
+
+// -----
+
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-nvvm))))" --iree-gpu-test-target=sm_60 --split-input-file %s | FileCheck %s --check-prefix=LLVM
+
+// Test that stream.binding_noalias attributes are correctly propagated from HAL
+// func op attributes to LLVM noalias attributes.
+//
+// This test verifies that:
+// 1. stream.binding_noalias attributes on func.func op (as a single
+//    function-level array-of-arrays attribute, with the outer index matching
+//    the HAL binding index) in HAL dialect are correctly read by ConvertToLLVM
+// 2. These attributes are converted to llvm.noalias attributes in LLVM IR
+// 3. Only bindings with explicit noalias relationships get llvm.noalias
+//
+// Note: In HAL dialect, func.func has no arguments, so stream.binding_noalias
+// is stored as a single function-level array-of-arrays attribute.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @test_noalias_propagation {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @test_noalias_propagation layout(#pipeline_layout)
+    builtin.module {
+      func.func @test_noalias_propagation() attributes {
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
+      } {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<16xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<16xf32>
+        %2 = memref.load %0[%c0] : memref<16xi32>
+        %3 = arith.sitofp %2 : i32 to f32
+        memref.store %3, %1[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @test_noalias_propagation
+// Both bindings have stream.binding_noalias attributes, so both should get llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: llvm.noalias
+
+// -----
+
+// Test case: Partial noalias relationships - binding 0 and 1 have noalias with
+// each other, but binding 2 has no noalias attribute
+#pipeline_layout_partial = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @test_partial_noalias {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @test_partial_noalias layout(#pipeline_layout_partial)
+    builtin.module {
+      func.func @test_partial_noalias() attributes {
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
+      } {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(0) : memref<16xi32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(1) : memref<16xf32>
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_partial) binding(2) : memref<16xf32>
+        %3 = memref.load %0[%c0] : memref<16xi32>
+        %4 = arith.sitofp %3 : i32 to f32
+        memref.store %4, %1[%c0] : memref<16xf32>
+        memref.store %4, %2[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @test_partial_noalias
+// Only binding 0 and 1 have noalias relationship, so only they get llvm.noalias
+// Binding 2 has no noalias attribute, so it should NOT have llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: llvm.noalias
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.nonnull, llvm.noundef}
+
+// -----
+
+// Test case: Multiple subspans of the SAME read-only binding still result in a
+// single deduplicated kernarg, and that kernarg keeps both `llvm.noalias` and
+// `llvm.readonly`. Mirrors the rustc -O behavior where two `&T` references to
+// the same readonly memory are both annotated `noalias readonly`.
+#pipeline_layout_same_ro = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable @same_binding_readonly_multi_subspan {
+  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @same_binding_readonly_multi_subspan layout(#pipeline_layout_same_ro)
+    builtin.module {
+      func.func @same_binding_readonly_multi_subspan() attributes {
+        stream.binding_noalias = [
+          [1 : i32],
+          [0 : i32]
+        ]
+      } {
+        %c0 = arith.constant 0 : index
+        %c128 = arith.constant 128 : index
+        // Two subspans on the same read-only binding(0), different offsets/types.
+        %0 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(0) offset(%c0)   flags(ReadOnly) : memref<16xf32>
+        %1 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(0) offset(%c128) flags(ReadOnly) : memref<16xi32, strided<[1], offset: ?>>
+        // Writeable output binding.
+        %2 = hal.interface.binding.subspan layout(#pipeline_layout_same_ro) binding(1) : memref<16xf32>
+        %3 = memref.load %0[%c0] : memref<16xf32>
+        %4 = memref.load %1[%c0] : memref<16xi32, strided<[1], offset: ?>>
+        %5 = arith.sitofp %4 : i32 to f32
+        %6 = arith.addf %3, %5 : f32
+        memref.store %6, %2[%c0] : memref<16xf32>
+        return
+      }
+    }
+  }
+}
+// LLVM-LABEL: llvm.func @same_binding_readonly_multi_subspan
+// The two subspans of binding(0) collapse into a single kernarg that keeps
+// both llvm.noalias and llvm.readonly. The writeable binding(1) keeps its
+// llvm.noalias as well (no readonly).
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef, llvm.readonly}
+// LLVM-SAME: %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef}

@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "configure_tensor_layout.mlir"
     "conv_pipeline_test_cuda.mlir"
     "convert_to_nvvm.mlir"
+    "convert_to_nvvm_noalias.mlir"
     "convert_to_rocdl.mlir"
     "convert_to_rocdl_gfx1201.mlir"
     "convert_to_rocdl_gfx942.mlir"
