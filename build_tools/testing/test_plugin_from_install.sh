@@ -21,10 +21,10 @@ fi
 BUILD_DIR="$(cd "${BUILD_DIR}" && pwd)"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-if ! grep -q "^IREE_COMPILER_DYNAMIC_PLUGINS:BOOL=ON" \
+if ! grep -q "^IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS:BOOL=ON" \
      "${BUILD_DIR}/CMakeCache.txt"; then
   echo "error: ${BUILD_DIR} was configured without" \
-       "-DIREE_COMPILER_DYNAMIC_PLUGINS=ON" >&2
+       "-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON" >&2
   exit 1
 fi
 
