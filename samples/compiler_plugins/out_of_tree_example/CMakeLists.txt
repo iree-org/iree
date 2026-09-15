@@ -90,7 +90,7 @@ iree_cc_library(
   PUBLIC
 )
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
 
 iree_compiler_register_dynamic_plugin(
   PLUGIN_ID

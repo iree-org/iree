@@ -41,7 +41,7 @@ parses.
 
 ```sh
 # CMake
-cmake -B build -DIREE_COMPILER_DYNAMIC_PLUGINS=ON -DIREE_ENABLE_THIN_ARCHIVES=OFF
+cmake -B build -DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON -DIREE_ENABLE_THIN_ARCHIVES=OFF
 ninja -C build iree_compiler_plugin_ootex
 
 # Bazel
@@ -69,6 +69,6 @@ the compiler, so it must match the compiler's build:
   settings; out-of-tree builds set them by hand.
 - The same IREE revision. The API version and header hash catch a changed
   plugin API, not a changed MLIR.
-- Under CMake, a host built with `IREE_COMPILER_DYNAMIC_PLUGINS=ON`;
+- Under CMake, a host built with `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`;
   without it `iree-compile` exports no compiler symbols. Bazel exports them
   either way.
