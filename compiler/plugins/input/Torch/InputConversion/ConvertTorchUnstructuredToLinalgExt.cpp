@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "llvm/ADT/APFloat.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -294,20 +293,212 @@ static SmallVector<Value> inlineTorchFunction(PatternRewriter &rewriter,
   return results;
 }
 
-/// Build the score modification region inside the OnlineAttention op.
-/// Both mask_mod and score_mod are inlined into the region to avoid separate
-/// mask materialization and to enable fusion during attention decomposition.
+/// Rewrites a rank-0 Torch vtensor type to a broadcasted tensor shape.
+static Type expandRank0TorchTensorType(Type type,
+                                       ArrayRef<int64_t> tensorShape) {
+  auto tensorType = dyn_cast<torch::Torch::ValueTensorType>(type);
+  if (!tensorType || !tensorType.hasSizes() || !tensorType.getSizes().empty()) {
+    return type;
+  }
+  return tensorType.getWithSizesAndDtype(tensorShape,
+                                         tensorType.getOptionalDtype());
+}
+
+/// Inlines a simple single-block function while letting callers recompute each
+/// cloned op's result types from its remapped operands.
 ///
-/// The region computes:
-///   1. mask = mask_mod_fn(b, h, q_idx, kv_idx)  [if mask_mod present]
-///   2. score = select(mask, score, -inf)         [if mask_mod present]
-///   3. score = score_mod_fn(score, b, h, q, kv)  [if score_mod present]
-///   4. yield score
+/// This handles the generic symbol lookup, argument mapping, operand remapping,
+/// and result mapping mechanics. The result type callback keeps clones
+/// type-consistent when the replacement arguments have different shapes than
+/// the original scalar function arguments.
+static FailureOr<SmallVector<Value>> inlineSingleBlockFunctionWithResultTypes(
+    PatternRewriter &rewriter, FlatSymbolRefAttr funcSymbol, ValueRange args,
+    Operation *contextOp,
+    llvm::function_ref<SmallVector<Type>(Operation &, ValueRange)>
+        getResultTypes) {
+  auto module = contextOp->getParentOfType<ModuleOp>();
+  if (!module) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected parent module when inlining callback function");
+  }
+  auto funcOp = module.lookupSymbol<func::FuncOp>(funcSymbol);
+  if (!funcOp) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected callback function symbol to resolve");
+  }
+  if (funcOp.isExternal() || !funcOp.getBody().hasOneBlock() ||
+      funcOp.getNumArguments() != args.size()) {
+    return rewriter.notifyMatchFailure(
+        funcOp.getOperation(),
+        "expected callback function to be defined with one block and matching "
+        "argument count");
+  }
+
+  Block &entryBlock = funcOp.getBody().front();
+  auto returnOp = dyn_cast<func::ReturnOp>(entryBlock.getTerminator());
+  if (!returnOp) {
+    return rewriter.notifyMatchFailure(
+        funcOp.getOperation(),
+        "expected callback function to terminate with func.return");
+  }
+
+  IRMapping mapper;
+  for (auto [blockArg, callArg] : llvm::zip(entryBlock.getArguments(), args)) {
+    mapper.map(blockArg, callArg);
+  }
+
+  for (Operation &op : entryBlock.without_terminator()) {
+    if (op.getNumRegions() != 0 || op.getNumSuccessors() != 0) {
+      return rewriter.notifyMatchFailure(
+          &op,
+          "expected callback function body to contain ops without regions or "
+          "successors");
+    }
+
+    SmallVector<Value> operands;
+    for (Value operand : op.getOperands()) {
+      operands.push_back(mapper.lookupOrDefault(operand));
+    }
+
+    OperationState state(op.getLoc(), op.getName(), operands,
+                         getResultTypes(op, operands), op.getAttrs());
+    Operation *clonedOp = rewriter.create(state);
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(op.getResults(), clonedOp->getResults())) {
+      mapper.map(oldResult, newResult);
+    }
+  }
+
+  SmallVector<Value> results;
+  for (Value operand : returnOp.getOperands()) {
+    results.push_back(mapper.lookupOrDefault(operand));
+  }
+  return results;
+}
+
+/// Inlines mask_mod with tensor index operands.
+///
+/// The callback is authored over scalar Torch tensors, but mask_mod is
+/// independent of the score value. Calling it with broadcastable index tensors
+/// lets normal Torch-to-linalg lowering produce a tensor mask instead of a
+/// rank-0 tensor payload inside the online_attention score region.
+static FailureOr<SmallVector<Value>> inlineFlexAttentionMaskFunction(
+    PatternRewriter &rewriter, Location loc, FlatSymbolRefAttr funcSymbol,
+    ValueRange args, ArrayRef<int64_t> tensorShape, Operation *contextOp) {
+  auto getExpandedResultTypes = [&](Operation &op, ValueRange operands) {
+    SmallVector<Value> tensorOperands;
+    for (Value operand : operands) {
+      if (isa<torch::Torch::BaseTensorType>(operand.getType())) {
+        tensorOperands.push_back(operand);
+      }
+    }
+    SmallVector<int64_t> broadcastShape(tensorShape);
+    if (!tensorOperands.empty()) {
+      SmallVector<Value> broadcastShapeValues;
+      torch::Torch::computeBroadcastShape(rewriter, loc, tensorOperands,
+                                          broadcastShape, broadcastShapeValues);
+    }
+
+    SmallVector<Type> resultTypes;
+    for (Type resultType : op.getResultTypes()) {
+      resultTypes.push_back(
+          expandRank0TorchTensorType(resultType, broadcastShape));
+    }
+
+    return resultTypes;
+  };
+
+  return inlineSingleBlockFunctionWithResultTypes(
+      rewriter, funcSymbol, args, contextOp, getExpandedResultTypes);
+}
+
+/// Builds the four callback index tensors: batch, head, query, and key/value.
+///
+/// Each result has only its corresponding dimension expanded, so the four
+/// tensors broadcast together to [B, H, Q, KV].
+static SmallVector<Value>
+createTorchIndexTensors(PatternRewriter &rewriter, Location loc,
+                        ArrayRef<int64_t> scoreShape) {
+  MLIRContext *context = rewriter.getContext();
+  Type signlessI32 = rewriter.getI32Type();
+  Type signedI32 = IntegerType::get(context, 32, IntegerType::Signed);
+
+  SmallVector<Value> torchIndices;
+  for (int64_t dim = 0, e = scoreShape.size(); dim < e; ++dim) {
+    SmallVector<int64_t> indexShape(scoreShape.size(), 1);
+    indexShape[dim] = scoreShape[dim];
+    Type indexTensorType = RankedTensorType::get(indexShape, signlessI32);
+    Type torchIndexType =
+        torch::Torch::ValueTensorType::get(context, indexShape, signedI32);
+    AffineMap identityMap =
+        AffineMap::getMultiDimIdentityMap(indexShape.size(), context);
+    ArrayRef<AffineMap> maps(identityMap);
+    SmallVector<utils::IteratorType> iterTypes(indexShape.size(),
+                                               utils::IteratorType::parallel);
+
+    Value empty =
+        tensor::EmptyOp::create(rewriter, loc, indexShape, signlessI32);
+    auto indexOp = linalg::GenericOp::create(
+        rewriter, loc, indexTensorType, ValueRange{}, ValueRange{empty}, maps,
+        iterTypes,
+        [dim, signlessI32](OpBuilder &b, Location loc, ValueRange args) {
+          Value index = linalg::IndexOp::create(b, loc, dim);
+          Value indexI32 =
+              arith::IndexCastOp::create(b, loc, signlessI32, index);
+          linalg::YieldOp::create(b, loc, indexI32);
+        });
+    torchIndices.push_back(torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, torchIndexType, indexOp.getResult(0)));
+  }
+  return torchIndices;
+}
+
+/// Emits mask_mod over the whole score matrix and returns the builtin mask.
+static FailureOr<Value> createFlexAttentionMask(PatternRewriter &rewriter,
+                                                Location loc,
+                                                FlatSymbolRefAttr maskModSymbol,
+                                                ValueRange torchIndices,
+                                                ArrayRef<int64_t> scoreShape,
+                                                Operation *contextOp) {
+  FailureOr<SmallVector<Value>> maskResults = inlineFlexAttentionMaskFunction(
+      rewriter, loc, maskModSymbol, torchIndices, scoreShape, contextOp);
+  if (failed(maskResults)) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "failed to inline flex_attention mask_mod");
+  }
+  if (maskResults->size() != 1) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected flex_attention mask_mod to return one result");
+  }
+
+  Value maskValue = (*maskResults)[0];
+  auto maskType = dyn_cast<torch::Torch::ValueTensorType>(maskValue.getType());
+  if (!maskType) {
+    return rewriter.notifyMatchFailure(
+        contextOp, "expected flex_attention mask_mod to return a Torch tensor");
+  }
+
+  if (maskType.hasSizes() && !llvm::equal(maskType.getSizes(), scoreShape)) {
+    Type broadcastType =
+        maskType.getWithSizesAndDtype(scoreShape, maskType.getOptionalDtype());
+    Value broadcastShapeList =
+        torch::Torch::toIntListConstruct(rewriter, loc, scoreShape);
+    maskValue = torch::Torch::AtenBroadcastToOp::create(
+        rewriter, loc, broadcastType, maskValue, broadcastShapeList);
+    maskType = cast<torch::Torch::ValueTensorType>(maskValue.getType());
+  }
+
+  return torch::TorchConversion::ToBuiltinTensorOp::create(
+             rewriter, loc, maskType.toBuiltinTensor(), maskValue)
+      .getResult();
+}
+
+/// Build the score modification region inside the OnlineAttention op.
+/// mask_mod is handled as the OnlineAttention mask operand.
 static void
 createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
                               IREE::LinalgExt::OnlineAttentionOp onlineAttnOp,
                               FlatSymbolRefAttr scoreModSymbol,
-                              FlatSymbolRefAttr maskModSymbol,
                               FloatType floatType, Operation *contextOp) {
   Region &region = onlineAttnOp.getRegion();
   OpBuilder::InsertionGuard guard(rewriter);
@@ -315,11 +506,10 @@ createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
       rewriter.createBlock(&region, region.end(), {floatType}, {loc});
 
   Value score = block->getArgument(0);
-  bool needIndices = scoreModSymbol || maskModSymbol;
 
   // Build index torch tensors: b, h, q_idx, kv_idx (dims 0-3).
   SmallVector<Value> torchIndices;
-  if (needIndices) {
+  if (scoreModSymbol) {
     auto signlessI32 = rewriter.getIntegerType(32);
     auto signedI32 =
         IntegerType::get(rewriter.getContext(), 32, IntegerType::Signed);
@@ -338,26 +528,7 @@ createScoreModificationRegion(PatternRewriter &rewriter, Location loc,
     }
   }
 
-  // Inline mask_mod: compute mask and apply select(mask, score, -inf).
-  if (maskModSymbol) {
-    Value maskResult = inlineTorchFunction(rewriter, loc, maskModSymbol,
-                                           torchIndices, contextOp)[0];
-
-    auto boolType = rewriter.getIntegerType(1);
-    Value builtinBool = torch::TorchConversion::ToBuiltinTensorOp::create(
-        rewriter, loc, RankedTensorType::get({}, boolType), maskResult);
-    Value boolScalar =
-        tensor::ExtractOp::create(rewriter, loc, builtinBool, ValueRange{});
-
-    Value negInf = arith::ConstantOp::create(
-        rewriter, loc,
-        rewriter.getFloatAttr(
-            floatType,
-            APFloat::getInf(floatType.getFloatSemantics(), /*Negative=*/true)));
-    score = arith::SelectOp::create(rewriter, loc, boolScalar, score, negInf);
-  }
-
-  // Inline score_mod: transform the (possibly masked) score.
+  // Inline score_mod: transform the score.
   if (scoreModSymbol) {
     auto f32ScalarTensor = RankedTensorType::get({}, floatType);
     auto torchF32Scalar = torch::Torch::ValueTensorType::get(
@@ -415,21 +586,25 @@ struct FlexAttentionOpConversion
     if (enableGqa) {
       if (failed(preProcessGroupQueryAttentionInputs(op, rewriter, query, key,
                                                      value))) {
-        return failure();
+        return rewriter.notifyMatchFailure(
+            op, "failed to preprocess grouped-query attention inputs");
       }
     }
 
     // Extract shapes from preprocessed Q, K, V.
     auto queryType = cast<torch::Torch::ValueTensorType>(query.getType());
+    auto keyType = cast<torch::Torch::ValueTensorType>(key.getType());
     auto valueType = cast<torch::Torch::ValueTensorType>(value.getType());
 
     ArrayRef<int64_t> queryShape = queryType.getSizes();
+    ArrayRef<int64_t> keyShape = keyType.getSizes();
     ArrayRef<int64_t> valueShape = valueType.getSizes();
 
     // Q: [B, H, M, K1], K: [B, H, N, K1], V: [B, H, N, K2]
     int64_t batch = queryShape[0];
     int64_t numHeads = queryShape[1];
     int64_t seqLenQ = queryShape[2];
+    int64_t seqLenKV = keyShape[2];
     int64_t valueDim = valueShape[3];
 
     auto floatType = Float32Type::get(rewriter.getContext());
@@ -468,12 +643,29 @@ struct FlexAttentionOpConversion
     AffineMap kMap = getMap({b, h, n, k1});
     AffineMap vMap = getMap({b, h, n, k2});
     AffineMap scaleMap = AffineMap::get(numDims, 0, rewriter.getContext());
+    AffineMap maskMap = getMap({b, h, m, n});
     AffineMap outputMap = getMap({b, h, m, k2});
     AffineMap maxMap = getMap({b, h, m});
     AffineMap sumMap = getMap({b, h, m});
 
-    // No mask operand: mask_mod is inlined into the score region.
+    SmallVector<int64_t> scoreShape = {batch, numHeads, seqLenQ, seqLenKV};
+    Value maskOperand;
+    if (maskModSymbol) {
+      SmallVector<Value> torchIndices =
+          createTorchIndexTensors(rewriter, loc, scoreShape);
+      FailureOr<Value> mask = createFlexAttentionMask(
+          rewriter, loc, maskModSymbol, torchIndices, scoreShape, op);
+      if (failed(mask)) {
+        return rewriter.notifyMatchFailure(
+            op, "failed to materialize flex_attention mask_mod");
+      }
+      maskOperand = *mask;
+    }
+
     SmallVector<AffineMap> indexingMaps = {qMap, kMap, vMap, scaleMap};
+    if (maskOperand) {
+      indexingMaps.push_back(maskMap);
+    }
     indexingMaps.push_back(outputMap);
     indexingMaps.push_back(maxMap);
     indexingMaps.push_back(sumMap);
@@ -504,17 +696,15 @@ struct FlexAttentionOpConversion
         linalg::FillOp::create(rewriter, loc, ValueRange{zeroInit}, rowRedEmpty)
             .getResult(0);
 
-    // Create OnlineAttentionOp without a mask operand.
     auto onlineAttnOp = IREE::LinalgExt::OnlineAttentionOp::create(
         rewriter, loc,
         TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
-        builtinQ, builtinK, builtinV, scale, /*mask=*/Value(), accFill, maxFill,
+        builtinQ, builtinK, builtinV, scale, maskOperand, accFill, maxFill,
         sumFill, rewriter.getAffineMapArrayAttr(indexingMaps),
         /*decomposition_config=*/DictionaryAttr::get(rewriter.getContext()));
 
-    // Build score modification region with inlined mask_mod and score_mod.
     createScoreModificationRegion(rewriter, loc, onlineAttnOp, scoreModSymbol,
-                                  maskModSymbol, floatType, op);
+                                  floatType, op);
 
     Value attnResult = onlineAttnOp.getResult(0);
     Value maxResult = onlineAttnOp.getResult(1);
