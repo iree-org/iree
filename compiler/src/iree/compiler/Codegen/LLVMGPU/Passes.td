@@ -70,24 +70,32 @@ def LLVMGPULegalizeNDVectorsPass :
   let summary = "Legalize n-D vectors to 1-D vectors using type conversion.";
   let dependentDialects = [
     "arith::ArithDialect",
+    "affine::AffineDialect",
+    "memref::MemRefDialect",
     "nvgpu::NVGPUDialect",
     "scf::SCFDialect",
+    "tensor::TensorDialect",
     "ub::UBDialect",
     "vector::VectorDialect",
+  ];
+}
+
+def LLVMGPULower1DVectorOpsPass :
+    InterfacePass<"iree-llvmgpu-lower-1d-vector-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Lower 1-D vector operations to simpler ops (e.g. transfer_read/write to load/store).";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "memref::MemRefDialect",
+    "ub::UBDialect",
+    "vector::VectorDialect",
+    "IREE::VectorExt::IREEVectorExtDialect",
+    "scf::SCFDialect",
   ];
 }
 
 def LLVMGPUVectorFlatteningPass :
     InterfacePass<"iree-llvmgpu-vector-flattening", "mlir::FunctionOpInterface"> {
   let summary = "Flatten n-D vectors.";
-  let dependentDialects = [
-    "vector::VectorDialect",
-  ];
-}
-
-def LLVMGPUVectorMultiReductionLoweringPass :
-    InterfacePass<"iree-llvmgpu-vector-multi-reduction-lowering", "mlir::FunctionOpInterface"> {
-  let summary = "Lower vector.multi_reduction ops.";
   let dependentDialects = [
     "vector::VectorDialect",
   ];
