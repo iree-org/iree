@@ -65,14 +65,14 @@ foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "version_mismatch.txt"
       "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_hidden_visibility_plugin>"
       "IREE_TEST_UNDEFINED_SYMBOL_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_undefined_symbol_plugin>"
       "IREE_TEST_ABI_HASH_MISMATCH_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_abi_hash_mismatch_plugin>"
-      $<$<BOOL:${IREE_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DEPS_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_deps_plugin>>
-      $<$<BOOL:${IREE_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DYNAMIC_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>>
+      $<$<BOOL:${IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DEPS_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_deps_plugin>>
+      $<$<BOOL:${IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DYNAMIC_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>>
   )
 endforeach()
 endif()
 
 # A plugin naming MLIR symbols loads only if both sides renamed alike.
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
   # Two libraries, which is what any real plugin is. Neither is in the
   # compiler, so the plugin link has to carry them.
   iree_cc_library(
