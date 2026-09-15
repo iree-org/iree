@@ -216,6 +216,24 @@ vm.module @module_diamond {
     vm.return
   }
 
+  // CHECK-LABEL: @diamond_forward_or_use
+  // A ref can transfer on one edge while remaining live on another. The
+  // non-coalesced forwarding edge must MOVE to avoid retaining a stale source.
+  vm.func @diamond_forward_or_use(%cond : i32, %buf : !vm.buffer) {
+    // CHECK: vm.cond_br
+    // CHECK-SAME: operand_registers = ["i0", "R0"]
+    // CHECK-SAME: remap_registers = {{\[}}{{\[}}"R0->r1"{{\]}}, {{\[}}{{\]}}{{\]}}
+    vm.cond_br %cond, ^forward(%buf : !vm.buffer), ^use_original
+  ^forward(%forwarded : !vm.buffer):
+    vm.call @consume_buffer(%forwarded) : (!vm.buffer) -> ()
+    vm.discard.refs %forwarded : !vm.buffer
+    vm.return
+  ^use_original:
+    vm.call @consume_buffer(%buf) : (!vm.buffer) -> ()
+    vm.discard.refs %buf : !vm.buffer
+    vm.return
+  }
+
   // CHECK-LABEL: @diamond_asymmetric_call
   // Diamond where one path calls with ref, other doesn't use it.
   vm.func @diamond_asymmetric_call(%cond : i32, %buf : !vm.buffer) {
@@ -683,6 +701,7 @@ vm.module @module_mixed {
 vm.module @module_same_target {
 
   vm.import private @consume_buffer(%buf : !vm.buffer)
+  vm.import private @use_two_buffers(%a : !vm.buffer, %b : !vm.buffer)
 
   // CHECK-LABEL: @same_ref_both_edges_same_target
   // cond_br where both edges go to same block with same ref.
@@ -699,6 +718,23 @@ vm.module @module_same_target {
     vm.call @consume_buffer(%b) : (!vm.buffer) -> ()
     // CHECK: vm.discard.refs
     vm.discard.refs %b : !vm.buffer
+    vm.return
+  }
+
+  // CHECK-LABEL: @same_ref_multiple_args_same_target
+  // When one destination coalesces with the source register, another
+  // destination must retain instead of moving and clearing that register.
+  vm.func @same_ref_multiple_args_same_target(%buf : !vm.buffer) {
+    // CHECK: vm.br
+    // CHECK-SAME: operand_registers = ["r0", "r0"]
+    // CHECK-SAME: remap_registers = {{\[}}{{\[}}"r0->r1"{{\]}}{{\]}}
+    vm.br ^merge(%buf, %buf : !vm.buffer, !vm.buffer)
+  ^merge(%a : !vm.buffer, %b : !vm.buffer):
+    // CHECK: vm.call @use_two_buffers
+    // CHECK-SAME: operand_registers = ["R0", "R1"]
+    vm.call @use_two_buffers(%a, %b) : (!vm.buffer, !vm.buffer) -> ()
+    // CHECK: vm.discard.refs
+    vm.discard.refs %a, %b : !vm.buffer, !vm.buffer
     vm.return
   }
 }
@@ -802,8 +838,8 @@ vm.module @module_br_table_refs {
   vm.func @br_table_ref_some_cases(%idx: i32, %ref: !vm.buffer) {
     // CHECK: vm.br_table
     // Ref forwarded to default and case 0, but NOT case 1.
-    // Case 0 gets MOVE since case 1 doesn't use the ref.
-    // CHECK: operand_registers = ["i0", "r0", "R0"]
+    // Each forwarding edge gets MOVE since only one edge executes.
+    // CHECK: operand_registers = ["i0", "R0", "R0"]
     vm.br_table %idx {
       default: ^bb_default(%ref : !vm.buffer),
       0: ^bb0(%ref : !vm.buffer),

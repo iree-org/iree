@@ -37,6 +37,7 @@ iree_lit_test_suite(
         "trace_dispatch_tensors.mlir",
         "transients_test.mlir",
         "unused_args.mlir",
+        "vm_ref_branch_ownership.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     tags = [
@@ -47,6 +48,7 @@ iree_lit_test_suite(
         "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
+        "//tools:iree-run-module",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
