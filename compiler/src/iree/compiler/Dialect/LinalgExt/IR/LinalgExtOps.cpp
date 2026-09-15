@@ -994,6 +994,105 @@ void MapStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// GroupMatmulOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GroupMatmulOp::verify() {
+  auto inputType = cast<RankedTensorType>(getInput().getType());
+  auto weightsType = cast<RankedTensorType>(getExpertWeights().getType());
+  auto offsetsType = cast<RankedTensorType>(getExpertOffsets().getType());
+  auto outputType = cast<RankedTensorType>(getOutput().getType());
+
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  ArrayRef<int64_t> weightsShape = weightsType.getShape();
+  ArrayRef<int64_t> offsetsShape = offsetsType.getShape();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+
+  if (ShapedType::isDynamic(weightsShape[0]) ||
+      ShapedType::isDynamic(offsetsShape[0])) {
+    return emitOpError("expert count must be static");
+  }
+  if (!ShapedType::isDynamic(inputShape[1]) &&
+      !ShapedType::isDynamic(weightsShape[1]) &&
+      inputShape[1] != weightsShape[1]) {
+    return emitOpError("input's N dimension must match expert_weights' N");
+  }
+  if (offsetsShape[0] != weightsShape[0]) {
+    return emitOpError(
+        "expert_offsets' E dimension must match expert_weights' E");
+  }
+  if (!ShapedType::isDynamic(outputShape[1]) &&
+      !ShapedType::isDynamic(weightsShape[2]) &&
+      outputShape[1] != weightsShape[2]) {
+    return emitOpError("output's M dimension must match expert_weights' M");
+  }
+  if (!ShapedType::isDynamic(inputShape[0]) &&
+      !ShapedType::isDynamic(outputShape[0]) &&
+      inputShape[0] != outputShape[0]) {
+    return emitOpError("output's T dimension must match input's T");
+  }
+  if (inputType.getElementType() != weightsType.getElementType() ||
+      inputType.getElementType() != outputType.getElementType()) {
+    return emitOpError(
+        "input, expert_weights, and output element types must match");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GroupMmt4DOp
+//===----------------------------------------------------------------------===//
+
+ArrayRef<int64_t> GroupMmt4DOp::getOutputPermutation() const {
+  static constexpr int64_t kIdentity[] = {0, 1, 2, 3};
+  static constexpr int64_t kTransposed[] = {1, 0, 3, 2};
+  return const_cast<GroupMmt4DOp *>(this)->getTransposed()
+             ? ArrayRef<int64_t>(kTransposed)
+             : ArrayRef<int64_t>(kIdentity);
+}
+
+ArrayRef<int64_t> GroupMmt4DOp::getLoopPermutation() const {
+  static constexpr int64_t kIdentity[] = {0, 1, 2, 3, 4, 5};
+  static constexpr int64_t kTransposed[] = {1, 0, 2, 4, 3, 5};
+  return const_cast<GroupMmt4DOp *>(this)->getTransposed()
+             ? ArrayRef<int64_t>(kTransposed)
+             : ArrayRef<int64_t>(kIdentity);
+}
+
+LogicalResult GroupMmt4DOp::verify() {
+  auto inputType = cast<RankedTensorType>(getInput().getType());
+  auto weightsType = cast<RankedTensorType>(getExpertWeights().getType());
+  auto offsetsType = cast<RankedTensorType>(getExpertOffsets().getType());
+  auto outputType = cast<RankedTensorType>(getOutput().getType());
+  auto dimsMatch = [](int64_t lhs, int64_t rhs) {
+    return ShapedType::isDynamic(lhs) || ShapedType::isDynamic(rhs) ||
+           lhs == rhs;
+  };
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  ArrayRef<int64_t> weightsShape = weightsType.getShape();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  ArrayRef<int64_t> outputPermutation = getOutputPermutation();
+  if (!dimsMatch(inputShape[0], outputShape[outputPermutation[0]]) ||
+      !dimsMatch(inputShape[1], weightsShape[2]) ||
+      !dimsMatch(outputShape[outputPermutation[1]], weightsShape[1]) ||
+      !dimsMatch(inputShape[2], outputShape[outputPermutation[2]]) ||
+      !dimsMatch(outputShape[outputPermutation[3]], weightsShape[3]) ||
+      !dimsMatch(inputShape[3], weightsShape[4])) {
+    return emitOpError("operand dimensions must match mmt4d");
+  }
+  if (offsetsType.getDimSize(0) != weightsType.getDimSize(0)) {
+    return emitOpError(
+        "expert_offsets' E dimension must match expert_weights' E");
+  }
+  if (inputType.getElementType() != weightsType.getElementType() ||
+      inputType.getElementType() != outputType.getElementType()) {
+    return emitOpError(
+        "input, expert_weights, and output element types must match");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
 
@@ -3401,6 +3500,8 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
+DEFINE_OP_GET_EFFECTS(GroupMatmulOp)
+DEFINE_OP_GET_EFFECTS(GroupMmt4DOp)
 DEFINE_OP_GET_EFFECTS(MapStoreOp)
 DEFINE_OP_GET_EFFECTS(MapLoadOp)
 DEFINE_OP_GET_EFFECTS(SortOp)

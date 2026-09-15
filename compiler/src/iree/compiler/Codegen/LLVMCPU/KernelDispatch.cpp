@@ -1816,12 +1816,11 @@ static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
   return divisors;
 }
 
-static IREE::Codegen::LoweringConfigAttrInterface
-getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
-  Value lhs = op.getDpsInputs()[0];
-  Value rhs = op.getDpsInputs()[1];
-  Value acc = op.getDpsInits()[0];
-
+// NOLINTBEGIN(readability-identifier-naming)
+static IREE::Codegen::LoweringConfigAttrInterface getMmt4dLoweringConfig(
+    Operation *op, Value lhs, Value rhs, Value acc, int mmt4dDimBase,
+    DictionaryAttr targetConfig, int64_t M0, int64_t N0, int64_t K0, int64_t M1,
+    int64_t N1, int64_t K1) { // NOLINTEND(readability-identifier-naming)
   const ShapedType lhsType = cast<ShapedType>(lhs.getType());
   const ShapedType rhsType = cast<ShapedType>(rhs.getType());
   const ShapedType accType = cast<ShapedType>(acc.getType());
@@ -1829,20 +1828,11 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   const int rhsTypeBits = rhsType.getElementTypeBitWidth();
   const int accTypeBits = accType.getElementTypeBitWidth();
 
-  SmallVector<int64_t> distTileSizes(op.getNumLoops(), 0);
-  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  auto tilingOp = cast<TilingInterface>(op);
+  SmallVector<int64_t> distTileSizes(tilingOp.getLoopIteratorTypes().size(), 0);
   if (mmt4dDimBase == 1) {
     distTileSizes[0] = 1;
   }
-  const auto lhsShape = lhsType.getShape();
-  const auto rhsShape = rhsType.getShape();
-  int64_t M0 = lhsShape[mmt4dDimBase + 2];
-  int64_t N0 = rhsShape[mmt4dDimBase + 2];
-  int64_t K0 = lhsShape[mmt4dDimBase + 3];
-  int64_t M1 = lhsShape[mmt4dDimBase + 0];
-  int64_t N1 = rhsShape[mmt4dDimBase + 0];
-  int64_t K1 = lhsShape[mmt4dDimBase + 1];
-
   //
   // Part 1: set the vectorization tile sizes, vecTileSizes.
   // Normally these are just the M0, N0, K0 dimension sizes, as long as these
@@ -1853,7 +1843,7 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   // tile sizes.
   //
 
-  unsigned numLoops = op.getNumLoops();
+  unsigned numLoops = tilingOp.getLoopIteratorTypes().size();
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
   vecTileSizes[mmt4dDimBase + 3] = M0;
@@ -1864,15 +1854,18 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   bool scalableTilesFound = false;
   // If scalable vectorization is enabled, adjust the vector tile sizes and the
   // corresponding scalable flags.
-  if (targetConfig && isScalableVectorizationEnabled()) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+      linalgOp && targetConfig && isScalableVectorizationEnabled()) {
     scalableTilesFound = adjustVectorSizesForScalableVectorization(
-        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
+        linalgOp, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
   }
   // In the existence of scalable tiles, we do not yet support limiting vector
   // sizes as this assumes static tile sizes.
   // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
   if (!scalableTilesFound) {
-    limitVectorTileSizes(op, vecTileSizes);
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      limitVectorTileSizes(linalgOp, vecTileSizes);
+    }
   }
   // Query back the final M0, N0, K0 values.
   M0 = vecTileSizes[mmt4dDimBase + 3];
@@ -1964,6 +1957,21 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);
   return generator.generateCPULoweringConfig();
+}
+
+static IREE::Codegen::LoweringConfigAttrInterface
+getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
+  Value lhs = op.getDpsInputs()[0];
+  Value rhs = op.getDpsInputs()[1];
+  Value acc = op.getDpsInits()[0];
+  const auto lhsShape = cast<ShapedType>(lhs.getType()).getShape();
+  const auto rhsShape = cast<ShapedType>(rhs.getType()).getShape();
+  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  return getMmt4dLoweringConfig(
+      op, lhs, rhs, acc, mmt4dDimBase, targetConfig, lhsShape[mmt4dDimBase + 2],
+      rhsShape[mmt4dDimBase + 2], lhsShape[mmt4dDimBase + 3],
+      lhsShape[mmt4dDimBase + 0], rhsShape[mmt4dDimBase + 0],
+      lhsShape[mmt4dDimBase + 1]);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
@@ -3013,6 +3021,31 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                             CPUPipeline::DoubleTilingExpert));
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::GroupMmt4DOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+
+  auto inputType = cast<ShapedType>(op.getInput().getType());
+  auto outputType = cast<ShapedType>(op.getOutput().getType());
+
+  ArrayRef<int64_t> outputPermutation = op.getOutputPermutation();
+
+  int64_t M0 = inputType.getDimSize(2);
+  int64_t N0 = outputType.getDimSize(outputPermutation[3]);
+  int64_t K0 = inputType.getDimSize(3);
+  assert(ShapedType::isStatic(M0) && ShapedType::isStatic(N0) &&
+         ShapedType::isStatic(K0) &&
+         "data-tiled group matmul requires static inner tiles");
+
+  auto loweringConfig = getMmt4dLoweringConfig(
+      op, op.getInput(), op.getExpertWeights(), op.getOutput(), 0,
+      /*targetConfig=*/nullptr, M0, N0, K0, inputType.getDimSize(0),
+      outputType.getDimSize(outputPermutation[1]), inputType.getDimSize(1));
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, loweringConfig,
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
+}
+
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -3211,8 +3244,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                                     initCPULaunchConfig);
           })
           .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
-                IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
-                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp,
+                IREE::LinalgExt::GatherOp, IREE::LinalgExt::GroupMmt4DOp,
+                linalg::PackOp, tensor::PadOp, linalg::UnPackOp,
+                linalg::Mmt4DOp, linalg::BatchMmt4DOp,
                 IREE::Codegen::InnerTiledOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,

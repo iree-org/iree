@@ -40,6 +40,7 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
       createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeGroupMmt4DPass());
   funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());

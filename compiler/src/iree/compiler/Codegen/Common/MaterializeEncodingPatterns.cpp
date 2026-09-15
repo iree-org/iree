@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/DebugLog.h"
@@ -804,6 +805,37 @@ public:
   }
 };
 
+struct MaterializeGroupMatmulOp
+    : OpConversionPattern<IREE::LinalgExt::GroupMatmulOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(IREE::LinalgExt::GroupMatmulOp op,
+                  IREE::LinalgExt::GroupMatmulOp::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter<MaterializeEncodingTypeConverter>();
+
+    Type resultType = converter->convertType(op.getResult().getType());
+    if (!resultType) {
+      return failure();
+    }
+
+    auto outputType = cast<RankedTensorType>(op.getOutput().getType());
+    auto materialized = IREE::LinalgExt::GroupMmt4DOp::create(
+        rewriter, op.getLoc(), resultType, adaptor.getInput(),
+        adaptor.getExpertWeights(), adaptor.getExpertOffsets(),
+        adaptor.getRowOffset(), adaptor.getOutput());
+
+    if (converter->getEncodingInfo(outputType).outerDimsPerm ==
+        ArrayRef<int64_t>{1, 0}) {
+      materialized.setTransposed(true);
+    }
+
+    rewriter.replaceOp(op, materialized.getResult());
+    return success();
+  }
+};
+
 static bool isRankedTensorTypeWithEncoding(Type type) {
   auto rankedTensorType = dyn_cast<RankedTensorType>(type);
   if (!rankedTensorType) {
@@ -873,13 +905,13 @@ void populateMaterializeEncodingPatterns(
                          isRankedTensorTypeWithEncoding);
   });
 
-  patterns.insert<MaterializeLinalgOp, SetEncodingOpLoweringConversion,
-                  UnsetEncodingOpLoweringConversion,
-                  MaterializeOperation<tensor::EmptyOp>,
-                  MaterializeOptimizationBarrierOp,
-                  MaterializeTensorExtDispatchTensorLoadOp,
-                  MaterializeTensorExtDispatchTensorStoreOp,
-                  MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
+  patterns.insert<
+      MaterializeLinalgOp, MaterializeGroupMatmulOp,
+      SetEncodingOpLoweringConversion, UnsetEncodingOpLoweringConversion,
+      MaterializeOperation<tensor::EmptyOp>, MaterializeOptimizationBarrierOp,
+      MaterializeTensorExtDispatchTensorLoadOp,
+      MaterializeTensorExtDispatchTensorStoreOp,
+      MaterializeInterfaceBindingEncoding, MaterializeFuncReturnOp>(
       typeConverter, context);
 };
 

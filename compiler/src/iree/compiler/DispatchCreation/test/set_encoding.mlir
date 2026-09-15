@@ -71,6 +71,46 @@ util.func public @matmul_f32f32f32_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tens
 
 // -----
 
+// Grouped matmul encodings use the same logical M/N/K metadata for input,
+// output, and expert weights, including narrow N and dynamic M cases.
+util.func public @group_matmul_narrow_n(
+    %input : tensor<3x2xf32>, %weights : tensor<2x2x1xf32>,
+    %offsets : tensor<2xi64>, %row_offset : index,
+    %output : tensor<3x1xf32>) -> tensor<3x1xf32> {
+  %0 = iree_linalg_ext.group_matmul {"iree.opt.data_tiling"} ins(
+      %input, %weights, %offsets, %row_offset : tensor<3x2xf32>,
+      tensor<2x2x1xf32>, tensor<2xi64>, index)
+    outs(%output : tensor<3x1xf32>) -> tensor<3x1xf32>
+  util.return %0 : tensor<3x1xf32>
+}
+// CHECK-DAG: #[[GROUP_INPUT:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul{{.*}}iteration_sizes = [3, 1, 2]>
+// CHECK-DAG: #[[GROUP_WEIGHTS:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul{{.*}}iteration_sizes = [2, 3, 1, 2]>
+// CHECK-DAG: #[[GROUP_OUTPUT:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul{{.*}}iteration_sizes = [3, 1, 2]>
+// CHECK: iree_encoding.set_encoding %{{.*}} : tensor<3x2xf32> -> tensor<3x2xf32, #[[GROUP_INPUT]]>
+// CHECK: iree_encoding.set_encoding %{{.*}} : tensor<2x2x1xf32> -> tensor<2x2x1xf32, #[[GROUP_WEIGHTS]]>
+// CHECK: iree_encoding.set_encoding %{{.*}} : tensor<3x1xf32> -> tensor<3x1xf32, #[[GROUP_OUTPUT]]>
+
+// -----
+
+util.func public @group_matmul_dynamic_m(
+    %input : tensor<?x2xf32>, %weights : tensor<2x2x1xf32>,
+    %offsets : tensor<2xi64>, %row_offset : index,
+    %output : tensor<?x1xf32>) -> tensor<?x1xf32> {
+  %0 = iree_linalg_ext.group_matmul {"iree.opt.data_tiling"} ins(
+      %input, %weights, %offsets, %row_offset : tensor<?x2xf32>,
+      tensor<2x2x1xf32>, tensor<2xi64>, index)
+    outs(%output : tensor<?x1xf32>) -> tensor<?x1xf32>
+  util.return %0 : tensor<?x1xf32>
+}
+// CHECK-DAG: #[[DYN_GROUP_INPUT:.+]] = #iree_encoding.encoding<operand_index = 0 : index, op_type = matmul{{.*}}iteration_sizes = [?, 1, 2]>
+// CHECK-DAG: #[[DYN_GROUP_WEIGHTS:.+]] = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul{{.*}}iteration_sizes = [2, ?, 1, 2]>
+// CHECK-DAG: #[[DYN_GROUP_OUTPUT:.+]] = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul{{.*}}iteration_sizes = [?, 1, 2]>
+// CHECK: iree_encoding.set_encoding %{{.*}} encoding_dims{%{{.*}}} : tensor<?x2xf32> -> tensor<?x2xf32, #[[DYN_GROUP_INPUT]]>
+// CHECK: iree_encoding.set_encoding %{{.*}} encoding_dims{%{{.*}}} : tensor<2x2x1xf32> -> tensor<2x2x1xf32, #[[DYN_GROUP_WEIGHTS]]>
+// CHECK: iree_encoding.set_encoding %{{.*}} encoding_dims{%{{.*}}} : tensor<?x1xf32> -> tensor<?x1xf32, #[[DYN_GROUP_OUTPUT]]>
+
+// -----
+
 util.func public @matmul_f32f32f32_parallel_reduce_parallel(%arg0 : tensor<32x128xf32>, %arg1 : tensor<128x4096xf32>,
     %arg2 : tensor<4096x32xf32>) -> tensor<4096x32xf32> {
   %0 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d2, d0)>], iterator_types = ["parallel", "reduction", "parallel"]} ins(%arg0, %arg1 : tensor<32x128xf32>, tensor<128x4096xf32>) outs(%arg2 : tensor<4096x32xf32>) {

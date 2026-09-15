@@ -2742,3 +2742,42 @@ func.func @map_load_memref_static(
 // CHECK:   iree_linalg_ext.yield %[[IDX0]], %[[PAD]]
 // CHECK: } : memref<16xf32> into memref<16xf32>
 // CHECK: return
+func.func @group_matmul(%input: tensor<?x16xf32>,
+                        %weights: tensor<4x16x32xf32>,
+                        %counts: tensor<4xi32>,
+                        %row_offset: index,
+                        %output: tensor<?x32xf32>) -> tensor<?x32xf32> {
+  %result = iree_linalg_ext.group_matmul ins(
+      %input, %weights, %counts, %row_offset : tensor<?x16xf32>, tensor<4x16x32xf32>, tensor<4xi32>, index)
+    outs(%output : tensor<?x32xf32>) -> tensor<?x32xf32>
+  return %result : tensor<?x32xf32>
+}
+// CHECK-LABEL: func.func @group_matmul
+// CHECK: iree_linalg_ext.group_matmul
+
+func.func @group_mmt4d(%input: tensor<2x3x4x5xf32>,
+                       %weights: tensor<4x6x3x7x5xf32>,
+                       %offsets: tensor<4xi64>, %row_offset: index,
+                       %output: tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32> {
+  %result = iree_linalg_ext.group_mmt4d ins(
+      %input, %weights, %offsets, %row_offset : tensor<2x3x4x5xf32>,
+      tensor<4x6x3x7x5xf32>, tensor<4xi64>, index)
+    outs(%output : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+  return %result : tensor<2x6x4x7xf32>
+}
+// CHECK-LABEL: func.func @group_mmt4d
+// CHECK: iree_linalg_ext.group_mmt4d
+
+func.func @group_mmt4d_transposed(%input: tensor<2x3x4x5xf32>,
+                                  %weights: tensor<4x6x3x7x5xf32>,
+                                  %offsets: tensor<4xi64>, %row_offset: index,
+                                  %output: tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32> {
+  %result = iree_linalg_ext.group_mmt4d {transposed = true} ins(
+      %input, %weights, %offsets, %row_offset : tensor<2x3x4x5xf32>,
+      tensor<4x6x3x7x5xf32>, tensor<4xi64>, index)
+    outs(%output : tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32>
+  return %result : tensor<6x2x7x4xf32>
+}
+// CHECK-LABEL: func.func @group_mmt4d_transposed
+// CHECK: iree_linalg_ext.group_mmt4d
+// CHECK-SAME: transposed = true

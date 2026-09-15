@@ -257,6 +257,7 @@ static void tileAndDistributeToWorkgroup(
          "forall distribution.");
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsWithReordering(
       strategy == ReorderWorkgroupsStrategy::Transpose));
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeGroupMmt4DPass());
 
   // TODO(#16421): Disable decomposition due to failure in bufferization.
   // funcPassManager.addPass(
