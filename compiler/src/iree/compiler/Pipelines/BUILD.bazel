@@ -12,6 +12,9 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Hashed into the plugin ABI; see PluginAPI/BUILD.bazel.
+exports_files(["Options.h"])
+
 iree_compiler_cc_library(
     name = "Options",
     srcs = ["Options.cpp"],
