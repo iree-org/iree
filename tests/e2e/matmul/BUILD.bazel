@@ -231,10 +231,13 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         "--acc_type=%s" % acc_type,
     ] + (["--shapes=small"] if acc_type == "f64" else []),
     tags = ([
-        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
+        # Large inner_tiled shapes time out under RISC-V QEMU (#24593).
+        # f16/bf16 also trigger LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else []),
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [
+        "noriscv",
+    ] if lhs_rhs_type == "f32" and acc_type == "f32" else []),
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -270,6 +273,28 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ("bf16", "bf16"),
     ("bf16", "f32"),
 ]]
+
+# RISC-V only: small-shape coverage of the inner_tiled MMA path. The large
+# default inner_tiled f32 set is tagged noriscv (#24593).
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_riscv_small_f32_f32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["riscv_64:rvv:+v,+zvl512b"],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
 
 # LLVMCPU, data-tiling lowering to iree_codegen.inner_tiled AND routing the
 # inner_tiled op through a built-in C-bitcode microkernel via
