@@ -152,7 +152,7 @@ function(iree_compiler_register_dynamic_plugin)
     ${ARGN}
   )
 
-  if(NOT IREE_COMPILER_DYNAMIC_PLUGINS)
+  if(NOT IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
     return()
   endif()
   include(iree_renamed_link)

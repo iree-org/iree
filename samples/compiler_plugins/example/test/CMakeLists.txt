@@ -16,7 +16,7 @@ iree_lit_test_suite(
     iree-compile
 )
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
   iree_lit_test_suite(
     NAME
       lit_dynamic

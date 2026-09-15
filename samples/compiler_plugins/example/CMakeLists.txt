@@ -39,7 +39,7 @@ iree_compiler_register_plugin(
     ::registration
 )
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
 
 iree_cc_library(
   NAME

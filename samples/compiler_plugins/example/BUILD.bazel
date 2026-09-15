@@ -42,7 +42,7 @@ iree_compiler_register_plugin(
 # plugins on, hence the guard.
 iree_cmake_extra_content(
     content = """
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
 """,
     inline = True,
 )
