@@ -217,7 +217,7 @@ void iree_task_executor_release(iree_task_executor_t* executor) {
   }
 }
 
-iree_task_topology_node_id_t iree_task_executor_numa_node_id(
+iree_task_topology_node_id_t iree_task_executor_node_id(
     iree_task_executor_t* executor) {
   return executor->numa_node_id;
 }
