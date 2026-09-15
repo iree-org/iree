@@ -48,6 +48,10 @@ table ExportDef {
 
   // Optional debug information related to the export.
   debug_info:iree.hal.debug.ExportDef;
+
+  // Original IREE executable export name used for runtime lookup. When absent,
+  // runtimes fall back to kernel_name for compatibility with older binaries.
+  export_name:string;
 }
 
 // A library containing one or more exported functions.

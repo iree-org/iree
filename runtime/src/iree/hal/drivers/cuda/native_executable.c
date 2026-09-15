@@ -293,10 +293,15 @@ iree_status_t iree_hal_cuda_native_executable_create(
   for (iree_host_size_t i = 0; i < export_count; ++i) {
     iree_hal_cuda_ExportDef_table_t export_def =
         iree_hal_cuda_ExportDef_vec_at(exports_vec, i);
+    flatbuffers_string_t export_name =
+        iree_hal_cuda_ExportDef_export_name_get(export_def);
+    if (!export_name) {
+      // Binaries produced before export_name was added used kernel_name for
+      // both PTX lookup and IREE executable export lookup.
+      export_name = iree_hal_cuda_ExportDef_kernel_name_get(export_def);
+    }
     if (IREE_UNLIKELY(!iree_host_size_checked_add(
-            total_export_name_length,
-            flatbuffers_string_len(
-                iree_hal_cuda_ExportDef_kernel_name_get(export_def)),
+            total_export_name_length, flatbuffers_string_len(export_name),
             &total_export_name_length))) {
       return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                               "export name storage size overflow");
@@ -431,14 +436,23 @@ iree_status_t iree_hal_cuda_native_executable_create(
           "cuFuncSetAttribute");
       if (!iree_status_is_ok(status)) break;
 
+      // Preserve the original executable export identity separately from the
+      // sanitized PTX symbol used for cuModuleGetFunction. Binaries produced
+      // before export_name was added use kernel_name for both.
+      flatbuffers_string_t export_name =
+          iree_hal_cuda_ExportDef_export_name_get(export_def);
+      if (!export_name) {
+        export_name = kernel_name;
+      }
+
       // Package required parameters for kernel launches for each entry point.
       iree_hal_cuda_kernel_params_t* kernel_info = &executable->exports[i];
-      const iree_host_size_t kernel_name_length =
-          flatbuffers_string_len(kernel_name);
+      const iree_host_size_t export_name_length =
+          flatbuffers_string_len(export_name);
       kernel_info->name =
-          iree_make_string_view(export_name_ptr, kernel_name_length);
-      memcpy(export_name_ptr, kernel_name, kernel_name_length);
-      export_name_ptr += kernel_name_length;
+          iree_make_string_view(export_name_ptr, export_name_length);
+      memcpy(export_name_ptr, export_name, export_name_length);
+      export_name_ptr += export_name_length;
       kernel_info->function = function;
       const iree_hal_cuda_BlockDims_t* block_dims =
           iree_hal_cuda_ExportDef_block_dims_get(export_def);
