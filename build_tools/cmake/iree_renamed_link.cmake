@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# CMake side of the renamed IREE compiler ABI (IREE_COMPILER_DYNAMIC_PLUGINS).
+# CMake side of the renamed IREE compiler ABI (IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS).
 #
 # Renaming every llvm/mlir C++ symbol lets libIREECompiler share a process with
 # a foreign LLVM/MLIR. Plugins rename to match so they resolve against it.

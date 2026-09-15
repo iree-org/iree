@@ -104,7 +104,8 @@ def _demangle(cxxfilt: str, names: list[str]) -> list[str]:
 
 
 def _write_rename_map(renames: set[tuple[str, str]], out_path: str) -> None:
-    # Bazel actions write to unique output paths, so a plain write suffices.
+    # Both builds give each invocation its own output path, so a plain write
+    # suffices.
     with open(out_path, "w", encoding="utf-8") as f:
         for old, new in sorted(renames):
             f.write(f"{old} {new}\n")

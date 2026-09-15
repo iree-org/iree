@@ -14,7 +14,8 @@ import unittest
 sys.path.insert(0, os.path.dirname(__file__))
 import gen_rename_map
 
-COMPONENT = gen_rename_map._itanium_component("IREE18")
+PREFIX = "IREE18"
+COMPONENT = gen_rename_map._itanium_component(PREFIX)
 
 
 class ItaniumComponentTest(unittest.TestCase):
@@ -66,13 +67,13 @@ class RenamedTest(unittest.TestCase):
     def test_nested_name(self):
         self.assertEqual(
             gen_rename_map._renamed("_ZN4mlir3fooEv", "mlir::foo()", COMPONENT),
-            "_ZN6IREE184mlir3fooEv",
+            "_ZN" + COMPONENT + "4mlir3fooEv",
         )
 
     def test_macho_extra_underscore(self):
         self.assertEqual(
             gen_rename_map._renamed("__ZN4mlir3barEv", "mlir::bar()", COMPONENT),
-            "__ZN6IREE184mlir3barEv",
+            "__ZN" + COMPONENT + "4mlir3barEv",
         )
 
     def test_vtable_typeinfo_guard(self):
@@ -80,19 +81,19 @@ class RenamedTest(unittest.TestCase):
             gen_rename_map._renamed(
                 "_ZTVN4mlir6WalkerE", "vtable for mlir::Walker", COMPONENT
             ),
-            "_ZTVN6IREE184mlir6WalkerE",
+            "_ZTVN" + COMPONENT + "4mlir6WalkerE",
         )
         self.assertEqual(
             gen_rename_map._renamed(
                 "_ZTIN4llvm5ErrorE", "typeinfo for llvm::Error", COMPONENT
             ),
-            "_ZTIN6IREE184llvm5ErrorE",
+            "_ZTIN" + COMPONENT + "4llvm5ErrorE",
         )
         self.assertEqual(
             gen_rename_map._renamed(
                 "_ZGVN4mlir3ctxE", "guard variable for mlir::ctx", COMPONENT
             ),
-            "_ZGVN6IREE184mlir3ctxE",
+            "_ZGVN" + COMPONENT + "4mlir3ctxE",
         )
 
     def test_local_scope_and_guard_chains(self):
@@ -104,7 +105,9 @@ class RenamedTest(unittest.TestCase):
                 "void>::resolveTypeID()::id",
                 COMPONENT,
             ),
-            "__ZGVZN6IREE184mlir6detail14TypeIDResolverIN4llvm5APIntEvE13resolveTypeIDEvE2id",
+            "__ZGVZN"
+            + COMPONENT
+            + "4mlir6detail14TypeIDResolverIN4llvm5APIntEvE13resolveTypeIDEvE2id",
         )
         # The local static itself.
         self.assertEqual(
@@ -113,7 +116,7 @@ class RenamedTest(unittest.TestCase):
                 "mlir::foo()::local",
                 COMPONENT,
             ),
-            "_ZZN6IREE184mlir3fooEvE5local",
+            "_ZZN" + COMPONENT + "4mlir3fooEvE5local",
         )
 
     def test_free_function_with_mlir_argument(self):
@@ -122,7 +125,7 @@ class RenamedTest(unittest.TestCase):
             gen_rename_map._renamed(
                 "_Z3fooN4mlir5ValueE", "foo(mlir::Value)", COMPONENT
             ),
-            "_Z6IREE183fooN4mlir5ValueE",
+            "_Z" + COMPONENT + "3fooN4mlir5ValueE",
         )
 
     def test_review_false_positive_good4mlir(self):
@@ -150,16 +153,16 @@ class WriteRenameMapTest(unittest.TestCase):
             out_path = os.path.join(temp_dir, "rename.map")
             gen_rename_map._write_rename_map(
                 {
-                    ("_ZN4mlir3barEv", "_ZN6IREE184mlir3barEv"),
-                    ("_ZN4llvm3fooEv", "_ZN6IREE184llvm3fooEv"),
+                    ("_ZN4mlir3barEv", "_ZN" + COMPONENT + "4mlir3barEv"),
+                    ("_ZN4llvm3fooEv", "_ZN" + COMPONENT + "4llvm3fooEv"),
                 },
                 out_path,
             )
             with open(out_path, encoding="utf-8") as f:
                 self.assertEqual(
                     f.read(),
-                    "_ZN4llvm3fooEv _ZN6IREE184llvm3fooEv\n"
-                    "_ZN4mlir3barEv _ZN6IREE184mlir3barEv\n",
+                    "_ZN4llvm3fooEv _ZN" + COMPONENT + "4llvm3fooEv\n"
+                    "_ZN4mlir3barEv _ZN" + COMPONENT + "4mlir3barEv\n",
                 )
 
 

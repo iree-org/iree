@@ -160,7 +160,7 @@ endforeach()
 # library structures.
 set(CMAKE_PLATFORM_NO_VERSIONED_SONAME ON)
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
   # Renamed ABI (see build_tools/cmake/iree_renamed_link.cmake). Exports
   # everything but the runtime's `iree_*` C-API, so plugins renamed the same way
   # resolve against this library at dlopen.
@@ -201,7 +201,7 @@ set_target_properties(iree_compiler_API_SharedImpl PROPERTIES
   LINK_DEPENDS "${_SHARED_IMPL_LINK_DEPENDS}"
 )
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
   include(iree_renamed_link)
 
   # The payload arrives as archive paths, so CMake sees only empty.c and would

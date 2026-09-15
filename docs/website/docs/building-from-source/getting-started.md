@@ -138,7 +138,7 @@ settings can improve compile and link times substantially.
 
 !!! Note "Note - thin archives and dynamic compiler plugins"
     `-DIREE_ENABLE_THIN_ARCHIVES=ON` cannot be combined with
-    `-DIREE_COMPILER_DYNAMIC_PLUGINS=ON`; configuring both fails. Dynamic
+    `-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`; configuring both fails. Dynamic
     plugins resolve against a renamed copy of the compiler's symbols, and the
     rename cannot rewrite a thin archive.
 
