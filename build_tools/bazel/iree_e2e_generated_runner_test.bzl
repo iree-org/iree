@@ -9,6 +9,22 @@
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
+def _target_backend_to_compiler_flags(target_backend):
+    if target_backend in ["llvm-cpu", "vmvx", "vmvx-inline"]:
+        return [
+            "--iree-hal-target-device=local",
+            "--iree-hal-local-target-device-backends=%s" % target_backend,
+        ]
+    if target_backend == "rocm":
+        return ["--iree-hal-target-device=hip"]
+    if target_backend == "vulkan-spirv":
+        return ["--iree-hal-target-device=vulkan"]
+    if target_backend == "cuda":
+        return ["--iree-hal-target-device=cuda"]
+    if target_backend == "metal-spirv":
+        return ["--iree-hal-target-device=metal"]
+    fail("Unsupported target backend: %s" % target_backend)
+
 def iree_e2e_runner_test(
         name,
         test_type,
@@ -51,9 +67,10 @@ def iree_e2e_runner_test(
         name = name + "_%s_module" % test_type,
         module_name = tests_vmfb,
         src = tests_src,
-        flags = [
-            "--iree-hal-target-backends=%s" % target_backend,
-        ] + compiler_flags,
+        flags = (
+            _target_backend_to_compiler_flags(target_backend)
+            + compiler_flags
+        )
         visibility = ["//visibility:private"],
         testonly = True,
         **kwargs
@@ -63,9 +80,10 @@ def iree_e2e_runner_test(
         name = name + "_calls_module",
         module_name = calls_vmfb,
         src = calls_src,
-        flags = [
-            "--iree-hal-target-backends=%s" % target_backend,
-        ] + compiler_flags,
+        flags = (
+            _target_backend_to_compiler_flags(target_backend)
+            + compiler_flags
+        )
         visibility = ["//visibility:private"],
         testonly = True,
         **kwargs

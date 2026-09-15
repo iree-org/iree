@@ -17,8 +17,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 // TODO(benvanik): remove this and replace with the pass pipeline options.
 // Controls executable translation targets.
 struct TargetOptions {
-  // TODO(benvanik): remove the legacy flag once users are switched to devices.
-  std::vector<std::string> legacyTargetBackends;
 
   // Specifies target devices to assign to the program. May be omitted if the
   // program already has devices assigned or no devices are required (host
