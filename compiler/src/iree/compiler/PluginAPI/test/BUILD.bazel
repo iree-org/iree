@@ -7,6 +7,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:renamed_link.bzl", "iree_compiler_register_dynamic_plugin")
 
 package(
     features = ["layering_check"],
@@ -50,13 +51,54 @@ cc_binary(
     deps = ["//compiler/src/iree/compiler/PluginAPI"],
 )
 
+# Two libraries, which is what any real plugin is. Neither is in the compiler,
+# so the plugin link has to carry them.
+cc_library(
+    name = "deps_helper",
+    srcs = ["plugins/deps_helper.cpp"],
+    hdrs = ["plugins/deps_helper.h"],
+)
+
+cc_library(
+    name = "deps_plugin",
+    srcs = ["plugins/deps_plugin.cpp"],
+    deps = [
+        ":deps_helper",
+        "//compiler/src/iree/compiler/PluginAPI",
+    ],
+)
+
+iree_compiler_register_dynamic_plugin(
+    compiler = "//lib:IREECompilerShared",
+    plugin_id = "deps_plugin",
+    target = ":deps_plugin",
+)
+
+# Touching MLIRContext forces the host to resolve renamed MLIR symbols.
+cc_library(
+    name = "dynamic_plugin",
+    srcs = ["dynamic_plugin.cpp"],
+    deps = [
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_register_dynamic_plugin(
+    compiler = "//lib:IREECompilerShared",
+    plugin_id = "dynamic_test_plugin",
+    target = ":dynamic_plugin",
+)
+
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
             "abi_hash_mismatch.txt",
+            "dynamic_plugin.txt",
             "invalid_options.txt",
             "invalid_plugin.txt",
+            "plugin_with_deps.txt",
             "hidden_visibility.txt",
             "undefined_symbol.txt",
             "valid_plugin.txt",
@@ -69,6 +111,8 @@ iree_lit_test_suite(
         ":abi_hash_mismatch_plugin",
         ":hidden_visibility_plugin",
         ":invalid_plugin",
+        ":iree_compiler_plugin_deps_plugin",
+        ":iree_compiler_plugin_dynamic_test_plugin",
         ":undefined_symbol_plugin",
         ":valid_plugin",
         ":version_mismatch_plugin",
@@ -80,6 +124,8 @@ iree_lit_test_suite(
         "IREE_TEST_VERSION_MISMATCH_PLUGIN": "$(rootpath :version_mismatch_plugin)",
         "IREE_TEST_HIDDEN_VISIBILITY_PLUGIN": "$(rootpath :hidden_visibility_plugin)",
         "IREE_TEST_UNDEFINED_SYMBOL_PLUGIN": "$(rootpath :undefined_symbol_plugin)",
+        "IREE_TEST_DEPS_PLUGIN": "$(rootpath :iree_compiler_plugin_deps_plugin)",
+        "IREE_TEST_DYNAMIC_PLUGIN": "$(rootpath :iree_compiler_plugin_dynamic_test_plugin)",
     },
     target_compatible_with = select({
         "@platforms//os:macos": ["@platforms//os:macos"],
