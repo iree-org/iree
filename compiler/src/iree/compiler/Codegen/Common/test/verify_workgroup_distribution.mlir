@@ -14,6 +14,17 @@ func.func @write_outside_workgroup_forall(%i: i32, %out: memref<32xi32, #hal.des
 
 // -----
 
+// CHECK-LABEL: func @write_outside_single_workgroup_forall
+func.func @write_outside_single_workgroup_forall(%i: i32, %out: memref<32xi32, #hal.descriptor_type<storage_buffer>>) {
+  scf.forall (%arg0) = (0) to (32) step (32) {
+  } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+  %c0 = arith.constant 0 : index
+  memref.store %i, %out[%c0] : memref<32xi32, #hal.descriptor_type<storage_buffer>>
+  return
+}
+
+// -----
+
 // CHECK-LABEL: func @non_workgroup_write_outside_workgroup_forall
 func.func @non_workgroup_write_outside_workgroup_forall(
   %i: i32, %out: memref<32xi32, #hal.descriptor_type<storage_buffer>>, %out2: memref<32xi32>) {
