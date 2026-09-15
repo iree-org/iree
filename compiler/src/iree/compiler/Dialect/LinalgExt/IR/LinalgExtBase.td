@@ -43,6 +43,19 @@ class RankedTensorOrScalarType<list<Type> allowedTypes> :
 def AnyRankedTensorOrScalarType :
   RankedTensorOrScalarType<[AnySignlessIntegerOrIndex, AnyFloat]>;
 
+// A ranked shaped value, tensor or memref. Unranked types and vectors are
+// excluded: ops using this derive their iteration space from the rank and
+// lower through `linalg.generic`, which takes neither.
+def AnyRankedShapedType :
+  AnyTypeOf<[AnyRankedTensor, AnyMemRef], "ranked tensor or memref">;
+
+// A ranked shaped value or a scalar. Used for operands that are invariant over
+// some of an op's iteration space, where a rank 0 value and a scalar carry the
+// same information.
+def AnyRankedShapedOrScalarType :
+  AnyTypeOf<[AnyRankedShapedType, AnySignlessIntegerOrIndex, AnyFloat],
+            "ranked tensor or memref, or scalar">;
+
 //===----------------------------------------------------------------------===//
 // Enum definitions
 //===----------------------------------------------------------------------===//

@@ -468,3 +468,31 @@ util.func @split_reduction_2d_by_tiling(%arg0 : tensor<?x2048x128xf32>) -> tenso
 //       CHECK:     iree_tensor_ext.dispatch.tensor.store %[[FORALL]]
 //       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups[%[[D0]]](%[[DISPATCH0]], %[[D0]])
 //       CHECK:   return %[[DISPATCH1]]
+
+// -----
+
+util.func public @quantization_ops_are_decomposed(%arg0: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi8>) -> tensor<128x64xf32> {
+  %qinit = tensor.empty() : tensor<128x64xi8>
+  %q = iree_linalg_ext.quantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128 : i64, quant_max = 127 : i64}
+      ins(%arg0, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi8>)
+      outs(%qinit : tensor<128x64xi8>) -> tensor<128x64xi8>
+  %dqinit = tensor.empty() : tensor<128x64xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi8>)
+      outs(%dqinit : tensor<128x64xf32>) -> tensor<128x64xf32>
+  util.return %dq : tensor<128x64xf32>
+}
+// CHECK-LABEL: util.func public @quantization_ops_are_decomposed
+//   CHECK-NOT:   iree_linalg_ext.quantize_affine
+//   CHECK-NOT:   iree_linalg_ext.dequantize_affine
+//       CHECK:   linalg.generic
