@@ -44,7 +44,7 @@ Both build systems are driven from `BUILD.bazel`; `bazel_to_cmake` generates
 
 ```sh
 # CMake
-cmake -B build -DIREE_COMPILER_DYNAMIC_PLUGINS=ON -DIREE_ENABLE_THIN_ARCHIVES=OFF
+cmake -B build -DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON -DIREE_ENABLE_THIN_ARCHIVES=OFF
 ninja -C build iree_compiler_plugin_ootex
 
 # Bazel
@@ -75,6 +75,6 @@ compiler's build:
   neither flag. An out-of-tree build has to match its host by hand.
 - The same IREE revision. `IREE_COMPILER_PLUGIN_API_VERSION` catches a changed
   entry point, not a changed `Client.h`.
-- Under CMake, a host built with `IREE_COMPILER_DYNAMIC_PLUGINS=ON`: without it
+- Under CMake, a host built with `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`: without it
   `iree-compile` exports no compiler symbols, and a plugin touching MLIR has
   nothing to bind to. Bazel exports them either way.

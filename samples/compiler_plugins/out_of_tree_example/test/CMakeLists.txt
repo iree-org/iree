@@ -6,7 +6,7 @@
 
 # Hand-written: bazel_to_cmake cannot express the test environment below.
 
-if(IREE_COMPILER_DYNAMIC_PLUGINS)
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
   iree_lit_test_suite(
     NAME
       lit
