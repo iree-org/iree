@@ -52,7 +52,7 @@ by the plugin and completes registration.
 ### Dynamic linking
 
 Plugins can also be loaded at run time, from a build configured with
-`-DIREE_COMPILER_DYNAMIC_PLUGINS=ON`. Each library is `dlopen()`'d and asked
+`-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`. Each library is `dlopen()`'d and asked
 for its registration through one exported symbol, which reports the plugin's
 id and the API version it was built against; a version mismatch is refused
 rather than run. Plugins are named either on the command line or, where there
@@ -140,7 +140,7 @@ Less frequently used extension points:
 * Statically linked, named plugins are supported in both build systems, with
   optional inclusion through `IREE_COMPILER_PLUGINS`.
 * Dynamically loaded plugins are supported in both build systems, from a build
-  configured with `IREE_COMPILER_DYNAMIC_PLUGINS=ON`.
+  configured with `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`.
 * `samples/compiler_plugins/example` is registered both ways from one source.
   `samples/compiler_plugins/out_of_tree_example` is shaped the way a plugin
   living in another repository would be, with its own dialect and pass.
