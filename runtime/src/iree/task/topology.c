@@ -11,6 +11,22 @@
 
 #include "iree/base/api.h"
 
+iree_host_size_t iree_task_topology_query_node_count(void) {
+  return iree_task_topology_query_node_ids(/*capacity=*/0,
+                                           /*out_ids=*/NULL);
+}
+
+iree_host_size_t iree_task_topology_dense_node_ids(
+    iree_host_size_t count, iree_host_size_t capacity,
+    iree_task_topology_node_id_t* out_ids) {
+  if (out_ids) {
+    for (iree_host_size_t i = 0; i < count && i < capacity; ++i) {
+      out_ids[i] = (iree_task_topology_node_id_t)i;
+    }
+  }
+  return count;
+}
+
 void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {
   memset(out_group, 0, sizeof(*out_group));
@@ -24,7 +40,7 @@ void iree_task_topology_group_initialize(
 void iree_task_topology_initialize(iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   memset(out_topology, 0, sizeof(*out_topology));
-  out_topology->node_id = IREE_TASK_TOPOLOGY_NODE_ID_ANY;
+  out_topology->numa_node_id = IREE_TASK_TOPOLOGY_NODE_ID_ANY;
 }
 
 void iree_task_topology_deinitialize(iree_task_topology_t* topology) {

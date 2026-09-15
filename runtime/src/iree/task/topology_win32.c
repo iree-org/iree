@@ -62,11 +62,29 @@ void iree_task_topology_query_default_caches(
   }
 }
 
-iree_host_size_t iree_task_topology_query_node_count(void) {
+iree_status_t iree_task_topology_set_snapshot_path(const char* path) {
+  (void)path;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "the win32 topology backend reads no "
+                          "redirectable data source");
+}
+
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer) {
+  (void)processor;
+  (void)buffer_capacity;
+  (void)buffer;
+  return 0;
+}
+
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids) {
   ULONG highest_number = 0;
-  return GetNumaHighestNodeNumber(&highest_number)
-             ? (iree_host_size_t)(highest_number + 1)
-             : 1;
+  const iree_host_size_t count = GetNumaHighestNodeNumber(&highest_number)
+                                     ? (iree_host_size_t)(highest_number + 1)
+                                     : 1;
+  // Windows NUMA node numbers are dense, so ids are [0, count).
+  return iree_task_topology_dense_node_ids(count, capacity, out_ids);
 }
 
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
@@ -413,7 +431,7 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 
   iree_task_topology_initialize(out_topology);
-  out_topology->node_id = node_id;
+  out_topology->numa_node_id = node_id;
 
   // Query the total size required for all information and allocate storage for
   // it on the stack - it's generally just a few KB.

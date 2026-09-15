@@ -48,12 +48,67 @@ void iree_task_topology_query_default_caches(
   }
 }
 
+// Returns the index of |package| within the cpuinfo package array, usable as a
+// stable NUMA node id in [0, cpuinfo_get_packages_count()). cpuinfo_package has
+// no numeric id field so we derive it from its array position.
+static uint32_t iree_task_topology_package_index(
+    const struct cpuinfo_package* package) {
+  if (!package) return 0;
+  return (uint32_t)(package - cpuinfo_get_packages());
+}
+
+// Returns the node id for a core.
+static uint32_t iree_task_topology_cpuinfo_node(
+    const struct cpuinfo_core* core) {
+  // cpuinfo exposes no NUMA information, so the package stands in for a node.
+  return core ? iree_task_topology_package_index(core->package) : 0;
+}
+
+iree_status_t iree_task_topology_set_snapshot_path(const char* path) {
+  (void)path;
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "the cpuinfo topology backend reads no "
+                          "redirectable data source");
+}
+
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer) {
+  (void)processor;
+  (void)buffer_capacity;
+  (void)buffer;
+  return 0;
+}
+
 // TODO(benvanik): change to a system API and move to iree/base/allocator.h so
 // it can be used there for binding memory to nodes.
-iree_host_size_t iree_task_topology_query_node_count(void) {
-  if (!iree_task_topology_is_cpuinfo_available()) return 1;
-  // NOTE: this may span across packages!
-  return cpuinfo_get_clusters_count();
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids) {
+  if (!iree_task_topology_is_cpuinfo_available()) {
+    if (out_ids && capacity >= 1) out_ids[0] = 0;
+    return 1;
+  }
+  // Enumerate the unique node ids across all cores.
+  iree_task_topology_node_id_t seen[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
+  iree_host_size_t count = 0;
+  for (uint32_t i = 0; i < cpuinfo_get_cores_count(); ++i) {
+    const uint32_t id = iree_task_topology_cpuinfo_node(cpuinfo_get_core(i));
+    bool duplicate = false;
+    for (iree_host_size_t j = 0; j < count && j < IREE_ARRAYSIZE(seen); ++j) {
+      if (seen[j] == id) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) continue;
+    if (count < IREE_ARRAYSIZE(seen)) seen[count] = id;
+    if (out_ids && count < capacity) out_ids[count] = id;
+    ++count;
+  }
+  if (count == 0) {
+    if (out_ids && capacity >= 1) out_ids[0] = 0;
+    return 1;
+  }
+  return count;
 }
 
 // Returns the core of the calling thread or NULL if not supported.
@@ -67,7 +122,7 @@ iree_task_topology_node_id_t iree_task_topology_query_current_node(void) {
   if (!iree_task_topology_is_cpuinfo_available()) return 0;
   const struct cpuinfo_core* current_core =
       iree_task_topology_get_current_core();
-  return current_core ? current_core->cluster->cluster_id : 0;
+  return current_core ? iree_task_topology_cpuinfo_node(current_core) : 0;
 }
 
 // Returns |core_id| rotated by the calling base core ID.
@@ -105,7 +160,7 @@ static void iree_task_topology_set_affinity_from_processor(
   out_affinity->id_assigned = 1;
   out_affinity->id = (uint32_t)(uintptr_t)processor;
 #elif defined(__linux__)
-  out_affinity->group = processor->cluster->cluster_id;
+  out_affinity->group = iree_task_topology_package_index(processor->package);
   out_affinity->id_assigned = 1;
   out_affinity->id = processor->linux_id;
 #else
@@ -277,17 +332,17 @@ typedef bool (*iree_task_topology_core_filter_t)(
     const struct cpuinfo_core* core, void* user_data);
 
 typedef struct iree_task_topology_core_filter_params_t {
-  uint32_t cluster_id;
+  uint32_t node_id;
   iree_task_topology_performance_level_t performance_level;
 } iree_task_topology_core_filter_params_t;
 
-// Matches all cores that have the provided cluster ID.
-static bool iree_task_topology_core_filter_by_cluster_id(
+// Matches all cores that belong to the provided node.
+static bool iree_task_topology_core_filter_by_node_id(
     const struct cpuinfo_core* core, void* user_data) {
   const iree_task_topology_core_filter_params_t* params =
       (const iree_task_topology_core_filter_params_t*)user_data;
-  if (params->cluster_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY &&
-      core->cluster->cluster_id != params->cluster_id) {
+  if (params->node_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY &&
+      iree_task_topology_cpuinfo_node(core) != params->node_id) {
     return false;
   }
   // cpuinfo doesn't expose performance levels and instead we have to switch on
@@ -385,14 +440,16 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   (void)distribution;
 
   iree_task_topology_core_filter_params_t params = {
-      .cluster_id = node_id,
+      .node_id = node_id,
       .performance_level = performance_level,
   };
   iree_status_t status =
       iree_task_topology_initialize_from_physical_cores_with_filter(
-          iree_task_topology_core_filter_by_cluster_id, &params, max_core_count,
+          iree_task_topology_core_filter_by_node_id, &params, max_core_count,
           out_topology);
-  out_topology->node_id = node_id;
+  // numa_node_id is left unspecified: cpuinfo reports package and cluster
+  // *indices* into its own tables and never reads the kernel node hierarchy,
+  // so it cannot produce an id that is valid to pass to mbind.
   return status;
 }
 
