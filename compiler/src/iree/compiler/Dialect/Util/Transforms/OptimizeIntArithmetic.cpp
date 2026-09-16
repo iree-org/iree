@@ -105,8 +105,11 @@ struct ConvertOpToUnsigned : OpRewritePattern<Signed> {
     if (failed(staticallyLegalToConvertToUnsignedOp(solver, op, indexIsI64))) {
       return failure();
     }
-    rewriter.replaceOpWithNewOp<Unsigned>(op, op->getResultTypes(),
-                                          op->getOperands(), op->getAttrs());
+    OperationState state(op.getLoc(), Unsigned::getOperationName());
+    state.addTypes(op->getResultTypes());
+    state.addOperands(op->getOperands());
+    state.addAttributes(op->getAttrs());
+    rewriter.replaceOp(op, rewriter.create(state));
     return success();
   }
 

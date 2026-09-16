@@ -240,7 +240,8 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 
   // If we couldn't find anything we could use we'll insert the size query. The
   // hope is that more program analysis could take care of this for us.
-  return IREE::Stream::ResourceSizeOp::create(builder, loc, resourceValue);
+  return IREE::Stream::ResourceSizeOp::create(
+      builder, loc, resourceValue, /*affinity=*/IREE::Stream::AffinityAttr{});
 }
 
 // Recursively expands resources into (timepoint, resource) pairs within the
@@ -355,7 +356,8 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
     replacementExceptions.insert(resultSize.getDefiningOp());
   } else {
     auto sizeOp = IREE::Stream::ResourceSizeOp::create(
-        builder, op.getLoc(), op.getLoadedGlobalValue());
+        builder, op.getLoc(), op.getLoadedGlobalValue(),
+        /*affinity=*/IREE::Stream::AffinityAttr{});
     replacementExceptions.insert(sizeOp);
     resultSize = sizeOp.getResult();
   }
@@ -483,9 +485,10 @@ static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
     auto newResult = newOp.getResult(newIdx++);
     auto newTimepoint = newOp.getResult(newIdx++);
     resourceTimepointMap.map(newResult, newTimepoint);
-    auto newResultSize =
-        IREE::Stream::ResourceSizeOp::create(builder, op.getLoc(), newResult)
-            .getResult();
+    auto newResultSize = IREE::Stream::ResourceSizeOp::create(
+                             builder, op.getLoc(), newResult,
+                             /*affinity=*/IREE::Stream::AffinityAttr{})
+                             .getResult();
     auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
         builder, op.getLoc(), newResult, newResultSize, newTimepoint);
     oldResult.replaceAllUsesWith(awaitOp.getResults().front());

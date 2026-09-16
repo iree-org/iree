@@ -157,7 +157,12 @@ getAllowedGenericOpOrGeneralizeNamedOp(RewriterBase &rewriter, Operation *op,
   }
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(linalgOp);
-  return linalg::generalizeNamedOp(rewriter, linalgOp);
+  FailureOr<linalg::LinalgOp> generalizedOp =
+      linalg::generalizeNamedOp(rewriter, linalgOp);
+  if (failed(generalizedOp)) {
+    return failure();
+  }
+  return cast<linalg::GenericOp>(generalizedOp->getOperation());
 }
 
 //===----------------------------------------------------------------------===//

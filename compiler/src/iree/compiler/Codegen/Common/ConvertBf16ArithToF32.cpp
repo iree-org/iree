@@ -55,7 +55,8 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0],
+                                 arith::FastMathFlagsAttr{});
   }
 
   return nullptr;
@@ -189,7 +190,9 @@ struct ConvertTypeSensitiveArithCastOp : OpConversionPattern<OpTy> {
                                                 resultEType.getWidth())) {
       return rewriter.notifyMatchFailure(op, "invalid width combination");
     }
-    rewriter.replaceOpWithNewOp<OpTy>(op, resultType, op.getOperand());
+    rewriter.replaceOpWithNewOp<OpTy>(
+        op, TypeRange{resultType}, ValueRange{op.getOperand()},
+        op.getProperties(), op->getDiscardableAttrDictionary().getValue());
     return success();
   }
 };

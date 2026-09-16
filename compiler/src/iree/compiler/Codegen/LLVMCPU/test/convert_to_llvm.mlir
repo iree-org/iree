@@ -182,7 +182,7 @@ module attributes {
 }
 
 // CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
-// CHECK: llvm.intr.masked.gather {{.*}} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
+// CHECK: llvm.intr.masked.gather({{.*}}), alignment({{[0-9]+}}) : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
 
 // -----
 

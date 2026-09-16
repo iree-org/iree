@@ -45,9 +45,11 @@ struct GenericConvertTypesPattern : OpConversionPattern<T> {
       return rewriter.notifyMatchFailure(op, "op does not need transformation");
     }
 
-    auto newOp = T::create(rewriter, op.getLoc(), newResultTypes,
-                           adaptor.getOperands(), newAttrs);
-    rewriter.replaceOp(op, newOp->getResults());
+    OperationState state(op.getLoc(), T::getOperationName());
+    state.addTypes(newResultTypes);
+    state.addOperands(adaptor.getOperands());
+    state.addAttributes(newAttrs);
+    rewriter.replaceOp(op, rewriter.create(state));
     return success();
   }
 

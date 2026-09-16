@@ -95,8 +95,8 @@ builtin.module {
 }
 // CHECK-LABEL: llvm.func @masked_load_store
 //       CHECK:   %[[MASK_BIT:.+]] = llvm.icmp "sgt" {{.*}} : vector<1xi64>
-//       CHECK:   llvm.intr.masked.load %{{.*}}, %[[MASK_BIT]]
-//       CHECK:   llvm.intr.masked.store %{{.*}}, %[[MASK_BIT]]
+//       CHECK:   llvm.intr.masked.load(%{{.*}}, %[[MASK_BIT]]
+//       CHECK:   llvm.intr.masked.store(%{{.*}}, %{{.*}}, %[[MASK_BIT]]
 
 // -----
 // Test workgroup size lowering

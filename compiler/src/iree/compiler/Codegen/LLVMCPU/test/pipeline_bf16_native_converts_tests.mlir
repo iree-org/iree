@@ -26,7 +26,7 @@ builtin.module {
     %lhs = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [1024], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>> -> tensor<1024xbf16>
     %rhs = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [1024], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1024xbf16>> -> tensor<1024xbf16>
     %init = tensor.empty() : tensor<1024xbf16>
-    %add = linalg.add ins(%lhs, %rhs : tensor<1024xbf16>, tensor<1024xbf16>) outs(%init : tensor<1024xbf16>) -> tensor<1024xbf16>
+    %add = linalg.elementwise <add> ins(%lhs, %rhs : tensor<1024xbf16>, tensor<1024xbf16>) outs(%init : tensor<1024xbf16>) -> tensor<1024xbf16>
     iree_tensor_ext.dispatch.tensor.store %add, %2, offsets = [0], sizes = [1024], strides = [1] : tensor<1024xbf16> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1024xbf16>>
     return
   }

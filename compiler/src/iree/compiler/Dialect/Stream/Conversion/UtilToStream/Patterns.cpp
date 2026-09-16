@@ -273,7 +273,8 @@ struct GlobalOpExpansion : BaseGlobalConversionPattern<IREE::Util::GlobalOp> {
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValueSize = IREE::Stream::ResourceSizeOp::create(
-            rewriter, globalOp.getLoc(), indexType, initialValue);
+            rewriter, globalOp.getLoc(), indexType, initialValue,
+            /*affinity=*/IREE::Stream::AffinityAttr{});
       }
       resourceOp.createStoreOp(globalOp.getLoc(), initialValue, rewriter);
       resourceSizeOp.createStoreOp(globalOp.getLoc(), initialValueSize,

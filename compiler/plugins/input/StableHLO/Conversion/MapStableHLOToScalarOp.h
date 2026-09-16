@@ -197,7 +197,7 @@ struct MapStableHloOpToScalarOpImpl<StdScalarOp> {
   Value operator()(Location loc, ArrayRef<Type> resultTypes,
                    ArrayRef<Type> /*argTypes*/, ValueRange args, OpBuilder *b) {
     return StdScalarOp::create(*b, loc, resultTypes, args,
-                               ArrayRef<NamedAttribute>{});
+                               typename StdScalarOp::Properties{});
   }
 };
 
@@ -208,7 +208,7 @@ struct MapStableHloOpToScalarOpImpl<SupportedType, StdScalarOp, Args...> {
     Type elementType = getElementTypeOrSelf(argTypes.front());
     if (SupportedType{}(elementType)) {
       return StdScalarOp::create(*b, loc, resultTypes, args,
-                                 ArrayRef<NamedAttribute>{});
+                                 typename StdScalarOp::Properties{});
     }
     return MapStableHloOpToScalarOpImpl<Args...>{}(loc, resultTypes, argTypes,
                                                    args, b);
@@ -689,7 +689,7 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
       mlir::arith::UIToFPOp::areCastCompatible(convertedSourceType,
                                                targetType)) {
     return mlir::arith::UIToFPOp::create(*b, loc, resultTypes, args,
-                                         ArrayRef<NamedAttribute>{});
+                                         mlir::arith::UIToFPOp::Properties{});
   }
   if (mlir::arith::SIToFPOp::areCastCompatible(sourceType, targetType)) {
     return mlir::arith::SIToFPOp::create(*b, loc, resultTypes, args,
@@ -700,18 +700,20 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
     auto res = cast<FloatType>(targetType);
     if (src.getWidth() > res.getWidth()) {
       return mlir::arith::TruncFOp::create(*b, loc, resultTypes, args,
-                                           ArrayRef<NamedAttribute>{});
+                                           mlir::arith::TruncFOp::Properties{});
     }
     if (src.getWidth() < res.getWidth()) {
       return mlir::arith::ExtFOp::create(*b, loc, resultTypes, args,
-                                         ArrayRef<NamedAttribute>{});
+                                         mlir::arith::ExtFOp::Properties{});
     }
     // There's no direct conversion between different 16 bit floating point
     // types, so go through 32 bit float.
     if (sourceType != targetType) {
       assert(sourceType.isBF16() || targetType.isBF16());
-      Value ext = arith::ExtFOp::create(*b, loc, b->getF32Type(), args);
-      return arith::TruncFOp::create(*b, loc, resultTypes, ext);
+      Value ext = arith::ExtFOp::create(*b, loc, TypeRange{b->getF32Type()},
+                                        args, arith::ExtFOp::Properties{});
+      return arith::TruncFOp::create(*b, loc, resultTypes, ValueRange{ext},
+                                     arith::TruncFOp::Properties{});
     }
     // No conversion is needed for identical float types.
     return args.front();
@@ -737,13 +739,13 @@ inline Value mapConvertOpToStdScalarOp(Location loc, ArrayRef<Type> targetTypes,
     auto res = cast<IntegerType>(targetType);
     if (src.getWidth() > res.getWidth()) {
       return mlir::arith::TruncIOp::create(*b, loc, resultTypes, args,
-                                           ArrayRef<NamedAttribute>{});
+                                           mlir::arith::TruncIOp::Properties{});
     }
     if (src.getWidth() < res.getWidth()) {
       // Special case boolean values, so they get casted to `1` instead of `-1`.
       if (IsUnsignedIntegerType{}(src)) {
         return mlir::arith::ExtUIOp::create(*b, loc, resultTypes, args,
-                                            ArrayRef<NamedAttribute>{});
+                                            mlir::arith::ExtUIOp::Properties{});
       }
       return mlir::arith::ExtSIOp::create(*b, loc, resultTypes, args,
                                           ArrayRef<NamedAttribute>{});

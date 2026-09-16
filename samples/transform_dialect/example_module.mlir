@@ -8,7 +8,7 @@
 //
 // module {
 //   func.func @example_module(%A : !A_size, %B : !B_size, %C : !C_size) -> !O_size {
-//     %0 = linalg.add ins(%A, %A : !A_size, !A_size)
+//     %0 = linalg.elementwise <add> ins(%A, %A : !A_size, !A_size)
 //                     outs(%A : !A_size) -> !A_size
 //     %1 = linalg.matmul ins(%0, %B : !A_size, !B_size)
 //                        outs(%C : !C_size) -> !C_size
@@ -54,7 +54,7 @@ module attributes {
 } {
 
 
-// The linalg.add (expressed as a linalg.generic).
+// The linalg.elementwise <add> (expressed as a linalg.generic).
 hal.executable private @example_module_dispatch_0 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #target}>) {
     hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(#pipeline_layout_0) count(%arg0: !hal.device) -> (index, index, index) {

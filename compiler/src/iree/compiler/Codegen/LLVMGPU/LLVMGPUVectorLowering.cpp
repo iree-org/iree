@@ -83,7 +83,8 @@ struct PromoteContractOperands final
     }
 
     if (isa<FloatType>(dstElementType)) {
-      return arith::ExtFOp::create(rewriter, loc, promotedType, v);
+      return arith::ExtFOp::create(rewriter, loc, promotedType, v,
+                                   arith::FastMathFlagsAttr{});
     }
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
@@ -214,13 +215,15 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     if (lhsVecType.getElementType() != elemType) {
       Type promotedType = lhsVecType.clone(elemType);
-      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs,
+                                  arith::FastMathFlagsAttr{});
       lhsVecType = cast<VectorType>(lhs.getType());
     }
 
     if (rhsVecType.getElementType() != elemType) {
       Type promotedType = rhsVecType.clone(elemType);
-      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs,
+                                  arith::FastMathFlagsAttr{});
       rhsVecType = cast<VectorType>(rhs.getType());
     }
 

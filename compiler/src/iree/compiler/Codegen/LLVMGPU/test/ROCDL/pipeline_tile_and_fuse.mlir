@@ -608,7 +608,7 @@ func.func @small_elementwise() attributes {hal.executable.target = #executable_t
   %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 3], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x3xf32>> -> tensor<1x3xf32>
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1, 3], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x3xf32>> -> tensor<1x3xf32>
   %5 = tensor.empty() : tensor<1x3xf32>
-  %6 = linalg.add {lowering_config = #lowering_config} ins(%3, %4 : tensor<1x3xf32>, tensor<1x3xf32>) outs(%5 : tensor<1x3xf32>) -> tensor<1x3xf32>
+  %6 = linalg.elementwise <add> {lowering_config = #lowering_config} ins(%3, %4 : tensor<1x3xf32>, tensor<1x3xf32>) outs(%5 : tensor<1x3xf32>) -> tensor<1x3xf32>
   iree_tensor_ext.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [1, 3], strides = [1, 1] : tensor<1x3xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x3xf32>>
   return
 }

@@ -980,7 +980,8 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     auto vt = cast<VectorType>(v.getType());
     auto wideTy = VectorType::get(vt.getShape(), wider);
     if (isa<FloatType>(vt.getElementType())) {
-      return arith::ExtFOp::create(builder, loc, wideTy, v);
+      return arith::ExtFOp::create(builder, loc, wideTy, v,
+                                   arith::FastMathFlagsAttr{});
     }
     return arith::ExtSIOp::create(builder, loc, wideTy, v);
   };
@@ -1209,7 +1210,8 @@ static LogicalResult lowerGenericScalarToVectorContract(
     }
     auto wideTy = VectorType::get(vt.getShape(), accElem);
     if (isa<FloatType>(accElem)) {
-      return arith::ExtFOp::create(builder, loc, wideTy, v);
+      return arith::ExtFOp::create(builder, loc, wideTy, v,
+                                   arith::FastMathFlagsAttr{});
     }
     return unsignedSrc ? Value(arith::ExtUIOp::create(builder, loc, wideTy, v))
                        : Value(arith::ExtSIOp::create(builder, loc, wideTy, v));

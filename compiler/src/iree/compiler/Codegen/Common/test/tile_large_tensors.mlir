@@ -72,7 +72,7 @@ func.func @in_nested_region(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: te
     %extracted_slice = tensor.extract_slice %3[0, %arg0] [64, 8] [1, 1] : tensor<64x64xf32> to tensor<64x8xf32>
     %extracted_slice_0 = tensor.extract_slice %4[0, %arg0] [64, 8] [1, 1] : tensor<64x64xf32> to tensor<64x8xf32>
     %extracted_slice_1 = tensor.extract_slice %arg1[0, %arg0] [64, 8] [1, 1] : tensor<64x64xf32> to tensor<64x8xf32>
-    %7 = linalg.add
+    %7 = linalg.elementwise <add>
       ins(%extracted_slice, %extracted_slice_0 : tensor<64x8xf32>, tensor<64x8xf32>)
       outs(%extracted_slice_1 : tensor<64x8xf32>) -> tensor<64x8xf32>
     %insert = tensor.insert_slice %7 into %arg1[0, %arg0] [64, 8] [1, 1] : tensor<64x8xf32> into tensor<64x64xf32>
@@ -84,16 +84,16 @@ func.func @in_nested_region(%3: tensor<64x64xf32>, %4: tensor<64x64xf32>, %5: te
 // CHECK-LABEL: func.func @in_nested_region
 //       CHECK:   scf.for
 //       CHECK:     scf.for %{{.*}} = %c0 to %c64 step %c1
-//       CHECK:       linalg.add {{.*}} -> tensor<1x8xf32>
+//       CHECK:       linalg.elementwise <add> {{.*}} -> tensor<1x8xf32>
 
 // -----
 
 func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>) -> (tensor<64x256xf32>, tensor<64x256xf32>) {
   %empty = tensor.empty() : tensor<64x256xf32>
-  %6 = linalg.add
+  %6 = linalg.elementwise <add>
     ins(%3, %4 : tensor<64x256xf32>, tensor<64x256xf32>)
     outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
-  %7 = linalg.exp
+  %7 = linalg.elementwise <exp>
     ins(%6 : tensor<64x256xf32>)
     outs(%empty : tensor<64x256xf32>) -> tensor<64x256xf32>
   return %6, %7 : tensor<64x256xf32>, tensor<64x256xf32>
@@ -101,10 +101,10 @@ func.func @multiple_use_tilable_op(%3: tensor<64x256xf32>, %4: tensor<64x256xf32
 
 // CHECK-LABEL: func.func @multiple_use_tilable_op
 //       CHECK:   %[[ADD_TILING:.+]] = scf.for
-//       CHECK:     linalg.add {{.*}} -> tensor<1x64xf32>
+//       CHECK:     linalg.elementwise <add> {{.*}} -> tensor<1x64xf32>
 //       CHECK:   %[[EXP_TILING:.+]] = scf.for
-//       CHECK:     %[[FUSED_ADD:.+]] = linalg.add {{.*}} -> tensor<1x64xf32>
-//       CHECK:     linalg.exp ins(%[[FUSED_ADD]]
+//       CHECK:     %[[FUSED_ADD:.+]] = linalg.elementwise <add> {{.*}} -> tensor<1x64xf32>
+//       CHECK:     linalg.elementwise <exp> ins(%[[FUSED_ADD]]
 //       CHECK:   return %[[ADD_TILING]], %[[EXP_TILING]]
 
 // -----

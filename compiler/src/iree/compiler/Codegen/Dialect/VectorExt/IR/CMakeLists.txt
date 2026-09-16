@@ -43,6 +43,7 @@ iree_cc_library(
     ::IREEVectorExtOpsGen
     LLVMSupport
     MLIRAffineDialect
+    MLIRArithDialect
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRSideEffectInterfaces

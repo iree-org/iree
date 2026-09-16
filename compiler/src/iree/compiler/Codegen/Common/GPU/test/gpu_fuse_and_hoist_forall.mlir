@@ -210,7 +210,7 @@ func.func @multi_hoist_and_fuse_trailing_stuff(%2: tensor<128x128xf16>) -> tenso
     scf.yield %9 : tensor<128x128xf16>
   }
   %transpose = linalg.transpose ins(%8: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) permutation = [1, 0]
-  %ceil = linalg.ceil ins(%transpose: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
+  %ceil = linalg.elementwise <ceil> ins(%transpose: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
   return %ceil : tensor<128x128xf16>
 }
 
@@ -220,7 +220,7 @@ func.func @multi_hoist_and_fuse_trailing_stuff(%2: tensor<128x128xf16>) -> tenso
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<2x4xf16>)
 //       CHECK:         linalg.copy
 //       CHECK:       %[[T:.+]] = linalg.transpose ins(%[[LOOP]] : tensor<2x4xf16>)
-//       CHECK:       linalg.ceil ins(%[[T]] : tensor<4x2xf16>) {{.*}} -> tensor<4x2xf16>
+//       CHECK:       linalg.elementwise <ceil> ins(%[[T]] : tensor<4x2xf16>) {{.*}} -> tensor<4x2xf16>
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
@@ -250,7 +250,7 @@ func.func @multi_hoist_and_fuse_trailing_with_producer_fusion(%2: tensor<128x128
     scf.yield %9 : tensor<128x128xf16>
   }
   %transpose_input = linalg.transpose ins(%3: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) permutation = [1, 0]
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%8, %transpose_input : tensor<128x128xf16>, tensor<128x128xf16>)
     outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
   return %add : tensor<128x128xf16>
@@ -264,7 +264,7 @@ func.func @multi_hoist_and_fuse_trailing_with_producer_fusion(%2: tensor<128x128
 //       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<2x4xf16>)
 //       CHECK:         linalg.copy
 //       CHECK:       %[[T:.+]] = linalg.transpose ins(%{{.*}} : tensor<4x2xf16>)
-//       CHECK:       linalg.add ins(%[[LOOP]], %[[T]] : tensor<2x4xf16>, tensor<2x4xf16>) {{.*}} -> tensor<2x4xf16>
+//       CHECK:       linalg.elementwise <add> ins(%[[LOOP]], %[[T]] : tensor<2x4xf16>, tensor<2x4xf16>) {{.*}} -> tensor<2x4xf16>
 //       CHECK:     scf.forall.in_parallel
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
@@ -501,7 +501,7 @@ func.func @fuse_multi_use(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> t
       tensor.parallel_insert_slice %16 into %arg8[%arg5, %arg6] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%10#0, %10#1 : tensor<128x128xf16>, tensor<128x128xf16>)
     outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
   return %add : tensor<128x128xf16>
@@ -510,7 +510,7 @@ func.func @fuse_multi_use(%2: tensor<128x128xf16>, %3: tensor<128x128xf16>) -> t
 // CHECK-LABEL: func @fuse_multi_use(
 //       CHECK:   scf.forall
 //       CHECK:     linalg.copy
-//       CHECK:     linalg.add
+//       CHECK:     linalg.elementwise <add>
 //       CHECK:   scf.forall.in_parallel
 //       CHECK:   return
 
@@ -537,7 +537,7 @@ func.func @no_fuse_incompatible_multi_use(%2: tensor<128x128xf16>, %3: tensor<12
       tensor.parallel_insert_slice %17 into %arg8[%arg6, %arg5] [2, 2] [1, 1] : tensor<2x2xf16> into tensor<128x128xf16>
     }
   } {mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>]}
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%10#0, %10#1 : tensor<128x128xf16>, tensor<128x128xf16>)
     outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
   return %add : tensor<128x128xf16>
@@ -770,7 +770,7 @@ func.func @fuse_warp_and_lane_foralls_multi_result(%2: tensor<2x2x64xf32>) -> (t
       %extracted_slice_3 = tensor.extract_slice %arg7[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
       %extracted_slice_4 = tensor.extract_slice %arg8[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x64xf32> to tensor<1x1x1xf32>
       %16 = linalg.copy ins(%extracted_slice_2 : tensor<1x1x1xf32>) outs(%extracted_slice_3 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
-      %17 = linalg.add ins(%extracted_slice_2, %extracted_slice_2 : tensor<1x1x1xf32>, tensor<1x1x1xf32>) outs(%extracted_slice_4 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+      %17 = linalg.elementwise <add> ins(%extracted_slice_2, %extracted_slice_2 : tensor<1x1x1xf32>, tensor<1x1x1xf32>) outs(%extracted_slice_4 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
       scf.forall.in_parallel {
         tensor.parallel_insert_slice %16 into %arg7[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
         tensor.parallel_insert_slice %17 into %arg8[0, 0, %arg6] [1, 1, 1] [1, 1, 1] : tensor<1x1x1xf32> into tensor<1x1x64xf32>
@@ -793,7 +793,7 @@ func.func @fuse_warp_and_lane_foralls_multi_result(%2: tensor<2x2x64xf32>) -> (t
 //   CHECK-DAG:     %[[OUT_SLICE0:.+]] = tensor.extract_slice %[[INIT_ARG0]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //   CHECK-DAG:     %[[OUT_SLICE1:.+]] = tensor.extract_slice %[[INIT_ARG1]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE0]]
-//       CHECK:     %[[ADD:.+]] = linalg.add ins(%[[IN_SLICE]], %[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE1]]
+//       CHECK:     %[[ADD:.+]] = linalg.elementwise <add> ins(%[[IN_SLICE]], %[[IN_SLICE]]{{.*}} outs(%[[OUT_SLICE1]]
 //       CHECK:     scf.forall.in_parallel {
 //   CHECK-DAG:       tensor.parallel_insert_slice %[[COPY]] into %[[INIT_ARG0]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //   CHECK-DAG:       tensor.parallel_insert_slice %[[ADD]] into %[[INIT_ARG1]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
@@ -809,7 +809,7 @@ func.func @fusion_through_non_dominating_loop_user(%arg0: tensor<1xf32>, %arg1: 
     %out0_slice = tensor.extract_slice %out0[%arg3] [1] [1] : tensor<64xf32> to tensor<1xf32>
     %out1_slice = tensor.extract_slice %out1[%arg3] [1] [1] : tensor<64xf32> to tensor<1xf32>
     %copied = linalg.copy ins(%arg0 : tensor<1xf32>) outs(%out0_slice : tensor<1xf32>) -> tensor<1xf32>
-    %add = linalg.add ins(%copied, %arg1 : tensor<1xf32>, tensor<1xf32>) outs(%out1_slice : tensor<1xf32>) -> tensor<1xf32>
+    %add = linalg.elementwise <add> ins(%copied, %arg1 : tensor<1xf32>, tensor<1xf32>) outs(%out1_slice : tensor<1xf32>) -> tensor<1xf32>
     scf.forall.in_parallel {
       tensor.parallel_insert_slice %copied into %out0[%arg3] [1] [1] : tensor<1xf32> into tensor<64xf32>
       tensor.parallel_insert_slice %add into %out1[%arg3] [1] [1] : tensor<1xf32> into tensor<64xf32>
@@ -833,7 +833,7 @@ func.func @fusion_through_non_dominating_loop_user(%arg0: tensor<1xf32>, %arg1: 
 //       CHECK:   %[[FORALL:.+]]:2 = scf.forall (%[[TID:.+]]) in (64)
 //  CHECK-SAME:       shared_outs(%[[OUT0:.+]] = %[[EMPTY]], %[[OUT1:.+]] = %[[EMPTY]])
 //       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[ARG0]]
-//       CHECK:     %[[ADD:.+]] = linalg.add ins(%[[COPY]], %[[ARG1]]
+//       CHECK:     %[[ADD:.+]] = linalg.elementwise <add> ins(%[[COPY]], %[[ARG1]]
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic{{.*}} ins(%[[ADD]]
 //   CHECK-DAG:     tensor.parallel_insert_slice %[[COPY]] into %[[OUT0]]
 //   CHECK-DAG:     tensor.parallel_insert_slice %[[GENERIC]] into %[[OUT1]]
@@ -996,7 +996,7 @@ func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128
     %slice0 = tensor.extract_slice %0[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
     %slice1 = tensor.extract_slice %1[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
     %slice_out = tensor.extract_slice %out[%i, %j] [4, 4] [1, 1] : tensor<128x128xf16> to tensor<4x4xf16>
-    %add = linalg.add ins(%slice0, %slice1 : tensor<4x4xf16>, tensor<4x4xf16>) outs(%slice_out : tensor<4x4xf16>) -> tensor<4x4xf16>
+    %add = linalg.elementwise <add> ins(%slice0, %slice1 : tensor<4x4xf16>, tensor<4x4xf16>) outs(%slice_out : tensor<4x4xf16>) -> tensor<4x4xf16>
     scf.forall.in_parallel {
       tensor.parallel_insert_slice %add into %out[%i, %j] [4, 4] [1, 1] : tensor<4x4xf16> into tensor<128x128xf16>
     }
@@ -1017,5 +1017,5 @@ func.func @swizzle_with_fusion(%arg0: tensor<128x128xf16>, %arg1: tensor<128x128
 //       CHECK:     %[[BARRIER2:.+]] = iree_gpu.barrier_region ins(%[[SWIZZLE2]] : tensor<128x128xf16>) {
 //       CHECK:       scf.for
 //       CHECK:         linalg.copy
-//       CHECK:     linalg.add
+//       CHECK:     linalg.elementwise <add>
 //       CHECK:   return

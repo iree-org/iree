@@ -27,8 +27,8 @@ func.func @main(%arg0: tensor<1x2xi32>) -> tensor<1x2xi32> {
   %empty = tensor.empty() : tensor<1x2xi32>
   %fill = linalg.fill ins(%cst : i32) outs(%empty : tensor<1x2xi32>) -> tensor<1x2xi32>
   %8 = linalg.matmul ins(%arg0, %6 : tensor<1x2xi32>, tensor<2x2xi32>) outs(%fill : tensor<1x2xi32>) -> tensor<1x2xi32>
-  %10 = linalg.add ins(%8, %5 : tensor<1x2xi32>, tensor<1x2xi32>) outs(%empty : tensor<1x2xi32>) -> tensor<1x2xi32>
+  %10 = linalg.elementwise <add> ins(%8, %5 : tensor<1x2xi32>, tensor<1x2xi32>) outs(%empty : tensor<1x2xi32>) -> tensor<1x2xi32>
   %12 = linalg.matmul ins(%10, %4 : tensor<1x2xi32>, tensor<2x2xi32>) outs(%fill : tensor<1x2xi32>) -> tensor<1x2xi32>
-  %14 = linalg.add ins(%12, %3 : tensor<1x2xi32>, tensor<1x2xi32>) outs(%empty : tensor<1x2xi32>) -> tensor<1x2xi32>
+  %14 = linalg.elementwise <add> ins(%12, %3 : tensor<1x2xi32>, tensor<1x2xi32>) outs(%empty : tensor<1x2xi32>) -> tensor<1x2xi32>
   return %14 : tensor<1x2xi32>
 }

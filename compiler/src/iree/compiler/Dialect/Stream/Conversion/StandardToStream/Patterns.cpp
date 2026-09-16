@@ -62,7 +62,8 @@ struct ConvertTensorConstantOp
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
-        constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
+        constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult(),
+        /*affinity=*/IREE::Stream::AffinityAttr{});
     auto transferOp = IREE::Stream::AsyncTransferOp::create(
         rewriter, constantOp.getLoc(), unknownType, newOp.getResult(),
         constantSize, constantSize,

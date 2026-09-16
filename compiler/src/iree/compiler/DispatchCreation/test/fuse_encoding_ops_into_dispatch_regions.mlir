@@ -164,7 +164,7 @@ util.func public @reshape_fusion(%arg0: tensor<32x32xf32>) -> tensor<16x64xf32, 
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<32x32xf32>
   %1 = flow.dispatch.region -> (tensor<32x32xf32>) {
-    %3 = linalg.add ins(%arg0, %arg0 : tensor<32x32xf32>, tensor<32x32xf32>)
+    %3 = linalg.elementwise <add> ins(%arg0, %arg0 : tensor<32x32xf32>, tensor<32x32xf32>)
         outs(%0 : tensor<32x32xf32>) -> tensor<32x32xf32>
     flow.return %3 : tensor<32x32xf32>
   }
@@ -176,7 +176,7 @@ util.func public @reshape_fusion(%arg0: tensor<32x32xf32>) -> tensor<16x64xf32, 
 // CHECK:       #[[$ENCODING:.+]] = #iree_encoding.testing<>
 // CHECK-LABEL: @reshape_fusion
 // CHECK:       %[[DISPATCH0:.+]] = flow.dispatch.region -> (tensor<16x64xf32, #[[$ENCODING]]>)
-// CHECK:         linalg.add
+// CHECK:         linalg.elementwise <add>
 // CHECK:         tensor.collapse_shape
 // CHECK:         tensor.expand_shape
 // CHECK:         %[[SET_ENCODING:.+]] = iree_encoding.set_encoding

@@ -201,7 +201,7 @@ util.func public @hoist_encoding_const_exprs() -> tensor<640x320xf32> {
   %init = tensor.empty() : tensor<640x320xf32>
   %0 = flow.dispatch.region -> (tensor<640x320xf32>) {
     %input = util.global.load @weight : tensor<640x320xf32>
-    %1 = linalg.elementwise kind=#linalg.elementwise_kind<exp>
+    %1 = linalg.elementwise <exp>
       ins(%input: tensor<640x320xf32>)
       outs(%init: tensor<640x320xf32>)
       -> tensor<640x320xf32>
