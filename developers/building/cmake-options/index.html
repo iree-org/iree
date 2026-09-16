@@ -4416,6 +4416,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_experimental_compiler_dynamic_plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_output_format_c" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6700,6 +6711,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#iree_experimental_compiler_dynamic_plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#iree_output_format_c" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6994,6 +7016,15 @@ Defaults to <code>ON</code>.</p>
 <li><code>IREE_INPUT_TORCH</code></li>
 <li><code>IREE_INPUT_TOSA</code></li>
 </ul>
+<h3 id="iree_experimental_compiler_dynamic_plugins"><code>IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS</code><a class="headerlink" href="#iree_experimental_compiler_dynamic_plugins" title="Permanent link">link</a></h3>
+<ul>
+<li>type: BOOL</li>
+</ul>
+<p>Experimental. Builds compiler plugins as shared libraries that <code>iree-compile</code>
+loads at run time through <code>--iree-load-plugin</code>. Defaults to <code>OFF</code>. Requires
+<code>-DIREE_ENABLE_THIN_ARCHIVES=OFF</code>, because the plugins resolve against a
+renamed copy of the compiler's symbols and the rename cannot rewrite a thin
+archive. See <code>compiler/src/iree/compiler/PluginAPI/README.md</code>.</p>
 <h3 id="iree_output_format_c"><code>IREE_OUTPUT_FORMAT_C</code><a class="headerlink" href="#iree_output_format_c" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>

@@ -6631,6 +6631,13 @@ cmake<span class="w"> </span>-G<span class="w"> </span>Ninja<span class="w"> </s
 </div>
 </div>
 </div>
+<div class="admonition note">
+<p class="admonition-title">Note - thin archives and dynamic compiler plugins</p>
+<p><code>-DIREE_ENABLE_THIN_ARCHIVES=ON</code> cannot be combined with
+<code>-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON</code>; configuring both fails. Dynamic
+plugins resolve against a renamed copy of the compiler's symbols, and the
+rename cannot rewrite a thin archive.</p>
+</div>
 <details class="tip" open="open">
 <summary>Tip - CMAKE_BUILD_TYPE values</summary>
 <p>We recommend using the <code>RelWithDebInfo</code> build type by default for a good
