@@ -81,10 +81,6 @@ typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 
-// Pointer-width unsigned integer for the string routines. Bitcode is only ever
-// retargeted between architectures of the same pointer width.
-typedef __SIZE_TYPE__ iree_device_size_t;
-
 #define INT8_MIN (-127i8 - 1)
 #define INT16_MIN (-32767i16 - 1)
 #define INT32_MIN (-2147483647i32 - 1)

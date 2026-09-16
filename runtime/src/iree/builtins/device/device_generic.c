@@ -175,6 +175,11 @@ IREE_DEVICE_EXPORT double fma(double x, double y, double z) {
 
 // LLVM codegen lowers oversized llvm.memset/memcpy/memmove intrinsics to
 // libcalls, and embedded executables link with -nostdlib.
+//
+// Pointer-width unsigned integer for the string routines; bitcode is only ever
+// retargeted between architectures of the same pointer width.
+typedef __SIZE_TYPE__ iree_device_size_t;
+
 IREE_DEVICE_EXPORT void* memset(void* dest, int value,
                                 iree_device_size_t count) {
   uint8_t* d = (uint8_t*)dest;
