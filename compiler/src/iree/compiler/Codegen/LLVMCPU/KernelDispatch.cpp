@@ -2033,6 +2033,18 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
   return tileSizes;
 }
 
+/// Returns true if pack/unpack ops with static inner tiles should be
+/// decomposed (into pad/reshape/transpose and slice ops) before
+/// GenericVectorization, instead of being vectorized directly.
+static bool preferPackUnPackDecomposition(DictionaryAttr targetConfig) {
+  if (isX86(targetConfig) || isRISCV(targetConfig)) {
+    return false;
+  }
+  // AArch64 only supports vector masking with SVE or SME.
+  return !(isAArch64(targetConfig) &&
+           (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig)));
+}
+
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    linalg::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
@@ -2065,15 +2077,15 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getDefaultDistributedLevelTileSizes(op, distConfig);
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
-  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
-  // backends prefer to not decompose the ops.
+  // by tensor.pad op), so we do not decompose the cases. Targets with vector
+  // masking support prefer to not decompose the ops.
   DictionaryAttr pipelineConfig;
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   DictionaryAttr targetConfig = target ? target.getConfiguration() : nullptr;
   bool hasDynamicInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
-  if (!hasDynamicInnerTile && targetConfig && !isX86(targetConfig) &&
-      !isRISCV(targetConfig)) {
+  if (!hasDynamicInnerTile && targetConfig &&
+      preferPackUnPackDecomposition(targetConfig)) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
 
@@ -2135,9 +2147,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   // Dynamic inner tiles lead to unbounded stack allocation (which is introduced
-  // by tensor.pad op), so we do not decompose the cases. The x86 and risc-v
-  // backends, as well as the aarch64 backend in case of scalable inner tiles,
-  // prefer to not decompose the ops.
+  // by tensor.pad op), so we do not decompose the cases. Targets with vector
+  // masking support prefer to not decompose the ops.
   // TODO: Enable scalable vectorization of unpack ops and adjust the below
   // condition to account for dynamic and scalable inner tiles separately.
   DictionaryAttr pipelineConfig;
@@ -2145,8 +2156,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   bool hasDynamicOrScalableInnerTile =
       llvm::any_of(op.getMixedTiles(), llvm::IsaPred<Value>);
   if (!hasDynamicOrScalableInnerTile && target &&
-      !isX86(target.getConfiguration()) &&
-      !isRISCV(target.getConfiguration())) {
+      preferPackUnPackDecomposition(target.getConfiguration())) {
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
   LoweringConfigGenerator generator(op);
