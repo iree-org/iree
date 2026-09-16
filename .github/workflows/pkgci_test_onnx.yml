@@ -36,13 +36,6 @@ jobs:
             runs-on: ubuntu-24.04
 
           # AMD GPU
-          # TODO(#21928): Enable the test suite after we fix the slow tests or
-          # have more machines. Developers care O3 more, so we remain the O3
-          # test suite.
-          # - name: amdgpu_hip_rdna3_O0
-          #   numprocesses: 1
-          #   config-file: onnx_ops_gpu_hip_rdna3_O0.json
-          #   runs-on: iree-w7900x2
           - name: amdgpu_hip_rdna3_O3
             numprocesses: 1
             config-file: onnx_ops_gpu_hip_rdna3_O3.json
