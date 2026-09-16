@@ -23,6 +23,7 @@ iree_lit_test_suite(
             "convert_qdq_to_integer_math_algebra.mlir",
             "convert_qdq_to_integer_math_maps.mlir",
             "convert_qdq_to_integer_math_negative.mlir",
+            "convert_qdq_to_integer_math_scale_range.mlir",
             "data_layout_propagation.mlir",
             "demote_contraction_inputs.mlir",
             "detach_elementwise_from_named_ops.mlir",

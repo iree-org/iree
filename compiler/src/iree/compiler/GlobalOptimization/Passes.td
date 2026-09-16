@@ -119,9 +119,7 @@ def ConvertQDQToIntegerMathPass :
 
     Scaling and partial-result accumulation use at least f32, preserving wider
     scale and output types, before conversion to the output type. Reassociation
-    changes floating-point rounding and is not a bitwise identity. The global
-    optimization pipeline enables this transform by default. Disable it with
-    `--iree-global-opt-enable-qdq-to-integer-math=false`.
+    changes floating-point rounding and is not a bitwise identity.
   }];
 }
 

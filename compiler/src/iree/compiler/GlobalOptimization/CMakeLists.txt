@@ -35,6 +35,36 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    QuantizationUtils
+  HDRS
+    "QuantizationUtils.h"
+  SRCS
+    "QuantizationUtils.cpp"
+  DEPS
+    LLVMSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    QuantizedContraction
+  HDRS
+    "QuantizedContraction.h"
+  SRCS
+    "QuantizedContraction.cpp"
+  DEPS
+    ::QuantizationUtils
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSupport
+    iree::compiler::Dialect::LinalgExt::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     GlobalOptimization
   HDRS
     "Passes.h"
@@ -69,6 +99,8 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    ::QuantizationUtils
+    ::QuantizedContraction
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect

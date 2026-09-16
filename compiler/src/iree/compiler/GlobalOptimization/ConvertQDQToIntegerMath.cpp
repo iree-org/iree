@@ -8,17 +8,19 @@
 //
 //   sum_k (Aq - zA)*(Bq - zB) = D - zB*RA - zA*RB + N*zA*zB,
 //
-// where D is the integer contraction and RA/RB sum the corresponding operand.
+// where D is the integer contraction, RA/RB sum the corresponding quantized
+// operand, and N is the product of the integer reduction extents.
 // Quantization parameters must be invariant over the integer reduction dims.
 // Other reduction dims become parallel in D and are reduced after scaling in
 // the epilogue. The integer contraction preserves the original contraction's
 // iteration dimension numbering; operand sums and the epilogue use their own.
 // Integer corrections precede conversion to float to retain cancellation when
-// D exceeds the floating-point mantissa.
+// D is too large to be represented exactly in the floating-point type.
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "llvm/Support/MathExtras.h"
+#include "iree/compiler/GlobalOptimization/QuantizationUtils.h"
+#include "iree/compiler/GlobalOptimization/QuantizedContraction.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -27,7 +29,6 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -39,213 +40,16 @@ using IREE::LinalgExt::DequantizeAffineOp;
 
 namespace {
 
-static constexpr unsigned kAccumulatorWidth = 32;
+using detail::getExplicitExtentDimsMap;
+using detail::getQuantizedContraction;
+using detail::QuantizedContraction;
+using detail::QuantizedOperand;
 
 /// Type of every integer intermediate: the contraction, the operand sums, and
 /// the zero-point corrections. The legality check bounds all of them against
 /// this width.
 static IntegerType getAccumulatorType(MLIRContext *context) {
   return IntegerType::get(context, kAccumulatorWidth);
-}
-
-//===----------------------------------------------------------------------===//
-// Analysis
-//===----------------------------------------------------------------------===//
-
-/// One dequantized operand. All map domains are the original contraction's
-/// iteration space.
-struct QuantizedOperand {
-  DequantizeAffineOp dequantize;
-  /// Range: quantized input data space.
-  AffineMap inputMap;
-  /// Range: scale data space.
-  AffineMap scaleMap;
-  /// Range: zero-point data space. Null if absent.
-  AffineMap zeroPointMap;
-};
-
-/// A matched contraction with a nonempty, statically bounded integer reduction.
-/// Construction succeeds only for a plain multiply-add body and a zero init.
-/// Dimension indices refer to the original contraction's iteration space.
-struct QuantizedContraction {
-  QuantizedOperand lhs;
-  QuantizedOperand rhs;
-  /// Original contraction's indexing map for the output.
-  AffineMap outputMap;
-  /// Reduction dims over which all quantization parameters are invariant.
-  SmallVector<unsigned> integerReductionDims;
-  /// Reduction dims retained as parallel dims until the scaling epilogue.
-  SmallVector<unsigned> floatingReductionDims;
-  /// Product of integer reduction extents, bounded for the i32 accumulator.
-  int64_t reductionExtent = 1;
-
-  // Each operand sum is multiplied by the opposite operand's zero point.
-  bool needsLhsSum() { return !rhs.dequantize.isSymmetric(); }
-  bool needsRhsSum() { return !lhs.dequantize.isSymmetric(); }
-};
-
-/// Maximum magnitude representable by the quantized storage grid. Returns zero
-/// when the grid cannot be accumulated in i32.
-static int64_t getStorageMagnitude(DequantizeAffineOp dequantize) {
-  unsigned width =
-      cast<IntegerType>(dequantize.getInputType().getElementType()).getWidth();
-  if (width >= kAccumulatorWidth) {
-    return 0;
-  }
-  return dequantize.getInputUnsigned() ? llvm::maxUIntN(width)
-                                       : int64_t{1} << (width - 1);
-}
-
-/// Conservative maximum magnitude of a dequantized operand's integer
-/// difference, `input - zero_point`.
-static int64_t getDifferenceMagnitude(DequantizeAffineOp dequantize) {
-  int64_t storageMagnitude = getStorageMagnitude(dequantize);
-  if (!storageMagnitude) {
-    return 0;
-  }
-
-  int64_t inputMagnitude = storageMagnitude;
-  if (dequantize.getQuantMin()) {
-    inputMagnitude =
-        std::max(-*dequantize.getQuantMin(), *dequantize.getQuantMax());
-  }
-  // A zero point is a value on the input's quantized grid. Its SSA carrier
-  // type does not enlarge that grid; PT2E commonly uses i64 for i8 values.
-  int64_t zeroPointMagnitude = dequantize.isSymmetric() ? 0 : storageMagnitude;
-  return inputMagnitude + zeroPointMagnitude;
-}
-
-/// Maximum reduction extent for which every i32 partial sum and correction is
-/// bounded by N * |Aq - zA|max * |Bq - zB|max <= INT32_MAX. Division avoids
-/// overflow in the bound and preserves the positive endpoint of signed i32.
-/// Returns zero when no positive reduction extent can be proven safe.
-static int64_t getMaxReductionExtent(QuantizedContraction &contraction) {
-  int64_t lhsMagnitude = getDifferenceMagnitude(contraction.lhs.dequantize);
-  int64_t rhsMagnitude = getDifferenceMagnitude(contraction.rhs.dequantize);
-  if (!lhsMagnitude || !rhsMagnitude) {
-    return 0;
-  }
-  return llvm::maxIntN(kAccumulatorWidth) / lhsMagnitude / rhsMagnitude;
-}
-
-/// Matches exactly two scalar operations: input multiplication and accumulator
-/// addition, in either operand order. Casts and other intervening operations
-/// prevent matching.
-static bool hasPlainFloatMulAddBody(linalg::LinalgOp op) {
-  Block *body = op.getBlock();
-  if (body->getNumArguments() != 3 || body->getOperations().size() != 3) {
-    return false;
-  }
-  auto yield = dyn_cast<linalg::YieldOp>(body->getTerminator());
-  if (!yield || yield.getNumOperands() != 1) {
-    return false;
-  }
-  auto addition = yield.getValues()[0].getDefiningOp<arith::AddFOp>();
-  if (!addition) {
-    return false;
-  }
-  Value accumulator = body->getArgument(2);
-  Value product;
-  if (addition.getLhs() == accumulator) {
-    product = addition.getRhs();
-  } else if (addition.getRhs() == accumulator) {
-    product = addition.getLhs();
-  } else {
-    return false;
-  }
-  auto multiplication = product.getDefiningOp<arith::MulFOp>();
-  if (!multiplication) {
-    return false;
-  }
-  Value lhs = body->getArgument(0);
-  Value rhs = body->getArgument(1);
-  return (multiplication.getLhs() == lhs && multiplication.getRhs() == rhs) ||
-         (multiplication.getLhs() == rhs && multiplication.getRhs() == lhs);
-}
-
-/// Rebase dequantization indexing maps onto the original contraction's
-/// iteration space. The inverse output map maps dequantized data space back to
-/// the dequantization iteration space, accounting for folded permutations.
-static QuantizedOperand getQuantizedOperand(DequantizeAffineOp dequantize,
-                                            AffineMap operandMap) {
-  AffineMap toDequantizeIteration =
-      inversePermutation(dequantize.getOutputMap()).compose(operandMap);
-  return {dequantize, dequantize.getInputMap().compose(toDequantizeIteration),
-          dequantize.getScaleMap().compose(toDequantizeIteration),
-          dequantize.isSymmetric()
-              ? AffineMap()
-              : dequantize.getZeroPointMap().compose(toDequantizeIteration)};
-}
-
-static FailureOr<QuantizedContraction>
-getQuantizedContraction(linalg::LinalgOp op) {
-  if (op.getNumDpsInputs() != 2 || op.getNumDpsInits() != 1 ||
-      !op.hasPureTensorSemantics() || !hasPlainFloatMulAddBody(op)) {
-    return failure();
-  }
-  auto fill = op.getDpsInits()[0].getDefiningOp<linalg::FillOp>();
-  if (!fill || !matchPattern(fill.getInputs()[0], m_AnyZeroFloat())) {
-    return failure();
-  }
-
-  auto lhs = op.getDpsInputs()[0].getDefiningOp<DequantizeAffineOp>();
-  auto rhs = op.getDpsInputs()[1].getDefiningOp<DequantizeAffineOp>();
-  if (!lhs || !rhs) {
-    return failure();
-  }
-  QuantizedContraction detail;
-  detail.lhs = getQuantizedOperand(
-      lhs, op.getMatchingIndexingMap(op.getDpsInputOperand(0)));
-  detail.rhs = getQuantizedOperand(
-      rhs, op.getMatchingIndexingMap(op.getDpsInputOperand(1)));
-
-  detail.outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
-  // The output map has to be a projected permutation for the epilogue to be
-  // expressible over the output data space and remaining reduction dimensions.
-  if (!detail.outputMap.isProjectedPermutation()) {
-    return failure();
-  }
-
-  int64_t maxReductionExtent = getMaxReductionExtent(detail);
-  if (maxReductionExtent == 0) {
-    return failure();
-  }
-
-  SmallVector<utils::IteratorType> iteratorTypes = op.getIteratorTypesArray();
-  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
-  for (auto [dim, iteratorType] : llvm::enumerate(iteratorTypes)) {
-    if (iteratorType != utils::IteratorType::reduction) {
-      continue;
-    }
-    // Contraction reductions are shared by both inputs and absent from output.
-    if (detail.outputMap.isFunctionOfDim(dim) ||
-        !detail.lhs.inputMap.isFunctionOfDim(dim) ||
-        !detail.rhs.inputMap.isFunctionOfDim(dim)) {
-      return failure();
-    }
-    if (detail.lhs.scaleMap.isFunctionOfDim(dim) ||
-        detail.rhs.scaleMap.isFunctionOfDim(dim) ||
-        (detail.lhs.zeroPointMap &&
-         detail.lhs.zeroPointMap.isFunctionOfDim(dim)) ||
-        (detail.rhs.zeroPointMap &&
-         detail.rhs.zeroPointMap.isFunctionOfDim(dim))) {
-      detail.floatingReductionDims.push_back(dim);
-      continue;
-    }
-    detail.integerReductionDims.push_back(dim);
-    int64_t extent = loopRanges[dim];
-    // Unknown and empty reductions retain the original computation. Checking
-    // before multiplying also prevents overflow for very large static shapes.
-    if (ShapedType::isDynamic(extent) || extent == 0 ||
-        detail.reductionExtent > maxReductionExtent / extent) {
-      return failure();
-    }
-    detail.reductionExtent *= extent;
-  }
-  if (detail.integerReductionDims.empty()) {
-    return failure();
-  }
-  return detail;
 }
 
 //===----------------------------------------------------------------------===//
@@ -260,9 +64,12 @@ static Value buildZeroFilledTensor(OpBuilder &b, Location loc,
   return linalg::FillOp::create(b, loc, zero, empty).getResult(0);
 }
 
+/// Computes static or dynamic extents in the original contraction's loop order
+/// (e.g. [M, N, K] for matmul), including output and reduction dimensions.
+/// Uses quantized storage shapes and preserves the output init's extents.
 static SmallVector<OpFoldResult>
 buildIterationSizes(OpBuilder &b, Location loc, linalg::LinalgOp op,
-                    QuantizedContraction &detail) {
+                    const QuantizedContraction &detail) {
   // Query storage shapes so tensor.dim uses do not keep dequantize ops alive
   // after the rewrite. Account for permutations folded into dequantization.
   SmallVector<OpFoldResult> flatShapes;
@@ -300,15 +107,17 @@ buildIterationSizes(OpBuilder &b, Location loc, linalg::LinalgOp op,
 
 static linalg::GenericOp
 buildIntegerContraction(OpBuilder &b, Location loc, linalg::LinalgOp op,
-                        QuantizedContraction &detail,
+                        const QuantizedContraction &detail,
                         ArrayRef<OpFoldResult> iterationSizes) {
-  Value lhs = detail.lhs.dequantize.getInput();
-  Value rhs = detail.rhs.dequantize.getInput();
-  bool lhsUnsigned = detail.lhs.dequantize.getInputUnsigned();
-  bool rhsUnsigned = detail.rhs.dequantize.getInputUnsigned();
+  DequantizeAffineOp lhsDequantize = detail.lhs.dequantize;
+  DequantizeAffineOp rhsDequantize = detail.rhs.dequantize;
+  Value lhs = lhsDequantize.getInput();
+  Value rhs = rhsDequantize.getInput();
+  bool lhsUnsigned = lhsDequantize.getInputUnsigned();
+  bool rhsUnsigned = rhsDequantize.getInputUnsigned();
 
   MLIRContext *context = b.getContext();
-  IntegerType accumulatorType = getAccumulatorType(context);
+  const IntegerType accumulatorType = getAccumulatorType(context);
 
   // Retain a partial result for each block; the epilogue scales and reduces it.
   SmallVector<AffineExpr> resultExprs(detail.outputMap.getResults());
@@ -326,6 +135,11 @@ buildIntegerContraction(OpBuilder &b, Location loc, linalg::LinalgOp op,
 
   SmallVector<AffineMap> maps{detail.lhs.inputMap, detail.rhs.inputMap,
                               resultMap};
+
+  // Scalar body: accumulate the product of quantized inputs into an i32 sum.
+  //   a = lhsUnsigned ? extui(lhsElement) : extsi(lhsElement)
+  //   b = rhsUnsigned ? extui(rhsElement) : extsi(rhsElement)
+  //   yield accumulator + a * b
   auto genericOp = linalg::GenericOp::create(
       b, loc, init.getType(), ValueRange{lhs, rhs}, ValueRange{init}, maps,
       iteratorTypes,
@@ -347,24 +161,6 @@ buildIntegerContraction(OpBuilder &b, Location loc, linalg::LinalgOp op,
 //===----------------------------------------------------------------------===//
 // Operand sums
 //===----------------------------------------------------------------------===//
-
-/// Returns a map selecting domain dimensions that do not appear as bare results
-/// in any of `maps`, a nonempty list with a shared domain. These dimensions
-/// need explicit extents because Linalg cannot infer them from operand shapes.
-static AffineMap getShapeMap(ArrayRef<AffineMap> maps) {
-  unsigned rank = maps.front().getNumDims();
-  llvm::SmallBitVector namedDims(rank);
-  for (AffineMap map : maps) {
-    for (AffineExpr expr : map.getResults()) {
-      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
-        namedDims.set(dimExpr.getPosition());
-      }
-    }
-  }
-
-  return AffineMap::getMultiDimIdentityMap(rank, maps.front().getContext())
-      .dropResults(namedDims);
-}
 
 /// Builds an integer sum with the given input and output indexing maps.
 /// `outputMap` is a projected permutation. Both maps use the domain described
@@ -394,7 +190,7 @@ static Value buildIntegerSum(OpBuilder &b, Location loc, Value input,
   // Window expressions such as oh * stride + kh * dilation do not expose kh's
   // extent. A shape-only input supplies missing extents without loading data.
   SmallVector<Value> inputs{input};
-  AffineMap shapeMap = getShapeMap(maps);
+  AffineMap shapeMap = getExplicitExtentDimsMap(maps);
   if (shapeMap.getNumResults() != 0) {
     SmallVector<OpFoldResult> shapeSizes =
         applyPermutationMap<OpFoldResult>(shapeMap, sizes);
@@ -477,8 +273,10 @@ static IndexedValue buildElementwise(
   return {genericOp.getResult(0), resultMap};
 }
 
-/// Computes factor * lhs * rhs, extending each input to `resultType` with its
-/// own signedness before multiplication. Broadcasting follows the input maps.
+/// Computes factor * lhs * rhs after converting each input to `resultType`.
+/// Widening uses each input's signedness; wider zero-point carriers are
+/// narrowed under the requirement that their values fit the storage grid.
+/// Broadcasting follows the input maps.
 static IndexedValue buildIntegerProduct(OpBuilder &b, Location loc,
                                         IndexedValue lhs, bool lhsUnsigned,
                                         IndexedValue rhs, bool rhsUnsigned,
@@ -503,12 +301,14 @@ static IndexedValue buildIntegerProduct(OpBuilder &b, Location loc,
       });
 }
 
-/// Builds zB*sum(Aq) + zA*sum(Bq) - N*zA*zB. Each product is a separate
-/// computation so constant terms can be evaluated independently of runtime
-/// terms and the integer contraction. Absent zero points contribute zero.
+/// Builds the correction subtracted from D: zB*sum(Aq) + zA*sum(Bq) - N*zA*zB.
+/// Sums span the integer reduction dims, whose extents multiply to N. Each
+/// product is a separate computation so constant terms can be evaluated
+/// independently of runtime terms and the integer contraction. Absent zero
+/// points contribute zero.
 static IndexedValue
 buildZeroPointCorrection(OpBuilder &b, Location loc,
-                         QuantizedContraction &detail,
+                         const QuantizedContraction &detail,
                          ArrayRef<OpFoldResult> iterationSizes) {
   IntegerType accumulatorType = getAccumulatorType(b.getContext());
   AffineMap identity =
@@ -517,32 +317,36 @@ buildZeroPointCorrection(OpBuilder &b, Location loc,
   for (unsigned dim : detail.integerReductionDims) {
     reductionDims.set(dim);
   }
-  QuantizedOperand &lhs = detail.lhs;
-  QuantizedOperand &rhs = detail.rhs;
+  const QuantizedOperand &lhs = detail.lhs;
+  DequantizeAffineOp lhsDequantize = lhs.dequantize;
+  const QuantizedOperand &rhs = detail.rhs;
+  DequantizeAffineOp rhsDequantize = rhs.dequantize;
   SmallVector<IndexedValue, 2> terms;
   if (detail.needsLhsSum()) {
     AffineMap sumMap = identity.dropResults(
         getUnusedDimsBitVector({lhs.inputMap}) | reductionDims);
-    Value sum = buildIntegerSum(b, loc, lhs.dequantize.getInput(), lhs.inputMap,
+    Value sum = buildIntegerSum(b, loc, lhsDequantize.getInput(), lhs.inputMap,
                                 sumMap, iterationSizes, accumulatorType,
-                                lhs.dequantize.getInputUnsigned());
+                                lhsDequantize.getInputUnsigned());
     terms.push_back(buildIntegerProduct(
-        b, loc, {rhs.dequantize.getZeroPoint(), rhs.zeroPointMap},
-        rhs.dequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,
+        b, loc, {rhsDequantize.getZeroPoint(), rhs.zeroPointMap},
+        rhsDequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,
         accumulatorType, iterationSizes));
   }
   if (detail.needsRhsSum()) {
     AffineMap sumMap = identity.dropResults(
         getUnusedDimsBitVector({rhs.inputMap}) | reductionDims);
-    Value sum = buildIntegerSum(b, loc, rhs.dequantize.getInput(), rhs.inputMap,
+    Value sum = buildIntegerSum(b, loc, rhsDequantize.getInput(), rhs.inputMap,
                                 sumMap, iterationSizes, accumulatorType,
-                                rhs.dequantize.getInputUnsigned());
+                                rhsDequantize.getInputUnsigned());
     terms.push_back(buildIntegerProduct(
-        b, loc, {lhs.dequantize.getZeroPoint(), lhs.zeroPointMap},
-        lhs.dequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,
+        b, loc, {lhsDequantize.getZeroPoint(), lhs.zeroPointMap},
+        lhsDequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,
         accumulatorType, iterationSizes));
   }
   if (terms.empty()) {
+    // Keep a uniform epilogue input list. Subsequent cleanup passes are
+    // expected to fold away this zero correction and the subtraction from D.
     Value zero =
         arith::ConstantOp::create(b, loc, b.getZeroAttr(accumulatorType));
     return {zero, AffineMap::get(identity.getNumDims(), 0, {}, b.getContext())};
@@ -552,10 +356,10 @@ buildZeroPointCorrection(OpBuilder &b, Location loc,
   }
 
   IndexedValue crossTerm = buildIntegerProduct(
-      b, loc, {lhs.dequantize.getZeroPoint(), lhs.zeroPointMap},
-      lhs.dequantize.getZpUnsigned(),
-      {rhs.dequantize.getZeroPoint(), rhs.zeroPointMap},
-      rhs.dequantize.getZpUnsigned(), accumulatorType, iterationSizes,
+      b, loc, {lhsDequantize.getZeroPoint(), lhs.zeroPointMap},
+      lhsDequantize.getZpUnsigned(),
+      {rhsDequantize.getZeroPoint(), rhs.zeroPointMap},
+      rhsDequantize.getZpUnsigned(), accumulatorType, iterationSizes,
       detail.reductionExtent);
   return buildElementwise(
       b, loc, {terms[0], terms[1], crossTerm}, iterationSizes, accumulatorType,
@@ -683,34 +487,86 @@ static Value buildEpilogue(OpBuilder &b, Location loc, IndexedValue partials,
                                resultSizes);
 }
 
+/// Rewrite contractions over affine-dequantized operands as integer
+/// contractions with zero-point corrections and a scaling epilogue:
+///
+/// For fixed output coordinates and fixed remaining reduction coordinates,
+/// k spans the integer reduction dims and N is the product of their extents.
+/// Scales sA/sB and zero points zA/zB are invariant over k. Algebraically:
+///
+/// ```text
+/// A[k] = sA * (Aq[k] - zA)
+/// B[k] = sB * (Bq[k] - zB)
+/// D    = sum_k Aq[k] * Bq[k]
+/// RA   = sum_k Aq[k]
+/// RB   = sum_k Bq[k]
+///
+/// C = sum_k A[k] * B[k]
+///   = sA * sB * sum_k (Aq[k] - zA) * (Bq[k] - zB)
+///   = sA * sB * (D - zB * RA - zA * RB + N * zA * zB)
+/// ```
+///
+/// Here C is one scaled partial; the epilogue sums these partials over any
+/// remaining reduction dims. With no remaining reductions, C is the output.
+///
+/// Compose storage and parameter maps into contraction coordinates. Reduce
+/// in integer arithmetic where parameters are invariant; retain the other
+/// reduction dimensions as partial results for the floating-point epilogue.
+/// Windowed operand sums use the same access expressions as the
+/// contraction.
 struct ConvertQDQToIntegerMath : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,
                                 PatternRewriter &rewriter) const override {
+    // Match a zero-initialized multiply-add contraction of two dequantized
+    // inputs. Separate reductions with invariant quantization parameters from
+    // those requiring floating-point accumulation, and prove that the integer
+    // intermediates fit in i32 before constructing the replacement.
     FailureOr<QuantizedContraction> maybeDetail = getQuantizedContraction(op);
     if (failed(maybeDetail)) {
       return failure();
     }
     QuantizedContraction &detail = *maybeDetail;
 
+    // Recover the original loop extents to size the intermediate tensors.
+    // Query quantized storage shapes so shape computations do not keep the
+    // dequantization ops alive, while preserving the output init's extents.
     Location loc = op.getLoc();
     SmallVector<OpFoldResult> iterationSizes =
         buildIterationSizes(rewriter, loc, op, detail);
 
+    // Compute D = sum_k Aq * Bq using i32 arithmetic, where k spans the integer
+    // reduction dims. Retain other reduction dims as parallel dims so each
+    // partial result can later receive its own scales and zero-point
+    // correction.
     linalg::GenericOp integerContraction =
         buildIntegerContraction(rewriter, loc, op, detail, iterationSizes);
 
+    // Keep the partials' indexing map alongside their values so the epilogue
+    // can align them with the correction and scales in the original loop space.
     IndexedValue partials{integerContraction.getResult(0),
                           integerContraction.getIndexingMapsArray().back()};
+
+    // Compute correction = zB * sum_k Aq + zA * sum_k Bq - N * zA * zB,
+    // where N is the product of the integer reduction extents. Subtracting it
+    // from D gives sum_k (Aq - zA) * (Bq - zB); absent zero points contribute
+    // zero.
     IndexedValue correction =
         buildZeroPointCorrection(rewriter, loc, detail, iterationSizes);
+
+    // Subtract the correction in integer arithmetic before converting to float
+    // to preserve cancellation in large partials. Apply both scales, sum any
+    // remaining reduction dims in floating point, and convert to the original
+    // output element type after accumulation.
     Value result = buildEpilogue(
         rewriter, loc, partials, correction,
         {detail.lhs.dequantize.getScale(), detail.lhs.scaleMap},
         {detail.rhs.dequantize.getScale(), detail.rhs.scaleMap},
         detail.outputMap, cast<RankedTensorType>(op.getDpsInits()[0].getType()),
         iterationSizes);
+
+    // Redirect uses to the completed result and erase the original contraction.
     rewriter.replaceOp(op, result);
     return success();
   }

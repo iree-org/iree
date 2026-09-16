@@ -42,9 +42,16 @@ func.func @wide_zero_point_carrier(%aq: tensor<4x8xi8>, %a_s: f32,
 // depends on which side carries a zero point, so these four cases add one term
 // at a time. The first spells out the shared epilogue arithmetic the rest
 // inherit.
+//
+// D = sum_k Aq[k] * Bq[k]
+// RA = sum_k Aq[k]
+// RB = sum_k Bq[k]
+// N = number of terms in the sum (reduction extent)
+//
 //===----------------------------------------------------------------------===//
 
 // Both symmetric: nothing to correct, so the epilogue only applies the scales.
+// C = sA*sB*D = sA*sB*sum_k Aq[k] * Bq[k]
 func.func @zp_neither(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
@@ -76,13 +83,15 @@ func.func @zp_neither(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b_s
 //  CHECK-SAME:     ins(%[[AQ]], %[[BQ]] : tensor<4x8xi8>, tensor<8x16xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<4x16xi32>)
 //       CHECK:   ^bb0(%[[L:[a-zA-Z0-9_]+]]: i8, %[[R:[a-zA-Z0-9_]+]]: i8, %[[ACC:[a-zA-Z0-9_]+]]: i32):
-//       CHECK:     %[[LE:.+]] = arith.extsi %[[L]]
-//       CHECK:     %[[RE:.+]] = arith.extsi %[[R]]
+//       CHECK:     %[[LE:.+]] = arith.extsi %[[L]] : i8 to i32
+//       CHECK:     %[[RE:.+]] = arith.extsi %[[R]] : i8 to i32
 //       CHECK:     %[[P:.+]] = arith.muli %[[LE]], %[[RE]]
 //       CHECK:     %[[SUM:.+]] = arith.addi %[[ACC]], %[[P]] : i32
 //  CHECK-NEXT:     linalg.yield %[[SUM]] : i32
-// The correction input is scalar i32 zero. This is the scaling epilogue:
-// it yields float(D - 0) * (sA * sB), not a zero-filled tensor.
+
+// The correction input is scalar i32 zero. This is the scaling epilogue: it
+// yields float(D - 0) * (sA * sB), not a zero-filled tensor. Subsequent scalar
+// inlining and canonicalization fold away the subtraction.
 // CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} ins(%[[D]], %[[ZERO]], %[[AS]], %[[BS]] : tensor<4x16xi32>, i32, f32, f32)
 // CHECK-SAME: outs(%{{.+}} : tensor<4x16xf32>)
 // CHECK: ^bb0(%[[ED:[a-zA-Z0-9_]+]]: i32, %[[EC:[a-zA-Z0-9_]+]]: i32, %[[SA:[a-zA-Z0-9_]+]]: f32, %[[SB:[a-zA-Z0-9_]+]]: f32, %[[ACC:[a-zA-Z0-9_]+]]: f32):
@@ -126,16 +135,19 @@ func.func @zp_lhs_only(%aq: tensor<4x8xi8>, %a_s: f32, %a_z: i8, %bq: tensor<8x1
 //       CHECK:   %[[D:[a-zA-Z0-9_]+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[AQ]], %[[BQ]] :
 //  CHECK-SAME:     outs(%{{.+}} : tensor<4x16xi32>)
+
 // One sum, and it reduces the *rhs*, which is what pairs with the lhs zero
-// point. Reducing the lhs here would be the wrong term.
+// point.
 //       CHECK:   %[[RB:[a-zA-Z0-9_]+]] = linalg.generic
 //  CHECK-SAME:     ins(%[[BQ]] : tensor<8x16xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<16xi32>)
+
 // It is a plain accumulation of the widened operand, nothing more.
 //       CHECK:   ^bb0(%[[SV:[a-zA-Z0-9_]+]]: i8, %[[SACC:[a-zA-Z0-9_]+]]: i32):
-//       CHECK:     %[[SVE:.+]] = arith.extsi %[[SV]]
+//       CHECK:     %[[SVE:.+]] = arith.extsi %[[SV]] : i8 to i32
 //       CHECK:     %[[SUM:.+]] = arith.addi %[[SACC]], %[[SVE]]
 //       CHECK:     linalg.yield %[[SUM]]
+
 // The zero-point product is independently evaluable and retains the sum shape.
 // CHECK: %[[TERM:.+]] = linalg.generic {{.*}} ins(%[[AZ]], %[[RB]] : i8, tensor<16xi32>)
 // CHECK-SAME: outs(%{{.+}} : tensor<16xi32>)
@@ -187,6 +199,7 @@ func.func @zp_rhs_only(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b_
 // -----
 
 // Both asymmetric: combine the two products as TA + TB - N*zA*zB.
+// TA = zB * RA, TB = zA * RB
 // The cross term is needed only when both zero points are present; N is 8.
 func.func @zp_both(%aq: tensor<4x8xi8>, %a_s: f32, %a_z: i8, %bq: tensor<8x16xi8>, %b_s: f32, %b_z: i8) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
@@ -213,22 +226,23 @@ func.func @zp_both(%aq: tensor<4x8xi8>, %a_s: f32, %a_z: i8, %bq: tensor<8x16xi8
   return %c : tensor<4x16xf32>
 }
 // CHECK-LABEL: func.func @zp_both(
-// CHECK-SAME: %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x8xi8>, %[[AS:[a-zA-Z0-9_]+]]: f32, %[[AZ:[a-zA-Z0-9_]+]]: i8,
-// CHECK-SAME: %[[BQ:[a-zA-Z0-9_]+]]: tensor<8x16xi8>, %[[BS:[a-zA-Z0-9_]+]]: f32, %[[BZ:[a-zA-Z0-9_]+]]: i8
+// CHECK-SAME: %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x8xi8>, %[[AS:[a-zA-Z0-9_]+]]: f32, %[[ZA:[a-zA-Z0-9_]+]]: i8,
+// CHECK-SAME: %[[BQ:[a-zA-Z0-9_]+]]: tensor<8x16xi8>, %[[BS:[a-zA-Z0-9_]+]]: f32, %[[ZB:[a-zA-Z0-9_]+]]: i8
 // CHECK: %[[N:.+]] = arith.constant 8 : i32
 // CHECK: %[[D:.+]] = linalg.generic {{.*}} ins(%[[AQ]], %[[BQ]] :
 // CHECK-SAME: outs(%{{.+}} : tensor<4x16xi32>)
 // CHECK: %[[RA:.+]] = linalg.generic {{.*}} ins(%[[AQ]] : tensor<4x8xi8>)
 // CHECK-SAME: outs(%{{.+}} : tensor<4xi32>)
-// CHECK: %[[TA:.+]] = linalg.generic {{.*}} ins(%[[BZ]], %[[RA]] : i8, tensor<4xi32>)
+// CHECK: %[[TA:.+]] = linalg.generic {{.*}} ins(%[[ZB]], %[[RA]] : i8, tensor<4xi32>)
 // CHECK-SAME: outs(%{{.+}} : tensor<4xi32>)
 // CHECK: %[[RB:.+]] = linalg.generic {{.*}} ins(%[[BQ]] : tensor<8x16xi8>)
 // CHECK-SAME: outs(%{{.+}} : tensor<16xi32>)
-// CHECK: %[[TB:.+]] = linalg.generic {{.*}} ins(%[[AZ]], %[[RB]] : i8, tensor<16xi32>)
+// CHECK: %[[TB:.+]] = linalg.generic {{.*}} ins(%[[ZA]], %[[RB]] : i8, tensor<16xi32>)
 // CHECK-SAME: outs(%{{.+}} : tensor<16xi32>)
+
 // The cross term stays scalar; only combining row/column terms needs M x N.
-// CHECK: %[[WA:.+]] = arith.extsi %[[AZ]]
-// CHECK: %[[WB:.+]] = arith.extsi %[[BZ]]
+// CHECK: %[[WA:.+]] = arith.extsi %[[ZA]] : i8 to i32
+// CHECK: %[[WB:.+]] = arith.extsi %[[ZB]] : i8 to i32
 // CHECK: %[[ZZ:.+]] = arith.muli %[[WA]], %[[WB]]
 // CHECK: %[[TZ:.+]] = arith.muli %[[ZZ]], %[[N]]
 // CHECK: %[[CORRECTION:.+]] = linalg.generic {{.*}} ins(%[[TA]], %[[TB]], %[[TZ]] :
@@ -504,9 +518,9 @@ func.func @form_partial_reduces_in_float(%aq: tensor<4x2x4xi8>, %a_s: tensor<4x2
 //===----------------------------------------------------------------------===//
 // Scale precision
 //
-// Scaling happens in the scale's own type. The result is narrowed once, after
-// every partial has accumulated, so a low-precision result never rounds a
-// partial sum.
+// Scaling uses at least f32, preserving wider scale and output types. The result
+// is narrowed once, after every partial has accumulated, so a low-precision
+// result never rounds a partial sum.
 //===----------------------------------------------------------------------===//
 
 // -----
