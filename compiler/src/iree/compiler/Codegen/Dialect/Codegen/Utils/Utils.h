@@ -76,6 +76,14 @@ bool isIdentityLayout(const MaterializeEncodingInfo &info);
 SmallVector<int64_t>
 getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape);
 
+/// Like `getExpandedTileShape`, but additionally reports for each expanded
+/// dim whether it is scalable, i.e., its runtime extent is the static base
+/// size times the runtime vector scale (`vscale`). Consumers must treat
+/// scalable dims as dynamic in tensor types and materialize their sizes as
+/// `base * vscale` values.
+SmallVector<std::pair<int64_t, bool>> getExpandedTileShapeWithScalableFlags(
+    const TileSwizzle::ExpandShapeType &expandShape);
+
 /// The dimensions needed for materializing an encoding for either a contraction
 /// or a scaled contraction.
 struct EncodingContractionLikeDimInfo {
