@@ -397,6 +397,20 @@ getExpandedTileShape(const TileSwizzle::ExpandShapeType &expandShape) {
   return result;
 }
 
+SmallVector<std::pair<int64_t, bool>> getExpandedTileShapeWithScalableFlags(
+    const TileSwizzle::ExpandShapeType &expandShape) {
+  SmallVector<std::pair<int64_t, bool>> result;
+  for (auto e : expandShape) {
+    for (auto d : e) {
+      bool scalable = d.kind() == TileSwizzle::Dim::Kind::Internal &&
+                      d.symbolicMultiplier() !=
+                          TileSwizzle::Dim::SymbolicMultiplier::One;
+      result.push_back({d.size(), scalable});
+    }
+  }
+  return result;
+}
+
 /// Returns the EncodingContractionLikeDimInfo for an encoding with scaled
 /// contraction user_indexing_maps, or failure if the scaled contraction
 /// dimensions can not be inferred.

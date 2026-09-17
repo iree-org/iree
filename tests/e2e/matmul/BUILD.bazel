@@ -296,6 +296,29 @@ iree_generated_e2e_runner_test(
     test_type = "matmul",
 )
 
+# AArch64 SVE inner_tiled f32: small shapes to avoid QEMU timeouts (#24593).
+# The scalable-vectorization flag enables the SVE MMA intrinsic path.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_aarch64_sve_small_f32_f32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+        "--iree-llvmcpu-enable-scalable-vectorization",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f32",
+        "--acc_type=f32",
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["arm_64:sve:+sve"],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 # LLVMCPU, data-tiling lowering to iree_codegen.inner_tiled AND routing the
 # inner_tiled op through a built-in C-bitcode microkernel via
 # `--iree-llvmcpu-enable-llvm-ukernels=inner_tiled`. Restricted to the

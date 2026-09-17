@@ -482,10 +482,15 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return Tuple{16, 16, 2};
   // Base sizes, i.e. the shape at the minimum vector length.
-  case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32:
-    return Tuple{1, 4, 1};
-  case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
-    return Tuple{4, 1, 1};
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32: {
+    int64_t vl = vlen / 4;
+    return Tuple{1, vl, 1};
+  }
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32: {
+    int64_t vl = vlen / 4;
+    return Tuple{vl, 1, 1};
+  }
+
   // RVV: M or N is vlen/8. Enum bit 0 is the swapped orientation.
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
@@ -1052,12 +1057,62 @@ static Value lowerRiscvVFmaccLike(OpBuilder &b, Location loc,
                                            /*pos=*/0);
 }
 
+// Lowers one AArch64 SVE FMLA f32 inner_tiled intrinsic to a scalable-vector
+// FMA call.  Handles both orientations:
+//   * `MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32` (natural):  scalar LHS × vector RHS
+//   * `MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32` (swapped):  vector LHS × scalar RHS
+//
+// Operands (already distributed by the swizzle machinery):
+//   One operand is a scalar f32 (the "by-element" operand of SVE FMLA);
+//   the other and the accumulator are both scalable vector<[4]xf32>
+//   (4VL = 4 scalable 128-bit VL units).
+//
+// Per call: identify the scalar operand based on orientation, broadcast it
+// to the accumulator's scalable vector type, then emit
+// `llvm.fma.nxv4f32(vector, broadcast(scalar), acc)`.  The LLVM AArch64
+// backend selects the SVE `FMLA` instruction (vector or indexed form)
+// from the FMA intrinsic.
+static Value lowerAarch64SveFmla(OpBuilder &builder, Location loc,
+                                 MMAIntrinsic intrinsic, Value lhs, Value rhs,
+                                 Value acc) {
+
+    bool swapped = (intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32);
+    auto accType = cast<VectorType>(acc.getType());
+
+    // Identify scalar and vector operands based on orientation.
+    Value scalar = swapped ? rhs : lhs;
+    Value vector = swapped ? lhs : rhs;
+
+    // Broadcast scalar to vector type so both operands have the same shape.
+    Value scalarVec = vector::BroadcastOp::create(builder, loc, accType, scalar);
+
+    // Emit llvm.fma.nxv4f32(vector, scalarVec, acc) for FMA: a*b+c.
+    return LLVM::CallIntrinsicOp::create(
+               builder, loc, accType,
+               builder.getStringAttr("llvm.fma.nxv4f32"),
+               ValueRange{vector, scalarVec, acc})
+        .getResult(0);
+}
+
 // Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
 // additional ops (potentially broadcasting or widening LHS/RHS or creating an
 // add op if the intrinsic isn't already adding the accumulator).
 static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                                        MMAIntrinsic intrinsic, Value lhs,
                                        Value rhs, Value acc, int64_t vlen) {
+  // AArch64 SVE FMLA intrinsics: handle before x86 logic to preserve scalable
+  // vector types. The SVE intrinsic shape is 1×4VL×1 (natural) or 4VL×1×1
+  // (swapped), where 4VL = 4 × scalable vector length in 128-bit units.
+  // Natural: lhs is scalar f32, rhs is vector<[4]xf32>, acc is vector<[4]xf32>
+  // Swapped: lhs is vector<[4]xf32>, rhs is scalar f32, acc is vector<[4]xf32>
+  // We broadcast the scalar operand to match the vector shape, then emit
+  // llvm.fma.nxv4f32 (LLVM backend selects AArch64 FMLA instruction).
+  if (intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32) {
+
+    return lowerAarch64SveFmla(builder, loc, intrinsic, lhs, rhs, acc);
+  }
+
   // The 16x16x2 i8 intrinsic processes whole panels and has its own widen /
   // shuffle scheme; it bypasses the per-row widen + broadcast path below.
   if (intrinsic == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16) {
