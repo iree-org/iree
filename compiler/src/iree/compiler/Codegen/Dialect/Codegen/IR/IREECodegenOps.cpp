@@ -286,8 +286,22 @@ static LogicalResult verifyOperandTypes(InnerTiledOp tiledOp) {
     ArrayRef<int64_t> operandShape = operandShapedType.getShape();
     ArrayRef<int64_t> operandTileShape(
         operandShape.drop_front(map.getNumResults()));
+    // When the operand is a VectorType with scalable dims (e.g., SVE),
+    // represent scalable dims as dynamic (?) in the tensor tile type so
+    // that matchTileTypes correctly identifies them as matching the MMA
+    // tile's scalable dims.
+    SmallVector<int64_t> tileShapeForMatch(operandTileShape);
+    if (auto operandVecType = dyn_cast<VectorType>(operandShapedType)) {
+      ArrayRef<bool> scalableDims = operandVecType.getScalableDims();
+      size_t offset = operandShape.size() - operandTileShape.size();
+      for (size_t i = 0; i < operandTileShape.size(); ++i) {
+        if (i + offset < scalableDims.size() && scalableDims[i + offset]) {
+          tileShapeForMatch[i] = ShapedType::kDynamic;
+        }
+      }
+    }
     auto tensorTileType =
-        RankedTensorType::get(operandTileShape, operandElemType);
+        RankedTensorType::get(tileShapeForMatch, operandElemType);
     SmallVector<int64_t> mmaShape(mmaVectorType.getShape());
     SmallVector<bool> mmaScalable(mmaVectorType.getScalableDims());
     std::optional<ArrayAttr> permutations = tiledOp.getPermutations();
