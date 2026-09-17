@@ -87,7 +87,6 @@ class TernaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(benvanik): support vectors.
     if (isa<VectorType>(srcOp.getResult().getType())) {
       return failure();
     }
