@@ -101,6 +101,26 @@ util.func public @fold_buffer_subspan_into_copy_buffer(
 
 // -----
 
+// CHECK-LABEL: @fold_buffer_subspan_into_flush_buffer
+//  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
+util.func public @fold_buffer_subspan_into_flush_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer
+  ) {
+  %c8192 = arith.constant 8192 : index
+  %c100000 = arith.constant 100000 : index
+  %c262144 = arith.constant 262144 : index
+  %target_subspan = hal.buffer.subspan<%buffer : !hal.buffer>[%c8192, %c262144] : !hal.buffer
+  // CHECK: hal.command_buffer.flush_buffer
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      // CHECK-SAME: target(%[[BASE_BUFFER]] : !hal.buffer)[%c108192, %c8192]
+      target(%target_subspan : !hal.buffer)[%c100000, %c8192]
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @fold_buffer_subspan_into_dispatch
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[EXECUTABLE:.+]]: !hal.executable,

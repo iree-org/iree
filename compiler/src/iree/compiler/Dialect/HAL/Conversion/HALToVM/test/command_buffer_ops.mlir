@@ -139,6 +139,38 @@ util.func public @command_buffer_fill_buffer_i32_indirect(
 
 // -----
 
+// CHECK-LABEL: @command_buffer_flush_buffer
+util.func public @command_buffer_flush_buffer(
+  %arg0: !hal.command_buffer,
+  %arg1: !hal.buffer
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.command_buffer.flush_buffer(%arg0, %[[UNUSED_SLOT]], %arg1, %c100, %c200)
+  hal.command_buffer.flush_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : !hal.buffer)[%c100, %c200]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_flush_buffer_indirect
+util.func public @command_buffer_flush_buffer_indirect(
+  %arg0: !hal.command_buffer,
+  %arg1: index
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.flush_buffer(%arg0, %arg1, %[[NULL_BUFFER]], %c100, %c200)
+  hal.command_buffer.flush_buffer<%arg0 : !hal.command_buffer>
+      target(%arg1 : index)[%c100, %c200]
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_update_buffer
 //  CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
 //  CHECK-SAME:  %[[HOST_BUFFER:[a-z0-9]+]]: !vm.buffer, %[[HOST_BUFFER_SIZE:[a-z0-9]+]]: i32, %[[SRC_OFFSET:[a-z0-9]+]]: i32,

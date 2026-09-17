@@ -1748,6 +1748,32 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let hasCanonicalizer = 1;
 }
 
+def HAL_CommandBufferFlushBufferOp : HAL_Op<"command_buffer.flush_buffer"> {
+  let summary = [{Command buffer buffer flush recording operation.}];
+  let description = [{
+    Flushes a range of the target buffer so that writes made to it by the
+    commands recorded before the flush are visible to other devices. This is a
+    no-op for memory that is host coherent.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+    // NOTE(Diego): maybe in the future HAL_FlushFlagBitfieldAttr:$flags
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `,` $length `]`
+    attr-dict-with-keyword
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
   AttrSizedOperandSegments,
 ]> {

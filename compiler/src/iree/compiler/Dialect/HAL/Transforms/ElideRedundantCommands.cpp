@@ -106,6 +106,7 @@ struct ElideRedundantCommandsPass
                     IREE::HAL::CommandBufferEndDebugGroupOp,
                     IREE::HAL::CommandBufferFillBufferOp,
                     IREE::HAL::CommandBufferCopyBufferOp,
+                    IREE::HAL::CommandBufferFlushBufferOp,
                     IREE::HAL::CommandBufferDispatchOp,
                     IREE::HAL::CommandBufferDispatchIndirectOp>(
                   [&](Operation *op) {

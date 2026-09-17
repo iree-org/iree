@@ -573,6 +573,39 @@ void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Folds hal.buffer.subspans into buffer flush offsets.
+struct FoldCommandBufferFlushBufferSubspans
+    : OpRewritePattern<CommandBufferFlushBufferOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(CommandBufferFlushBufferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto subspanOp = dyn_cast_if_present<IREE::HAL::BufferSubspanOp>(
+        op.getTargetBuffer().getDefiningOp());
+    if (!subspanOp) {
+      return failure();
+    }
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(op);
+    Value newTargetOffset = rewriter.createOrFold<arith::AddIOp>(
+        subspanOp.getLoc(), subspanOp.getSourceOffset(), op.getTargetOffset());
+    rewriter.modifyOpInPlace(op, [&]() {
+      op.getTargetBufferMutable().assign(subspanOp.getSourceBuffer());
+      op.getTargetOffsetMutable().assign(newTargetOffset);
+    });
+    return success();
+  }
+};
+
+} // namespace
+
+void CommandBufferFlushBufferOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<FoldCommandBufferFlushBufferSubspans>(context);
+}
+
+namespace {
+
 /// Folds hal.buffer.subspans into dispatch bindings.
 /// The binding range is always equal to or a subset of the subspan.
 template <typename OpT>
