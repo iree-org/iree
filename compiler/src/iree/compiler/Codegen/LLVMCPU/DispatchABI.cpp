@@ -1334,11 +1334,10 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
 
   Location loc = forOp->getLoc();
   if (cConv == IREE::HAL::CallingConvention::Default) {
-    OperationState state(loc, LLVM::CallOp::getOperationName());
-    state.addTypes(abiFunctionType->getReturnTypes());
-    state.addOperands(allArgsList);
-    state.addAttributes(forOp->getAttrs());
-    auto callOp = cast<LLVM::CallOp>(rewriter.create(state));
+    auto callOp = LLVM::CallOp::create(
+        rewriter, loc, abiFunctionType->getReturnTypes(), allArgsList,
+        cast<LLVM::CallOp>(forOp).getProperties(),
+        forOp->getDiscardableAttrDictionary().getValue());
     callOp.getProperties().operandSegmentSizes = {
         static_cast<int32_t>(allArgsList.size()), 0};
     callOp.getProperties().op_bundle_sizes = rewriter.getDenseI32ArrayAttr({});
