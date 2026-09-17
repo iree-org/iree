@@ -527,7 +527,7 @@ func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor
   %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
     %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
     %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
-    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %out = linalg.elementwise <add> ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
     %td = tensor.insert_slice %out into %t[1, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
     scf.yield %td : tensor<64x64xf32>
   }
@@ -539,7 +539,7 @@ func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor
 // CHECK:   scf.for {{.*}} iter_args(%[[IV:.+]] = {{.*}})
 // CHECK:     %[[SLICE:.+]] = tensor.extract_slice
 // CHECK-NOT: tensor.extract_slice
-// CHECK:     linalg.add ins(%[[IV]], %[[SLICE]] : {{.*}})
+// CHECK:     linalg.elementwise <add> ins(%[[IV]], %[[SLICE]] : {{.*}})
 // CHECK:   scf.yield
 // CHECK:   tensor.insert_slice
 
@@ -553,7 +553,7 @@ func.func @subset_hoisting_invariant_tensor_nonequivalent_subset(%init: tensor<6
   %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
     %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
     %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
-    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %out = linalg.elementwise <add> ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
     %td = tensor.insert_slice %out into %t[0, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
     scf.yield %td : tensor<64x64xf32>
   }

@@ -170,8 +170,8 @@ struct TimelineAwareCallExternalModel
         // Create new import before the op.
         auto importOp = IREE::Stream::TimepointImportOp::create(
             builder, callOp.getLoc(),
-            builder.getType<IREE::Stream::TimepointType>(),
-            ValueRange{operand});
+            builder.getType<IREE::Stream::TimepointType>(), ValueRange{operand},
+            /*affinity=*/IREE::Stream::AffinityAttr{});
         timepoints.push_back(importOp.getResultTimepoint());
       }
     }
@@ -216,8 +216,8 @@ struct TimelineAwareCallExternalModel
     // Create new import after the call.
     auto importOp = IREE::Stream::TimepointImportOp::create(
         builder, callOp.getLoc(),
-        builder.getType<IREE::Stream::TimepointType>(),
-        ValueRange{signalFence});
+        builder.getType<IREE::Stream::TimepointType>(), ValueRange{signalFence},
+        /*affinity=*/IREE::Stream::AffinityAttr{});
     return importOp.getResultTimepoint();
   }
 };

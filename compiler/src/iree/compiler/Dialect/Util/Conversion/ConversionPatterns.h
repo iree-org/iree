@@ -33,21 +33,34 @@ struct GenericConvertTypesPattern : OpConversionPattern<T> {
       newResultTypes.push_back(newTypes.front());
     }
 
-    SmallVector<NamedAttribute> newAttrs;
-    if (failed(convertTypeAttributes(op->getAttrs(), newAttrs))) {
+    ArrayRef<NamedAttribute> oldAttrs =
+        op->getDiscardableAttrDictionary().getValue();
+    // Null for ops with empty properties; such ops reject a properties attr.
+    auto propsDict =
+        dyn_cast_if_present<DictionaryAttr>(op->getPropertiesAsAttribute());
+    ArrayRef<NamedAttribute> oldProps;
+    if (propsDict) {
+      oldProps = propsDict.getValue();
+    }
+    SmallVector<NamedAttribute> newAttrs, newProps;
+    if (failed(convertTypeAttributes(oldAttrs, newAttrs)) ||
+        failed(convertTypeAttributes(oldProps, newProps))) {
       return rewriter.notifyMatchFailure(op,
                                          "failed converting type attributes");
     }
 
     if (newResultTypes == op->getResultTypes() &&
-        op->getOperands() == adaptor.getOperands() &&
-        newAttrs == op->getAttrs()) {
+        op->getOperands() == adaptor.getOperands() && newAttrs == oldAttrs &&
+        newProps == oldProps) {
       return rewriter.notifyMatchFailure(op, "op does not need transformation");
     }
 
-    auto newOp = T::create(rewriter, op.getLoc(), newResultTypes,
-                           adaptor.getOperands(), newAttrs);
-    rewriter.replaceOp(op, newOp->getResults());
+    OperationState state(op.getLoc(), T::getOperationName(),
+                         adaptor.getOperands(), newResultTypes, newAttrs);
+    if (propsDict) {
+      state.propertiesAttr = rewriter.getDictionaryAttr(newProps);
+    }
+    rewriter.replaceOp(op, rewriter.create(state));
     return success();
   }
 

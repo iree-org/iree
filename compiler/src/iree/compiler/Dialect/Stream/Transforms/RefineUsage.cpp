@@ -170,7 +170,7 @@ struct UsageRefinementPattern : OpRewritePattern<OpT> {
       // placeholder (as we may later decide it's ok to transition on a
       // particular device).
       auto resultSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
-          op->getLoc(), result);
+          op->getLoc(), result, /*affinity=*/IREE::Stream::AffinityAttr{});
       auto affinityAttr = getOpAffinity(op);
       auto transferOp = IREE::Stream::AsyncTransferOp::create(
           rewriter, op->getLoc(), newType, result, resultSize, resultSize,

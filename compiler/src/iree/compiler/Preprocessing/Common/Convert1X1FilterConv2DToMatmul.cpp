@@ -72,7 +72,8 @@ public:
     newMaps[0] = AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                                 newExprs, rewriter.getContext());
 
-    auto genericOp = linalg::generalizeNamedOp(rewriter, convOp).value();
+    auto genericOp = cast<linalg::GenericOp>(
+        linalg::generalizeNamedOp(rewriter, convOp)->getOperation());
     genericOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(newMaps));
     return success();
   }

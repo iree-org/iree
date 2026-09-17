@@ -491,7 +491,7 @@ module {
   func.func @swap_expand_shape_with_extract_slice(%0: tensor<60xf32>) -> tensor<2x3x10xf32> {
     %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [2, 3, 10] : tensor<60xf32> into tensor<2x3x10xf32>
     %empty = tensor.empty() : tensor<2x3x10xf32>
-    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<2x3x10xf32>) outs(%empty : tensor<2x3x10xf32>) -> tensor<2x3x10xf32>
+    %exp = linalg.elementwise <exp> {lowering_config = #config} ins(%expand : tensor<2x3x10xf32>) outs(%empty : tensor<2x3x10xf32>) -> tensor<2x3x10xf32>
     return %exp : tensor<2x3x10xf32>
   }
 }
@@ -501,7 +501,7 @@ module {
 //       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[Z]]] by (2, 3, 10)
 //       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [5] [1] : tensor<60xf32> to tensor<5xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 1, 5]
-//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+//       THREAD:     linalg.elementwise <exp> {{.*}} ins(%[[EXPAND]]
 
 // -----
 
@@ -510,7 +510,7 @@ module {
   func.func @swap_expand_shape_with_extract_slice_full_inner_dim(%0: tensor<120xf32>) -> tensor<3x4x10xf32> {
     %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [3, 4, 10] : tensor<120xf32> into tensor<3x4x10xf32>
     %empty = tensor.empty() : tensor<3x4x10xf32>
-    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
+    %exp = linalg.elementwise <exp> {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
     return %exp : tensor<3x4x10xf32>
   }
 }
@@ -521,7 +521,7 @@ module {
 //       THREAD:     %[[LINEAR_IDX:.+]] = affine.linearize_index disjoint [%[[X]], %[[Y]], %[[C0]]] by (3, 4, 10)
 //       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX]]] [20] [1] : tensor<120xf32> to tensor<20xf32>
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2]] output_shape [1, 2, 10]
-//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+//       THREAD:     linalg.elementwise <exp> {{.*}} ins(%[[EXPAND]]
 
 // -----
 
@@ -530,7 +530,7 @@ module {
   func.func @no_swap_expand_shape_with_extract_slice_non_contiguous(%0: tensor<120xf32>) -> tensor<3x4x10xf32> {
     %expand = tensor.expand_shape %0 [[0, 1, 2]] output_shape [3, 4, 10] : tensor<120xf32> into tensor<3x4x10xf32>
     %empty = tensor.empty() : tensor<3x4x10xf32>
-    %exp = linalg.exp {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
+    %exp = linalg.elementwise <exp> {lowering_config = #config} ins(%expand : tensor<3x4x10xf32>) outs(%empty : tensor<3x4x10xf32>) -> tensor<3x4x10xf32>
     return %exp : tensor<3x4x10xf32>
   }
 }
@@ -538,7 +538,7 @@ module {
 // THREAD-LABEL: func.func @no_swap_expand_shape_with_extract_slice_non_contiguous
 //       THREAD:   tensor.expand_shape
 //       THREAD:   scf.forall
-//       THREAD:     linalg.exp
+//       THREAD:     linalg.elementwise <exp>
 
 // -----
 
@@ -547,7 +547,7 @@ module {
   func.func @swap_expand_shape_with_extract_slice_multiple_expanded_dims(%0: tensor<120x56xf32>) -> tensor<3x4x10x7x8xf32> {
     %expand = tensor.expand_shape %0 [[0, 1, 2], [3, 4]] output_shape [3, 4, 10, 7, 8] : tensor<120x56xf32> into tensor<3x4x10x7x8xf32>
     %empty = tensor.empty() : tensor<3x4x10x7x8xf32>
-    %exp = linalg.exp {lowering_config = #config}
+    %exp = linalg.elementwise <exp> {lowering_config = #config}
       ins(%expand : tensor<3x4x10x7x8xf32>) outs(%empty : tensor<3x4x10x7x8xf32>) -> tensor<3x4x10x7x8xf32>
     return %exp : tensor<3x4x10x7x8xf32>
   }
@@ -560,7 +560,7 @@ module {
 //       THREAD:     %[[LINEAR_IDX1:.+]] = affine.linearize_index disjoint [%[[ID2]], %[[ID3]]] by (7, 8)
 //       THREAD:     %[[SLICE:.+]] = tensor.extract_slice %{{.*}}[%[[LINEAR_IDX0]], %[[LINEAR_IDX1]]] [20, 4] [1, 1]
 //       THREAD:     %[[EXPAND:.+]] = tensor.expand_shape %[[SLICE]] {{\[\[}}0, 1, 2], [3, 4]] output_shape [1, 2, 10, 1, 4]
-//       THREAD:     linalg.exp {{.*}} ins(%[[EXPAND]]
+//       THREAD:     linalg.elementwise <exp> {{.*}} ins(%[[EXPAND]]
 
 // -----
 

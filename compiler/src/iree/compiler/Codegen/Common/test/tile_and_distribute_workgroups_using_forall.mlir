@@ -644,7 +644,7 @@ func.func @consumer_fuse_scatter(%arg0: tensor<3x2048x2048xf32>,
                                  %arg2: tensor<3x1xi32>) -> tensor<3x2048x2048xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<3x2048x2048xf32>
-  %1 = linalg.add {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 256]}>}
+  %1 = linalg.elementwise <add> {lowering_config = #iree_gpu.lowering_config<{workgroup = [1, 1, 256]}>}
     ins(%arg0, %arg1 : tensor<3x2048x2048xf32>, tensor<3x2048x2048xf32>) outs(%0 : tensor<3x2048x2048xf32>) -> tensor<3x2048x2048xf32>
   %2 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
     ins(%1, %arg2 : tensor<3x2048x2048xf32>, tensor<3x1xi32>) outs(%0 : tensor<3x2048x2048xf32>) {
@@ -659,7 +659,7 @@ func.func @consumer_fuse_scatter(%arg0: tensor<3x2048x2048xf32>,
 //  CHECK-SAME:   %[[RHS:[A-Za-z0-9]+]]: tensor<3x2048x2048xf32>
 //  CHECK-SAME:   %[[IND:[A-Za-z0-9]+]]: tensor<3x1xi32>
 //       CHECK:   %[[RESULT:.+]] = scf.forall (%[[ID0:.+]], %[[ID1:.+]], %[[ID2:[A-Za-z0-9]+]]) {{.*}} shared_outs(%[[DEST:.+]] = %{{.*}})
-//   CHECK-DAG:     %[[SRC:.+]] = linalg.add
+//   CHECK-DAG:     %[[SRC:.+]] = linalg.elementwise <add>
 //   CHECK-DAG:     %[[IND_SLICE:.+]] = tensor.extract_slice %[[IND]][%[[ID0]], 0] {{.*}} : tensor<3x1xi32> to tensor<1x1xi32>
 //   CHECK-DAG:     %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]][0, %[[ID1]], %[[ID2]]] {{.*}} to tensor<3x1x256xf32>
 //       CHECK:     %[[SCATTER:.+]] = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)

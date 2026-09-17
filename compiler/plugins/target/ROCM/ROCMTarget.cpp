@@ -448,7 +448,7 @@ public:
       if (failed(targetID)) {
         return nullptr;
       }
-      format = targetID->getCanonicalFeatureString();
+      format = targetID->getCanonicalTargetIDString();
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
@@ -836,7 +836,6 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         llvm::TargetOptions opt;
-        opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
         // Be extra cautious while this is less tested, and prevent unknown
         // fallbacks from global isel.
         //
@@ -1178,7 +1177,7 @@ public:
       break;
     }
     case ContainerType::AMDGPU: {
-      std::string canonicalTargetID = targetID->getCanonicalFeatureString();
+      std::string canonicalTargetID = targetID->getCanonicalTargetIDString();
       executableBinaryFormat =
           executableBuilder.getStringAttr(canonicalTargetID);
       binaryContainer = serializeAMDGPUBinaryContainer(

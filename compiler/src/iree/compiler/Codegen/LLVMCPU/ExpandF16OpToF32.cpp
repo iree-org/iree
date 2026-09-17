@@ -43,10 +43,13 @@ public:
         operands.push_back(operand);
         continue;
       }
-      Value ext = arith::ExtFOp::create(rewriter, loc, f32Type, operand);
+      Value ext = arith::ExtFOp::create(rewriter, loc, f32Type, operand,
+                                        arith::FastMathFlagsAttr{});
       operands.push_back(ext);
     }
-    Value newOp = Op::create(rewriter, loc, f32Type, operands);
+    Value newOp = Op::create(rewriter, loc, TypeRange{f32Type}, operands,
+                             op.getProperties(),
+                             op->getDiscardableAttrDictionary().getValue());
 
     rewriter.replaceOpWithNewOp<arith::TruncFOp>(op, resultType, newOp);
     return success();

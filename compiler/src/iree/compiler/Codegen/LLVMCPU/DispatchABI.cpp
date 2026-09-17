@@ -1160,11 +1160,14 @@ Value HALDispatchABI::callImport(Operation *forOp, StringRef importName,
       /*context=*/importFunc.second,
       /*reserved=*/nullPtrValue,
   };
-  auto callOp =
-      LLVM::CallOp::create(builder, loc, TypeRange{builder.getI32Type()}, args);
-  callOp.getProperties().operandSegmentSizes = {
-      static_cast<int32_t>(args.size()), 0};
-  callOp.getProperties().op_bundle_sizes = builder.getDenseI32ArrayAttr({});
+  LLVM::CallOp::Properties properties;
+  LLVM::CallOp::populateDefaultProperties(
+      OperationName(LLVM::CallOp::getOperationName(), builder.getContext()),
+      properties);
+  properties.operandSegmentSizes = {static_cast<int32_t>(args.size()), 0};
+  properties.op_bundle_sizes = builder.getDenseI32ArrayAttr({});
+  auto callOp = LLVM::CallOp::create(
+      builder, loc, TypeRange{builder.getI32Type()}, args, properties);
   return callOp.getResult();
 }
 
@@ -1331,9 +1334,10 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
 
   Location loc = forOp->getLoc();
   if (cConv == IREE::HAL::CallingConvention::Default) {
-    auto callOp =
-        LLVM::CallOp::create(rewriter, loc, abiFunctionType->getReturnTypes(),
-                             allArgsList, forOp->getAttrs());
+    auto callOp = LLVM::CallOp::create(
+        rewriter, loc, abiFunctionType->getReturnTypes(), allArgsList,
+        cast<LLVM::CallOp>(forOp).getProperties(),
+        forOp->getDiscardableAttrDictionary().getValue());
     callOp.getProperties().operandSegmentSizes = {
         static_cast<int32_t>(allArgsList.size()), 0};
     callOp.getProperties().op_bundle_sizes = rewriter.getDenseI32ArrayAttr({});

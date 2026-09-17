@@ -35,7 +35,7 @@ generalizeCandidates(MLIRContext *context,
         getCompilationInfo(linalgOp);
 
     rewriter.setInsertionPoint(linalgOp);
-    FailureOr<linalg::GenericOp> generalizedOp =
+    FailureOr<linalg::LinalgOp> generalizedOp =
         linalg::generalizeNamedOp(rewriter, linalgOp);
     if (failed(generalizedOp)) {
       linalgOp->emitOpError("failed to generalize operation");

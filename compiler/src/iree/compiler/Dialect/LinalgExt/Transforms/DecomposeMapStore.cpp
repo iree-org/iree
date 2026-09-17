@@ -357,7 +357,8 @@ static LogicalResult decomposeToScatter(MapStoreOp mapStoreOp,
   SmallVector<Value> operands = {flatOutputBuffer, offsets[0], indexVector,
                                  maskVector, inputVector};
   rewriter.replaceOpWithNewOp<vector::ScatterOp>(
-      mapStoreOp, /*resultTypes=*/TypeRange{}, operands);
+      mapStoreOp, /*resultTypes=*/TypeRange{}, operands,
+      vector::ScatterOp::Properties{});
   return success();
 }
 

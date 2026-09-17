@@ -45,7 +45,8 @@ void replaceOpOutputs(T op, PatternRewriter &rewriter, Type srcType,
           rewriter, loc, TypeRange{promoteOutputType}, ValueRange{output},
           ValueRange{promoteEmpty}, maps, iteratorTypes,
           [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value result = arith::ExtFOp::create(b, loc, destType, args[0]);
+            Value result = arith::ExtFOp::create(b, loc, destType, args[0],
+                                                 arith::FastMathFlagsAttr{});
             linalg::YieldOp::create(b, loc, result);
           })
           ->getResult(0);
