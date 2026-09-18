@@ -13,23 +13,16 @@
 
 namespace mlir::iree_compiler::GlobalOptimization::detail {
 
-/// Extracts storage and quantization parameters to bound |input - zero_point|
-/// by max|input| + max|zero_point|. The sum of magnitudes is conservative and
-/// also bounds the separate terms used in the zero-point correction.
-static int64_t getDifferenceMagnitude(DequantizeAffineOp dequantize) {
-  unsigned storageBitWidth =
+static std::optional<QuantizedOperandRanges>
+getOperandRanges(DequantizeAffineOp dequantize) {
+  unsigned bitWidth =
       cast<IntegerType>(dequantize.getInputType().getElementType()).getWidth();
-  bool storageIsUnsigned = dequantize.getInputUnsigned();
   std::optional<QuantMinMax> quantMinMax;
   if (auto quantMin = dequantize.getQuantMin()) {
-    auto quantMax = dequantize.getQuantMax();
-    assert(quantMax &&
-           "Quantized max must be defined when quantized min is defined");
-    quantMinMax = QuantMinMax{*quantMin, *quantMax};
+    quantMinMax = QuantMinMax{*quantMin, *dequantize.getQuantMax()};
   }
-  return GlobalOptimization::getDifferenceMagnitude(
-      storageBitWidth, storageIsUnsigned, quantMinMax,
-      /*isSymmetric=*/dequantize.isSymmetric());
+  return getQuantizedOperandRanges(bitWidth, dequantize.getInputUnsigned(),
+                                   quantMinMax, dequantize.isSymmetric());
 }
 
 /// Matches exactly two scalar operations: input multiplication and accumulator
@@ -109,9 +102,12 @@ FailureOr<QuantizedContraction> getQuantizedContraction(linalg::LinalgOp op) {
     return failure();
   }
 
-  int64_t maxReductionExtent =
-      getMaxReductionExtent(getDifferenceMagnitude(detail.lhs.dequantize),
-                            getDifferenceMagnitude(detail.rhs.dequantize));
+  auto lhsRanges = getOperandRanges(lhs);
+  auto rhsRanges = getOperandRanges(rhs);
+  if (!lhsRanges || !rhsRanges) {
+    return failure();
+  }
+  int64_t maxReductionExtent = getMaxReductionExtent(*lhsRanges, *rhsRanges);
   if (maxReductionExtent == 0) {
     return failure();
   }

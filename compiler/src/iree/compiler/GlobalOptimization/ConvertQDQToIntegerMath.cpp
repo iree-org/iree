@@ -466,9 +466,17 @@ static Value buildEpilogue(OpBuilder &b, Location loc, IndexedValue partials,
             nested, nestedLoc, args[2], computeType, /*isUnsignedCast=*/false);
         Value rhsScaleValue = convertScalarToDtype(
             nested, nestedLoc, args[3], computeType, /*isUnsignedCast=*/false);
-        Value scale = arith::MulFOp::create(nested, nestedLoc, lhsScaleValue,
-                                            rhsScaleValue);
-        Value result = arith::MulFOp::create(nested, nestedLoc, real, scale);
+        // Apply scales sequentially so their product cannot overflow or
+        // underflow before scaling the accumulator. This is still a
+        // reassociation of the original floating-point contraction: with
+        // opposing scale magnitudes, real * lhsScaleValue may overflow even
+        // when the original result is finite. Conversely, integer reduction
+        // bypasses overflow and rounding in the original dequantized inputs.
+        // See the pass description for the numerical limitations.
+        Value partial =
+            arith::MulFOp::create(nested, nestedLoc, real, lhsScaleValue);
+        Value result =
+            arith::MulFOp::create(nested, nestedLoc, partial, rhsScaleValue);
         if (isReduction) {
           result =
               arith::AddFOp::create(nested, nestedLoc, args.back(), result);

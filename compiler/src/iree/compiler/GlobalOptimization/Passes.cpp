@@ -28,7 +28,8 @@ static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
     "iree-global-opt-enable-qdq-to-integer-math",
     llvm::cl::desc("Rewrites contractions over dequantized operands into "
                    "integer contractions with zero point corrections ("
-                   "changes floating-point rounding)."),
+                   "changes floating-point rounding and exceptional-value "
+                   "behavior)."),
     llvm::cl::init(true));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",

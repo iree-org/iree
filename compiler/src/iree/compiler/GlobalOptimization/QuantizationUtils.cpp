@@ -20,30 +20,58 @@ int64_t getStorageMagnitude(unsigned bitWidth, bool isUnsigned) {
   return isUnsigned ? llvm::maxUIntN(bitWidth) : llvm::maxIntN(bitWidth) + 1;
 }
 
-int64_t getDifferenceMagnitude(unsigned storageBitWidth, bool storageIsUnsigned,
-                               std::optional<QuantMinMax> quantMinMax,
-                               bool isSymmetric) {
-  int64_t storageMagnitude =
-      getStorageMagnitude(storageBitWidth, storageIsUnsigned);
-  if (!storageMagnitude) {
-    return 0;
+std::optional<QuantizedOperandRanges>
+getQuantizedOperandRanges(unsigned storageBitWidth, bool storageIsUnsigned,
+                          std::optional<QuantMinMax> quantMinMax,
+                          bool isSymmetric) {
+  int64_t magnitude = getStorageMagnitude(storageBitWidth, storageIsUnsigned);
+  if (!magnitude) {
+    return std::nullopt;
   }
-
-  int64_t inputMagnitude = storageMagnitude;
-  if (quantMinMax) {
-    inputMagnitude = std::max(-quantMinMax->min, quantMinMax->max);
-  }
-  // A zero point is a value on the input's quantized grid. Its SSA carrier
-  // type does not enlarge that grid; PT2E commonly uses i64 for i8 values.
-  int64_t zeroPointMagnitude = isSymmetric ? 0 : storageMagnitude;
-  return inputMagnitude + zeroPointMagnitude;
+  QuantMinMax storage = storageIsUnsigned
+                            ? QuantMinMax{0, magnitude}
+                            : QuantMinMax{-magnitude, magnitude - 1};
+  QuantMinMax input = quantMinMax.value_or(storage);
+  QuantMinMax zeroPoint = isSymmetric ? QuantMinMax{0, 0} : storage;
+  return QuantizedOperandRanges{input, zeroPoint};
 }
 
-int64_t getMaxReductionExtent(int64_t lhsMagnitude, int64_t rhsMagnitude) {
-  if (lhsMagnitude <= 0 || rhsMagnitude <= 0) {
-    return 0;
+static QuantMinMax multiplyRanges(QuantMinMax lhs, QuantMinMax rhs) {
+  auto products = {lhs.min * rhs.min, lhs.min * rhs.max, lhs.max * rhs.min,
+                   lhs.max * rhs.max};
+  return {*std::min_element(products.begin(), products.end()),
+          *std::max_element(products.begin(), products.end())};
+}
+
+static QuantMinMax subtractRanges(QuantMinMax lhs, QuantMinMax rhs) {
+  return {lhs.min - rhs.max, lhs.max - rhs.min};
+}
+
+int64_t getMaxReductionExtent(const QuantizedOperandRanges &lhs,
+                              const QuantizedOperandRanges &rhs) {
+  QuantMinMax a = lhs.input, za = lhs.zeroPoint;
+  QuantMinMax b = rhs.input, zb = rhs.zeroPoint;
+  QuantMinMax product = multiplyRanges(a, b);
+  QuantMinMax lhsCorrection = multiplyRanges(zb, a);
+  QuantMinMax rhsCorrection = multiplyRanges(za, b);
+  QuantMinMax crossTerm = multiplyRanges(za, zb);
+  QuantMinMax correctionSum = {lhsCorrection.min + rhsCorrection.min,
+                               lhsCorrection.max + rhsCorrection.max};
+  QuantMinMax correction = subtractRanges(correctionSum, crossTerm);
+  // Bound the final result using (Aq-zA)*(Bq-zB), retaining the cancellation
+  // lost by independently bounding D - correction.
+  QuantMinMax corrected =
+      multiplyRanges(subtractRanges(a, za), subtractRanges(b, zb));
+
+  // Storage is at most 31 bits. Centered values have magnitude <= INT32_MAX;
+  // the products and correction range endpoints above all fit in int64_t.
+  // Include the operand sums as well as each product and correction stage.
+  int64_t maxMagnitude = 0;
+  for (QuantMinMax range : {a, b, product, lhsCorrection, rhsCorrection,
+                            crossTerm, correctionSum, correction, corrected}) {
+    maxMagnitude = std::max({maxMagnitude, -range.min, range.max});
   }
-  return llvm::maxIntN(kAccumulatorWidth) / lhsMagnitude / rhsMagnitude;
+  return maxMagnitude > 0 ? llvm::maxIntN(kAccumulatorWidth) / maxMagnitude : 0;
 }
 
 std::optional<int64_t>

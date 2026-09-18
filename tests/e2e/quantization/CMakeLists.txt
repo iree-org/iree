@@ -22,6 +22,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-global-opt-convert-qdq-to-integer-math\)\)"
+  RUNNER_ARGS
+    "--gtest_filter=-*_reference"
 )
 
 iree_check_single_backend_test_suite(
@@ -36,6 +38,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-global-opt-enable-qdq-to-integer-math=false"
     "--iree-llvmcpu-target-cpu=generic"
+  RUNNER_ARGS
+    "--gtest_filter=-*_rewritten"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

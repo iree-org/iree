@@ -5,9 +5,9 @@
 // retained by the rewrite. FIXME checks record current behavior, not a promise
 // that these numerical differences should be preserved.
 
-// FIXME: This contraction should return zero: (1 * 1e20) * (0 * 1e20) = 0.
-// Combining the scales first overflows to infinity, so the rewritten result
-// is 0 * infinity = NaN. These checks record the broken behavior until fixed.
+// This contraction returns zero: (1 * 1e20) * (0 * 1e20) = 0.
+// Apply each scale to the accumulator in sequence; combining the scales first
+// would overflow to infinity and produce NaN from 0 * infinity.
 func.func @scale_product_overflow() -> tensor<1x1xf32> {
   %aq = arith.constant dense<1> : tensor<1x1xi8>
   %bq = arith.constant dense<0> : tensor<1x1xi8>
@@ -33,12 +33,12 @@ func.func @scale_product_overflow() -> tensor<1x1xf32> {
       outs(%init : tensor<1x1xf32>) -> tensor<1x1xf32>
   return %result : tensor<1x1xf32>
 }
-// f32 0x7F800000 -> +infinity
 // CHECK-LABEL: func.func @scale_product_overflow(
-// CHECK: %[[INF:.+]] = arith.constant 0x7F800000 : f32
+// CHECK: %[[SCALE:.+]] = arith.constant 1.000000e+20 : f32
 // CHECK: linalg.generic {{.*}} outs(%{{.+}} : tensor<1x1xi32>)
 // CHECK: %[[REAL:.+]] = arith.sitofp %{{.+}} : i32 to f32
-// CHECK-NEXT: %[[RESULT:.+]] = arith.mulf %[[REAL]], %[[INF]] : f32
+// CHECK-NEXT: %[[PARTIAL:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK-NEXT: %[[RESULT:.+]] = arith.mulf %[[PARTIAL]], %[[SCALE]] : f32
 // CHECK-NEXT: linalg.yield %[[RESULT]] : f32
 
 // -----
@@ -162,9 +162,9 @@ func.func @infinite_scale_nan_propagation() -> tensor<1x1xf32> {
 
 // -----
 
-// FIXME: This contraction should return approximately 1.07368e-37, a normal
-// f32 value. The i32 dot product fits, but combining the 1e-23 scales first
-// underflows to zero and erases the result. These checks record that failure.
+// This contraction returns approximately 1.07368e-37, a normal f32 value.
+// Apply each 1e-23 scale to the accumulator in sequence; combining the scales
+// first would underflow to zero and erase the result.
 func.func @scale_product_underflow() -> tensor<1x1xf32> {
   %q = arith.constant dense<32767> : tensor<1x1xi16>
   %scale = arith.constant 1.0e-23 : f32
@@ -190,10 +190,11 @@ func.func @scale_product_underflow() -> tensor<1x1xf32> {
   return %result : tensor<1x1xf32>
 }
 // CHECK-LABEL: func.func @scale_product_underflow(
-// CHECK: %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK: %[[SCALE:.+]] = arith.constant 9.99999999E-24 : f32
 // CHECK: linalg.generic {{.*}} outs(%{{.+}} : tensor<1x1xi32>)
 // CHECK: %[[REAL:.+]] = arith.sitofp %{{.+}} : i32 to f32
-// CHECK-NEXT: %[[RESULT:.+]] = arith.mulf %[[REAL]], %[[ZERO]] : f32
+// CHECK-NEXT: %[[PARTIAL:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK-NEXT: %[[RESULT:.+]] = arith.mulf %[[PARTIAL]], %[[SCALE]] : f32
 // CHECK-NEXT: linalg.yield %[[RESULT]] : f32
 
 // -----
@@ -232,8 +233,8 @@ func.func @symmetric_zero_correction_folded(%aq: tensor<4x8xi8>, %a_s: f32, %bq:
 // CHECK-SAME: outs(%{{.+}} : tensor<4x16xf32>)
 // CHECK-NEXT: ^bb0(%[[ED:[a-zA-Z0-9_]+]]: i32, %{{.+}}: f32):
 // CHECK-NEXT: %[[REAL:.+]] = arith.sitofp %[[ED]] : i32 to f32
-// CHECK-NEXT: %[[SCALE:.+]] = arith.mulf %[[SA]], %[[SB]] : f32
-// CHECK-NEXT: %[[SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK-NEXT: %[[PARTIAL:.+]] = arith.mulf %[[REAL]], %[[SA]] : f32
+// CHECK-NEXT: %[[SCALED:.+]] = arith.mulf %[[PARTIAL]], %[[SB]] : f32
 // CHECK-NEXT: linalg.yield %[[SCALED]] : f32
 // CHECK: return %[[RESULT]] : tensor<4x16xf32>
 
@@ -277,8 +278,8 @@ func.func @symmetric_half_partial_reduction(%aq: tensor<4x2x4xi8>, %a_s: tensor<
 // CHECK-NEXT: ^bb0(%[[ED:[a-zA-Z0-9_]+]]: i32, %[[SA:[a-zA-Z0-9_]+]]: f16, %[[ACC:[a-zA-Z0-9_]+]]: f32):
 // CHECK-NEXT: %[[REAL:.+]] = arith.sitofp %[[ED]] : i32 to f32
 // CHECK-NEXT: %[[WIDE_SA:.+]] = arith.extf %[[SA]] : f16 to f32
-// CHECK-NEXT: %[[SCALE:.+]] = arith.mulf %[[WIDE_SA]], %[[SB]] : f32
-// CHECK-NEXT: %[[SCALED:.+]] = arith.mulf %[[REAL]], %[[SCALE]] : f32
+// CHECK-NEXT: %[[PARTIAL:.+]] = arith.mulf %[[REAL]], %[[WIDE_SA]] : f32
+// CHECK-NEXT: %[[SCALED:.+]] = arith.mulf %[[PARTIAL]], %[[SB]] : f32
 // CHECK-NEXT: %[[TOTAL:.+]] = arith.addf %[[ACC]], %[[SCALED]] : f32
 // CHECK-NEXT: linalg.yield %[[TOTAL]] : f32
 // CHECK: linalg.generic {{.*}} ins(%[[PARTIALS]] : tensor<4x16xf32>)

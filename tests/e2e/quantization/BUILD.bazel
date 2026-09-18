@@ -23,6 +23,8 @@ iree_check_single_backend_test_suite(
         "--iree-preprocessing-pass-pipeline=builtin.module\\(util.func\\(iree-global-opt-convert-qdq-to-integer-math\\)\\)",
     ],
     driver = "local-task",
+    # Accepted numerical differences have separate reference/rewrite checks.
+    runner_args = ["--gtest_filter=-*_reference"],
     target_backend = "llvm-cpu",
 )
 
@@ -36,5 +38,6 @@ iree_check_single_backend_test_suite(
         "--iree-llvmcpu-target-cpu=generic",
     ],
     driver = "local-task",
+    runner_args = ["--gtest_filter=-*_rewritten"],
     target_backend = "llvm-cpu",
 )

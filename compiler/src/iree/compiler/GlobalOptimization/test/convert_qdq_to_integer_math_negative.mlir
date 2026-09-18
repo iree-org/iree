@@ -617,10 +617,11 @@ func.func @reduction_dim_in_output(%aq: tensor<2x4xi8>, %sa: f32,
 //===----------------------------------------------------------------------===//
 // Accumulator bound
 //
-// Every integer intermediate is i32, bounded by
-// N * (|Aq|max + |zA|max) * (|Bq|max + |zB|max). Quantization ranges bound the
+// Every integer intermediate must fit in i32. Quantization ranges bound the
 // inputs when present; otherwise the quantized storage types do. Zero points
 // are points on those storage grids, regardless of their SSA carrier types.
+// Ranges are propagated through the products and correction stages; the final
+// result is bounded using the centered product (Aq-zA)*(Bq-zB).
 // The admissible counterpart of each pair below is in
 // convert_qdq_to_integer_math_algebra.mlir.
 //===----------------------------------------------------------------------===//
@@ -628,8 +629,7 @@ func.func @reduction_dim_in_output(%aq: tensor<2x4xi8>, %sa: f32,
 // -----
 
 // The shape and types of @acc_symmetric_fits_deep with both sides asymmetric.
-// That is four terms rather than one, costing two more bits: 7+7+16+2+1 = 33,
-// so it no longer fits. This pair is what pins the term counting.
+// Centered values can reach +/-255, so N*255^2 exceeds INT32_MAX.
 func.func @acc_asymmetric_too_deep(%aq: tensor<4x65536xi8>, %a_s: f32, %a_z: i8, %bq: tensor<65536x16xi8>, %b_s: f32, %b_z: i8) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x65536xf32>
   %a = iree_linalg_ext.dequantize_affine
@@ -741,3 +741,102 @@ func.func @acc_dynamic_wide_storage(%aq: tensor<1x?xi64>, %sa: f32,
 // CHECK-LABEL: func.func @acc_dynamic_wide_storage(
 //       CHECK:   iree_linalg_ext.dequantize_affine
 //       CHECK:   linalg.matmul
+
+// -----
+
+// The centered result fits, but P+Q can overflow: reject one element
+// beyond floor(INT32_MAX/(2*255^2)).
+func.func @unsigned_reduction_16513(%aq: tensor<1x16513xi8>, %a_s: f32, %a_z: i8, %bq: tensor<16513x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
+  %a_i = tensor.empty() : tensor<1x16513xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%aq, %a_s, %a_z : tensor<1x16513xi8>, f32, i8)
+      outs(%a_i : tensor<1x16513xf32>) -> tensor<1x16513xf32>
+  %b_i = tensor.empty() : tensor<16513x1xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%bq, %b_s, %b_z : tensor<16513x1xi8>, f32, i8)
+      outs(%b_i : tensor<16513x1xf32>) -> tensor<16513x1xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %e = tensor.empty() : tensor<1x1xf32>
+  %f = linalg.fill ins(%cst : f32) outs(%e : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %c = linalg.matmul ins(%a, %b : tensor<1x16513xf32>, tensor<16513x1xf32>)
+      outs(%f : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %c : tensor<1x1xf32>
+}
+// CHECK-LABEL: func.func @unsigned_reduction_16513(
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK: linalg.matmul
+
+// -----
+
+// The centered product is in [-255^2, 255^2] and bounds all intermediates.
+// Reject one element beyond the safe depth.
+func.func @signed_reduction_33026(%aq: tensor<1x33026xi8>, %a_s: f32, %a_z: i8, %bq: tensor<33026x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
+  %a_i = tensor.empty() : tensor<1x33026xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%aq, %a_s, %a_z : tensor<1x33026xi8>, f32, i8)
+      outs(%a_i : tensor<1x33026xf32>) -> tensor<1x33026xf32>
+  %b_i = tensor.empty() : tensor<33026x1xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%bq, %b_s, %b_z : tensor<33026x1xi8>, f32, i8)
+      outs(%b_i : tensor<33026x1xf32>) -> tensor<33026x1xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %e = tensor.empty() : tensor<1x1xf32>
+  %f = linalg.fill ins(%cst : f32) outs(%e : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %c = linalg.matmul ins(%a, %b : tensor<1x33026xf32>, tensor<33026x1xf32>)
+      outs(%f : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %c : tensor<1x1xf32>
+}
+// CHECK-LABEL: func.func @signed_reduction_33026(
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK: linalg.matmul
+
+// -----
+
+// The correction interval is [-97665, 97410], larger than the centered product.
+// Reject one element beyond the safe depth.
+func.func @mixed_reduction_21989(%aq: tensor<1x21989xi8>, %a_s: f32, %a_z: i8, %bq: tensor<21989x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
+  %a_i = tensor.empty() : tensor<1x21989xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%aq, %a_s, %a_z : tensor<1x21989xi8>, f32, i8)
+      outs(%a_i : tensor<1x21989xf32>) -> tensor<1x21989xf32>
+  %b_i = tensor.empty() : tensor<21989x1xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%bq, %b_s, %b_z : tensor<21989x1xi8>, f32, i8)
+      outs(%b_i : tensor<21989x1xf32>) -> tensor<21989x1xf32>
+  %cst = arith.constant 0.000000e+00 : f32
+  %e = tensor.empty() : tensor<1x1xf32>
+  %f = linalg.fill ins(%cst : f32) outs(%e : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %c = linalg.matmul ins(%a, %b : tensor<1x21989xf32>, tensor<21989x1xf32>)
+      outs(%f : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %c : tensor<1x1xf32>
+}
+// CHECK-LABEL: func.func @mixed_reduction_21989(
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK: linalg.matmul

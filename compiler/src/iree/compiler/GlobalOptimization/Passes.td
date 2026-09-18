@@ -118,8 +118,13 @@ def ConvertQDQToIntegerMathPass :
     integer contractions. Unsupported cases retain the original computation.
 
     Scaling and partial-result accumulation use at least f32, preserving wider
-    scale and output types, before conversion to the output type. Reassociation
-    changes floating-point rounding and is not a bitwise identity.
+    scale and output types, before conversion to the output type.
+
+    Numerical stability is best effort. Reassociation changes floating-point
+    rounding; no fixed error bound or preservation of signed zero, NaNs,
+    infinities, or overflow/underflow behavior is guaranteed. Disable this
+    transformation when reference floating-point semantics are required with
+    `--iree-global-opt-enable-qdq-to-integer-math=false`.
   }];
 }
 
