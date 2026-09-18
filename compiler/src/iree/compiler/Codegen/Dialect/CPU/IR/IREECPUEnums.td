@@ -174,6 +174,13 @@ def MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32
 def MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32
     : I32EnumAttrCase<"MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32", 0x2211>;
 
+// RISC-V V `vfmacc.vf` (f32, f32). 1x8VLsx1 or swapped 8VLsx1x1.
+// 8VLs = LMUL=4; lane count is DataTiledMMAAttr.vlen/8. Requires +v.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32", 0x3110>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32", 0x3111>;
+
 // RISC-V V `vfmacc.vf` (f16, f16): a 1x8VLsx1 matmul tile, or 8VLsx1x1 in the
 // M<->N-swapped orientation. `8VLs` is 8 f16 elements per 64-bit vector-length
 // unit, i.e. one LMUL=2 register group, and s stands for static. The LHS is a
@@ -233,6 +240,8 @@ def IREECPU_MMAIntrinsic
            MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
 
            // RISC-V V
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
            MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
            MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
 

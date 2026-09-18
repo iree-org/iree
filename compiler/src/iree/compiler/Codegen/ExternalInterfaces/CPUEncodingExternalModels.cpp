@@ -432,6 +432,9 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x1x4_I32_I8_UI8:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16:
     return {"+avx512vnni"};
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
+    return {"+v"};
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
     return {"+v", "+zvfh"};
@@ -617,6 +620,8 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
   }
   if (isRISCV64(config)) {
     static const MMAIntrinsic kAllRiscvV[] = {
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
     };
