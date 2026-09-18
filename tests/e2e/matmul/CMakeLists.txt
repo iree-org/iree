@@ -144,7 +144,7 @@ iree_generated_e2e_runner_test(
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "riscv_64:ime:+v,+zvl256b,+xsmtvdot"
+    "riscv_64:ime:+m,+a,+f,+d,+c,+v,+zvl256b,+xsmtvdot"
 )
 
 iree_generated_e2e_runner_test(
@@ -345,7 +345,7 @@ iree_generated_e2e_runner_test(
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "riscv_64:ime:+v,+zvl256b,+xsmtvdot"
+    "riscv_64:ime:+m,+a,+f,+d,+c,+v,+zvl256b,+xsmtvdot"
 )
 
 iree_generated_e2e_runner_test(
@@ -1172,7 +1172,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1196,7 +1196,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1221,7 +1221,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-global-opt-enable-early-materialization=false"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1246,7 +1246,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-global-opt-enable-early-materialization=false"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
