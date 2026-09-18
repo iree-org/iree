@@ -448,7 +448,7 @@ public:
       if (failed(targetID)) {
         return nullptr;
       }
-      format = targetID->getCanonicalTargetIDString();
+      format = targetID->getCanonicalFeatureString();
     } else {
       format = "rocm-hsaco-fb"; // legacy HIP
     }
@@ -1177,7 +1177,7 @@ public:
       break;
     }
     case ContainerType::AMDGPU: {
-      std::string canonicalTargetID = targetID->getCanonicalTargetIDString();
+      std::string canonicalTargetID = targetID->getCanonicalFeatureString();
       executableBinaryFormat =
           executableBuilder.getStringAttr(canonicalTargetID);
       binaryContainer = serializeAMDGPUBinaryContainer(
