@@ -45,5 +45,7 @@ jobs:
         run: |
           ctest --test-dir "${BUILD_DIR}" -R "PluginAPI|compiler_plugins" \
             --output-on-failure --timeout 900
+      - name: Test a plugin built against the install tree
+        run: ./build_tools/testing/test_plugin_from_install.sh "${BUILD_DIR}"
 
       # Alerting on failure is the responsibility of the calling job.
