@@ -21,6 +21,12 @@ void populateFoldReshapeOpsByExpansionPatterns(
     RewritePatternSet &patterns,
     const linalg::ControlFusionFn &controlFoldingReshapes);
 
+/// Hoist quantize ops through collapse_shape producers and sink dequantize ops
+/// through expand_shape consumers.
+void populatePropagateAffineQuantizationReshapesPatterns(
+    RewritePatternSet &patterns,
+    const linalg::ControlFusionFn &controlFoldingReshapes);
+
 /// Fuse transpose-like ops into LinalgExt ops (only `AttentionOp` supported).
 void populateFuseLinalgExtOpsWithTransposes(
     RewritePatternSet &patterns,

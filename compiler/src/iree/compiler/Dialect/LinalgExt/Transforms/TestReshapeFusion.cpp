@@ -31,6 +31,8 @@ struct TestReshapeFusionPass final
     RewritePatternSet patterns(context);
     LinalgExt::populateFoldReshapeOpsByExpansionPatterns(
         patterns, [](OpOperand *) { return true; });
+    LinalgExt::populatePropagateAffineQuantizationReshapesPatterns(
+        patterns, [](OpOperand *) { return true; });
     tensor::populateFoldTensorEmptyPatterns(patterns);
     tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);

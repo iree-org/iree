@@ -89,6 +89,7 @@ iree_cc_library(
     "OptimizeNumerics.cpp"
     "Passes.cpp"
     "PropagateLinalgTranspose.cpp"
+    "PropagateQuantizationTowardContractions.cpp"
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "RaiseSpecialOps.cpp"
