@@ -1,7 +1,8 @@
 {
   "config_name": "gpu_vulkan",
   "iree_compile_flags": [
-    "--iree-hal-target-device=vulkan"
+    "--iree-hal-target-device=vulkan",
+    "--iree-vulkan-target=vp_android_baseline_2022"
   ],
   "iree_run_module_flags": [
     "--device=vulkan"
