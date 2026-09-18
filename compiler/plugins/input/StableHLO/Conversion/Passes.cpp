@@ -90,6 +90,11 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
+  // A shape operand that arrives through a call is constant only once the
+  // inliner has run.
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloCanonicalizeDynamismPass());
+
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
