@@ -1335,6 +1335,7 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
     ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 
