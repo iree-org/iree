@@ -1,5 +1,8 @@
 vm.module @call_ops version 0
 vm.type i32
+vm.type i64
+vm.type f32
+vm.type f64
 vm.type !vm.buffer
 vm.type !vm.opaque
 vm.rodata[0] = 010203
@@ -212,4 +215,98 @@ vm.func @fn17() -> () {
 ^bb0:
   %i0 = vm.const.i32 9  // 0x00000009
   vm.fail %i0, ""
+}
+
+// Consecutive i64 arguments must each occupy two registers in the callee.
+vm.export @test_call_consecutive_i64_arguments
+vm.func @test_call_consecutive_i64_arguments() -> () {
+^bb0:
+  %i0:1 = vm.const.i64 4294967298
+  %i2:3 = vm.const.i64 12884901892
+  vm.call @call_ops:19(%i0, %i2)
+  vm.return
+}
+
+vm.func @check_consecutive_i64(%i0:1: i64, %i2:3: i64) -> () {
+^bb0:
+  %i4:5 = vm.const.i64 4294967298
+  %i6:7 = vm.const.i64 12884901892
+  %i8 = vm.cmp.ne.i64 %i0:1, %i4:5
+  %i9 = vm.cmp.ne.i64 %i2:3, %i6:7
+  %i8 = vm.or.i32 %i8, %i9
+  vm.cond_br %i8, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  %i10 = vm.const.i32 9
+  vm.fail %i10, "consecutive i64 arguments must preserve both words"
+}
+
+// Initialize destination high words so a partial return copy fails reliably.
+vm.export @test_call_i64_results_preserve_high_words
+vm.func @test_call_i64_results_preserve_high_words() -> () {
+^bb0:
+  %i0:1 = vm.const.i64.zero
+  %i2:3 = vm.const.i64.zero
+  %i0, %i2 = vm.call @call_ops:21()
+  %i4:5 = vm.const.i64 4294967298
+  %i6:7 = vm.const.i64 12884901892
+  %i8 = vm.cmp.ne.i64 %i0:1, %i4:5
+  %i9 = vm.cmp.ne.i64 %i2:3, %i6:7
+  %i8 = vm.or.i32 %i8, %i9
+  vm.cond_br %i8, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  %i10 = vm.const.i32 9
+  vm.fail %i10, "i64 results must preserve both words"
+}
+
+vm.func @return_i64_pair() -> (i64, i64) {
+^bb0:
+  %i0:1 = vm.const.i64 4294967298
+  %i2:3 = vm.const.i64 12884901892
+  vm.return %i0, %i2
+}
+
+// Mixed-width values share the integer bank; references use a separate bank
+// and must retain their ownership semantics.
+vm.export @test_call_mixed_width_arguments_and_results
+vm.func @test_call_mixed_width_arguments_and_results() -> () {
+^bb0:
+  %i0 = vm.const.i32 7
+  %i2:3 = vm.const.i64 4294967298
+  %r0 = vm.const.ref.rodata 0
+  %i4 = vm.const.f32 3.5
+  %i6:7 = vm.const.f64 5.5
+  %i8 = vm.const.i32 11
+  %i10 = vm.const.i32.zero
+  %i12:13 = vm.const.i64.zero
+  %i14 = vm.const.i32.zero
+  %i16:17 = vm.const.i64.zero
+  %i18 = vm.const.i32.zero
+  %i10, %i12, %r1, %i14, %i16, %i18 = vm.call @call_ops:23(%i2, %i0, %r0, %i4, %i6, %i8)
+  %i19 = vm.cmp.ne.i32 %i10, %i0
+  %i20 = vm.cmp.ne.i64 %i12:13, %i2:3
+  %i19 = vm.or.i32 %i19, %i20
+  %i20 = vm.cmp.ne.f32.o %i14, %i4
+  %i19 = vm.or.i32 %i19, %i20
+  %i20 = vm.cmp.ne.f64.o %i16:17, %i6:7
+  %i19 = vm.or.i32 %i19, %i20
+  %i20 = vm.cmp.ne.i32 %i18, %i8
+  %i19 = vm.or.i32 %i19, %i20
+  %i20 = vm.cmp.ne.ref %r0, %r1
+  %i19 = vm.or.i32 %i19, %i20
+  vm.discard.refs %r0, %r1
+  vm.cond_br %i19, ^bb2(), ^bb1()
+^bb1:
+  vm.return
+^bb2:
+  %i21 = vm.const.i32 9
+  vm.fail %i21, "mixed-width call must preserve values and alignment"
+}
+
+vm.func @return_mixed_width(%i0:1: i64, %i2: i32, %r0: !vm.ref<?>, %i3: f32, %i4:5: f64, %i6: i32) -> (i32, i64, !vm.ref<?>, f32, f64, i32) {
+^bb0:
+  vm.return %i2, %i0, %R0, %i3, %i4, %i6
 }
