@@ -38,7 +38,8 @@ def compile_simple_mul_binary() -> Output:
     session = Session()
     source = Source.wrap_buffer(session, asm)
     session.set_flags(
-        f"--iree-hal-target-backends={iree.compiler.core.DEFAULT_TESTING_BACKENDS[0]}"
+        "--iree-hal-target-device=local",
+        f"--iree-hal-local-target-device-backends={iree.compiler.core.DEFAULT_TESTING_BACKENDS[0]}",
     )
     inv = session.invocation()
     inv.parse_source(source)

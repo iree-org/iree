@@ -176,8 +176,6 @@ void buildIREEPrecompileTransformPassPipeline(
   // information. If trying to compile in a generic mode the user should omit
   // specifying targets.
   IREE::HAL::AssignmentOptions halAssignmentOptions;
-  halAssignmentOptions.legacyTargetBackends =
-      halTargetOptions.legacyTargetBackends;
   halAssignmentOptions.targetDevices = halTargetOptions.targetDevices;
   halAssignmentOptions.defaultDevice = halTargetOptions.defaultDevice;
   IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
