@@ -101,6 +101,18 @@ def ExpandTensorShapesPass :
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
 }
 
+def PropagateQuantizationTowardContractionsPass :
+    InterfacePass<"iree-global-opt-propagate-quantization-toward-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Moves affine quantization operations toward contractions.";
+  let description = [{
+    Hoists `iree_linalg_ext.quantize_affine` through producer-side collapse
+    reshapes, and sinks `iree_linalg_ext.dequantize_affine` through consumer-side
+    expand reshapes, transposes and legal zero padding. This places the
+    quantization operations next to contractions and establishes the direct
+    dequantize producers matched by the integer contraction rewrite.
+  }];
+}
+
 def ConvertQDQToIntegerMathPass :
     InterfacePass<"iree-global-opt-convert-qdq-to-integer-math", "mlir::FunctionOpInterface"> {
   let summary = "Rewrites contractions over dequantized operands into integer contractions.";
