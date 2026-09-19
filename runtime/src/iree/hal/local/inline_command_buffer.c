@@ -357,6 +357,44 @@ static iree_status_t iree_hal_inline_command_buffer_advise_buffer(
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hal_command_buffer_flush_buffer
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_hal_inline_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  if (target_ref.length == 0) return iree_ok_status();
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      target_ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_WRITE, target_ref.offset, target_ref.length,
+      &mapping));
+  iree_status_t status = iree_hal_buffer_mapping_flush_range(
+      &mapping, 0, IREE_HAL_WHOLE_BUFFER);
+  return iree_status_join(status, iree_hal_buffer_unmap_range(&mapping));
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_command_buffer_invalidate_buffer
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_hal_inline_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  if (target_ref.length == 0) return iree_ok_status();
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      target_ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_READ, target_ref.offset, target_ref.length,
+      &mapping));
+  iree_status_t status = iree_hal_buffer_mapping_invalidate_range(
+      &mapping, 0, IREE_HAL_WHOLE_BUFFER);
+  return iree_status_join(status, iree_hal_buffer_unmap_range(&mapping));
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_fill_buffer
 //===----------------------------------------------------------------------===//
 
@@ -624,6 +662,8 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_inline_command_buffer_reset_event,
         .wait_events = iree_hal_inline_command_buffer_wait_events,
         .advise_buffer = iree_hal_inline_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_inline_command_buffer_flush_buffer,
+        .invalidate_buffer = iree_hal_inline_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_inline_command_buffer_fill_buffer,
         .update_buffer = iree_hal_inline_command_buffer_update_buffer,
         .copy_buffer = iree_hal_inline_command_buffer_copy_buffer,

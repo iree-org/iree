@@ -937,6 +937,19 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_advise_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t buffer_ref,
     iree_hal_memory_advise_flags_t flags, uint64_t arg0, uint64_t arg1);
 
+// Makes prior writes to the target buffer range available to external
+// consumers. The operation is ordered with command buffer execution.
+IREE_API_EXPORT iree_status_t
+iree_hal_command_buffer_flush_buffer(iree_hal_command_buffer_t* command_buffer,
+                                     iree_hal_buffer_ref_t target_ref);
+
+// Makes external writes to the target buffer range visible to subsequent
+// consumers.
+// The operation is ordered with command buffer execution.
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t target_ref);
+
 // Fills the target buffer with the given repeating value.
 // Expects that |pattern_length| is one of 1, 2, or 4 and that the offset and
 // length are aligned to the natural alignment of the value.
@@ -1143,6 +1156,14 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
       uint64_t arg0, uint64_t arg1);
+
+  iree_status_t(IREE_API_PTR* flush_buffer)(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_ref_t target_ref);
+
+  iree_status_t(IREE_API_PTR* invalidate_buffer)(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_ref_t target_ref);
 
   iree_status_t(IREE_API_PTR* fill_buffer)(
       iree_hal_command_buffer_t* command_buffer,
