@@ -77,7 +77,7 @@ func.func @unpack(%arg0 : tensor<128x10x?x8x?xf32>) -> tensor<128x80x320xf32> at
 //       CHECK: func.func @unpack
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
-//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Unknown, Equal]>
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Unknown, Multiple], vector_common_parallel = [Unknown, Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -99,7 +99,7 @@ func.func @unpack_outer_dynamic(%arg0 : tensor<?x?x32x?xf32>, %dim0 : index, %di
 //       CHECK: func.func @unpack_outer_dynamic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   linalg.unpack
-//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+//  CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -121,7 +121,7 @@ func.func @pack(%arg0: tensor<20x48xf32>) -> tensor<2x?x16x?xf32> attributes {ha
 //      CHECK: func.func @pack(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pack
-// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
@@ -152,7 +152,7 @@ func.func @elem_pack(%arg0: tensor<128x384xf32>) -> tensor<16x?x8x?xf32> attribu
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
 //      CHECK:   linalg.pack
-// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:       inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Multiple], vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 
 // -----
@@ -194,14 +194,13 @@ func.func @mmt4d_generic_unpack_pack(%arg0: tensor<5x4096x7x1xf16>, %arg1: tenso
 // CHECK-SAME:      {lowering_config = #[[$CONFIG1]]}
 // CHECK:         linalg.generic
 // CHECK-SAME:      {lowering_config = #[[$CONFIG0]]}
-// The producer unpack carries a precomputed inner-tile alignment hint.
+// The unpack carries precomputed distribution and vector inner-tile alignment hints.
 // CHECK:         linalg.unpack
-// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Equal], vector_common_parallel = [Unknown, Equal]>
 // CHECK-SAME:      lowering_config = #[[$CONFIG2]]
-// The consumer pack also carries a precomputed inner-tile alignment hint and
-// has no lowering config of its own.
+// The consumer pack carries the same hints and has no lowering config of its own.
 // CHECK:         linalg.pack
-// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<vector_common_parallel = [Unknown, Equal]>
+// CHECK-SAME:      inner_tile_alignments = #iree_cpu.inner_tile_alignments<distribution = [Unknown, Equal], vector_common_parallel = [Unknown, Equal]>
 // CHECK-NOT:       lowering_config
 
 // -----
