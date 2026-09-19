@@ -352,6 +352,40 @@ iree_status_t iree_hal_command_buffer_advise_buffer_validation(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_command_buffer_flush_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref) {
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_command_buffer_invalidate_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref) {
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
+
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_command_buffer_fill_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,

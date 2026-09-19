@@ -70,6 +70,19 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "deferred_command_buffer_test",
+    srcs = ["deferred_command_buffer_test.cc"],
+    deps = [
+        ":deferred_command_buffer",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "executable_debug_info",
     srcs = ["executable_debug_info.c"],
