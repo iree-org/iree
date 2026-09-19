@@ -29,6 +29,7 @@ iree_lit_test_suite(
             "func_conversion_sync.mlir",
             "func_conversion_sync_invalid.mlir",
             "func_conversion_transients.mlir",
+            "quantization_to_linalg_ext.mlir",
             "scan.mlir",
             "scatter.mlir",
             "sort.mlir",
