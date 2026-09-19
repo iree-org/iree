@@ -411,3 +411,260 @@ func.func @dynamic_broadcast_annotated_both(%a: tensor<?x?xf32>, %s: tensor<3xi3
   %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1, 2] {known_expanding_dimensions = array<i64: 0>, known_nonexpanding_dimensions = array<i64: 1>} : (tensor<?x?xf32>, tensor<3xi32>) -> tensor<?x?x?xf32>
   return %r : tensor<?x?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dynamic_reduce_window
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x8xf32>, %[[INIT:.+]]: tensor<f32>)
+// CHECK: %[[DIM:.+]] = tensor.dim %[[ARG0]], %c0
+// CHECK: %[[EMPTY:.+]] = tensor.empty(%[[DIM]]) : tensor<?x4xf32>
+// CHECK: linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<?x4xf32>)
+// CHECK: linalg.generic
+// CHECK: arith.maximumf
+// CHECK: return %{{.+}} : tensor<?x4xf32>
+func.func @dynamic_reduce_window(%a: tensor<?x8xf32>, %i: tensor<f32>) -> tensor<?x4xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.maximum %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2>, window_strides = array<i64: 1, 2>, padding = dense<0> : tensor<2x2xi64>} : (tensor<?x8xf32>, tensor<f32>) -> tensor<?x4xf32>
+  return %r : tensor<?x4xf32>
+}
+
+// -----
+
+// A pooling-shaped reduce_window with a dynamic batch dim: upstream's own
+// pattern seeds the dynamic output dim itself, so it applies here too.
+// CHECK-LABEL: @dynamic_reduce_window_pooling
+// CHECK-NOT: linalg.generic
+// CHECK: linalg.pooling_nhwc_max
+// CHECK: return %{{.+}} : tensor<?x4x4x3xf32>
+func.func @dynamic_reduce_window_pooling(%a: tensor<?x8x8x3xf32>, %i: tensor<f32>) -> tensor<?x4x4x3xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.maximum %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2, 2, 1>, window_strides = array<i64: 1, 2, 2, 1>, padding = dense<0> : tensor<4x2xi64>} : (tensor<?x8x8x3xf32>, tensor<f32>) -> tensor<?x4x4x3xf32>
+  return %r : tensor<?x4x4x3xf32>
+}
+
+// -----
+
+// A windowed dynamic dim: the result dim is computed from the input dim.
+// CHECK-LABEL: @dynamic_reduce_window_strided
+// CHECK: arith.subi
+// CHECK: arith.divsi
+// CHECK: arith.addi
+// CHECK: tensor.empty(%{{.+}}) : tensor<?xf32>
+// CHECK: linalg.generic
+func.func @dynamic_reduce_window_strided(%a: tensor<?xf32>, %i: tensor<f32>) -> tensor<?xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>, padding = dense<[[1, 1]]> : tensor<1x2xi64>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  return %r : tensor<?xf32>
+}
+
+// -----
+
+// Rank 3, every dim, window, stride and padding amount distinct. Static
+// result dims: (9 + 0 + 1 - 3) / 2 + 1 = 4 and (7 + 2 + 2 - 2) / 1 + 1 = 10.
+// CHECK-LABEL: @dynamic_reduce_window_rank3
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x9x7xf32>,
+// CHECK: tensor.pad %[[ARG0]] low[1, 0, 2] high[0, 1, 2]
+// CHECK: tensor.empty(%{{.+}}) : tensor<?x4x10xf32>
+// CHECK: linalg.generic
+// CHECK: arith.maximumf
+// CHECK: return %{{.+}} : tensor<?x4x10xf32>
+func.func @dynamic_reduce_window_rank3(%a: tensor<?x9x7xf32>, %i: tensor<f32>) -> tensor<?x4x10xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.maximum %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 2, 3, 2>, window_strides = array<i64: 2, 2, 1>, padding = dense<[[1, 0], [0, 1], [2, 2]]> : tensor<3x2xi64>} : (tensor<?x9x7xf32>, tensor<f32>) -> tensor<?x4x10xf32>
+  return %r : tensor<?x4x10xf32>
+}
+
+// -----
+
+// Base dilation becomes interior padding, window dilation widens the window
+// in the size formula: dim 0 is (d - 3) / 1 + 1, dim 1 is (17 - 3) / 2 + 1 = 8.
+// CHECK-LABEL: @dynamic_reduce_window_dilations
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x9xf32>,
+// CHECK: tensor.insert_slice %[[ARG0]] into %{{.+}}[0, 0] [%{{.+}}, 9] [1, 2]
+// CHECK: arith.addi %{{.+}}, %c-2
+// CHECK: tensor.empty(%{{.+}}) : tensor<?x8xf32>
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<?x8xf32>
+func.func @dynamic_reduce_window_dilations(%a: tensor<?x9xf32>, %i: tensor<f32>) -> tensor<?x8xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 2, 3>, window_strides = array<i64: 1, 2>, base_dilations = array<i64: 1, 2>, window_dilations = array<i64: 2, 1>, padding = dense<0> : tensor<2x2xi64>} : (tensor<?x9xf32>, tensor<f32>) -> tensor<?x8xf32>
+  return %r : tensor<?x8xf32>
+}
+
+// -----
+
+// Every dim dynamic: every result dim is computed.
+// CHECK-LABEL: @dynamic_reduce_window_all_dynamic
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x?x?xf32>,
+// CHECK-DAG: tensor.dim %[[ARG0]], %c0
+// CHECK-DAG: tensor.dim %[[ARG0]], %c1
+// CHECK-DAG: tensor.dim %[[ARG0]], %c2
+// CHECK: tensor.empty(%{{.+}}, %{{.+}}, %{{.+}}) : tensor<?x?x?xf32>
+// CHECK: linalg.generic
+func.func @dynamic_reduce_window_all_dynamic(%a: tensor<?x?x?xf32>, %i: tensor<f32>) -> tensor<?x?x?xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.maximum %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2, 3>, window_strides = array<i64: 1, 2, 3>, padding = dense<0> : tensor<3x2xi64>} : (tensor<?x?x?xf32>, tensor<f32>) -> tensor<?x?x?xf32>
+  return %r : tensor<?x?x?xf32>
+}
+
+// -----
+
+// Two inputs reduced together, one float and one integer.
+// CHECK-LABEL: @dynamic_reduce_window_variadic
+// CHECK: tensor.empty(%{{.+}}) : tensor<?x4xf32>
+// CHECK: tensor.empty(%{{.+}}) : tensor<?x4xi32>
+// CHECK: linalg.generic
+// CHECK-DAG: arith.maximumf
+// CHECK-DAG: arith.maxsi
+// CHECK: return %{{.+}}, %{{.+}} : tensor<?x4xf32>, tensor<?x4xi32>
+func.func @dynamic_reduce_window_variadic(%a: tensor<?x8xf32>, %b: tensor<?x8xi32>, %ia: tensor<f32>, %ib: tensor<i32>) -> (tensor<?x4xf32>, tensor<?x4xi32>) {
+  %r:2 = "stablehlo.reduce_window"(%a, %b, %ia, %ib) ({
+  ^bb0(%x0: tensor<f32>, %x1: tensor<i32>, %y0: tensor<f32>, %y1: tensor<i32>):
+    %m0 = stablehlo.maximum %x0, %y0 : tensor<f32>
+    %m1 = stablehlo.maximum %x1, %y1 : tensor<i32>
+    "stablehlo.return"(%m0, %m1) : (tensor<f32>, tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2>, window_strides = array<i64: 1, 2>, padding = dense<0> : tensor<2x2xi64>} : (tensor<?x8xf32>, tensor<?x8xi32>, tensor<f32>, tensor<i32>) -> (tensor<?x4xf32>, tensor<?x4xi32>)
+  return %r#0, %r#1 : tensor<?x4xf32>, tensor<?x4xi32>
+}
+
+// -----
+
+// Integer minimum.
+// CHECK-LABEL: @dynamic_reduce_window_min_i32
+// CHECK: linalg.generic
+// CHECK: arith.minsi
+// CHECK: return %{{.+}} : tensor<?x4xi32>
+func.func @dynamic_reduce_window_min_i32(%a: tensor<?x8xi32>, %i: tensor<i32>) -> tensor<?x4xi32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<i32>, %y: tensor<i32>):
+    %m = stablehlo.minimum %x, %y : tensor<i32>
+    "stablehlo.return"(%m) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2>, window_strides = array<i64: 1, 2>, padding = dense<0> : tensor<2x2xi64>} : (tensor<?x8xi32>, tensor<i32>) -> tensor<?x4xi32>
+  return %r : tensor<?x4xi32>
+}
+
+// -----
+
+// Pooling shape with distinct spatial dims, window and strides: stands aside.
+// CHECK-LABEL: @dynamic_reduce_window_pooling_distinct
+// CHECK-NOT: linalg.generic
+// CHECK: linalg.pooling_nhwc_max
+// CHECK-SAME: strides = dense<[2, 3]>
+// CHECK: return %{{.+}} : tensor<?x4x2x3xf32>
+func.func @dynamic_reduce_window_pooling_distinct(%a: tensor<?x8x6x3xf32>, %i: tensor<f32>) -> tensor<?x4x2x3xf32> {
+  %r = "stablehlo.reduce_window"(%a, %i) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %m = stablehlo.maximum %x, %y : tensor<f32>
+    "stablehlo.return"(%m) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>, window_strides = array<i64: 1, 2, 3, 1>, padding = dense<0> : tensor<4x2xi64>} : (tensor<?x8x6x3xf32>, tensor<f32>) -> tensor<?x4x2x3xf32>
+  return %r : tensor<?x4x2x3xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @scatter_batching_dynamic
+// CHECK: iree_linalg_ext.scatter
+// CHECK: return %{{.+}} : tensor<2x8xf32>
+func.func @scatter_batching_dynamic(%a: tensor<2x8xf32>, %i: tensor<2x?x1xi64>, %u: tensor<2x?xf32>) -> tensor<2x8xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<2x8xf32>, tensor<2x?x1xi64>, tensor<2x?xf32>) -> tensor<2x8xf32>
+  return %r : tensor<2x8xf32>
+}
+
+// -----
+
+// Rank 3 with a window dim.
+// CHECK-LABEL: @scatter_batching_window
+// CHECK: iree_linalg_ext.scatter
+// CHECK: return %{{.+}} : tensor<3x8x5xf32>
+func.func @scatter_batching_window(%a: tensor<3x8x5xf32>, %i: tensor<3x?x1xi64>, %u: tensor<3x?x5xf32>) -> tensor<3x8x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<3x8x5xf32>, tensor<3x?x1xi64>, tensor<3x?x5xf32>) -> tensor<3x8x5xf32>
+  return %r : tensor<3x8x5xf32>
+}
+
+// -----
+
+// The batching dim is the middle operand dim and the middle indices dim.
+// CHECK-LABEL: @scatter_batching_middle
+// CHECK: iree_linalg_ext.scatter
+// CHECK: return %{{.+}} : tensor<8x3x5xf32>
+func.func @scatter_batching_middle(%a: tensor<8x3x5xf32>, %i: tensor<?x3x1xi64>, %u: tensor<?x3x5xf32>) -> tensor<8x3x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [0], input_batching_dims = [1], scatter_indices_batching_dims = [1], scatter_dims_to_operand_dims = [0], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<8x3x5xf32>, tensor<?x3x1xi64>, tensor<?x3x5xf32>) -> tensor<8x3x5xf32>
+  return %r : tensor<8x3x5xf32>
+}
+
+// -----
+
+// Two batching dims around the scattered dim.
+// CHECK-LABEL: @scatter_batching_two
+// CHECK: iree_linalg_ext.scatter
+// CHECK: return %{{.+}} : tensor<3x8x4xf32>
+func.func @scatter_batching_two(%a: tensor<3x8x4xf32>, %i: tensor<3x?x4x1xi64>, %u: tensor<3x?x4xf32>) -> tensor<3x8x4xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [1], input_batching_dims = [0, 2], scatter_indices_batching_dims = [0, 2], scatter_dims_to_operand_dims = [1], index_vector_dim = 3>, indices_are_sorted = false, unique_indices = false} : (tensor<3x8x4xf32>, tensor<3x?x4x1xi64>, tensor<3x?x4xf32>) -> tensor<3x8x4xf32>
+  return %r : tensor<3x8x4xf32>
+}
+
+// -----
+
+// A dynamic batching dim promotes i32 indices to i64: the iota over it has no
+// static bound.
+// CHECK-LABEL: @scatter_batching_i32_indices
+// CHECK: arith.extsi %{{.+}} : i32 to i64
+// CHECK: iree_linalg_ext.scatter
+// CHECK-SAME: tensor<?x2xi64>
+func.func @scatter_batching_i32_indices(%a: tensor<?x8x5xf32>, %i: tensor<?x7x1xi32>, %u: tensor<?x7x5xf32>) -> tensor<?x8x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<?x8x5xf32>, tensor<?x7x1xi32>, tensor<?x7x5xf32>) -> tensor<?x8x5xf32>
+  return %r : tensor<?x8x5xf32>
+}
+
+// -----
+
+// index_vector_dim equal to the indices rank: the trailing 1 is added first.
+// CHECK-LABEL: @scatter_batching_implicit_index_vector
+// CHECK: iree_linalg_ext.scatter
+// CHECK: return %{{.+}} : tensor<3x8x5xf32>
+func.func @scatter_batching_implicit_index_vector(%a: tensor<3x8x5xf32>, %i: tensor<3x?xi64>, %u: tensor<3x?x5xf32>) -> tensor<3x8x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<3x8x5xf32>, tensor<3x?xi64>, tensor<3x?x5xf32>) -> tensor<3x8x5xf32>
+  return %r : tensor<3x8x5xf32>
+}

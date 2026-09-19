@@ -943,3 +943,91 @@ func.func @dynamic_conv_to_padded_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1
   } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi64>) -> tensor<1x8x8x1xf32>
   return %r : tensor<1x8x8x1xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @scatter_batching_dynamic_indices
+// CHECK-SAME: %[[IDX:[^:]+]]: tensor<2x?x1xi64>
+// CHECK: %[[N:.+]] = stablehlo.get_dimension_size %[[IDX]], dim = 1
+// CHECK: %[[SHAPE:.+]] = stablehlo.concatenate
+// CHECK: %[[IOTA:.+]] = stablehlo.dynamic_iota %[[SHAPE]], dim = 0 : (tensor<3xi64>) -> tensor<2x?x1xi64>
+// CHECK: %[[CAT:.+]] = stablehlo.concatenate %[[IOTA]], %[[IDX]], dim = 2 : (tensor<2x?x1xi64>, tensor<2x?x1xi64>) -> tensor<2x?x2xi64>
+// A pre-existing pattern then collapses the now-adjacent batch dims into one.
+// CHECK: stablehlo.scatter
+// CHECK-SAME: inserted_window_dims = [0, 1]
+// CHECK-SAME: scatter_dims_to_operand_dims = [0, 1]
+// CHECK-NOT: input_batching_dims = [0]
+func.func @scatter_batching_dynamic_indices(%a: tensor<2x8xf32>, %i: tensor<2x?x1xi64>, %u: tensor<2x?xf32>) -> tensor<2x8xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<2x8xf32>, tensor<2x?x1xi64>, tensor<2x?xf32>) -> tensor<2x8xf32>
+  return %r : tensor<2x8xf32>
+}
+
+// -----
+
+// The batching dim sits in the middle: the iota runs along indices dim 1 and
+// is concatenated ahead of the original index column.
+// CHECK-LABEL: @scatter_batching_middle_indices
+// CHECK-SAME: %[[IDX:[^:]+]]: tensor<?x3x1xi64>
+// CHECK: stablehlo.get_dimension_size %[[IDX]], dim = 0
+// CHECK: %[[IOTA:.+]] = stablehlo.dynamic_iota %{{.+}}, dim = 1 : (tensor<3xi64>) -> tensor<?x3x1xi64>
+// CHECK: stablehlo.concatenate %[[IOTA]], %[[IDX]], dim = 2 : (tensor<?x3x1xi64>, tensor<?x3x1xi64>) -> tensor<?x3x2xi64>
+func.func @scatter_batching_middle_indices(%a: tensor<8x3x5xf32>, %i: tensor<?x3x1xi64>, %u: tensor<?x3x5xf32>) -> tensor<8x3x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [0], input_batching_dims = [1], scatter_indices_batching_dims = [1], scatter_dims_to_operand_dims = [0], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<8x3x5xf32>, tensor<?x3x1xi64>, tensor<?x3x5xf32>) -> tensor<8x3x5xf32>
+  return %r : tensor<8x3x5xf32>
+}
+
+// -----
+
+// Two batching dims give two iota columns.
+// CHECK-LABEL: @scatter_batching_two_indices
+// CHECK: stablehlo.dynamic_iota %{{.+}}, dim = 0 : (tensor<4xi64>) -> tensor<3x?x4x1xi64>
+// CHECK: stablehlo.dynamic_iota %{{.+}}, dim = 2 : (tensor<4xi64>) -> tensor<3x?x4x1xi64>
+// CHECK: stablehlo.concatenate %{{.+}}, %{{.+}}, %{{.+}}, dim = 3 : (tensor<3x?x4x1xi64>, tensor<3x?x4x1xi64>, tensor<3x?x4x1xi64>) -> tensor<3x?x4x3xi64>
+func.func @scatter_batching_two_indices(%a: tensor<3x8x4xf32>, %i: tensor<3x?x4x1xi64>, %u: tensor<3x?x4xf32>) -> tensor<3x8x4xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [1], input_batching_dims = [0, 2], scatter_indices_batching_dims = [0, 2], scatter_dims_to_operand_dims = [1], index_vector_dim = 3>, indices_are_sorted = false, unique_indices = false} : (tensor<3x8x4xf32>, tensor<3x?x4x1xi64>, tensor<3x?x4xf32>) -> tensor<3x8x4xf32>
+  return %r : tensor<3x8x4xf32>
+}
+
+// -----
+
+// A dynamic batching dim promotes i32 indices to i64 before the concatenate;
+// the iota over it has no static bound.
+// CHECK-LABEL: @scatter_batching_i32_promotion
+// CHECK: stablehlo.convert %{{.+}} : (tensor<?x7x1xi32>) -> tensor<?x7x1xi64>
+// CHECK: stablehlo.dynamic_iota %{{.+}}, dim = 0 : (tensor<3xi64>) -> tensor<?x7x1xi64>
+// CHECK: stablehlo.concatenate {{.*}} -> tensor<?x7x2xi64>
+func.func @scatter_batching_i32_promotion(%a: tensor<?x8x5xf32>, %i: tensor<?x7x1xi32>, %u: tensor<?x7x5xf32>) -> tensor<?x8x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<?x8x5xf32>, tensor<?x7x1xi32>, tensor<?x7x5xf32>) -> tensor<?x8x5xf32>
+  return %r : tensor<?x8x5xf32>
+}
+
+// -----
+
+// index_vector_dim equal to the indices rank: a trailing 1 is added first.
+// CHECK-LABEL: @scatter_batching_implicit_index_vector
+// CHECK: stablehlo.{{(dynamic_)?}}reshape %{{.+}} {{.*}} -> tensor<3x?x1xi64>
+// CHECK: stablehlo.concatenate {{.*}} -> tensor<3x?x2xi64>
+func.func @scatter_batching_implicit_index_vector(%a: tensor<3x8x5xf32>, %i: tensor<3x?xi64>, %u: tensor<3x?x5xf32>) -> tensor<3x8x5xf32> {
+  %r = "stablehlo.scatter"(%a, %i, %u) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %s = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%s) : (tensor<f32>) -> ()
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>, indices_are_sorted = false, unique_indices = false} : (tensor<3x8x5xf32>, tensor<3x?xi64>, tensor<3x?x5xf32>) -> tensor<3x8x5xf32>
+  return %r : tensor<3x8x5xf32>
+}
