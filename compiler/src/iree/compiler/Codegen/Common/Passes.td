@@ -1178,6 +1178,11 @@ def TileLargeTensorsPass :
     Option<"maxVectorSize", "max-vector-size", "int64_t",
            /*default=*/"64",
            "Maximum static size to tile to (i.e. all remaining ops will be smaller)">,
+    Option<"allowMaskedDynamicDims", "allow-masked-dynamic-dims", "bool",
+           /*default=*/"false",
+           "Leave dynamic parallel dims untiled when a static upper bound can "
+           "be proven for them, deferring partial-tile remainders to "
+           "downstream masked vectorization instead of tiling them to 1.">,
   ];
 }
 
