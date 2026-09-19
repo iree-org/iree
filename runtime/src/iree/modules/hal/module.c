@@ -941,6 +941,38 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_advise_buffer,  //
                                                flags, arg0, arg1);
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_flush_buffer,  //
+                   iree_hal_module_state_t,                      //
+                   rirII, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  uint32_t target_buffer_slot = (uint32_t)args->i1;
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i3);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i4);
+  iree_hal_buffer_ref_t target_ref = iree_hal_make_indirect_buffer_ref(
+      target_buffer_slot, target_offset, length);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_check_deref_or_null(args->r2, &target_ref.buffer));
+  return iree_hal_command_buffer_flush_buffer(command_buffer, target_ref);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_invalidate_buffer,  //
+                   iree_hal_module_state_t,                           //
+                   rirII, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  uint32_t target_buffer_slot = (uint32_t)args->i1;
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i3);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i4);
+  iree_hal_buffer_ref_t target_ref = iree_hal_make_indirect_buffer_ref(
+      target_buffer_slot, target_offset, length);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_check_deref_or_null(args->r2, &target_ref.buffer));
+  return iree_hal_command_buffer_invalidate_buffer(command_buffer, target_ref);
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
                    iree_hal_module_state_t,                     //
                    rrIIiIiI, v) {

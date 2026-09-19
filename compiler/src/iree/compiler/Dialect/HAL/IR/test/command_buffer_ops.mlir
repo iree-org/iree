@@ -53,6 +53,42 @@ util.func public @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
 
 // -----
 
+// CHECK-LABEL: @command_buffer_flush_buffer
+//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME: %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+util.func public @command_buffer_flush_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer,
+    %offset: index,
+    %length: index) {
+  //      CHECK: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      target(%buffer : !hal.buffer)[%offset, %length]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_invalidate_buffer
+//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME: %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
+util.func public @command_buffer_invalidate_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer,
+    %offset: index,
+    %length: index) {
+  //      CHECK: hal.command_buffer.invalidate_buffer<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
+  hal.command_buffer.invalidate_buffer<%cmd : !hal.command_buffer>
+      target(%buffer : !hal.buffer)[%offset, %length]
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_fill_buffer
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
