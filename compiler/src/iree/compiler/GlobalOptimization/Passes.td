@@ -101,6 +101,33 @@ def ExpandTensorShapesPass :
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
 }
 
+def ConvertQDQToIntegerMathPass :
+    InterfacePass<"iree-global-opt-convert-qdq-to-integer-math", "mlir::FunctionOpInterface"> {
+  let summary = "Rewrites contractions over dequantized operands into integer contractions.";
+  let description = [{
+    Matches a contraction or convolution whose inputs are produced by
+    `iree_linalg_ext.dequantize_affine` and rewrites it into an integer
+    contraction plus a zero point correction epilogue:
+
+      C = sA*sB*(D - zB*RA - zA*RB + N*zA*zB)
+
+    Matches a plain floating-point multiply-add body with a zero init. Integer
+    reduction dimensions must have positive static extents whose products and
+    zero point corrections fit in signed i32. Dimensions along which a
+    quantization parameter varies remain floating-point reductions over partial
+    integer contractions. Unsupported cases retain the original computation.
+
+    Scaling and partial-result accumulation use at least f32, preserving wider
+    scale and output types, before conversion to the output type.
+
+    Numerical stability is best effort. Reassociation changes floating-point
+    rounding; no fixed error bound or preservation of signed zero, NaNs,
+    infinities, or overflow/underflow behavior is guaranteed. Disable this
+    transformation when reference floating-point semantics are required with
+    `--iree-global-opt-enable-qdq-to-integer-math=false`.
+  }];
+}
+
 def FuseDequantizationMatmulPass:
     InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Fuses dequantization and matmul linalg.generic ops.";
