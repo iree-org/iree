@@ -13,6 +13,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Interfaces/SubsetOpInterface.h"
 
 namespace mlir::iree_compiler {
@@ -32,7 +33,8 @@ static Value getBufferizedSubspanOrSubview(
   SmallVector<Value> dynamicSizes;
   std::tie(std::ignore, dynamicSizes) = decomposeMixedValues(sizes);
   if (equalTensorShape(tensorType, dynamicSizes, dispatchTensorType,
-                       subspanDynamicSizes)) {
+                       subspanDynamicSizes) &&
+      areAllConstantIntValue(strides, 1)) {
     return subspanMemref;
   }
   MemRefType subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(

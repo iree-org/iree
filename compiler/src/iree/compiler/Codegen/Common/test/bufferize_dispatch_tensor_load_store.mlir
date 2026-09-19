@@ -190,3 +190,35 @@ func.func @nested_dispatch_tensor_load_in_forall() {
 // CHECK:           iree_codegen.load_from_buffer %[[SUBVIEW]]
 // CHECK-SAME:          : memref<3072x512xbf16, strided<[512, 1], offset: ?>, #hal.descriptor_type<storage_buffer>> -> tensor<3072x512xbf16>
 // CHECK:         iree_codegen.store_to_buffer %{{.+}}, %[[OUTPUT]]
+
+// -----
+
+// Verify that dispatch.tensor.load with negative strides is correctly
+// bufferized to a memref.subview with negative strides, not the raw buffer.
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @negative_stride_load_store() {
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [3], sizes = [4], strides = [-1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<4xf32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0], sizes = [4], strides = [1]
+      : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @negative_stride_load_store()
+// CHECK:         %[[INPUT:.+]] = hal.interface.binding.subspan
+// CHECK-SAME:        binding(0) : memref<4xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK:         %[[OUTPUT:.+]] = hal.interface.binding.subspan
+// CHECK-SAME:        binding(1) : memref<4xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK:         %[[SUBVIEW:.+]] = memref.subview %[[INPUT]][3] [4] [-1]
+// CHECK-SAME:        : memref<4xf32, #hal.descriptor_type<storage_buffer>> to
+// CHECK-SAME:          memref<4xf32, strided<[-1], offset: 3>, #hal.descriptor_type<storage_buffer>>
+// CHECK:         %[[LOAD:.+]] = iree_codegen.load_from_buffer %[[SUBVIEW]]
+// CHECK-SAME:        : memref<4xf32, strided<[-1], offset: 3>, #hal.descriptor_type<storage_buffer>> -> tensor<4xf32>
+// CHECK:         iree_codegen.store_to_buffer %[[LOAD]], %[[OUTPUT]]
+// CHECK-SAME:        : tensor<4xf32> into memref<4xf32, #hal.descriptor_type<storage_buffer>>
