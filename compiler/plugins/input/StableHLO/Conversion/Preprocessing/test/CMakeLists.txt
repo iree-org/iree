@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "flatten_tuples_in_cfg.mlir"
     "flatten_tuples_in_scf.mlir"
     "gather_to_torch_index_select.mlir"
+    "lower_bounds.mlir"
     "stablehlo_to_stablehlo.mlir"
     "unfuse_batch_norm.mlir"
   TOOLS

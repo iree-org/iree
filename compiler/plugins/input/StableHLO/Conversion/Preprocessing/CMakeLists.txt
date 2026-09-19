@@ -55,6 +55,7 @@ iree_cc_library(
     "FlattenTuplesInCFG.cpp"
     "FlattenTuplesInSCF.cpp"
     "GatherToTorchIndexSelect.cpp"
+    "LowerBounds.cpp"
     "LowerComplex.cpp"
     "Passes.cpp"
     "StableHLOToStableHLO.cpp"
@@ -80,6 +81,8 @@ iree_cc_library(
     MLIRTransforms
     StablehloBase
     StablehloOps
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 
