@@ -16,7 +16,7 @@
 stream.executable private @rebaseBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
-    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
+    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]}, %[[BINDING_B:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]},
     // CHECK-SAME: %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
      util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
@@ -97,7 +97,7 @@ util.func public @rebaseBindings(%operand: index) {
 stream.executable private @deduplicateBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
-    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
+    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]}, %[[BINDING_B:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]},
     // CHECK-SAME: %[[OFFSET_A:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
      util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
