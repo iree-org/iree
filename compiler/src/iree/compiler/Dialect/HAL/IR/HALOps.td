@@ -2652,11 +2652,11 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
       auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
       return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    auto
     getConstantBlockOps() {
       return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    auto
     getExportOps() {
       return getBody().getOps<IREE::HAL::ExecutableExportOp>();
     }
@@ -2925,11 +2925,11 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
       auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
       return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    auto
     getConstantBlockOps() {
       return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    auto
     getExportOps() {
       return getBody().getOps<IREE::HAL::ExecutableExportOp>();
     }
