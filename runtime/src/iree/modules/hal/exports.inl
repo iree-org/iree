@@ -61,6 +61,8 @@ EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_d
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riiI, v)
 EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rrIIiIiI, v)
 EXPORT_FN("command_buffer.finalize", iree_hal_module_command_buffer_finalize, r, v)
+EXPORT_FN("command_buffer.flush_buffer", iree_hal_module_command_buffer_flush_buffer, rirII, v)
+EXPORT_FN("command_buffer.invalidate_buffer", iree_hal_module_command_buffer_invalidate_buffer, rirII, v)
 EXPORT_FN("command_buffer.update_buffer", iree_hal_module_command_buffer_update_buffer, rrIrIIiI, v)
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
