@@ -1533,7 +1533,7 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
   llvm::cl::ParseCommandLineOptions(argc, argv, banner);
   // cl has already exited on any flag it rejected; this one it accepted.
   if (!mlir::iree_compiler::verifyDynamicPluginFlags(llvm::errs())) {
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 

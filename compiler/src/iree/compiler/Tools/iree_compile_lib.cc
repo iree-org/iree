@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Tools/iree_compile_lib.h"
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <string>
@@ -203,14 +204,14 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   if (!mlir::iree_compiler::initializeDynamicPlugins(
           llvm::ArrayRef<const char *>(const_cast<const char **>(argv), argc),
           llvm::errs())) {
-    return 1;
+    return EXIT_FAILURE;
   }
 
   ireeCompilerGlobalInitialize();
   if (mlir::iree_compiler::DynamicPluginRegistry::get()
           .hasRegistrationFailures()) {
     ireeCompilerGlobalShutdown();
-    return 1;
+    return EXIT_FAILURE;
   }
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
   ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
