@@ -62,9 +62,10 @@ func.func @nonzero_init(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b
 
 // -----
 
-// The dequantize has to be the contraction's immediate producer. Anything in
-// between hides it, which is why the pass runs after the passes that move
-// reshapes and transposes out from between the two.
+// The rewrite requires dequantize to be the contraction's immediate producer;
+// it does not look through the tensor.pad below. The global optimization
+// pipeline can expose direct producers by folding transposes into contractions,
+// but moving QDQ through reshapes or padding requires separate propagation.
 func.func @op_between_dequantize_and_contraction(%aq: tensor<4x6xi8>, %a_s: f32,
     %bq: tensor<8x16xi8>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x6xf32>

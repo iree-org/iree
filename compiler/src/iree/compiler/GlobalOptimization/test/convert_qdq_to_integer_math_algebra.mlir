@@ -625,7 +625,9 @@ func.func @half_partial_reduction(%aq: tensor<4x2x4xi8>, %a_s: tensor<4x2xf16>, 
   return %c : tensor<4x16xf16>
 }
 // CHECK-LABEL: func.func @half_partial_reduction(
-// CHECK: %[[PARTIALS:.+]] = linalg.generic {{.*}} outs(%{{.+}} : tensor<4x16xf32>)
+// This epilogue corrects and scales each integer block result, then sums all
+// blocks in f32. ACCUMULATED is the complete result, with no block dimension.
+// CHECK: %[[ACCUMULATED:.+]] = linalg.generic {{.*}} outs(%{{.+}} : tensor<4x16xf32>)
 // CHECK-NEXT: ^bb0(%{{.+}}: i32, %{{.+}}: i32, %[[SA:[a-zA-Z0-9_]+]]: f16, %[[SB:[a-zA-Z0-9_]+]]: f32, %{{.+}}: f32):
 // CHECK: %[[WIDE_SA:.+]] = arith.extf %[[SA]] : f16 to f32
 // CHECK: %[[PARTIAL:.+]] = arith.mulf %{{.+}}, %[[WIDE_SA]] : f32
@@ -634,7 +636,8 @@ func.func @half_partial_reduction(%aq: tensor<4x2x4xi8>, %a_s: tensor<4x2xf16>, 
 // CHECK: %[[TOTAL:.+]] = arith.addf %{{.+}}, %{{.+}} : f32
 // CHECK-NOT: arith.truncf
 // CHECK: linalg.yield %[[TOTAL]] : f32
-// CHECK: linalg.generic {{.*}} ins(%[[PARTIALS]] : tensor<4x16xf32>)
+// A separate elementwise generic narrows each completed result to f16 once.
+// CHECK: linalg.generic {{.*}} ins(%[[ACCUMULATED]] : tensor<4x16xf32>)
 // CHECK-SAME: outs(%{{.+}} : tensor<4x16xf16>)
 // CHECK-NEXT: ^bb0(%[[V:[a-zA-Z0-9_]+]]: f32, %{{.+}}: f16):
 // CHECK: %[[NARROW:.+]] = arith.truncf %[[V]] : f32 to f16

@@ -55,10 +55,10 @@ func.func @matmul_baseline(%aq: tensor<4x8xi8>, %sa: tensor<f32>, %za: tensor<i8
 
 // -----
 
-// matmul_transpose_b: the same per-channel rhs scale map as above, but the
-// operand map places it on N instead of K. Composing the two is what decides
-// legality, and the contraction's rhs map keeps the transposed form so no
-// transpose is materialised.
+// The rhs is stored as (N, K), with one scale per row. Its first dimension
+// maps to the output column N, so the scale is constant across the K reduction.
+// The integer contraction reads Bq[n, k] directly through its indexing map;
+// no transpose operation is needed.
 func.func @matmul_transpose_b(%aq: tensor<4x8xi8>, %sa: tensor<f32>,
     %bq: tensor<16x8xi8>, %sb: tensor<16xf32>) -> tensor<4x16xf32> {
   %ainit = tensor.empty() : tensor<4x8xf32>
@@ -213,8 +213,11 @@ func.func @contract_multi_dim(%aq: tensor<2x4x3x8xi8>, %sa: tensor<f32>, %za: te
   return %c : tensor<2x4x5x16xf32>
 }
 // CHECK-LABEL: func.func @contract_multi_dim(
+//  CHECK-SAME:   %[[AQ:[a-zA-Z0-9_]+]]: tensor<2x4x3x8xi8>,
+//  CHECK-SAME:   %[[BQ:[a-zA-Z0-9_]+]]: tensor<3x8x5x16xi8>,
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]
+//  CHECK-SAME:     ins(%[[AQ]], %[[BQ]] : tensor<2x4x3x8xi8>, tensor<3x8x5x16xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<2x4x5x16xi32>)
 // Both N dims survive into the sum, both K dims are reduced, and both M dims are
 // dropped.
@@ -222,6 +225,7 @@ func.func @contract_multi_dim(%aq: tensor<2x4x3x8xi8>, %sa: tensor<f32>, %za: te
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d3, d0, d1)>,
 //  CHECK-SAME:                      affine_map<(d0, d1, d2, d3) -> (d0, d1)>]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+//  CHECK-SAME:     ins(%[[BQ]] : tensor<3x8x5x16xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<5x16xi32>)
 
 //===----------------------------------------------------------------------===//
@@ -281,7 +285,12 @@ func.func @per_channel_different_dims(%aq: tensor<4x8xi8>, %sa: tensor<4xf32>, %
 // CHECK: %[[TZ:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>]
 // CHECK-SAME: ins(%[[ZA]], %[[ZB]] :
-// CHECK: %[[CORRECTION:.+]] = linalg.generic {{.*}} ins(%[[TA]], %[[TB]], %[[TZ]] :
+// CHECK: %[[CORRECTION:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+// CHECK-SAME:                  affine_map<(d0, d1) -> (d0, d1)>,
+// CHECK-SAME:                  affine_map<(d0, d1) -> (d0, d1)>,
+// CHECK-SAME:                  affine_map<(d0, d1) -> (d0, d1)>]
+// CHECK-SAME: ins(%[[TA]], %[[TB]], %[[TZ]] :
 // CHECK-SAME: outs(%{{.+}} : tensor<4x16xi32>)
 // The complete correction uses M and N; the scales retain their own axes.
 // CHECK: linalg.generic
@@ -304,9 +313,11 @@ func.func @per_channel_different_dims(%aq: tensor<4x8xi8>, %sa: tensor<4xf32>, %
 
 // -----
 
-// A GEMV, where the sum reduces as many elements as the contraction multiplies.
-// It is still a single pass over the operand, and over constant weights it folds
-// entirely, so it is built rather than declined.
+// Multiply a 1x128 vector by ten weight rows. The lhs zero point requires
+// RB[n] = sum_k Bq[n, k], producing ten sums for the correction zA*RB[n].
+// Computing RB visits all 10x128 weights, just as the contraction does. The
+// rewrite still supports dynamic weights; constant weights allow RB to be
+// precomputed. This test checks the dynamic case.
 func.func @gemv(%aq: tensor<1x128xi8>, %sa: f32, %za: i8,
     %bq: tensor<10x128xi8>, %sb: tensor<10xf32>) -> tensor<1x10xf32> {
   %ainit = tensor.empty() : tensor<1x128xf32>
@@ -336,10 +347,16 @@ func.func @gemv(%aq: tensor<1x128xi8>, %sa: f32, %za: i8,
   return %c : tensor<1x10xf32>
 }
 // CHECK-LABEL: func.func @gemv(
-//       CHECK:   linalg.generic
+//  CHECK-SAME:   %[[AQ:[a-zA-Z0-9_]+]]: tensor<1x128xi8>,
+//  CHECK-SAME:   %[[BQ:[a-zA-Z0-9_]+]]: tensor<10x128xi8>,
+//       CHECK:   %[[D:.+]] = linalg.generic
+//  CHECK-SAME:     ins(%[[AQ]], %[[BQ]] : tensor<1x128xi8>, tensor<10x128xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x10xi32>)
-//       CHECK:   linalg.generic
+// RB keeps the weight row N and reduces its K dimension.
+//       CHECK:   %[[RB:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>]
 //  CHECK-SAME:     iterator_types = ["parallel", "reduction"]
+//  CHECK-SAME:     ins(%[[BQ]] : tensor<10x128xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<10xi32>)
 
 //===----------------------------------------------------------------------===//
@@ -650,7 +667,103 @@ func.func @blockwise_promotes_block_dim(%aq: tensor<4x2x8xi8>, %sa: tensor<4x2xf
 
 // -----
 
-// The same contraction with the block dims stored the other way round, folded
+// Both operands have per-block scales and zero points. For each (M, N, G),
+// correct D with zB*RA + zA*RB - L*zA*zB before scaling and summing across G.
+// There are two blocks of eight elements, so the cross term uses 8, not 16.
+func.func @blockwise_both_asymmetric(%aq: tensor<4x2x8xi8>, %sa: tensor<4x2xf32>, %za: tensor<4x2xi8>,
+    %bq: tensor<2x8x16xi8>, %sb: tensor<2x16xf32>, %zb: tensor<2x16xi8>) -> tensor<4x16xf32> {
+  %ainit = tensor.empty() : tensor<4x2x8xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(m, g, l) -> (m, g, l)>,
+                        affine_map<(m, g, l) -> (m, g)>,
+                        affine_map<(m, g, l) -> (m, g)>,
+                        affine_map<(m, g, l) -> (m, g, l)>]}
+      ins(%aq, %sa, %za : tensor<4x2x8xi8>, tensor<4x2xf32>, tensor<4x2xi8>)
+      outs(%ainit : tensor<4x2x8xf32>) -> tensor<4x2x8xf32>
+  %binit = tensor.empty() : tensor<2x8x16xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(g, l, n) -> (g, l, n)>,
+                        affine_map<(g, l, n) -> (g, n)>,
+                        affine_map<(g, l, n) -> (g, n)>,
+                        affine_map<(g, l, n) -> (g, l, n)>]}
+      ins(%bq, %sb, %zb : tensor<2x8x16xi8>, tensor<2x16xf32>, tensor<2x16xi8>)
+      outs(%binit : tensor<2x8x16xf32>) -> tensor<2x8x16xf32>
+  %zero = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<4x16xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%init : tensor<4x16xf32>) -> tensor<4x16xf32>
+  %c = linalg.contract
+      indexing_maps = [affine_map<(m, n, g, l) -> (m, g, l)>,
+                       affine_map<(m, n, g, l) -> (g, l, n)>,
+                       affine_map<(m, n, g, l) -> (m, n)>]
+      ins(%a, %b : tensor<4x2x8xf32>, tensor<2x8x16xf32>)
+      outs(%fill : tensor<4x16xf32>) -> tensor<4x16xf32>
+  return %c : tensor<4x16xf32>
+}
+// CHECK-LABEL: func.func @blockwise_both_asymmetric(
+// CHECK-SAME: %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x2x8xi8>, %[[SA:[a-zA-Z0-9_]+]]: tensor<4x2xf32>, %[[ZA:[a-zA-Z0-9_]+]]: tensor<4x2xi8>,
+// CHECK-SAME: %[[BQ:[a-zA-Z0-9_]+]]: tensor<2x8x16xi8>, %[[SB:[a-zA-Z0-9_]+]]: tensor<2x16xf32>, %[[ZB:[a-zA-Z0-9_]+]]: tensor<2x16xi8>
+// CHECK: %[[L:.+]] = arith.constant 8 : i32
+// D retains G and reduces only L.
+// CHECK: %[[D:.+]] = linalg.generic
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME: ins(%[[AQ]], %[[BQ]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16x2xi32>)
+// RA[M, G] and RB[N, G] each reduce L; neither sums across blocks.
+// CHECK: %[[RA:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK-SAME: ins(%[[AQ]] : tensor<4x2x8xi8>)
+// CHECK-SAME: outs(%{{.+}} : tensor<4x2xi32>)
+// CHECK: %[[TA:.+]] = linalg.generic {{.*}} ins(%[[ZB]], %[[RA]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16x2xi32>)
+// CHECK: %[[RB:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0, d1)>]
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK-SAME: ins(%[[BQ]] : tensor<2x8x16xi8>)
+// CHECK-SAME: outs(%{{.+}} : tensor<16x2xi32>)
+// CHECK: %[[TB:.+]] = linalg.generic {{.*}} ins(%[[ZA]], %[[RB]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16x2xi32>)
+// The zero points share G but index different output dimensions.
+// CHECK: %[[TZ:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d2, d1)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d0, d1, d2)>]
+// CHECK-SAME: ins(%[[ZA]], %[[ZB]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16x2xi32>)
+// CHECK: ^bb0(%[[AZ:[a-zA-Z0-9_]+]]: i8, %[[BZ:[a-zA-Z0-9_]+]]: i8, %{{.+}}: i32):
+// CHECK: %[[AZ32:.+]] = arith.extsi %[[AZ]] : i8 to i32
+// CHECK: %[[BZ32:.+]] = arith.extsi %[[BZ]] : i8 to i32
+// CHECK: %[[ZZ:.+]] = arith.muli %[[AZ32]], %[[BZ32]] : i32
+// CHECK: %[[CROSS:.+]] = arith.muli %[[ZZ]], %[[L]] : i32
+// CHECK: linalg.yield %[[CROSS]] : i32
+// CHECK: %[[CORRECTION:.+]] = linalg.generic {{.*}} ins(%[[TA]], %[[TB]], %[[TZ]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16x2xi32>)
+// CHECK: ^bb0(%[[A:[a-zA-Z0-9_]+]]: i32, %[[B:[a-zA-Z0-9_]+]]: i32, %[[Z:[a-zA-Z0-9_]+]]: i32, %{{.+}}: i32):
+// CHECK: %[[SUM:.+]] = arith.addi %[[A]], %[[B]] : i32
+// CHECK: %[[OFFSET:.+]] = arith.subi %[[SUM]], %[[Z]] : i32
+// CHECK: linalg.yield %[[OFFSET]] : i32
+// Scale each corrected block, then reduce G in floating point.
+// CHECK: %[[RESULT:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d0, d2)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d2, d1)>,
+// CHECK-SAME:                  affine_map<(d0, d1, d2) -> (d0, d1)>]
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK-SAME: ins(%[[D]], %[[CORRECTION]], %[[SA]], %[[SB]] :
+// CHECK-SAME: outs(%{{.+}} : tensor<4x16xf32>)
+// CHECK: ^bb0(%[[ED:[a-zA-Z0-9_]+]]: i32, %[[EC:[a-zA-Z0-9_]+]]: i32, %[[AS:[a-zA-Z0-9_]+]]: f32, %[[BS:[a-zA-Z0-9_]+]]: f32, %[[ACC:[a-zA-Z0-9_]+]]: f32):
+// CHECK: %[[CORRECTED:.+]] = arith.subi %[[ED]], %[[EC]] : i32
+// CHECK: %[[REAL:.+]] = arith.sitofp %[[CORRECTED]] : i32 to f32
+// CHECK: %[[PARTIAL:.+]] = arith.mulf %[[REAL]], %[[AS]] : f32
+// CHECK: %[[SCALED:.+]] = arith.mulf %[[PARTIAL]], %[[BS]] : f32
+// CHECK: %[[TOTAL:.+]] = arith.addf %[[ACC]], %[[SCALED]] : f32
+// CHECK: linalg.yield %[[TOTAL]] : f32
+// CHECK: return %[[RESULT]] : tensor<4x16xf32>
+
+// -----
+
+// An asymmetric lhs with the block dims stored the other way round, folded
 // into the dequantize. Inverting its output map carries the contraction's
 // (M, G, L) lhs map onto the (G, M, L) storage, so the integer contraction
 // reads the stored order directly and the promoted group extent survives the

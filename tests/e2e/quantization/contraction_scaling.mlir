@@ -73,6 +73,162 @@ func.func @convolution_zero_point_corrections() {
   return
 }
 
+// NCHW layout with two input channels: all three filter dimensions reduce.
+// Distinct signed data and per-filter parameters expose channel/layout swaps.
+func.func @convolution_nchw_asymmetric() {
+  %aq = util.unfoldable_constant dense<[[[[-8, -5, -2, 1], [-3, 0, 3, 6], [2, 5, 8, -6]], [[3, 6, -8, -5], [8, -6, -3, 0], [-4, -1, 2, 5]]]]> : tensor<1x2x3x4xi8>
+  %bq = util.unfoldable_constant dense<[[[[-5, -4], [-2, -1]], [[0, 1], [3, 4]]], [[[2, 3], [5, -5]], [[-4, -3], [-1, 0]]]]> : tensor<2x2x2x2xi8>
+  %sb = util.unfoldable_constant dense<[1.0, 0.25]> : tensor<2xf32>
+  %zb = util.unfoldable_constant dense<[-1, 2]> : tensor<2xi8>
+  %sa = util.unfoldable_constant 0.5 : f32
+  %za = util.unfoldable_constant -2 : i8
+  %ai = tensor.empty() : tensor<1x2x3x4xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(n, c, h, w) -> (n, c, h, w)>,
+                        affine_map<(n, c, h, w) -> ()>,
+                        affine_map<(n, c, h, w) -> ()>,
+                        affine_map<(n, c, h, w) -> (n, c, h, w)>]}
+      ins(%aq, %sa, %za : tensor<1x2x3x4xi8>, f32, i8)
+      outs(%ai : tensor<1x2x3x4xf32>) -> tensor<1x2x3x4xf32>
+  %bi = tensor.empty() : tensor<2x2x2x2xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(f, c, h, w) -> (f, c, h, w)>,
+                        affine_map<(f, c, h, w) -> (f)>,
+                        affine_map<(f, c, h, w) -> (f)>,
+                        affine_map<(f, c, h, w) -> (f, c, h, w)>]}
+      ins(%bq, %sb, %zb : tensor<2x2x2x2xi8>, tensor<2xf32>, tensor<2xi8>)
+      outs(%bi : tensor<2x2x2x2xf32>) -> tensor<2x2x2x2xf32>
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<1x2x2x3xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x2x2x3xf32>) -> tensor<1x2x2x3xf32>
+  %result = linalg.conv_2d_nchw_fchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+      ins(%a, %b : tensor<1x2x3x4xf32>, tensor<2x2x2x2xf32>)
+      outs(%init : tensor<1x2x2x3xf32>) -> tensor<1x2x2x3xf32>
+  check.expect_eq_const(%result, dense<[[[[37.5, -7.5, -10.0], [-3.5, -6.0, 0.0]], [[-14.0, -4.125, 1.5], [-8.875, -3.25, 4.5]]]]> : tensor<1x2x2x3xf32>) : tensor<1x2x2x3xf32>
+  return
+}
+
+// Channels remain parallel in depthwise convolution. Both operands have
+// channel-specific scales and zero points; activation bytes exercise extui.
+// Different stride/dilation axes distinguish the sampled spatial windows.
+func.func @depthwise_asymmetric_strided_dilated() {
+  %aq = util.unfoldable_constant dense<[[[[128, 133], [131, 136], [134, 139], [137, 142], [140, 145]], [[135, 140], [138, 143], [141, 146], [144, 130], [128, 133]], [[142, 128], [145, 131], [129, 134], [132, 137], [135, 140]], [[130, 135], [133, 138], [136, 141], [139, 144], [142, 128]]]]> : tensor<1x4x5x2xi8>
+  %bq = util.unfoldable_constant dense<[[[-3, 4], [2, -1]], [[5, 0], [-2, 6]]]> : tensor<2x2x2xi8>
+  %sa = util.unfoldable_constant dense<[0.5, 2.0]> : tensor<2xf32>
+  %za = util.unfoldable_constant dense<[132, 136]> : tensor<2xi8>
+  %sb = util.unfoldable_constant dense<[2.0, 0.25]> : tensor<2xf32>
+  %zb = util.unfoldable_constant dense<[-1, 2]> : tensor<2xi8>
+  %ai = tensor.empty() : tensor<1x4x5x2xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned, indexing_maps = [affine_map<(n, h, w, c) -> (n, h, w, c)>,
+                        affine_map<(n, h, w, c) -> (c)>,
+                        affine_map<(n, h, w, c) -> (c)>,
+                        affine_map<(n, h, w, c) -> (n, h, w, c)>]}
+      ins(%aq, %sa, %za : tensor<1x4x5x2xi8>, tensor<2xf32>, tensor<2xi8>)
+      outs(%ai : tensor<1x4x5x2xf32>) -> tensor<1x4x5x2xf32>
+  %bi = tensor.empty() : tensor<2x2x2xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(h, w, c) -> (h, w, c)>,
+                        affine_map<(h, w, c) -> (c)>,
+                        affine_map<(h, w, c) -> (c)>,
+                        affine_map<(h, w, c) -> (h, w, c)>]}
+      ins(%bq, %sb, %zb : tensor<2x2x2xi8>, tensor<2xf32>, tensor<2xi8>)
+      outs(%bi : tensor<2x2x2xf32>) -> tensor<2x2x2xf32>
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<1x2x2x2xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x2x2x2xf32>) -> tensor<1x2x2x2xf32>
+  %result = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<[2, 1]> : tensor<2xi64>, strides = dense<[1, 2]> : tensor<2xi64>}
+      ins(%a, %b : tensor<1x4x5x2xf32>, tensor<2x2x2xf32>)
+      outs(%init : tensor<1x2x2x2xf32>) -> tensor<1x2x2x2xf32>
+  check.expect_eq_const(%result, dense<[[[[52.0, -5.0], [-7.0, -2.0]], [[-1.0, -1.5], [35.0, 30.0]]]]> : tensor<1x2x2x2xf32>) : tensor<1x2x2x2xf32>
+  return
+}
+
+// A custom strided window contraction with interleaved reduction/parallel
+// loops, a broadcast RHS batch, and output axes ordered (n, batch, m).
+// C[n,t,m] = sum_{r,c} DQ(A[t,2*m+r,c]) * DQ(B[n,c,r]).
+func.func @generic_strided_permuted_contraction() {
+  %aq = util.unfoldable_constant dense<[[[128, 131], [132, 135], [136, 139], [140, 143], [144, 147], [148, 128], [129, 132]], [[137, 140], [141, 144], [145, 148], [149, 129], [130, 133], [134, 137], [138, 141]]]> : tensor<2x7x2xi8>
+  %bq = util.unfoldable_constant dense<[[[-6, -4, -2], [-3, -1, 1]], [[-1, 1, 3], [2, 4, 6]], [[4, 6, -5], [-6, -4, -2]]]> : tensor<3x2x3xi8>
+  %sa = util.unfoldable_constant dense<[0.5, 1.0]> : tensor<2xf32>
+  %za = util.unfoldable_constant dense<[130, 134]> : tensor<2xi8>
+  %sb = util.unfoldable_constant dense<[1.0, 0.5, 2.0]> : tensor<3xf32>
+  %zb = util.unfoldable_constant dense<[-2, 1, 3]> : tensor<3xi8>
+  %ai = tensor.empty() : tensor<2x7x2xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned, indexing_maps = [affine_map<(t, x, c) -> (t, x, c)>,
+                        affine_map<(t, x, c) -> (t)>,
+                        affine_map<(t, x, c) -> (t)>,
+                        affine_map<(t, x, c) -> (t, x, c)>]}
+      ins(%aq, %sa, %za : tensor<2x7x2xi8>, tensor<2xf32>, tensor<2xi8>)
+      outs(%ai : tensor<2x7x2xf32>) -> tensor<2x7x2xf32>
+  %bi = tensor.empty() : tensor<3x2x3xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(n, c, r) -> (n, c, r)>,
+                        affine_map<(n, c, r) -> (n)>,
+                        affine_map<(n, c, r) -> (n)>,
+                        affine_map<(n, c, r) -> (n, c, r)>]}
+      ins(%bq, %sb, %zb : tensor<3x2x3xi8>, tensor<3xf32>, tensor<3xi8>)
+      outs(%bi : tensor<3x2x3xf32>) -> tensor<3x2x3xf32>
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<3x2x3xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<3x2x3xf32>) -> tensor<3x2x3xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(c, n, t, r, m) -> (t, m * 2 + r, c)>,
+                       affine_map<(c, n, t, r, m) -> (n, c, r)>,
+                       affine_map<(c, n, t, r, m) -> (n, t, m)>],
+      iterator_types = ["reduction", "parallel", "parallel", "reduction", "parallel"]}
+      ins(%a, %b : tensor<2x7x2xf32>, tensor<3x2x3xf32>)
+      outs(%init : tensor<3x2x3xf32>) {
+    ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+      %product = arith.mulf %lhs, %rhs : f32
+      %sum = arith.addf %acc, %product : f32
+      linalg.yield %sum : f32
+  } -> tensor<3x2x3xf32>
+  check.expect_eq_const(%result, dense<[[[17.5, 5.5, -52.5], [20.0, -96.0, 41.0]], [[19.25, 37.25, -2.25], [61.0, -18.0, 29.5]], [[-133.0, -333.0, -73.0], [-516.0, 4.0, -166.0]]]> : tensor<3x2x3xf32>) : tensor<3x2x3xf32>
+  return
+}
+
+// Both asymmetric operands vary by block and output axis, with different
+// storage permutations folded into dequantization. Only k is reduced in i32;
+// g is retained in partials and reduced after applying both block scales.
+// C[n,m] = sum_{g,k} DQ(A[k,m,g]) * DQ(B[n,k,g]).
+func.func @blockwise_asymmetric_permuted_storage() {
+  %aq = util.unfoldable_constant dense<[[[128, 131], [133, 136]], [[135, 138], [140, 143]], [[142, 145], [147, 129]]]> : tensor<3x2x2xi8>
+  %bq = util.unfoldable_constant dense<[[[-8, -3], [-5, 0], [-2, 3]], [[-1, 4], [2, 7], [5, -7]], [[6, -6], [-8, -3], [-5, 0]]]> : tensor<3x3x2xi8>
+  %sa = util.unfoldable_constant dense<[[0.5, 2.0], [1.0, 0.25]]> : tensor<2x2xf32>
+  %za = util.unfoldable_constant dense<[[130, 135], [134, 129]]> : tensor<2x2xi8>
+  %sb = util.unfoldable_constant dense<[[1.0, 0.5], [2.0, 0.25], [0.5, 2.0]]> : tensor<3x2xf32>
+  %zb = util.unfoldable_constant dense<[[-3, 1], [2, -4], [-1, 3]]> : tensor<3x2xi8>
+  %ai = tensor.empty() : tensor<2x2x3xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {input_unsigned, zp_unsigned, indexing_maps = [affine_map<(m, g, k) -> (k, m, g)>,
+                        affine_map<(m, g, k) -> (g, m)>,
+                        affine_map<(m, g, k) -> (g, m)>,
+                        affine_map<(m, g, k) -> (m, g, k)>]}
+      ins(%aq, %sa, %za : tensor<3x2x2xi8>, tensor<2x2xf32>, tensor<2x2xi8>)
+      outs(%ai : tensor<2x2x3xf32>) -> tensor<2x2x3xf32>
+  %bi = tensor.empty() : tensor<2x3x3xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(g, k, n) -> (n, k, g)>,
+                        affine_map<(g, k, n) -> (n, g)>,
+                        affine_map<(g, k, n) -> (n, g)>,
+                        affine_map<(g, k, n) -> (g, k, n)>]}
+      ins(%bq, %sb, %zb : tensor<3x3x2xi8>, tensor<3x2xf32>, tensor<3x2xi8>)
+      outs(%bi : tensor<2x3x3xf32>) -> tensor<2x3x3xf32>
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<3x2xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<3x2xf32>) -> tensor<3x2xf32>
+  %result = linalg.contract
+      indexing_maps = [affine_map<(m, n, g, k) -> (m, g, k)>,
+                       affine_map<(m, n, g, k) -> (g, k, n)>,
+                       affine_map<(m, n, g, k) -> (n, m)>]
+      ins(%a, %b : tensor<2x2x3xf32>, tensor<2x3x3xf32>)
+      outs(%init : tensor<3x2xf32>) -> tensor<3x2xf32>
+  check.expect_eq_const(%result, dense<[[21.0, 18.75], [38.75, 181.125], [-84.25, -170.5]]> : tensor<3x2xf32>) : tensor<3x2xf32>
+  return
+}
+
 // Anticipated QDQ Linalg translation of a PT2E/XNNPACK bias-free Linear(16,16)
 // with an 8x16 input: Q -> DQ -> matmul(input, DQ(weight).T) -> Q -> DQ.
 // Input, quantized weights, scales, zero points, and expected output are from

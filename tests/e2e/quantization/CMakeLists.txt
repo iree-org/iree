@@ -21,7 +21,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
-    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-global-opt-convert-qdq-to-integer-math\)\)"
+    "--iree-global-opt-enable-qdq-to-integer-math=true"
   RUNNER_ARGS
     "--gtest_filter=-*_reference"
 )

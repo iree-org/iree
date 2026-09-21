@@ -18,9 +18,7 @@ iree_check_single_backend_test_suite(
     ],
     compiler_flags = [
         "--iree-llvmcpu-target-cpu=generic",
-        # Match before unit-dimension folding inserts reshapes between the
-        # convolution and its dequantized operands.
-        "--iree-preprocessing-pass-pipeline=builtin.module\\(util.func\\(iree-global-opt-convert-qdq-to-integer-math\\)\\)",
+        "--iree-global-opt-enable-qdq-to-integer-math=true",
     ],
     driver = "local-task",
     # Accepted numerical differences have separate reference/rewrite checks.
