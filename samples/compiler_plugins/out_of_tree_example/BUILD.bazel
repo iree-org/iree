@@ -6,7 +6,7 @@
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_gentbl_cc_library", "iree_td_library")
-load("//build_tools/bazel:renamed_link.bzl", "iree_compiler_register_dynamic_plugin")
+load("//build_tools/bazel:renamed_link.bzl", "iree_compiler_register_experimental_dynamic_plugin")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -121,7 +121,7 @@ cc_library(
     ],
 )
 
-# Out of tree this one rule is the whole integration.
+# Package the registration library and its dependencies as a loadable plugin.
 iree_cmake_extra_content(
     content = """
 if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
@@ -129,7 +129,7 @@ if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
     inline = True,
 )
 
-iree_compiler_register_dynamic_plugin(
+iree_compiler_register_experimental_dynamic_plugin(
     compiler = "//lib:IREECompilerShared",
     plugin_id = "ootex",
     target = ":registration",
