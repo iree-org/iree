@@ -105,6 +105,23 @@ public:
       return failure();
     }
 
+    // Factoring the strides out separates the strided input from a producer
+    // that could otherwise fuse elementwise into this op: elementwise fusion
+    // requires the producer to directly define the operand, and tile-based
+    // producer fusion only supports unit-stride slices. Keep the strided map
+    // so that codegen can fuse the producer instead of materializing its
+    // whole result as a dispatch-local buffer. Only do so when every use of
+    // this producer result can fuse elementwise, allowing fusion to eliminate
+    // the intermediate tensor. Otherwise, keep the factored map since the
+    // producer result still needs to be materialized.
+    OpOperand *inputOperand = op.getDpsInputOperand(0);
+    if (linalg::areElementwiseOpsFusable(inputOperand) &&
+        llvm::all_of(inputOperand->get().getUses(), [&](OpOperand &use) {
+          return &use == inputOperand || linalg::areElementwiseOpsFusable(&use);
+        })) {
+      return failure();
+    }
+
     mapRange[inputPos] =
         AffineMap::get(inputMap.getNumDims(), inputMap.getNumSymbols(),
                        replacementExprs, op.getContext());
