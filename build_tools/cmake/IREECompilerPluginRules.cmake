@@ -56,7 +56,7 @@ function(iree_compiler_register_dynamic_plugin)
         --input "${_input}"
         --out "${_map}"
         --symbol-prefix "${IREE_COMPILER_ABI_PREFIX}"
-      DEPENDS "${_RULE_TARGET}" "${IREE_COMPILER_RENAME_SCRIPT}"
+      DEPENDS "${_RULE_TARGET}" "${_input}" "${IREE_COMPILER_RENAME_SCRIPT}"
       COMMENT "Computing llvm/mlir rename map for ${_name}"
       VERBATIM
     )
@@ -79,8 +79,10 @@ function(iree_compiler_register_dynamic_plugin)
   endif()
   add_library(${_name} MODULE "${_stub}")
   if(APPLE)
+    foreach(_archive IN LISTS _renamed)
+      target_link_options(${_name} PRIVATE "-Wl,-force_load,${_archive}")
+    endforeach()
     target_link_options(${_name} PRIVATE
-      "-Wl,-force_load,${_renamed}"
       "-Wl,-undefined,dynamic_lookup"
     )
   else()

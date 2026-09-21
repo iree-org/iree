@@ -85,6 +85,7 @@ add_library(iree_compiler_PluginAPI_headers INTERFACE)
 iree_install_targets(
   TARGETS iree_compiler_PluginAPI_headers
   HDRS "Client.h" "PluginEntryPoint.h" "PluginABIHash.h"
+    "../Pipelines/Options.h" "../Utils/OptionUtils.h"
   COMPONENT IREEDevLibraries-Compiler
   EXPORT_SET Compiler
 )

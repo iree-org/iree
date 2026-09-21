@@ -44,7 +44,9 @@ for required in \
     "lib/cmake/IREE/gen_rename_map.py" \
     "include/iree/compiler/PluginAPI/PluginEntryPoint.h" \
     "include/iree/compiler/PluginAPI/PluginABIHash.h" \
-    "include/iree/compiler/PluginAPI/Client.h" ; do
+    "include/iree/compiler/PluginAPI/Client.h" \
+    "include/iree/compiler/Pipelines/Options.h" \
+    "include/iree/compiler/Utils/OptionUtils.h" ; do
   if [[ ! -f "${PREFIX}/${required}" ]]; then
     echo "error: install tree is missing ${required}" >&2
     exit 1
@@ -70,9 +72,23 @@ fi
 
 echo "--- Loading it into iree-compile"
 OUTPUT="$("${BUILD_DIR}/tools/iree-compile" \
-  "--iree-load-plugin=${PLUGIN}" --help 2>&1 || true)"
-if ! grep -q "INSTALL_TREE_PLUGIN: renamed MLIRContext ok" <<<"${OUTPUT}"; then
+  "--iree-load-plugin=${PLUGIN}" --iree-plugin=install_tree_probe \
+  --compile-to=preprocessing - <<<"module {}" 2>&1)"
+if ! grep -q "INSTALL_TREE_PLUGIN: session activated" <<<"${OUTPUT}"; then
   echo "error: the plugin did not register. Output was:" >&2
+  echo "${OUTPUT}" >&2
+  exit 1
+fi
+
+echo "--- Rebuilding only the helper with a new MLIR reference"
+cmake -S "${REPO_DIR}/build_tools/testing/plugin_from_install" \
+  -B "${PLUGIN_BUILD}" -DTEST_UPDATED_HELPER=ON
+cmake --build "${PLUGIN_BUILD}"
+OUTPUT="$("${BUILD_DIR}/tools/iree-compile" \
+  "--iree-load-plugin=${PLUGIN}" --iree-plugin=install_tree_probe \
+  --compile-to=preprocessing - <<<"module {}" 2>&1)"
+if ! grep -q "INSTALL_TREE_PLUGIN: updated helper" <<<"${OUTPUT}"; then
+  echo "error: the rebuilt helper did not run. Output was:" >&2
   echo "${OUTPUT}" >&2
   exit 1
 fi
