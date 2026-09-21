@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -41,8 +41,66 @@ package(
         "abi_hash_mismatch_plugin",
         "null_field_plugin",
         "duplicate_id_plugin",
+        "registration_failure_plugin",
     ]
 ]
+
+cc_test(
+    name = "embedding_registration_test",
+    srcs = ["embedding_registration_test.c"],
+    args = [
+        "$(location //lib:IREECompiler)",
+        "$(location :registration_failure_plugin)",
+    ],
+    data = [
+        ":registration_failure_plugin",
+        "//lib:IREECompiler",
+    ],
+    tags = ["skip-bazel_to_cmake"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/bindings/c:loader",
+    ],
+)
+
+cc_binary(
+    name = "static_collision_plugin",
+    testonly = True,
+    srcs = ["plugins/static_collision_plugin.c"],
+    linkshared = True,
+    deps = [
+        "//compiler/src/iree/compiler/PluginAPI:PluginEntryPoint",
+        "//compiler/src/iree/compiler/PluginAPI/Config:StaticLinkedPlugins",
+    ],
+)
+
+cc_test(
+    name = "embedding_static_collision_test",
+    srcs = ["embedding_registration_test.c"],
+    args = [
+        "$(location //lib:IREECompiler)",
+        "$(location :static_collision_plugin)",
+    ],
+    data = [
+        ":static_collision_plugin",
+        "//lib:IREECompiler",
+    ],
+    tags = ["skip-bazel_to_cmake"],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//compiler/bindings/c:headers",
+        "//compiler/bindings/c:loader",
+    ],
+)
 
 cc_binary(
     name = "undefined_symbol_plugin",

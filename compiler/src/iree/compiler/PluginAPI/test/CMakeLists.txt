@@ -9,7 +9,8 @@ endif()
 # renamed: they are never registered.
 foreach(_PLUGIN "valid_plugin" "invalid_plugin" "version_mismatch_plugin"
                 "undefined_symbol_plugin" "abi_hash_mismatch_plugin"
-                "null_field_plugin" "duplicate_id_plugin")
+                "null_field_plugin" "duplicate_id_plugin"
+                "registration_failure_plugin" "static_collision_plugin")
   add_library(iree_compiler_PluginAPI_test_${_PLUGIN} MODULE
     "plugins/${_PLUGIN}.c")
   set_target_properties(iree_compiler_PluginAPI_test_${_PLUGIN} PROPERTIES
@@ -17,9 +18,38 @@ foreach(_PLUGIN "valid_plugin" "invalid_plugin" "version_mismatch_plugin"
 endforeach()
 
 foreach(_PLUGIN "valid_plugin" "abi_hash_mismatch_plugin" "undefined_symbol_plugin"
-                "null_field_plugin" "duplicate_id_plugin")
+                "null_field_plugin" "duplicate_id_plugin"
+                "registration_failure_plugin" "static_collision_plugin")
   target_link_libraries(iree_compiler_PluginAPI_test_${_PLUGIN}
     PRIVATE iree::compiler::PluginAPI::PluginEntryPoint)
+endforeach()
+
+iree_cc_test(
+  NAME embedding_registration_test
+  SRCS "embedding_registration_test.c"
+  ARGS
+    "$<TARGET_FILE:iree::compiler::API::SharedImpl>"
+    "$<TARGET_FILE:iree_compiler_PluginAPI_test_registration_failure_plugin>"
+  DEPS iree::compiler::bindings::c::loader
+)
+add_dependencies(iree_compiler_PluginAPI_test_embedding_registration_test
+  iree::compiler::API::SharedImpl
+  iree_compiler_PluginAPI_test_registration_failure_plugin
+  iree_compiler_PluginAPI_test_static_collision_plugin)
+target_link_libraries(iree_compiler_PluginAPI_test_static_collision_plugin PRIVATE
+  iree::compiler::PluginAPI::Config::StaticLinkedPlugins)
+add_test(NAME "iree/compiler/PluginAPI/test/embedding_static_collision"
+  COMMAND iree_compiler_PluginAPI_test_embedding_registration_test
+    "$<TARGET_FILE:iree::compiler::API::SharedImpl>"
+    "$<TARGET_FILE:iree_compiler_PluginAPI_test_static_collision_plugin>")
+
+foreach(_tool iree-compile iree-opt)
+  add_test(NAME "iree/compiler/PluginAPI/test/${_tool}_registration_failure"
+    COMMAND $<TARGET_FILE:${_tool}>
+      "--iree-load-plugin=$<TARGET_FILE:iree_compiler_PluginAPI_test_registration_failure_plugin>"
+      --help)
+  set_tests_properties("iree/compiler/PluginAPI/test/${_tool}_registration_failure"
+    PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
 # ELF leaves undefined symbols alone; ld64 has to be told.
