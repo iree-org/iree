@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -76,12 +77,60 @@ struct FoldZeroExtentInserts : OpRewritePattern<tensor::InsertSliceOp> {
   }
 };
 
+struct FoldZeroExtentReduction : OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    // Must be a single-result reduction on tensors.
+    if (genericOp.getNumReductionLoops() == 0) {
+      return failure();
+    }
+    if (genericOp.getNumDpsInits() != 1) {
+      return failure();
+    }
+    if (!genericOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+
+    auto resultType = dyn_cast<RankedTensorType>(genericOp.getResultTypes()[0]);
+    if (!resultType) {
+      return failure();
+    }
+
+    // Output must be non-empty; the zero-sized dim is on the (reduced) input.
+    if (isZeroExtent(resultType)) {
+      return failure();
+    }
+
+    // Require at least one zero-extent input operand.
+    bool hasZeroExtentInput = false;
+    for (Value in : genericOp.getDpsInputs()) {
+      if (isZeroExtent(in.getType())) {
+        hasZeroExtentInput = true;
+        break;
+      }
+    }
+    if (!hasZeroExtentInput) {
+      return failure();
+    }
+
+    // With a zero-sized reduction dimension, no input element is combined,
+    // so the result equals the init operand. Forward it directly; this
+    // preserves the semantics of any initial accumulator value (identity or
+    // not) without materializing a new fill.
+    Value init = genericOp.getDpsInitOperand(0)->get();
+    rewriter.replaceOp(genericOp, init);
+    return success();
+  }
+};
+
 namespace {
 
 struct RemoveZeroExtentTensorsPass
     : impl::RemoveZeroExtentTensorsPassBase<RemoveZeroExtentTensorsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<tensor::TensorDialect>();
+    registry.insert<tensor::TensorDialect, linalg::LinalgDialect>();
   }
   void runOnOperation() override;
 };
@@ -91,11 +140,10 @@ struct RemoveZeroExtentTensorsPass
 void RemoveZeroExtentTensorsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
-  SmallVector<Operation *> opWithZeroExtentTensorOperands;
-  SmallVector<tensor::InsertSliceOp> insertSliceOps;
 
   RewritePatternSet patterns(context);
-  patterns.insert<FoldZeroExtentInserts, ReplaceZeroExtentOperands>(context);
+  patterns.insert<FoldZeroExtentReduction, FoldZeroExtentInserts,
+                  ReplaceZeroExtentOperands>(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     funcOp->emitOpError("failed to run canonicalizations (proxy for DCE)");
