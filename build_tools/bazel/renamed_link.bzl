@@ -13,8 +13,8 @@ undefined references included.
 Rewritten archives are declared as new provider values rather than mutating the
 inputs, keeping Bazel's C++ provider graph intact.
 
-Plugins use iree_compiler_register_dynamic_plugin. The ABI target and CcInfo
-transform stay separate so each can be tested alone.
+Experimental plugins use iree_compiler_register_experimental_dynamic_plugin.
+The ABI target and CcInfo transform stay separate so each can be tested alone.
 """
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain", "use_cpp_toolchain")
@@ -465,17 +465,19 @@ iree_renamed_compiler_abi = rule(
     toolchains = use_cpp_toolchain(),
 )
 
-def iree_compiler_register_dynamic_plugin(plugin_id, target, compiler, extra_deps = [], linkopts = [], **kwargs):
-    """Builds a compiler plugin against the renamed compiler ABI.
+def iree_compiler_register_experimental_dynamic_plugin(plugin_id, target, compiler, extra_deps = [], linkopts = [], **kwargs):
+    """Builds an experimental dynamic compiler plugin against the renamed ABI.
 
-    The dynamic counterpart of iree_compiler_register_plugin, spelled the same
-    in both build systems for bazel_to_cmake.
+    The plugin API and ABI are unstable. Build plugins with the host compiler's
+    IREE and LLVM/MLIR revisions and ABI-affecting build settings.
+    bazel_to_cmake maps this to iree_compiler_register_dynamic_plugin, which
+    requires IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON in CMake.
 
     target is whole-archive linked: nothing references the entry points before
     dlsym.
 
-    extra_deps are MLIR archives libIREECompiler lacks. CMake cannot express
-    them.
+    extra_deps adds archives explicitly to the plugin. The in-tree CMake rule
+    has no equivalent parameter; bazel_to_cmake rejects extra_deps and linkopts.
     """
 
     # Same module name CMake emits.

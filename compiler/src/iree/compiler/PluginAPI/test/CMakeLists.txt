@@ -114,8 +114,8 @@ endforeach()
 
 # A plugin naming MLIR symbols loads only if both sides renamed alike.
 if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
-  # Two libraries, which is what any real plugin is. Neither is in the
-  # compiler, so the plugin link has to carry them.
+  # Exercise a plugin with a separate helper library. Neither library is in
+  # the compiler, so the plugin link must include both.
   iree_cc_library(
     NAME
       deps_helper

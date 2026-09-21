@@ -948,12 +948,14 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def iree_compiler_register_dynamic_plugin(
+    def iree_compiler_register_experimental_dynamic_plugin(
         self, plugin_id, target, compiler=None, extra_deps=None, linkopts=None, **kwargs
     ):
         if self._should_skip_target(**kwargs):
             return
-        # CMake resolves the compiler itself. It cannot express the other two.
+        # The CMake rule selects the compiler implicitly and is gated by
+        # IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS. It has no parameters
+        # corresponding to extra_deps or linkopts.
         if extra_deps:
             self._convert_unimplemented_function("extra_deps", plugin_id)
         if linkopts:
