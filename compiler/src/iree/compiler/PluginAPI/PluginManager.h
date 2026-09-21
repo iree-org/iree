@@ -22,6 +22,7 @@
 namespace mlir::iree_compiler {
 
 class PluginManagerSession;
+class PluginManager;
 
 // Command line options for the plugin manager.
 class PluginManagerOptions {
@@ -52,9 +53,10 @@ public:
   [[nodiscard]] llvm::Error initialize(llvm::ArrayRef<const char *> args,
                                        EnvPlugins envPlugins);
 
-  [[nodiscard]] bool registerPlugins(PluginRegistrar *registrar) const;
+  [[nodiscard]] bool registerPlugins(PluginManager *registrar) const;
   llvm::SmallVector<std::string> getLoadedPlugins() const;
   bool hasPluginPath(llvm::StringRef path) const;
+  bool hasRegistrationFailures() const { return registrationFailed; }
 
 private:
   struct Plugin {
@@ -75,6 +77,7 @@ private:
   void addPlugin(llvm::Expected<Plugin> plugin);
 
   bool initialized = false;
+  mutable bool registrationFailed = false;
   llvm::Error loadErrors = llvm::Error::success();
   llvm::SmallVector<Plugin> plugins;
 };
@@ -105,7 +108,9 @@ public:
   // Initializes the plugin manager. Since this may do shared library opening
   // and use failable initializers, it can fail. There probably isn't much to
   // do in that case but crash, but the choice is left to the caller.
-  bool loadAvailablePlugins();
+  // Embedders may skip failed dynamic registrations. Static registration
+  // failures remain fatal to initialization.
+  bool loadAvailablePlugins(bool tolerateDynamicFailures = false);
 
   // Calls through to AbstractPluginRegistration::globalInitialize for all
   // available plugins.
@@ -127,6 +132,7 @@ public:
   llvm::SmallVector<std::string> getLoadedPlugins() const;
 
 private:
+  friend class DynamicPluginRegistry;
   friend class PluginManagerSession;
 };
 

@@ -135,15 +135,41 @@ bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
   return valid;
 }
 
-bool DynamicPluginRegistry::registerPlugins(PluginRegistrar *registrar) const {
+bool DynamicPluginRegistry::registerPlugins(PluginManager *registrar) const {
   bool success = true;
   for (const auto &plugin : plugins) {
-    if (!plugin.registerFunction(registrar)) {
+    if (registrar->registrations.count(plugin.pluginId)) {
+      llvm::errs() << "[IREE Dynamic Plugin ERROR]: '" << plugin.pluginId
+                   << "' has the same id as an already registered plugin\n";
+      success = false;
+      continue;
+    }
+    // Commit registrations only after the callback succeeds. A failing plugin
+    // must not leave partially registered sessions in an embedded compiler.
+    PluginManager pending;
+    if (!plugin.registerFunction(&pending)) {
       llvm::errs() << "[IREE Dynamic Plugin ERROR]: registration function of '"
                    << plugin.pluginId << "' (" << plugin.path << ") failed\n";
       success = false;
+      continue;
+    }
+    bool unique = true;
+    for (const auto &entry : pending.registrations) {
+      if (registrar->registrations.count(entry.getKey())) {
+        llvm::errs() << "[IREE Dynamic Plugin ERROR]: '" << entry.getKey()
+                     << "' has the same id as an already registered plugin\n";
+        unique = false;
+      }
+    }
+    if (!unique) {
+      success = false;
+      continue;
+    }
+    for (auto &entry : pending.registrations) {
+      registrar->registerPlugin(std::move(entry.getValue()));
     }
   }
+  registrationFailed |= !success;
   return success;
 }
 
@@ -300,7 +326,7 @@ void DynamicPluginRegistry::loadPluginPathsFromEnv() {
   }
 }
 
-bool PluginManager::loadAvailablePlugins() {
+bool PluginManager::loadAvailablePlugins(bool tolerateDynamicFailures) {
 // Initialize static plugins.
 #define HANDLE_PLUGIN_ID(plugin_id)                                            \
   if (!iree_register_compiler_plugin_##plugin_id(this))                        \
@@ -308,21 +334,8 @@ bool PluginManager::loadAvailablePlugins() {
 #include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
 #undef HANDLE_PLUGIN_ID
 
-  // The registrar aborts on a duplicate id, and dynamic ids are user input.
-  auto &registry = DynamicPluginRegistry::get();
-  bool unique = true;
-  for (const std::string &pluginId : registry.getLoadedPlugins()) {
-    if (registrations.count(pluginId)) {
-      llvm::errs() << "[IREE Dynamic Plugin ERROR]: '" << pluginId
-                   << "' has the same id as an already registered plugin\n";
-      unique = false;
-    }
-  }
-  if (!unique) {
-    return false;
-  }
-
-  return registry.registerPlugins(this);
+  bool success = DynamicPluginRegistry::get().registerPlugins(this);
+  return success || tolerateDynamicFailures;
 }
 
 void PluginManager::globalInitialize() {
@@ -351,13 +364,10 @@ void PluginManager::registerGlobalDialects(DialectRegistry &registry) {
 
 llvm::SmallVector<std::string> PluginManager::getLoadedPlugins() const {
   llvm::SmallVector<std::string> plugins;
-#define HANDLE_PLUGIN_ID(plugin_id) plugins.push_back(#plugin_id);
-#include "iree/compiler/PluginAPI/Config/StaticLinkedPlugins.inc"
-#undef HANDLE_PLUGIN_ID
-
-  auto dynamicPlugins = DynamicPluginRegistry::get().getLoadedPlugins();
-  plugins.append(dynamicPlugins.begin(), dynamicPlugins.end());
-
+  for (const auto &entry : registrations) {
+    plugins.push_back(entry.getKey().str());
+  }
+  llvm::sort(plugins);
   return plugins;
 }
 

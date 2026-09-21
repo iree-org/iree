@@ -62,7 +62,10 @@ IREE_LOAD_PLUGINS=/path/to/libmy_plugin.so   # comma-separated, same effect
 ```
 
 Every failed load is reported. The tools then exit; a host of the compiler
-library carries on with what did load. `IREE_DEFINE_COMPILER_PLUGIN` serves
+library carries on with successful registrations, skipping dynamic plugins
+whose registration callback fails or whose IDs collide. Registrations from a
+failed callback are discarded; callbacks must not leave other global side
+effects on failure. `IREE_DEFINE_COMPILER_PLUGIN` serves
 static and dynamic registration from one source.
 
 Both build systems provide `iree_compiler_register_dynamic_plugin`, which
@@ -87,7 +90,11 @@ the compiler's shared library, so:
 * The same plugin API headers. `IREE_COMPILER_PLUGIN_ABI_HASH` covers
   `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h` and
   `Utils/OptionUtils.h`. The llvm/mlir headers behind them are not hashed; the
-  rename already forces one tree.
+  rename does not check their compatibility. Use the host compiler's exact
+  IREE and LLVM/MLIR revisions and ABI-affecting build settings (including
+  assertions and the C++ standard library). A matching hash and successful
+  symbol resolution do not guarantee ABI compatibility; an incompatible
+  plugin may still load and crash or corrupt memory.
 
 ## Extension points
 

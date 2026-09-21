@@ -420,7 +420,7 @@ GlobalInit::GlobalInit() : threadPool(getGlobalThreadPoolStrategy()) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerLLVMIRTranslations(registry);
 
-  if (!pluginManager.loadAvailablePlugins()) {
+  if (!pluginManager.loadAvailablePlugins(/*tolerateDynamicFailures=*/true)) {
     fprintf(stderr, "Failed to initialize IREE compiler plugins.\n");
     abort();
   }

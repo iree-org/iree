@@ -9,8 +9,9 @@
 The API version covers IreeCompilerPluginInfo alone, so a plugin built against
 a changed Client.h loads and then misbehaves. The hash catches that at load.
 
-Only IREE's headers are hashed. The llvm/mlir headers behind them agree when
-the plugin is built from the same tree, which the symbol rename enforces.
+Only the listed IREE headers are hashed. This is not a full ABI fingerprint:
+plugins must use the compiler's LLVM/MLIR revision and ABI-affecting build
+settings. Symbol renaming isolates namespaces; it does not enforce that match.
 """
 
 import argparse

@@ -207,6 +207,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   }
 
   ireeCompilerGlobalInitialize();
+  if (mlir::iree_compiler::DynamicPluginRegistry::get()
+          .hasRegistrationFailures()) {
+    ireeCompilerGlobalShutdown();
+    return 1;
+  }
   ireeCompilerGetProcessCLArgs(&argc, const_cast<const char ***>(&argv));
   ireeCompilerSetupGlobalCL(argc, const_cast<const char **>(argv),
                             "IREE compilation driver\n",
