@@ -19,6 +19,8 @@ on:
 
 jobs:
   test_w7900:
+    # Disabled until an iree-w7900 runner is available.
+    if: false
     runs-on: [Linux, X64, iree-w7900]
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
