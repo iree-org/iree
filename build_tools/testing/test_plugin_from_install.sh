@@ -5,8 +5,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Builds a plugin against an IREE install tree and loads it. Nothing here reads
-# the IREE sources except to install them.
+# Builds and activates a plugin against an IREE install tree. The plugin uses
+# installed IREE headers and the host build's LLVM/MLIR headers.
 #
 # Usage: test_plugin_from_install.sh <iree-build-dir>
 
@@ -54,7 +54,7 @@ for required in \
 done
 
 echo "--- Building the plugin against the install tree"
-# IREE installs no llvm/mlir headers, so they come from the build tree.
+# IREE does not install LLVM/MLIR C++ headers; use the host compiler's build.
 cmake -G Ninja \
   -S "${REPO_DIR}/build_tools/testing/plugin_from_install" \
   -B "${PLUGIN_BUILD}" \

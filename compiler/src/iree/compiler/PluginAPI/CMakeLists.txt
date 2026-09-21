@@ -79,8 +79,8 @@ iree_cc_library(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-# All an out-of-tree plugin needs from IREE; the rest resolves from the host at
-# load.
+# Install the plugin API headers and their IREE header dependencies. A plugin
+# using other compiler APIs may need additional headers from the matching tree.
 add_library(iree_compiler_PluginAPI_headers INTERFACE)
 iree_install_targets(
   TARGETS iree_compiler_PluginAPI_headers

@@ -15,8 +15,9 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # LLVM's tools, not binutils: the rename works on demangled text, and the two
 # demanglers disagree on some symbols, which would then not resolve at load.
 #
-# Looked up on first use, after the caller has found LLVM, so they come from
-# the compiler's LLVM. Set them to override.
+# Looked up on first use, after the caller has found LLVM. Prefer its tools
+# directory, falling back to normal CMake search paths. Set IREE_LLVM_NM,
+# IREE_LLVM_CXXFILT, and IREE_LLVM_OBJCOPY explicitly to select exact tools.
 macro(_iree_find_rename_tools)
   find_program(IREE_LLVM_NM
     NAMES llvm-nm HINTS "${LLVM_TOOLS_BINARY_DIR}" REQUIRED)
@@ -27,9 +28,10 @@ macro(_iree_find_rename_tools)
 endmacro()
 
 # Parameters:
-# PLUGIN_ID: Id the plugin reports and --iree-plugin= activates.
+# PLUGIN_ID: Module name suffix; must match the ID declared by the plugin.
 # TARGET: Static library carrying the registration.
-# EXTRA_ARCHIVES: Further static libraries the plugin must carry.
+# EXTRA_ARCHIVES: Paths to additional static archives, e.g. $<TARGET_FILE:helper>.
+# Dependencies are not collected automatically; name every required archive.
 function(iree_compiler_register_dynamic_plugin)
   cmake_parse_arguments(_RULE "" "PLUGIN_ID;TARGET" "EXTRA_ARCHIVES" ${ARGN})
 

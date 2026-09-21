@@ -7,7 +7,7 @@
 # A plugin built as one in another repository would be: IREE comes from an
 # install tree and nothing here reads the IREE sources.
 #
-# IREE installs no llvm/mlir headers, so the caller points at the compiler's.
+# IREE does not install LLVM/MLIR C++ headers; use the host compiler's build.
 cmake_minimum_required(VERSION 3.21)
 project(iree_plugin_from_install CXX C)
 
@@ -20,7 +20,7 @@ find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "IREE ABI prefix: ${IREE_COMPILER_ABI_PREFIX}")
 
-# Two libraries, as any real plugin; the second must be named to be renamed too.
+# Exercise a separate helper archive, which must also be listed for renaming.
 add_library(registration STATIC "plugin.cpp")
 add_library(helper STATIC "helper.cpp")
 option(TEST_UPDATED_HELPER "Introduce a new MLIR reference in the helper" OFF)
