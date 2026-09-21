@@ -1,12 +1,12 @@
 iree_add_all_subdirs()
 
-# The loader is not built for Windows.
+# Dynamic loading is unsupported on Windows.
 if(NOT IREE_BUILD_TESTS OR WIN32)
   return()
 endif()
 
 # Built here so the tests need no compiler of their own. Plain C and not
-# renamed: they are never registered.
+# renamed: their callbacks do not reference compiler C++ symbols.
 foreach(_PLUGIN "valid_plugin" "invalid_plugin" "version_mismatch_plugin"
                 "undefined_symbol_plugin" "abi_hash_mismatch_plugin"
                 "null_field_plugin" "duplicate_id_plugin"

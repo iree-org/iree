@@ -52,7 +52,7 @@ void PluginManagerOptions::bindOptions(OptionsBinder &binder) {
 
 namespace {
 
-// --iree-load-plugin is parsed by hand before llvm::cl exists, so plugins can
+// --iree-load-plugin is parsed before LLVM command-line parsing, so plugins can
 // add options. This sink keeps cl from rejecting it and lists it in --help.
 struct PluginOptionsSink {
   llvm::SmallVector<std::string> pluginOpts;
@@ -60,9 +60,11 @@ struct PluginOptionsSink {
     static llvm::cl::OptionCategory category("IREE dynamic plugin options");
     binder.list<std::string>(
         "iree-load-plugin", pluginOpts,
-        llvm::cl::desc("Shared library to load. The plugin reports its id; "
-                       "activate it with --iree-plugin."),
-        llvm::cl::cat(category));
+        llvm::cl::desc(
+            "Load an experimental compiler plugin library (repeatable). "
+            "Use --iree-print-plugin-info during compilation to list "
+            "IDs; activate a plugin with --iree-plugin=<id>."),
+        llvm::cl::value_desc("path"), llvm::cl::cat(category));
   }
   using FromFlags = OptionsFromFlags<PluginOptionsSink>;
 };
@@ -119,7 +121,8 @@ void DynamicPluginRegistry::addPlugin(llvm::Expected<Plugin> plugin) {
 
 bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
                               llvm::raw_ostream &os) {
-  // The first caller's arguments win; later callers have none to add.
+  // The first call loads plugins; subsequent calls reuse its result and ignore
+  // their arguments and any environment changes.
   static const bool valid = [&] {
     llvm::Error e = DynamicPluginRegistry::get().initialize(
         args, DynamicPluginRegistry::EnvPlugins::Enabled);
@@ -242,7 +245,7 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),
         "plugin '%s' was built against plugin API version %u, this compiler "
-        "speaks %u",
+        "supports %u",
         plugin.path.c_str(), info->apiVersion,
         IREE_COMPILER_PLUGIN_API_VERSION);
   }
@@ -273,7 +276,8 @@ DynamicPluginRegistry::Plugin::loadFromPath(llvm::StringRef path) {
 void DynamicPluginRegistry::loadPluginsFromCL(
     llvm::ArrayRef<const char *> args) {
   // Match every spelling cl accepts: one or two dashes, a separated value,
-  // response files. Anything missed here the sink swallows and nothing loads.
+  // response files. verifyDynamicPluginFlags rejects accepted flags whose
+  // paths were not loaded during initialization.
   llvm::BumpPtrAllocator alloc;
   llvm::SmallVector<const char *> expanded(args.begin(), args.end());
   llvm::cl::ExpansionContext expansion(alloc, llvm::cl::TokenizeGNUCommandLine);

@@ -37,7 +37,7 @@ public:
   using FromFlags = OptionsFromFlags<PluginManagerOptions>;
 };
 
-// Built before llvm::cl so plugins can contribute CLI options.
+// Initialized before LLVM command-line parsing so plugins can add options.
 class DynamicPluginRegistry {
 public:
   DynamicPluginRegistry(const DynamicPluginRegistry &) = delete;
@@ -105,11 +105,9 @@ bool verifyDynamicPluginFlags(llvm::raw_ostream &os);
 // an MLIRContext is available.
 class PluginManager : public PluginRegistrar {
 public:
-  // Initializes the plugin manager. Since this may do shared library opening
-  // and use failable initializers, it can fail. There probably isn't much to
-  // do in that case but crash, but the choice is left to the caller.
-  // Embedders may skip failed dynamic registrations. Static registration
-  // failures remain fatal to initialization.
+  // Registers static plugins and previously loaded dynamic plugins. Returns
+  // false on registration failure. With tolerateDynamicFailures, skips failed
+  // dynamic registrations and returns false only for static failures.
   bool loadAvailablePlugins(bool tolerateDynamicFailures = false);
 
   // Calls through to AbstractPluginRegistration::globalInitialize for all
@@ -124,11 +122,11 @@ public:
   // available plugins.
   void initializeCLI();
 
-  // Calls through to AbstractPluginRegistration::registerDialects for all
+  // Calls through to AbstractPluginRegistration::registerGlobalDialects for all
   // available plugins.
   void registerGlobalDialects(DialectRegistry &registry);
 
-  // Gets a list of all loaded plugin names.
+  // Returns successfully registered plugin IDs in sorted order.
   llvm::SmallVector<std::string> getLoadedPlugins() const;
 
 private:

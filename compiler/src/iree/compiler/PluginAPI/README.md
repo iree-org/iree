@@ -36,8 +36,9 @@ specified `OptionsTy` class will be available in the `PluginSession` as
 
 ### Static linking
 
-Plugins can be statically linked into the compiler by way of the
-`-DIREE_COMPILER_PLUGINS=` option. This does two things:
+In CMake, select statically linked compiler plugins with
+`-DIREE_COMPILER_PLUGINS=<id1;id2>`. In Bazel, use
+`--iree_compiler_plugins=<id1,id2>`. Selection does two things:
 
 * Causes the generated `PluginAPI/Config/StaticLinkedPlugins.inc` to have
   a `HANDLE_PLUGIN_ID(plugin_id)` line.
@@ -51,17 +52,34 @@ by the plugin and completes registration.
 
 ### Dynamic linking
 
-A build with `-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON` also loads
-plugins at run time. Each library is `dlopen()`'d and asked through one exported
+Dynamic compiler plugins are experimental and supported on Linux and macOS.
+In CMake, enable compiler symbol exports with
+`-DIREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`. Bazel's compiler shared
+library exports these symbols without an additional option.
+Each library is opened with `dlopen()` and queried through one exported
 symbol for its id, API version and header hash; a mismatch in version or hash is
 refused. Plugins are named on the command line or in the environment:
 
 ```sh
 iree-compile --iree-load-plugin=/path/to/libmy_plugin.so --iree-plugin=my_id ...
-IREE_LOAD_PLUGINS=/path/to/libmy_plugin.so   # comma-separated, same effect
+IREE_LOAD_PLUGINS=/path/to/libmy_plugin.so \
+  iree-compile --iree-plugin=my_id ...
 ```
 
-Every failed load is reported. The tools then exit; a host of the compiler
+Repeat `--iree-load-plugin=<path>` to load multiple libraries, or set
+`IREE_LOAD_PLUGINS` to a comma-separated list of paths. Loading makes a plugin
+available; `--iree-plugin=<id>` activates an explicitly selected plugin for a
+session. Use `--iree-print-plugin-info` during compilation to list available
+and activated IDs.
+
+Embedded users must set `IREE_LOAD_PLUGINS` before the first
+`ireeCompilerGlobalInitialize()` call. Loading happens once per process;
+subsequent initialization calls do not reread the environment or load new
+plugins. `ireeCompilerSessionSetFlags` can select an already registered plugin
+with `--iree-plugin=<id>`, but cannot load a library with `--iree-load-plugin`.
+
+Load and registration errors detected by the loader are reported. The tools
+then exit; a host of the compiler
 library carries on with successful registrations, skipping dynamic plugins
 whose registration callback fails or whose IDs collide. Registrations from a
 failed callback are discarded; callbacks must not leave other global side
@@ -81,8 +99,8 @@ the compiler's shared library, so:
 
 * The tools link the compiler as a shared library, the default in both build
   systems (`IREE_LINK_COMPILER_SHARED_LIBRARY` in CMake,
-  `//compiler/src/iree/compiler/API:link_shared` in Bazel). A static tool
-  exports nothing to resolve against.
+  `//compiler/src/iree/compiler/API:link_shared` in Bazel). Statically linked
+  tools do not provide the exported compiler ABI required by these plugins.
 * `-DIREE_ENABLE_THIN_ARCHIVES=OFF`, the default. `llvm-objcopy` cannot rewrite
   a thin archive's members.
 * RTTI and exception settings match the compiler's. In-tree builds inherit
@@ -137,10 +155,11 @@ Less frequently used extension points:
 
 ## Current Status
 
-* Statically linked, named plugins are supported in both build systems, with
-  optional inclusion through `IREE_COMPILER_PLUGINS`.
-* Dynamic plugins are supported in both build systems behind
-  `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`.
+* Statically linked plugins are selected with `IREE_COMPILER_PLUGINS` in CMake
+  and `--iree_compiler_plugins` in Bazel.
+* Dynamic plugins are experimental in both build systems. CMake requires
+  `IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS=ON`; Bazel has no equivalent
+  feature gate.
 * `samples/compiler_plugins/example` is registered both ways from one source.
   `samples/compiler_plugins/out_of_tree_example` has its own dialect and pass,
   as a plugin in another repository would.

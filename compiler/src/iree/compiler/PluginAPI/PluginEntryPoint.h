@@ -49,12 +49,20 @@ typedef void IreeCompilerPluginRegistrar;
 // The strings are owned by the plugin and live for the process.
 typedef struct IreeCompilerPluginInfo {
   uint32_t apiVersion;
-  // Hash of the headers the plugin compiled against; apiVersion covers this
-  // struct alone.
+  // Hash of the selected IREE plugin API headers, not a full ABI fingerprint.
+  // LLVM/MLIR revisions and ABI-affecting build settings must also match.
   const char *abiHash;
+  // Unique ID advertised by this library. Use the same ID when registering
+  // its session with PluginRegistrar and selecting it with --iree-plugin.
   const char *pluginId;
   // Free-form, only echoed in diagnostics.
   const char *pluginVersion;
+  // Registers sessions and returns true on success. The registrar is borrowed
+  // only for this call; do not retain its address. Dynamic registrations are
+  // committed only if this callback succeeds and their IDs do not collide
+  // with existing registrations. Other global side effects cannot be rolled
+  // back, so the callback must clean them up on failure. Each ID may be
+  // registered only once within a callback.
   bool (*registerPlugin)(IreeCompilerPluginRegistrar *registrar);
 } IreeCompilerPluginInfo;
 

@@ -14,7 +14,7 @@ package(
 )
 
 # Built here so the tests need no compiler of their own. Plain C and not
-# renamed: they are never registered.
+# renamed: their callbacks do not reference compiler C++ symbols.
 [
     cc_binary(
         name = plugin,
