@@ -17,7 +17,7 @@ static void check_plugin(const char *id, void *user_data) {
 int main(int argc, char **argv) {
   if (argc != 3 || setenv("IREE_LOAD_PLUGINS", argv[2], 1) != 0 ||
       !ireeCompilerLoadLibrary(argv[1])) {
-    return 1;
+    return EXIT_FAILURE;
   }
   ireeCompilerGlobalInitialize();
   bool found_failure = false;
@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   ireeCompilerGlobalShutdown();
   if (found_failure) {
     fprintf(stderr, "Failed plugin was advertised as registered\n");
-    return 1;
+    return EXIT_FAILURE;
   }
-  return 0;
+  return EXIT_SUCCESS;
 }
