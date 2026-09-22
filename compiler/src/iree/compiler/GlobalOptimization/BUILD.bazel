@@ -47,11 +47,40 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "QuantizationUtils",
+    srcs = ["QuantizationUtils.cpp"],
+    hdrs = ["QuantizationUtils.h"],
+    deps = [
+        "@llvm-project//llvm:Support",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "QuantizedContraction",
+    srcs = ["QuantizedContraction.cpp"],
+    hdrs = ["QuantizedContraction.h"],
+    visibility = [
+        "//compiler/src/iree/compiler/GlobalOptimization:__pkg__",
+        "//compiler/src/iree/compiler/GlobalOptimization/unittests:__pkg__",
+    ],
+    deps = [
+        ":QuantizationUtils",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "GlobalOptimization",
     srcs = [
         "CleanupNumericNarrowing.cpp",
         "ConvertBatchMatmulToMatmul.cpp",
         "ConvertConv2DToImg2Col.cpp",
+        "ConvertQDQToIntegerMath.cpp",
         "ConvertStridedContractionToContraction.cpp",
         "DataLayoutPropagation.cpp",
         "DecomposeConcat.cpp",
@@ -82,6 +111,8 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
+        ":QuantizationUtils",
+        ":QuantizedContraction",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",

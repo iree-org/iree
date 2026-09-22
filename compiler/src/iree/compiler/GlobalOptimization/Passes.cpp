@@ -24,6 +24,13 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
+    "iree-global-opt-enable-qdq-to-integer-math",
+    llvm::cl::desc("Rewrites contractions over dequantized operands into "
+                   "integer contractions with zero point corrections ("
+                   "changes floating-point rounding and exceptional-value "
+                   "behavior)."),
+    llvm::cl::init(true));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -123,6 +130,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
+      // Match direct dequantize producers before convolution lowering and
+      // unit-dimension folding insert reshapes between them and the
+      // contraction.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
                          createConvertConv2DToImg2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
@@ -200,6 +212,10 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
+      // Retry for contractions whose dequantize producers were exposed by
+      // reshape/transpose propagation, before selecting integer layouts.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(
