@@ -96,7 +96,7 @@ jobs:
 
       - name: Run clang-tidy
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
-        uses: cpp-linter/cpp-linter-action@cab1143a2c149bc41e85b070a9de81716974c18f # v1.11.4
+        uses: cpp-linter/cpp-linter-action@dacf512996b9cfe9d9bcc7b326d1f3a64ab7b91f # v1.11.4
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
