@@ -3267,6 +3267,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-convert-qdq-to-integer-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-convert-qdq-to-integer-math
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-convert-strided-contraction-to-contraction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6454,6 +6465,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-convert-qdq-to-integer-math" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-convert-qdq-to-integer-math
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-convert-strided-contraction-to-contraction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6776,6 +6798,24 @@
 <p><em>Converts batch_matmul to reshape + matmul + reshape.</em></p>
 <h3 id="-iree-global-opt-convert-conv2d-to-img2col"><code>-iree-global-opt-convert-conv2d-to-img2col</code><a class="headerlink" href="#-iree-global-opt-convert-conv2d-to-img2col" title="Permanent link">link</a></h3>
 <p><em>Convert linalg convolution ops to matmul img2col based implementation</em></p>
+<h3 id="-iree-global-opt-convert-qdq-to-integer-math"><code>-iree-global-opt-convert-qdq-to-integer-math</code><a class="headerlink" href="#-iree-global-opt-convert-qdq-to-integer-math" title="Permanent link">link</a></h3>
+<p><em>Rewrites contractions over dequantized operands into integer contractions.</em></p>
+<p>Matches a contraction or convolution whose inputs are produced by
+<code>iree_linalg_ext.dequantize_affine</code> and rewrites it into an integer
+contraction plus a zero point correction epilogue:</p>
+<p>C = sA<em>sB</em>(D - zB<em>RA - zA</em>RB + N<em>zA</em>zB)</p>
+<p>Matches a plain floating-point multiply-add body with a zero init. Integer
+reduction dimensions must have positive static extents whose products and
+zero point corrections fit in signed i32. Dimensions along which a
+quantization parameter varies remain floating-point reductions over partial
+integer contractions. Unsupported cases retain the original computation.</p>
+<p>Scaling and partial-result accumulation use at least f32, preserving wider
+scale and output types, before conversion to the output type.</p>
+<p>Numerical stability is best effort. Reassociation changes floating-point
+rounding; no fixed error bound or preservation of signed zero, NaNs,
+infinities, or overflow/underflow behavior is guaranteed. Disable this
+transformation when reference floating-point semantics are required with
+<code>--iree-global-opt-enable-qdq-to-integer-math=false</code>.</p>
 <h3 id="-iree-global-opt-convert-strided-contraction-to-contraction"><code>-iree-global-opt-convert-strided-contraction-to-contraction</code><a class="headerlink" href="#-iree-global-opt-convert-strided-contraction-to-contraction" title="Permanent link">link</a></h3>
 <p><em>Factors out an extract_slice from contraction-like ops with strided inputs.</em></p>
 <h3 id="-iree-global-opt-data-layout-propagation"><code>-iree-global-opt-data-layout-propagation</code><a class="headerlink" href="#-iree-global-opt-data-layout-propagation" title="Permanent link">link</a></h3>
