@@ -327,12 +327,12 @@ func.func @dynamic_gather_batching(%a: tensor<3x8x5xi32>, %i: tensor<3x7x1xi64>,
 
 // -----
 
-// No annotation and a dynamic operand dim: whether it expands is decided
-// per element at runtime.
+// Runtime expansion depends on the operand shape, not the output index.
 // CHECK-LABEL: @dynamic_broadcast_undecidable
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
 // CHECK: linalg.generic
-// CHECK: arith.cmpi eq
-// CHECK: arith.select
+// CHECK-NOT: arith.cmpi
+// CHECK: arith.select %[[EXPANDS]]
 // CHECK: tensor.extract %{{.+}} : tensor<?xf32>
 // CHECK: return %{{.+}} : tensor<?x?xf32>
 func.func @dynamic_broadcast_undecidable(%a: tensor<?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
@@ -358,7 +358,9 @@ func.func @dynamic_broadcast_annotated(%a: tensor<?xf32>, %s: tensor<2xi32>) -> 
 // Rank 3 into rank 4: the two dynamic operand dims each get a select, the
 // static 1 indexes zero without one.
 // CHECK-LABEL: @dynamic_broadcast_mixed
+// CHECK-COUNT-2: arith.cmpi eq
 // CHECK: linalg.generic
+// CHECK-NOT: arith.cmpi
 // CHECK-COUNT-2: arith.select
 // CHECK-NOT: arith.select
 // CHECK: tensor.extract %{{.+}} : tensor<?x1x?xf32>
@@ -401,8 +403,11 @@ func.func @dynamic_broadcast_permuted(%a: tensor<?x?xf32>, %s: tensor<3xi64>) ->
 
 // One dynamic dim annotated, one not: the unannotated dim keeps this path.
 // CHECK-LABEL: @dynamic_broadcast_partial_annotation
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK-NOT: arith.cmpi
 // CHECK: linalg.generic
-// CHECK: arith.select
+// CHECK-NOT: arith.cmpi
+// CHECK: arith.select %[[EXPANDS]]
 // CHECK-NOT: arith.select
 // CHECK: tensor.extract %{{.+}} : tensor<?x?xf32>
 func.func @dynamic_broadcast_partial_annotation(%a: tensor<?x?xf32>, %s: tensor<2xi32>) -> tensor<?x?xf32> {
