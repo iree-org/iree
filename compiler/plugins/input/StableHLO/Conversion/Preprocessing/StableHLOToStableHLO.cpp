@@ -690,23 +690,16 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
   Value iotaShapeValue;
   if (!iotaType.hasStaticShape()) {
     Type i64 = rewriter.getI64Type();
-    auto scalarShape = RankedTensorType::get({1}, i64);
-    SmallVector<Value> parts;
+    SmallVector<Value> sizes;
     for (auto [d, size] : llvm::enumerate(iotaShape)) {
       if (!ShapedType::isDynamic(size)) {
-        parts.push_back(mlir::stablehlo::ConstantOp::create(
-            rewriter, loc, DenseIntElementsAttr::get(scalarShape, size)));
+        sizes.push_back(arith::ConstantIntOp::create(rewriter, loc, size, 64));
         continue;
       }
-      Value dim = mlir::stablehlo::GetDimensionSizeOp::create(rewriter, loc,
-                                                              indices, d);
-      dim = mlir::stablehlo::ConvertOp::create(
-          rewriter, loc, RankedTensorType::get({}, i64), dim);
-      parts.push_back(
-          mlir::stablehlo::ReshapeOp::create(rewriter, loc, scalarShape, dim));
+      Value dim = tensor::DimOp::create(rewriter, loc, indices, d);
+      sizes.push_back(arith::IndexCastOp::create(rewriter, loc, i64, dim));
     }
-    iotaShapeValue =
-        mlir::stablehlo::ConcatenateOp::create(rewriter, loc, parts, 0);
+    iotaShapeValue = tensor::FromElementsOp::create(rewriter, loc, sizes);
   }
 
   if (indexVectorDimOnLastDim) {
