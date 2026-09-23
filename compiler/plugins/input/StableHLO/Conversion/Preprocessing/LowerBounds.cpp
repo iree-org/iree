@@ -47,38 +47,35 @@ Type stripBounds(Type type) {
 
 // Rewrites `value` to its plain type and routes its uses through a
 // `flow.tensor.tie_shape` whose dynamic dims carry the bounds.
-void bindBounds(OpBuilder &builder, Value value) {
+void applyBounds(OpBuilder &builder, Value value) {
   auto bounds = getBounds(value.getType());
   if (!bounds) {
     return;
   }
   auto tensorType = cast<RankedTensorType>(value.getType());
-  auto plainType = cast<RankedTensorType>(stripBounds(tensorType));
+  auto plainType =
+      RankedTensorType::get(tensorType.getShape(), tensorType.getElementType());
   value.setType(plainType);
   if (plainType.hasStaticShape()) {
     return;
   }
 
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointAfterValue(value);
+
+  SmallVector<OpOperand *> originalUses;
+  for (OpOperand &use : value.getUses()) {
+    originalUses.push_back(&use);
+  }
+
   Location loc = value.getLoc();
-  SmallVector<Operation *> created;
   SmallVector<Value> dynamicDims;
-  SmallVector<Value> dimIndices;
   for (auto [index, size] : llvm::enumerate(plainType.getShape())) {
     if (!ShapedType::isDynamic(size)) {
       continue;
     }
     auto constOp = arith::ConstantIndexOp::create(builder, loc, index);
-    created.push_back(constOp);
-    dimIndices.push_back(constOp);
-  }
-  size_t dimIndexPos = 0;
-  for (auto [index, size] : llvm::enumerate(plainType.getShape())) {
-    if (!ShapedType::isDynamic(size)) {
-      continue;
-    }
-    auto dimOp =
-        tensor::DimOp::create(builder, loc, value, dimIndices[dimIndexPos++]);
-    created.push_back(dimOp);
+    auto dimOp = tensor::DimOp::create(builder, loc, value, constOp);
     Value dim = dimOp;
     int64_t bound = bounds.getBounds()[index];
     if (!ShapedType::isDynamic(bound)) {
@@ -87,17 +84,15 @@ void bindBounds(OpBuilder &builder, Value value) {
           /*udiv=*/std::nullopt);
       auto assumeOp =
           IREE::Util::AssumeIntOp::create(builder, loc, dim, assumption);
-      created.push_back(assumeOp);
       dim = assumeOp.getResult(0);
     }
     dynamicDims.push_back(dim);
   }
   auto tieOp = IREE::Flow::TensorTieShapeOp::create(builder, loc, plainType,
                                                     value, dynamicDims);
-  created.push_back(tieOp);
-  value.replaceUsesWithIf(tieOp.getResult(), [&](OpOperand &use) {
-    return !llvm::is_contained(created, use.getOwner());
-  });
+  for (OpOperand *use : originalUses) {
+    use->set(tieOp.getResult());
+  }
 }
 
 struct LowerBounds final : impl::LowerBoundsBase<LowerBounds> {
@@ -107,13 +102,16 @@ struct LowerBounds final : impl::LowerBoundsBase<LowerBounds> {
     AttrTypeReplacer constantAttrReplacer;
     constantAttrReplacer.addReplacement(
         [](DenseElementsAttr value) -> Attribute {
-          return value.reshape(cast<ShapedType>(stripBounds(value.getType())));
+          auto plainType = cast<ShapedType>(stripBounds(value.getType()));
+          if (plainType == value.getType()) {
+            return value;
+          }
+          return value.reshape(plainType);
         });
 
     funcOp.walk([&](Block *block) {
-      builder.setInsertionPointToStart(block);
       for (BlockArgument arg : block->getArguments()) {
-        bindBounds(builder, arg);
+        applyBounds(builder, arg);
       }
     });
     funcOp.walk([&](Operation *op) {
@@ -124,9 +122,8 @@ struct LowerBounds final : impl::LowerBoundsBase<LowerBounds> {
                                                /*replaceLocs=*/false,
                                                /*replaceTypes=*/false);
       }
-      builder.setInsertionPointAfter(op);
       for (Value result : op->getResults()) {
-        bindBounds(builder, result);
+        applyBounds(builder, result);
       }
     });
 
