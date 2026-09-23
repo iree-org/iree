@@ -605,109 +605,98 @@ struct DynamicGatherOpConversion final
     Value emptyOp = mlir::stablehlo::getEmptyTensorFor(
         rewriter, loc, resultType, gatherOp, adaptor.getOperands());
 
-    SmallVector<AffineMap, 1> indexingMaps(
-        {rewriter.getMultiDimIdentityMap(resultRank)});
     auto linalgOp = linalg::GenericOp::create(
         rewriter, loc, /*resultTensorTypes=*/resultType,
-        /*inputs=*/ValueRange{}, /*outputs=*/emptyOp, indexingMaps,
+        /*inputs=*/ValueRange{}, /*outputs=*/emptyOp,
+        SmallVector<AffineMap>{rewriter.getMultiDimIdentityMap(resultRank)},
         mlir::stablehlo::getNParallelLoopsAttrs(resultRank),
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(gatherOp));
+        [&](OpBuilder &b, Location nestedLoc, ValueRange) {
+          SmallVector<Value> linalgIndices, gatherIndex;
+          for (int64_t dim = 0; dim < resultRank; ++dim) {
+            Value index = linalg::IndexOp::create(b, nestedLoc, dim);
+            linalgIndices.push_back(index);
+            if (!llvm::is_contained(offsetDims, dim)) {
+              gatherIndex.push_back(index);
+            }
+          }
 
-    Region &region = linalgOp.getRegion();
-    Block *block = rewriter.createBlock(&region, region.end());
-    block->addArguments(resultType.getElementType(), loc);
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToEnd(block);
+          SmallVector<Value> indexFromStartIndices;
+          for (size_t i = 0, e = startIndexMap.size(); i != e; ++i) {
+            SmallVector<Value> gCombine(gatherIndex);
+            if (indexVectorDim != startIndicesType.getRank()) {
+              gCombine.insert(gCombine.begin() + indexVectorDim, constants[i]);
+            }
+            indexFromStartIndices.push_back(extractIndexFromTensor(
+                b, nestedLoc, startIndices,
+                gatherOp.getStartIndices().getType(), gCombine));
+          }
 
-    SmallVector<int64_t> batchDims;
-    for (int64_t dim = 0; dim < resultRank; ++dim) {
-      if (!llvm::is_contained(offsetDims, dim)) {
-        batchDims.push_back(dim);
-      }
-    }
-    SmallVector<Value> linalgIndices;
-    for (int64_t i = 0; i < resultRank; ++i) {
-      linalgIndices.push_back(linalg::IndexOp::create(rewriter, loc, i));
-    }
-    SmallVector<Value> gatherIndex;
-    for (int64_t dim : batchDims) {
-      gatherIndex.push_back(linalgIndices[dim]);
-    }
+          SmallVector<Value> remappedIndexFromIndices(operandRank,
+                                                      constants[0]);
+          for (auto [idx, value] : llvm::enumerate(startIndexMap)) {
+            remappedIndexFromIndices[value] = indexFromStartIndices[idx];
+          }
 
-    SmallVector<Value> indexFromStartIndices;
-    for (size_t i = 0, e = startIndexMap.size(); i != e; ++i) {
-      SmallVector<Value> gCombine(gatherIndex);
-      if (indexVectorDim != startIndicesType.getRank()) {
-        gCombine.insert(gCombine.begin() + indexVectorDim, constants[i]);
-      }
-      indexFromStartIndices.push_back(extractIndexFromTensor(
-          rewriter, loc, startIndices, gatherOp.getStartIndices().getType(),
-          gCombine));
-    }
+          SmallVector<Value> indexFromBatching(operandRank, constants[0]);
+          for (auto [operandDim, indicesDim] :
+               llvm::zip_equal(operandBatchingDims, startIndicesBatchingDims)) {
+            indexFromBatching[operandDim] =
+                gatherIndex[indicesDim - (indicesDim < indexVectorDim ? 0 : 1)];
+          }
 
-    SmallVector<Value> remappedIndexFromIndices(operandRank, constants[0]);
-    for (auto [idx, value] : llvm::enumerate(startIndexMap)) {
-      remappedIndexFromIndices[value] = indexFromStartIndices[idx];
-    }
+          auto isCollapsedOrBatching = [&](int64_t dim) {
+            return llvm::is_contained(collapsedSliceDims, dim) ||
+                   llvm::is_contained(operandBatchingDims, dim);
+          };
+          SmallVector<unsigned> remappedOffsetDims;
+          for (int64_t i = 0; i < operandRank; ++i) {
+            if (!isCollapsedOrBatching(i)) {
+              remappedOffsetDims.push_back(static_cast<unsigned>(i));
+            }
+          }
 
-    SmallVector<Value> indexFromBatching(operandRank, constants[0]);
-    for (auto [operandDim, indicesDim] :
-         llvm::zip_equal(operandBatchingDims, startIndicesBatchingDims)) {
-      indexFromBatching[operandDim] =
-          gatherIndex[indicesDim - (indicesDim < indexVectorDim ? 0 : 1)];
-    }
+          // Clamp start indices to [0, operand_dim - slice_size]; the slice
+          // size is the matching result dim, or 1 for a collapsed dim.
+          for (int i = 0, operandIndexDim = 0; i < operandRank; ++i) {
+            Value outputDimSize = constants[1];
+            if (!isCollapsedOrBatching(i)) {
+              outputDimSize = b.createOrFold<tensor::DimOp>(
+                  nestedLoc, emptyOp, offsetDims[operandIndexDim++]);
+            }
+            if (remappedIndexFromIndices[i] == constants[0]) {
+              continue;
+            }
+            Value operandDimSize =
+                b.createOrFold<tensor::DimOp>(nestedLoc, operand, i);
+            Value largestValidIndex = b.createOrFold<arith::SubIOp>(
+                nestedLoc, operandDimSize, outputDimSize);
+            remappedIndexFromIndices[i] = arith::MinSIOp::create(
+                b, nestedLoc,
+                arith::MaxSIOp::create(b, nestedLoc, constants[0],
+                                       remappedIndexFromIndices[i]),
+                largestValidIndex);
+          }
 
-    auto isCollapsedOrBatching = [&](int64_t dim) {
-      return llvm::is_contained(collapsedSliceDims, dim) ||
-             llvm::is_contained(operandBatchingDims, dim);
-    };
-    SmallVector<unsigned> remappedOffsetDims;
-    for (int64_t i = 0; i < operandRank; ++i) {
-      if (!isCollapsedOrBatching(i)) {
-        remappedOffsetDims.push_back(static_cast<unsigned>(i));
-      }
-    }
+          SmallVector<Value> indexFromOffset(operandRank, constants[0]);
+          for (auto [remappedOffsetDim, offsetDim] :
+               llvm::zip_equal(remappedOffsetDims, offsetDims)) {
+            indexFromOffset[remappedOffsetDim] = linalgIndices[offsetDim];
+          }
 
-    // Clamp start indices to [0, operand_dim - slice_size]; the slice size is
-    // the matching result dim, or 1 for a collapsed dim.
-    for (int i = 0, operandIndexDim = 0; i < operandRank; ++i) {
-      Value outputDimSize = constants[1];
-      if (!isCollapsedOrBatching(i)) {
-        outputDimSize = rewriter.createOrFold<tensor::DimOp>(
-            loc, emptyOp, offsetDims[operandIndexDim++]);
-      }
-      if (remappedIndexFromIndices[i] == constants[0]) {
-        continue;
-      }
-      Value operandDimSize =
-          rewriter.createOrFold<tensor::DimOp>(loc, operand, i);
-      Value largestValidIndex = rewriter.createOrFold<arith::SubIOp>(
-          loc, operandDimSize, outputDimSize);
-      remappedIndexFromIndices[i] = arith::MinSIOp::create(
-          rewriter, loc,
-          arith::MaxSIOp::create(rewriter, loc, constants[0],
-                                 remappedIndexFromIndices[i]),
-          largestValidIndex);
-    }
-
-    SmallVector<Value> indexFromOffset(operandRank, constants[0]);
-    for (auto [remappedOffsetDim, offsetDim] :
-         llvm::zip_equal(remappedOffsetDims, offsetDims)) {
-      indexFromOffset[remappedOffsetDim] = linalgIndices[offsetDim];
-    }
-
-    SmallVector<Value> combinedIndex;
-    for (int64_t i = 0; i < operandRank; ++i) {
-      combinedIndex.push_back(rewriter.createOrFold<arith::AddIOp>(
-          loc, rewriter.getIndexType(),
-          rewriter.createOrFold<arith::AddIOp>(loc, rewriter.getIndexType(),
-                                               remappedIndexFromIndices[i],
-                                               indexFromBatching[i]),
-          indexFromOffset[i]));
-    }
-    Value element =
-        tensor::ExtractOp::create(rewriter, loc, operand, combinedIndex);
-    linalg::YieldOp::create(rewriter, loc, element);
+          SmallVector<Value> combinedIndex;
+          for (int64_t i = 0; i < operandRank; ++i) {
+            combinedIndex.push_back(b.createOrFold<arith::AddIOp>(
+                nestedLoc, b.getIndexType(),
+                b.createOrFold<arith::AddIOp>(nestedLoc, b.getIndexType(),
+                                              remappedIndexFromIndices[i],
+                                              indexFromBatching[i]),
+                indexFromOffset[i]));
+          }
+          Value element =
+              tensor::ExtractOp::create(b, nestedLoc, operand, combinedIndex);
+          linalg::YieldOp::create(b, nestedLoc, element);
+        },
+        linalg::getPrunedAttributeList(gatherOp));
 
     rewriter.replaceOp(gatherOp, linalgOp.getResults());
     return success();
@@ -762,10 +751,14 @@ struct DynamicBroadcastInDimGatherConversion final
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
 
-    SmallVector<Value> operandDims;
+    SmallVector<Value> isExpanding(operandType.getRank());
     for (int64_t i = 0, e = operandType.getRank(); i < e; ++i) {
-      operandDims.push_back(
-          rewriter.createOrFold<tensor::DimOp>(loc, operand, i));
+      if (expanding[i].has_value()) {
+        continue;
+      }
+      Value dim = rewriter.createOrFold<tensor::DimOp>(loc, operand, i);
+      isExpanding[i] = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, dim, one);
     }
 
     auto linalgOp = linalg::GenericOp::create(
@@ -776,17 +769,17 @@ struct DynamicBroadcastInDimGatherConversion final
         [&](OpBuilder &b, Location nestedLoc, ValueRange) {
           SmallVector<Value> index;
           for (auto [operandDim, resultDim] : llvm::enumerate(bcastDims)) {
-            Value resultIndex =
-                linalg::IndexOp::create(b, nestedLoc, resultDim);
-            if (expanding[operandDim].has_value()) {
-              index.push_back(*expanding[operandDim] ? zero : resultIndex);
+            if (expanding[operandDim] == true) {
+              index.push_back(zero);
               continue;
             }
-            Value isOne =
-                arith::CmpIOp::create(b, nestedLoc, arith::CmpIPredicate::eq,
-                                      operandDims[operandDim], one);
-            index.push_back(arith::SelectOp::create(b, nestedLoc, isOne, zero,
-                                                    resultIndex));
+            Value resultIndex =
+                linalg::IndexOp::create(b, nestedLoc, resultDim);
+            index.push_back(expanding[operandDim].has_value()
+                                ? resultIndex
+                                : arith::SelectOp::create(
+                                      b, nestedLoc, isExpanding[operandDim],
+                                      zero, resultIndex));
           }
           Value element =
               tensor::ExtractOp::create(b, nestedLoc, operand, index);
@@ -804,11 +797,10 @@ void populateDynamicShapeConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet *patterns) {
   // Prefer these lowerings for runtime shapes over upstream fallbacks.
-  patterns
-      ->add<DynamicReshapeOpConversion, DynamicPadOpConversion,
-            DynamicConvolutionOpConversion, DynamicGatherOpConversion,
-                DynamicBroadcastInDimGatherConversion>(
-          typeConverter, context, PatternBenefit{1000});
+  patterns->add<DynamicReshapeOpConversion, DynamicPadOpConversion,
+                DynamicConvolutionOpConversion, DynamicGatherOpConversion,
+                DynamicBroadcastInDimGatherConversion>(typeConverter, context,
+                                                       PatternBenefit{1000});
 }
 
 } // namespace mlir::iree_compiler::stablehlo
