@@ -73,11 +73,15 @@ struct DynamicPadOpConversion final
 
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
-    SmallVector<Value> dynamicDims;
-    SmallVector<OpFoldResult> insertOffsets, insertSizes, insertStrides;
+    SmallVector<Value> dynamicDims, resultDynamicDims;
+    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+    SmallVector<OpFoldResult> insertSizes =
+        tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
+    SmallVector<OpFoldResult> insertOffsets, insertStrides;
     SmallVector<OpFoldResult> extractOffsets, extractSizes;
     for (int64_t i = 0; i < rank; ++i) {
-      Value dim = tensor::DimOp::create(rewriter, loc, adaptor.getOperand(), i);
+      Value dim =
+          getValueOrCreateConstantIndexOp(rewriter, loc, insertSizes[i]);
       Value low = extractIndex(rewriter, loc, adaptor.getEdgePaddingLow(), i);
       Value high = extractIndex(rewriter, loc, adaptor.getEdgePaddingHigh(), i);
       Value interior =
@@ -110,26 +114,17 @@ struct DynamicPadOpConversion final
             arith::AddIOp::create(rewriter, loc, dimAndInterior, low);
         Value resultDim = arith::AddIOp::create(rewriter, loc, dimAndLow, high);
         extractSizes.push_back(resultDim);
+        resultDynamicDims.push_back(resultDim);
       } else {
         extractSizes.push_back(rewriter.getIndexAttr(resultType.getDimSize(i)));
       }
 
       insertOffsets.push_back(lowPos);
-      insertSizes.push_back(
-          tensor::getMixedSize(rewriter, loc, adaptor.getOperand(), i));
       insertStrides.push_back(
           arith::AddIOp::create(rewriter, loc, interior, one).getResult());
       extractOffsets.push_back(lowNeg);
-    }
-
-    SmallVector<Value> resultDynamicDims;
-    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
-    for (int64_t d = 0; d < rank; ++d) {
       Value size =
-          getValueOrCreateConstantIndexOp(rewriter, loc, extractSizes[d]);
-      if (resultType.isDynamicDim(d)) {
-        resultDynamicDims.push_back(size);
-      }
+          getValueOrCreateConstantIndexOp(rewriter, loc, extractSizes.back());
       Value positive = rewriter.createOrFold<arith::CmpIOp>(
           loc, arith::CmpIPredicate::sgt, size, zero);
       nonempty = rewriter.createOrFold<arith::AndIOp>(loc, nonempty, positive);
