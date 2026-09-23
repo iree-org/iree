@@ -719,3 +719,18 @@ func.func @dynamic_reduce_window_empty(%a: tensor<?xf32>) -> tensor<?xf32> {
   }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
   return %r : tensor<?xf32>
 }
+
+// -----
+
+// A reduction body can return a block argument without a defining operation.
+// CHECK-LABEL: @dynamic_reduce_window_passthrough
+// CHECK: linalg.generic
+// CHECK-NOT: linalg.pooling
+// CHECK: return
+func.func @dynamic_reduce_window_passthrough(%input: tensor<?x4x4x1xf32>, %init: tensor<f32>) -> tensor<?x3x3x1xf32> {
+  %0 = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%a: tensor<f32>, %b: tensor<f32>):
+    stablehlo.return %b : tensor<f32>
+  }) {window_dimensions = array<i64: 1, 2, 2, 1>} : (tensor<?x4x4x1xf32>, tensor<f32>) -> tensor<?x3x3x1xf32>
+  return %0 : tensor<?x3x3x1xf32>
+}

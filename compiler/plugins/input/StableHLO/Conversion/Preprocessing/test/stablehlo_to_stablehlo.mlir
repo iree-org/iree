@@ -961,8 +961,12 @@ func.func @dynamic_conv_to_padded_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1
 
 // CHECK-LABEL: @scatter_batching_dynamic_indices
 // CHECK-SAME: %[[IDX:[^:]+]]: tensor<2x?x1xi64>
-// CHECK: %[[N:.+]] = stablehlo.get_dimension_size %[[IDX]], dim = 1
-// CHECK: %[[SHAPE:.+]] = stablehlo.concatenate
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[ONE:.+]] = arith.constant 1 : i64
+// CHECK-DAG: %[[TWO:.+]] = arith.constant 2 : i64
+// CHECK: %[[N:.+]] = tensor.dim %[[IDX]], %[[C1]]
+// CHECK: %[[N64:.+]] = arith.index_cast %[[N]] : index to i64
+// CHECK: %[[SHAPE:.+]] = tensor.from_elements %[[TWO]], %[[N64]], %[[ONE]]
 // CHECK: %[[IOTA:.+]] = stablehlo.dynamic_iota %[[SHAPE]], dim = 0 : (tensor<3xi64>) -> tensor<2x?x1xi64>
 // CHECK: %[[CAT:.+]] = stablehlo.concatenate %[[IOTA]], %[[IDX]], dim = 2 : (tensor<2x?x1xi64>, tensor<2x?x1xi64>) -> tensor<2x?x2xi64>
 // CHECK: stablehlo.scatter
@@ -984,7 +988,8 @@ func.func @scatter_batching_dynamic_indices(%a: tensor<2x8xf32>, %i: tensor<2x?x
 // is concatenated ahead of the original index column.
 // CHECK-LABEL: @scatter_batching_middle_indices
 // CHECK-SAME: %[[IDX:[^:]+]]: tensor<?x3x1xi64>
-// CHECK: stablehlo.get_dimension_size %[[IDX]], dim = 0
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: tensor.dim %[[IDX]], %[[C0]]
 // CHECK: %[[IOTA:.+]] = stablehlo.dynamic_iota %{{.+}}, dim = 1 : (tensor<3xi64>) -> tensor<?x3x1xi64>
 // CHECK: stablehlo.concatenate %[[IOTA]], %[[IDX]], dim = 2 : (tensor<?x3x1xi64>, tensor<?x3x1xi64>) -> tensor<?x3x2xi64>
 func.func @scatter_batching_middle_indices(%a: tensor<8x3x5xf32>, %i: tensor<?x3x1xi64>, %u: tensor<?x3x5xf32>) -> tensor<8x3x5xf32> {
