@@ -178,11 +178,10 @@ func.func @dynamic_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: te
 
 // -----
 
-// NHWC with every dim distinct and a non-square kernel. The crop restores
-// the static batch and feature dims.
+// NHWC with distinct dimensions: batch and feature sizes remain static.
 // CHECK-LABEL: @dynamic_conv_nhwc
-// CHECK: %[[INS:.+]] = tensor.insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] [2, 8, 6, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> into tensor<?x?x?x?xf32>
-// CHECK: tensor.extract_slice %[[INS]][%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] [2, %{{.+}}, %{{.+}}, 3] [1, 1, 1, 1] : tensor<?x?x?x?xf32> to tensor<2x?x?x3xf32>
+// CHECK: %[[INS:.+]] = tensor.insert_slice %{{.+}} into %{{.+}}[0, %{{.+}}, %{{.+}}, 0] [2, 8, 6, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> into tensor<2x?x?x3xf32>
+// CHECK: tensor.extract_slice %[[INS]][0, %{{.+}}, %{{.+}}, 0] [2, %{{.+}}, %{{.+}}, 3] [1, 1, 1, 1] : tensor<2x?x?x3xf32> to tensor<2x?x?x3xf32>
 // CHECK: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME: ins(%{{.+}}, %{{.+}} : tensor<2x?x?x3xf32>, tensor<3x2x3x4xf32>)
 // CHECK: return %{{.+}} : tensor<2x8x6x4xf32>
@@ -199,7 +198,7 @@ func.func @dynamic_conv_nhwc(%a: tensor<2x8x6x3xf32>, %k: tensor<3x2x3x4xf32>, %
 
 // lhs_dilation [2, 3] becomes the insert strides [1, 2, 3, 1].
 // CHECK-LABEL: @dynamic_conv_lhs_dilation_nhwc
-// CHECK: tensor.insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] [2, 4, 3, 3] [1, 2, 3, 1]
+// CHECK: tensor.insert_slice %{{.+}} into %{{.+}}[0, %{{.+}}, %{{.+}}, 0] [2, 4, 3, 3] [1, 2, 3, 1]
 // CHECK: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME: dilations = dense<1>
 // CHECK: return %{{.+}} : tensor<2x5x6x5xf32>
