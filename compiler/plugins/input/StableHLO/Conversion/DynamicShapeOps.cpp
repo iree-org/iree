@@ -49,6 +49,100 @@ struct DynamicReshapeOpConversion final
   }
 };
 
+struct DynamicPadGeometry {
+  SmallVector<Value> scratchDynamicDims, resultDynamicDims;
+  SmallVector<OpFoldResult> insertSizes, insertOffsets, insertStrides;
+  SmallVector<OpFoldResult> extractOffsets, extractSizes;
+  Value nonempty;
+};
+
+DynamicPadGeometry
+computeDynamicPadGeometry(OpBuilder &rewriter, Location loc,
+                          mlir::stablehlo::DynamicPadOp::Adaptor adaptor,
+                          RankedTensorType resultType) {
+  int64_t rank = resultType.getRank();
+  DynamicPadGeometry geometry;
+  Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+  Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+  geometry.nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+  geometry.insertSizes =
+      tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
+  for (int64_t i = 0; i < rank; ++i) {
+    Value dim =
+        getValueOrCreateConstantIndexOp(rewriter, loc, geometry.insertSizes[i]);
+    Value low = extractIndex(rewriter, loc, adaptor.getEdgePaddingLow(), i);
+    Value high = extractIndex(rewriter, loc, adaptor.getEdgePaddingHigh(), i);
+    Value interior =
+        extractIndex(rewriter, loc, adaptor.getInteriorPadding(), i);
+
+    Value lowPos = arith::MaxSIOp::create(rewriter, loc, low, zero);
+    Value highPos = arith::MaxSIOp::create(rewriter, loc, high, zero);
+    Value lowNeg = arith::MaxSIOp::create(
+        rewriter, loc, arith::SubIOp::create(rewriter, loc, zero, low), zero);
+
+    Value dimMinusOne = arith::SubIOp::create(rewriter, loc, dim, one);
+    Value clampedDimMinusOne =
+        arith::MaxSIOp::create(rewriter, loc, dimMinusOne, zero);
+    Value interiorTotal =
+        arith::MulIOp::create(rewriter, loc, clampedDimMinusOne, interior);
+    Value dimAndInterior =
+        arith::AddIOp::create(rewriter, loc, dim, interiorTotal);
+
+    // The scratch tensor's size depends on lowPos/highPos, which are
+    // runtime values even where the result type's dim is static, so every
+    // dim of the scratch tensor is dynamic.
+    Value dimAndLowPos =
+        arith::AddIOp::create(rewriter, loc, dimAndInterior, lowPos);
+    Value filledDim =
+        arith::AddIOp::create(rewriter, loc, dimAndLowPos, highPos);
+    geometry.scratchDynamicDims.push_back(filledDim);
+
+    if (resultType.isDynamicDim(i)) {
+      Value dimAndLow =
+          arith::AddIOp::create(rewriter, loc, dimAndInterior, low);
+      Value resultDim = arith::AddIOp::create(rewriter, loc, dimAndLow, high);
+      geometry.extractSizes.push_back(resultDim);
+      geometry.resultDynamicDims.push_back(resultDim);
+    } else {
+      geometry.extractSizes.push_back(
+          rewriter.getIndexAttr(resultType.getDimSize(i)));
+    }
+
+    geometry.insertOffsets.push_back(lowPos);
+    geometry.insertStrides.push_back(
+        arith::AddIOp::create(rewriter, loc, interior, one).getResult());
+    geometry.extractOffsets.push_back(lowNeg);
+    Value size = getValueOrCreateConstantIndexOp(rewriter, loc,
+                                                 geometry.extractSizes.back());
+    Value positive = rewriter.createOrFold<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::sgt, size, zero);
+    geometry.nonempty =
+        rewriter.createOrFold<arith::AndIOp>(loc, geometry.nonempty, positive);
+  }
+  return geometry;
+}
+
+Value createPaddedTensor(OpBuilder &rewriter, Location loc, Value operand,
+                         Value paddingValue, RankedTensorType resultType,
+                         const DynamicPadGeometry &geometry) {
+  int64_t rank = resultType.getRank();
+  SmallVector<int64_t> scratchShape(rank, ShapedType::kDynamic);
+  Value empty = tensor::EmptyOp::create(rewriter, loc, scratchShape,
+                                        resultType.getElementType(),
+                                        geometry.scratchDynamicDims);
+  Value filled =
+      linalg::FillOp::create(rewriter, loc, paddingValue, empty).result();
+  Value inserted = tensor::InsertSliceOp::create(
+                       rewriter, loc, operand, filled, geometry.insertOffsets,
+                       geometry.insertSizes, geometry.insertStrides)
+                       .getResult();
+  // Negative edge padding crops, which the insert cannot express.
+  SmallVector<OpFoldResult> extractStrides(rank, rewriter.getIndexAttr(1));
+  return tensor::ExtractSliceOp::create(rewriter, loc, resultType, inserted,
+                                        geometry.extractOffsets,
+                                        geometry.extractSizes, extractStrides);
+}
+
 // tensor.pad has no interior padding, and whether the interior amounts are
 // zero is unknown here, so the strided insert covers every case.
 struct DynamicPadOpConversion final
@@ -66,103 +160,295 @@ struct DynamicPadOpConversion final
     if (!resultType || !operandType) {
       return rewriter.notifyMatchFailure(op, "type conversion failed");
     }
-    int64_t rank = operandType.getRank();
 
     Value paddingValue = rewriter.createOrFold<tensor::ExtractOp>(
         loc, adaptor.getPaddingValue());
 
-    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
-    Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
-    SmallVector<Value> dynamicDims, resultDynamicDims;
-    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
-    SmallVector<OpFoldResult> insertSizes =
-        tensor::getMixedSizes(rewriter, loc, adaptor.getOperand());
-    SmallVector<OpFoldResult> insertOffsets, insertStrides;
-    SmallVector<OpFoldResult> extractOffsets, extractSizes;
-    for (int64_t i = 0; i < rank; ++i) {
-      Value dim =
-          getValueOrCreateConstantIndexOp(rewriter, loc, insertSizes[i]);
-      Value low = extractIndex(rewriter, loc, adaptor.getEdgePaddingLow(), i);
-      Value high = extractIndex(rewriter, loc, adaptor.getEdgePaddingHigh(), i);
-      Value interior =
-          extractIndex(rewriter, loc, adaptor.getInteriorPadding(), i);
-
-      Value lowPos = arith::MaxSIOp::create(rewriter, loc, low, zero);
-      Value highPos = arith::MaxSIOp::create(rewriter, loc, high, zero);
-      Value lowNeg = arith::MaxSIOp::create(
-          rewriter, loc, arith::SubIOp::create(rewriter, loc, zero, low), zero);
-
-      Value dimMinusOne = arith::SubIOp::create(rewriter, loc, dim, one);
-      Value clampedDimMinusOne =
-          arith::MaxSIOp::create(rewriter, loc, dimMinusOne, zero);
-      Value interiorTotal =
-          arith::MulIOp::create(rewriter, loc, clampedDimMinusOne, interior);
-      Value dimAndInterior =
-          arith::AddIOp::create(rewriter, loc, dim, interiorTotal);
-
-      // The scratch tensor's size depends on lowPos/highPos, which are
-      // runtime values even where the result type's dim is static, so every
-      // dim of the scratch tensor is dynamic.
-      Value dimAndLowPos =
-          arith::AddIOp::create(rewriter, loc, dimAndInterior, lowPos);
-      Value filledDim =
-          arith::AddIOp::create(rewriter, loc, dimAndLowPos, highPos);
-      dynamicDims.push_back(filledDim);
-
-      if (resultType.isDynamicDim(i)) {
-        Value dimAndLow =
-            arith::AddIOp::create(rewriter, loc, dimAndInterior, low);
-        Value resultDim = arith::AddIOp::create(rewriter, loc, dimAndLow, high);
-        extractSizes.push_back(resultDim);
-        resultDynamicDims.push_back(resultDim);
-      } else {
-        extractSizes.push_back(rewriter.getIndexAttr(resultType.getDimSize(i)));
-      }
-
-      insertOffsets.push_back(lowPos);
-      insertStrides.push_back(
-          arith::AddIOp::create(rewriter, loc, interior, one).getResult());
-      extractOffsets.push_back(lowNeg);
-      Value size =
-          getValueOrCreateConstantIndexOp(rewriter, loc, extractSizes.back());
-      Value positive = rewriter.createOrFold<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::sgt, size, zero);
-      nonempty = rewriter.createOrFold<arith::AndIOp>(loc, nonempty, positive);
-    }
+    auto geometry =
+        computeDynamicPadGeometry(rewriter, loc, adaptor, resultType);
     // Empty crops need no scratch buffer. In particular, runtime convolution
     // padding can remove an arbitrarily large dilated input entirely.
-    auto ifOp =
-        scf::IfOp::create(rewriter, loc, TypeRange{resultType}, nonempty,
-                          /*withElseRegion=*/true);
+    auto ifOp = scf::IfOp::create(rewriter, loc, TypeRange{resultType},
+                                  geometry.nonempty,
+                                  /*withElseRegion=*/true);
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      SmallVector<int64_t> scratchShape(rank, ShapedType::kDynamic);
-      Value empty =
-          tensor::EmptyOp::create(rewriter, loc, scratchShape,
-                                  resultType.getElementType(), dynamicDims);
-      Value filled =
-          linalg::FillOp::create(rewriter, loc, paddingValue, empty).result();
-      Value inserted = tensor::InsertSliceOp::create(
-                           rewriter, loc, adaptor.getOperand(), filled,
-                           insertOffsets, insertSizes, insertStrides)
-                           .getResult();
-      // Negative edge padding crops, which the insert cannot express.
-      SmallVector<OpFoldResult> extractStrides(rank, rewriter.getIndexAttr(1));
-      Value result = tensor::ExtractSliceOp::create(
-          rewriter, loc, resultType, inserted, extractOffsets, extractSizes,
-          extractStrides);
+      Value result = createPaddedTensor(rewriter, loc, adaptor.getOperand(),
+                                        paddingValue, resultType, geometry);
       scf::YieldOp::create(rewriter, loc, result);
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-      Value resultEmpty =
-          tensor::EmptyOp::create(rewriter, loc, resultType, resultDynamicDims);
+      Value resultEmpty = tensor::EmptyOp::create(rewriter, loc, resultType,
+                                                  geometry.resultDynamicDims);
       scf::YieldOp::create(rewriter, loc, resultEmpty);
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorTieShapeOp>(
-        op, resultType, ifOp.getResult(0), resultDynamicDims);
+        op, resultType, ifOp.getResult(0), geometry.resultDynamicDims);
     return success();
   }
 };
+
+struct ConvolutionWindow {
+  SmallVector<int64_t> strides, lhsDilations, rhsDilations, padding;
+};
+
+ConvolutionWindow getConvolutionWindow(mlir::stablehlo::ConvolutionOp op) {
+  int64_t spatialRank =
+      op.getDimensionNumbers().getInputSpatialDimensions().size();
+  ConvolutionWindow window{SmallVector<int64_t>(spatialRank, 1),
+                           SmallVector<int64_t>(spatialRank, 1),
+                           SmallVector<int64_t>(spatialRank, 1),
+                           SmallVector<int64_t>(2 * spatialRank, 0)};
+  if (op.getWindowStrides()) {
+    window.strides = llvm::to_vector(*op.getWindowStrides());
+  }
+  if (op.getLhsDilation()) {
+    window.lhsDilations = llvm::to_vector(*op.getLhsDilation());
+  }
+  if (op.getRhsDilation()) {
+    window.rhsDilations = llvm::to_vector(*op.getRhsDilation());
+  }
+  if (op.getPadding()) {
+    window.padding = llvm::to_vector(op.getPadding()->getValues<int64_t>());
+  }
+  return window;
+}
+
+struct ConvolutionResultShape {
+  SmallVector<Value> dynamicDims;
+  Value nonempty;
+};
+
+ConvolutionResultShape
+computeConvolutionResultShape(OpBuilder &rewriter,
+                              mlir::stablehlo::ConvolutionOp op, Value input,
+                              Value filter, RankedTensorType resultType,
+                              const ConvolutionWindow &window) {
+  Location loc = op.getLoc();
+  int64_t rank = resultType.getRank();
+  auto constant = [&](int64_t value) -> Value {
+    return rewriter.createOrFold<arith::ConstantIndexOp>(loc, value);
+  };
+  Value zero = constant(0);
+  Value one = constant(1);
+  // An empty input/kernel stays empty under dilation (StableHLO C25).
+  auto dilate = [&](Value size, int64_t dilation) -> Value {
+    if (dilation == 1) {
+      return size;
+    }
+    Value empty = rewriter.createOrFold<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, size, zero);
+    Value span = rewriter.createOrFold<arith::SubIOp>(loc, size, one);
+    span = rewriter.createOrFold<arith::MulIOp>(loc, span, constant(dilation));
+    Value dilated = rewriter.createOrFold<arith::AddIOp>(loc, span, one);
+    return rewriter.createOrFold<arith::SelectOp>(loc, empty, zero, dilated);
+  };
+
+  ConvolutionResultShape shape;
+  shape.nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+  for (int64_t d = 0; d < rank; ++d) {
+    Value size;
+    if (!resultType.isDynamicDim(d)) {
+      size = constant(resultType.getDimSize(d));
+    } else if (d == 0) {
+      size = rewriter.createOrFold<tensor::DimOp>(loc, input, 0);
+      size = rewriter.createOrFold<arith::DivUIOp>(
+          loc, size, constant(op.getBatchGroupCount()));
+    } else if (d == rank - 1) {
+      size = rewriter.createOrFold<tensor::DimOp>(loc, filter, rank - 1);
+    } else {
+      int64_t s = d - 1;
+      Value inputSize = rewriter.createOrFold<tensor::DimOp>(loc, input, d);
+      Value kernelSize = rewriter.createOrFold<tensor::DimOp>(loc, filter, s);
+      Value padded = dilate(inputSize, window.lhsDilations[s]);
+      padded = rewriter.createOrFold<arith::AddIOp>(
+          loc, padded, constant(window.padding[2 * s]));
+      padded = rewriter.createOrFold<arith::AddIOp>(
+          loc, padded, constant(window.padding[2 * s + 1]));
+      Value dilatedKernel = dilate(kernelSize, window.rhsDilations[s]);
+      Value span =
+          rewriter.createOrFold<arith::SubIOp>(loc, padded, dilatedKernel);
+      // For a fitting window span is nonnegative, so truncation is floor.
+      // The select discards this count when the window does not fit.
+      Value count = rewriter.createOrFold<arith::DivSIOp>(
+          loc, span, constant(window.strides[s]));
+      count = rewriter.createOrFold<arith::AddIOp>(loc, count, one);
+      Value fits = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sge, span, zero);
+      Value hasInput = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::ne, padded, zero);
+      fits = rewriter.createOrFold<arith::AndIOp>(loc, fits, hasInput);
+      size = rewriter.createOrFold<arith::SelectOp>(loc, fits, count, zero);
+    }
+    if (resultType.isDynamicDim(d)) {
+      shape.dynamicDims.push_back(size);
+    }
+    Value positive = rewriter.createOrFold<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::sgt, size, zero);
+    shape.nonempty =
+        rewriter.createOrFold<arith::AndIOp>(loc, shape.nonempty, positive);
+  }
+  return shape;
+}
+
+Value padConvolutionInput(OpBuilder &rewriter, Location loc, Value input,
+                          const ConvolutionWindow &window) {
+  int64_t rank = cast<RankedTensorType>(input.getType()).getRank();
+  if (llvm::any_of(window.padding, [](int64_t v) { return v != 0; }) ||
+      llvm::any_of(window.lhsDilations, [](int64_t v) { return v != 1; })) {
+    SmallVector<int64_t> lows(rank, 0), highs(rank, 0), interiors(rank, 0);
+    for (int64_t i = 0; i < rank - 2; ++i) {
+      lows[i + 1] = window.padding[2 * i];
+      highs[i + 1] = window.padding[2 * i + 1];
+      interiors[i + 1] = window.lhsDilations[i] - 1;
+    }
+    auto shapeType = RankedTensorType::get({rank}, rewriter.getI64Type());
+    auto shapeConstant = [&](ArrayRef<int64_t> values) -> Value {
+      return arith::ConstantOp::create(
+          rewriter, loc, DenseIntElementsAttr::get(shapeType, values));
+    };
+    auto inputType = cast<RankedTensorType>(input.getType());
+    SmallVector<int64_t> paddedShape(inputType.getShape());
+    for (int64_t i = 1; i < rank - 1; ++i) {
+      paddedShape[i] = ShapedType::kDynamic;
+    }
+    Value scalarEmpty = tensor::EmptyOp::create(
+        rewriter, loc, ArrayRef<int64_t>{}, inputType.getElementType());
+    Value padValue =
+        mlir::stablehlo::fillTensorWithZeros(rewriter, loc, scalarEmpty);
+    return mlir::stablehlo::DynamicPadOp::create(
+        rewriter, loc,
+        RankedTensorType::get(paddedShape, inputType.getElementType()), input,
+        padValue, shapeConstant(lows), shapeConstant(highs),
+        shapeConstant(interiors));
+  }
+  return input;
+}
+
+Value splitConvolutionGroupDimension(OpBuilder &rewriter, Location loc,
+                                     Value value, int64_t dimension,
+                                     int64_t groups) {
+  auto type = cast<RankedTensorType>(value.getType());
+  int64_t rank = type.getRank();
+  SmallVector<int64_t> shape(type.getShape());
+  if (!ShapedType::isDynamic(shape[dimension])) {
+    shape[dimension] /= groups;
+  }
+  shape.insert(shape.begin() + dimension, groups);
+  SmallVector<ReassociationIndices> reassociation;
+  for (int64_t d = 0; d < rank; ++d) {
+    if (d < dimension) {
+      reassociation.push_back({d});
+    } else if (d == dimension) {
+      reassociation.push_back({d, d + 1});
+    } else {
+      reassociation.push_back({d + 1});
+    }
+  }
+  return tensor::ExpandShapeOp::create(
+      rewriter, loc, RankedTensorType::get(shape, type.getElementType()), value,
+      reassociation);
+}
+
+Value createGroupedConvolution(OpBuilder &rewriter,
+                               mlir::stablehlo::ConvolutionOp op, Value input,
+                               Value filter, Value init,
+                               RankedTensorType resultType,
+                               const ConvolutionWindow &window) {
+  Location loc = op.getLoc();
+  int64_t rank = resultType.getRank();
+  // Split the grouped dimension instead of unrolling one convolution per
+  // group. This keeps the IR size independent of the number of channels.
+  int64_t groups = std::max(op.getFeatureGroupCount(), op.getBatchGroupCount());
+  input = splitConvolutionGroupDimension(
+      rewriter, loc, input, op.getFeatureGroupCount() != 1 ? rank - 1 : 0,
+      groups);
+  filter =
+      splitConvolutionGroupDimension(rewriter, loc, filter, rank - 1, groups);
+  Value groupedInit =
+      splitConvolutionGroupDimension(rewriter, loc, init, rank - 1, groups);
+  // Parallel loops: batch, output spatial dimensions, group, output
+  // channel within the group. Reduction loops: kernel spatial, channel.
+  int64_t loops = 2 * rank;
+  auto dim = [&](int64_t d) { return rewriter.getAffineDimExpr(d); };
+  SmallVector<AffineExpr> inputMap, filterMap, outputMap;
+  if (op.getBatchGroupCount() != 1) {
+    inputMap.push_back(dim(rank - 1));
+  }
+  inputMap.push_back(dim(0));
+  for (int64_t i = 0; i < rank - 2; ++i) {
+    inputMap.push_back(dim(i + 1) * window.strides[i] +
+                       dim(rank + 1 + i) * window.rhsDilations[i]);
+    filterMap.push_back(dim(rank + 1 + i));
+  }
+  if (op.getFeatureGroupCount() != 1) {
+    inputMap.push_back(dim(rank - 1));
+  }
+  inputMap.push_back(dim(loops - 1));
+  filterMap.append({dim(loops - 1), dim(rank - 1), dim(rank)});
+  for (int64_t i = 0; i <= rank; ++i) {
+    outputMap.push_back(dim(i));
+  }
+  SmallVector<AffineMap> maps;
+  for (auto &exprs : {inputMap, filterMap, outputMap}) {
+    maps.push_back(AffineMap::get(loops, 0, exprs, rewriter.getContext()));
+  }
+  SmallVector<utils::IteratorType> iterators(loops,
+                                             utils::IteratorType::reduction);
+  std::fill_n(iterators.begin(), rank + 1, utils::IteratorType::parallel);
+  Value convolved =
+      linalg::GenericOp::create(
+          rewriter, loc, TypeRange{groupedInit.getType()},
+          ValueRange{input, filter}, ValueRange{groupedInit}, maps, iterators,
+          [&](OpBuilder &builder, Location nestedLoc, ValueRange) {
+            ImplicitLocOpBuilder nested(nestedLoc, builder);
+            linalg::Conv2DOp::regionBuilder(nested, *nested.getInsertionBlock(),
+                                            {}, {});
+          },
+          linalg::getPrunedAttributeList(op))
+          .getResult(0);
+  SmallVector<ReassociationIndices> collapse;
+  for (int64_t i = 0; i < rank - 1; ++i) {
+    collapse.push_back({i});
+  }
+  collapse.push_back({rank - 1, rank});
+  return tensor::CollapseShapeOp::create(rewriter, loc, resultType, convolved,
+                                         collapse);
+}
+
+Value createConvolution(OpBuilder &rewriter, mlir::stablehlo::ConvolutionOp op,
+                        Value input, Value filter, Value init,
+                        RankedTensorType resultType,
+                        const ConvolutionWindow &window) {
+  Location loc = op.getLoc();
+  int64_t rank = resultType.getRank();
+  bool grouped = op.getFeatureGroupCount() != 1 || op.getBatchGroupCount() != 1;
+  auto strideAttr = rewriter.getI64TensorAttr(window.strides);
+  auto dilationAttr = rewriter.getI64TensorAttr(window.rhsDilations);
+  if (grouped) {
+    return createGroupedConvolution(rewriter, op, input, filter, init,
+                                    resultType, window);
+  }
+  if (rank == 3) {
+    return linalg::Conv1DNwcWcfOp::create(
+               rewriter, loc, resultType, ValueRange{input, filter},
+               ValueRange{init}, strideAttr, dilationAttr,
+               linalg::getPrunedAttributeList(op))
+        .getResult(0);
+  }
+  if (rank == 4) {
+    return linalg::Conv2DNhwcHwcfOp::create(
+               rewriter, loc, resultType, ValueRange{input, filter},
+               ValueRange{init}, strideAttr, dilationAttr,
+               linalg::getPrunedAttributeList(op))
+        .getResult(0);
+  }
+  return linalg::Conv3DNdhwcDhwcfOp::create(
+             rewriter, loc, resultType, ValueRange{input, filter},
+             ValueRange{init}, strideAttr, dilationAttr,
+             linalg::getPrunedAttributeList(op))
+      .getResult(0);
+}
 
 // The upstream named convolution lowering computes dynamic batch/channel sizes
 // but requires static spatial results. Compute those sizes from StableHLO C25.
@@ -220,228 +506,30 @@ struct DynamicConvolutionOpConversion final
     Location loc = op.getLoc();
     Value input = adaptor.getLhs();
     Value filter = adaptor.getRhs();
-    SmallVector<int64_t> strides(rank - 2, 1), lhsDilations(rank - 2, 1),
-        rhsDilations(rank - 2, 1), padding(2 * (rank - 2), 0);
-    if (op.getWindowStrides()) {
-      strides = llvm::to_vector(*op.getWindowStrides());
-    }
-    if (op.getLhsDilation()) {
-      lhsDilations = llvm::to_vector(*op.getLhsDilation());
-    }
-    if (op.getRhsDilation()) {
-      rhsDilations = llvm::to_vector(*op.getRhsDilation());
-    }
-    if (op.getPadding()) {
-      padding = llvm::to_vector(op.getPadding()->getValues<int64_t>());
-    }
-    auto constant = [&](int64_t value) -> Value {
-      return rewriter.createOrFold<arith::ConstantIndexOp>(loc, value);
-    };
-    Value zero = constant(0);
-    Value one = constant(1);
-    // An empty input/kernel stays empty under dilation (StableHLO C25).
-    auto dilate = [&](Value size, int64_t dilation) -> Value {
-      if (dilation == 1) {
-        return size;
-      }
-      Value empty = rewriter.createOrFold<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::eq, size, zero);
-      Value span = rewriter.createOrFold<arith::SubIOp>(loc, size, one);
-      span =
-          rewriter.createOrFold<arith::MulIOp>(loc, span, constant(dilation));
-      Value dilated = rewriter.createOrFold<arith::AddIOp>(loc, span, one);
-      return rewriter.createOrFold<arith::SelectOp>(loc, empty, zero, dilated);
-    };
-
-    SmallVector<Value> dynamicDims;
-    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
-    for (int64_t d = 0; d < rank; ++d) {
-      Value size;
-      if (!resultType.isDynamicDim(d)) {
-        size = constant(resultType.getDimSize(d));
-      } else if (d == 0) {
-        size = rewriter.createOrFold<tensor::DimOp>(loc, input, 0);
-        size = rewriter.createOrFold<arith::DivUIOp>(
-            loc, size, constant(op.getBatchGroupCount()));
-      } else if (d == rank - 1) {
-        size = rewriter.createOrFold<tensor::DimOp>(loc, filter, rank - 1);
-      } else {
-        int64_t s = d - 1;
-        Value inputSize = rewriter.createOrFold<tensor::DimOp>(loc, input, d);
-        Value kernelSize = rewriter.createOrFold<tensor::DimOp>(loc, filter, s);
-        Value padded = dilate(inputSize, lhsDilations[s]);
-        padded = rewriter.createOrFold<arith::AddIOp>(loc, padded,
-                                                      constant(padding[2 * s]));
-        padded = rewriter.createOrFold<arith::AddIOp>(
-            loc, padded, constant(padding[2 * s + 1]));
-        Value window = dilate(kernelSize, rhsDilations[s]);
-        Value span = rewriter.createOrFold<arith::SubIOp>(loc, padded, window);
-        // For a fitting window span is nonnegative, so truncation is floor.
-        // The select discards this count when the window does not fit.
-        Value count = rewriter.createOrFold<arith::DivSIOp>(
-            loc, span, constant(strides[s]));
-        count = rewriter.createOrFold<arith::AddIOp>(loc, count, one);
-        Value fits = rewriter.createOrFold<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::sge, span, zero);
-        Value hasInput = rewriter.createOrFold<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::ne, padded, zero);
-        fits = rewriter.createOrFold<arith::AndIOp>(loc, fits, hasInput);
-        size = rewriter.createOrFold<arith::SelectOp>(loc, fits, count, zero);
-      }
-      if (resultType.isDynamicDim(d)) {
-        dynamicDims.push_back(size);
-      }
-      Value positive = rewriter.createOrFold<arith::CmpIOp>(
-          loc, arith::CmpIPredicate::sgt, size, zero);
-      nonempty = rewriter.createOrFold<arith::AndIOp>(loc, nonempty, positive);
-    }
+    auto window = getConvolutionWindow(op);
+    auto shape = computeConvolutionResultShape(rewriter, op, input, filter,
+                                               resultType, window);
     Value empty =
-        tensor::EmptyOp::create(rewriter, loc, resultType, dynamicDims);
+        tensor::EmptyOp::create(rewriter, loc, resultType, shape.dynamicDims);
     Value init = mlir::stablehlo::fillTensorWithZeros(rewriter, loc, empty);
 
     // Avoid materializing a negatively-sized crop (or running a convolution)
     // when no window fits. The shape calculation above still follows C25.
     auto ifOp =
-        scf::IfOp::create(rewriter, loc, TypeRange{resultType}, nonempty,
+        scf::IfOp::create(rewriter, loc, TypeRange{resultType}, shape.nonempty,
                           /*withElseRegion=*/true);
     {
       OpBuilder::InsertionGuard guard(rewriter);
       rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-      if (llvm::any_of(padding, [](int64_t v) { return v != 0; }) ||
-          llvm::any_of(lhsDilations, [](int64_t v) { return v != 1; })) {
-        SmallVector<int64_t> lows(rank, 0), highs(rank, 0), interiors(rank, 0);
-        for (int64_t i = 0; i < rank - 2; ++i) {
-          lows[i + 1] = padding[2 * i];
-          highs[i + 1] = padding[2 * i + 1];
-          interiors[i + 1] = lhsDilations[i] - 1;
-        }
-        auto shapeType = RankedTensorType::get({rank}, rewriter.getI64Type());
-        auto shapeConstant = [&](ArrayRef<int64_t> values) -> Value {
-          return arith::ConstantOp::create(
-              rewriter, loc, DenseIntElementsAttr::get(shapeType, values));
-        };
-        auto inputType = cast<RankedTensorType>(input.getType());
-        SmallVector<int64_t> paddedShape(inputType.getShape());
-        for (int64_t i = 1; i < rank - 1; ++i) {
-          paddedShape[i] = ShapedType::kDynamic;
-        }
-        Value scalarEmpty = tensor::EmptyOp::create(
-            rewriter, loc, ArrayRef<int64_t>{}, inputType.getElementType());
-        Value padValue =
-            mlir::stablehlo::fillTensorWithZeros(rewriter, loc, scalarEmpty);
-        input = mlir::stablehlo::DynamicPadOp::create(
-            rewriter, loc,
-            RankedTensorType::get(paddedShape, inputType.getElementType()),
-            input, padValue, shapeConstant(lows), shapeConstant(highs),
-            shapeConstant(interiors));
-      }
-      auto strideAttr = rewriter.getI64TensorAttr(strides);
-      auto dilationAttr = rewriter.getI64TensorAttr(rhsDilations);
-      Value result;
-      if (grouped) {
-        // Split the grouped dimension instead of unrolling one convolution per
-        // group. This keeps the IR size independent of the number of channels.
-        int64_t groups =
-            std::max(op.getFeatureGroupCount(), op.getBatchGroupCount());
-        auto split = [&](Value value, int64_t dimension) -> Value {
-          auto type = cast<RankedTensorType>(value.getType());
-          SmallVector<int64_t> shape(type.getShape());
-          if (!ShapedType::isDynamic(shape[dimension])) {
-            shape[dimension] /= groups;
-          }
-          shape.insert(shape.begin() + dimension, groups);
-          SmallVector<ReassociationIndices> reassociation;
-          for (int64_t d = 0; d < rank; ++d) {
-            if (d < dimension) {
-              reassociation.push_back({d});
-            } else if (d == dimension) {
-              reassociation.push_back({d, d + 1});
-            } else {
-              reassociation.push_back({d + 1});
-            }
-          }
-          return tensor::ExpandShapeOp::create(
-              rewriter, loc,
-              RankedTensorType::get(shape, type.getElementType()), value,
-              reassociation);
-        };
-        input = split(input, op.getFeatureGroupCount() != 1 ? rank - 1 : 0);
-        filter = split(filter, rank - 1);
-        Value groupedInit = split(init, rank - 1);
-        // Parallel loops: batch, output spatial dimensions, group, output
-        // channel within the group. Reduction loops: kernel spatial, channel.
-        int64_t loops = 2 * rank;
-        auto dim = [&](int64_t d) { return rewriter.getAffineDimExpr(d); };
-        SmallVector<AffineExpr> inputMap, filterMap, outputMap;
-        if (op.getBatchGroupCount() != 1) {
-          inputMap.push_back(dim(rank - 1));
-        }
-        inputMap.push_back(dim(0));
-        for (int64_t i = 0; i < rank - 2; ++i) {
-          inputMap.push_back(dim(i + 1) * strides[i] +
-                             dim(rank + 1 + i) * rhsDilations[i]);
-          filterMap.push_back(dim(rank + 1 + i));
-        }
-        if (op.getFeatureGroupCount() != 1) {
-          inputMap.push_back(dim(rank - 1));
-        }
-        inputMap.push_back(dim(loops - 1));
-        filterMap.append({dim(loops - 1), dim(rank - 1), dim(rank)});
-        for (int64_t i = 0; i <= rank; ++i) {
-          outputMap.push_back(dim(i));
-        }
-        SmallVector<AffineMap> maps;
-        for (auto &exprs : {inputMap, filterMap, outputMap}) {
-          maps.push_back(
-              AffineMap::get(loops, 0, exprs, rewriter.getContext()));
-        }
-        SmallVector<utils::IteratorType> iterators(
-            loops, utils::IteratorType::reduction);
-        std::fill_n(iterators.begin(), rank + 1, utils::IteratorType::parallel);
-        Value convolved =
-            linalg::GenericOp::create(
-                rewriter, loc, TypeRange{groupedInit.getType()},
-                ValueRange{input, filter}, ValueRange{groupedInit}, maps,
-                iterators,
-                [&](OpBuilder &builder, Location nestedLoc, ValueRange) {
-                  ImplicitLocOpBuilder nested(nestedLoc, builder);
-                  linalg::Conv2DOp::regionBuilder(
-                      nested, *nested.getInsertionBlock(), {}, {});
-                },
-                linalg::getPrunedAttributeList(op))
-                .getResult(0);
-        SmallVector<ReassociationIndices> collapse;
-        for (int64_t i = 0; i < rank - 1; ++i) {
-          collapse.push_back({i});
-        }
-        collapse.push_back({rank - 1, rank});
-        result = tensor::CollapseShapeOp::create(rewriter, loc, resultType,
-                                                 convolved, collapse);
-      } else if (rank == 3) {
-        result = linalg::Conv1DNwcWcfOp::create(
-                     rewriter, loc, resultType, ValueRange{input, filter},
-                     ValueRange{init}, strideAttr, dilationAttr,
-                     linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-      } else if (rank == 4) {
-        result = linalg::Conv2DNhwcHwcfOp::create(
-                     rewriter, loc, resultType, ValueRange{input, filter},
-                     ValueRange{init}, strideAttr, dilationAttr,
-                     linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-      } else {
-        result = linalg::Conv3DNdhwcDhwcfOp::create(
-                     rewriter, loc, resultType, ValueRange{input, filter},
-                     ValueRange{init}, strideAttr, dilationAttr,
-                     linalg::getPrunedAttributeList(op))
-                     .getResult(0);
-      }
+      input = padConvolutionInput(rewriter, loc, input, window);
+      Value result = createConvolution(rewriter, op, input, filter, init,
+                                       resultType, window);
       scf::YieldOp::create(rewriter, loc, result);
       rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
       scf::YieldOp::create(rewriter, loc, init);
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorTieShapeOp>(
-        op, resultType, ifOp.getResult(0), dynamicDims);
+        op, resultType, ifOp.getResult(0), shape.dynamicDims);
     return success();
   }
 };
