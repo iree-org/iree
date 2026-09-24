@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' \
-// RUN:   %s | FileCheck %s
+// RUN:   %s | FileCheck %s --implicit-check-not=vector.create_mask --implicit-check-not=vector.constant_mask
 
 // Test that the vector distribute pipeline correctly handles attention with
 // a K1 dimension (63) that is not aligned to the reduction tile size (64),
