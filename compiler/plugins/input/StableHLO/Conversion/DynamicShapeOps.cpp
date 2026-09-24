@@ -864,7 +864,9 @@ bool matchesUpstreamPooling(mlir::stablehlo::ReduceWindowOp op) {
   if (rank != 4 && rank != 5) {
     return false;
   }
-  if (op.getPadding() && !mlir::stablehlo::isSplatValue(*op.getPadding(), 0)) {
+  if (auto padding = op.getPadding();
+      padding &&
+      (!padding->isSplat() || !padding->getSplatValue<APInt>().isZero())) {
     return false;
   }
   if (auto bd = op.getBaseDilations();
@@ -1044,8 +1046,8 @@ struct DynamicReduceWindowOpConversion final
                                              rewriter.getF32Type()));
     auto linalgOp = linalg::GenericOp::create(
         rewriter, loc, resultTypes, inputs, seeds, indexingMaps,
-        mlir::stablehlo::getParallelAndReductionIterators(
-            rank + filteredWindowDims.size(), filteredWindowDims.size()),
+        getParallelAndReductionIterators(rank + filteredWindowDims.size(),
+                                         filteredWindowDims.size()),
         /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(op));
 
     Region &region = linalgOp.getRegion();
