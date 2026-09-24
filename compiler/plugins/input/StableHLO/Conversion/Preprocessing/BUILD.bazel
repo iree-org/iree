@@ -66,6 +66,7 @@ iree_compiler_cc_library(
         "FlattenTuplesInCFG.cpp",
         "FlattenTuplesInSCF.cpp",
         "GatherToTorchIndexSelect.cpp",
+        "LowerBounds.cpp",
         "LowerComplex.cpp",
         "Passes.cpp",
         "StableHLOToStableHLO.cpp",
@@ -78,6 +79,8 @@ iree_compiler_cc_library(
     deps = [
         ":ComplexLoweringPatterns",
         ":PassHeaders",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:CommonFolders",

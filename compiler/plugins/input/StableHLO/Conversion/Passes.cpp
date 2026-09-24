@@ -74,6 +74,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
     passManager.addPass(createFlattenTuplesInCFG());
   }
 
+  // Runs after the tuple flatteners, which unpack a bounded tensor out of a
+  // tuple argument.
+  passManager.addNestedPass<func::FuncOp>(createLowerBounds());
+
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
