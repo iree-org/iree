@@ -9,17 +9,33 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo/conversions/linalg/transforms/LegalizeToLinalgUtils.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
+
+Value fillTensorWithZeros(OpBuilder &builder, Location loc, Value tensor) {
+  Type elementType = cast<RankedTensorType>(tensor.getType()).getElementType();
+  Value zero;
+  if (auto complexType = dyn_cast<ComplexType>(elementType)) {
+    auto zeroElement = builder.getZeroAttr(complexType.getElementType());
+    zero = complex::ConstantOp::create(
+        builder, loc, complexType,
+        builder.getArrayAttr({zeroElement, zeroElement}));
+  } else {
+    zero = arith::ConstantOp::create(builder, loc,
+                                     builder.getZeroAttr(elementType));
+  }
+  return linalg::FillOp::create(builder, loc, zero, tensor).result();
+}
 
 Value extractIndex(OpBuilder &b, Location loc, Value shapeTensor, int64_t i) {
   Value index = arith::ConstantIndexOp::create(b, loc, i);
@@ -314,8 +330,7 @@ Value padConvolutionInput(OpBuilder &rewriter, Location loc, Value input,
     }
     Value scalarEmpty = tensor::EmptyOp::create(
         rewriter, loc, ArrayRef<int64_t>{}, inputType.getElementType());
-    Value padValue =
-        mlir::stablehlo::fillTensorWithZeros(rewriter, loc, scalarEmpty);
+    Value padValue = fillTensorWithZeros(rewriter, loc, scalarEmpty);
     return mlir::stablehlo::DynamicPadOp::create(
         rewriter, loc,
         RankedTensorType::get(paddedShape, inputType.getElementType()), input,
@@ -511,7 +526,7 @@ struct DynamicConvolutionOpConversion final
                                                resultType, window);
     Value empty =
         tensor::EmptyOp::create(rewriter, loc, resultType, shape.dynamicDims);
-    Value init = mlir::stablehlo::fillTensorWithZeros(rewriter, loc, empty);
+    Value init = fillTensorWithZeros(rewriter, loc, empty);
 
     // Avoid materializing a negatively-sized crop (or running a convolution)
     // when no window fits. The shape calculation above still follows C25.
