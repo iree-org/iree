@@ -6,21 +6,50 @@
 
 // Lowerings for the StableHLO ops whose shapes are known only at runtime.
 
+#include "compiler/plugins/input/StableHLO/Conversion/LegalizeToLinalgUtils.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
+
+Value getEmptyTensorFor(OpBuilder &builder, Location loc,
+                        RankedTensorType resultType, Operation *op,
+                        ValueRange operands) {
+  SmallVector<Value> sizes;
+  if (!resultType.hasStaticShape()) {
+    SmallVector<Value> shapes;
+    if (failed(cast<InferShapedTypeOpInterface>(op).reifyReturnTypeShapes(
+            builder, operands, shapes))) {
+      return {};
+    }
+    for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+      if (resultType.isDynamicDim(dim)) {
+        Value index = arith::ConstantIndexOp::create(builder, loc, dim);
+        sizes.push_back(
+            tensor::ExtractOp::create(builder, loc, shapes[0], index));
+      }
+    }
+  }
+  if (sparse_tensor::getSparseTensorEncoding(resultType)) {
+    return bufferization::AllocTensorOp::create(builder, loc, resultType, sizes,
+                                                Value(), IntegerAttr());
+  }
+  return tensor::EmptyOp::create(builder, loc, resultType, sizes);
+}
 
 Value fillTensorWithZeros(OpBuilder &builder, Location loc, Value tensor) {
   Type elementType = cast<RankedTensorType>(tensor.getType()).getElementType();
@@ -602,14 +631,18 @@ struct DynamicGatherOpConversion final
       constants.push_back(arith::ConstantIndexOp::create(rewriter, loc, i));
     }
 
-    Value emptyOp = mlir::stablehlo::getEmptyTensorFor(
-        rewriter, loc, resultType, gatherOp, adaptor.getOperands());
+    Value emptyOp = getEmptyTensorFor(rewriter, loc, resultType, gatherOp,
+                                      adaptor.getOperands());
+    if (!emptyOp) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "could not reify result shape");
+    }
 
     auto linalgOp = linalg::GenericOp::create(
         rewriter, loc, /*resultTensorTypes=*/resultType,
         /*inputs=*/ValueRange{}, /*outputs=*/emptyOp,
         SmallVector<AffineMap>{rewriter.getMultiDimIdentityMap(resultRank)},
-        mlir::stablehlo::getNParallelLoopsAttrs(resultRank),
+        getNParallelLoopsAttrs(resultRank),
         [&](OpBuilder &b, Location nestedLoc, ValueRange) {
           SmallVector<Value> linalgIndices, gatherIndex;
           for (int64_t dim = 0; dim < resultRank; ++dim) {
@@ -745,8 +778,11 @@ struct DynamicBroadcastInDimGatherConversion final
       return rewriter.notifyMatchFailure(op, "expansion is decidable");
     }
 
-    Value empty = mlir::stablehlo::getEmptyTensorFor(rewriter, loc, resultType,
-                                                     op, adaptor.getOperands());
+    Value empty =
+        getEmptyTensorFor(rewriter, loc, resultType, op, adaptor.getOperands());
+    if (!empty) {
+      return rewriter.notifyMatchFailure(op, "could not reify result shape");
+    }
     int64_t resultRank = resultType.getRank();
     Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -765,7 +801,7 @@ struct DynamicBroadcastInDimGatherConversion final
         rewriter, loc, /*resultTensorTypes=*/resultType,
         /*inputs=*/ValueRange{}, /*outputs=*/empty,
         SmallVector<AffineMap>{rewriter.getMultiDimIdentityMap(resultRank)},
-        mlir::stablehlo::getNParallelLoopsAttrs(resultRank),
+        getNParallelLoopsAttrs(resultRank),
         [&](OpBuilder &b, Location nestedLoc, ValueRange) {
           SmallVector<Value> index;
           for (auto [operandDim, resultDim] : llvm::enumerate(bcastDims)) {
