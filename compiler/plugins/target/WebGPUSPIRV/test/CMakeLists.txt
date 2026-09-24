@@ -8,8 +8,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "dynamic_shape.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
