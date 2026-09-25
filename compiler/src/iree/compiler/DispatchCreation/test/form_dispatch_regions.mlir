@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-multi-use-producers=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-MULTI-USE
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions))" --split-input-file %s | FileCheck %s --check-prefix=DEFAULT
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-mmt4d=true}))" --split-input-file %s | FileCheck %s --check-prefix=FUSE-MMT4D
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
@@ -770,6 +771,79 @@ util.func public @no_batch_mmt4d_fusion(%arg0: tensor<1x1x64x1x1xf32>,
 //  CHECK-SAME:       outs(%[[INIT0]] : tensor<1x1x32x1x4xf32>)
 //       CHECK:   flow.return %[[GEN]] : tensor<1x1x32x1x4xf32>
 //       CHECK:   util.return %[[DISP1]] : tensor<1x1x32x1x4xf32>
+
+// With fuse-mmt4d, the elementwise consumer joins the batch_mmt4d dispatch.
+// FUSE-MMT4D-LABEL: util.func public @no_batch_mmt4d_fusion
+//  FUSE-MMT4D-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1x64x1x1xf32>
+//  FUSE-MMT4D-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x32x64x4x1xf32>
+//  FUSE-MMT4D-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x1x32x1x4xf32>
+//       FUSE-MMT4D:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<1x1x32x1x4xf32>)
+//       FUSE-MMT4D:     %[[MMT4D:.+]] = linalg.batch_mmt4d
+//  FUSE-MMT4D-SAME:         ins(%[[ARG0]], %[[ARG1]] : tensor<1x1x64x1x1xf32>, tensor<1x32x64x4x1xf32>)
+//       FUSE-MMT4D:     %[[GEN:.+]] = linalg.generic
+//  FUSE-MMT4D-SAME:         ins(%[[ARG2]], %[[MMT4D]] : tensor<1x1x32x1x4xf32>, tensor<1x1x32x1x4xf32>)
+//       FUSE-MMT4D:     flow.return %[[GEN]] : tensor<1x1x32x1x4xf32>
+//   FUSE-MMT4D-NOT:   flow.dispatch.region
+//       FUSE-MMT4D:   util.return %[[DISP]] : tensor<1x1x32x1x4xf32>
+
+
+// -----
+
+// The mmt4d result has a second use, so its dispatch does not claim the unpack.
+// The unclaimed unpack then fuses with its consumer before the later matmul
+// can, as it does without fuse-mmt4d.
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @unclaimed_unpack_program_order(%lhs: tensor<8x128x8x1xf32>, %rhs: tensor<8x128x8x1xf32>,
+    %a: tensor<64x32xf32>, %b: tensor<32x64xf32>) -> (tensor<64x64xf32>, tensor<8x8x8x8xf32>) {
+  %zero = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<8x8x8x8xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %mmt4d = linalg.mmt4d ins(%lhs, %rhs : tensor<8x128x8x1xf32>, tensor<8x128x8x1xf32>) outs(%fill : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %relu = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%mmt4d : tensor<8x8x8x8xf32>) outs(%empty : tensor<8x8x8x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %max = arith.maximumf %in, %zero : f32
+    linalg.yield %max : f32
+  } -> tensor<8x8x8x8xf32>
+  %dest = tensor.empty() : tensor<64x64xf32>
+  %unpack = linalg.unpack %relu outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<8x8x8x8xf32> -> tensor<64x64xf32>
+  %matmul_fill = linalg.fill ins(%zero : f32) outs(%dest : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %matmul = linalg.matmul ins(%a, %b : tensor<64x32xf32>, tensor<32x64xf32>) outs(%matmul_fill : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %add = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%unpack, %matmul : tensor<64x64xf32>, tensor<64x64xf32>) outs(%dest : tensor<64x64xf32>) {
+  ^bb0(%x: f32, %y: f32, %out: f32):
+    %sum = arith.addf %x, %y : f32
+    linalg.yield %sum : f32
+  } -> tensor<64x64xf32>
+  util.return %add, %mmt4d : tensor<64x64xf32>, tensor<8x8x8x8xf32>
+}
+//    DEFAULT-LABEL: util.func public @unclaimed_unpack_program_order
+//          DEFAULT:   %[[MMT4D_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     linalg.mmt4d
+//          DEFAULT:   %[[RELU_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     linalg.generic
+//          DEFAULT:   %[[MATMUL_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     %[[MATMUL:.+]] = linalg.matmul
+//          DEFAULT:     flow.return %[[MATMUL]]
+//          DEFAULT:   %[[ADD_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     %[[UNPACK:.+]] = linalg.unpack %[[RELU_DISPATCH]]
+//          DEFAULT:     %[[ADD:.+]] = linalg.generic
+//     DEFAULT-SAME:       ins(%[[UNPACK]], %[[MATMUL_DISPATCH]] :
+//          DEFAULT:     flow.return %[[ADD]]
+//          DEFAULT:   util.return %[[ADD_DISPATCH]], %[[MMT4D_DISPATCH]]
+// FUSE-MMT4D-LABEL: util.func public @unclaimed_unpack_program_order
+//       FUSE-MMT4D:   %[[MMT4D_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     linalg.mmt4d
+//       FUSE-MMT4D:   %[[RELU_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     linalg.generic
+//       FUSE-MMT4D:   %[[MATMUL_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     %[[MATMUL:.+]] = linalg.matmul
+//       FUSE-MMT4D:     flow.return %[[MATMUL]]
+//       FUSE-MMT4D:   %[[ADD_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     %[[UNPACK:.+]] = linalg.unpack %[[RELU_DISPATCH]]
+//       FUSE-MMT4D:     %[[ADD:.+]] = linalg.generic
+//  FUSE-MMT4D-SAME:       ins(%[[UNPACK]], %[[MATMUL_DISPATCH]] :
+//       FUSE-MMT4D:     flow.return %[[ADD]]
+//       FUSE-MMT4D:   util.return %[[ADD_DISPATCH]], %[[MMT4D_DISPATCH]]
 
 // -----
 
