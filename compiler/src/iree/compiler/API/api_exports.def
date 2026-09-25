@@ -455,6 +455,8 @@ EXPORTS
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
   mlirEmitError
+  mlirEmitRemark
+  mlirEmitWarning
   mlirEnableGlobalDebug
   mlirExternalPassSignalFailure
   mlirF16TypeGet
@@ -889,7 +891,9 @@ EXPORTS
   mlirOperationHashValue
   mlirOperationImplementsInterface
   mlirOperationImplementsInterfaceStatic
+  mlirOperationIsAncestor
   mlirOperationIsBeforeInBlock
+  mlirOperationIsProperAncestor
   mlirOperationIsStructurallyEquivalent
   mlirOperationMoveAfter
   mlirOperationMoveBefore

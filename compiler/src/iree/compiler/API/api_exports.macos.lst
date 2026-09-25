@@ -454,6 +454,8 @@ _mlirElementsAttrGetNumElements
 _mlirElementsAttrGetValue
 _mlirElementsAttrIsValidIndex
 _mlirEmitError
+_mlirEmitRemark
+_mlirEmitWarning
 _mlirEnableGlobalDebug
 _mlirExternalPassSignalFailure
 _mlirF16TypeGet
@@ -888,7 +890,9 @@ _mlirOperationHasInherentAttributeByName
 _mlirOperationHashValue
 _mlirOperationImplementsInterface
 _mlirOperationImplementsInterfaceStatic
+_mlirOperationIsAncestor
 _mlirOperationIsBeforeInBlock
+_mlirOperationIsProperAncestor
 _mlirOperationIsStructurallyEquivalent
 _mlirOperationMoveAfter
 _mlirOperationMoveBefore
