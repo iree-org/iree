@@ -453,11 +453,17 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_riscv_v_1x8vlsx1_f32_vlen256
+//       CHECK:   %[[POL:.+]] = arith.constant 3 : i64
+//       CHECK:   ub.poison : vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
 //       CHECK:   vector.extract {{.*}} : f32 from vector<{{1x1|1}}xf32>
 //   CHECK-NOT:   vector.broadcast {{.*}} : f32 to vector<32xf32>
+//   CHECK-NOT:   vector.broadcast {{.*}} : f32 to vector<[8]xf32>
 //       CHECK:   vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc{{.*}}"({{.*}}) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
-//       CHECK:   vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc"({{.*}}, %[[POL]]) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
 
 // -----
 
@@ -492,10 +498,16 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_riscv_v_1x8vlsx1_f32_vlen128
+//       CHECK:   %[[POL:.+]] = arith.constant 3 : i64
+//       CHECK:   ub.poison : vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:     vector.scalable.insert {{.*}} : vector<16xf32> into vector<[8]xf32>
 //       CHECK:   vector.extract {{.*}} : f32 from vector<{{1x1|1}}xf32>
+//   CHECK-NOT:   vector.broadcast {{.*}} : f32 to vector<[8]xf32>
 //       CHECK:   vector.scalable.insert {{.*}} : vector<16xf32> into vector<[8]xf32>
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc{{.*}}"({{.*}}) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
-//       CHECK:   vector.scalable.extract {{.*}} : vector<16xf32> from vector<[8]xf32>
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc"({{.*}}, %[[POL]]) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<16xf32> from vector<[8]xf32>
 
 // -----
 
@@ -530,8 +542,14 @@ module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @lower_riscv_v_8vlsx1x1_f32_vlen256
+//       CHECK:   %[[POL:.+]] = arith.constant 3 : i64
+//       CHECK:   ub.poison : vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
 //       CHECK:   vector.extract {{.*}} : f32 from vector<{{1x1|1}}xf32>
 //   CHECK-NOT:   vector.broadcast {{.*}} : f32 to vector<32xf32>
+//   CHECK-NOT:   vector.broadcast {{.*}} : f32 to vector<[8]xf32>
 //       CHECK:   vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc{{.*}}"({{.*}}) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
-//       CHECK:   vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfmacc"({{.*}}, %[[POL]]) : (vector<[8]xf32>, f32, vector<[8]xf32>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>

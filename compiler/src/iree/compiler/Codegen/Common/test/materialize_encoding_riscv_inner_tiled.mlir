@@ -181,6 +181,49 @@ func.func @matmul_f32_zvl256b(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, 
 
 // -----
 
+// Narrow-N: with `iteration_sizes = [?, 8, ?]` the natural 1x8VLsx1 wastes
+// all but 8 of its 32 N lanes, so the cost model picks the M↔N-swapped
+// 8VLsx1x1, which puts the 32 lanes on M.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+func.func @matmul_f32_zvl256b_narrow_n(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %m: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %k} : tensor<?x?xf32> -> tensor<?x?xf32, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #lhs>, tensor<?x?xf32, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_f32_zvl256b_narrow_n(
+//       CHECK:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}inner_tiles = [32, 1]
+//  CHECK-SAME:       -> tensor<?x?x32x1xf32>
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [6, 1]
+//  CHECK-SAME:       -> tensor<?x?x6x1xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[PACK_RHS]] {{\[}}[0], [1], [2], [3, 4]{{\]}}
+//  CHECK-SAME:       tensor<?x?x6x1xf32> into tensor<?x?x6x1x1xf32>
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled ins(%[[PACK_LHS]], %[[EXPANDED]])
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32, intrinsics_n = 6, vlen = 256>
+//  CHECK-SAME:       tensor<?x?x32x1xf32>, tensor<?x?x6x1x1xf32> into tensor<?x?x6x32x1xf32>
+//       CHECK:   %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[INNER]]
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSPOSED]]
+//  CHECK-SAME:       into tensor<?x?x32x6xf32>
+//       CHECK:   linalg.unpack %[[COLLAPSED]] {{.*}}inner_tiles = [32, 6]
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

@@ -98,8 +98,8 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
     int64_t intrinsicsM, int64_t intrinsicsN, int64_t intrinsicsK,
     ValueRange inputs, ValueRange outputs,
-    DataTiledMMAIntrinsicEmitter emitIntrinsic,
-    SmallVectorImpl<Value> &results) {
+    DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
+    DataTiledMMAValueXformer legalizeAcc, DataTiledMMAValueXformer restoreAcc) {
   if (inputs.size() != 2 || outputs.size() != 1) {
     return failure();
   }
@@ -123,8 +123,14 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
       [&](OpBuilder &b, Location loc, ValueRange args) -> SmallVector<Value> {
         Value accDistributed =
             reshapeToSwizzleDistributed(b, loc, args[0], accSwizzle);
-        return distributeMmaFragmentToIntrinsics(b, loc, accDistributed,
-                                                 accSwizzle);
+        SmallVector<Value> pieces = distributeMmaFragmentToIntrinsics(
+            b, loc, accDistributed, accSwizzle);
+        if (legalizeAcc) {
+          for (Value &piece : pieces) {
+            piece = legalizeAcc(b, loc, piece);
+          }
+        }
+        return pieces;
       });
   SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
 
@@ -170,6 +176,9 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
         Value acc =
             arith::ConstantOp::create(b, loc, b.getZeroAttr(fullAccType));
         for (Value intrAcc : args) {
+          if (restoreAcc) {
+            intrAcc = restoreAcc(b, loc, intrAcc);
+          }
           Value expandedAcc = vector::ShapeCastOp::create(
               b, loc, VectorType::get(accInternalShape, accElemType), intrAcc);
           acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,

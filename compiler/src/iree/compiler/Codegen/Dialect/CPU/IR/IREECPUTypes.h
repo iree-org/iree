@@ -89,6 +89,10 @@ bool isGenericScalar(MMAIntrinsic intr);
 // RISC-V family of intrinsics.
 bool isVlenParameterized(MMAIntrinsic intr);
 
+// True if `intr` is the M↔N-swapped orientation of a natural/swapped pair,
+// i.e. bit 0 of the enum value is set (see IREECPUEnums.td).
+bool isMNSwapped(MMAIntrinsic intr);
+
 // For an `MMA_GENERIC_SCALAR_1x1x1_REG*` intrinsic, returns the register
 // budget encoded in the enum case (8 or 16). Asserts otherwise.
 int64_t getGenericScalarRegisterBudget(MMAIntrinsic intr);
