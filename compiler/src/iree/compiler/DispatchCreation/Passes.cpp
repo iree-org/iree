@@ -54,7 +54,9 @@ static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
 
 static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
     "iree-dispatch-creation-set-encoding-strategy",
-    llvm::cl::desc("Set the encoding strategy for operations."),
+    llvm::cl::desc("Set the encoding strategy for operations. With "
+                   "--iree-opt-experimental-early-data-tiling, strategies "
+                   "other than generic keep dispatch-time data tiling."),
     llvm::cl::values(
         clEnumValN(
             DispatchCreation::EncodingOptions::Generic, "generic",
@@ -74,7 +76,8 @@ ArrayRef<IREE::Encoding::EncodingOpType> getDefaultDataTilingOpTypes() {
 static llvm::cl::list<mlir::iree_compiler::IREE::Encoding::EncodingOpType>
     clDataTilingOps(
         "iree-dispatch-creation-experimental-set-data-tiling-ops",
-        llvm::cl::desc("Op families eligible for data-tiling annotation. "
+        llvm::cl::desc("Op families eligible for data tiling, also with "
+                       "--iree-opt-experimental-early-data-tiling. "
                        "Defaults to {matmul, scaled_matmul}, add convolution "
                        "to enable experimental data tiling support."),
         llvm::cl::values(
@@ -122,6 +125,13 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
+
+DataTilingEncodingOptions getDataTilingEncodingOptionsFromFlags() {
+  DataTilingEncodingOptions options;
+  options.opTypes.assign(clDataTilingOps.begin(), clDataTilingOps.end());
+  options.encodingOption = clSetEncodingStrategy;
+  return options;
+}
 
 void buildDataTilingEncodingPassPipeline(
     OpPassManager &passManager, const DataTilingEncodingOptions &options) {
@@ -319,11 +329,10 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
   // after fusion decisions have already been made, so encodings can be
   // separated from compiler fusion decisions.
   if (options.dataTiling) {
-    AssignDataTilingEncodingsPassOptions assignOptions;
-    assignOptions.opTypes.assign(clDataTilingOps.begin(),
-                                 clDataTilingOps.end());
-    assignOptions.encodingOption = clSetEncodingStrategy;
-    passManager.addPass(createAssignDataTilingEncodingsPass(assignOptions));
+    DataTilingEncodingOptions encodingOptions =
+        getDataTilingEncodingOptionsFromFlags();
+    passManager.addPass(createAssignDataTilingEncodingsPass(
+        {encodingOptions.opTypes, encodingOptions.encodingOption}));
     // SetEncodingOps should not be in the same dispatch as the data-tiled
     // op, so hoist them out of their current dispatch regions. Also, bubble
     // SetEncodingOps through special operations like bit-extending ops and
