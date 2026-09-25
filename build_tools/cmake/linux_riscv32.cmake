@@ -41,11 +41,13 @@ set(RISCV_COMPILER_FLAGS "\
     -Wno-atomic-alignment")
 set(RISCV_LINKER_FLAGS "-lstdc++ -lpthread -lm -ldl -latomic")
 set(RISCV_QEMU_CPU_FLAGS "rv32,Zve32f=true,vlen=512,elen=32,vext_spec=v1.0")
-set(RISCV32_TEST_DEFAULT_LLVM_FLAGS
+set(RISCV32_TEST_DEFAULT_ABI_FLAGS
   "--iree-llvmcpu-target-triple=riscv32"
   "--iree-llvmcpu-target-abi=ilp32d"
+  CACHE INTERNAL "Default llvm triple and ABI flags for testing purposes")
+set(RISCV32_TEST_DEFAULT_FEAT_FLAGS
   "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+zve32f"
-  CACHE INTERNAL "Default llvm codegen flags for testing purposes")
+  CACHE INTERNAL "Default llvm CPU feature flags for testing purposes")
 
 set(CMAKE_C_FLAGS             "${RISCV_COMPILER_FLAGS} ${CMAKE_C_FLAGS}")
 set(CMAKE_CXX_FLAGS           "${RISCV_COMPILER_FLAGS} ${CMAKE_CXX_FLAGS}")
