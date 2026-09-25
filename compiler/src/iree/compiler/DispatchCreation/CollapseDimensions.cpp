@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
@@ -44,6 +45,7 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 
+#define GEN_PASS_DEF_COLLAPSECONTRACTIONDIMENSIONSPASS
 #define GEN_PASS_DEF_COLLAPSEDIMENSIONSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
@@ -54,6 +56,12 @@ namespace {
 struct CollapseDimensionsPass final
     : impl::CollapseDimensionsPassBase<CollapseDimensionsPass> {
   using Base::Base;
+  void runOnOperation() override;
+};
+
+struct CollapseContractionDimensionsPass final
+    : impl::CollapseContractionDimensionsPassBase<
+          CollapseContractionDimensionsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -1200,6 +1208,38 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
 //===---------------------------------------------------------------------===//
 // Passes
 //===---------------------------------------------------------------------===//
+
+void CollapseContractionDimensionsPass::runOnOperation() {
+  SmallVector<linalg::GenericOp> contractions;
+  getOperation()->walk([&](linalg::GenericOp op) {
+    // Dispatch bodies already have their own normalization and shape-hoisting
+    // policy. Do not revisit explicitly scheduled workgroups either. A preset
+    // compilation info or lowering config refers to the original loops, so
+    // collapsing would invalidate it.
+    if (op->getParentOfType<IREE::Flow::DispatchRegionOp>() ||
+        op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
+        getCompilationInfo(op) || getLoweringConfig(op) ||
+        !op.hasPureTensorSemantics() || !isEligibleForCollapse(op) ||
+        !linalg::isaContractionOpInterface(op)) {
+      return;
+    }
+    contractions.push_back(op);
+  });
+
+  IRRewriter rewriter(&getContext());
+  for (linalg::GenericOp op : contractions) {
+    SmallVector<ReassociationIndices> reassociation = getCollapsibleLoops(op);
+    if (reassociation.empty()) {
+      continue;
+    }
+    rewriter.setInsertionPoint(op);
+    FailureOr<linalg::CollapseResult> result =
+        linalg::collapseOpIterationDims(op, reassociation, rewriter);
+    if (succeeded(result)) {
+      rewriter.replaceOp(op, result->results);
+    }
+  }
+}
 
 void CollapseDimensionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
