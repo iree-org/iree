@@ -1266,6 +1266,33 @@ maybeFindConsumerCompatibleSize(linalg::LinalgOp reductionOp,
   return failure();
 }
 
+// Tile dispatch down the road expects at most one op to have a workgroup tiling
+// level. This function propagates the reduction level config to all the other
+// linalg.ops, but resets the workgroup tiling.
+static void propagateReductionTileSizes(linalg::LinalgOp rootOp,
+                                        TileSizesListTypeRef tileSizes) {
+  assert(tileSizes.size() == 2 && "expected workgroup and reduction levels");
+  ArrayRef<int64_t> rootReductionLevel = tileSizes.back();
+
+  rootOp->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
+    // Do not erase workgroupt tiling from the root op
+    if (op.getOperation() == rootOp.getOperation()) {
+      return;
+    }
+    SmallVector<int64_t> reductionLevel(rootReductionLevel);
+    // Pad the tiling config to the same length, padded zeros mean "no tiling"
+    if (reductionLevel.size() < op.getNumLoops()) {
+      reductionLevel.resize(op.getNumLoops(), 0);
+    }
+
+    TileSizesListType otherTileSizes;
+    otherTileSizes.emplace_back(); // No workgroup tiling
+    otherTileSizes.push_back(std::move(reductionLevel));
+    setLoweringConfig(op, IREE::Codegen::LoweringConfigAttr::get(
+                              op.getContext(), otherTileSizes));
+  });
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                         linalg::LinalgOp op) {
@@ -1368,12 +1395,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
       return failure();
     }
 
-    // Set lowering configuration to drive tiling for other Linalg ops too---the
-    // pipeline expects it.
-    op->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
-      setLoweringConfig(op, IREE::Codegen::LoweringConfigAttr::get(
-                                op.getContext(), tileSizes));
-    });
+    propagateReductionTileSizes(op, tileSizes);
     return success();
   }
 
@@ -1494,12 +1516,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  // Set lowering configuration to drive tiling for other Linalg ops too---the
-  // pipeline expects it.
-  op->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
-    setLoweringConfig(
-        op, IREE::Codegen::LoweringConfigAttr::get(op.getContext(), tileSizes));
-  });
+  propagateReductionTileSizes(op, tileSizes);
   return success();
 }
 
