@@ -192,6 +192,18 @@ void ConvertTensorToFlowPass::runOnOperation() {
   }
   numSlowCopyDispatches += numSlowExtractSliceDispatches.value();
 
+  // Refine constant dimensions while empty tensors are still in the Tensor
+  // dialect. This may introduce tensor.cast ops, which the conversion below
+  // lowers to Flow. Doing this as a flow.tensor.empty canonicalization would
+  // reintroduce tensor.cast after conversion and break Stream lowering.
+  RewritePatternSet refineEmptyTensorPatterns(context);
+  tensor::EmptyOp::getCanonicalizationPatterns(refineEmptyTensorPatterns,
+                                               context);
+  if (failed(applyPatternsGreedily(funcOp,
+                                   std::move(refineEmptyTensorPatterns)))) {
+    return signalPassFailure();
+  }
+
   // Canonicalize to flow.tensor ops.
   RewritePatternSet convertToFlowPatterns(context);
   IREE::Flow::populateTensorToFlowConversionPatterns(context,
