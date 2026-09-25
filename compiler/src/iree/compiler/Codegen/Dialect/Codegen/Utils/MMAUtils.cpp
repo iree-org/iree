@@ -26,14 +26,20 @@ bool incrementIndices(MutableArrayRef<int64_t> indices,
 }
 
 // Flattens vector `value` to 1-D if its rank is greater than 1; otherwise
-// returns it unchanged.
+// returns it unchanged. Preserves scalable dimension flags for SVE support.
 static Value flattenVector(OpBuilder &builder, Location loc, Value value) {
   auto vectorType = cast<VectorType>(value.getType());
   if (vectorType.getRank() <= 1) {
     return value;
   }
+  // Preserve scalable flags: if any dimension is scalable, the flattened
+  // 1-D vector should also be scalable.
+  ArrayRef<bool> scalableDims = vectorType.getScalableDims();
+  bool hasScalable = llvm::any_of(scalableDims, [](bool s) { return s; });
+  SmallVector<bool> flatScalable = {hasScalable};
   auto flatVectorType = VectorType::get({vectorType.getNumElements()},
-                                        vectorType.getElementType());
+                                        vectorType.getElementType(),
+                                        flatScalable);
   return vector::ShapeCastOp::create(builder, loc, flatVectorType, value);
 }
 
@@ -80,7 +86,8 @@ static SmallVector<int64_t> fullDistributedShape(const TileSwizzle &swizzle) {
 // distributed N-D form; this reshape lets the shared lowering body operate
 // uniformly. Both sides apply the swizzle's permutation (CPU's permutation is
 // always identity, see `IREECPUAttrs.cpp:getSwizzle`), so a plain `shape_cast`
-// suffices — no transpose is needed.
+// suffices — no transpose is needed. Uses `getTileVectorType` to preserve
+// scalable dimension flags for SVE support.
 static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
                                          Value value,
                                          const TileSwizzle &swizzle) {
@@ -89,7 +96,14 @@ static Value reshapeToSwizzleDistributed(OpBuilder &builder, Location loc,
   if (vecType.getShape() == ArrayRef<int64_t>(fullShape)) {
     return value;
   }
-  auto fullType = VectorType::get(fullShape, vecType.getElementType());
+  // Use getTileVectorType to correctly handle scalable dimensions (e.g., SVE).
+  // This constructs VectorType with scalable flags based on the swizzle's
+  // symbolic multipliers (like ArmSveVLIn128bitUnits).
+  auto fullType = getTileVectorType(swizzle, vecType.getElementType(),
+                                     [](TileSwizzle::Dim dim) {
+                                       return dim.kind() !=
+                                              TileSwizzle::Dim::Kind::CrossThread;
+                                     });
   return vector::ShapeCastOp::create(builder, loc, fullType, value);
 }
 
@@ -147,18 +161,18 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
   // Reassemble per-intrinsic ACC pieces into the swizzle's distributed form,
   // then shape_cast to the original output type as the final step inside the
   // HoistableConversionOp body (paired with the inverse cast above).
-  SmallVector<int64_t> accFullShape = fullDistributedShape(accSwizzle);
   SmallVector<int64_t> accCrossIntrinsicShape =
       sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
         return dim.kind() == TileSwizzle::Dim::Kind::CrossIntrinsic;
       });
-  SmallVector<int64_t> accInternalShape =
-      sliceSwizzledShape(accSwizzle, [](TileSwizzle::Dim dim) {
-        return dim.kind() == TileSwizzle::Dim::Kind::Internal;
-      });
   Type origAccType = outputs[0].getType();
   Type accElemType = cast<VectorType>(origAccType).getElementType();
-  auto fullAccType = VectorType::get(accFullShape, accElemType);
+  // Use getTileVectorType to preserve scalable dimension flags for SVE.
+  auto fullAccType = getTileVectorType(accSwizzle, accElemType,
+                                        [](TileSwizzle::Dim dim) {
+                                          return dim.kind() !=
+                                                 TileSwizzle::Dim::Kind::CrossThread;
+                                        });
 
   auto reassembleOp = IREE::Util::HoistableConversionOp::create(
       builder, loc, /*tag=*/kDataTiledAccReassemble,
@@ -170,8 +184,15 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
         Value acc =
             arith::ConstantOp::create(b, loc, b.getZeroAttr(fullAccType));
         for (Value intrAcc : args) {
+          // Use getTileVectorType to preserve scalable dimension flags for SVE.
+          // Filter to only Internal dims (the per-intrinsic tile shape).
+          auto internalAccType = getTileVectorType(accSwizzle, accElemType,
+                                                    [](TileSwizzle::Dim dim) {
+                                                      return dim.kind() ==
+                                                             TileSwizzle::Dim::Kind::Internal;
+                                                    });
           Value expandedAcc = vector::ShapeCastOp::create(
-              b, loc, VectorType::get(accInternalShape, accElemType), intrAcc);
+              b, loc, internalAccType, intrAcc);
           acc = vector::InsertStridedSliceOp::create(b, loc, expandedAcc, acc,
                                                      indices, strides);
           incrementIndices(indices, accCrossIntrinsicShape);

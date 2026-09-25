@@ -283,6 +283,83 @@ func.func @cpu_inner_tiled_tensor_arm_sve_fmla_f32(
 
 // -----
 
+#scalar_accesses = [
+  affine_map<() -> ()>,
+  affine_map<() -> ()>,
+  affine_map<() -> ()>
+]
+// AArch64 SVE FMLA natural orientation: tile-level test with dynamic dim for
+// the scalable SVE dimension. LHS is 1x1, RHS is ?x1, ACC is ?x1.
+func.func @cpu_arm_sve_fmla_1x4vlx1_f32_natural(
+    %lhs: tensor<1x1xf32>, %rhs: tensor<?x1xf32>, %acc: tensor<?x1xf32>)
+    -> tensor<?x1xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #scalar_accesses,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : tensor<1x1xf32>, tensor<?x1xf32> into tensor<?x1xf32>
+  return %0 : tensor<?x1xf32>
+}
+// CHECK-LABEL: func @cpu_arm_sve_fmla_1x4vlx1_f32_natural
+//       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+
+// -----
+
+#scalar_accesses = [
+  affine_map<() -> ()>,
+  affine_map<() -> ()>,
+  affine_map<() -> ()>
+]
+// AArch64 SVE FMLA swapped orientation: tile-level test with dynamic dim for
+// the scalable SVE dimension. LHS is ?x1, RHS is 1x1, ACC is ?x1.
+func.func @cpu_arm_sve_fmla_4vlx1x1_f32_swapped(
+    %lhs: tensor<?x1xf32>, %rhs: tensor<1x1xf32>, %acc: tensor<?x1xf32>)
+    -> tensor<?x1xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #scalar_accesses,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : tensor<?x1xf32>, tensor<1x1xf32> into tensor<?x1xf32>
+  return %0 : tensor<?x1xf32>
+}
+// CHECK-LABEL: func @cpu_arm_sve_fmla_4vlx1x1_f32_swapped
+//       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+
+// -----
+
+#scalar_accesses = [
+  affine_map<() -> ()>,
+  affine_map<() -> ()>,
+  affine_map<() -> ()>
+]
+// AArch64 SVE FMLA with multiple intrinsic tiles (intrinsics_m = 2): tests
+// distribution and reassembly of scalable vector fragments across multiple
+// intrinsic invocations.
+func.func @cpu_arm_sve_fmla_1x4vlx1_f32_multi_tile(
+    %lhs: tensor<2x1x1xf32>, %rhs: tensor<1x?x1xf32>, %acc: tensor<2x?x1xf32>)
+    -> tensor<2x?x1xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    indexing_maps = #scalar_accesses,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, intrinsics_m = 2>,
+    semantics = #iree_cpu.mma_semantics<>
+  } : tensor<2x1x1xf32>, tensor<1x?x1xf32> into tensor<2x?x1xf32>
+  return %0 : tensor<2x?x1xf32>
+}
+// CHECK-LABEL: func @cpu_arm_sve_fmla_1x4vlx1_f32_multi_tile
+//       CHECK:   iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2)
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32, intrinsics_m = 2>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+//  CHECK-SAME:       semantics = #iree_cpu.mma_semantics<>
+
+// -----
+
 #contraction_accesses = [
   affine_map<(i, j, k) -> (i, k)>,
   affine_map<(i, j, k) -> (k, j)>,

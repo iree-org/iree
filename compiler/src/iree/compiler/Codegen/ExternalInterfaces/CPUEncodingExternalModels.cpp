@@ -622,6 +622,16 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
     };
     checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
   }
+  // AArch64 SVE/SVE2 intrinsics: require scalable vectorization enabled and
+  // either +sve or +sve2 feature. The SVE FMLA intrinsics use scalable vector
+  // types (vector<[4]xf32>) that map to AArch64's scalable vector registers.
+  if (isAArch64(config) && isScalableVectorizationEnabled()) {
+    if (hasFeature(config, "+sve") || hasFeature(config, "+sve2")) {
+      out.push_back(MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32);
+      out.push_back(MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32);
+    }
+    // Note: NEON intrinsics will be added in a follow-up PR.
+  }
   out.push_back(pickGenericScalarMMAForTarget(config));
   assert(isMmaIntrinsicArrayValid(config, out) &&
          "getMmaIntrinsicsForTargetConfig must return a list satisfying the "
@@ -1208,7 +1218,8 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
 //   - f16 (16 bits): 64/16 = 4 elements per vscale
 static SmallVector<TileMxNxK>
 enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
-  // Data-tiling is only implemented for the V extension.
+
+  // Data-Tiling is only implemented for the V extension
   if (!hasFeature(config, "+v")) {
     return {};
   }
