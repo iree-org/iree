@@ -43,6 +43,7 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
+#define GEN_PASS_DEF_PROPAGATEDATATILINGENCODINGSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 /// Bubbles a SetEncodingOp up through a linalg::GenericOp. The `genericOp`
@@ -54,6 +55,7 @@ namespace mlir::iree_compiler::DispatchCreation {
 ///  5. Have a tensor.empty init operand.
 ///  6. Have as many indexing map dims as there are results in the encoding's
 ///     bcast_map.
+/// The encoding of `encodingOp` must be an `EncodingAttr`.
 ///
 /// This function creates SetEncoding ops on all of the inputs to the
 /// `genericOp`, and replaces the op with an encoded version. If any of
@@ -99,7 +101,11 @@ bubbleUpSetEncodingThroughGenericOp(RewriterBase &rewriter,
   AffineMap invOutputMap = inversePermutation(outputMap);
 
   RankedTensorType encodedType = encodingOp.getResultType();
-  auto encoding = cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
+  auto encoding =
+      dyn_cast<IREE::Encoding::EncodingAttr>(encodedType.getEncoding());
+  if (!encoding) {
+    return rewriter.notifyMatchFailure(encodingOp, "expected an EncodingAttr");
+  }
   AffineMap lastMap = encoding.getLastMapForOperandIndex();
   if (outputMap.getNumDims() != lastMap.getNumResults()) {
     return rewriter.notifyMatchFailure(
@@ -193,43 +199,83 @@ static bool isHoistableOp(Operation *op) {
 }
 
 namespace {
+/// Where encoding propagation is allowed to move encoding ops.
+enum class EncodingPropagationScope { WithinDispatch, OutsideDispatch };
+} // namespace
+
+/// Returns true if an encoding may be propagated between `producer` and
+/// `consumer` under `scope`. Within dispatches, both operations must be inside
+/// a dispatch. Outside dispatches, both must be outside every dispatch and in
+/// the same block, so existing dispatches and region boundaries remain encoding
+/// boundaries.
+static bool canPropagateBetween(Operation *producer, Operation *consumer,
+                                EncodingPropagationScope scope) {
+  bool producerOutside = IREE::Flow::isNonNullAndOutsideDispatch(producer);
+  bool consumerOutside = IREE::Flow::isNonNullAndOutsideDispatch(consumer);
+  if (scope == EncodingPropagationScope::WithinDispatch) {
+    return !producerOutside && !consumerOutside;
+  }
+  return producerOutside && consumerOutside &&
+         producer->getBlock() == consumer->getBlock();
+}
+
+namespace {
 /// Pass declaration.
-struct HoistEncodingOpsPass
+struct HoistEncodingOpsPass final
     : impl::HoistEncodingOpsPassBase<HoistEncodingOpsPass> {
   using Base::Base;
   void runOnOperation() override;
 };
 
-/// Pattern to bubble SetEncoding ops upwards through producers. This pattern
-/// runs until bubbling is not possible, or until the SetEncoding op is outside
-/// of a dispatch.
+// TODO(#20179): Merge with PropagateEncodingsPass once bubbling through
+// generic ops goes through the encoding propagation interfaces.
+struct PropagateDataTilingEncodingsPass final
+    : impl::PropagateDataTilingEncodingsPassBase<
+          PropagateDataTilingEncodingsPass> {
+  void runOnOperation() override;
+};
+
+/// Pattern to bubble SetEncoding ops upwards through producers. Within
+/// dispatches, it only bubbles through producers in the same dispatch region,
+/// which prepares the SetEncoding op for hoisting. Outside dispatches, it only
+/// bubbles through producers that are outside every dispatch and in the same
+/// block.
 struct BubbleUpSetEncodingOp : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
-  using Base::Base;
+  BubbleUpSetEncodingOp(MLIRContext *context, EncodingPropagationScope scope)
+      : Base(context), scope(scope) {}
 
   LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
-    if (IREE::Flow::isNonNullAndOutsideDispatch(encodingOp)) {
-      return failure();
-    }
-    // Fail if the encodingOp is not in the same dispatch as its producer.
     Operation *producer = encodingOp.getSource().getDefiningOp();
     if (!producer) {
-      return failure();
+      return rewriter.notifyMatchFailure(encodingOp, "source has no producer");
     }
-    auto dispatch = producer->getParentOfType<IREE::Flow::DispatchRegionOp>();
-    if (!dispatch ||
-        dispatch !=
-            encodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
-      return failure();
+    if (!canPropagateBetween(producer, encodingOp, scope)) {
+      return rewriter.notifyMatchFailure(
+          encodingOp, "producer is outside the propagation scope");
+    }
+    if (scope == EncodingPropagationScope::WithinDispatch) {
+      // Preserve the late policy: bubble only within the same dispatch region.
+      auto dispatch = producer->getParentOfType<IREE::Flow::DispatchRegionOp>();
+      if (!dispatch ||
+          dispatch !=
+              encodingOp->getParentOfType<IREE::Flow::DispatchRegionOp>()) {
+        return rewriter.notifyMatchFailure(
+            encodingOp, "producer is not in the same dispatch region");
+      }
     }
 
     return bubbleUpSetEncoding(rewriter, encodingOp->getOpOperand(0));
   }
+
+private:
+  EncodingPropagationScope scope;
 };
 
 /// Pattern to sink UnsetEncoding ops down through consumers.
 struct SinkUnsetEncodingOp : OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
-  using Base::Base;
+  SinkUnsetEncodingOp(MLIRContext *context, EncodingPropagationScope scope)
+      : Base(context), scope(scope) {}
 
   LogicalResult matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
@@ -238,10 +284,9 @@ struct SinkUnsetEncodingOp : OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
     }
     OpOperand *consumerOperand = &(*encodingOp->getUses().begin());
     Operation *consumer = consumerOperand->getOwner();
-    if (IREE::Flow::isNonNullAndOutsideDispatch(encodingOp) ||
-        IREE::Flow::isNonNullAndOutsideDispatch(consumer)) {
+    if (!canPropagateBetween(encodingOp, consumer, scope)) {
       return rewriter.notifyMatchFailure(
-          encodingOp, "expected that both operations are inside dispatch");
+          encodingOp, "operations are outside the propagation scope");
     }
 
     auto propagationAttrInterface =
@@ -284,22 +329,40 @@ struct SinkUnsetEncodingOp : OpRewritePattern<IREE::Encoding::UnsetEncodingOp> {
     rewriter.replaceOp(consumer, maybeResult->replacements);
     return success();
   }
+
+private:
+  EncodingPropagationScope scope;
 };
 
 } // namespace
 
-/// Create dispatch.region Ops based on a fusion heuristic.
+/// Bubbles set_encoding and sinks unset_encoding ops in `root` within `scope`.
+static LogicalResult propagateEncodings(Operation *root,
+                                        EncodingPropagationScope scope) {
+  MLIRContext *context = root->getContext();
+  RewritePatternSet patterns(context);
+  patterns.insert<BubbleUpSetEncodingOp, SinkUnsetEncodingOp>(context, scope);
+  // Flow regions are not isolated from above and do not materialize constants
+  // themselves, so constant CSE would move constants out of existing dispatch
+  // regions and turn them into dispatch captures.
+  GreedyRewriteConfig config;
+  config.enableConstantCSE(false);
+  return applyPatternsGreedily(root, std::move(patterns), config);
+}
+
+void PropagateDataTilingEncodingsPass::runOnOperation() {
+  if (failed(propagateEncodings(getOperation(),
+                                EncodingPropagationScope::OutsideDispatch))) {
+    signalPassFailure();
+  }
+}
+
 void HoistEncodingOpsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   ModuleOp moduleOp = getOperation();
 
-  RewritePatternSet bubblingPatterns(ctx);
-  bubblingPatterns.insert<BubbleUpSetEncodingOp>(ctx);
-  bubblingPatterns.insert<SinkUnsetEncodingOp>(ctx);
-  GreedyRewriteConfig config;
-  config.enableConstantCSE(false);
-  if (failed(applyPatternsGreedily(moduleOp, std::move(bubblingPatterns),
-                                   config))) {
+  if (failed(propagateEncodings(moduleOp,
+                                EncodingPropagationScope::WithinDispatch))) {
     return signalPassFailure();
   }
 
@@ -393,6 +456,8 @@ void HoistEncodingOpsPass::runOnOperation() {
   RewritePatternSet cleanPatterns(ctx);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(cleanPatterns);
   IREE::Flow::DispatchRegionOp::getCanonicalizationPatterns(cleanPatterns, ctx);
+  GreedyRewriteConfig config;
+  config.enableConstantCSE(false);
   if (failed(
           applyPatternsGreedily(moduleOp, std::move(cleanPatterns), config))) {
     return signalPassFailure();
