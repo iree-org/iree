@@ -144,6 +144,11 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
     // strides: thread, subgroup
     SmallVector<int64_t> levels(5, 1);
     SmallVector<int64_t> strides(2, 0);
+    // Keep non-unit levels in order when merging source dimensions into this
+    // target dimension. Track this separately from currLevel, which resets at
+    // each source dimension. Consuming an element level after a thread level
+    // would change which elements each thread owns.
+    int64_t minTargetLevel = 0;
 
     // The idea of this loop is to distribute the current dimension of the
     // target shape onto one or multiple dimensions of the layout.
@@ -242,7 +247,7 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
         continue;
       }
 
-      if (currLevel < minLevel) {
+      if (currLevel < minLevel || currLevel < minTargetLevel) {
         // Check that invariant that we're always moving upwards in the levels
         // of the layout (see above for definition). Bail out if the invariant
         // doesn't hold.
@@ -277,6 +282,7 @@ NestedLayoutAttr::reshape(ArrayRef<int64_t> newShape) const {
       }
 
       levels[currLevel] *= consume;
+      minTargetLevel = currLevel;
       dimRemaining /= consume;
       remainingLevels[currLevel] /= consume;
     } while (true);

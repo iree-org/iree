@@ -1117,3 +1117,52 @@ func.func @scan_backward_propagation(%arr: memref<16x16xf16>, %arr_init: memref<
   %destl = iree_vector_ext.to_layout %out#0 to layout(#layout_scan_bwd) : vector<16x16xf16>
   func.return %destl, %out#1 : vector<16x16xf16>, vector<16xf16>
 }
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1],
+  thread_tile = [2, 2], element_tile = [2, 2],
+  subgroup_strides = [0, 0], thread_strides = [1, 2]>
+
+// Each thread's 2x2 tile spans non-contiguous columns in the 2x8 result.
+// Reject the reshape layout that assigns it four consecutive columns.
+func.func @reshape_noncontiguous_thread_elements_forward(%arg0: vector<4x4xf32>) -> vector<2x8xf32> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#layout) : vector<4x4xf32>
+  %reshape = vector.shape_cast %source : vector<4x4xf32> to vector<2x8xf32>
+  // No layout remark is expected for the shape_cast result.
+  return %reshape : vector<2x8xf32>
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1],
+  thread_tile = [2, 2], element_tile = [2, 2],
+  subgroup_strides = [0, 0], thread_strides = [1, 2]>
+
+// Backward propagation must also reject this non-contiguous layout.
+func.func @reshape_noncontiguous_thread_elements_backward(%arg0: vector<2x8xf32>) -> vector<4x4xf32> {
+  %source = arith.negf %arg0 : vector<2x8xf32>
+  // No layout remark is expected for the source producer.
+  %reshape = vector.shape_cast %source : vector<2x8xf32> to vector<4x4xf32>
+  // expected-remark @above {{thread_tile = [2, 2], element_tile = [2, 2]}}
+  %result = iree_vector_ext.to_layout %reshape to layout(#layout) : vector<4x4xf32>
+  return %result : vector<4x4xf32>
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [1, 1], outer_tile = [1, 1],
+  thread_tile = [2, 1], element_tile = [2, 4],
+  subgroup_strides = [0, 0], thread_strides = [1, 0]>
+
+// Merging element levels across source dimensions is valid when no thread
+// level separates them. Each thread still owns eight consecutive elements.
+func.func @reshape_contiguous_thread_elements(%arg0: vector<4x4xf32>) -> vector<2x8xf32> {
+  %source = iree_vector_ext.to_layout %arg0 to layout(#layout) : vector<4x4xf32>
+  %reshape = vector.shape_cast %source : vector<4x4xf32> to vector<2x8xf32>
+  // expected-remark @above {{thread_tile = [2, 1], element_tile = [1, 8]}}
+  return %reshape : vector<2x8xf32>
+}
