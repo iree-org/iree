@@ -337,9 +337,9 @@ def FormDispatchRegionsPass :
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
            /*default=*/"false", "Enable fusion of pad with producers">,
     Option<"fuseMmt4d", "fuse-mmt4d", "bool",
-           /*default=*/"false", "Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches">,
+           /*default=*/"false", "Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false">,
     Option<"fuseDataTiledConvolution", "fuse-data-tiled-convolution", "bool",
-           /*default=*/"false", "Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches">
+           /*default=*/"false", "Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false">
   ];
   let description = [{
     Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region

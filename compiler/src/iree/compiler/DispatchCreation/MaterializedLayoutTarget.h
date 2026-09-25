@@ -16,14 +16,18 @@ namespace mlir::iree_compiler::DispatchCreation {
 /// Discardable module attribute holding the `#hal.executable.target` that the
 /// module's tensor layouts were materialized for before dispatch creation.
 ///
-/// A module carrying it already has target-specific layouts, e.g. linalg.pack
-/// and linalg.mmt4d, instead of encodings. The attribute changes dispatch
-/// creation as follows:
+/// iree-global-opt-early-data-tiling sets it. A module carrying it already has
+/// target-specific layouts, e.g. linalg.pack and linalg.mmt4d, instead of
+/// encodings. The attribute changes dispatch creation as follows:
 ///  - iree-dispatch-creation-assign-data-tiling-encodings does not assign
 ///    encodings again, which would re-encode materialized ops.
 ///  - iree-dispatch-creation-verify-materialized-layout-target rejects
 ///    compiling the module for any other executable target, for several
 ///    targets, or for none.
+///  - iree-dispatch-creation-form-dispatch-regions enables its fuse-mmt4d and
+///    fuse-data-tiled-convolution options, even if they are set to false.
+///  - iree-dispatch-creation-transpose-generic-ops keeps the loop order of
+///    data-tiled convolutions.
 /// The attribute is preserved across serialization so that compilation can be
 /// resumed. Its accessors live here rather than in the Encoding dialect because
 /// its value is a HAL attribute, and HAL depends on the Encoding dialect.
