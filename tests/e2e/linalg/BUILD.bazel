@@ -22,6 +22,8 @@ LLVM_SRCS = enforce_glob(
     # keep sorted
     [
         "conv2d.mlir",
+        "early_data_tiling_convolutions.mlir",
+        "early_data_tiling_matmuls.mlir",
         "fp4_f32_conversion.mlir",
         "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
@@ -46,6 +48,46 @@ iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+# Data-tiling layouts materialized before dispatch creation. The convolution
+# suite also data-tiles convolutions, which are not data-tiled by default.
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_early_dt_local-task",
+    srcs = [
+        "early_data_tiling_matmuls.mlir",
+        "narrow_n_matmuls.mlir",
+    ],
+    compiler_flags = [
+        "--iree-opt-experimental-early-data-tiling",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    tags = [
+        # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_early_dt_conv_local-task",
+    srcs = [
+        "conv2d.mlir",
+        "early_data_tiling_convolutions.mlir",
+    ],
+    compiler_flags = [
+        "--iree-dispatch-creation-experimental-set-data-tiling-ops=convolution",
+        "--iree-global-opt-use-im2col-for-convs=false",
+        "--iree-opt-experimental-early-data-tiling",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
     driver = "local-task",
     tags = [
         # subbyte support for wasm is not on priorities.
@@ -91,6 +133,8 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "early_data_tiling_convolutions.mlir",
+        "early_data_tiling_matmuls.mlir",
         "large_linalg_matmul.mlir",
     ],
 )
@@ -138,6 +182,8 @@ VULKAN_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "early_data_tiling_convolutions.mlir",
+        "early_data_tiling_matmuls.mlir",
         # TODO(#23387): Enable the test once scaling_extf/truncf lowering is
         # supported.
         "fp4_f32_conversion.mlir",
@@ -196,6 +242,8 @@ CUDA_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "early_data_tiling_convolutions.mlir",
+        "early_data_tiling_matmuls.mlir",
         "argmax.mlir",
         "fp4_f32_conversion.mlir",
         "gather_like_ops.mlir",
@@ -241,6 +289,8 @@ ROCM_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
+        "early_data_tiling_convolutions.mlir",
+        "early_data_tiling_matmuls.mlir",
         "large_linalg_matmul.mlir",
         # https://github.com/llvm/llvm-project/issues/131386 causes
         # See bug #20294

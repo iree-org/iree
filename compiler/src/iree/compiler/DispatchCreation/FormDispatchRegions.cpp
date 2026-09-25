@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/LoopMappingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
+#include "iree/compiler/DispatchCreation/MaterializedLayoutTarget.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1314,6 +1315,16 @@ void FormDispatchRegionsPass::runOnOperation() {
                                          fusePadWithProducers,
                                          fuseMmt4d,
                                          fuseDataTiledConvolution};
+  // Materialized layouts turn contractions into mmt4d ops and data-tiled
+  // convolutions before dispatch formation. Keep their elementwise epilogues
+  // and result unpacks in the same dispatch, even if the options are off.
+  // TODO: Which data-tiled ops fuse with their epilogues follows from the CPU
+  // layouts. Get it from the component that decided the layouts instead of
+  // keying it on the materialized layout target.
+  if (getMaterializedLayoutTarget(funcOp)) {
+    options.fuseMmt4d = true;
+    options.fuseDataTiledConvolution = true;
+  }
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();

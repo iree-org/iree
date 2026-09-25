@@ -1,5 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-mmt4d=true}))" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-mmt4d=true}))" %s | FileCheck %s --check-prefix=AGGRESSIVE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-mmt4d=false fuse-data-tiled-convolution=false}))" %s | FileCheck %s --check-prefix=MATERIALIZED
 
 // The elementwise epilogue and the row-major result unpack join the mmt4d
 // dispatch.
@@ -369,4 +370,63 @@ util.func public @no_fuse_multi_use_result(%lhs: tensor<8x128x8x1xf32>, %rhs: te
     linalg.yield %0 : f32
   } -> tensor<64x64xf32>
   util.return %neg, %mmt4d : tensor<64x64xf32>, tensor<8x8x8x8xf32>
+}
+
+// -----
+
+// Modules with materialized layouts fuse data-tiled ops with their epilogues
+// and result unpacks even if the options are off.
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+#target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {target_triple = "aarch64-unknown-unknown-eabi-elf"}>
+module attributes {iree.encoding.materialized_layout_target = #target} {
+  // MATERIALIZED-LABEL: util.func public @materialized_mmt4d_relu_unpack(
+  // MATERIALIZED:         %[[RESULT:.+]] = flow.dispatch.region -> (tensor<64x64xf32>)
+  // MATERIALIZED:           %[[MMT4D:.+]] = linalg.mmt4d
+  // MATERIALIZED:           %[[RELU:.+]] = linalg.generic
+  // MATERIALIZED-SAME:        ins(%[[MMT4D]] : tensor<8x8x8x8xf32>)
+  // MATERIALIZED:           %[[UNPACK:.+]] = linalg.unpack %[[RELU]]
+  // MATERIALIZED:           flow.return %[[UNPACK]]
+  // MATERIALIZED-NOT:     flow.dispatch.region
+  // MATERIALIZED:         util.return %[[RESULT]]
+  util.func public @materialized_mmt4d_relu_unpack(%lhs: tensor<8x128x8x1xf32>, %rhs: tensor<8x128x8x1xf32>) -> tensor<64x64xf32> {
+    %zero = arith.constant 0.000000e+00 : f32
+    %empty = tensor.empty() : tensor<8x8x8x8xf32>
+    %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+    %mmt4d = linalg.mmt4d ins(%lhs, %rhs : tensor<8x128x8x1xf32>, tensor<8x128x8x1xf32>) outs(%fill : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+    %relu = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%mmt4d : tensor<8x8x8x8xf32>) outs(%empty : tensor<8x8x8x8xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %max = arith.maximumf %in, %zero : f32
+      linalg.yield %max : f32
+    } -> tensor<8x8x8x8xf32>
+    %dest = tensor.empty() : tensor<64x64xf32>
+    %unpack = linalg.unpack %relu outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<8x8x8x8xf32> -> tensor<64x64xf32>
+    util.return %unpack : tensor<64x64xf32>
+  }
+
+  // MATERIALIZED-LABEL: util.func public @materialized_conv_unpack(
+  // MATERIALIZED:         %[[RESULT:.+]] = flow.dispatch.region -> (tensor<2x14x14x16xf32>)
+  // MATERIALIZED:           %[[CONV:.+]] = linalg.generic
+  // MATERIALIZED:           %[[UNPACK:.+]] = linalg.unpack %[[CONV]]
+  // MATERIALIZED:           flow.return %[[UNPACK]]
+  // MATERIALIZED-NOT:     flow.dispatch.region
+  // MATERIALIZED:         util.return %[[RESULT]]
+  util.func public @materialized_conv_unpack(%input: tensor<2x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>) -> tensor<2x14x14x16xf32> {
+    %zero = arith.constant 0.0 : f32
+    %empty = tensor.empty() : tensor<2x2x14x14x8xf32>
+    %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<2x2x14x14x8xf32>) -> tensor<2x2x14x14x8xf32>
+    %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+      ins(%input, %filter : tensor<2x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<2x2x14x14x8xf32>) {
+    ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+      %mul = arith.mulf %lhs, %rhs : f32
+      %sum = arith.addf %mul, %acc : f32
+      linalg.yield %sum : f32
+    } -> tensor<2x2x14x14x8xf32>
+    %dest = tensor.empty() : tensor<2x14x14x16xf32>
+    %unpack = linalg.unpack %conv outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [8] into %dest : tensor<2x2x14x14x8xf32> -> tensor<2x14x14x16xf32>
+    util.return %unpack : tensor<2x14x14x16xf32>
+  }
 }
