@@ -249,3 +249,30 @@ func.func @nested_op_scalable_alloc_linalg_use(%arg0 : index) {
 // CHECK-UNBOUNDED-VSCALE-LABEL: func @nested_op_scalable_alloc_linalg_use(
 //       CHECK-UNBOUNDED-VSCALE: scf.for
 //       CHECK-UNBOUNDED-VSCALE:   memref.alloc
+
+// -----
+
+// An unconstrained `index` operand carries the trivial type-level upper bound
+// (~2^53), which `ceildiv 2` turns into a 2^52 static dimension. The hoist must
+// not materialize that as a static alloca (see #24483); it stays dynamic.
+func.func @no_hoist_umax_bounded_alloca(%arg0: index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c42 = arith.constant 42 : i32
+  %assumed = util.assume.int %arg0<umin = 0, umax = 9007199254740991> : index
+  %dim = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%assumed]
+  scf.for %iv = %c0 to %c1 step %c1 {
+    %a = memref.alloca(%dim) : memref<?xi32>
+    memref.store %c42, %a[%iv] : memref<?xi32>
+    scf.yield
+  }
+  return
+}
+// CHECK-LABEL: func @no_hoist_umax_bounded_alloca(
+//   CHECK-NOT:   memref.alloca() :
+//       CHECK:   scf.for
+//       CHECK:     memref.alloca(%{{.+}}) : memref<?xi32>
+
+// CHECK-UNBOUNDED-VSCALE-LABEL: func @no_hoist_umax_bounded_alloca(
+//   CHECK-UNBOUNDED-VSCALE-NOT:   memref.alloca() :
+//       CHECK-UNBOUNDED-VSCALE:   memref.alloca(%{{.+}}) : memref<?xi32>
