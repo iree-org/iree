@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -18,6 +19,7 @@
 #include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
@@ -31,6 +33,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Builders.h"
@@ -477,6 +480,167 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+/// Returns true if `operand` feeds a data-tiled contraction result into an
+/// elementwise epilogue that keeps the physical result layout. The operand and
+/// the single init must use identity maps, so transposes and reductions are
+/// rejected; other inputs may use any projected permutation, such as a
+/// broadcast bias. Epilogues that update the result in place through their
+/// init operand are not matched.
+static bool isDataTiledEpilogueOperand(OpOperand &operand) {
+  auto generic = dyn_cast<linalg::GenericOp>(operand.getOwner());
+  if (!generic || generic.getNumDpsInits() != 1 ||
+      !linalg::isElementwise(generic) || generic.isDpsInit(&operand)) {
+    return false;
+  }
+  return generic.getMatchingIndexingMap(&operand).isIdentity() &&
+         generic.getMatchingIndexingMap(generic.getDpsInitOperand(0))
+             .isIdentity();
+}
+
+// TODO: The matchers for data-tiled roots and their result unpacks hardcode the
+// ops and layouts that CPU data-tiling materialization produces: mmt4d,
+// data-tiled convolution generics, the narrow-N transposition and the
+// convolution layouts of getEncodingInfoForConv. The layout decision should be
+// its own component that materialization and dispatch formation both query, for
+// example by marking the ops it materializes, instead of dispatch formation
+// re-deriving the layouts. That would also drop the dependency on
+// Codegen/Dialect/Codegen/Utils.
+static bool isDataTiledRoot(Operation *op,
+                            FormDispatchRegionsPassOptions const &options) {
+  if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(op)) {
+    return options.fuseMmt4d;
+  }
+  auto generic = dyn_cast<linalg::GenericOp>(op);
+  return options.fuseDataTiledConvolution && generic &&
+         IREE::Codegen::isDataTiledConvGeneric(generic);
+}
+
+/// Returns true if `collapse` folds a unit batch dimension of a data-tiled
+/// convolution result into its outer channel dimension, i.e.
+/// [1, OC/k0, OH, OW, k0] into [OC/k0, OH, OW, k0]. Batchless convolutions
+/// reach dispatch formation in this form. Reshapes of channel tiles or spatial
+/// dimensions are not matched.
+static bool isUnitBatchCollapse(tensor::CollapseShapeOp collapse) {
+  return collapse.getSrcType().getRank() == 5 &&
+         collapse.getSrcType().getDimSize(0) == 1 &&
+         collapse.getReassociationIndices() ==
+             SmallVector<ReassociationIndices>{{0, 1}, {2}, {3}, {4}};
+}
+
+/// Returns the data-tiled root that produces `value` through
+/// layout-preserving epilogues, or null. This only defers the root selection of
+/// a potential result unpack; the normal use, dependency and fusion-group
+/// checks still decide whether the root claims it.
+static Operation *
+findDataTiledRoot(Value value, FormDispatchRegionsPassOptions const &options) {
+  SmallVector<Value> worklist{value};
+  llvm::SmallPtrSet<Operation *, 8> visited;
+  Block *block = value.getParentBlock();
+  while (!worklist.empty()) {
+    Operation *producer = worklist.pop_back_val().getDefiningOp();
+    if (!producer || producer->getBlock() != block ||
+        !visited.insert(producer).second) {
+      continue;
+    }
+    if (isDataTiledRoot(producer, options)) {
+      return producer;
+    }
+    if (auto collapse = dyn_cast<tensor::CollapseShapeOp>(producer);
+        collapse && options.fuseDataTiledConvolution &&
+        isUnitBatchCollapse(collapse)) {
+      worklist.push_back(collapse.getSrc());
+      continue;
+    }
+    for (OpOperand &operand : producer->getOpOperands()) {
+      if (isDataTiledEpilogueOperand(operand)) {
+        worklist.push_back(operand.get());
+      }
+    }
+  }
+  return nullptr;
+}
+
+/// Returns true if `unpack` restores an mmt4d or batch_mmt4d result
+/// [(B,) M1, N1, M0, N0] with static tiles into [(B,) M, N]. Besides this
+/// row-major form, accept the transposed form that data-tiling materialization
+/// uses for narrow N, where the last two entries of both inner_dims_pos and
+/// outer_dims_perm are swapped. Other permutations, and dynamic or scalable
+/// tiles, keep their separate dispatch.
+static bool isMmt4dResultUnpack(linalg::UnPackOp unpack) {
+  int64_t destRank = unpack.getDestType().getRank();
+  if (!unpack.getInnerTiles().empty() || unpack.getInnerDimsPos().size() != 2 ||
+      (destRank != 2 && destRank != 3)) {
+    return false;
+  }
+  SmallVector<int64_t> innerDimsPos(unpack.getInnerDimsPos());
+  SmallVector<int64_t> outerDimsPerm(unpack.getOuterDimsPerm());
+  if (outerDimsPerm.empty()) {
+    outerDimsPerm = llvm::to_vector(llvm::seq<int64_t>(0, destRank));
+  }
+  if (innerDimsPos[0] > innerDimsPos[1]) {
+    std::swap(innerDimsPos[0], innerDimsPos[1]);
+    std::swap(outerDimsPerm[destRank - 2], outerDimsPerm[destRank - 1]);
+  }
+  return innerDimsPos[0] == destRank - 2 && innerDimsPos[1] == destRank - 1 &&
+         isIdentityPermutation(outerDimsPerm);
+}
+
+// Result unpacks of a data-tiled convolution. The convolution produces
+// [N, OC/k0, OH, OW, k0]; these layouts only unpack the k0 tile, mirroring the
+// outer_dims_perm and inner_dims_pos that data-tiling materialization computes
+// for convolution results (see getEncodingInfoForConv in
+// Codegen/Dialect/Codegen/Utils/Utils.cpp).
+// NHWC: [N, OC/k0, OH, OW, k0] into [N, OH, OW, OC].
+constexpr int64_t kNhwcChannelPos = 3;
+constexpr int64_t kNhwcOuterDimsPerm[] = {0, 3, 1, 2};
+// NCHW: [N, OC/k0, OH, OW, k0] into [N, OC, OH, OW].
+constexpr int64_t kNchwChannelPos = 1;
+// Batchless HWC, after isUnitBatchCollapse: [OC/k0, OH, OW, k0] into
+// [OH, OW, OC]. Batchless CHW is not matched.
+constexpr int64_t kHwcChannelPos = 2;
+constexpr int64_t kHwcOuterDimsPerm[] = {2, 0, 1};
+
+/// Returns true if `unpack` restores a data-tiled convolution result into one
+/// of the layouts above. Arbitrary permutations keep their separate dispatch.
+static bool isDataTiledConvResultUnpack(linalg::UnPackOp unpack) {
+  if (!unpack.getInnerTiles().empty() || unpack.getInnerDimsPos().size() != 1) {
+    return false;
+  }
+  ArrayRef<int64_t> outerDimsPerm = unpack.getOuterDimsPerm();
+  int64_t channelPos = unpack.getInnerDimsPos()[0];
+  switch (unpack.getSourceType().getRank()) {
+  case 5:
+    return (channelPos == kNhwcChannelPos &&
+            outerDimsPerm == ArrayRef(kNhwcOuterDimsPerm)) ||
+           (channelPos == kNchwChannelPos &&
+            (outerDimsPerm.empty() || isIdentityPermutation(outerDimsPerm)));
+  case 4: {
+    auto collapse = unpack.getSource().getDefiningOp<tensor::CollapseShapeOp>();
+    return collapse && isUnitBatchCollapse(collapse) &&
+           channelPos == kHwcChannelPos &&
+           outerDimsPerm == ArrayRef(kHwcOuterDimsPerm);
+  }
+  default:
+    return false;
+  }
+}
+
+static bool isDataTiledResultUnpack(linalg::UnPackOp unpack, Operation *root) {
+  if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(root)) {
+    return isMmt4dResultUnpack(unpack);
+  }
+  return isDataTiledConvResultUnpack(unpack);
+}
+
+/// Returns true if `unpack` can join `group`, whose root is a data-tiled
+/// contraction, as the final operation of the group.
+static bool canFuseDataTiledResultUnpack(linalg::UnPackOp unpack,
+                                         const FusionGroup &group) {
+  return isDataTiledResultUnpack(unpack, group.getRoot()) &&
+         !llvm::any_of(group.getFusedOperations(), isPackLikeOp) &&
+         !group.wouldExceedOperandLimit(unpack);
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -491,6 +655,44 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   cloneableOptions.aggressive = options.aggressiveFusion;
   if (IREE::Flow::isCloneableIntoDispatchOp(consumer, cloneableOptions)) {
     return false;
+  }
+
+  const FusionGroup &group = tracker.getFusionGroup(producer);
+  Operation *groupRoot = group.getRoot();
+  if (isDataTiledRoot(groupRoot, options)) {
+    // The result unpack is the final operation in a data-tiled group.
+    if (isUnpackLikeOp(producer)) {
+      return false;
+    }
+    // A data-tiled group holds pack-like ops or its result unpack, but not
+    // both. This rejects the pack-like op if the unpack joined first, and
+    // canFuseDataTiledResultUnpack rejects the unpack otherwise.
+    if (isPackLikeOp(consumer) &&
+        llvm::any_of(group.getFusedOperations(),
+                     llvm::IsaPred<linalg::UnPackOp>)) {
+      return false;
+    }
+    if (auto unpack = dyn_cast<linalg::UnPackOp>(consumer)) {
+      return canFuseDataTiledResultUnpack(unpack, group);
+    }
+    // A unit-batch collapse only joins together with the unpack that consumes
+    // it, so that a group never ends in the collapse. The unpack adds no
+    // operands, so it passes the operand limit whenever the collapse does.
+    if (auto collapse = dyn_cast<tensor::CollapseShapeOp>(consumer);
+        collapse && isa<linalg::GenericOp>(groupRoot) &&
+        isUnitBatchCollapse(collapse) && collapse->hasOneUse()) {
+      auto unpack = dyn_cast<linalg::UnPackOp>(*collapse->getUsers().begin());
+      return unpack && canFuseDataTiledResultUnpack(unpack, group) &&
+             !group.wouldExceedOperandLimit(consumer);
+    }
+    // Default fusion never adds consumers to mmt4d ops, so their groups only
+    // gain layout-preserving epilogues. Data-tiled convolutions are generic
+    // ops that the rules below already fuse with their consumers; keep those
+    // decisions so that the option only adds the result unpack.
+    if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(groupRoot) &&
+        !isDataTiledEpilogueOperand(fusedOperand)) {
+      return false;
+    }
   }
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
@@ -547,9 +749,13 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     return insertSliceOp.getDest().getDefiningOp<linalg::FillOp>();
   }
 
-  // TODO(#16025): Enable mmt4d fusion. It is disabled because the backends
-  // can not set multi lowering_config properly. See the issue for more details.
-  if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(producer)) {
+  // mmt4d consumer fusion is opt-in through `fuseMmt4d`. The CPU codegen
+  // limitation that originally disabled it (#16025) is fixed, but the other
+  // flows that reach dispatch formation with mmt4d ops have not been validated
+  // with fused dispatches.
+  // TODO: Enable mmt4d consumer fusion by default once they are.
+  if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(producer) &&
+      !options.fuseMmt4d) {
     return false;
   }
 
@@ -854,6 +1060,10 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
     // - First find the roots
     // - To fuse with consumers make the consumer the root.
     SmallVector<Operation *> roots;
+    // Result unpacks left for their data-tiled root to claim as a consumer.
+    // They keep their position in `roots`, but only get a fusion group if the
+    // root does not claim them.
+    llvm::SmallPtrSet<Operation *, 4> deferredUnpacks;
     for (Operation &op : llvm::reverse(block)) {
       if (isa<scf::SCFDialect>(op.getDialect())) {
         for (auto &region : op.getRegions()) {
@@ -864,6 +1074,17 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       }
 
       // Start with a root operation and fuse its producers.
+      // Let a packed contraction claim its final unpack as a consumer.
+      if (options.fuseMmt4d || options.fuseDataTiledConvolution) {
+        if (auto unpack = dyn_cast<linalg::UnPackOp>(op)) {
+          Operation *root = findDataTiledRoot(unpack.getSource(), options);
+          if (root && isDataTiledResultUnpack(unpack, root)) {
+            deferredUnpacks.insert(&op);
+            roots.push_back(&op);
+            continue;
+          }
+        }
+      }
       if (tracker.isFusedOp(&op) || !isRootLikeOp(&op)) {
         continue;
       }
@@ -872,8 +1093,24 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
                              /*fuseWithTruncate=*/false);
       roots.push_back(&op);
     }
-    roots = llvm::to_vector(llvm::reverse(roots));
-    fuseRootsWithConsumers(context, roots, dominanceInfo, options, tracker);
+    // Fuse consumers in program order. A deferred unpack that its root did not
+    // claim becomes a root at its own position, as it would be without
+    // deferral. Roots before it cannot claim it instead: only data-tiled
+    // groups take unpack consumers.
+    SmallVector<Operation *> orderedRoots;
+    for (Operation *root : llvm::reverse(roots)) {
+      if (deferredUnpacks.contains(root)) {
+        if (tracker.isFusedOp(root)) {
+          continue;
+        }
+        FusionGroup &newGroup = tracker.createFusionGroup(context, root);
+        fuseRootsWithProducers(context, root, newGroup, options, tracker,
+                               /*fuseWithTruncate=*/false);
+      }
+      fuseRootsWithConsumers(context, root, dominanceInfo, options, tracker);
+      orderedRoots.push_back(root);
+    }
+    roots = std::move(orderedRoots);
     for (Operation *root : roots) {
       FusionGroup &fusionGroup = tracker.getFusionGroup(root);
       fuseRootsWithProducers(context, root, fusionGroup, options, tracker,
@@ -1071,9 +1308,12 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{
-      aggressiveFusion, fuseMultiUseProducers, fusePadWithConsumers,
-      fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{aggressiveFusion,
+                                         fuseMultiUseProducers,
+                                         fusePadWithConsumers,
+                                         fusePadWithProducers,
+                                         fuseMmt4d,
+                                         fuseDataTiledConvolution};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
