@@ -366,14 +366,6 @@ TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   return bestRatedTile;
 }
 
-static bool getEnableInnerTiledFromConfig(DictionaryAttr config) {
-  Attribute attr = config.get("enable_inner_tiled");
-  if (auto battr = dyn_cast_if_present<BoolAttr>(attr)) {
-    return battr.getValue();
-  }
-  return false;
-}
-
 /// Returns the matmul {M, N, K} tile shape covered by a CPU DataTiledMMAAttr.
 /// The swizzle's `expandShape` is partitioned per its convention (see
 /// `getIntrinsicSwizzle`): LHS is `[M dims, K dims]`, RHS is `[N dims, K
@@ -1643,7 +1635,7 @@ struct CPUEncodingPackedLayoutMaterializerAttr
     }
 
     DictionaryAttr config = layoutAttr.getConfiguration();
-    if (getEnableInnerTiledFromConfig(config)) {
+    if (isInnerTiledEnabled(config)) {
       return getInnerTiledEncodingInfo(type.getContext(), encoding, *cDims,
                                        config);
     }
@@ -1777,7 +1769,7 @@ struct CPUEncodingResolverMaterializerAttr final
     }
     if (linalg::isaContractionOpInterface(linalgOp)) {
       DictionaryAttr config = layoutAttr.getConfiguration();
-      if (getEnableInnerTiledFromConfig(config)) {
+      if (isInnerTiledEnabled(config)) {
         return lowerContractionToInnerTiled(
             b, linalgOp, convertedOperands,
             cast<IREE::Encoding::LayoutMaterializerAttr>(layoutAttr));

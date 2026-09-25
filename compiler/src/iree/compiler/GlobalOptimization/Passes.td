@@ -91,6 +91,46 @@ def DetachElementwiseFromNamedOpsPass :
   let summary = "Detaches elementwise ops from named Linalg ops.";
 }
 
+def EarlyDataTilingPass : Pass<"iree-global-opt-early-data-tiling", "mlir::ModuleOp"> {
+  let summary = "Materializes data-tiling layouts before dispatch creation for a supported target.";
+  let description = [{
+    For a module with a single executable target that supports host encoding
+    materialization, normalizes contraction dimensions, assigns data-tiling
+    encodings, propagates them through elementwise producers and consumers,
+    and materializes them into packed layouts such as linalg.pack,
+    linalg.mmt4d and linalg.unpack. Records the target in the
+    `iree.encoding.materialized_layout_target` module attribute, which keeps
+    dispatch creation from assigning encodings again and from compiling the
+    module for another target. Other modules are left unchanged, so they use
+    dispatch-time data tiling. The options select the operation families and
+    encoding strategy, as for iree-dispatch-creation-assign-data-tiling-encodings.
+    Only the default encoding strategy materializes into packed layouts, so
+    modules are left unchanged for other strategies.
+  }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data tiling. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init(
+            mlir::iree_compiler::DispatchCreation::getDefaultDataTilingOpTypes())}]>,
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
+  ];
+}
+
 def EraseUnusedLinalgOperandsPass :
     Pass<"iree-global-opt-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erases unused linalg operand and remove dead code.";
