@@ -11,6 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/MaterializedLayoutTarget.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -31,9 +33,22 @@ namespace {
 /// dimension.
 struct MakeReductionInnermostPattern final
     : OpRewritePattern<linalg::GenericOp> {
-  using Base::Base;
+  MakeReductionInnermostPattern(MLIRContext *context,
+                                bool keepDataTiledConvLoopOrder)
+      : Base(context), keepDataTiledConvLoopOrder(keepDataTiledConvLoopOrder) {}
+
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
+    // Data-tiled convolutions from materialized layouts already have the loop
+    // order that their codegen configuration expects, like named mmt4d ops.
+    // TODO: The expected loop order is a property of CPU codegen. Get it from
+    // the component that decided the layouts instead of keying it on the
+    // materialized layout target.
+    if (keepDataTiledConvLoopOrder &&
+        IREE::Codegen::isDataTiledConvGeneric(genericOp)) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "keep the loop order of data-tiled convolutions");
+    }
     SmallVector<unsigned> interchange;
     bool needInterchange = false;
     unsigned numParallelLoop = genericOp.getNumParallelLoops();
@@ -59,6 +74,9 @@ struct MakeReductionInnermostPattern final
     }
     return interchangeGenericOp(rewriter, genericOp, interchange);
   }
+
+private:
+  bool keepDataTiledConvLoopOrder;
 };
 
 /// For elementwise ops that consumer values produced by named ops (or reduction
@@ -187,8 +205,12 @@ struct TransposeGenericOpsPass final
     : impl::TransposeGenericOpsPassBase<TransposeGenericOpsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<MakeReductionInnermostPattern, TransposeGenericOpPattern,
-                 NormalizeReductionDimsPattern>(&getContext());
+    bool keepDataTiledConvLoopOrder =
+        static_cast<bool>(getMaterializedLayoutTarget(getOperation()));
+    patterns.add<MakeReductionInnermostPattern>(&getContext(),
+                                                keepDataTiledConvLoopOrder);
+    patterns.add<TransposeGenericOpPattern, NormalizeReductionDimsPattern>(
+        &getContext());
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

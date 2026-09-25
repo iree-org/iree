@@ -202,9 +202,14 @@ void buildIREEPrecompileTransformPassPipeline(
       globalOptimizationOptions.outerDimConcat;
   // The pipeline option has higher priority.
   globalTransformOptions.dataTiling = globalOptimizationOptions.dataTiling;
-  if (pipelineOptions.dataTiling) {
+  globalTransformOptions.earlyDataTiling = pipelineOptions.earlyDataTiling;
+  if (pipelineOptions.dataTiling || pipelineOptions.earlyDataTiling) {
     globalTransformOptions.dataTiling = false;
   }
+  // Modules that the early route does not support fall back to dispatch-time
+  // data tiling, so both use the dispatch creation configuration.
+  globalTransformOptions.earlyDataTilingEncodingOptions =
+      DispatchCreation::getDataTilingEncodingOptionsFromFlags();
   globalTransformOptions.constEval = globalOptimizationOptions.constEval;
   globalTransformOptions.numericPrecisionReduction =
       globalOptimizationOptions.numericPrecisionReduction;
@@ -345,11 +350,12 @@ void buildIREEVMTransformPassPipeline(
         dispatchCreationOptions.enableFuseMultiUse;
     // The pipeline option has higher priority.
     dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
-    if (pipelineOptions.dataTiling) {
+    if (pipelineOptions.dataTiling || pipelineOptions.earlyDataTiling) {
       dispatchTransformOptions.dataTiling = true;
     }
     if (dispatchTransformOptions.dataTiling &&
-        globalOptimizationOptions.dataTiling) {
+        globalOptimizationOptions.dataTiling &&
+        !pipelineOptions.earlyDataTiling) {
 #ifndef NDEBUG
       llvm::reportFatalUsageError(
           "Invalid configuration: data-tiling cannot be enabled in both "
