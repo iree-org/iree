@@ -767,13 +767,16 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
       if (!isa<IREE::Stream::ResourceType>(operand.getType())) {
         continue;
       }
+      if (!IREE::Util::TiedOpInterface::hasAnyTiedUses(operand)) {
+        continue;
+      }
       for (auto user : operand.getUsers()) {
         if (user == &op || user->getBlock() != block ||
             user->isBeforeInBlock(&op)) {
           continue;
         }
         auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(user);
-        if (!tiedOp || !tiedOp.hasAnyTiedUses(operand)) {
+        if (!tiedOp) {
           continue;
         }
         auto userInfoIt = opInfos.find(user);
