@@ -54,6 +54,7 @@ iree_runtime_cc_library(
 
 iree_hal_cts_testdata(
     backend_name = "vulkan",
+    flags = ["--iree-vulkan-target=vp_android_baseline_2022"],
     format_name = "vulkan_spirv",
     format_string = '"vulkan-spirv-fb"',
     identifier = "iree_cts_testdata_vulkan_spirv",
@@ -63,7 +64,10 @@ iree_hal_cts_testdata(
 
 iree_hal_cts_testdata(
     backend_name = "vulkan_bda",
-    flags = ["--iree-vulkan-dispatch-abi=bda"],
+    flags = [
+        "--iree-vulkan-dispatch-abi=bda",
+        "--iree-vulkan-target=vp_android_baseline_2022",
+    ],
     format_name = "vulkan_spirv_bda",
     format_string = '"vulkan-spirv-bda-v1"',
     identifier = "iree_cts_testdata_vulkan_spirv_bda",
