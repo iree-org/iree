@@ -204,26 +204,32 @@ func.func @reduction_with_distributable_elementwise_consumer(
 //  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256]{{\]}}>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 256]{{\]}}>
 //  CHECK-DAG: #[[CONFIG3:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048]{{\]}}>
+//  CHECK-DAG: #[[CONFIG1_FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [256, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[CONFIG2_FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 256, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[CONFIG3_FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [2048, 0]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION1:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //  CHECK-DAG: #[[TRANSLATION2:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [512, 1, 1]>
+// In each of these the reduction op keeps its workgroup level while the fused
+// consumer gets the reduction level only, so the consumer cannot outrank the
+// reduction during workgroup root selection.
 //      CHECK: func.func @reduction_with_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION1]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG1]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG1]]
+// CHECK-SAME:       lowering_config = #[[CONFIG1_FUSED]]
 //      CHECK: func.func @batch_reduction_and_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION1]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG2]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG2]]
+// CHECK-SAME:       lowering_config = #[[CONFIG2_FUSED]]
 //      CHECK: func.func @reduction_with_distributable_elementwise_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION2]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG3]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG3]]
+// CHECK-SAME:       lowering_config = #[[CONFIG3_FUSED]]
 
 // -----
 
@@ -278,3 +284,58 @@ func.func @fail_reduction_with_nondistributable_consumer(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-NOT: pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce>
 //      CHECK: return
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
+    subgroup_size_choices = [16], max_workgroup_sizes = [512, 512, 512],
+    max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 32768,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+#map14 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#map15 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map16 = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+#map17 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map18 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+
+func.func @reduction_with_permuted_consumer_and_extra_parallel_dim(
+    %input: tensor<16x4x64xf32>,
+    %other: tensor<4x16x64xf32>,
+    %filled: tensor<4x64xf32>,
+    %empty_out: tensor<16x4x64xf32>
+) -> tensor<16x4x64xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %reduction = linalg.generic {
+    indexing_maps = [#map14, #map15],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%input : tensor<16x4x64xf32>) outs(%filled : tensor<4x64xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %0 = arith.maximumf %in, %out : f32
+    linalg.yield %0 : f32
+  } -> tensor<4x64xf32>
+
+  %epilogue = linalg.generic {
+    indexing_maps = [#map16, #map17, #map18],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%other, %reduction : tensor<4x16x64xf32>, tensor<4x64xf32>)
+    outs(%empty_out : tensor<16x4x64xf32>) {
+  ^bb0(%in: f32, %in_reduction: f32, %out: f32):
+    %0 = arith.subf %in, %in_reduction : f32
+    %1 = math.exp %0 : f32
+    linalg.yield %1 : f32
+  } -> tensor<16x4x64xf32>
+  return %epilogue : tensor<16x4x64xf32>
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [16, 1, 1]>
+//      CHECK: func.func @reduction_with_permuted_consumer_and_extra_parallel_dim(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// The reduction op owns the workgroup level...
+//      CHECK:   linalg.generic
+// CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel"]
+// CHECK-SAME:       lowering_config = #[[FUSED]]
