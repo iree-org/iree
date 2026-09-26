@@ -8,18 +8,21 @@
 #define IREE_COMPILER_PLUGINAPI_PLUGINMANAGER_H_
 
 #include <optional>
+#include <string>
 #include <string_view>
-#include <vector>
 
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/OptionUtils.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Error.h"
 
 namespace mlir::iree_compiler {
 
-class PluginManager;
 class PluginManagerSession;
+class PluginManager;
 
 // Command line options for the plugin manager.
 class PluginManagerOptions {
@@ -33,6 +36,60 @@ public:
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PluginManagerOptions>;
 };
+
+// Initialized before LLVM command-line parsing so plugins can add options.
+class DynamicPluginRegistry {
+public:
+  DynamicPluginRegistry(const DynamicPluginRegistry &) = delete;
+  DynamicPluginRegistry &operator=(const DynamicPluginRegistry &) = delete;
+
+  enum class EnvPlugins { Disabled, Enabled };
+
+  /// Empty until initialize().
+  static DynamicPluginRegistry &get();
+
+  /// Loads every plugin named in |args| and, if enabled, in IREE_LOAD_PLUGINS.
+  /// Call once. The error joins every failure.
+  [[nodiscard]] llvm::Error initialize(llvm::ArrayRef<const char *> args,
+                                       EnvPlugins envPlugins);
+
+  [[nodiscard]] bool registerPlugins(PluginManager *registrar) const;
+  llvm::SmallVector<std::string> getLoadedPlugins() const;
+  bool hasPluginPath(llvm::StringRef path) const;
+  bool hasRegistrationFailures() const { return registrationFailed; }
+
+private:
+  struct Plugin {
+    std::string path;
+    std::string pluginId;
+    // Never closed: registered code must outlive every session.
+    void *library = nullptr;
+    PluginRegistrationFunction registerFunction = nullptr;
+
+    /// The id is read from the library.
+    static llvm::Expected<Plugin> loadFromPath(llvm::StringRef path);
+  };
+
+  DynamicPluginRegistry() = default;
+
+  void loadPluginsFromCL(llvm::ArrayRef<const char *> args);
+  void loadPluginPathsFromEnv();
+  void addPlugin(llvm::Expected<Plugin> plugin);
+
+  bool initialized = false;
+  mutable bool registrationFailed = false;
+  llvm::Error loadErrors = llvm::Error::success();
+  llvm::SmallVector<Plugin> plugins;
+};
+
+/// Loads once, however often it is called; later |args| are ignored. False if
+/// any plugin failed, with the failures written to |os|.
+bool initializeDynamicPlugins(llvm::ArrayRef<const char *> args,
+                              llvm::raw_ostream &os);
+
+/// Catches an --iree-load-plugin that reached llvm::cl without passing through
+/// initializeDynamicPlugins, as through the C API.
+bool verifyDynamicPluginFlags(llvm::raw_ostream &os);
 
 // Manages global registrations for available plugins.
 // Typically, there will be one PluginManager globally for the compiler, and
@@ -48,12 +105,10 @@ public:
 // an MLIRContext is available.
 class PluginManager : public PluginRegistrar {
 public:
-  PluginManager();
-
-  // Initializes the plugin manager. Since this may do shared library opening
-  // and use failable initializers, it can fail. There probably isn't much to
-  // do in that case but crash, but the choice is left to the caller.
-  bool loadAvailablePlugins();
+  // Registers static plugins and previously loaded dynamic plugins. Returns
+  // false on registration failure. With tolerateDynamicFailures, skips failed
+  // dynamic registrations and returns false only for static failures.
+  bool loadAvailablePlugins(bool tolerateDynamicFailures = false);
 
   // Calls through to AbstractPluginRegistration::globalInitialize for all
   // available plugins.
@@ -67,14 +122,15 @@ public:
   // available plugins.
   void initializeCLI();
 
-  // Calls through to AbstractPluginRegistration::registerDialects for all
+  // Calls through to AbstractPluginRegistration::registerGlobalDialects for all
   // available plugins.
   void registerGlobalDialects(DialectRegistry &registry);
 
-  // Gets a list of all loaded plugin names.
-  llvm::SmallVector<std::string> getLoadedPlugins();
+  // Returns successfully registered plugin IDs in sorted order.
+  llvm::SmallVector<std::string> getLoadedPlugins() const;
 
 private:
+  friend class DynamicPluginRegistry;
   friend class PluginManagerSession;
 };
 
