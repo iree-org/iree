@@ -78,3 +78,14 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# Install the plugin API headers and their IREE header dependencies. A plugin
+# using other compiler APIs may need additional headers from the matching tree.
+add_library(iree_compiler_PluginAPI_headers INTERFACE)
+iree_install_targets(
+  TARGETS iree_compiler_PluginAPI_headers
+  HDRS "Client.h" "PluginEntryPoint.h" "PluginABIHash.h"
+    "../Pipelines/Options.h" "../Utils/OptionUtils.h"
+  COMPONENT IREEDevLibraries-Compiler
+  EXPORT_SET Compiler
+)

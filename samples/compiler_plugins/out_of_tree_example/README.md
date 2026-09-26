@@ -82,3 +82,62 @@ the compiler, so it must match the compiler's build:
   without it the compiler library does not export the C++ ABI these plugins
   need. Bazel's compiler shared library exports it without a separate gate.
   Both builds require tools linked to the shared compiler library.
+
+## Building against an install tree
+
+To build a plugin in another repository, first install a compiler built with
+dynamic plugin support:
+
+```sh
+cmake --install <build> --prefix <prefix> --component IREECMakeExports
+cmake --install <build> --prefix <prefix> --component IREEDevLibraries-Compiler
+cmake --install <build> --prefix <prefix> --component Compiler
+```
+
+```cmake
+cmake_minimum_required(VERSION 3.21)
+project(my_iree_plugin LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(IREECompiler REQUIRED)
+find_package(MLIR REQUIRED CONFIG)
+
+add_library(registration STATIC "plugin.cpp")
+set_target_properties(registration PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(registration PRIVATE iree_compiler_PluginAPI_headers)
+target_include_directories(registration PRIVATE
+  ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS})
+# For a host built without RTTI or exceptions; match your host's settings.
+target_compile_options(registration PRIVATE -fno-rtti -fno-exceptions)
+
+iree_compiler_register_dynamic_plugin(
+  PLUGIN_ID my_plugin
+  TARGET registration
+)
+```
+
+`find_package(IREECompiler)` brings the plugin headers, the rename script and
+`IREE_COMPILER_ABI_PREFIX`. `plugin.cpp` must define the `my_plugin` entry point
+with `IREE_DEFINE_COMPILER_PLUGIN` and register the corresponding session.
+IREE does not install LLVM/MLIR C++ headers. Point CMake at the packages from
+the host compiler's build:
+
+```sh
+cmake -S <plugin-source> -B <plugin-build> \
+  -DIREECompiler_DIR=<prefix>/lib/cmake/IREE \
+  -DMLIR_DIR=<iree-build>/lib/cmake/mlir \
+  -DLLVM_DIR=<iree-build>/llvm-project/lib/cmake/llvm
+cmake --build <plugin-build> --target iree_compiler_plugin_my_plugin
+```
+
+Match the host's other ABI-affecting options, including assertions and the C++
+standard library. The example above assumes Clang or GCC. If the plugin has
+additional static libraries, list their archive paths under `EXTRA_ARCHIVES`,
+for example `$<TARGET_FILE:helper>`; the installed rule does not collect
+transitive dependencies automatically.
+
+See the complete [install-tree test project](../../../build_tools/testing/plugin_from_install/CMakeLists.txt)
+and [test script](../../../build_tools/testing/test_plugin_from_install.sh),
+which build, activate, and incrementally rebuild a plugin against an install.
