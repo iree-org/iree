@@ -64,6 +64,11 @@ struct GatherIsTorchIndexSelectPattern final
     if (!resultTy) {
       return rewriter.notifyMatchFailure(gather, "unranked result");
     }
+    // The reshape below requires a static result. Leave dynamic results to
+    // the general gather lowering, which also preserves index clamping.
+    if (!resultTy.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(gather, "dynamic result shape");
+    }
 
     // Offset dimensions should be the defaults.
     if (static_cast<int64_t>(dimensionNumbers.getOffsetDims().size()) !=
