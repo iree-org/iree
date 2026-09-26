@@ -1,6 +1,9 @@
 // RUN: iree-opt %s --split-input-file --mlir-print-local-scope \
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-tile-large-tensors, canonicalize, cse))" | \
 // RUN:   FileCheck %s
+// RUN: iree-opt %s --split-input-file --mlir-print-local-scope \
+// RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-tile-large-tensors{allow-masked-dynamic-dims=true}, canonicalize, cse))" | \
+// RUN:   FileCheck %s --check-prefix=MASKED
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @simple_generic(%3: tensor<64x256xf32>, %4: tensor<64x256xf32>, %5: tensor<64x256xf32>) -> tensor<64x256xf32> {
@@ -196,3 +199,94 @@ func.func @skip_empty_parallel_loops(%arg0: tensor<f32>, %arg1: tensor<f32>, %ar
 
 // CHECK-LABEL: func.func @skip_empty_parallel_loops
 //   CHECK-NOT:   scf.for
+
+// -----
+
+// With allow-masked-dynamic-dims, a dynamic parallel dim with a provable
+// static upper bound within the vector size limit is left untiled; the
+// partial tile is handled by masked vectorization downstream.
+func.func @masked_bound_kept_dynamic(%arg0: tensor<196x32xf32>, %arg1: tensor<196xf32>) -> tensor<196xf32> {
+  %0 = scf.forall (%arg2) = (0) to (196) step (16) shared_outs(%arg3 = %arg1) -> (tensor<196xf32>) {
+    %1 = affine.min affine_map<(d0) -> (-d0 + 196, 16)>(%arg2)
+    %extracted_slice = tensor.extract_slice %arg0[%arg2, 0] [%1, 32] [1, 1] : tensor<196x32xf32> to tensor<?x32xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg3[%arg2] [%1] [1] : tensor<196xf32> to tensor<?xf32>
+    %2 = linalg.generic {
+      indexing_maps = [
+        affine_map<(d0, d1) -> (d0, d1)>,
+        affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+    ins(%extracted_slice : tensor<?x32xf32>)
+    outs(%extracted_slice_0 : tensor<?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %3 = arith.addf %out, %in : f32
+      linalg.yield %3 : f32
+    } -> tensor<?xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %2 into %arg3[%arg2] [%1] [1] : tensor<?xf32> into tensor<196xf32>
+    }
+  }
+  return %0 : tensor<196xf32>
+}
+
+// Without the option (CHECK), the dynamic dim is tiled to 1.
+//       CHECK-LABEL: func.func @masked_bound_kept_dynamic
+//             CHECK:   scf.for %{{.+}} = %c0 to %{{.+}} step %c1
+// With the option (MASKED), the op is left alone.
+//  MASKED-LABEL: func.func @masked_bound_kept_dynamic
+//    MASKED-NOT:   scf.for %
+//        MASKED:   linalg.generic
+//   MASKED-SAME:   ins(%{{.*}} : tensor<?x32xf32>)
+
+// -----
+
+// A dynamic parallel dim whose proven upper bound exceeds the vector size
+// limit is tiled to the largest factor of the bound within the limit (here
+// 100 -> 50, the largest factor of 100 <= 64).
+func.func @masked_large_bound_tiled(%arg0: tensor<4096xf32>, %arg1: tensor<4096xf32>) -> tensor<4096xf32> {
+  %0 = scf.forall (%arg2) = (0) to (4096) step (100) shared_outs(%arg3 = %arg1) -> (tensor<4096xf32>) {
+    %1 = affine.min affine_map<(d0) -> (-d0 + 4096, 100)>(%arg2)
+    %extracted_slice = tensor.extract_slice %arg0[%arg2] [%1] [1] : tensor<4096xf32> to tensor<?xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg3[%arg2] [%1] [1] : tensor<4096xf32> to tensor<?xf32>
+    %2 = linalg.generic {
+      indexing_maps = [
+        affine_map<(d0) -> (d0)>,
+        affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+    ins(%extracted_slice : tensor<?xf32>)
+    outs(%extracted_slice_0 : tensor<?xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      linalg.yield %in : f32
+    } -> tensor<?xf32>
+    scf.forall.in_parallel {
+      tensor.parallel_insert_slice %2 into %arg3[%arg2] [%1] [1] : tensor<?xf32> into tensor<4096xf32>
+    }
+  }
+  return %0 : tensor<4096xf32>
+}
+
+//  MASKED-LABEL: func.func @masked_large_bound_tiled
+//        MASKED:   scf.for %{{.+}} = %c0 to %{{.+}} step %c50
+
+// -----
+
+// A dynamic parallel dim without a provable upper bound keeps the legacy
+// tile-to-1 behavior with or without the option.
+func.func @masked_unbounded_tiled_to_one(%arg0: tensor<?x32xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1) -> (d0, d1)>,
+      affine_map<(d0, d1) -> (d0)>],
+    iterator_types = ["parallel", "reduction"]}
+  ins(%arg0 : tensor<?x32xf32>)
+  outs(%arg1 : tensor<?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %1 = arith.addf %out, %in : f32
+    linalg.yield %1 : f32
+  } -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+
+//       CHECK-LABEL: func.func @masked_unbounded_tiled_to_one
+//             CHECK:   scf.for %{{.+}} = %c0 to %{{.+}} step %c1
+//  MASKED-LABEL: func.func @masked_unbounded_tiled_to_one
+//        MASKED:   scf.for %{{.+}} = %c0 to %{{.+}} step %c1
