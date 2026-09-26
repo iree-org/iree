@@ -105,6 +105,16 @@ iree_status_t iree_hal_command_buffer_advise_buffer_validation(
     iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
     uint64_t arg0, uint64_t arg1);
 
+iree_status_t iree_hal_command_buffer_flush_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref);
+
+iree_status_t iree_hal_command_buffer_invalidate_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref);
+
 iree_status_t iree_hal_command_buffer_fill_buffer_validation(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,

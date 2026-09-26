@@ -143,6 +143,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    inline_command_buffer_test
+  SRCS
+    "inline_command_buffer_test.cc"
+  DEPS
+    ::local
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     inline_dispatch
