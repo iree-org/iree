@@ -911,6 +911,9 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  // Retarget copy-in/DPS-op/copy-out chains while DPS inits are explicit.
+  funcPassManager.addPass(createFoldMemRefCopyIntoDPSOpsPass());
+
   funcPassManager.addPass(IREE::LinalgExt::createLinalgExtToLoopsPass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
   funcPassManager.addPass(createConvertLinalgToLoopsPass());
@@ -977,6 +980,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   modulePassManager.addPass(createLowerUKernelOpsToCallsPass());
 
   FunctionLikeNest(modulePassManager)
+      // Retarget copy-in/DPS-op/copy-out chains while DPS inits are explicit.
+      .addPass(createFoldMemRefCopyIntoDPSOpsPass)
+
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
 
