@@ -1,0 +1,7 @@
+// REQUIRES: iree_dynamic_plugins
+
+// Loads only if host and plugin renamed alike.
+
+// RUN: iree-opt --iree-load-plugin=%iree_test_dynamic_plugin --help 2>&1 | FileCheck %s
+
+// CHECK: DYNAMIC_TEST_PLUGIN: renamed MLIRContext ok

@@ -86,8 +86,9 @@ failed callback are discarded; callbacks must not leave other global side
 effects on failure. `IREE_DEFINE_COMPILER_PLUGIN` serves
 static and dynamic registration from one source.
 
-Both build systems provide `iree_compiler_register_dynamic_plugin`, which
-builds the library and applies the rename described below. An install tree
+CMake provides `iree_compiler_register_dynamic_plugin`; Bazel provides
+`iree_compiler_register_experimental_dynamic_plugin`. Both build the library
+and apply the symbol rename described below. An install tree
 provides it through `find_package(IREECompiler)`; see
 `samples/compiler_plugins/out_of_tree_example/README.md`.
 
