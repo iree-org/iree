@@ -1445,6 +1445,9 @@ static iree_status_t iree_hal_amdgpu_allocator_export_buffer(
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
     iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
+  (void)base_allocator;
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(out_external_buffer);
   if (IREE_UNLIKELY(requested_flags != IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "unsupported AMDGPU external buffer export flags: "
@@ -1452,14 +1455,24 @@ static iree_status_t iree_hal_amdgpu_allocator_export_buffer(
                             requested_flags);
   }
 
+  iree_hal_buffer_t* allocated_buffer = iree_hal_buffer_allocated_buffer(buffer);
+  void* base_ptr = iree_hal_amdgpu_buffer_device_pointer(allocated_buffer);
+  if (IREE_UNLIKELY(!base_ptr)) {
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "AMDGPU buffer has no HSA allocation pointer to export");
+  }
+  const iree_device_size_t byte_offset = iree_hal_buffer_byte_offset(buffer);
+  const iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
+  void* view_ptr = (uint8_t*)base_ptr + byte_offset;
+
+  memset(out_external_buffer, 0, sizeof(*out_external_buffer));
+  out_external_buffer->flags = requested_flags;
+  out_external_buffer->type = requested_type;
+  out_external_buffer->size = byte_length;
+
   switch (requested_type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION: {
-      if (IREE_UNLIKELY(buffer != iree_hal_buffer_allocated_buffer(buffer))) {
-        return iree_make_status(
-            IREE_STATUS_UNAVAILABLE,
-            "AMDGPU subspan buffers cannot yet be exported as external device "
-            "allocations");
-      }
       if (IREE_UNLIKELY(
               !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
                                  IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL))) {
@@ -1468,22 +1481,24 @@ static iree_status_t iree_hal_amdgpu_allocator_export_buffer(
             "AMDGPU buffer memory type is not supported for export as an "
             "external device allocation");
       }
-
-      void* device_ptr = iree_hal_amdgpu_buffer_device_pointer(buffer);
-      if (IREE_UNLIKELY(!device_ptr)) {
-        return iree_make_status(
-            IREE_STATUS_UNAVAILABLE,
-            "AMDGPU buffer has no HSA device allocation pointer to export");
-      }
-      out_external_buffer->flags = requested_flags;
-      out_external_buffer->type = requested_type;
-      out_external_buffer->size = iree_hal_buffer_allocation_size(buffer);
       out_external_buffer->handle.device_allocation.ptr =
-          (uint64_t)(uintptr_t)device_ptr;
+          (uint64_t)(uintptr_t)view_ptr;
       return iree_ok_status();
     }
 
-    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION:
+    case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
+      if (IREE_UNLIKELY(
+              !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL))) {
+        return iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "AMDGPU buffer memory type is not supported for export as an "
+            "external host allocation");
+      }
+      out_external_buffer->handle.host_allocation.ptr = view_ptr;
+      return iree_ok_status();
+    }
+
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD:
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32:
       return iree_make_status(

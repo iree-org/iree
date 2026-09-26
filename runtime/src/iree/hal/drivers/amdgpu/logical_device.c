@@ -1887,6 +1887,47 @@ static iree_status_t iree_hal_amdgpu_logical_device_query_i64(
                    system->topology.gpu_agent_queue_count;
       return iree_ok_status();
     }
+    if (iree_string_view_equal(key, IREE_SV("warp_size")) ||
+        iree_string_view_equal(key, IREE_SV("wavefront_size"))) {
+      if (logical_device->physical_device_count == 0) {
+        return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                                "logical device has no physical devices");
+      }
+      *out_value =
+          (int64_t)logical_device->physical_devices[0]->wavefront_size;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("gfxip"))) {
+      if (logical_device->physical_device_count == 0) {
+        return iree_make_status(
+            IREE_STATUS_INTERNAL,
+            "logical device has no physical devices (initialization incomplete)");
+      }
+      const iree_hal_amdgpu_gfxip_version_t version =
+          logical_device->physical_devices[0]->isa.target_id.version;
+      *out_value = ((int64_t)version.major << 16) |
+                   ((int64_t)version.minor << 8) | (int64_t)version.stepping;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("memory.total")) ||
+        iree_string_view_equal(key, IREE_SV("memory.free"))) {
+      uint64_t total = 0;
+      for (iree_host_size_t i = 0;
+           i < logical_device->physical_device_count; ++i) {
+        iree_hal_amdgpu_physical_device_t* physical_device =
+            logical_device->physical_devices[i];
+        hsa_amd_memory_pool_t pool =
+            physical_device->coarse_block_pools.large.memory_pool;
+        if (!pool.handle) continue;
+        size_t pool_size = 0;
+        IREE_RETURN_IF_ERROR(iree_hsa_amd_memory_pool_get_info(
+            IREE_LIBHSA(&system->libhsa), pool,
+            HSA_AMD_MEMORY_POOL_INFO_SIZE, &pool_size));
+        total += (uint64_t)pool_size;
+      }
+      *out_value = (int64_t)total;
+      return iree_ok_status();
+    }
   } else if (iree_string_view_equal(category, IREE_SV("amdgpu.device"))) {
     if (iree_string_view_equal(key, IREE_SV("physical_device.count"))) {
       *out_value = (int64_t)logical_device->physical_device_count;
