@@ -83,8 +83,7 @@ public:
   virtual ~TargetBackend() = default;
 
   // Returns the ID of a DeviceTarget that can execute files produced by this
-  // backend. This is used to support the `--iree-hal-target-backends=` flag
-  // and will be removed in the future.
+  // backend. Used for legacy backend-to-device inference.
   virtual std::string getLegacyDefaultDeviceID() const = 0;
 
   // Appends zero or more executable targets for a device with the given

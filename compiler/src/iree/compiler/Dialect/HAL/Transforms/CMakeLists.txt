@@ -17,7 +17,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AnnotateTargetDevices.cpp"
-    "AssignLegacyTargetDevices.cpp"
     "AssignTargetDevices.cpp"
     "CaptureExecutableSources.cpp"
     "ConfigureExecutables.cpp"

@@ -42,29 +42,6 @@ def ConvertToHALPass :
 // Device management
 //===----------------------------------------------------------------------===//
 
-def AssignLegacyTargetDevicesPass :
-    Pass<"iree-hal-assign-legacy-target-devices", "mlir::ModuleOp"> {
-  let summary = "Assigns the HAL devices the module will target to the given list of targets.";
-  let description = [{
-    Assigns target HAL devices to the module based on the given list.
-  }];
-  let options = [
-    Option<
-      "targetRegistry", "target-registry",
-      "llvm::cl::TargetRegistryRef", "",
-      "Target registry containing the list of available devices and backends."
-    >,
-    ListOption<
-      "targetBackends", "targetBackends",
-      "std::string",
-      "List of target backends to assign as device targets."
-    >,
-  ];
-  let dependentDialects = [
-    "IREE::HAL::HALDialect",
-  ];
-}
-
 def AssignTargetDevicesPass :
     Pass<"iree-hal-assign-target-devices", "mlir::ModuleOp"> {
   let summary = "Assigns the HAL devices the module will target to the given list of target specifications.";

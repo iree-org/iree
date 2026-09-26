@@ -666,8 +666,7 @@ endfunction()
 # Helper function to add necessary compile flags based on platform-specific
 # configurations. Note the flags are added for cpu backends only.
 function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
-  # Match both --iree-hal-target-backends= (iree_bytecode_module flag format)
-  # and --iree-hal-local-target-device-backends= (iree_hal_executable format).
+  # Match local target device backend flags for CPU backends.
   if(NOT (IN_FLAGS MATCHES "backends=llvm-cpu" OR
           IN_FLAGS MATCHES "backends=vmvx"))
     set(${OUT_FLAGS} "" PARENT_SCOPE)

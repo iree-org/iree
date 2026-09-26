@@ -17,15 +17,6 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory halTargetOptionsCategory(
       "IREE HAL executable target options");
 
-  // This function is called as part of registering the pass
-  // TranslateAllExecutablesPass. Pass registry is also statically
-  // initialized, so targetBackendsFlags needs to be here to be initialized
-  // first.
-  binder.list<std::string>(
-      "iree-hal-target-backends", legacyTargetBackends,
-      llvm::cl::desc("Target backends for executable compilation."),
-      llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory));
-
   binder.list<std::string>("iree-hal-target-device", targetDevices,
                            llvm::cl::desc("Target device specifications."),
                            llvm::cl::ZeroOrMore,
