@@ -150,3 +150,20 @@ func.func @select_conversion(%arg0: tensor<i1>, %arg1: tensor<?xui16>, %arg2: te
   %0 = arith.select %extracted, %arg1, %arg2 : tensor<?xui16>
   return %0 : tensor<?xui16>
 }
+
+// -----
+
+// Tests whether the pass fails on ReorderElementwiseAndShapeOp pattern.
+
+// CHECK:       func.func @reorder_elementwise_and_shape
+// CHECK-SAME:    %[[ARG0:[^:]+]]: tensor<2048xi1>
+// CHECK-SAME:    %[[ARG1:[^:]+]]: tensor<1x2048xi32>
+func.func @reorder_elementwise_and_shape(%arg0: tensor<2048xi1>, %arg1: tensor<1x2048xi32>) -> tensor<1x2048xi32> {
+  // CHECK: tensor.expand_shape
+  %0 = stablehlo.reshape %arg0 : (tensor<2048xi1>) -> tensor<1x2048xi1>
+  // CHECK: linalg.generic
+  %1 = stablehlo.convert %0 : (tensor<1x2048xi1>) -> tensor<1x2048xi32>
+  // CHECK: linalg.generic
+  %2 = stablehlo.subtract %arg1, %1 : tensor<1x2048xi32>
+  return %2 : tensor<1x2048xi32>
+}
