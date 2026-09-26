@@ -115,9 +115,9 @@ struct GatherFusionPattern final : OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(tensor::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if extractOp is inside a generic op.
-    auto consumerOp =
-        dyn_cast_if_present<linalg::GenericOp>(extractOp->getParentOp());
+    // Concatenation can extract from a producer inside an scf.if nested in the
+    // generic. Fuse at the extraction site, including in such nested regions.
+    auto consumerOp = extractOp->getParentOfType<linalg::GenericOp>();
     if (!consumerOp) {
       return rewriter.notifyMatchFailure(
           extractOp, "expected extract op to be inside a generic op");
