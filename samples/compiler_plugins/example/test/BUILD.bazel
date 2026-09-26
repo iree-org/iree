@@ -20,3 +20,26 @@ iree_lit_test_suite(
         "@llvm-project//llvm:FileCheck",
     ],
 )
+
+# samples/lit.cfg.py gates the iree_dynamic_plugins feature on this variable.
+iree_lit_test_suite(
+    name = "lit_dynamic",
+    srcs = [
+        "duplicate_link.mlir",
+        "dynamic_link.mlir",
+    ],
+    cfg = "//samples:lit.cfg.py",
+    data = ["//samples/compiler_plugins/example:iree_compiler_plugin_example_dyn"],
+    env = {
+        "IREE_EXAMPLE_DYN_PLUGIN": "$(rootpath //samples/compiler_plugins/example:iree_compiler_plugin_example_dyn)",
+    },
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
