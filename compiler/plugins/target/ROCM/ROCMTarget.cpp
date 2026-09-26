@@ -206,7 +206,7 @@ struct ROCMOptions {
       GPU::kDataTilingEncodingLayoutResolverName;
   bool slpVectorization = true;
   bool globalISel = false;
-  bool specializeDispatches = false;
+  bool specializeDispatches = true;
   bool enableTensorUKernels = false;
   IREE::Codegen::DenormalFpMath denormalFpMathF32 =
       IREE::Codegen::DenormalFpMath::None;
@@ -330,6 +330,11 @@ struct ROCMOptions {
                                    GPU::normalizeHIPTarget(target),
                                    targetFeatures))) {
       return failure();
+    }
+    if (enableTensorUKernels && !specializeDispatches) {
+      return emitError(builder.getUnknownLoc())
+             << "--iree-hip-enable-ukernels=true requires "
+                "--iree-hip-specialize-dispatches to be enabled as well";
     }
     return success();
   }
