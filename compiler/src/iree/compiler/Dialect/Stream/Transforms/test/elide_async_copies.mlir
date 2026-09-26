@@ -405,16 +405,19 @@ util.func public @constantCloneMultiUse(%size: index) -> (!stream.resource<const
   %clone1 = stream.async.clone %const : !stream.resource<constant>{%size} -> !stream.resource<constant>{%size}
 
   // Both dispatches read from the same constant (no mutation).
-  // CSE will deduplicate these identical dispatches into one.
+  // CSE cannot merge them because they produce non-tied resource results
+  // (fresh allocations) and getEffects() reports Allocate.
   // CHECK: %[[RESULT0:.+]] = stream.async.dispatch @constantDispatch::@entry
   // CHECK-SAME: %[[CONST]]
   %result0 = stream.async.dispatch @constantDispatch::@entry(%clone0[%c0 to %size for %size]) :
       (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
 
+  // CHECK: %[[RESULT1:.+]] = stream.async.dispatch @constantDispatch::@entry
+  // CHECK-SAME: %[[CONST]]
   %result1 = stream.async.dispatch @constantDispatch::@entry(%clone1[%c0 to %size for %size]) :
       (!stream.resource<constant>{%size}) -> !stream.resource<constant>{%size}
 
-  // CHECK: util.return %[[RESULT0]], %[[RESULT0]]
+  // CHECK: util.return %[[RESULT0]], %[[RESULT1]]
   util.return %result0, %result1 : !stream.resource<constant>, !stream.resource<constant>
 }
 
@@ -1349,7 +1352,8 @@ util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*
   %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // Multiple clones of same source, all used by read-only dispatches.
   // All clones can be elided because neither source nor results are mutated.
-  // After elision, CSE folds the identical dispatches into one.
+  // CSE cannot fold the dispatches because they produce non-tied resource
+  // results (getEffects() reports Allocate).
   // CHECK-NOT: stream.async.clone
   %clone0 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone0[%c0 to %size for %size])
@@ -1360,8 +1364,10 @@ util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*
   %clone2 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   %d2 = stream.async.dispatch @dispatch_ex::@dispatch(%clone2[%c0 to %size for %size])
       : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
-  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
-  // CHECK: util.return %[[DISPATCH]], %[[DISPATCH]], %[[DISPATCH]]
+  // CHECK: %[[D0:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: %[[D1:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: %[[D2:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: util.return %[[D0]], %[[D1]], %[[D2]]
   util.return %d0, %d1, %d2 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>
 }
 
@@ -1432,7 +1438,8 @@ util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*
   %source = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // Multiple clones of same source, all used by read-only dispatches.
   // All clones can be elided because neither source nor results are mutated.
-  // After elision, CSE folds the identical dispatches into one.
+  // CSE cannot fold the dispatches because they produce non-tied resource
+  // results (getEffects() reports Allocate).
   // CHECK-NOT: stream.async.clone
   %clone0 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   %d0 = stream.async.dispatch @dispatch_ex::@dispatch(%clone0[%c0 to %size for %size])
@@ -1443,8 +1450,10 @@ util.func public @multiCloneImmutableSource(%size: index) -> (!stream.resource<*
   %clone2 = stream.async.clone %source : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   %d2 = stream.async.dispatch @dispatch_ex::@dispatch(%clone2[%c0 to %size for %size])
       : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
-  // CHECK: %[[DISPATCH:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
-  // CHECK: util.return %[[DISPATCH]], %[[DISPATCH]], %[[DISPATCH]]
+  // CHECK: %[[D0:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: %[[D1:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: %[[D2:.+]] = stream.async.dispatch @dispatch_ex::@dispatch(%[[SOURCE]]
+  // CHECK: util.return %[[D0]], %[[D1]], %[[D2]]
   util.return %d0, %d1, %d2 : !stream.resource<*>, !stream.resource<*>, !stream.resource<*>
 }
 
