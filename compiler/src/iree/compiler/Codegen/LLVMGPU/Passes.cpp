@@ -1011,16 +1011,14 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager.addPass(createLLVMGPUVectorLoweringPass)
       .addPass(createLLVMGPUVectorFlatteningPass)
       .addPass(createLLVMGPULegalizeNDVectorsPass)
-      .addPass(createLLVMGPUVectorMultiReductionLoweringPass)
       .addPass(createCanonicalizerPass)
-      .addPass(createCSEPass);
+      .addPass(createCSEPass)
+      .addPass(createLLVMGPU1DVectorCanonicalizationsPass)
+      .addPass(createLLVMGPULower1DVectorOpsPass);
 
   funcPassManager.addPass(createReinsertSwizzleHintsPass);
 
   addLowerAndOptimizeAddressComputationPasses(funcPassManager);
-
-  // Canonicalize with a restriction that all vector operations are 1D.
-  funcPassManager.addPass(createLLVMGPU1DVectorCanonicalizationsPass);
 
   if (forROCDL) {
     // This pass needs to run after the LLVMGPUVectorLoweringPass.
