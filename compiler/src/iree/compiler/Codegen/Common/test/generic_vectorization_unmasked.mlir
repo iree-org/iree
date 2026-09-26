@@ -21,6 +21,38 @@ func.func @matmul(%lhs: tensor<3x4xf16>, %rhs: tensor<4x5xf16>, %acc: tensor<3x5
 
 // -----
 
+#config = #iree_cpu.lowering_config<distribution = [16, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, 8, 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+func.func @mmt4d_bf16_static_inner_tiles(%lhs: tensor<1x1x8x1xbf16>, %rhs: tensor<1x1x8x1xbf16>, %acc: tensor<1x1x8x8xf32>) -> tensor<1x1x8x8xf32> {
+  %0 = linalg.mmt4d {lowering_config = #config} ins(%lhs, %rhs : tensor<1x1x8x1xbf16>, tensor<1x1x8x1xbf16>) outs(%acc : tensor<1x1x8x8xf32>) -> tensor<1x1x8x8xf32>
+  return %0 : tensor<1x1x8x8xf32>
+}
+// CHECK-MASK-LABEL: func.func @mmt4d_bf16_static_inner_tiles(
+// CHECK-MASK:         %[[LHS_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x8x1xbf16>, vector<1x1x8x1xbf16>
+// CHECK-MASK:         %[[RHS_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x8x1xbf16>, vector<1x1x8x1xbf16>
+// CHECK-MASK:         %[[OUT_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x8x8xf32>, vector<1x1x8x8xf32>
+// Named contractions do not get any extf in-between, generic lowering of mmt4d gets them.
+// CHECK-MASK-NOT:     arith.extf
+// CHECK-MASK:         %[[CONTRACT:.+]] = vector.contract {{.+}} %[[LHS_VEC]], %[[RHS_VEC]], %[[OUT_VEC]] : vector<1x1x8x1xbf16>, vector<1x1x8x1xbf16> into vector<1x1x8x8xf32>
+// CHECK-MASK:         vector.transfer_write %[[CONTRACT]]
+
+// -----
+
+#config = #iree_cpu.lowering_config<distribution = [32, 16, 0, 0, 0, 0], vector_common_parallel = [1, 1, 0, 8, [8], 0], vector_reduction = [0, 0, 1, 0, 0, 1]>
+func.func @mmt4d_bf16_scalable_inner_tiles(%lhs: tensor<1x1x8x1xbf16>, %rhs: tensor<1x1x?x1xbf16>, %acc: tensor<1x1x8x?xf32>) -> tensor<1x1x8x?xf32> {
+  %0 = linalg.mmt4d {lowering_config = #config} ins(%lhs, %rhs : tensor<1x1x8x1xbf16>, tensor<1x1x?x1xbf16>) outs(%acc : tensor<1x1x8x?xf32>) -> tensor<1x1x8x?xf32>
+  return %0 : tensor<1x1x8x?xf32>
+}
+// CHECK-MASK-LABEL: func.func @mmt4d_bf16_scalable_inner_tiles(
+// CHECK-MASK:         %[[LHS_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x8x1xbf16>, vector<1x1x8x1xbf16>
+// CHECK-MASK:         %[[RHS_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x?x1xbf16>, vector<1x1x[8]x1xbf16>
+// CHECK-MASK:         %[[OUT_VEC:.+]] = vector.transfer_read {{.+}} : tensor<1x1x8x?xf32>, vector<1x1x8x[8]xf32>
+// Named contractions do not get any extf in-between, generic lowering of mmt4d gets them.
+// CHECK-MASK-NOT:     arith.extf
+// CHECK-MASK:         %[[CONTRACT:.+]] = vector.contract {{.+}} %[[LHS_VEC]], %[[RHS_VEC]], %[[OUT_VEC]] : vector<1x1x8x1xbf16>, vector<1x1x[8]x1xbf16> into vector<1x1x8x[8]xf32>
+// CHECK-MASK:         vector.transfer_write %[[CONTRACT]]
+
+// -----
+
 #map = affine_map<(d0) -> (-d0 + 13, 2)>
 #map1 = affine_map<(d0) -> (-d0 + 51, 4)>
 #map2 = affine_map<(d0) -> (d0 * 2)>

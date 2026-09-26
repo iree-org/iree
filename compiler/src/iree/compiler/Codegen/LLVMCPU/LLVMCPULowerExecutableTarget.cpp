@@ -136,7 +136,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     });
   }
 
-  if (isX86(targetConfig) || isRISCV(targetConfig)) {
+  if (isX86(targetConfig) ||
+      (isRISCV(targetConfig) && !isScalableVectorizationEnabled())) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
   pipelineOpts.decomposePackUnPackOps =
