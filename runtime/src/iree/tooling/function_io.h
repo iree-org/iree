@@ -38,6 +38,8 @@ extern "C" {
 //    `@file.npy` (first array from the file)
 //    `+file.npy` (next array from the file)
 //    `*file.npy` (all following arrays from the file)
+//    `2x2xi32=@file.npy` (first array with explicit shape/type metadata)
+//    `2x2xi32=+file.npy` (next array with explicit shape/type metadata)
 //  - Binary files:
 //    `2x2xf32=@file.ext` (dense tensor<2x2xf32> at the start of the file)
 //    `4xf32=+file.ext` (dense tensor<4xf32> following the prior input)
