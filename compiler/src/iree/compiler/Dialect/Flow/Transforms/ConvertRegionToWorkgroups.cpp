@@ -96,8 +96,13 @@ static Value getRequiredDirectTiedResultBase(DispatchRegionOp regionOp,
   }
   Value tiedOperand = tiedOp.getTiedResultOperand(result);
   if (!tiedOperand || isPreConversionTensorView(tiedOperand.getDefiningOp()) ||
-      tiedOperand.getType() != result.getType() ||
-      tiedOperand != tiedOp.getTiedResult(result.getResultNumber())) {
+      tiedOperand.getType() != result.getType()) {
+    return {};
+  }
+  // One tied predecessor makes the operand indirect; there is no need to walk
+  // the rest of the chain for every candidate result.
+  auto operandOp = tiedOperand.getDefiningOp<IREE::Util::TiedOpInterface>();
+  if (operandOp && operandOp.getTiedResultOperand(tiedOperand)) {
     return {};
   }
   return tiedOperand;
