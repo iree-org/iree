@@ -188,9 +188,69 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
   return success();
 }
 
+/// Lifts `store_to_buffer %v, subview(%parent)` to
+/// `store_to_buffer (insert_slice %v into %loaded), %parent` so OneShot's
+/// tensor-level RaW analysis sees the partial write conflict with any
+/// sibling `tensor.insert_slice` into `%loaded`. Only fires when an existing
+/// in-block dominating `load_from_buffer %parent` is found (the reader that
+/// makes the conflict real); without one there's no aliasing to expose.
+static LogicalResult liftPartialStoreToBufferOps(RewriterBase &rewriter,
+                                                 FunctionOpInterface funcOp) {
+  // Iterate to a fixed point so chains of subviews peel one level per
+  // iteration. Same-block restriction on the load is load-bearing in loop
+  // bodies — a parent-block load would lose per-iteration accumulation.
+  while (true) {
+    SmallVector<std::pair<IREE::Codegen::StoreToBufferOp, Value>> work;
+    funcOp.walk([&](IREE::Codegen::StoreToBufferOp storeOp) {
+      auto subviewOp = storeOp.getBuffer().getDefiningOp<memref::SubViewOp>();
+      if (!subviewOp) {
+        return;
+      }
+      Value parent = subviewOp.getSource();
+      auto parentMemrefType = cast<MemRefType>(parent.getType());
+      auto parentTensorType = RankedTensorType::get(
+          parentMemrefType.getShape(), parentMemrefType.getElementType());
+      Block *block = storeOp->getBlock();
+      for (Operation *user : parent.getUsers()) {
+        auto load = dyn_cast<IREE::Codegen::LoadFromBufferOp>(user);
+        if (!load || load.getTensor().getType() != parentTensorType ||
+            load->getBlock() != block || !load->isBeforeInBlock(storeOp)) {
+          continue;
+        }
+        work.emplace_back(storeOp, load.getResult());
+        return;
+      }
+    });
+    if (work.empty()) {
+      return success();
+    }
+    for (auto [storeOp, parentTensor] : work) {
+      auto subviewOp = storeOp.getBuffer().getDefiningOp<memref::SubViewOp>();
+      Value parent = subviewOp.getSource();
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(storeOp);
+      Value insertedTensor = tensor::InsertSliceOp::create(
+          rewriter, storeOp.getLoc(), storeOp.getTensor(), parentTensor,
+          subviewOp.getMixedOffsets(), subviewOp.getMixedSizes(),
+          subviewOp.getMixedStrides());
+      rewriter.replaceOpWithNewOp<IREE::Codegen::StoreToBufferOp>(
+          storeOp, insertedTensor, parent);
+    }
+  }
+}
+
 void EliminateEmptyTensorsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   MLIRContext *context = &getContext();
+
+  // Lift partial `store_to_buffer %v, subview` ops to tensor-level
+  // `insert_slice + store_to_buffer of full tensor`. This must run before
+  // the actual empty-tensor elimination so that EliminateEmptyTensors and
+  // OneShot's analysis see all writes through the same SSA tensor chain.
+  IRRewriter liftRewriter(context);
+  if (failed(liftPartialStoreToBufferOps(liftRewriter, funcOp))) {
+    return signalPassFailure();
+  }
 
   OpBuilder b(context);
   SmallVector<tensor::EmptyOp> emptyOps;
