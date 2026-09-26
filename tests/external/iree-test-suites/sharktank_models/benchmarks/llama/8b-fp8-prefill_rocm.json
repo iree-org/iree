@@ -1,0 +1,41 @@
+{
+    "inputs": [
+        "4x2048xi64",
+        "4xi64",
+        "4x64xi64",
+        "261x2097152xf8E4M3FNUZ"
+    ],
+    "function_run": "prefill_bs4",
+    "benchmark_flags": [
+        "--benchmark_repetitions=10",
+        "--benchmark_min_warmup_time=3.0"
+    ],
+    "device": "hip",
+    "golden_time_tolerance_multiplier": {
+        "mi250": 1.3,
+        "mi300": 1.1,
+        "mi308": 1.1
+    },
+    "golden_time_ms": {
+        "mi250": 203.611,
+        "mi300": 203.611,
+        "mi308": 203.611
+    },
+    "compilation_required": true,
+    "mlir_url": "https://sharkpublic.blob.core.windows.net/sharkpublic/yrathore/output_8b_fp8_2025-09-22.mlir",
+    "compile_flags": [
+        "--iree-hal-target-backends=rocm",
+        "--iree-hal-target-device=hip",
+        "--iree-opt-level=O3",
+        "--iree-hal-indirect-command-buffers=true",
+        "--iree-stream-resource-memory-model=discrete",
+        "--iree-hip-enable-tensor-ukernels",
+        "--iree-stream-affinity-solver-max-iterations=1024",
+        "--iree-hal-memoization=true",
+        "--iree-codegen-enable-default-tuning-specs=true",
+        "--iree-scheduling-dump-statistics-format=json",
+        "--iree-scheduling-dump-statistics-file=compilation_info.json"
+    ],
+    "compiled_file_name":"llama_8b-fp8-prefill_vmfbs/model.rocm_gfx942",
+    "real_weights_file_path": "/shark-dev/8b/fp8/attnf8/native_fp8_e4m3fnuz_llama3_8b.irpa"
+}
