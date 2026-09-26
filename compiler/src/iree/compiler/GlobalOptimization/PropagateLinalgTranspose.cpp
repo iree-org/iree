@@ -844,8 +844,7 @@ public:
       }
 
       auto maybeTransposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
-      // Skip multi-use transposes.
-      if (!maybeTransposeOp || !maybeTransposeOp->hasOneUse()) {
+      if (!maybeTransposeOp) {
         continue;
       }
 
