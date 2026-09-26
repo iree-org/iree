@@ -32,6 +32,181 @@ func.func @batch_norm_inference(
 
 // -----
 
+// lhs_dilation folds into the pad's interior, not the replacement convolution.
+// CHECK-LABEL: @dynamic_conv_lhs_dilation
+// CHECK: %[[INTERIOR:.+]] = stablehlo.constant dense<[0, 1, 1, 0]> : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[INTERIOR]]
+// CHECK: stablehlo.convolution
+// CHECK-SAME: lhs_dilate = [1, 1]
+func.func @dynamic_conv_lhs_dilation(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: tensor<2x2xi64>) -> tensor<1x15x15x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 2, 2>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi64>) -> tensor<1x15x15x1xf32>
+  return %r : tensor<1x15x15x1xf32>
+}
+
+// -----
+
+// NHWC, every dim distinct. Batch and feature slots get zero padding.
+// CHECK-LABEL: @dynamic_conv_nhwc_distinct
+// CHECK-SAME: %[[PAD:[^:]+]]: tensor<2x2xi64>
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[LO0:.+]] = tensor.extract %[[PAD]][%[[C0]], %[[C0]]]
+// CHECK-DAG: %[[LO1:.+]] = tensor.extract %[[PAD]][%[[C1]], %[[C0]]]
+// CHECK: %[[LOW:.+]] = tensor.from_elements %[[ZERO]], %[[LO0]], %[[LO1]], %[[ZERO]] : tensor<4xi64>
+// CHECK: %[[HIGH:.+]] = tensor.from_elements {{.*}} : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[LOW]], %[[HIGH]],
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_nhwc_distinct(%a: tensor<2x8x6x3xf32>, %k: tensor<3x2x3x4xf32>, %p: tensor<2x2xi64>) -> tensor<2x8x6x4xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<2x8x6x3xf32>, tensor<3x2x3x4xf32>, tensor<2x2xi64>) -> tensor<2x8x6x4xf32>
+  return %r : tensor<2x8x6x4xf32>
+}
+
+// -----
+
+// NCHW: the batch and feature slots come first, the spatial run last.
+// CHECK-LABEL: @dynamic_conv_nchw
+// CHECK-SAME: %[[PAD:[^:]+]]: tensor<2x2xi64>
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[LO0:.+]] = tensor.extract %[[PAD]][%[[C0]], %[[C0]]]
+// CHECK-DAG: %[[LO1:.+]] = tensor.extract %[[PAD]][%[[C1]], %[[C0]]]
+// CHECK: %[[LOW:.+]] = tensor.from_elements %[[ZERO]], %[[ZERO]], %[[LO0]], %[[LO1]] : tensor<4xi64>
+// CHECK: %[[HIGH:.+]] = tensor.from_elements {{.*}} : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[LOW]], %[[HIGH]],
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_nchw(%a: tensor<2x3x8x6xf32>, %k: tensor<4x3x3x2xf32>, %p: tensor<2x2xi64>) -> tensor<2x4x8x6xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, f, 0, 1]x[o, i, 0, 1]->[b, f, 0, 1]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<2x3x8x6xf32>, tensor<4x3x3x2xf32>, tensor<2x2xi64>) -> tensor<2x4x8x6xf32>
+  return %r : tensor<2x4x8x6xf32>
+}
+
+// -----
+
+// Spatial dims listed in reverse: padding row 0 belongs to tensor dim 2.
+// CHECK-LABEL: @dynamic_conv_spatial_reversed
+// CHECK-SAME: %[[PAD:[^:]+]]: tensor<2x2xi64>
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[LO0:.+]] = tensor.extract %[[PAD]][%[[C0]], %[[C0]]]
+// CHECK-DAG: %[[LO1:.+]] = tensor.extract %[[PAD]][%[[C1]], %[[C0]]]
+// CHECK: %[[LOW:.+]] = tensor.from_elements %[[ZERO]], %[[LO1]], %[[LO0]], %[[ZERO]] : tensor<4xi64>
+// CHECK: %[[HIGH:.+]] = tensor.from_elements {{.*}} : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[LOW]], %[[HIGH]],
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_spatial_reversed(%a: tensor<2x8x6x3xf32>, %k: tensor<3x2x3x4xf32>, %p: tensor<2x2xi64>) -> tensor<2x8x6x4xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 1, 0, f]x[1, 0, i, o]->[b, 1, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<2x8x6x3xf32>, tensor<3x2x3x4xf32>, tensor<2x2xi64>) -> tensor<2x8x6x4xf32>
+  return %r : tensor<2x8x6x4xf32>
+}
+
+// -----
+
+// Distinct lhs_dilation per spatial dim.
+// CHECK-LABEL: @dynamic_conv_lhs_dilation_distinct
+// CHECK: %[[INTERIOR:.+]] = stablehlo.constant dense<[0, 1, 2, 0]> : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[INTERIOR]]
+// CHECK: stablehlo.convolution
+// CHECK-SAME: lhs_dilate = [1, 1]
+func.func @dynamic_conv_lhs_dilation_distinct(%a: tensor<2x4x3x3xf32>, %k: tensor<3x2x3x5xf32>, %p: tensor<2x2xi64>) -> tensor<2x5x6x5xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 2, 3>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<2x4x3x3xf32>, tensor<3x2x3x5xf32>, tensor<2x2xi64>) -> tensor<2x5x6x5xf32>
+  return %r : tensor<2x5x6x5xf32>
+}
+
+// -----
+
+// Three spatial dims.
+// CHECK-LABEL: @dynamic_conv_3d
+// CHECK-SAME: %[[PAD:[^:]+]]: tensor<3x2xi64>
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[LO0:.+]] = tensor.extract %[[PAD]][%[[C0]], %[[C0]]]
+// CHECK-DAG: %[[LO1:.+]] = tensor.extract %[[PAD]][%[[C1]], %[[C0]]]
+// CHECK-DAG: %[[LO2:.+]] = tensor.extract %[[PAD]][%[[C2]], %[[C0]]]
+// CHECK: %[[LOW:.+]] = tensor.from_elements %[[ZERO]], %[[LO0]], %[[LO1]], %[[LO2]], %[[ZERO]] : tensor<5xi64>
+// CHECK: %[[HIGH:.+]] = tensor.from_elements {{.*}} : tensor<5xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[LOW]], %[[HIGH]],
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_3d(%a: tensor<2x8x6x4x3xf32>, %k: tensor<3x2x2x3x5xf32>, %p: tensor<3x2xi64>) -> tensor<2x8x6x4x5xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, 2, f]x[0, 1, 2, i, o]->[b, 0, 1, 2, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1, 1>, lhs_dilation = array<i64: 1, 1, 1>, rhs_dilation = array<i64: 1, 1, 1>
+  } : (tensor<2x8x6x4x3xf32>, tensor<3x2x2x3x5xf32>, tensor<3x2xi64>) -> tensor<2x8x6x4x5xf32>
+  return %r : tensor<2x8x6x4x5xf32>
+}
+
+// -----
+
+// Strides, rhs dilation and the group count carry over unchanged.
+// CHECK-LABEL: @dynamic_conv_attrs_kept
+// CHECK: stablehlo.convolution
+// CHECK-SAME: stride = [2, 1]
+// CHECK-SAME: rhs_dilate = [1, 2]
+// CHECK-SAME: feature_group_count = 3
+func.func @dynamic_conv_attrs_kept(%a: tensor<2x8x6x3xf32>, %k: tensor<3x2x1x6xf32>, %p: tensor<2x2xi64>) -> tensor<2x4x4x6xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 3 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 2, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 2>
+  } : (tensor<2x8x6x3xf32>, tensor<3x2x1x6xf32>, tensor<2x2xi64>) -> tensor<2x4x4x6xf32>
+  return %r : tensor<2x4x4x6xf32>
+}
+
+// -----
+
+// The dynamic_pad operands must all share the padding operand's element type.
+// CHECK-LABEL: @dynamic_conv_i32_padding
+// CHECK: stablehlo.dynamic_pad
+// CHECK-SAME: (tensor<1x8x8x1xf32>, tensor<f32>, tensor<4xi32>, tensor<4xi32>, tensor<4xi32>) -> tensor<1x?x?x1xf32>
+func.func @dynamic_conv_i32_padding(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: tensor<2x2xi32>) -> tensor<1x8x8x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi32>) -> tensor<1x8x8x1xf32>
+  return %r : tensor<1x8x8x1xf32>
+}
+
+// -----
+
+// Constant padding is left for the dynamism fold.
+// CHECK-LABEL: @dynamic_conv_constant_padding
+// CHECK: stablehlo.dynamic_conv
+func.func @dynamic_conv_constant_padding(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>) -> tensor<1x8x8x1xf32> {
+  %p = stablehlo.constant dense<0> : tensor<2x2xi64>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi64>) -> tensor<1x8x8x1xf32>
+  return %r : tensor<1x8x8x1xf32>
+}
+
+// -----
+
 // CHECK: @reorder_broadcast_in_dim_scalar_binary(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>, %[[ARG2:.*]]: tensor<i32>, %[[ARG3:.*]]: tensor<i32>)
 func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>) {
   // CHECK: %[[ADD:.*]] = stablehlo.add %[[ARG0]], %[[ARG1]] : tensor<f32>
@@ -758,4 +933,41 @@ func.func @scatter_materialize_inserted_dim(
       index_vector_dim = 1>
   } : (tensor<5x4x1xf32>, tensor<1x1xi32>, tensor<1x4xf32>) -> tensor<5x4x1xf32>
   return %0 : tensor<5x4x1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @dynamic_conv_to_padded_conv
+// CHECK-SAME: %[[PAD:[^:]+]]: tensor<2x2xi64>
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[LO0:.+]] = tensor.extract %[[PAD]][%[[C0]], %[[C0]]]
+// CHECK-DAG: %[[LO1:.+]] = tensor.extract %[[PAD]][%[[C1]], %[[C0]]]
+// CHECK: %[[LOW:.+]] = tensor.from_elements %[[ZERO]], %[[LO0]], %[[LO1]], %[[ZERO]] : tensor<4xi64>
+// CHECK: %[[HIGH:.+]] = tensor.from_elements {{.*}} : tensor<4xi64>
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[LOW]], %[[HIGH]],
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_to_padded_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: tensor<2x2xi64>) -> tensor<1x8x8x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
+  } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi64>) -> tensor<1x8x8x1xf32>
+  return %r : tensor<1x8x8x1xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @convolution_reversal
+// CHECK: %[[REVERSED:.+]] = stablehlo.reverse %arg1, dims = [0]
+// CHECK: stablehlo.convolution(%arg0, %[[REVERSED]])
+// CHECK-SAME: reverse = [false]
+func.func @convolution_reversal(%a: tensor<1x?x1xf32>, %k: tensor<2x1x1xf32>) -> tensor<1x?x1xf32> {
+  %r = "stablehlo.convolution"(%a, %k) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_reversal = array<i1: true>
+  } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
 }

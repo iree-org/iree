@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -32,6 +33,62 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
 namespace {
+
+// Restore unit batch/channel dimensions to vectorize non-unit stride/dilation
+// through the upstream NWC path.
+static linalg::GenericOp expandNonChanneledConv(RewriterBase &rewriter,
+                                                linalg::GenericOp op) {
+  if (!op || !op.hasPureTensorSemantics()) {
+    return {};
+  }
+  auto params = linalg::matchConvolutionOpOfType<linalg::Conv1DOp>(op);
+  if (!params || (params->strides[0] == 1 && params->dilations[0] == 1)) {
+    return {};
+  }
+  for (Value operand : op->getOperands()) {
+    if (cast<RankedTensorType>(operand.getType()).getDimSize(0) <= 0) {
+      return {};
+    }
+  }
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(op);
+  Location loc = op.getLoc();
+  SmallVector<ReassociationIndices> reassociation{{0, 1, 2}};
+  auto expand = [&](Value value, int64_t spatialDim) -> Value {
+    auto type = cast<RankedTensorType>(value.getType());
+    SmallVector<int64_t> shape(3, 1);
+    shape[spatialDim] = type.getDimSize(0);
+    return tensor::ExpandShapeOp::create(
+        rewriter, loc, RankedTensorType::get(shape, type.getElementType()),
+        value, reassociation);
+  };
+  Value input = expand(op.getDpsInputOperand(0)->get(), 1);
+  Value filter = expand(op.getDpsInputOperand(1)->get(), 0);
+  Value init = expand(op.getDpsInitOperand(0)->get(), 1);
+  AffineExpr n, w, f, kw, c;
+  bindDims(op.getContext(), n, w, f, kw, c);
+  SmallVector<AffineMap> maps{
+      AffineMap::get(5, 0,
+                     {n, w * params->strides[0] + kw * params->dilations[0], c},
+                     op.getContext()),
+      AffineMap::get(5, 0, {kw, c, f}, op.getContext()),
+      AffineMap::get(5, 0, {n, w, f}, op.getContext())};
+  SmallVector<utils::IteratorType> iterators{
+      utils::IteratorType::parallel, utils::IteratorType::parallel,
+      utils::IteratorType::parallel, utils::IteratorType::reduction,
+      utils::IteratorType::reduction};
+  auto expanded = linalg::GenericOp::create(
+      rewriter, loc, TypeRange{init.getType()}, ValueRange{input, filter},
+      ValueRange{init}, maps, iterators);
+  rewriter.cloneRegionBefore(op.getRegion(), expanded.getRegion(),
+                             expanded.getRegion().end());
+  auto collapsed =
+      tensor::CollapseShapeOp::create(rewriter, loc, op.getResult(0).getType(),
+                                      expanded.getResult(0), reassociation);
+  rewriter.replaceOp(op, collapsed.getResult());
+  return expanded;
+}
 
 // Returns the vector sizes from the local lowering config, materialized
 // tile size attributes, or tries to infer them from the tensor shapes and
@@ -251,6 +308,19 @@ void GenericVectorizationPass::runOnOperation() {
     if (!vectorizableOp.isVectorizable(vectorSizes, scalableVecDims,
                                        linalgOptions)) {
       continue;
+    }
+
+    if (llvm::none_of(scalableVecDims,
+                      [](bool scalable) { return scalable; })) {
+      if (auto expanded = expandNonChanneledConv(
+              rewriter, dyn_cast<linalg::GenericOp>(op))) {
+        op = expanded.getOperation();
+        vectorizableOp = cast<VectorizableOpInterface>(op);
+        if (!vectorSizes.empty()) {
+          vectorSizes = {1, vectorSizes[0], 1, vectorSizes[1], 1};
+          scalableVecDims.assign(5, false);
+        }
+      }
     }
 
     FailureOr<SmallVector<Value>> result = vectorizableOp.vectorize(

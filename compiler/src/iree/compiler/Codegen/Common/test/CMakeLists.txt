@@ -61,6 +61,7 @@ iree_lit_test_suite(
     "generic_vectorization_map_store.mlir"
     "generic_vectorization_masked_configured.mlir"
     "generic_vectorization_masked_inferred.mlir"
+    "generic_vectorization_strided_conv.mlir"
     "generic_vectorization_unmasked.mlir"
     "generic_vectorization_using_transfer_gather_masked.mlir"
     "generic_vectorization_using_transfer_gather_unmasked.mlir"
