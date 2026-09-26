@@ -194,58 +194,6 @@ static bool sourceIsFromFatRawBuffer(Value source) {
   return hasAMDGPUFatRawBufferAddressSpace(memrefType);
 }
 
-/// Returns the minimum number of elements needed (after padding) for DMA
-/// alignment, or std::nullopt if DMA is not supported for this element type.
-static std::optional<int64_t>
-getMinDMAAlignedElements(FunctionOpInterface funcOp, Type elementType) {
-  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-  if (!subgroupSize) {
-    return std::nullopt;
-  }
-
-  int64_t elementBits = elementType.getIntOrFloatBitWidth();
-
-  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-  if (!target || !targetSupportsGlobalLoadDMA(target)) {
-    return std::nullopt;
-  }
-
-  ArrayRef<int64_t> dmaSizes;
-  if (auto dmaSizesAttr = target.getWgp().getDmaSizes()) {
-    dmaSizes = dmaSizesAttr.asArrayRef();
-  }
-
-  int64_t minElementsPerTransfer = std::numeric_limits<int64_t>::max();
-  for (int64_t dmaSize : dmaSizes) {
-    if (dmaSize % elementBits != 0) {
-      continue;
-    }
-    int64_t elementsPerLane = dmaSize / elementBits;
-    int64_t elementsPerTransfer = *subgroupSize * elementsPerLane;
-    minElementsPerTransfer =
-        std::min(minElementsPerTransfer, elementsPerTransfer);
-  }
-
-  if (minElementsPerTransfer == std::numeric_limits<int64_t>::max()) {
-    return std::nullopt;
-  }
-  return minElementsPerTransfer;
-}
-
-/// Returns the subgroup size if the available elements are aligned to DMA
-/// transfer sizes, std::nullopt otherwise.
-static std::optional<int64_t>
-getDMAAlignedSubgroupSize(FunctionOpInterface funcOp, Type elementType,
-                          int64_t availableElements) {
-  std::optional<int64_t> minAligned =
-      getMinDMAAlignedElements(funcOp, elementType);
-  if (!minAligned || availableElements % *minAligned != 0) {
-    return std::nullopt;
-  }
-  // getMinDMAAlignedElements already validated subgroupSize is present.
-  return getSubgroupSize(funcOp);
-}
-
 /// Largest numWarps in [1, totalWarps] (by repeated halving) such that
 /// `product(shape) / numWarps` satisfies the minimum DMA transfer alignment.
 /// Conservative for shapes that don't divide evenly (the real greedy in
