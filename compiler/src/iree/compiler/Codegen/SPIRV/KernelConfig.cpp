@@ -1275,7 +1275,7 @@ static void propagateReductionTileSizes(linalg::LinalgOp rootOp,
   ArrayRef<int64_t> rootReductionLevel = tileSizes.back();
 
   rootOp->getParentOfType<FunctionOpInterface>().walk([&](linalg::LinalgOp op) {
-    // Do not erase workgroupt tiling from the root op
+    // Do not erase workgroup tiling from the root op
     if (op.getOperation() == rootOp.getOperation()) {
       return;
     }
@@ -1286,8 +1286,8 @@ static void propagateReductionTileSizes(linalg::LinalgOp rootOp,
     }
 
     TileSizesListType otherTileSizes;
-    otherTileSizes.emplace_back(); // No workgroup tiling
-    otherTileSizes.push_back(std::move(reductionLevel));
+    otherTileSizes.emplace_back({}); // No workgroup tiling
+    otherTileSizes.emplace_back(std::move(reductionLevel));
     setLoweringConfig(op, IREE::Codegen::LoweringConfigAttr::get(
                               op.getContext(), otherTileSizes));
   });
