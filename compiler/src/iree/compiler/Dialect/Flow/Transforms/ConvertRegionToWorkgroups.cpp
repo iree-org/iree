@@ -139,15 +139,25 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
              [](Value v) { return isa<UnrankedTensorType>(v.getType()); }) &&
          "unranked tensors are not supported");
 
-  // Compute dimensions of tensor args.
+  // Record capture indices and dimension offsets to avoid repeated scans.
+  DenseMap<Value, unsigned> argumentIndices;
   SmallVector<Value> argumentDims;
-  for (Value tensor : argumentsSet) {
+  SmallVector<unsigned> argumentDimOffsets;
+  for (auto [index, tensor] : llvm::enumerate(argumentsSet)) {
+    argumentIndices[tensor] = index;
+    argumentDimOffsets.push_back(argumentDims.size());
     auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
     if (!tensorType) {
       continue;
     }
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
+  argumentDimOffsets.push_back(argumentDims.size());
+  auto getArgumentDims = [&](unsigned index) -> ValueRange {
+    return ValueRange(argumentDims)
+        .slice(argumentDimOffsets[index],
+               argumentDimOffsets[index + 1] - argumentDimOffsets[index]);
+  };
 
   // Find tied results.
   SmallVector<Value> requiredResults;
@@ -185,8 +195,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
         if (!tiedArgumentsSet.insert(tiedArgument).second) {
           continue;
         }
-        tiedArguments[resultIndex] = std::distance(
-            argumentsSet.begin(), llvm::find(argumentsSet, tiedArgument));
+        tiedArguments[resultIndex] = argumentIndices.lookup(tiedArgument);
       }
     };
     // Required bindings claim shared storage before optional result ties.
@@ -228,8 +237,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
           continue;
         }
         tiedArgumentsSet.insert(tiedBase);
-        tiedArguments.push_back(std::distance(
-            argumentsSet.begin(), llvm::find(argumentsSet, tiedBase)));
+        tiedArguments.push_back(argumentIndices.lookup(tiedBase));
         requiredResults.push_back(result);
       }
     }
@@ -254,8 +262,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   SmallVector<Value> resultDims(regionOp.getResultDims());
   for (auto [index, result] : llvm::enumerate(requiredResults)) {
     resultTypes.push_back(result.getType());
-    auto dims = IREE::Util::findDynamicDimsInList(
-        tiedArguments[numResults + index], arguments, argumentDims);
+    auto dims = getArgumentDims(tiedArguments[numResults + index]);
     resultDims.append(dims.begin(), dims.end());
   }
 
@@ -295,8 +302,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       continue;
     }
     auto inputBbArg = workgroupsOp.getInputBlockArgument(it.index());
-    auto dims =
-        IREE::Util::findDynamicDimsInList(it.index(), arguments, argumentDims);
+    auto dims = getArgumentDims(it.index());
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "dynamic dims not found among arguments");
     SmallVector<Value> bbArgDims =
@@ -336,8 +342,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       } else {
         // This assumes that the number of dynamic dims does not change when
         // following an SSA use-def chain of tied values.
-        dims = IREE::Util::findDynamicDimsInList(tiedArguments[it.index()],
-                                                 arguments, argumentDims);
+        dims = getArgumentDims(tiedArguments[it.index()]);
       }
 #ifndef NDEBUG
       auto tensorType = cast<RankedTensorType>(it.value().getType());
