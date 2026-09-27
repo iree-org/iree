@@ -51,6 +51,19 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    flush_buffer_test
+  SRCS
+    "flush_buffer_test.cc"
+  DEPS
+    iree::hal
+    iree::hal::cts::util::test_base
+  TESTONLY
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     update_buffer_test
   SRCS
     "update_buffer_test.cc"
@@ -173,6 +186,7 @@ iree_cc_library(
     ::basic_test
     ::copy_buffer_test
     ::fill_buffer_test
+    ::flush_buffer_test
     ::stress_test
     ::transient_buffer_test
     ::update_buffer_test

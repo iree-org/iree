@@ -297,6 +297,27 @@ static iree_status_t iree_hal_null_command_buffer_copy_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_null_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_null_command_buffer_t* command_buffer =
+      iree_hal_null_command_buffer_cast(base_command_buffer);
+
+  // TODO(null): make completed writes to the target buffer range available to
+  // consumers outside of the device (other devices or the host); consumers make
+  // them visible on their side. This is cache maintenance only (e.g. a cache
+  // writeback) and must not introduce execution dependencies: callers use
+  // execution barriers for ordering. On memory coherent with all consumers this
+  // can be a no-op.
+  // Note that the buffer may be a reference to a binding table slot in which
+  // case it will be provided during submission to a queue.
+  (void)command_buffer;
+  iree_status_t status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                                          "flush buffer not implemented");
+
+  return status;
+}
+
 static iree_status_t iree_hal_null_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
@@ -361,6 +382,7 @@ static const iree_hal_command_buffer_vtable_t
         .fill_buffer = iree_hal_null_command_buffer_fill_buffer,
         .update_buffer = iree_hal_null_command_buffer_update_buffer,
         .copy_buffer = iree_hal_null_command_buffer_copy_buffer,
+        .flush_buffer = iree_hal_null_command_buffer_flush_buffer,
         .collective = iree_hal_null_command_buffer_collective,
         .dispatch = iree_hal_null_command_buffer_dispatch,
 };

@@ -1751,9 +1751,14 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
 def HAL_CommandBufferFlushBufferOp : HAL_Op<"command_buffer.flush_buffer"> {
   let summary = [{Command buffer buffer flush recording operation.}];
   let description = [{
-    Flushes a range of the target buffer so that writes made to it by the
-    commands recorded before the flush are visible to other devices. This is a
-    no-op for memory that is host coherent.
+    Flushes a range of the target buffer so that writes to it that have
+    completed by the time the flush executes are made available to consumers
+    outside of the device (other devices or the host). Consumers must still make
+    the writes visible on their side.
+
+    A flush does not order itself with respect to other commands: an execution
+    barrier must be recorded between the writes and the flush to ensure the
+    writes have completed before the flush executes.
   }];
 
   let arguments = (ins

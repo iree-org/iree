@@ -309,8 +309,9 @@ vm.import private @command_buffer.copy_buffer(
   %flags : i64
 )
 
-// Flushes a range of a buffer so that writes made to it by previously recorded
-// commands are visible to other devices.
+// Flushes a range of a buffer so that completed writes to it are made available
+// to consumers outside of the device. Does not order itself with respect to
+// other commands.
 // NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.flush_buffer(
   %command_buffer : !vm.ref<!hal.command_buffer>,

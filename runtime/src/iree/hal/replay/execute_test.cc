@@ -1620,6 +1620,8 @@ TEST(ReplayExecuteTest, ExecutesRecordedCommandBufferTransfers) {
   IREE_ASSERT_OK(iree_hal_command_buffer_update_buffer(
       command_buffer, update_data, /*source_offset=*/1,
       iree_hal_make_buffer_ref(buffer, 4, 4), IREE_HAL_UPDATE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_flush_buffer(
+      command_buffer, iree_hal_make_buffer_ref(buffer, 0, 16)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_semaphore_t* semaphore = nullptr;

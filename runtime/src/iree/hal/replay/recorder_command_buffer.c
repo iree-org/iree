@@ -770,6 +770,38 @@ static iree_status_t iree_hal_replay_recorder_command_buffer_copy_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_replay_recorder_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_replay_recorder_command_buffer_t* command_buffer =
+      iree_hal_replay_recorder_command_buffer_cast(base_command_buffer);
+  iree_hal_buffer_ref_t base_target_ref = target_ref;
+  iree_hal_buffer_t* temporary_target_buffer = NULL;
+  iree_status_t status = iree_ok_status();
+  if (target_ref.buffer) {
+    status = iree_hal_replay_recorder_buffer_unwrap_for_call(
+        target_ref.buffer, command_buffer->host_allocator,
+        &base_target_ref.buffer, &temporary_target_buffer);
+  }
+  // TODO(#24930): capture a payload so that flushes can be replayed. They are
+  // recorded without one for now and skipped during replay.
+  iree_hal_replay_pending_record_t pending_record = {0};
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_command_buffer_passthrough(
+        command_buffer,
+        IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FLUSH_BUFFER,
+        &pending_record);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_replay_recorder_end_operation(
+        &pending_record,
+        iree_hal_command_buffer_flush_buffer(
+            command_buffer->base_command_buffer, base_target_ref));
+  }
+  iree_hal_replay_recorder_buffer_release_temporary(temporary_target_buffer);
+  return status;
+}
+
 static iree_status_t iree_hal_replay_recorder_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
@@ -920,6 +952,7 @@ static const iree_hal_command_buffer_vtable_t
         .fill_buffer = iree_hal_replay_recorder_command_buffer_fill_buffer,
         .update_buffer = iree_hal_replay_recorder_command_buffer_update_buffer,
         .copy_buffer = iree_hal_replay_recorder_command_buffer_copy_buffer,
+        .flush_buffer = iree_hal_replay_recorder_command_buffer_flush_buffer,
         .collective = iree_hal_replay_recorder_command_buffer_collective,
         .dispatch = iree_hal_replay_recorder_command_buffer_dispatch,
 };

@@ -189,6 +189,8 @@ IREE_API_EXPORT const char* iree_hal_replay_operation_code_string(
       return "command_buffer.collective";
     case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_DISPATCH:
       return "command_buffer.dispatch";
+    case IREE_HAL_REPLAY_OPERATION_CODE_COMMAND_BUFFER_FLUSH_BUFFER:
+      return "command_buffer.flush_buffer";
     case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_INFER_FORMAT:
       return "executable_cache.infer_format";
     case IREE_HAL_REPLAY_OPERATION_CODE_EXECUTABLE_CACHE_CAN_PREPARE_FORMAT:
