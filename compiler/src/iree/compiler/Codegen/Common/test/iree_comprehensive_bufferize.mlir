@@ -3154,3 +3154,32 @@ module attributes {hal.executable.target = #executable_target_rocm} {
 // CHECK-LABEL: func.func @constant_to_buffer_rocm
 // CHECK:         %[[CST:.+]] = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
 // CHECK:         bufferization.to_buffer %[[CST]] {{.*}} : tensor<4xi32> to memref<4xi32, #gpu.address_space<constant>>
+
+// -----
+
+// Verify that dispatch.tensor.load with negative strides (tensor flip) is
+// correctly bufferized to a memref.subview with negative strides, instead of
+// being incorrectly treated as a full-tensor identity load.
+
+#pipeline_layout_neg_stride = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer, "ReadOnly|Indirect">,
+  #hal.pipeline.binding<storage_buffer, Indirect>
+], flags = Indirect>
+func.func @negative_stride_dispatch_tensor_load() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout_neg_stride) binding(0) alignment(64) offset(%c0) flags("ReadOnly|Indirect") : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout_neg_stride) binding(1) alignment(64) offset(%c0) flags(Indirect) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [3], sizes = [4], strides = [-1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<4xf32>
+  iree_tensor_ext.dispatch.tensor.store %2, %1, offsets = [0], sizes = [4], strides = [1] : tensor<4xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf32>>
+  return
+}
+
+// CHECK-LABEL: func.func @negative_stride_dispatch_tensor_load()
+//  CHECK-DAG:    %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(0) {{.+}} : memref<4xf32, #hal.descriptor_type<storage_buffer>>
+//  CHECK-DAG:    %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(1) {{.+}} : memref<4xf32, #hal.descriptor_type<storage_buffer>>
+//      CHECK:    %[[SUBVIEW:.+]] = memref.subview %[[INPUT]][3] [4] [-1]
+// CHECK-SAME:      : memref<4xf32, #hal.descriptor_type<storage_buffer>>
+// CHECK-SAME:        to memref<4xf32, strided<[-1], offset: 3>, #hal.descriptor_type<storage_buffer>>
+//      CHECK:    linalg.generic
+// CHECK-SAME:      ins(%[[SUBVIEW]] : memref<4xf32, strided<[-1], offset: 3>, #hal.descriptor_type<storage_buffer>>)
+// CHECK-SAME:      outs(%[[OUTPUT]] : memref<4xf32, #hal.descriptor_type<storage_buffer>>)
