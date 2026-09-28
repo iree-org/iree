@@ -1286,8 +1286,8 @@ static void propagateReductionTileSizes(linalg::LinalgOp rootOp,
     }
 
     TileSizesListType otherTileSizes;
-    otherTileSizes.emplace_back({}); // No workgroup tiling
-    otherTileSizes.emplace_back(std::move(reductionLevel));
+    otherTileSizes.push_back({}); // No workgroup tiling
+    otherTileSizes.push_back(std::move(reductionLevel));
     setLoweringConfig(op, IREE::Codegen::LoweringConfigAttr::get(
                               op.getContext(), otherTileSizes));
   });
