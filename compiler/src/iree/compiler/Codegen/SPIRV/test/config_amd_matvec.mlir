@@ -29,9 +29,12 @@ func.func @i4_dequant_matvec_f32(%5: tensor<4096x86x128xi4>, %6: tensor<4096x86x
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
@@ -65,9 +68,12 @@ func.func @i4_dequant_matvec_f32(%5: tensor<4096x32x128xi4>, %6: tensor<4096x32x
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 4, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 0, 4, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [128, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
@@ -101,9 +107,12 @@ func.func @i4_dequant_matvec_f32(%30: index, %33: tensor<4096x86x128xi4>, %34: t
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec_f32(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
@@ -137,9 +146,12 @@ func.func @i4_dequant_matvec_f16(%5: tensor<4096x86x128xi4>, %6: tensor<4096x86x
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec_f16(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
@@ -173,9 +185,12 @@ func.func @i4_dequant_matvec(%30: index, %33: tensor<4096x86x128xi4>, %34: tenso
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 2, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 2, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
@@ -209,9 +224,12 @@ func.func @i4_dequant_matvec(%23: index, %26: tensor<11008x32x128xi4>, %27: tens
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1], [0, 0, 4, 128]{{\]}}>
+//   CHECK-DAG: #[[$FUSED:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [0, 0, 4, 128]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec(
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       lowering_config = #[[$FUSED]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 

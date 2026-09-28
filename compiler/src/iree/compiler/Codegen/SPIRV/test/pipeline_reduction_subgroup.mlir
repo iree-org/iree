@@ -114,3 +114,54 @@ func.func @softmax() {
 
 // CHECK-LABEL: spirv.func @softmax
 //       CHECK:   %{{.*}} = spirv.FAdd {{.*}} : vector<4xf32>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#red_in   = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+#red_out  = affine_map<(d0, d1, d2) -> (d0, d1)>
+#cons_in0 = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
+#cons_in1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#cons_out = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @reduction_with_permuted_consumer() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0xFF800000 : f32
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4x16xf32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16x16xf32>>
+  %2 = hal.interface.binding.subspan layout(#pipeline_layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x4x16xf32>>
+  %3 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [16, 4, 16], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<16x4x16xf32>> -> tensor<16x4x16xf32>
+  %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 16, 16], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4x16x16xf32>> -> tensor<4x16x16xf32>
+  %5 = tensor.empty() : tensor<4x16xf32>
+  %6 = tensor.empty() : tensor<16x4x16xf32>
+  %7 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x16xf32>) -> tensor<4x16xf32>
+  %8 = linalg.generic {
+    indexing_maps = [#red_in, #red_out],
+    iterator_types = ["parallel", "parallel", "reduction"]
+  } ins(%3 : tensor<16x4x16xf32>) outs(%7 : tensor<4x16xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %10 = arith.maximumf %in, %out : f32
+    linalg.yield %10 : f32
+  } -> tensor<4x16xf32>
+  %9 = linalg.generic {
+    indexing_maps = [#cons_in0, #cons_in1, #cons_out],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%4, %8 : tensor<4x16x16xf32>, tensor<4x16xf32>) outs(%6 : tensor<16x4x16xf32>) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %10 = arith.subf %in, %in_0 : f32
+    %11 = math.exp %10 : f32
+    linalg.yield %11 : f32
+  } -> tensor<16x4x16xf32>
+  iree_tensor_ext.dispatch.tensor.store %9, %2, offsets = [0, 0, 0], sizes = [16, 4, 16], strides = [1, 1, 1] : tensor<16x4x16xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<16x4x16xf32>>
+  return
+}
+
+// CHECK-LABEL: spirv.func @reduction_with_permuted_consumer
+//   CHECK-NOT:   spirv.GroupNonUniform
+//       CHECK:   spirv.GroupNonUniformFMax <Subgroup> <Reduce>
+//   CHECK-NOT:   spirv.GroupNonUniform
+//   CHECK-NOT:   spirv.mlir.loop
+//   CHECK-NOT:   spirv.ControlBarrier
