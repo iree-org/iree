@@ -2637,6 +2637,35 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                             CPUPipeline::DoubleTilingExpert));
 }
 
+static std::optional<SizesAndScalableFlags>
+getElementwiseVectorSizes(mlir::FunctionOpInterface entryPointFn,
+                          linalg::GenericOp genericOp,
+                          const LinalgOpInfo &linalgOpInfo,
+                          const TargetMLTransformInfo &targetMLTransInfo) {
+  SmallVector<int64_t> tileSizes;
+  SmallVector<bool> scalableFlags;
+  auto config = 
+    IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn).getConfiguration();
+  tileSizes = getMinTilingSizesForEachDim(entryPointFn, genericOp,
+    linalgOpInfo, targetMLTransInfo);
+  scalableFlags = SmallVector<bool>(tileSizes.size(), false);
+  // Check if target supports scalable vectors.
+  bool hasAArch64ScalableSupport =
+      isAArch64(config) &&
+      (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
+  if (isScalableVectorizationEnabled() &&
+      (hasAArch64ScalableSupport || isArmStreamingForced())) {
+    if (scalableFlags.size() == 3)
+      scalableFlags[1] = true;
+    else
+      scalableFlags.back() = true;
+  }
+
+  LDBG() << "Elementwise vector sizes: " << tileSizes;
+  LDBG() << "Elementwise vector scalable flags: " << scalableFlags;
+  return std::make_pair(tileSizes, scalableFlags);
+}
+
 /// Sets elementwise dispatches to use peeling approach. It scales the number of
 /// workload per workgroup to a larger number, which prevents runtime overheads
 /// from tiny dispatches.
@@ -2658,8 +2687,16 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
-  distConfig.minTileSizes = getMinTilingSizesForEachDim(
-      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+  std::optional<SizesAndScalableFlags> vecDims = getElementwiseVectorSizes(
+    entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+  if (!vecDims) {
+    return failure();
+  }
+
+  auto [vecSizes, vecScalableDims] = *vecDims;
+  distConfig.minTileSizes = vecSizes;
+  // distConfig.minTileSizes = getMinTilingSizesForEachDim(
+  //     entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
@@ -2717,7 +2754,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   LoweringConfigGenerator generator(genericOp);
   generator.setDistributionTileSizes(distTileSizes);
-  generator.setVectorTileSizes(vecTileSizes);
+  // vecScalableDims = SmallVector<bool>(vecTileSizes.size(), true);
+  generator.setVectorTileSizes(vecTileSizes, vecScalableDims);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
   LDBG() << "Set lowering_config for element-wise op: " << loweringConfig;
