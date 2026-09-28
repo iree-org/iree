@@ -456,6 +456,8 @@ VER_0 {
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
     mlirEmitError;
+    mlirEmitRemark;
+    mlirEmitWarning;
     mlirEnableGlobalDebug;
     mlirExternalPassSignalFailure;
     mlirF16TypeGet;
@@ -890,7 +892,9 @@ VER_0 {
     mlirOperationHashValue;
     mlirOperationImplementsInterface;
     mlirOperationImplementsInterfaceStatic;
+    mlirOperationIsAncestor;
     mlirOperationIsBeforeInBlock;
+    mlirOperationIsProperAncestor;
     mlirOperationIsStructurallyEquivalent;
     mlirOperationMoveAfter;
     mlirOperationMoveBefore;

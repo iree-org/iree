@@ -546,6 +546,10 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
   case vector::CombiningKind::OR:
   case vector::CombiningKind::XOR:
     return builder.getZeroAttr(type);
+  case vector::CombiningKind::MINIMUMNUMF:
+  case vector::CombiningKind::MAXIMUMNUMF:
+    return builder.getFloatAttr(
+        type, APFloat::getQNaN(cast<FloatType>(type).getFloatSemantics()));
   case vector::CombiningKind::MINIMUMF:
   case vector::CombiningKind::MINNUMF: {
     auto posInfApFloat = APFloat::getInf(
@@ -600,6 +604,8 @@ gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
     MAP_CASE(XOR);
     MAP_CASE(MINIMUMF);
     MAP_CASE(MAXIMUMF);
+    MAP_CASE(MINIMUMNUMF);
+    MAP_CASE(MAXIMUMNUMF);
 #undef MAP_CASE
   }
   // Upstream LLVM has the same assertion for the reverse direction (see

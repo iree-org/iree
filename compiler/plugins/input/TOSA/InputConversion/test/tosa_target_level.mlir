@@ -9,7 +9,7 @@
 // CHECK-LABEL: @dynamic_shape
 func.func @dynamic_shape(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
   // CHECK: linalg.generic
-  %0 = tosa.clamp %arg0 {max_val = 1.0 : f32, min_val = 0.0 : f32} : (tensor<?x4xf32>) -> tensor<?x4xf32>
+  %0 = tosa.clamp %arg0 min_val(0.0 : f32) max_val(1.0 : f32) : (tensor<?x4xf32>) -> tensor<?x4xf32>
   return %0 : tensor<?x4xf32>
 }
 
