@@ -37,3 +37,6 @@
 [submodule "third_party/hsa-runtime-headers"]
 	path = third_party/hsa-runtime-headers
 	url = https://github.com/iree-org/hsa-runtime-headers.git
+[submodule "third_party/shardy"]
+	path = third_party/shardy
+	url = https://github.com/openxla/shardy.git

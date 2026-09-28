@@ -48,6 +48,11 @@ diff_jax_test test/test_add.py
 diff_jax_test test/test_degenerate.py
 diff_jax_test test/test_simple.py
 
+# Test Shardy dialect support (JAX 0.8.2+ uses Shardy by default)
+# This test verifies the sdy dialect can be deserialized and stripped
+echo "Testing Shardy dialect support..."
+JAX_PLATFORMS=$actual_jax_platform python test/test_shardy.py
+
 # here we test if the compile options is passed to IREE PJRT plugin successfully.
 # we pass --iree-scheduling-dump-statistics-format=csv via jax.jit,
 # and see if there's statistics in the output
