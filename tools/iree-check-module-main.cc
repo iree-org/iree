@@ -63,7 +63,7 @@ class CheckModuleTest : public ::testing::Test {
   }
 
   void TestBody() override {
-    iree_hal_profiling_from_flags_t* profiling = nullptr;
+    iree_hal_profiling_session_t* profiling = nullptr;
     IREE_ASSERT_OK(iree_hal_begin_profiling_from_flags(
         device_, iree_vm_instance_allocator(instance_), &profiling));
     iree_status_t status =
@@ -72,8 +72,8 @@ class CheckModuleTest : public ::testing::Test {
                        /*inputs=*/nullptr, /*outputs=*/nullptr,
                        iree_vm_instance_allocator(instance_));
     if (profiling) {
-      status = iree_status_join(status,
-                                iree_hal_end_profiling_from_flags(profiling));
+      status =
+          iree_status_join(status, iree_hal_profiling_session_end(profiling));
     }
     IREE_EXPECT_OK(status);
   }

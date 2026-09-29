@@ -103,6 +103,63 @@ BM_RunModule/process_time/real_time      0.011 ms        0.014 ms        61654
 
 Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 
+`--batch_size` counts logical benchmark iterations. Its execution depends on
+the exported function's ABI:
+
+| Function | One measured batch |
+| --- | --- |
+| Synchronous entry point | One VM invocation. Match `--batch_size` to the compiler's `--iree-hal-benchmark-dispatch-repeat-count`. |
+| Asynchronous entry point | `--batch_size` VM invocations, rounded up to a multiple of `--batch_concurrency`, followed by one completion wait. Fence and argument setup and output cleanup are outside the measured interval. |
+| Generated dispatch benchmark | One VM invocation with `--batch_size` as its repeat count. |
+
+`--enable_output_processing` retains the last measured invocation's outputs
+for the usual `--output` and `--expected_output` flags, including asynchronous
+entry points. Select a single function when processing outputs.
+
+### Per-dispatch breakdown
+
+Pass `--dispatch_statistics` to see where the time goes. Each benchmark result
+is followed by one row per dispatch function, longest total time first:
+
+```shell
+$ ./bazel-bin/tools/iree-benchmark-module \
+  --module=/tmp/module.vmfb \
+  --device=local-task \
+  --function=main \
+  --input=64x64xf32=1 --input=64x64xf32=1 --input=64x32xf32=1 \
+  --dispatch_statistics
+```
+
+```shell
+------------------------------------------------------------------------------------------------------
+Benchmark                                            Time             CPU   Iterations UserCounters...
+------------------------------------------------------------------------------------------------------
+BM_main/process_time/real_time                   0.066 ms        0.098 ms        13876 items_per_second=15.1222k/s
+BM_main/main_dispatch_0_matmul_64x64x64_f32      0.020 ms        0.027 ms        13876 calls=2 percent=80.5021
+BM_main/main_dispatch_2_matmul_64x32x64_f32      0.005 ms        0.007 ms        13876 calls=1 percent=19.4979
+```
+
+Dispatch rows report the time spent in that function per benchmark iteration,
+`calls` is the number of dispatches per iteration, and `percent` is the
+function's share of all dispatch time. On CPU devices the `CPU` column is the
+worker time summed over all tiles of the dispatches.
+
+After each measured repetition, Google Benchmark reruns the same function and
+batch schedule with a lightweight HAL profiling session on every device. The
+profile pass runs outside the measured interval and uses the same iteration
+budget. Dispatch rows aggregate all profiled repetitions and divide by their
+total logical iteration count. They appear in console, JSON, and CSV output,
+including `--benchmark_out` files and aggregate-only reports.
+
+Profiling executes the program again, so stateful programs observe extra
+invocations. Output processing retains the measured pass's results. Profiles
+require backend support for profiling existing command buffers and attributing
+dispatches, as provided by `local-task` and `local-sync`; other backends either
+fail to start the session or report no rows. Missing attribution, unscalable
+timestamps, or dropped records produce a warning. This flag cannot
+be combined with the [device profiling](./device-profiling.md) or
+[device replay](./device-replay.md) capture flags.
+
 ## Executable Benchmarks
 
 We also benchmark the performance of individual parts of the IREE system in

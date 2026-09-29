@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "executable_configurations.mlir"
     "executable_sources.mlir"
     "iree-benchmark-executable.mlir"
+    "iree-benchmark-module-dispatch-statistics.mlir"
     "iree-benchmark-module-outputs.mlir"
     "iree-benchmark-module.mlir"
     "iree-compile-help.txt"
@@ -75,6 +76,7 @@ iree_lit_test_suite(
     not
   DATA
     MLIROpBaseTdFiles
+    benchmark_module_test.py
     echo_npy.py
     iree-link-anonymous.mlir
     iree-link-executable-source-module-d.mlir

@@ -128,6 +128,20 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    device_util_test
+  SRCS
+    "device_util_test.cc"
+  DEPS
+    ::device_util
+    iree::base
+    iree::hal
+    iree::hal::utils::statistics_sink
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     function_io

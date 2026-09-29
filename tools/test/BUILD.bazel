@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "executable_sources.mlir",
             "iree-benchmark-executable.mlir",
             "iree-compile-help.txt",
+            "iree-benchmark-module-dispatch-statistics.mlir",
             "iree-benchmark-module-outputs.mlir",
             "iree-benchmark-module.mlir",
             "iree-convert-parameters.txt",
@@ -85,6 +86,7 @@ iree_lit_test_suite(
     ),
     cfg = "//tools:lit.cfg.py",
     data = [
+        "benchmark_module_test.py",
         "echo_npy.py",
         "iree-link-anonymous.mlir",
         "iree-tokenize.json",

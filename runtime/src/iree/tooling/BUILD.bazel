@@ -116,6 +116,19 @@ iree_runtime_cc_library(
     ],
 )
 
+iree_runtime_cc_test(
+    name = "device_util_test",
+    srcs = ["device_util_test.cc"],
+    deps = [
+        ":device_util",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:statistics_sink",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
 iree_runtime_cc_library(
     name = "function_io",
     srcs = ["function_io.c"],
