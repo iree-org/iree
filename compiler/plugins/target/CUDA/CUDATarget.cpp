@@ -424,11 +424,20 @@ public:
       return nullptr;
     }
 
-    // Use a PTX level that knows about Ada when sm_89 is selected by default.
+    // Raise the default PTX level where +ptx76 is too low: the NVPTX backend
+    // rejects levels below its per-architecture minimum (8.7 for sm_120, 8.8
+    // for sm_121), and the FP8 mma.sync intrinsics selected by default on Ada
+    // need 8.4.
     std::string targetFeatures = options.clTargetFeatures;
-    if (GPU::normalizeCUDATarget(options.clTarget) == "sm_89" &&
-        targetFeatures == "+ptx76") {
-      targetFeatures = "+ptx78";
+    if (targetFeatures == "+ptx76") {
+      StringRef arch = GPU::normalizeCUDATarget(options.clTarget);
+      if (arch == "sm_121") {
+        targetFeatures = "+ptx88";
+      } else if (arch == "sm_120") {
+        targetFeatures = "+ptx87";
+      } else if (arch == "sm_89") {
+        targetFeatures = "+ptx84";
+      }
     }
 
     if (auto target = GPU::getCUDATargetDetails(options.clTarget,
