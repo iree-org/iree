@@ -1219,7 +1219,6 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
   }];
 
   let hasVerifier = 1;
-  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
