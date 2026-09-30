@@ -184,7 +184,7 @@ collect_wasm_js = aspect(
           "and IreeWasmEntryInfo from targets reachable through cc_library deps.",
 )
 
-_WASM32_COMPATIBLE_WITH = ["@platforms//cpu:wasm32"]
+_WASM32_COMPATIBLE_WITH = [Label("@platforms//cpu:wasm32")]
 
 def _add_wasm_target_compatibility(kwargs):
     kwargs = dict(kwargs)
@@ -390,7 +390,7 @@ def iree_wasm_cc_binary(name, main = None, srcs = None, deps = None, **kwargs):
 
     native.sh_binary(
         name = name,
-        srcs = ["//build_tools/wasm:wasm_node_test_runner.sh"],
+        srcs = [Label("//build_tools/wasm:wasm_node_test_runner.sh")],
         data = [":" + name + "_bundle"],
         args = ["$(rootpath :" + name + "_bundle)"],
         target_compatible_with = kwargs["target_compatible_with"],
@@ -445,7 +445,7 @@ def iree_wasm_cc_test(name, main = None, srcs = None, deps = None, **kwargs):
 
     native.sh_test(
         name = name,
-        srcs = ["//build_tools/wasm:wasm_node_test_runner.sh"],
+        srcs = [Label("//build_tools/wasm:wasm_node_test_runner.sh")],
         data = [":" + name + "_bundle"],
         args = ["$(rootpath :" + name + "_bundle)"],
         target_compatible_with = kwargs["target_compatible_with"],

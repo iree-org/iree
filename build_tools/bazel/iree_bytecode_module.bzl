@@ -15,7 +15,7 @@ def iree_bytecode_module(
         src,
         flags,
         module_name = None,
-        compile_tool = "//tools:iree-compile",
+        compile_tool = Label("//tools:iree-compile"),
         linker_tool = "@llvm-project//lld:lld",
         c_identifier = "",
         static_lib_path = "",
