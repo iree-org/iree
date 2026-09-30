@@ -4099,6 +4099,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#stacked-pull-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stacked pull requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#opt-in-for-presubmit-jobs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6427,6 +6438,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#stacked-pull-requests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stacked pull requests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#opt-in-for-presubmit-jobs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6818,6 +6840,23 @@ balance between utility and economics.</p>
 <p>Required checks must use only either standard GitHub-hosted runners or
 runners from the CPU builder pool.</p>
 </div>
+<h4 id="stacked-pull-requests">Stacked pull requests<a class="headerlink" href="#stacked-pull-requests" title="Permanent link">link</a></h4>
+<p>For native GitHub stacks, CI and PkgCI run their selected build and test jobs
+only for the lowest unmerged pull request. This is the PR whose base branch
+matches the stack's base branch. It uses the normal presubmit job selection,
+including file filters and PR description trailers. Non-stacked PRs are
+unaffected.</p>
+<p>Upper stack PRs still run setup, which reports that CI is deferred and selects
+no build or test jobs. Clang-tidy is also skipped. DCO and pre-commit retain
+their existing behavior on every layer. Both summary jobs still run, but
+<code>ci_summary</code> explicitly fails (with an explanation) to prevent the untested PR
+to merge together with the bottom PR.</p>
+<p>After the bottom PR merges, the remaining PRs rebase. CI relies on the rebase
+of the remaining stack to reevaluate and trigger test jobs. The next PR then
+becomes eligible for normal presubmit CI.</p>
+<p>PR description trailers such as <code>ci-extra</code> and <code>ci-exactly</code> cannot override
+stack deferral. Scheduled and postsubmit workflows are unaffected. One can
+still manually dispatch a workflow on a PR that is higher in the stack.</p>
 <h4 id="opt-in-for-presubmit-jobs"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0M1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0m9.78-2.22-5.5 5.5a.749.749 0 0 1-1.275-.326.75.75 0 0 1 .215-.734l5.5-5.5a.75.75 0 0 1 1.042.018.75.75 0 0 1 .018 1.042"/></svg></span> Opt-in for presubmit jobs<a class="headerlink" href="#opt-in-for-presubmit-jobs" title="Permanent link">link</a></h4>
 <p>GitHub supports
 <a href="https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#onpushpull_requestpull_request_targetpathspaths-ignore"><code>paths</code> and <code>paths-ignore</code> filters</a>
