@@ -737,7 +737,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-inner-tiled"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(

@@ -971,10 +971,8 @@ static Value lowerX86Avx512Vnni16x16x2I8(OpBuilder &b, Location loc, Value lhs,
 }
 
 // Insert a fixed 1-D vector into poison `nxv8` so 8 * vscale == vlen/8 lanes.
-// Poison (not a zero splat) plus TA/MA policy lets LLVM treat the insert as a
-// register copy instead of `vmv.v.i` + TU `vmv.v.v`. Already-scalable values
-// are returned unchanged so ACC rows that were legalized in the hoistable
-// distribute pair are not converted again around every FMA.
+// Poison plus a tail-agnostic policy lets LLVM treat the insert as a
+// register copy. Already-scalable values are returned unchanged.
 static Value insertFixedIntoNxv8(OpBuilder &b, Location loc, Value v) {
   auto vt = dyn_cast<VectorType>(v.getType());
   if (!vt) {
@@ -1006,8 +1004,7 @@ static Value extractNxv8ToFixed(OpBuilder &b, Location loc, Value v,
 // RVV `.vf` FMA (`vfmacc` / `vfwmaccbf16`). Enum bit 0 selects which operand
 // is the scalar (swapped => RHS). The vector operand is inserted into nxv8 so
 // 8 * vscale == vlen/8 lanes. ACC is left scalable when the caller already
-// legalized it (hoisted out of K). frm=7 is DYN; policy=3 is tail/mask
-// agnostic, matching the mmt4d ukernel.
+// legalized it (hoisted out of K). frm=7 is DYN; policy=1 is tail-agnostic.
 static Value lowerRiscvVFmaccLike(OpBuilder &b, Location loc,
                                   MMAIntrinsic intrinsic, int64_t vlen,
                                   Value lhs, Value rhs, Value acc,
@@ -1040,8 +1037,8 @@ static Value lowerRiscvVFmaccLike(OpBuilder &b, Location loc,
   Value frm = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(7));
   Value vl = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(lanes));
   // RISC-V vector policy: bit0 = tail (0=tu, 1=ta), bit1 = mask (0=mu, 1=ma).
-  // 3 = TA/MA, same encoding the f32 mmt4d ukernel passes to llvm.riscv.vfmacc.
-  Value policy = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(3));
+  // 1 = tail-agnostic. The intrinsic is unmasked, so the mask bit stays 0.
+  Value policy = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(1));
   Value resultScalable =
       LLVM::CallIntrinsicOp::create(
           b, loc, accScalable.getType(), b.getStringAttr(llvmName),

@@ -291,7 +291,7 @@ iree_generated_e2e_runner_test(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
-    target_cpu_features_variants = ["riscv_64:rvv:+v,+zvl512b"],
+    target_cpu_features_variants = ["riscv_64:rvv:+m,+v,+zvl512b"],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
 )
