@@ -354,39 +354,46 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   return success();
 }
 
-template <typename AttentionOpTy>
-static SmallVector<ReshapeOperandInfo>
-getAttentionLikeReshapeInfo(AttentionOpTy attentionOp) {
-  return llvm::map_to_vector(
-      attentionOp->getOpOperands(), [&](OpOperand &opOperand) {
-        ReshapeOperandInfo operandInfo;
-        auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
-        if (!operandType) {
-          assert(
-              attentionOp.getMatchingIndexingMap(&opOperand).getNumResults() ==
-                  0 &&
-              "expected non-shaped type to have no results in indexing map");
-          return operandInfo;
-        }
+/// Derives the reshape info of an op that states an indexing map for every
+/// operand, where each map is a projected permutation.
+template <typename OpTy>
+static SmallVector<ReshapeOperandInfo> getMappedOperandsReshapeInfo(OpTy op) {
+  return llvm::map_to_vector(op->getOpOperands(), [&](OpOperand &opOperand) {
+    ReshapeOperandInfo operandInfo;
+    auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
+    if (!operandType) {
+      assert(op.getMatchingIndexingMap(&opOperand).getNumResults() == 0 &&
+             "expected non-shaped type to have no results in indexing map");
+      return operandInfo;
+    }
 
-        operandInfo.originalShape = getDimSizes(opOperand.get());
-        for (auto result :
-             attentionOp.getMatchingIndexingMap(&opOperand).getResults()) {
-          operandInfo.operandToIterationSpace.push_back(
-              cast<AffineDimExpr>(result).getPosition());
-        }
-        return operandInfo;
-      });
+    operandInfo.originalShape = getDimSizes(opOperand.get());
+    for (auto result : op.getMatchingIndexingMap(&opOperand).getResults()) {
+      operandInfo.operandToIterationSpace.push_back(
+          cast<AffineDimExpr>(result).getPosition());
+    }
+    return operandInfo;
+  });
 }
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
-  return getAttentionLikeReshapeInfo(attentionOp);
+  return getMappedOperandsReshapeInfo(attentionOp);
 }
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
-  return getAttentionLikeReshapeInfo(attentionOp);
+  return getMappedOperandsReshapeInfo(attentionOp);
+}
+
+static SmallVector<ReshapeOperandInfo>
+getReshapeInfo(LinalgExt::QuantizeAffineOp quantizeOp) {
+  return getMappedOperandsReshapeInfo(quantizeOp);
+}
+
+static SmallVector<ReshapeOperandInfo>
+getReshapeInfo(LinalgExt::DequantizeAffineOp dequantizeOp) {
+  return getMappedOperandsReshapeInfo(dequantizeOp);
 }
 
 static SmallVector<ReshapeOperandInfo>
@@ -537,7 +544,9 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
   }
 
   if constexpr (std::is_same_v<OpTy, AttentionOp> ||
-                std::is_same_v<OpTy, OnlineAttentionOp>) {
+                std::is_same_v<OpTy, OnlineAttentionOp> ||
+                std::is_same_v<OpTy, QuantizeAffineOp> ||
+                std::is_same_v<OpTy, DequantizeAffineOp>) {
     auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
         llvm::map_range(op.getIndexingMapsArray(), [&](AffineMap m) {
           return getIndexingMapInExpandedOp(rewriter, m, info);
@@ -556,7 +565,7 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
       replacements.push_back(newResult);
     } else {
       replacements.push_back(tensor::CollapseShapeOp::create(
-          rewriter, loc, op.getResult(i).getType(), newResult,
+          rewriter, loc, op->getResult(i).getType(), newResult,
           originalReassoc));
     }
   }
@@ -1190,6 +1199,14 @@ void populateFoldReshapeOpsByExpansionPatterns(
       patterns.getContext(), controlFoldingReshapes);
 }
 
+void populatePropagateAffineQuantizationReshapesPatterns(
+    RewritePatternSet &patterns,
+    const linalg::ControlFusionFn &controlFoldingReshapes) {
+  patterns.add<FoldWithProducerReshapeByExpansion<QuantizeAffineOp>,
+               FoldWithConsumerReshapeByExpansion<DequantizeAffineOp>>(
+      patterns.getContext(), controlFoldingReshapes);
+}
+
 SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
   auto fusionOp = cast<LinalgFusionOpInterface>(op);
   return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
@@ -1216,49 +1233,55 @@ replaceUnitDimIndexOps(Block *body,
   }
 }
 
-template <typename AttentionOpType>
-struct DropAttentionLikeUnitDims final : OpRewritePattern<AttentionOpType> {
-  DropAttentionLikeUnitDims(MLIRContext *context,
-                            linalg::ControlDropUnitDims options,
-                            PatternBenefit benefit = 1)
-      : OpRewritePattern<AttentionOpType>(context, benefit),
-        options(std::move(options)) {}
+/// Drops unit dims from an op that states an indexing map for every operand,
+/// by cloning it with the reduced operands and maps that `linalg::dropUnitDims`
+/// computes. Ops carrying a body additionally need their `linalg.index` uses
+/// fixed up for the dropped dims.
+template <typename OpTy>
+struct DropMappedOperandsUnitDims final : OpRewritePattern<OpTy> {
+  DropMappedOperandsUnitDims(MLIRContext *context,
+                             linalg::ControlDropUnitDims options,
+                             PatternBenefit benefit = 1)
+      : OpRewritePattern<OpTy>(context, benefit), options(std::move(options)) {}
 
-  LogicalResult matchAndRewrite(AttentionOpType attentionOp,
+  LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
     linalg::DroppedUnitDimsBuilder builder =
-        [](Location loc, OpBuilder &b, IndexingMapOpInterface op,
+        [](Location loc, OpBuilder &b, IndexingMapOpInterface interfaceOp,
            ArrayRef<Value> newOperands, ArrayRef<AffineMap> newIndexingMaps,
            const llvm::SmallDenseSet<unsigned> &droppedDims)
         -> IndexingMapOpInterface {
-      auto attentionOp = cast<AttentionOpType>(op);
-      auto resultTypes = llvm::map_to_vector(
-          newOperands.take_back(attentionOp.getNumDpsInits()),
-          [](Value v) { return v.getType(); });
+      auto op = cast<OpTy>(interfaceOp);
+      auto resultTypes =
+          llvm::map_to_vector(newOperands.take_back(op.getNumDpsInits()),
+                              [](Value v) { return v.getType(); });
 
       IRMapping mapping;
       for (auto [oldOperand, newOperand] :
-           llvm::zip(attentionOp->getOperands(), newOperands)) {
+           llvm::zip(op->getOperands(), newOperands)) {
         mapping.map(oldOperand, newOperand);
       }
-      auto *cloned = b.clone(*attentionOp, mapping);
-      auto newOp = cast<AttentionOpType>(cloned);
+      auto *cloned = b.clone(*op, mapping);
+      auto newOp = cast<OpTy>(cloned);
       for (auto [result, type] : llvm::zip(newOp->getResults(), resultTypes)) {
         result.setType(type);
       }
       newOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(newIndexingMaps));
-      IRRewriter rewriter(b);
-      replaceUnitDimIndexOps(newOp.getBody(), droppedDims, rewriter);
+      if constexpr (std::is_same_v<OpTy, AttentionOp> ||
+                    std::is_same_v<OpTy, OnlineAttentionOp>) {
+        IRRewriter rewriter(b);
+        replaceUnitDimIndexOps(newOp.getBody(), droppedDims, rewriter);
+      }
       return newOp;
     };
     FailureOr<linalg::DropUnitDimsResult> result = linalg::dropUnitDims(
-        rewriter, cast<IndexingMapOpInterface>(attentionOp.getOperation()),
-        builder, options);
+        rewriter, cast<IndexingMapOpInterface>(op.getOperation()), builder,
+        options);
     if (failed(result)) {
       return failure();
     }
 
-    rewriter.replaceOp(attentionOp, result->replacements);
+    rewriter.replaceOp(op, result->replacements);
     return success();
   }
 
@@ -1269,11 +1292,12 @@ private:
 void populateFoldUnitExtentDimsPatterns(
     RewritePatternSet &patterns, const linalg::ControlDropUnitDims &options) {
   patterns.add<DropScatterUnitIndexDepth>(patterns.getContext());
-  patterns
-      .add<DropGatherUnitDims, DropScatterUnitDims,
-           DropAttentionLikeUnitDims<AttentionOp>,
-           DropAttentionLikeUnitDims<OnlineAttentionOp>, DropMapStoreUnitDims>(
-          patterns.getContext(), options);
+  patterns.add<DropGatherUnitDims, DropScatterUnitDims,
+               DropMappedOperandsUnitDims<AttentionOp>,
+               DropMappedOperandsUnitDims<OnlineAttentionOp>,
+               DropMappedOperandsUnitDims<QuantizeAffineOp>,
+               DropMappedOperandsUnitDims<DequantizeAffineOp>,
+               DropMapStoreUnitDims>(patterns.getContext(), options);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/GlobalOptimization/TransposePropagationPatterns.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,6 +23,8 @@
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+using IREE::LinalgExt::DequantizeAffineOp;
 
 //===----------------------------------------------------------------------===//
 // Transpose permutation helpers
@@ -376,6 +379,63 @@ public:
 
 private:
   // Decides whether the transpose may bubble through the collapse_shape.
+  ControlTransposePropagationFn controlFn;
+};
+
+// Fuses a transpose into its single-use dequantize producer by permuting the
+// dequantize's output map. The dequantize then writes the transposed layout
+// directly, so its consumer reads it without an intervening transpose, and no
+// transpose is materialized on either side.
+//
+// linalg.transpose follows result[i] = input[perm[i]], so the fused output
+// map reads its results in the transposed order. This mirrors the output map
+// update in FuseTransposeWithProducerLinalgOp.
+class FuseTransposeIntoDequantize
+    : public OpRewritePattern<linalg::TransposeOp> {
+public:
+  FuseTransposeIntoDequantize(MLIRContext *ctx,
+                              ControlTransposePropagationFn controlFn,
+                              PatternBenefit b = 1)
+      : OpRewritePattern<linalg::TransposeOp>(ctx, b),
+        controlFn(std::move(controlFn)) {}
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    auto dequantizeOp =
+        transposeOp.getInput().getDefiningOp<DequantizeAffineOp>();
+    if (!dequantizeOp) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "input is not a dequantize");
+    }
+    // With other consumers the untransposed dequantize has to stay, so fusing
+    // would duplicate the dequantization rather than remove the transpose.
+    if (!dequantizeOp->getResult(0).hasOneUse()) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "dequantize has other users");
+    }
+    if (!controlFn(&transposeOp.getInputMutable())) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "rejected by control function");
+    }
+
+    SmallVector<AffineMap> maps = dequantizeOp.getIndexingMapsArray();
+    AffineMap outputMap = maps.back();
+    maps.back() = AffineMap::get(
+        outputMap.getNumDims(), outputMap.getNumSymbols(),
+        applyPermutation(outputMap.getResults(), transposeOp.getPermutation()),
+        rewriter.getContext());
+
+    SmallVector<Value> operands = dequantizeOp->getOperands();
+    operands.back() = transposeOp.getDpsInits()[0];
+    auto fusedOp = cast<DequantizeAffineOp>(mlir::clone(
+        rewriter, dequantizeOp, transposeOp->getResultTypes(), operands));
+    fusedOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(maps));
+    rewriter.replaceOp(transposeOp, fusedOp->getResults());
+    return success();
+  }
+
+private:
+  // Decides whether the transpose may fuse into the dequantize.
   ControlTransposePropagationFn controlFn;
 };
 
@@ -1199,6 +1259,13 @@ void populateBubbleTransposeThroughUnaryElementwiseDpsInitPattern(
     PatternBenefit benefit) {
   patterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
       patterns.getContext(), std::move(controlFn), benefit);
+}
+
+void populateFuseTransposeIntoDequantizePattern(
+    RewritePatternSet &patterns, ControlTransposePropagationFn controlFn,
+    PatternBenefit benefit) {
+  patterns.add<FuseTransposeIntoDequantize>(patterns.getContext(),
+                                            std::move(controlFn), benefit);
 }
 
 void populateComposeTransposesPattern(RewritePatternSet &patterns,
