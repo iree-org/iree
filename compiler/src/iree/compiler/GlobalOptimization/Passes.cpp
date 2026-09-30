@@ -130,9 +130,11 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
-      // Match direct dequantize producers before convolution lowering and
-      // unit-dimension folding insert reshapes between them and the
-      // contraction.
+      // Run propagation immediately before the QDQ rewrite so contractions
+      // consume dequantize results directly. This must happen before im2col
+      // inserts a packing operation between dequantize and its matmul.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createPropagateAffineQuantizationPass)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
@@ -212,8 +214,10 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
-      // Retry for contractions whose dequantize producers were exposed by
-      // reshape/transpose propagation, before selecting integer layouts.
+      // Run propagation immediately before the QDQ rewrite again: earlier
+      // reshape/transpose passes can separate dequantize from its consumers.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createPropagateAffineQuantizationPass)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)

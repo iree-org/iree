@@ -261,6 +261,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateBubbleTransposeThroughUnaryElementwiseDpsInitPattern(
         bubblingPatterns, isOutsideDispatch, /*benefit=*/2);
     populateComposeTransposesPattern(bubblingPatterns, isOutsideDispatch);
+    populateFuseTransposeIntoDequantizePattern(bubblingPatterns,
+                                               isOutsideDispatch);
     populateCommonCanonicalizationPatterns(context, bubblingPatterns);
 
     GreedyRewriteConfig config;
