@@ -68,6 +68,7 @@ iree_cc_library(
     GlobalOptimization
   HDRS
     "Passes.h"
+    "TransposePropagationPatterns.h"
     "Utils.h"
   SRCS
     "CleanupNumericNarrowing.cpp"
@@ -94,6 +95,7 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
+    "TransposePropagationPatterns.cpp"
     "Utils.cpp"
     "WarnOnUninitializedValues.cpp"
   DEPS
