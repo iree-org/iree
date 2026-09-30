@@ -8,8 +8,8 @@
 #
 # Renaming every llvm/mlir C++ symbol lets libIREECompiler share a process with
 # a foreign LLVM/MLIR. Plugins rename to match so they resolve against it.
-# gen_rename_map.py decides the spelling, shared with Bazel so both builds land
-# on the same ABI.
+# CMake and Bazel share gen_rename_map.py to produce the same symbol names.
+# Matching names alone do not establish C++ ABI compatibility.
 #
 # Everything becomes a static archive first, because that is what llvm-objcopy
 # takes. The linked library cannot be renamed instead: rewriting .dynsym breaks
@@ -93,7 +93,7 @@ endfunction()
 
 # Splits the transitive link closure into archives to rename (STATIC_LIBS_VAR)
 # and everything else, passed through untouched (OTHER_VAR). Imported targets
-# and C archives are safe to pass through: they define no mangled C++ names.
+# are not renamed; callers must ensure they do not need LLVM/MLIR renaming.
 function(iree_collect_static_link_closure STATIC_LIBS_VAR OTHER_VAR)
   set(_worklist ${ARGN})
   set(_visited "")
