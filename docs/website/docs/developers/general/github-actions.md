@@ -261,11 +261,8 @@ of the remaining stack to reevaluate and trigger test jobs. The next PR then
 becomes eligible for normal presubmit CI.
 
 PR description trailers such as `ci-extra` and `ci-exactly` cannot override
-stack deferral. Scheduled and postsubmit workflows are unaffected. Manual
-`workflow_dispatch` runs also bypass stack deferral: CI and PkgCI use their
-normal non-PR job selection, without PR trailers, while individual workflows
-can be dispatched directly. The stack merge guard applies to PR runs, not
-manual dispatches.
+stack deferral. Scheduled and postsubmit workflows are unaffected. One can
+still manually dispatch a workflow on a PR that is higher in the stack.
 
 #### :octicons-skip-16: Opt-in for presubmit jobs
 
