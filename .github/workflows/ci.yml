@@ -361,3 +361,4 @@ jobs:
     secrets: inherit
     with:
       jobs-json: ${{ toJson(needs) }}
+      ci-deferred: ${{ needs.setup.outputs.ci-deferred == 'true' }}

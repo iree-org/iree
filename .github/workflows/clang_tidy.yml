@@ -29,6 +29,10 @@ concurrency:
 
 jobs:
   clang-tidy:
+    # Run expensive CI only for the lowest unmerged PR in a native stack.
+    if: >-
+      github.event.pull_request.stack == null ||
+      github.event.pull_request.stack.base.ref == github.event.pull_request.base.ref
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb

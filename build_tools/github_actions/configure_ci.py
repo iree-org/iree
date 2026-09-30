@@ -21,6 +21,7 @@ variables to be set:
 - PR_TITLE (required): PR title.
 - PR_BODY (optional): PR description.
 - PR_LABELS (optional): JSON list of PR label names.
+- GITHUB_EVENT_PATH (required): path to the webhook event JSON payload.
 - BASE_REF (required): base commit SHA of the PR.
 - ORIGINAL_PR_TITLE (optional): PR title from the original PR event, showing a
     notice if PR_TITLE is different.
@@ -30,8 +31,7 @@ variables to be set:
 - ORIGINAL_PR_LABELS (optional): PR labels from the original PR event, showing a
     notice if PR_LABELS is different. ORIGINAL_PR_TITLE must also be set.
 
-Exit code 0 indicates that it should and exit code 2 indicates that it should
-not.
+Selected jobs are written to GITHUB_OUTPUT; an empty list skips CI jobs.
 """
 
 import difflib
@@ -542,6 +542,12 @@ def get_enabled_jobs(
     return (enabled_jobs | extra_jobs) - skip_jobs
 
 
+def is_upper_stack_pr(pr: Mapping) -> bool:
+    stack = pr.get("stack")
+    # Base refs identify the lowest remaining PR after earlier layers merge.
+    return stack is not None and stack["base"]["ref"] != pr["base"]["ref"]
+
+
 def main():
     is_pr = os.environ["GITHUB_EVENT_NAME"] == "pull_request"
     trailers, labels = get_trailers_and_labels(is_pr)
@@ -567,7 +573,18 @@ def main():
     except ValueError as e:
         print(e)
         sys.exit(1)
+    ci_deferred = False
+    if is_pr:
+        with open(os.environ["GITHUB_EVENT_PATH"]) as f:
+            pr = json.load(f)["pull_request"]
+        ci_deferred = is_upper_stack_pr(pr)
+    if ci_deferred:
+        enabled_jobs = set()
+        write_job_summary(
+            "CI deferred until this PR is the lowest unmerged PR in its stack."
+        )
     output = {
+        "ci-deferred": json.dumps(ci_deferred),
         "enabled-jobs": json.dumps(sorted(enabled_jobs)),
         "is-pr": json.dumps(is_pr),
         "write-caches": "0" if is_pr else "1",
