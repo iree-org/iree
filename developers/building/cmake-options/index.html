@@ -7020,11 +7020,15 @@ Defaults to <code>ON</code>.</p>
 <ul>
 <li>type: BOOL</li>
 </ul>
-<p>Experimental. Builds compiler plugins as shared libraries that <code>iree-compile</code>
-loads at run time through <code>--iree-load-plugin</code>. Defaults to <code>OFF</code>. Requires
-<code>-DIREE_ENABLE_THIN_ARCHIVES=OFF</code>, because the plugins resolve against a
-renamed copy of the compiler's symbols and the rename cannot rewrite a thin
-archive. See <code>compiler/src/iree/compiler/PluginAPI/README.md</code>.</p>
+<p>Enables experimental dynamic compiler plugins and exports the compiler symbols
+that they need. Defaults to <code>OFF</code>. Requires
+<code>IREE_LINK_COMPILER_SHARED_LIBRARY=ON</code> and <code>IREE_ENABLE_THIN_ARCHIVES=OFF</code>.
+Load a plugin with <code>--iree-load-plugin=&lt;path&gt;</code> and activate it with
+<code>--iree-plugin=&lt;id&gt;</code>.</p>
+<p>Plugins must use the host compiler's IREE and LLVM/MLIR revisions and matching
+ABI-affecting build settings. See the
+<a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md">compiler plugin documentation</a>
+for build requirements and compatibility checks.</p>
 <h3 id="iree_output_format_c"><code>IREE_OUTPUT_FORMAT_C</code><a class="headerlink" href="#iree_output_format_c" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>
