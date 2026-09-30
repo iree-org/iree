@@ -33,9 +33,10 @@
 // ROWS-NEXT: BM_main/main_dispatch_{{.+}} 4 calls={{.+}} percent=
 // ROWS-NOT: BM_
 
-// Calls are counted per benchmark iteration.
-// CALLS-DAG: BM_main/main_dispatch_{{[0-9]+}}_matmul_64x64x64_f32 {{.+}} calls=2 percent=
-// CALLS-DAG: BM_main/main_dispatch_{{[0-9]+}}_matmul_64x32x64_f32 {{.+}} calls=1 percent=
+// Calls are counted per benchmark iteration, followed by per-call statistics.
+// The four iterations are four profiled batches, so each row has a stddev.
+// CALLS-DAG: BM_main/main_dispatch_{{[0-9]+}}_matmul_64x64x64_f32 {{.+}} calls=2 max={{.+}} mean={{.+}} min={{.+}} percent={{.+}} stddev=
+// CALLS-DAG: BM_main/main_dispatch_{{[0-9]+}}_matmul_64x32x64_f32 {{.+}} calls=1 max={{.+}} mean={{.+}} min={{.+}} percent={{.+}} stddev=
 
 func.func @main(%lhs: tensor<64x64xf32>, %rhs: tensor<64x64xf32>,
                 %narrow: tensor<64x32xf32>) -> tensor<64x32xf32> {

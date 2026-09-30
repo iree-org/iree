@@ -127,19 +127,36 @@ def main():
         def dispatches(reports):
             return [r for r in reports if "calls" in r]
 
-        def check_dispatches(reports, iterations=4):
+        seconds = {"ns": 1e-9, "us": 1e-6, "ms": 1e-3, "s": 1.0}
+
+        def check_dispatches(reports, iterations=4, batches=1):
             samples = dispatches(reports)
             assert len(samples) == 2, reports
             assert sorted(r["calls"] for r in samples) == [1, 2], samples
             assert all(r["iterations"] == iterations for r in samples), samples
             assert abs(sum(r["percent"] for r in samples) - 100) < 1e-6, samples
+            for r in samples:
+                # Per-call counters are in seconds; the row time is the
+                # per-iteration total of all calls in the row's time unit.
+                total = r["real_time"] * seconds[r["time_unit"]]
+                assert abs(r["mean"] * r["calls"] - total) <= 1e-6 * total, r
+                # Clocks with microsecond ticks can time a short call as 0.
+                assert 0 <= r["min"] <= r["mean"] <= r["max"] and r["max"] > 0, r
+                # The spread of per-call means needs two profiled batches.
+                if batches < 2:
+                    assert "stddev" not in r, r
+                else:
+                    assert 0 <= r["stddev"] <= r["max"] - r["min"], r
 
         # Flags the build does not register pass through, as in the other
         # benchmark tools.
         benchmark(sync, "--not_a_registered_flag=1")
+        # With --benchmark_min_time=4x a pass runs four loop iterations of one
+        # invocation, or one of four batched invocations.
         for module, batch in ((sync, 1), (async_module, 4), (repeated, 4)):
             check_dispatches(
-                rows(module, "--dispatch_statistics", "--batch_size=" + str(batch))
+                rows(module, "--dispatch_statistics", "--batch_size=" + str(batch)),
+                batches=4 // batch,
             )
             result = benchmark(
                 module,
@@ -169,7 +186,7 @@ def main():
                 "--benchmark_out=" + str(output),
                 *aggregate_flag
             )
-            check_dispatches(reports, iterations=8)
+            check_dispatches(reports, iterations=8, batches=8)
             assert reports == json.loads(output.read_text())["benchmarks"]
         result = benchmark(
             sync,
