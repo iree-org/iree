@@ -6,6 +6,62 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-edge-reshape-propagation=true}))" %s -o - --split-input-file | FileCheck %s --check-prefix=ENABLE-EDGE-PROP
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-sink-transpose-through-pad=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK-PAD
 
+// A transpose fuses into the dequantize's output map. The output map is
+// already permuted and the transpose permutation is not its own inverse, so the
+// fused map is their composition in transpose order. The input and scale maps
+// are unchanged.
+util.func public @fuse_transpose_into_dequantize(%q: tensor<2x3x4xi8>,
+    %scale: tensor<2xf32>) -> tensor<4x3x2xf32> {
+  %init = tensor.empty() : tensor<3x2x4xf32>
+  %d = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d0)>,
+                        affine_map<(d0, d1, d2) -> (d1, d0, d2)>]}
+      ins(%q, %scale : tensor<2x3x4xi8>, tensor<2xf32>)
+      outs(%init : tensor<3x2x4xf32>) -> tensor<3x2x4xf32>
+  %transpose_init = tensor.empty() : tensor<4x3x2xf32>
+  %t = linalg.transpose ins(%d : tensor<3x2x4xf32>)
+      outs(%transpose_init : tensor<4x3x2xf32>) permutation = [2, 0, 1]
+  util.return %t : tensor<4x3x2xf32>
+}
+//   CHECK-DAG: #[[$IN_MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//   CHECK-DAG: #[[$SCALE_MAP:.+]] = affine_map<(d0, d1, d2) -> (d0)>
+//   CHECK-DAG: #[[$OUT_MAP:.+]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
+// CHECK-LABEL: util.func public @fuse_transpose_into_dequantize(
+//  CHECK-SAME:     %[[Q:[a-zA-Z0-9_]+]]: tensor<2x3x4xi8>
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     indexing_maps = [#[[$IN_MAP]], #[[$SCALE_MAP]], #[[$OUT_MAP]]]
+//  CHECK-SAME:     ins(%[[Q]]
+//  CHECK-SAME:     -> tensor<4x3x2xf32>
+//   CHECK-NOT:   linalg.transpose
+
+// -----
+
+// A transpose does not fuse when the dequantize has another consumer, since the
+// untransposed dequantize would have to stay for that consumer.
+util.func public @decline_transpose_into_multi_use_dequantize(%q: tensor<2x3xi8>,
+    %scale: f32) -> (tensor<3x2xf32>, tensor<2x3xf32>) {
+  %init = tensor.empty() : tensor<2x3xf32>
+  %d = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>]}
+      ins(%q, %scale : tensor<2x3xi8>, f32)
+      outs(%init : tensor<2x3xf32>) -> tensor<2x3xf32>
+  %transpose_init = tensor.empty() : tensor<3x2xf32>
+  %t = linalg.transpose ins(%d : tensor<2x3xf32>)
+      outs(%transpose_init : tensor<3x2xf32>) permutation = [1, 0]
+  util.return %t, %d : tensor<3x2xf32>, tensor<2x3xf32>
+}
+// CHECK-LABEL: util.func public @decline_transpose_into_multi_use_dequantize(
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     -> tensor<2x3xf32>
+//       CHECK:   %[[T:.+]] = linalg.transpose ins(%[[DEQ]]
+//       CHECK:   util.return %[[T]], %[[DEQ]]
+
+// -----
+
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
   %transposed = linalg.generic {indexing_maps = [

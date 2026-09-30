@@ -55,6 +55,12 @@ void populateBubbleTransposeThroughUnaryElementwiseDpsInitPattern(
     RewritePatternSet &patterns, ControlTransposePropagationFn controlFn,
     PatternBenefit benefit = 1);
 
+// Fuses a transpose into its single-use iree_linalg_ext.dequantize_affine
+// producer by permuting the dequantize's output map.
+void populateFuseTransposeIntoDequantizePattern(
+    RewritePatternSet &patterns, ControlTransposePropagationFn controlFn,
+    PatternBenefit benefit = 1);
+
 //===----------------------------------------------------------------------===//
 // Transpose sinking patterns
 //===----------------------------------------------------------------------===//
