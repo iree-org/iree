@@ -30,6 +30,10 @@ name: Workflow Summary
 on:
   workflow_call:
     inputs:
+        ci-deferred:
+          type: boolean
+          default: false
+          description: Whether CI is deferred for an upper stack PR.
         jobs-json:
           type: string
           description: The output of `toJson(needs)`
@@ -54,6 +58,13 @@ jobs:
             echo "The following jobs failed: ${FAILED_JOBS}"
             exit 1
           fi
+      - name: Require CI before merging
+        if: inputs.ci-deferred
+        run: |
+          message="CI is deferred. This PR must become the lowest unmerged PR in its stack and pass CI before merging."
+          echo "::error::${message}"
+          echo "${message}" >> "${GITHUB_STEP_SUMMARY}"
+          exit 1
       - name: Post to Discord on Failure
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0
         if: failure() && github.ref_name == 'main' && github.repository_owner == 'iree-org'

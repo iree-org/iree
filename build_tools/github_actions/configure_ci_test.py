@@ -13,6 +13,22 @@ import configure_ci
 
 
 class ConfigureCITest(unittest.TestCase):
+    def test_is_upper_stack_pr(self):
+        self.assertFalse(configure_ci.is_upper_stack_pr({"base": {"ref": "main"}}))
+        self.assertFalse(configure_ci.is_upper_stack_pr({"stack": None}))
+        for base, trunk, position, expected in [
+            ("main", "main", 1, False),
+            ("parent", "main", 2, True),
+            ("main", "main", 2, False),
+            ("release", "release", 3, False),
+        ]:
+            with self.subTest(base=base, trunk=trunk, position=position):
+                pr = {
+                    "base": {"ref": base},
+                    "stack": {"base": {"ref": trunk}, "position": position},
+                }
+                self.assertEqual(configure_ci.is_upper_stack_pr(pr), expected)
+
     def test_parse_jobs_trailer(self):
         trailers = {"key": "job1,job2"}
         key = "key"
