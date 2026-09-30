@@ -58,6 +58,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cinttypes>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -70,6 +71,7 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
+#include "iree/base/threading/mutex.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/hal/api.h"
 #include "iree/hal/replay/recorder.h"
@@ -112,7 +114,9 @@ IREE_FLAG(
     "time spent in that function per benchmark iteration. The rows come from\n"
     "a separate untimed pass that reruns the benchmark with a lightweight HAL\n"
     "profiling session active after each measured repetition. Dispatch rows\n"
-    "average all profiled repetitions. Requires a backend whose lightweight\n"
+    "average all profiled repetitions and also report, in seconds, the mean,\n"
+    "min and max duration of one call and the stddev of the per-call mean\n"
+    "across profiled batches. Requires a backend whose lightweight\n"
     "profiling attributes dispatches in existing command buffers (currently\n"
     "local-task and local-sync); elsewhere the session fails to start or the\n"
     "rows are missing with a warning. Cannot combine with\n"
@@ -248,10 +252,45 @@ static void PrintBenchmarkModuleAgentMarkdown(FILE* file) {
 // The runner uses the same workload for measurement and profiling.
 enum class InvocationKind { kSync, kAsync, kDispatch };
 
+// Running mean and variance of a series (Welford's method).
+struct RunningStats {
+  uint64_t count = 0;
+  double mean = 0.0;
+  double m2 = 0.0;
+
+  void Add(double value) {
+    ++count;
+    const double delta = value - mean;
+    mean += delta / count;
+    m2 += delta * (value - mean);
+  }
+  // Combines the statistics of a disjoint series (Chan et al.).
+  void Merge(const RunningStats& other) {
+    if (!other.count) return;
+    if (!count) {
+      *this = other;
+      return;
+    }
+    const double total = static_cast<double>(count + other.count);
+    const double delta = other.mean - mean;
+    mean += delta * other.count / total;
+    m2 += other.m2 + delta * delta * count * other.count / total;
+    count += other.count;
+  }
+  double stddev() const {
+    return count > 1 ? std::sqrt(m2 / (count - 1)) : 0.0;
+  }
+};
+
 struct DispatchRow {
   uint64_t calls = 0;
   uint64_t duration_ns = 0;
   uint64_t tile_duration_ns = 0;
+  // Shortest and longest single call.
+  uint64_t min_ns = UINT64_MAX;
+  uint64_t max_ns = 0;
+  // Per-call mean of each profiled batch (loop iteration of the benchmark).
+  RunningStats batch_means;
 };
 
 // Per-dispatch results accumulated over all profiled repetitions.
@@ -353,6 +392,81 @@ struct Batch {
   }
 };
 
+// Forwards profile chunks to a statistics sink under a lock. The statistics
+// sink does not synchronize readers with producers, which may write from their
+// own threads, and the profiler reads its rows between batches.
+struct LockedStatisticsSink {
+  iree_hal_resource_t resource;
+  iree_slim_mutex_t mutex;
+  iree_hal_profile_statistics_sink_t* statistics = nullptr;
+
+  static iree_status_t Create(LockedStatisticsSink** out_sink) {
+    static const iree_hal_profile_sink_vtable_t vtable = {
+        /*.destroy=*/Destroy,
+        /*.begin_session=*/BeginSession,
+        /*.write=*/Write,
+        /*.end_session=*/EndSession,
+    };
+    auto sink = std::make_unique<LockedStatisticsSink>();
+    IREE_RETURN_IF_ERROR(iree_hal_profile_statistics_sink_create(
+        iree_allocator_system(), &sink->statistics));
+    iree_slim_mutex_initialize(&sink->mutex);
+    iree_hal_resource_initialize(&vtable, &sink->resource);
+    *out_sink = sink.release();
+    return iree_ok_status();
+  }
+
+  iree_hal_profile_sink_t* base() {
+    return reinterpret_cast<iree_hal_profile_sink_t*>(this);
+  }
+  iree_hal_profile_sink_t* forward() {
+    return iree_hal_profile_statistics_sink_base(statistics);
+  }
+  static LockedStatisticsSink* Cast(iree_hal_profile_sink_t* sink) {
+    return reinterpret_cast<LockedStatisticsSink*>(sink);
+  }
+
+ private:
+  static void Destroy(iree_hal_profile_sink_t* base_sink) {
+    LockedStatisticsSink* sink = Cast(base_sink);
+    iree_hal_profile_statistics_sink_release(sink->statistics);
+    iree_slim_mutex_deinitialize(&sink->mutex);
+    delete sink;
+  }
+  static iree_status_t BeginSession(
+      iree_hal_profile_sink_t* base_sink,
+      const iree_hal_profile_chunk_metadata_t* metadata) {
+    LockedStatisticsSink* sink = Cast(base_sink);
+    iree_slim_mutex_lock(&sink->mutex);
+    iree_status_t status =
+        iree_hal_profile_sink_begin_session(sink->forward(), metadata);
+    iree_slim_mutex_unlock(&sink->mutex);
+    return status;
+  }
+  static iree_status_t Write(iree_hal_profile_sink_t* base_sink,
+                             const iree_hal_profile_chunk_metadata_t* metadata,
+                             iree_host_size_t iovec_count,
+                             const iree_const_byte_span_t* iovecs) {
+    LockedStatisticsSink* sink = Cast(base_sink);
+    iree_slim_mutex_lock(&sink->mutex);
+    iree_status_t status = iree_hal_profile_sink_write(
+        sink->forward(), metadata, iovec_count, iovecs);
+    iree_slim_mutex_unlock(&sink->mutex);
+    return status;
+  }
+  static iree_status_t EndSession(
+      iree_hal_profile_sink_t* base_sink,
+      const iree_hal_profile_chunk_metadata_t* metadata,
+      iree_status_code_t session_status_code) {
+    LockedStatisticsSink* sink = Cast(base_sink);
+    iree_slim_mutex_lock(&sink->mutex);
+    iree_status_t status = iree_hal_profile_sink_end_session(
+        sink->forward(), metadata, session_status_code);
+    iree_slim_mutex_unlock(&sink->mutex);
+    return status;
+  }
+};
+
 // Runs a lightweight HAL statistics session on every device during Google
 // Benchmark's untimed profiling pass, which reruns the registered benchmark
 // after each measured repetition, and adds the per-dispatch rows to the
@@ -392,6 +506,23 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
     return std::exchange(status_, iree_ok_status());
   }
 
+  // Adds the per-call mean of each function's calls since the previous batch.
+  // Called after each flushed batch of the profiling pass.
+  void SampleBatch() {
+    std::map<std::string, DispatchRow> totals;
+    if (!Check(Collect(&totals, /*unscaled_rows=*/nullptr))) return;
+    for (const auto& [key, total] : totals) {
+      DispatchRow& previous = batch_totals_[key];
+      const uint64_t calls = total.calls - previous.calls;
+      if (calls) {
+        pass_batch_means_[key].Add(
+            static_cast<double>(total.duration_ns - previous.duration_ns) /
+            calls);
+      }
+      previous = total;
+    }
+  }
+
   void AfterSetupStart() override {
     in_pass_ = true;
     Check(Begin());
@@ -415,11 +546,12 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
   }
 
   iree_status_t Begin() {
-    IREE_RETURN_IF_ERROR(iree_hal_profile_statistics_sink_create(
-        iree_allocator_system(), &sink_));
+    batch_totals_.clear();
+    pass_batch_means_.clear();
+    IREE_RETURN_IF_ERROR(LockedStatisticsSink::Create(&sink_));
     iree_hal_device_profiling_options_t options = {};
     options.flags = IREE_HAL_DEVICE_PROFILING_FLAG_LIGHTWEIGHT_STATISTICS;
-    options.sink = iree_hal_profile_statistics_sink_base(sink_);
+    options.sink = sink_->base();
     return iree_hal_profiling_session_begin(
         devices_->count, devices_->devices, &options,
         /*external_options=*/nullptr, /*flush_interval_ms=*/0,
@@ -432,21 +564,45 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
         iree_hal_profiling_session_end(std::exchange(session_, nullptr));
     if (!sink_) return status;
     if (workload && iree_status_is_ok(status)) {
-      workload->profile.dropped_records +=
-          iree_hal_profile_statistics_sink_dropped_record_count(sink_);
-      Collector collector = {sink_, &workload->profile};
-      iree_hal_profile_statistics_row_callback_t callback = {CollectRow,
-                                                             &collector};
-      status = iree_hal_profile_statistics_sink_for_each_row(sink_, callback);
+      DispatchProfile& profile = workload->profile;
+      profile.dropped_records +=
+          iree_hal_profile_statistics_sink_dropped_record_count(
+              sink_->statistics);
+      std::map<std::string, DispatchRow> totals;
+      status = Collect(&totals, &profile.unscaled_rows);
+      for (const auto& [key, total] : totals) {
+        DispatchRow& result = profile.rows[key];
+        result.calls += total.calls;
+        result.duration_ns += total.duration_ns;
+        result.tile_duration_ns += total.tile_duration_ns;
+        result.min_ns = std::min(result.min_ns, total.min_ns);
+        result.max_ns = std::max(result.max_ns, total.max_ns);
+        result.batch_means.Merge(pass_batch_means_[key]);
+      }
     }
-    iree_hal_profile_statistics_sink_release(std::exchange(sink_, nullptr));
+    iree_hal_profile_sink_release(std::exchange(sink_, nullptr)->base());
     return status;
   }
 
   struct Collector {
     iree_hal_profile_statistics_sink_t* sink;
-    DispatchProfile* profile;
+    std::map<std::string, DispatchRow>* totals;
+    uint64_t unscaled_rows;
   };
+
+  // Sums the current function rows of all devices by function name.
+  iree_status_t Collect(std::map<std::string, DispatchRow>* out_totals,
+                        uint64_t* unscaled_rows) {
+    Collector collector = {sink_->statistics, out_totals, 0};
+    iree_hal_profile_statistics_row_callback_t callback = {CollectRow,
+                                                           &collector};
+    iree_slim_mutex_lock(&sink_->mutex);
+    iree_status_t status = iree_hal_profile_statistics_sink_for_each_row(
+        sink_->statistics, callback);
+    iree_slim_mutex_unlock(&sink_->mutex);
+    if (unscaled_rows) *unscaled_rows += collector.unscaled_rows;
+    return status;
+  }
 
   static iree_status_t CollectRow(
       void* data, const iree_hal_profile_statistics_row_t* row) {
@@ -457,12 +613,16 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
             IREE_HAL_PROFILE_STATISTICS_ROW_TYPE_HOST_EXECUTION_FUNCTION) {
       return iree_ok_status();
     }
-    uint64_t duration = 0;
+    uint64_t duration = 0, min_ns = 0, max_ns = 0;
     if (!iree_all_bits_set(row->flags,
                            IREE_HAL_PROFILE_STATISTICS_ROW_FLAG_TIMING) ||
         !iree_hal_profile_statistics_sink_scale_duration_to_ns(
-            collector.sink, row, row->total_duration, &duration)) {
-      ++collector.profile->unscaled_rows;
+            collector.sink, row, row->total_duration, &duration) ||
+        !iree_hal_profile_statistics_sink_scale_duration_to_ns(
+            collector.sink, row, row->minimum_duration, &min_ns) ||
+        !iree_hal_profile_statistics_sink_scale_duration_to_ns(
+            collector.sink, row, row->maximum_duration, &max_ns)) {
+      ++collector.unscaled_rows;
       return iree_ok_status();
     }
     iree_string_view_t name;
@@ -474,9 +634,11 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
       key = "executable_" + std::to_string(row->executable_id) + "_function_" +
             std::to_string(row->function_ordinal);
     }
-    DispatchRow& result = collector.profile->rows[key];
+    DispatchRow& result = (*collector.totals)[key];
     result.calls += row->sample_count;
     result.duration_ns += duration;
+    result.min_ns = std::min(result.min_ns, min_ns);
+    result.max_ns = std::max(result.max_ns, max_ns);
     if (iree_all_bits_set(row->flags,
                           IREE_HAL_PROFILE_STATISTICS_ROW_FLAG_TILE_TOTALS)) {
       result.tile_duration_ns += row->tile_duration_sum_ns;
@@ -486,7 +648,11 @@ class DispatchProfiler final : public benchmark::ProfilerManager {
 
   iree_hal_device_list_t* devices_ = nullptr;
   iree_hal_profiling_session_t* session_ = nullptr;
-  iree_hal_profile_statistics_sink_t* sink_ = nullptr;
+  LockedStatisticsSink* sink_ = nullptr;
+  // Function totals at the previous batch of the running pass.
+  std::map<std::string, DispatchRow> batch_totals_;
+  // Per-call batch means of the running pass, merged if the pass completes.
+  std::map<std::string, RunningStats> pass_batch_means_;
   Workload* workload_ = nullptr;
   benchmark::State* state_ = nullptr;
   bool in_pass_ = false;
@@ -794,6 +960,7 @@ class BenchmarkSession {
         batch = {};
       }
       if (pause && Check(iree_hal_profiling_session_flush(profiling))) {
+        if (profiling_pass) profiler_->SampleBatch();
         state.ResumeTiming();
       }
     }
@@ -891,6 +1058,15 @@ class DispatchReporter : public benchmark::BenchmarkReporter {
       run.cpu_accumulated_time = row.tile_duration_ns * 1e-9;
       run.counters["calls"] = static_cast<double>(row.calls) / run.iterations;
       run.counters["percent"] = total ? 100.0 * row.duration_ns / total : 0;
+      // Per-call statistics in seconds.
+      if (row.calls) {
+        run.counters["mean"] = 1e-9 * row.duration_ns / row.calls;
+        run.counters["min"] = 1e-9 * row.min_ns;
+        run.counters["max"] = 1e-9 * row.max_ns;
+      }
+      if (row.batch_means.count > 1) {
+        run.counters["stddev"] = 1e-9 * row.batch_means.stddev();
+      }
       reports.push_back(std::move(run));
     }
   }

@@ -134,15 +134,24 @@ $ ./bazel-bin/tools/iree-benchmark-module \
 ------------------------------------------------------------------------------------------------------
 Benchmark                                            Time             CPU   Iterations UserCounters...
 ------------------------------------------------------------------------------------------------------
-BM_main/process_time/real_time                   0.066 ms        0.098 ms        13876 items_per_second=15.1222k/s
-BM_main/main_dispatch_0_matmul_64x64x64_f32      0.020 ms        0.027 ms        13876 calls=2 percent=80.5021
-BM_main/main_dispatch_2_matmul_64x32x64_f32      0.005 ms        0.007 ms        13876 calls=1 percent=19.4979
+BM_main/process_time/real_time                   0.041 ms        0.161 ms        17187 items_per_second=24.622k/s
+BM_main/main_dispatch_0_matmul_64x64x64_f32      0.006 ms        0.014 ms        17187 calls=2 max=18u mean=3.18875u min=1u percent=80.0628 stddev=643.686n
+BM_main/main_dispatch_2_matmul_64x32x64_f32      0.002 ms        0.005 ms        17187 calls=1 max=6u mean=1.58812u min=0 percent=19.9372 stddev=690.381n
 ```
 
 Dispatch rows report the time spent in that function per benchmark iteration,
 `calls` is the number of dispatches per iteration, and `percent` is the
 function's share of all dispatch time. On CPU devices the `CPU` column is the
 worker time summed over all tiles of the dispatches.
+
+`mean`, `min` and `max` describe a single call and are in seconds, so `3.19u`
+is 3.19 µs. `stddev` is the standard deviation of the per-call mean across
+profiled batches, one per benchmark loop iteration, and appears once there are
+two batches. For a function that runs once per batch it is the call-to-call
+deviation; for one that runs several times it is smaller. Local backends time
+calls with the host clock, which ticks in microseconds on macOS, so `min`,
+`max` and the spread of dispatches that take a few microseconds are coarse
+there.
 
 After each measured repetition, Google Benchmark reruns the same function and
 batch schedule with a lightweight HAL profiling session on every device. The

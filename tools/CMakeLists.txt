@@ -94,6 +94,7 @@ if(IREE_BUILD_BENCHMARKS)
     DEPS
       benchmark
       iree::base
+      iree::base::threading
       iree::base::tooling::flags
       iree::hal
       iree::hal::replay::recorder
