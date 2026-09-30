@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 
@@ -135,7 +136,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   SmallVector<OpFoldResult> newShape = linalg::PackOp::getResultShape(
       rewriter, loc, sourceDims, *innerTileSizesOfr, encodingInfo.innerDimsPos,
       encodingInfo.outerDimsPerm);
-  newShape = getSwizzledShape(newShape, encodingInfo);
+  newShape = getSwizzledShape(rewriter, loc, newShape, encodingInfo);
   Operation *newEmptyOp = tensor::EmptyOp::create(rewriter, loc, newShape,
                                                   emptyType.getElementType());
   return newEmptyOp;
@@ -626,17 +627,44 @@ struct SetEncodingOpLoweringConversion
     Location loc = encodingOp.getLoc();
     int origRank = encodingOp.getSourceType().getRank();
 
+    // Materialize the expanded tile dims: static dims become index
+    // attributes, scalable dims (e.g., SVE, with a runtime extent of
+    // `base * vscale`) become dynamic values. In types, scalable dims are
+    // `kDynamic` so the expand_shape result stays consistent with the
+    // dynamic packed dim produced by the pack op.
+    SmallVector<std::pair<int64_t, bool>> expandedTileDims =
+        getExpandedTileShapeWithScalableFlags(
+            encodingInfo.swizzle->expandShape());
+    Value vscale;
+    auto tileDimValue = [&](int64_t base, bool scalable) -> OpFoldResult {
+      if (!scalable) {
+        return rewriter.getIndexAttr(base);
+      }
+      if (!vscale) {
+        vscale = vector::VectorScaleOp::create(rewriter, loc);
+      }
+      Value baseVal = arith::ConstantIndexOp::create(rewriter, loc, base);
+      return arith::MulIOp::create(rewriter, loc, baseVal, vscale).getResult();
+    };
+
     // Final shape after the swizzle is applied: outer dims + permuted
-    // expand-shape inner tile.
-    SmallVector<int64_t> permutedInnerShape =
-        getExpandedTileShape(encodingInfo.swizzle->expandShape());
-    applyPermutationToVector(permutedInnerShape,
+    // expand-shape inner tile. Scalable tile dims are dynamic in the type.
+    SmallVector<std::pair<int64_t, bool>> permutedInnerDims(expandedTileDims);
+    applyPermutationToVector(permutedInnerDims,
                              encodingInfo.swizzle->permutation());
     SmallVector<int64_t> finalShape(cast<ShapedType>(packedValue->getType())
                                         .getShape()
                                         .take_front(origRank));
-    finalShape.append(permutedInnerShape);
+    for (auto [size, scalable] : permutedInnerDims) {
+      finalShape.push_back(scalable ? ShapedType::kDynamic : size);
+    }
     RankedTensorType finalType = encodingOp.getSourceType().clone(finalShape);
+
+    // Output shape operands for the expand_shape: outer dim sizes come from
+    // the packed value; tile dims come from `tileDimValue`.
+    SmallVector<OpFoldResult> outputShape =
+        tensor::getMixedSizes(rewriter, loc, packedValue.value());
+    outputShape.truncate(origRank);
 
     // Fast path: when the permutation is a layout no-op and the fold is
     // expressible as a single reshape, replace expand_shape + transpose with
@@ -647,8 +675,13 @@ struct SetEncodingOpLoweringConversion
       if (auto reassoc = getSwizzleFoldedReassociation(
               origRank, encodingInfo.innerTileSizes, *encodingInfo.swizzle);
           succeeded(reassoc)) {
+        SmallVector<OpFoldResult> permutedOutputShape(outputShape);
+        for (auto [size, scalable] : permutedInnerDims) {
+          permutedOutputShape.push_back(tileDimValue(size, scalable));
+        }
         auto expandShapeOp = tensor::ExpandShapeOp::create(
-            rewriter, loc, finalType, packedValue.value(), *reassoc);
+            rewriter, loc, finalType, packedValue.value(), *reassoc,
+            permutedOutputShape);
         rewriter.replaceOp(encodingOp, expandShapeOp.getResult());
         return success();
       }
@@ -660,15 +693,20 @@ struct SetEncodingOpLoweringConversion
         cast<ShapedType>(packedValue->getType())
             .getShape()
             .take_front(origRank));
-    expandShapeShape.append(
-        getExpandedTileShape(encodingInfo.swizzle->expandShape()));
+    for (auto [size, scalable] : expandedTileDims) {
+      expandShapeShape.push_back(scalable ? ShapedType::kDynamic : size);
+    }
     RankedTensorType expandShapeType =
         encodingOp.getSourceType().clone(expandShapeShape);
 
     SmallVector<ReassociationIndices> reassociation =
         getReassociationIndices(origRank, encodingInfo.swizzle->expandShape());
+    for (auto [size, scalable] : expandedTileDims) {
+      outputShape.push_back(tileDimValue(size, scalable));
+    }
     auto expandShapeOp = tensor::ExpandShapeOp::create(
-        rewriter, loc, expandShapeType, packedValue.value(), reassociation);
+        rewriter, loc, expandShapeType, packedValue.value(), reassociation,
+        outputShape);
 
     SmallVector<int64_t> transposePerm =
         llvm::to_vector(llvm::seq<int64_t>(0, origRank));
@@ -715,8 +753,16 @@ struct UnsetEncodingOpLoweringConversion
           cast<RankedTensorType>(adaptor.getSource().getType());
       SmallVector<int64_t> unpackSrcShape(
           srcConvertedType.getShape().take_front(targetRank));
-      unpackSrcShape.append(encodingInfo.innerTileSizes.begin(),
-                            encodingInfo.innerTileSizes.end());
+      // Scalable inner tiles (e.g., SVE) have a runtime extent of
+      // `base * vscale`, so the collapsed tile dims must stay dynamic to
+      // match what `tensor.collapse_shape` infers from the dynamic source.
+      for (auto [i, tileSize] :
+           llvm::enumerate(encodingInfo.innerTileSizes)) {
+        bool scalable = encodingInfo.scalableTiles &&
+                        i < encodingInfo.scalableTiles->size() &&
+                        (*encodingInfo.scalableTiles)[i];
+        unpackSrcShape.push_back(scalable ? ShapedType::kDynamic : tileSize);
+      }
       RankedTensorType unpackSrcType =
           unsetEncodingOp.getResultType().clone(unpackSrcShape);
 
@@ -735,9 +781,20 @@ struct UnsetEncodingOpLoweringConversion
         SmallVector<OpFoldResult> emptyShape =
             tensor::getMixedSizes(rewriter, loc, adaptor.getSource());
         emptyShape.resize(targetRank);
-        for (auto i :
-             getExpandedTileShape(encodingInfo.swizzle->expandShape())) {
-          emptyShape.push_back(rewriter.getIndexAttr(i));
+        Value unsetVscale;
+        for (auto [size, scalable] : getExpandedTileShapeWithScalableFlags(
+                 encodingInfo.swizzle->expandShape())) {
+          if (!scalable) {
+            emptyShape.push_back(rewriter.getIndexAttr(size));
+            continue;
+          }
+          if (!unsetVscale) {
+            unsetVscale = vector::VectorScaleOp::create(rewriter, loc);
+          }
+          Value baseVal = arith::ConstantIndexOp::create(rewriter, loc, size);
+          emptyShape.push_back(
+              arith::MulIOp::create(rewriter, loc, baseVal, unsetVscale)
+                  .getResult());
         }
         auto emptyTensor = tensor::EmptyOp::create(
             rewriter, loc, emptyShape,
