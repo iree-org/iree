@@ -244,6 +244,7 @@ EXPORTS
   mlirAttributeIsADenseIntElements
   mlirAttributeIsADenseResourceElements
   mlirAttributeIsADictionary
+  mlirAttributeIsADynamicAttr
   mlirAttributeIsAElements
   mlirAttributeIsAFlatSymbolRef
   mlirAttributeIsAFloat
@@ -442,6 +443,7 @@ EXPORTS
   mlirDialectHandleInsertDialect
   mlirDialectHandleLoadDialect
   mlirDialectHandleRegisterDialect
+  mlirDialectIsAExtensibleDialect
   mlirDialectRegistryCreate
   mlirDialectRegistryDestroy
   mlirDictionaryAttrGet
@@ -451,6 +453,31 @@ EXPORTS
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
   mlirDistinctAttrCreate
+  mlirDynamicAttrDefinitionGetDialect
+  mlirDynamicAttrDefinitionGetName
+  mlirDynamicAttrDefinitionGetTypeID
+  mlirDynamicAttrGet
+  mlirDynamicAttrGetAttrDef
+  mlirDynamicAttrGetNumParams
+  mlirDynamicAttrGetParam
+  mlirDynamicOpTraitAttach
+  mlirDynamicOpTraitCreate
+  mlirDynamicOpTraitDestroy
+  mlirDynamicOpTraitIsIsolatedFromAboveCreate
+  mlirDynamicOpTraitIsIsolatedFromAboveGetTypeID
+  mlirDynamicOpTraitIsTerminatorCreate
+  mlirDynamicOpTraitIsTerminatorGetTypeID
+  mlirDynamicOpTraitNoTerminatorCreate
+  mlirDynamicOpTraitNoTerminatorGetTypeID
+  mlirDynamicOpTraitRecursiveMemoryEffectsCreate
+  mlirDynamicOpTraitRecursiveMemoryEffectsGetTypeID
+  mlirDynamicTypeDefinitionGetDialect
+  mlirDynamicTypeDefinitionGetName
+  mlirDynamicTypeDefinitionGetTypeID
+  mlirDynamicTypeGet
+  mlirDynamicTypeGetNumParams
+  mlirDynamicTypeGetParam
+  mlirDynamicTypeGetTypeDef
   mlirElementsAttrGetNumElements
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
@@ -458,6 +485,8 @@ EXPORTS
   mlirEmitRemark
   mlirEmitWarning
   mlirEnableGlobalDebug
+  mlirExtensibleDialectLookupAttrDefinition
+  mlirExtensibleDialectLookupTypeDefinition
   mlirExternalPassSignalFailure
   mlirF16TypeGet
   mlirF16TypeGetName
@@ -1117,6 +1146,8 @@ EXPORTS
   mlirTransformStateForEachParam
   mlirTransformStateForEachPayloadOp
   mlirTransformStateForEachPayloadValue
+  mlirTranslateModuleToLLVMIR
+  mlirTranslateModuleToLLVMIRToString
   mlirTupleTypeGet
   mlirTupleTypeGetName
   mlirTupleTypeGetNumTypes
@@ -1137,6 +1168,9 @@ EXPORTS
   mlirTypeConverterDestroy
   mlirTypeDump
   mlirTypeEqual
+  mlirTypeFromLLVMIRTranslatorCreate
+  mlirTypeFromLLVMIRTranslatorDestroy
+  mlirTypeFromLLVMIRTranslatorTranslateType
   mlirTypeGetContext
   mlirTypeGetDialect
   mlirTypeGetTypeID
@@ -1148,6 +1182,7 @@ EXPORTS
   mlirTypeIDHashValue
   mlirTypeIsABF16
   mlirTypeIsAComplex
+  mlirTypeIsADynamicType
   mlirTypeIsAF16
   mlirTypeIsAF32
   mlirTypeIsAF64
@@ -1196,6 +1231,9 @@ EXPORTS
   mlirTypeIsAVector
   mlirTypeParseGet
   mlirTypePrint
+  mlirTypeToLLVMIRTranslatorCreate
+  mlirTypeToLLVMIRTranslatorDestroy
+  mlirTypeToLLVMIRTranslatorTranslateType
   mlirUnitAttrGet
   mlirUnitAttrGetName
   mlirUnitAttrGetTypeID
