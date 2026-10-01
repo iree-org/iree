@@ -212,7 +212,7 @@ static iree_status_t iree_tooling_run_function(
   }
 
   // Begin profiling immediately prior to invocation.
-  iree_hal_profiling_from_flags_t* profiling = NULL;
+  iree_hal_profiling_session_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
         iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling),
@@ -242,7 +242,7 @@ static iree_status_t iree_tooling_run_function(
   if (profiling) {
     status = iree_status_join(
         status,
-        iree_status_annotate_f(iree_hal_end_profiling_from_flags(profiling),
+        iree_status_annotate_f(iree_hal_profiling_session_end(profiling),
                                "ending device profiling"));
   }
 

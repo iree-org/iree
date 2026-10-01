@@ -95,6 +95,11 @@ iree_status_t iree_tooling_find_single_exported_function(
 iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
                                            iree_vm_instance_t** out_instance);
 
+// Returns true if --device_replay_output= requests a HAL replay capture. Tools
+// can reject conflicting flags with this before context creation opens and
+// truncates the capture file.
+bool iree_tooling_device_replay_capture_requested(void);
+
 // Creates a new VM context with the provided |user_modules| and dependent
 // system modules. The provided user module order is preserved.
 // The context is returned frozen.
