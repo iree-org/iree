@@ -275,11 +275,8 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
   options.memCpyFn = memCpyFn;
-  // Turning off checkParallelRegions assumes that we are not relying too much
-  // on bufferization being conservative. If we are, then this could cause race
-  // conditions. Turning this option off could be a good step in diagnosing
-  // data races on GPU.
-  options.checkParallelRegions = false;
+  // Disable parallel-region conflict checks to avoid conservative copies.
+  options.mayHaveParallelRegions = false;
 
   // Place constants in the GPU constant address space to enable
   // backend-specific optimizations (e.g., scalar reads on AMDGPU).

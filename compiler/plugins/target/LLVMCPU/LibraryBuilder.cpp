@@ -420,8 +420,9 @@ static llvm::Constant *createStringConstant(StringRef value,
                                           literal, /*Name=*/"");
   global->setAlignment(llvm::MaybeAlign(1));
   llvm::Constant *zero = llvm::ConstantInt::get(i32Type, 0);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      stringType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  return llvm::ConstantExpr::getGetElementPtr(
+      module->getDataLayout(), stringType, global,
+      ArrayRef<llvm::Constant *>{zero, zero}, llvm::GEPNoWrapFlags::inBounds());
 }
 
 // Creates a global NUL-terminated string constant or NULL if the string is
@@ -451,8 +452,9 @@ static llvm::Constant *createBufferConstant(StringRef name,
       /*isConstant=*/true, llvm::GlobalVariable::PrivateLinkage, literal, name);
   global->setAlignment(llvm::MaybeAlign(1));
   llvm::Constant *zero = llvm::ConstantInt::get(i32Type, 0);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      bufferType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  return llvm::ConstantExpr::getGetElementPtr(
+      module->getDataLayout(), bufferType, global,
+      ArrayRef<llvm::Constant *>{zero, zero}, llvm::GEPNoWrapFlags::inBounds());
 }
 
 // Creates a global constant with the given elements.
@@ -467,8 +469,9 @@ static llvm::Constant *createArrayConstant(StringRef name,
       *module, arrayType, /*isConstant=*/true,
       llvm::GlobalVariable::PrivateLinkage,
       llvm::ConstantArray::get(arrayType, elements), name);
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(
-      arrayType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  return llvm::ConstantExpr::getGetElementPtr(
+      module->getDataLayout(), arrayType, global,
+      ArrayRef<llvm::Constant *>{zero, zero}, llvm::GEPNoWrapFlags::inBounds());
 }
 
 //===----------------------------------------------------------------------===//

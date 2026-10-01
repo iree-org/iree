@@ -14,6 +14,7 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 def Stream_Dialect : Dialect {
+  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "stream";
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 

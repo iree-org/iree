@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -30,6 +31,30 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
+// Keep widening next to contractions so custom kernels can match narrow inputs.
+struct BubbleShapeCastThroughExtension : OpRewritePattern<vector::ShapeCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ShapeCastOp op,
+                                PatternRewriter &rewriter) const override {
+    Operation *extension = op.getSource().getDefiningOp();
+    if (!isa_and_nonnull<arith::ExtSIOp, arith::ExtUIOp, arith::ExtFOp,
+                         arith::SIToFPOp, arith::UIToFPOp>(extension)) {
+      return failure();
+    }
+    Value input = extension->getOperand(0);
+    auto inputType = cast<VectorType>(input.getType());
+    Value reshaped = vector::ShapeCastOp::create(
+        rewriter, op.getLoc(), op.getType().clone(inputType.getElementType()),
+        input);
+    Operation *newExtension = rewriter.clone(*extension);
+    newExtension->setOperand(0, reshaped);
+    newExtension->getResult(0).setType(op.getType());
+    rewriter.replaceOp(op, newExtension->getResults());
+    return success();
+  }
+};
+
 struct LLVMCPUMmt4dVectorLoweringPass
     : impl::LLVMCPUMmt4dVectorLoweringPassBase<LLVMCPUMmt4dVectorLoweringPass> {
   using Base::Base;
@@ -86,6 +111,9 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     }
 
     RewritePatternSet reductionToContractPatterns(&getContext());
+    vector::ShapeCastOp::getCanonicalizationPatterns(
+        reductionToContractPatterns, context);
+    reductionToContractPatterns.add<BubbleShapeCastThroughExtension>(context);
     vector::populateVectorReductionToContractPatterns(
         reductionToContractPatterns);
     vector::ExtractOp::getCanonicalizationPatterns(reductionToContractPatterns,
