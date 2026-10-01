@@ -20,6 +20,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def Flow_Dialect : Dialect {
+  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "flow";
   let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 

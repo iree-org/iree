@@ -14,6 +14,7 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 def IREECodegen_Dialect : Dialect {
+  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "iree_codegen";
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 

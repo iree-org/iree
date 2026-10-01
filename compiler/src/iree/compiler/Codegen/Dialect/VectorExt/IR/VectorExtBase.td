@@ -19,6 +19,7 @@ include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def IREEVectorExt_Dialect : Dialect {
+  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "iree_vector_ext";
   let cppNamespace = "::mlir::iree_compiler::IREE::VectorExt";
   let summary = [{
