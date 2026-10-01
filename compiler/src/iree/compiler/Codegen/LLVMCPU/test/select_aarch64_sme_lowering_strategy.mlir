@@ -67,7 +67,7 @@ func.func @transpose_unsupported_not_rank_2(%2: tensor<2x4x8xf32>) -> tensor<2x8
    } -> tensor<2x8x4xf32>
    return %4 : tensor<2x8x4xf32>
 }
-//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [2, 8, 4], vector_common_parallel = [1, [4], 4]>
+//   CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [2, 8, 4], vector_common_parallel = [1, 4, [4]]>
 //   CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //       CHECK: func.func @transpose_unsupported_not_rank_2
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
