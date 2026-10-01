@@ -85,9 +85,10 @@ struct DemoteContractionInputsPattern
       }
       auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(
           linalgOp.getOperation());
+      NamedAttrList attrs(namedOp->getAttrs());
+      attrs.erase("operandSegmentSizes");
       rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
-          linalgOp, demotedInputs, linalgOp.getDpsInits(),
-          linalg::getPrunedAttributeList(namedOp));
+          linalgOp, demotedInputs, linalgOp.getDpsInits(), attrs.getAttrs());
     };
 
     bool demoteMatmul = (demoteOperation == DemoteOperation::All) ||

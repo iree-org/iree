@@ -50,10 +50,10 @@ void replaceOpOutputs(T op, PatternRewriter &rewriter, Type srcType,
             linalg::YieldOp::create(b, loc, result);
           })
           ->getResult(0);
-  auto newLinalgOp =
-      T::create(rewriter, loc, op.getDpsInputs(), ValueRange{promoteOutput},
-                mlir::getPrunedAttributeList(
-                    op, {"operandSegmentSizes", "resultSegmentSizes"}));
+  NamedAttrList attrs(op->getAttrs());
+  attrs.erase("operandSegmentSizes");
+  auto newLinalgOp = T::create(rewriter, loc, op.getDpsInputs(),
+                               ValueRange{promoteOutput}, attrs.getAttrs());
   Value truncEmpty =
       tensor::EmptyOp::create(rewriter, loc, mixedSizes, srcType);
   rewriter.replaceOpWithNewOp<linalg::GenericOp>(

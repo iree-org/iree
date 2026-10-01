@@ -87,8 +87,11 @@ OperationEquivalenceCache::getOp(Operation *op) {
   }
   OperationEntry *entry = new OperationEntry();
   entry->attrs.append(op->getRawDictionaryAttrs().getValue());
-  if (op->getPropertiesStorageSize()) {
-    op->getName().populateInherentAttrs(op, entry->attrs);
+  Attribute properties = op->getPropertiesAsAttribute();
+  if (auto dict = dyn_cast_if_present<DictionaryAttr>(properties)) {
+    entry->attrs.append(dict.getValue());
+  } else {
+    entry->properties = properties;
   }
   ops[op] = entry;
   return *entry;
@@ -220,6 +223,10 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
 
   auto &lhsEntry = cache.getOp(&lhs);
   auto &rhsEntry = cache.getOp(&rhs);
+
+  if (lhsEntry.properties != rhsEntry.properties) {
+    return false;
+  }
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
   if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size()) {

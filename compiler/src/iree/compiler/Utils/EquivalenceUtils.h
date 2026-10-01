@@ -54,6 +54,7 @@ public:
 
   struct OperationEntry {
     NamedAttrList attrs;
+    Attribute properties;
   };
   OperationEntry &getOp(Operation *op);
 

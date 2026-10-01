@@ -74,6 +74,12 @@ compareCastCompatibleOperations(transform::TransformOpInterface transformOp,
            << payload->getAttrDictionary();
   }
 
+  if (target->getPropertiesAsAttribute() !=
+      payload->getPropertiesAsAttribute()) {
+    return transformOp.emitSilenceableError()
+           << "target properties do not match payload properties";
+  }
+
   if (target->getNumResults() != payload->getNumResults()) {
     return transformOp.emitSilenceableError() << "result count mismatch";
   }

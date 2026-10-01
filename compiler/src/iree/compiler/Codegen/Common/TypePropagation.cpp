@@ -208,9 +208,10 @@ struct NamedOpTypePropagation : TypePropagationPattern<OpTy> {
       Type legalizedType = this->getTypeConverter()->convertType(resultType);
       resultTypes.push_back(legalizedType);
     }
+    NamedAttrList attrs(namedOp->getAttrs());
+    attrs.erase("operandSegmentSizes");
     rewriter.replaceOpWithNewOp<OpTy>(namedOp, resultTypes, adaptor.getInputs(),
-                                      adaptor.getOutputs(),
-                                      linalg::getPrunedAttributeList(namedOp));
+                                      adaptor.getOutputs(), attrs.getAttrs());
     return success();
   }
 };
@@ -527,7 +528,10 @@ struct LegalizeResultElementType : ConversionPattern {
     for (auto successor : op->getSuccessors()) {
       state.addSuccessors(successor);
     }
-    Operation *newOp = rewriter.create(state);
+    Operation *newOp = rewriter.insert(Operation::create(
+        state.location, state.name, state.types, state.operands,
+        std::move(state.attributes), op->getPropertiesStorage(),
+        state.successors, state.regions));
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.

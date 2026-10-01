@@ -785,6 +785,9 @@ public:
     Value init = matmulOp.getDpsInitOperand(0)->get();
     rewriter.setInsertionPoint(matmulOp);
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
+    if (Attribute castAttr = matmulOp->getAttr("cast")) {
+      attrs.emplace_back(rewriter.getStringAttr("cast"), castAttr);
+    }
     rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
         matmulOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
     return success();
@@ -811,6 +814,9 @@ public:
     Value init = bmmOp.getDpsInitOperand(0)->get();
     rewriter.setInsertionPoint(bmmOp);
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
+    if (Attribute castAttr = bmmOp->getAttr("cast")) {
+      attrs.emplace_back(rewriter.getStringAttr("cast"), castAttr);
+    }
     rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
         bmmOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
     return success();

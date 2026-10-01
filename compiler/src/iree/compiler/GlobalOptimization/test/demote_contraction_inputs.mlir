@@ -445,7 +445,7 @@ util.func public @conv_2d_nchw_fchw_f32f32f32(%arg0 : tensor<1x16x130x130xf32>, 
 // BF16-CONV:             %[[VAL_12:.*]] = arith.truncf %[[VAL_10]] : f32 to bf16
 // BF16-CONV:             linalg.yield %[[VAL_12]] : bf16
 // BF16-CONV:           } -> tensor<512x16x3x3xbf16>
-// BF16-CONV:           %[[VAL_13:.*]] = linalg.conv_2d_nchw_fchw ins(%[[DEMOT1]], %[[DEMOT2]] : tensor<1x16x130x130xbf16>, tensor<512x16x3x3xbf16>)
+// BF16-CONV:           %[[VAL_13:.*]] = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%[[DEMOT1]], %[[DEMOT2]] : tensor<1x16x130x130xbf16>, tensor<512x16x3x3xbf16>)
 // BF16-CONV-SAME:      outs(%[[VAL_2]] : tensor<1x512x128x128xf32>) -> tensor<1x512x128x128xf32>
 
 // F16-CONV: #[[$ATTR_0:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -469,5 +469,18 @@ util.func public @conv_2d_nchw_fchw_f32f32f32(%arg0 : tensor<1x16x130x130xf32>, 
 // F16-CONV:             %[[VAL_12:.*]] = arith.truncf %[[VAL_10]] : f32 to f16
 // F16-CONV:             linalg.yield %[[VAL_12]] : f16
 // F16-CONV:           } -> tensor<512x16x3x3xf16>
-// F16-CONV:           %[[VAL_13:.*]] = linalg.conv_2d_nchw_fchw ins(%[[DEMOT1]], %[[DEMOT2]] : tensor<1x16x130x130xf16>, tensor<512x16x3x3xf16>)
+// F16-CONV:           %[[VAL_13:.*]] = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>} ins(%[[DEMOT1]], %[[DEMOT2]] : tensor<1x16x130x130xf16>, tensor<512x16x3x3xf16>)
 // F16-CONV-SAME:      outs(%[[VAL_2]] : tensor<1x512x128x128xf32>) -> tensor<1x512x128x128xf32>
+
+// -----
+
+// F16-CONV-LABEL: @preserve_conv_strides
+// F16-CONV: linalg.conv_2d_nhwc_hwcf
+// F16-CONV-SAME: strides = dense<2> : vector<2xi64>
+// BF16-CONV-LABEL: @preserve_conv_strides
+// BF16-CONV: linalg.conv_2d_nhwc_hwcf
+// BF16-CONV-SAME: strides = dense<2> : vector<2xi64>
+util.func public @preserve_conv_strides(%input: tensor<1x8x8x4xf32>, %filter: tensor<3x3x4x8xf32>, %init: tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32> {
+  %result = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%input, %filter : tensor<1x8x8x4xf32>, tensor<3x3x4x8xf32>) outs(%init : tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32>
+  util.return %result : tensor<1x3x3x8xf32>
+}

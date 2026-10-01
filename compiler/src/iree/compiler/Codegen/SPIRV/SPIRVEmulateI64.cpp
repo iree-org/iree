@@ -195,9 +195,10 @@ struct FlattenElementwisePattern final : RewritePattern {
                                                            operand);
     }
 
-    Operation *newOp =
-        rewriter.create(loc, op->getName().getIdentifier(), operands,
-                        newResultTypes, op->getAttrs());
+    OperationState state(loc, op->getName(), operands, newResultTypes,
+                         op->getDiscardableAttrDictionary().getValue());
+    state.propertiesAttr = op->getPropertiesAsAttribute();
+    Operation *newOp = rewriter.create(state);
 
     // Shape cast results.
     for (auto [oldResult, newResult] :

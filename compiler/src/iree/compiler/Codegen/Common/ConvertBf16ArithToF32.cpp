@@ -152,7 +152,10 @@ struct GenericTypeConversionPattern : ConversionPattern {
       rewriter.applySignatureConversion(&newRegion->front(), result);
     }
 
-    Operation *newOp = rewriter.create(state);
+    Operation *newOp = rewriter.insert(Operation::create(
+        state.location, state.name, state.types, state.operands,
+        std::move(state.attributes), op->getPropertiesStorage(),
+        state.successors, state.regions));
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

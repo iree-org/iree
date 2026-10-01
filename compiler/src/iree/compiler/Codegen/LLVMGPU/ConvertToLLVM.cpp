@@ -140,7 +140,10 @@ struct ScalarizeMathOp : OpRewritePattern<MathOpTy> {
         newOperands.push_back(
             vector::ExtractOp::create(rewriter, loc, operand, indices));
       }
-      Value scalarOp = MathOpTy::create(rewriter, loc, newOperands);
+      Value scalarOp =
+          MathOpTy::create(rewriter, loc, TypeRange{vecType.getElementType()},
+                           newOperands, mathOp.getProperties(),
+                           mathOp->getDiscardableAttrDictionary().getValue());
       newVector =
           vector::InsertOp::create(rewriter, loc, scalarOp, newVector, indices);
     }

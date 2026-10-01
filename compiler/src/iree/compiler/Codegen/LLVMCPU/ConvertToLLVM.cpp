@@ -819,23 +819,15 @@ struct RewriteFuncOpABI : OpRewritePattern<LLVM::LLVMFuncOp> {
             funcType.getReturnTypes(), funcType.getParams())) {
       return failure();
     }
-    auto attrs = getPrunedAttributeList(
-        funcOp, llvm::to_vector(LLVM::LLVMFuncOp::getAttributeNames()));
-    SmallVector<DictionaryAttr> argAttrs;
-    if (auto currArgAttrs = funcOp.getArgAttrsAttr()) {
-      argAttrs = llvm::map_to_vector(currArgAttrs, [](Attribute attr) {
-        return cast<DictionaryAttr>(attr);
-      });
-    }
-    std::optional<uint64_t> functionEntryCount;
-    if (auto attr = funcOp.getFunctionEntryCountAttr()) {
-      functionEntryCount = attr.getEntryCount();
-    }
-    LLVM::LLVMFuncOp::create(
-        rewriter, funcOp.getLoc(), funcOp.getName(), expectedType.value(),
-        funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(),
-        /*comdat=*/nullptr, attrs, argAttrs, functionEntryCount);
-    rewriter.eraseOp(funcOp);
+    rewriter.modifyOpInPlace(funcOp, [&] {
+      funcOp.setFunctionType(*expectedType);
+      if (auto oldArgAttrs = funcOp.getArgAttrsAttr()) {
+        SmallVector<Attribute> argAttrs(oldArgAttrs.getValue());
+        argAttrs.resize(expectedType->getNumParams(),
+                        rewriter.getDictionaryAttr({}));
+        funcOp.setArgAttrsAttr(rewriter.getArrayAttr(argAttrs));
+      }
+    });
     return success();
   }
 

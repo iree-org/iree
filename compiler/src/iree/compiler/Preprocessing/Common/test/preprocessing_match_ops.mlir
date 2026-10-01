@@ -1169,3 +1169,48 @@ module attributes {transform.with_named_sequence} {
     transform.yield
   }
 }
+
+// -----
+
+module attributes {transform.with_named_sequence} {
+  // CHECK-LABEL: func.func @native_properties_match
+  func.func @native_properties_match() {
+    // CHECK: pcf.generic sync true
+    // CHECK: match_status = "matched"
+    pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+      pcf.return
+    } {match_status = "unmatched"}
+    return
+  }
+
+  // CHECK-LABEL: func.func @native_properties_mismatch
+  func.func @native_properties_mismatch() {
+    // CHECK: pcf.generic scope
+    // CHECK: match_status = "unmatched"
+    pcf.generic scope(#pcf.test_scope) execute[%id: index, %count: index] {
+      pcf.return
+    } {match_status = "unmatched"}
+    return
+  }
+
+  transform.named_sequence @match_sync(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %root {
+      pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+        pcf.return
+      } {match_status = "unmatched"}
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    transform.yield %root : !transform.any_op
+  }
+
+  transform.named_sequence @annotate_sync(%root: !transform.any_op {transform.readonly}) {
+    %value = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %root "match_status" = %value : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module @match_sync -> @annotate_sync
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}

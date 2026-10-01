@@ -11,7 +11,7 @@ func.func @fold_forall_into_pcf_loop(%init: tensor<16x32xf32>) -> tensor<16x32xf
   %0 = scf.forall (%id0, %id1) in (4, 8) shared_outs(%iter = %init) -> (tensor<16x32xf32>) {
     %tile_init = tensor.extract_slice %iter[%id0, %id1] [4, 4] [1, 1]
         : tensor<16x32xf32> to tensor<4x4xf32>
-    %loop_result = pcf.loop scope(#pcf.sequential) count(%c4)
+    %loop_result = pcf.loop sync true scope(#pcf.sequential) count(%c4)
         execute(%ref = %tile_init)[%loop_id: index]
             : (!pcf.sref<4x4xf32, sync(#pcf.sequential)>)
            -> (tensor<4x4xf32>) {
@@ -32,7 +32,7 @@ func.func @fold_forall_into_pcf_loop(%init: tensor<16x32xf32>) -> tensor<16x32xf
 // CHECK-LABEL: @fold_forall_into_pcf_loop
 //  CHECK-SAME:   %[[INIT:[A-Za-z0-9_]+]]: tensor<16x32xf32>
 
-//       CHECK:   %[[GENERIC:.+]] = pcf.generic
+//       CHECK:   %[[GENERIC:.+]] = pcf.generic sync true
 //       CHECK:     scope(#pcf.sequential)
 //       CHECK:     execute(%[[REF:[A-Za-z0-9_]+]] = %[[INIT]])[%[[GEN_ID:[A-Za-z0-9_]+]]: index, %[[GEN_COUNT:[A-Za-z0-9_]+]]: index]
 //       CHECK:          : (!pcf.sref<16x32xf32, sync(#pcf.sequential)>)

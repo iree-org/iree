@@ -355,9 +355,11 @@ void reorderTranspose(RewriterBase &rewriter,
       transposedOperands.push_back(transposed);
     }
     SmallVector<Type> resultTypes{transposedOperands.front().getType()};
-    Operation *newOp =
-        rewriter.create(op->getLoc(), op->getName().getIdentifier(),
-                        transposedOperands, resultTypes, op->getAttrs());
+    OperationState state(op->getLoc(), op->getName(), transposedOperands,
+                         resultTypes,
+                         op->getDiscardableAttrDictionary().getValue());
+    state.propertiesAttr = op->getPropertiesAsAttribute();
+    Operation *newOp = rewriter.create(state);
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
   }
 }

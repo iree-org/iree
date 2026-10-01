@@ -1050,6 +1050,9 @@ public:
           namedOp, "transpose permutation does not match target permutation");
     }
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
+    if (Attribute castAttr = namedOp->getAttr("cast")) {
+      attrs.emplace_back(rewriter.getStringAttr("cast"), castAttr);
+    }
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
 

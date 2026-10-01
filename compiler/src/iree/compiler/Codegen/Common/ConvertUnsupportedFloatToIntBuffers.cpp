@@ -214,7 +214,10 @@ struct GenericTypeConversionPattern : ConversionPattern {
       Region *newRegion = state.addRegion();
       rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
     }
-    Operation *newOp = rewriter.create(state);
+    Operation *newOp = rewriter.insert(Operation::create(
+        state.location, state.name, state.types, state.operands,
+        std::move(state.attributes), op->getPropertiesStorage(),
+        state.successors, state.regions));
 
     for (Region &newRegion : newOp->getRegions()) {
       TypeConverter::SignatureConversion result(newRegion.getNumArguments());
