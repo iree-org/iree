@@ -111,47 +111,6 @@ void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment) {
 
 namespace {
 
-/// Scalarize math ops. It is needed to lower vector operation that don't have
-/// vector support in CUDA and ROCM device library.
-template <typename MathOpTy>
-struct ScalarizeMathOp : OpRewritePattern<MathOpTy> {
-  using OpRewritePattern<MathOpTy>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(MathOpTy mathOp,
-                                PatternRewriter &rewriter) const override {
-    auto vecType = dyn_cast<VectorType>(mathOp.getType());
-    if (!vecType) {
-      return failure();
-    }
-    Location loc = mathOp.getLoc();
-    Value newVector = arith::ConstantOp::create(rewriter, loc, vecType,
-                                                rewriter.getZeroAttr(vecType));
-
-    for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
-      llvm::SmallVector<int64_t> indices;
-      int64_t projectIndex = element;
-      for (int64_t dim : llvm::seq(int64_t(0), vecType.getRank())) {
-        int64_t index = projectIndex % vecType.getDimSize(dim);
-        projectIndex = projectIndex / vecType.getDimSize(dim);
-        indices.push_back(index);
-      }
-      SmallVector<Value> newOperands;
-      for (Value operand : mathOp->getOperands()) {
-        newOperands.push_back(
-            vector::ExtractOp::create(rewriter, loc, operand, indices));
-      }
-      Value scalarOp =
-          MathOpTy::create(rewriter, loc, TypeRange{vecType.getElementType()},
-                           newOperands, mathOp.getProperties(),
-                           mathOp->getDiscardableAttrDictionary().getValue());
-      newVector =
-          vector::InsertOp::create(rewriter, loc, scalarOp, newVector, indices);
-    }
-    rewriter.replaceOp(mathOp, newVector);
-    return success();
-  }
-};
-
 struct ConvertSharedMemAllocOp : OpRewritePattern<memref::AllocOp> {
   using Base::Base;
 
