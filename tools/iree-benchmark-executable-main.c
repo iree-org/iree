@@ -252,7 +252,7 @@ static iree_status_t iree_benchmark_executable_run(
 
   // Start profiling now - all subsequent device operations will be what the
   // user wants to measure.
-  iree_hal_profiling_from_flags_t* profiling = NULL;
+  iree_hal_profiling_session_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_begin_profiling_from_flags(
         args->device, iree_allocator_system(), &profiling);
@@ -291,7 +291,7 @@ static iree_status_t iree_benchmark_executable_run(
 
       // Flush profiling if recording. Note that we don't want to include the
       // profiling time in the benchmark result.
-      status = iree_hal_flush_profiling_from_flags(profiling);
+      status = iree_hal_profiling_session_flush(profiling);
 
       iree_benchmark_resume_timing(benchmark_state);
     }
@@ -300,7 +300,7 @@ static iree_status_t iree_benchmark_executable_run(
   // End profiling before cleaning up so tooling doesn't capture it.
   if (profiling) {
     status =
-        iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+        iree_status_join(status, iree_hal_profiling_session_end(profiling));
   }
 
   // To get a total time per invocation we set the item count to the total
