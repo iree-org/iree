@@ -44,7 +44,7 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
   // TODO(#7824): make export ordinals map to objects so that we can perform
   // our own linking (until some future Vulkan extension is added for pipeline
   // libraries).
-  hal.executable.source private @simple_mul attributes {
+  hal.executable.source private @simple_mul <
     // Object files linked into the executable.
     // Certain backends (today) support either wholesale definition or linking
     // of partial objects for imports used by generated code. Each compilation
@@ -66,7 +66,7 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
         }>
       ]
     }>
-  } {
+  > {
 
     // TODO(benvanik): demonstrate hal.executable.constant.block for
     // specialization via host logic. These map to specialization constants.

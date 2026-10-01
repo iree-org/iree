@@ -65,8 +65,8 @@ module attributes {transform.with_named_sequence} {
       %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
       %rank = transform.match.structured.rank %argmax : (!transform.any_op) -> !transform.param<i64>
       transform.match.param.cmpi eq %rank, %c2 : !transform.param<i64>
-      transform.match.structured.dim %argmax[0] {parallel} : !transform.any_op
-      transform.match.structured.dim %argmax[-1] {reduction} : !transform.any_op
+      transform.match.structured.dim %argmax[0] parallel : !transform.any_op
+      transform.match.structured.dim %argmax[-1] reduction : !transform.any_op
 
       // Verify a single input (target vector to compute the argmax of) and two
       // outputs, one for the maximum value and one for the index.
