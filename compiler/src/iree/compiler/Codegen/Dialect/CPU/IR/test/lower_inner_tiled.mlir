@@ -432,12 +432,12 @@ module attributes { transform.with_named_sequence } {
 func.func @lower_riscv_v_1x8vlsx1_f32_vlen256(
     %lhs: vector<1x1xf32>, %rhs: vector<32x1xf32>, %acc: vector<1x32xf32>)
     -> vector<1x32xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses_rvv,
     iterator_types = [],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, vlen = 256>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<1x1xf32>, vector<32x1xf32> into vector<1x32xf32>
+  > : vector<1x1xf32>, vector<32x1xf32> into vector<1x32xf32>
   return %0 : vector<1x32xf32>
 }
 
@@ -481,12 +481,12 @@ module attributes { transform.with_named_sequence } {
 func.func @lower_riscv_v_1x8vlsx1_f32_vlen128(
     %lhs: vector<1x1xf32>, %rhs: vector<16x1xf32>, %acc: vector<1x16xf32>)
     -> vector<1x16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses_rvv128,
     iterator_types = [],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, vlen = 128>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<1x1xf32>, vector<16x1xf32> into vector<1x16xf32>
+  > : vector<1x1xf32>, vector<16x1xf32> into vector<1x16xf32>
   return %0 : vector<1x16xf32>
 }
 
@@ -529,12 +529,12 @@ module attributes { transform.with_named_sequence } {
 func.func @lower_riscv_v_8vlsx1x1_f32_vlen256(
     %lhs: vector<32x1xf32>, %rhs: vector<1x1xf32>, %acc: vector<32x1xf32>)
     -> vector<32x1xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses_rvv_t,
     iterator_types = [],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32, vlen = 256>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<32x1xf32>, vector<1x1xf32> into vector<32x1xf32>
+  > : vector<32x1xf32>, vector<1x1xf32> into vector<32x1xf32>
   return %0 : vector<32x1xf32>
 }
 

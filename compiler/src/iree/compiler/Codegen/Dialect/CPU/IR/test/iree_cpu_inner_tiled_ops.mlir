@@ -340,12 +340,12 @@ func.func @cpu_riscv_v_vfmacc_f16_swapped(
 func.func @cpu_riscv_v_vfmacc_f32(
     %lhs: vector<1x1x1xf32>, %rhs: vector<1x1x32xf32>, %acc: vector<1x1x32xf32>)
     -> vector<1x1x32xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, vlen = 256>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<1x1x1xf32>, vector<1x1x32xf32> into vector<1x1x32xf32>
+  > : vector<1x1x1xf32>, vector<1x1x32xf32> into vector<1x1x32xf32>
   return %0 : vector<1x1x32xf32>
 }
 // CHECK-LABEL: func @cpu_riscv_v_vfmacc_f32
@@ -364,12 +364,12 @@ func.func @cpu_riscv_v_vfmacc_f32(
 func.func @cpu_riscv_v_vfmacc_f32_swapped(
     %lhs: vector<1x1x16xf32>, %rhs: vector<1x1x1xf32>, %acc: vector<1x1x16xf32>)
     -> vector<1x1x16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32, vlen = 128>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<1x1x16xf32>, vector<1x1x1xf32> into vector<1x1x16xf32>
+  > : vector<1x1x16xf32>, vector<1x1x1xf32> into vector<1x1x16xf32>
   return %0 : vector<1x1x16xf32>
 }
 // CHECK-LABEL: func @cpu_riscv_v_vfmacc_f32_swapped

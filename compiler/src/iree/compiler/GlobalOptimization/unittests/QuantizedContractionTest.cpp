@@ -79,11 +79,11 @@ TEST_F(QuantizedContractionTest, SymmetricMultiDimensionalReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -135,11 +135,11 @@ TEST_F(QuantizedContractionTest, LhsZeroPointNeedsRhsSum) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #scalar, #identity]>
           ins(%aq, %as, %az : tensor<2x4x8xi8>, f32, i8)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -184,11 +184,11 @@ TEST_F(QuantizedContractionTest, RhsZeroPointNeedsLhsSum) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #scalar, #identity]>
           ins(%bq, %bs, %bz : tensor<4x8x3xi8>, f32, i8)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -234,11 +234,11 @@ TEST_F(QuantizedContractionTest, BothZeroPointsNeedBothSums) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #scalar, #identity]>
           ins(%aq, %as, %az : tensor<2x4x8xi8>, f32, i8)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #scalar, #identity]>
           ins(%bq, %bs, %bz : tensor<4x8x3xi8>, f32, i8)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -282,11 +282,11 @@ TEST_F(QuantizedContractionTest, LhsScaleRetainsFloatingReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1)>, #identity]}
+          <indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1)>, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, tensor<4xf32>)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -329,11 +329,11 @@ TEST_F(QuantizedContractionTest, RhsScaleRetainsFloatingReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d0)>, #identity]}
+          <indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d0)>, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, tensor<4xf32>)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -377,11 +377,11 @@ TEST_F(QuantizedContractionTest, LhsZeroPointRetainsFloatingReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, affine_map<(d0, d1, d2) -> (d1)>, #identity]}
+          <indexing_maps = [#identity, #scalar, affine_map<(d0, d1, d2) -> (d1)>, #identity]>
           ins(%aq, %as, %az : tensor<2x4x8xi8>, f32, tensor<4xi8>)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -425,11 +425,11 @@ TEST_F(QuantizedContractionTest, RhsZeroPointRetainsFloatingReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, affine_map<(d0, d1, d2) -> (d0)>, #identity]}
+          <indexing_maps = [#identity, #scalar, affine_map<(d0, d1, d2) -> (d0)>, #identity]>
           ins(%bq, %bs, %bz : tensor<4x8x3xi8>, f32, tensor<4xi8>)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -473,11 +473,11 @@ TEST_F(QuantizedContractionTest, RebasesTransposedDequantizationMaps) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d0)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d1, d0, d2)>]}
+          <indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d0)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d1, d0, d2)>]>
           ins(%aq, %as, %az : tensor<4x2x8xi8>, tensor<4xf32>, tensor<4x2xi8>)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -522,11 +522,11 @@ TEST_F(QuantizedContractionTest, RequiresAnIntegerReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1, d2)>, #identity]}
+          <indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1, d2)>, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, tensor<4x8xf32>)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -565,11 +565,11 @@ TEST_F(QuantizedContractionTest, RejectsDynamicIntegerReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x?x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<?x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -608,11 +608,11 @@ TEST_F(QuantizedContractionTest, AcceptsDynamicFloatingReduction) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1)>, #identity]}
+          <indexing_maps = [#identity, affine_map<(d0, d1, d2) -> (d1)>, #identity]>
           ins(%aq, %as : tensor<2x?x8xi8>, tensor<?xf32>)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<?x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -655,11 +655,11 @@ TEST_F(QuantizedContractionTest, AcceptsSafeProductOfReductionExtents) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x256x511xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<256x511x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -700,11 +700,11 @@ TEST_F(QuantizedContractionTest, RejectsUnsafeProductOfReductionExtents) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x256x512xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<256x512x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -744,11 +744,11 @@ TEST_F(QuantizedContractionTest, AcceptsCommutedMultiplyAndAdd) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -818,11 +818,11 @@ TEST_F(QuantizedContractionTest, RejectsBodyThatIgnoresAnInput) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 0.0 : f32
@@ -861,11 +861,11 @@ TEST_F(QuantizedContractionTest, RejectsNonzeroInit) {
         %binit: !b,
         %cinit: !c) {
       %a = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%aq, %as : tensor<2x4x8xi8>, f32)
           outs(%ainit : !a) -> !a
       %b = iree_linalg_ext.dequantize_affine
-          {indexing_maps = [#identity, #scalar, #identity]}
+          <indexing_maps = [#identity, #scalar, #identity]>
           ins(%bq, %bs : tensor<4x8x3xi8>, f32)
           outs(%binit : !b) -> !b
       %zero = arith.constant 1.0 : f32
