@@ -1427,6 +1427,21 @@ func.func @exp_reduction_index(%S: tensor<2x3xf32>, %M : tensor<2xf32>) -> tenso
 
 // -----
 
+func.func @illegal_im2col_batch_pos_exceeds_output_rank(%arg0: tensor<2x3x4x5xf32>) -> tensor<2xf32> {
+  %0 = tensor.empty() : tensor<2xf32>
+  // expected-error @+1 {{expected batch_pos size (4) to not exceed output rank (1)}}
+  %1 = iree_linalg_ext.im2col strides = [] dilations = [] kernel_size = []
+           offsets = [0] output_sizes = [[2]]
+           batch_pos = [0, 1, 2, 3] m_pos = [] k_pos = []
+           input_k_perm = []
+           output_perm = [0]
+           ins(%arg0 : tensor<2x3x4x5xf32>)
+           outs(%0 : tensor<2xf32>) -> tensor<2xf32>
+  return %1 : tensor<2xf32>
+}
+
+// -----
+
 func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
