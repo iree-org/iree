@@ -11,12 +11,12 @@ hal.executable.source public @executable {
   hal.executable.export public @negate ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
 
   hal.executable.export public @double_it ordinal(1) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
 
   builtin.module {
     func.func @negate() {

@@ -541,7 +541,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
                                                      $target_ordinals,
                                                      $target_objects,
                                                      $target_regions) `}` `)`
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;
@@ -2641,7 +2641,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
     $body
   }];
 
@@ -2808,7 +2808,7 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     (`condition` `` custom<ExportConditionRegion>($condition)^)?
     (`fallback` `(` $condition_fallback^ `)`)?
     (`count` `` custom<WorkgroupCountRegion>($workgroup_count)^)?
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let builders = [
@@ -3172,7 +3172,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;

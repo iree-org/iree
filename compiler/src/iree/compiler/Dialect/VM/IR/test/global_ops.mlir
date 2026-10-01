@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @global_load_i32
 vm.module @my_module {
@@ -100,4 +101,12 @@ vm.module @my_module {
     vm.global.store.indirect.ref %arg0, %0 : !vm.ref<?> -> !util.ptr<!vm.ref<?>>
     vm.return
   }
+}
+
+// -----
+
+// CHECK-LABEL: vm.module public @global_properties
+vm.module @global_properties {
+  // CHECK: vm.global.i32 public @g0 <ordinal = 4> {test.discardable} : i32
+  vm.global.i32 @g0 <ordinal = 4> {test.discardable} : i32
 }

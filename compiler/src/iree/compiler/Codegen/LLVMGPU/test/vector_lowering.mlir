@@ -174,10 +174,10 @@ func.func @transfer_gather_unroll_embedding_lookup(
   %cst = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<4xindex>], %cst {
+  [%indices : vector<4xindex>], %cst <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : memref<4096x64xf16>, vector<4x64xf16>
+  > : memref<4096x64xf16>, vector<4x64xf16>
   return %out : vector<4x64xf16>
 }
 
@@ -199,11 +199,11 @@ func.func @transfer_gather_unroll_masked(
   %cst = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<4xindex>], %cst, %mask {
+  [%indices : vector<4xindex>], %cst, %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : memref<4096x64xf16>, vector<4x64xf16>, vector<4x64xi1>
+  > : memref<4096x64xf16>, vector<4x64xf16>, vector<4x64xi1>
   return %out : vector<4x64xf16>
 }
 
@@ -227,10 +227,10 @@ func.func @transfer_gather_unroll_transposed_index(
   %cst = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<8x4xindex>], %cst {
+  [%indices : vector<8x4xindex>], %cst <
     indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
                      affine_map<(d0, d1, d2)[s0] -> (d1, d0)>]
-  } : memref<4096x64xf16>, vector<4x8x64xf16>
+  > : memref<4096x64xf16>, vector<4x8x64xf16>
   return %out : vector<4x8x64xf16>
 }
 
@@ -252,10 +252,10 @@ func.func @transfer_scatter_unroll_embedding_write(
   %indices: vector<4xindex>) {
   %c0 = arith.constant 0 : index
   iree_vector_ext.transfer_scatter %vector into %source[%c0, %c0]
-  [%indices : vector<4xindex>] {
+  [%indices : vector<4xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<4x64xf16>, memref<4096x64xf16>
+  > : vector<4x64xf16>, memref<4096x64xf16>
   return
 }
 
@@ -274,11 +274,11 @@ func.func @transfer_scatter_unroll_masked(
   %mask: vector<4x64xi1>) {
   %c0 = arith.constant 0 : index
   iree_vector_ext.transfer_scatter %vector into %source[%c0, %c0]
-  [%indices : vector<4xindex>], %mask {
+  [%indices : vector<4xindex>], %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : vector<4x64xf16>, memref<4096x64xf16>, vector<4x64xi1>
+  > : vector<4x64xf16>, memref<4096x64xf16>, vector<4x64xi1>
   return
 }
 
@@ -296,10 +296,10 @@ func.func @transfer_scatter_unroll_tensor(
   %indices: vector<4xindex>) -> tensor<4096x64xf16> {
   %c0 = arith.constant 0 : index
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%indices : vector<4xindex>] {
+  [%indices : vector<4xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<4x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<4x64xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
   return %out : tensor<4096x64xf16>
 }
 
@@ -321,10 +321,10 @@ func.func @transfer_scatter_unroll_transposed_index(
   %indices: vector<8x4xindex>) {
   %c0 = arith.constant 0 : index
   iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%indices : vector<8x4xindex>] {
+  [%indices : vector<8x4xindex>] <
     indexing_maps = [affine_map<(d0, d1, d2)[s0] -> (s0, d2)>,
                      affine_map<(d0, d1, d2)[s0] -> (d1, d0)>]
-  } : vector<4x8x64xf16>, memref<4096x64xf16>
+  > : vector<4x8x64xf16>, memref<4096x64xf16>
   return
 }
 

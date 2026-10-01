@@ -9,9 +9,9 @@
 ]>
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-bda-v1">) {
-    hal.executable.export public @interface_binding layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_binding layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
         [Int64, Shader, PhysicalStorageBufferAddresses],

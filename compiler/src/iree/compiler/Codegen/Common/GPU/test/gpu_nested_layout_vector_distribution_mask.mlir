@@ -388,11 +388,11 @@ func.func @paged_transfer_gather_mask(%indices: vector<16xindex>,
   %mask = vector.create_mask %c7, %c7 : vector<16x8xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
-  [%indices : vector<16xindex>], %cst0, %mask {
+  [%indices : vector<16xindex>], %cst0, %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : memref<4096x512x8xf16>, vector<16x8xf16>, vector<16x8xi1>
+  > : memref<4096x512x8xf16>, vector<16x8xf16>, vector<16x8xi1>
 
   %l_out = iree_vector_ext.to_layout %out to layout(#layout) : vector<16x8xf16>
 
@@ -444,11 +444,11 @@ func.func @transfer_gather_projected_mask(%indices: vector<16xindex>,
   %mask = vector.create_mask %c7 : vector<8xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0, %c0]
-  [%indices : vector<16xindex>], %cst0, %mask {
+  [%indices : vector<16xindex>], %cst0, %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (0, s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d1)>]
-  } : memref<4096x512x8xf16>, vector<16x8xf16>, vector<8xi1>
+  > : memref<4096x512x8xf16>, vector<16x8xf16>, vector<8xi1>
 
   %l_out = iree_vector_ext.to_layout %out to layout(#layout_projected_mask) : vector<16x8xf16>
 

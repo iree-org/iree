@@ -22,7 +22,7 @@ hal.executable public @main {
     hal.executable.export public @no_merge_basic_blocks ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
       hal.return %x, %y, %z : index, index, index
-    } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 1 : index, 1 : index]}
+    } <subgroup_size = 64, workgroup_size = [128 : index, 1 : index, 1 : index]>
     builtin.module {
       func.func @no_merge_basic_blocks() {
         %c8 = arith.constant 8 : index

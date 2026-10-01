@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK: flow.func private @externArg0()
 flow.func private @externArg0()
@@ -45,8 +46,8 @@ util.func public @basicCall(%arg0: tensor<?xf32>) -> (tensor<?xf32>, i32) {
   %c0 = arith.constant 0 : index
   // CHECK: %[[DIM:.+]] = tensor.dim %[[ARG0]], %c0
   %dim = tensor.dim %arg0, %c0 : tensor<?xf32>
-  // CHECK: %[[CALL:.+]]:2 = flow.call @basicExtern(%[[ARG0]], %[[DIM]]) : (tensor<?xf32>{%[[DIM]]}, index) -> (tensor<?xf32>{%[[DIM]]}, i32)
-  %call:2 = flow.call @basicExtern(%arg0, %dim) : (tensor<?xf32>{%dim}, index) -> (tensor<?xf32>{%dim}, i32)
+  // CHECK: %[[CALL:.+]]:2 = flow.call @basicExtern(%[[ARG0]], %[[DIM]]) <arg_attrs = [{test.arg}, {}], res_attrs = [{test.result}, {}]> {test.discardable} : (tensor<?xf32>{%[[DIM]]}, index) -> (tensor<?xf32>{%[[DIM]]}, i32)
+  %call:2 = flow.call @basicExtern(%arg0, %dim) <arg_attrs = [{test.arg}, {}], res_attrs = [{test.result}, {}]> {test.discardable} : (tensor<?xf32>{%dim}, index) -> (tensor<?xf32>{%dim}, i32)
   // CHECK: util.return %[[CALL]]#0, %[[CALL]]#1
   util.return %call#0, %call#1 : tensor<?xf32>, i32
 }

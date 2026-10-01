@@ -93,7 +93,7 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
 
   }  // hal.executable
 
-  hal.executable.source private @simple_mul_inplace attributes {
+  hal.executable.source private @simple_mul_inplace <
     objects = #hal.executable.objects<{
       #spirv_target = [
         #hal.executable.object<{
@@ -101,7 +101,7 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
         }>
       ]
     }>
-  } {
+  > {
     // Similar to the above but in-place by using a read/write binding.
     hal.executable.export public @main ordinal(0)
         layout(#hal.pipeline.layout<constants = 1, bindings = [

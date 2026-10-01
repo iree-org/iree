@@ -130,14 +130,14 @@ util.func public @attention_broadcast(
     linalg.yield %in : f16
   } -> tensor<4x8x16x128x?xf16>
   %v_collapse = tensor.collapse_shape %v_bcast [[0, 1], [2], [3], [4]] : tensor<4x8x16x128x?xf16> into tensor<32x16x128x?xf16>
-  %17 = iree_linalg_ext.attention {
+  %17 = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
-      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]}
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]>
     ins(%arg0, %k_collapse, %v_collapse, %arg3, %arg4 : tensor<32x16x?x128xf16>, tensor<32x16x?x128xf16>, tensor<32x16x128x?xf16>, f16, tensor<32x16x?x?xf16>)
     outs(%empty4 : tensor<32x16x?x128xf16>) {
   ^bb0(%arg8: f32):

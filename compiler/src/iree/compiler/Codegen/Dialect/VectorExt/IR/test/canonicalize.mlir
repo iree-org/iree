@@ -58,10 +58,10 @@ func.func @transfer_gather_fold_broadcast(%indices: vector<64xindex>,
   %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%broadcasted : vector<32x64xindex>], %cst0 {
+  [%broadcasted : vector<32x64xindex>], %cst0 <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
                      affine_map<(d0, d1)[s0] -> (d1, d0)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>
+  > : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
 }
@@ -84,10 +84,10 @@ func.func @transfer_gather_fold_transpose(%indices: vector<64x32xindex>,
   %transposed = vector.transpose %indices, [1, 0] : vector<64x32xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%transposed : vector<32x64xindex>], %cst0 {
+  [%transposed : vector<32x64xindex>], %cst0 <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
                      affine_map<(d0, d1)[s0] -> (d1, d0)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>
+  > : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
 }
@@ -110,11 +110,11 @@ func.func @transfer_gather_fold_step(%indices: vector<64x32xindex>,
   %step = vector.step : vector<64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%step, %indices : vector<64xindex>, vector<64x32xindex>], %cst0 {
+  [%step, %indices : vector<64xindex>, vector<64x32xindex>], %cst0 <
     indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>
+  > : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
 }
@@ -135,11 +135,11 @@ func.func @transfer_gather_fold_single_element(%scalar: vector<1xindex>,
   %c0 = arith.constant 0 : index
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%scalar, %indices : vector<1xindex>, vector<64x1xindex>], %cst0 {
+  [%scalar, %indices : vector<1xindex>, vector<64x1xindex>], %cst0 <
     indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
-  } : tensor<4096x64xf16>, vector<64x1xf16>
+  > : tensor<4096x64xf16>, vector<64x1xf16>
 
   return %out : vector<64x1xf16>
 }
@@ -162,10 +162,10 @@ func.func @transfer_gather_fold_add_broadcast(%indices: vector<64xindex>,
   %added = arith.addi %indices, %bcast : vector<64xindex>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%added : vector<64xindex>], %cst0 {
+  [%added : vector<64xindex>], %cst0 <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>
+  > : tensor<4096x64xf16>, vector<64x32xf16>
 
   return %out : vector<64x32xf16>
 }
@@ -184,9 +184,9 @@ func.func @transfer_gather_fold_contiguous_load(
   %cst0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
 
-  %out = iree_vector_ext.transfer_gather %source[%c0, %c0], %cst0 {
+  %out = iree_vector_ext.transfer_gather %source[%c0, %c0], %cst0 <
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>]
-  } : tensor<4096x64xf16>, vector<64x1xf16>
+  > : tensor<4096x64xf16>, vector<64x1xf16>
 
   return %out : vector<64x1xf16>
 }
@@ -206,11 +206,11 @@ func.func @transfer_gather_fold_all_true_mask(
   %mask = arith.constant dense<true> : vector<64x32xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<64xindex>], %cst0, %mask {
+  [%indices : vector<64xindex>], %cst0, %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
+  > : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
 
   return %out : vector<64x32xf16>
 }
@@ -234,11 +234,11 @@ func.func @transfer_gather_fold_all_false_mask(
   %mask = arith.constant dense<false> : vector<64x32xi1>
 
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<64xindex>], %cst0, %mask {
+  [%indices : vector<64xindex>], %cst0, %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
+  > : tensor<4096x64xf16>, vector<64x32xf16>, vector<64x32xi1>
 
   return %out : vector<64x32xf16>
 }
@@ -260,10 +260,10 @@ func.func @transfer_scatter_fold_broadcast(%indices: vector<64xindex>,
   %broadcasted = vector.broadcast %indices : vector<64xindex> to vector<32x64xindex>
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%broadcasted : vector<32x64xindex>] {
+  [%broadcasted : vector<32x64xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (d0, s0)>,
                      affine_map<(d0, d1)[s0] -> (d1, d0)>]
-  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -286,11 +286,11 @@ func.func @transfer_scatter_fold_step(%indices: vector<64x32xindex>,
   %step = vector.step : vector<64xindex>
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%step, %indices : vector<64xindex>, vector<64x32xindex>] {
+  [%step, %indices : vector<64xindex>, vector<64x32xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
-  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -311,11 +311,11 @@ func.func @transfer_scatter_fold_single_element(%scalar: vector<1xindex>,
   %c0 = arith.constant 0 : index
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%scalar, %indices : vector<1xindex>, vector<64x1xindex>] {
+  [%scalar, %indices : vector<1xindex>, vector<64x1xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0, s1] -> (s0, s1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d1)>,
                      affine_map<(d0, d1)[s0, s1] -> (d0, d1)>]
-  } : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -338,10 +338,10 @@ func.func @transfer_scatter_fold_add_broadcast(%indices: vector<64xindex>,
   %added = arith.addi %indices, %bcast : vector<64xindex>
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%added : vector<64xindex>] {
+  [%added : vector<64xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<64x32xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -360,9 +360,9 @@ func.func @transfer_scatter_fold_contiguous_write(
 
   %c0 = arith.constant 0 : index
 
-  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0] {
+  %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0] <
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>]
-  } : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
+  > : vector<64x1xf16>, tensor<4096x64xf16> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -382,11 +382,11 @@ func.func @transfer_scatter_fold_all_true_mask(
   %mask = arith.constant dense<true> : vector<64x32xi1>
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%indices : vector<64xindex>], %mask {
+  [%indices : vector<64xindex>], %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
+  > : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }
@@ -410,11 +410,11 @@ func.func @transfer_scatter_fold_all_false_mask(
   %mask = arith.constant dense<false> : vector<64x32xi1>
 
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%indices : vector<64xindex>], %mask {
+  [%indices : vector<64xindex>], %mask <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>,
                      affine_map<(d0, d1)[s0] -> (d0, d1)>]
-  } : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
+  > : vector<64x32xf16>, tensor<4096x64xf16>, vector<64x32xi1> -> tensor<4096x64xf16>
 
   return %out : tensor<4096x64xf16>
 }

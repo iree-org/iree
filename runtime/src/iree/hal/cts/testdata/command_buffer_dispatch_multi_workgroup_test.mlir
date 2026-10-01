@@ -10,7 +10,7 @@ hal.executable.source public @executable {
     %c32 = arith.constant 32 : index
     %c1 = arith.constant 1 : index
     hal.return %c32, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
   builtin.module {
     func.func @write_workgroup_ids() {
       %out = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<32xi32>

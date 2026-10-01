@@ -297,12 +297,12 @@ util.func @pingpong_dt_medium_f4E2M1FN(
       amdgpu.lds_barrier
       rocdl.sched.barrier none
 
-      %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) {
+      %dot = iree_codegen.inner_tiled ins(%lhs_vec, %rhs_vec, %lhs_scale_vec, %rhs_scale_vec) outs(%iter) <
         indexing_maps = #contraction_accesses,
         iterator_types = #iterator_types,
         kind = #mfma_type,
         semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-      } : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
+      > : !lhs_vec_ty, !rhs_vec_ty, !lhs_scale_vec_ty, !rhs_scale_vec_ty into !acc_ty
 
       scf.yield %dot : !acc_ty
     }

@@ -23,8 +23,8 @@ func.func @forward(%arg0: !torch.vtensor<[128,20],f32>) -> !torch.vtensor<[128,3
   %6 = torch.aten.add.Tensor %3, %5, %int1_2 : !torch.vtensor<[128,30],f32>, !torch.vtensor<[30],f32>, !torch.int -> !torch.vtensor<[128,30],f32>
   return %6 : !torch.vtensor<[128,30],f32>
 }
-util.global private @_params.classifier.weight {inlining_policy = #util.inline.never} : tensor<30x20xf32>
-util.global private @_params.classifier.bias {inlining_policy = #util.inline.never} : tensor<30xf32>
+util.global private @_params.classifier.weight <inlining_policy = #util.inline.never> : tensor<30x20xf32>
+util.global private @_params.classifier.bias <inlining_policy = #util.inline.never> : tensor<30xf32>
 
 // -----
 

@@ -192,7 +192,7 @@ func.func @implicit_gather_like_generic_stride_2(%arg0: tensor<1x1x31xf32>, %arg
 // CHECK:         %[[INDICES:.+]] = arith.muli %[[STEP]], %[[DENSE]] : vector<16xindex>
 // CHECK:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]]
 // CHECK-SAME:      [%[[INDICES]] : vector<16xindex>], %[[PASSTHRU]]
-// CHECK-SAME:      {indexing_maps = [#[[$MAP0]], #[[$MAP1]]]}
+// CHECK-SAME:      <indexing_maps = [#[[$MAP0]], #[[$MAP1]]]>
 // CHECK:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
 // CHECK:         return %[[RESULT]]
 
@@ -218,7 +218,7 @@ func.func @implicit_gather_strided_leading_dims(%arg0: tensor<1x1x3xf32>, %arg1:
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[PASSTHRU:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:         %[[GATHER:.+]] = iree_vector_ext.transfer_gather %[[IN]][%[[C0]], %[[C0]], %[[C0]]],
-// CHECK-SAME:      %[[PASSTHRU]] {indexing_maps = [#[[$MAP0]]]}
+// CHECK-SAME:      %[[PASSTHRU]] <indexing_maps = [#[[$MAP0]]]>
 // CHECK:         %[[RESULT:.+]] = vector.transfer_write %[[GATHER]], %[[OUT]][%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[C0]]]
 // CHECK:         return %[[RESULT]]
 

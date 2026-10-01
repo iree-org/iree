@@ -1006,7 +1006,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
-    attr-dict
+    prop-dict attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
     `outs` `(` $output `:` type($output) `)`
     $region
@@ -1146,7 +1146,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
-    attr-dict
+    prop-dict attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
     `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
     $region
@@ -1789,11 +1789,11 @@ def IREELinalgExt_QuantizeAffineOp
 
     ```mlir
     %q = iree_linalg_ext.quantize_affine
-        {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+        <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                           affine_map<(d0, d1) -> (d0)>,
                           affine_map<(d0, d1) -> (d0)>,
                           affine_map<(d0, d1) -> (d0, d1)>],
-         quant_min = -128 : i64, quant_max = 127 : i64}
+         quant_min = -128, quant_max = 127>
         ins(%x, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi8>)
         outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
     ```
@@ -1813,7 +1813,7 @@ def IREELinalgExt_QuantizeAffineOp
   let results = (outs Variadic<AnyRankedTensor>:$result);
 
   let assemblyFormat = [{
-    attr-dict
+    prop-dict attr-dict
     `ins` `(` $input `,` $scale (`,` $zero_point^)? `:`
               type($input) `,` type($scale) (`,` type($zero_point)^)? `)`
     `outs` `(` $output `:` type($output) `)`
@@ -1861,11 +1861,11 @@ def IREELinalgExt_DequantizeAffineOp
 
     ```mlir
     %dq = iree_linalg_ext.dequantize_affine
-        {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+        <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                           affine_map<(d0, d1) -> (d0)>,
                           affine_map<(d0, d1) -> (d0)>,
                           affine_map<(d0, d1) -> (d0, d1)>],
-         input_unsigned}
+         input_unsigned>
         ins(%q, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi32>)
         outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
     ```
@@ -1885,7 +1885,7 @@ def IREELinalgExt_DequantizeAffineOp
   let results = (outs Variadic<AnyRankedTensor>:$result);
 
   let assemblyFormat = [{
-    attr-dict
+    prop-dict attr-dict
     `ins` `(` $input `,` $scale (`,` $zero_point^)? `:`
               type($input) `,` type($scale) (`,` type($zero_point)^)? `)`
     `outs` `(` $output `:` type($output) `)`

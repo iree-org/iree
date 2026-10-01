@@ -61,9 +61,9 @@ stream.executable public @mul_dispatch_executable {
 }
 
 //      CHECK:   hal.executable public @smoketest_linked
-//      CHECK:   hal.executable.binary public @amdgcn_amd_amdhsa attributes {
-// CHECK-SAME:     data = dense
+//      CHECK:   hal.executable.binary public @amdgcn_amd_amdhsa <
 // CHECK-SAME:     format = "amdgcn-amd-amdhsa"
+// CHECK-SAME:     data = dense
 
 // -----
 

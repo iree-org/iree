@@ -7,9 +7,9 @@
 ]>
 hal.executable private @push_constant {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @push_constant layout(#pipeline_layout) attributes {
+    hal.executable.export public @push_constant layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
       // CHECK: spirv.GlobalVariable @__push_constant_var__ : !spirv.ptr<!spirv.struct<(!spirv.array<5 x i32, stride=4> [0]), Block>, PushConstant>
@@ -42,9 +42,9 @@ hal.executable private @push_constant {
 ]>
 hal.executable private @push_constant_annotated {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export @push_constant_annotated layout(#pipeline_layout) attributes {
+    hal.executable.export @push_constant_annotated layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader, ExpectAssumeKHR], [SPV_KHR_expect_assume]>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.func @push_constant_annotated()
       func.func @push_constant_annotated() -> index {
@@ -82,9 +82,9 @@ hal.executable private @push_constant_annotated {
 ]>
 hal.executable private @resource_bindings_in_same_func {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @resource_bindings_in_same_func layout(#pipeline_layout) attributes {
+    hal.executable.export public @resource_bindings_in_same_func layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
       // CHECK: spirv.GlobalVariable @[[ARG0:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
@@ -138,12 +138,12 @@ hal.executable private @resource_bindings_in_same_func {
 ]>
 hal.executable private @resource_bindings_in_multi_entry_func {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @resource_bindings_in_entry_func1 layout(#pipeline_layout) attributes {
+    hal.executable.export public @resource_bindings_in_entry_func1 layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
-    hal.executable.export public @resource_bindings_in_entry_func2 layout(#pipeline_layout) attributes {
+    >
+    hal.executable.export public @resource_bindings_in_entry_func2 layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
       // CHECK: spirv.GlobalVariable @[[FUNC1_ARG:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
@@ -196,9 +196,9 @@ hal.executable private @resource_bindings_in_multi_entry_func {
 ]>
 hal.executable private @interface_binding {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @interface_binding layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_binding layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       func.func @interface_binding() -> f32 {
         %c0 = arith.constant 0 : index
@@ -239,9 +239,9 @@ hal.executable private @interface_binding {
 ]>
 hal.executable private @interface_wg_id {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @interface_wg_id layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_id layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       func.func @interface_wg_id() -> index {
         %0 = hal.interface.workgroup.id[0] : index
@@ -272,9 +272,9 @@ hal.executable private @interface_wg_id {
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @interface_wg_size layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_size layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       func.func @interface_wg_size() {
         %c0 = arith.constant 0.0 : f32
@@ -308,9 +308,9 @@ hal.executable private @interface_wg_size {
 ]>
 hal.executable private @interface_wg_count {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @interface_wg_count layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_count layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       func.func @interface_wg_count() -> index {
         %0 = hal.interface.workgroup.count[0] : index

@@ -15,7 +15,6 @@ include "iree/compiler/Utils/DocMetadata.td"
 //===----------------------------------------------------------------------===//
 
 def VM_Dialect : Dialect {
-  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "vm";
   let cppNamespace = "::mlir::iree_compiler::IREE::VM";
 

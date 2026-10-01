@@ -8,9 +8,9 @@
 // that the `.ELF` magic bytes are present at the start and ignore the contents.
 
 //      CHECK: hal.executable public @executable
-//      CHECK: hal.executable.binary public @rocm_hsaco_fb attributes {
-// CHECK-SAME:   data = dense<"0x7F454C46
+//      CHECK: hal.executable.binary public @rocm_hsaco_fb <
 // CHECK-SAME:   format = "rocm-hsaco-fb"
+// CHECK-SAME:   data = dense<"0x7F454C46
 
 #pipeline_layout = #hal.pipeline.layout<bindings = [
   #hal.pipeline.binding<storage_buffer>

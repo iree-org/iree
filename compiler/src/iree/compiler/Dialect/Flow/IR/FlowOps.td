@@ -755,7 +755,7 @@ def FLOW_CallOp : FLOW_Op<"call", [
 
   let assemblyFormat = [{
     $callee
-    `(` $arguments `)` attr-dict `:`
+    `(` $arguments `)` prop-dict attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
                                type($arguments), $argument_dims,
                                type($results), $result_dims,

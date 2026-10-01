@@ -1,14 +1,14 @@
 // RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 hal.executable @exe {
-  hal.executable.binary @binary1 attributes {
+  hal.executable.binary @binary1 <
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
     format = "format1"
-  }
-  hal.executable.binary @binary2 attributes {
+  >
+  hal.executable.binary @binary2 <
     data = dense<[4, 5, 6, 7]> : vector<4xi8>,
     format = "format2"
-  }
+  >
 }
 
 // CHECK-LABEL: @executableCreate
@@ -20,7 +20,7 @@ util.func public @executableCreate(
 ) -> (!hal.executable, !hal.executable) {
 
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format1_
-  // CHECK-DAG: %[[BINARY1:.+]] = vm.rodata.inline "exe_binary1" {alignment = 16 : i64} : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
+  // CHECK-DAG: %[[BINARY1:.+]] = vm.rodata.inline "exe_binary1" <alignment = 16> : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
   // CHECK-DAG: %[[NULL1:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[EXE1:.+]] = vm.call @hal.executable.create(
   // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]], %[[FORMAT1]], %[[BINARY1]], %[[NULL1]]
@@ -28,7 +28,7 @@ util.func public @executableCreate(
   %0 = hal.executable.create device(%device : !hal.device) affinity(%affinity) target(@exe::@binary1) : !hal.executable
 
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format2_
-  // CHECK-DAG: %[[BINARY2:.+]] = vm.rodata.inline "exe_binary2" {alignment = 16 : i64} : !vm.buffer = dense<[4, 5, 6, 7]> : vector<4xi8>
+  // CHECK-DAG: %[[BINARY2:.+]] = vm.rodata.inline "exe_binary2" <alignment = 16> : !vm.buffer = dense<[4, 5, 6, 7]> : vector<4xi8>
   // CHECK-DAG: %[[NULL2:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[EXE2:.+]] = vm.call @hal.executable.create(
   // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]], %[[FORMAT2]], %[[BINARY2]], %[[NULL2]]
@@ -41,25 +41,25 @@ util.func public @executableCreate(
 // -----
 
 hal.executable @exe1 {
-  hal.executable.binary @binary1 attributes {
+  hal.executable.binary @binary1 <
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
     format = "format"
-  }
+  >
 }
 hal.executable @exe2 {
-  hal.executable.binary @binary2 attributes {
+  hal.executable.binary @binary2 <
     data = dense<[4, 5, 6, 7]> : vector<4xi8>,
     format = "format"
-  }
+  >
 }
 
 // CHECK-LABEL: @multipleExecutables
 util.func public @multipleExecutables(%device: !hal.device, %affinity: i64) -> (!hal.executable, !hal.executable) {
   // CHECK-DAG: %[[FORMAT1:.+]] = vm.rodata.inline "_utf8_format_
-  // CHECK-DAG: %[[BINARY1:.+]] = vm.rodata.inline "exe1_binary1" {alignment = 16 : i64} : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
+  // CHECK-DAG: %[[BINARY1:.+]] = vm.rodata.inline "exe1_binary1" <alignment = 16> : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
   %0 = hal.executable.create device(%device : !hal.device) affinity(%affinity) target(@exe1::@binary1) : !hal.executable
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format_
-  // CHECK-DAG: %[[BINARY2:.+]] = vm.rodata.inline "exe2_binary2" {alignment = 16 : i64} : !vm.buffer = dense<[4, 5, 6, 7]> : vector<4xi8>
+  // CHECK-DAG: %[[BINARY2:.+]] = vm.rodata.inline "exe2_binary2" <alignment = 16> : !vm.buffer = dense<[4, 5, 6, 7]> : vector<4xi8>
   %1 = hal.executable.create device(%device : !hal.device) affinity(%affinity) target(@exe2::@binary2) : !hal.executable
   util.return %0, %1 : !hal.executable, !hal.executable
 }
@@ -67,10 +67,10 @@ util.func public @multipleExecutables(%device: !hal.device, %affinity: i64) -> (
 // -----
 
 hal.executable @exe {
-  hal.executable.binary @binary attributes {
+  hal.executable.binary @binary <
     data = dense<[0, 1, 2, 3]> : vector<4xi8>,
     format = "format"
-  }
+  >
 }
 
 // CHECK-LABEL: @executableConstants
@@ -83,7 +83,7 @@ util.func public @executableConstants(
     %constant0: i32, %constant1: i32
   ) -> !hal.executable {
   // CHECK-DAG: %[[FORMAT:.+]] = vm.rodata.inline "_utf8_format_
-  // CHECK-DAG: %[[BINARY:.+]] = vm.rodata.inline "exe_binary" {alignment = 16 : i64} : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
+  // CHECK-DAG: %[[BINARY:.+]] = vm.rodata.inline "exe_binary" <alignment = 16> : !vm.buffer = dense<[0, 1, 2, 3]> : vector<4xi8>
 
   // CHECK: %[[CONSTANTS:.+]] = vm.buffer.alloc %c12, %c16 : !vm.buffer
   // CHECK-DAG: %[[INDEX0:.+]] = vm.const.i64 0
