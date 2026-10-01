@@ -14,12 +14,12 @@ def iree_c_module(
         h_file_output,
         flags,
         deps = [
-            "//runtime/src/iree/vm",
-            "//runtime/src/iree/vm:ops",
-            "//runtime/src/iree/vm:ops_emitc",
-            "//runtime/src/iree/vm:shims_emitc",
+            Label("//runtime/src/iree/vm"),
+            Label("//runtime/src/iree/vm:ops"),
+            Label("//runtime/src/iree/vm:ops_emitc"),
+            Label("//runtime/src/iree/vm:shims_emitc"),
         ],
-        compile_tool = "//tools:iree-compile",
+        compile_tool = Label("//tools:iree-compile"),
         no_runtime = None,
         static_lib_path = "",
         **kwargs):
@@ -77,7 +77,7 @@ def iree_c_module(
     iree_runtime_cc_library(
         name = name,
         hdrs = [h_file_output],
-        srcs = ["//runtime/src/iree/vm:module_impl_emitc.c", h_file_output],
+        srcs = [Label("//runtime/src/iree/vm:module_impl_emitc.c"), h_file_output],
         copts = [
             "-DEMITC_IMPLEMENTATION='\"$(location %s)\"'" % h_file_output,
             # Generated EmitC code may have unused variables from optimization

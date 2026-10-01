@@ -42,19 +42,19 @@ load("//build_tools/bazel:iree_hal_executable.bzl", "iree_hal_executables")
 # Non-executable test categories. Each entry maps a test binary name suffix
 # to the aggregate test library it links.
 _NON_EXECUTABLE_SUITES = [
-    ("buffer_tests", "//runtime/src/iree/hal/cts/buffer:all_tests"),
-    ("command_buffer_tests", "//runtime/src/iree/hal/cts/command_buffer:all_tests"),
-    ("core_tests", "//runtime/src/iree/hal/cts/core:all_tests"),
-    ("file_tests", "//runtime/src/iree/hal/cts/file:all_tests"),
-    ("queue_tests", "//runtime/src/iree/hal/cts/queue:all_tests"),
+    ("buffer_tests", Label("//runtime/src/iree/hal/cts/buffer:all_tests")),
+    ("command_buffer_tests", Label("//runtime/src/iree/hal/cts/command_buffer:all_tests")),
+    ("core_tests", Label("//runtime/src/iree/hal/cts/core:all_tests")),
+    ("file_tests", Label("//runtime/src/iree/hal/cts/file:all_tests")),
+    ("queue_tests", Label("//runtime/src/iree/hal/cts/queue:all_tests")),
 ]
 
 # Executable-dependent test categories. Each entry maps a test binary name
 # suffix to the aggregate test library it links.
 _EXECUTABLE_SUITES = [
-    ("dispatch_tests", "//runtime/src/iree/hal/cts/command_buffer:all_dispatch_tests"),
-    ("executable_tests", "//runtime/src/iree/hal/cts/core:all_executable_tests"),
-    ("queue_dispatch_tests", "//runtime/src/iree/hal/cts/queue:queue_dispatch_test"),
+    ("dispatch_tests", Label("//runtime/src/iree/hal/cts/command_buffer:all_dispatch_tests")),
+    ("executable_tests", Label("//runtime/src/iree/hal/cts/core:all_executable_tests")),
+    ("queue_dispatch_tests", Label("//runtime/src/iree/hal/cts/queue:queue_dispatch_test")),
 ]
 
 def _camel_case(snake_str):
@@ -201,7 +201,7 @@ def iree_hal_cts_testdata(
     rule_flag_values = {v: k for k, v in flag_values.items()}
     _cts_testdata_gen(
         name = gen_cc_name,
-        template = "//runtime/src/iree/hal/cts/util:testdata_format.cc.tpl",
+        template = Label("//runtime/src/iree/hal/cts/util:testdata_format.cc.tpl"),
         out = gen_cc_file,
         substitutions = {
             "{HEADER_PATH}": header_path,
@@ -223,7 +223,7 @@ def iree_hal_cts_testdata(
         srcs = [gen_cc_file],
         deps = [
             ":%s" % testdata_name,
-            "//runtime/src/iree/hal/cts/util:registry",
+            Label("//runtime/src/iree/hal/cts/util:registry"),
         ],
         alwayslink = True,
     )
@@ -319,17 +319,17 @@ def iree_hal_cts_test_suite(
     # Common deps for all test binaries.
     common_deps = [
         backends_lib,
-        "//runtime/src/iree/base/tooling:flags",
-        "//runtime/src/iree/hal/cts/util:registry",
-        "//runtime/src/iree/hal/cts/util:test_base",
-        "//runtime/src/iree/testing:gtest",
+        Label("//runtime/src/iree/base/tooling:flags"),
+        Label("//runtime/src/iree/hal/cts/util:registry"),
+        Label("//runtime/src/iree/hal/cts/util:test_base"),
+        Label("//runtime/src/iree/testing:gtest"),
     ]
 
     # Non-executable test binaries.
     for suffix, test_lib in _NON_EXECUTABLE_SUITES:
         _iree_hal_cts_test(
             name = "%s%s" % (prefix, suffix),
-            srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+            srcs = [Label("//runtime/src/iree/hal/cts/util:test_main.cc")],
             args = args,
             deps = common_deps + [test_lib],
             resource_group = resource_group,
@@ -343,7 +343,7 @@ def iree_hal_cts_test_suite(
         for suffix, test_lib in _EXECUTABLE_SUITES:
             _iree_hal_cts_test(
                 name = "%s%s" % (prefix, suffix),
-                srcs = ["//runtime/src/iree/hal/cts/util:test_main.cc"],
+                srcs = [Label("//runtime/src/iree/hal/cts/util:test_main.cc")],
                 args = args,
                 deps = common_deps + _testdata_libs + [test_lib],
                 resource_group = resource_group,
