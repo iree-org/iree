@@ -94,12 +94,12 @@ Value createGenericElementwiseCastOp(
   return linalg::GenericOp::create(
              builder, loc, castedType, input, init, maps, iteratorTypes,
              [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-               OperationState state(
-                   nestedLoc, castOp->getName(), args.take_front(1),
-                   elementType,
-                   castOp->getDiscardableAttrDictionary().getValue());
-               state.propertiesAttr = castOp->getPropertiesAsAttribute();
-               Value castRes = b.create(state)->getResult(0);
+               Operation *scalarCast = castOp->clone(
+                   Operation::CloneOptions().withResultTypes({{elementType}}));
+               scalarCast->setLoc(nestedLoc);
+               scalarCast->setOperands(args.take_front(1));
+               b.insert(scalarCast);
+               Value castRes = scalarCast->getResult(0);
                linalg::YieldOp::create(b, nestedLoc, castRes);
              },
              attrs)

@@ -513,25 +513,16 @@ struct LegalizeResultElementType : ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> convertedOperands,
                   ConversionPatternRewriter &rewriter) const final {
-    Location loc = op->getLoc();
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
       Type legalizedType = this->typeConverter->convertType(resultType);
       assert(legalizedType && "Failed to drop encoding from type");
       resultTypes.push_back(legalizedType);
     }
-    OperationState state(loc, op->getName(), convertedOperands, resultTypes,
-                         op->getAttrs());
-    for (unsigned i = 0, e = op->getNumRegions(); i != e; ++i) {
-      state.addRegion();
-    }
-    for (auto successor : op->getSuccessors()) {
-      state.addSuccessors(successor);
-    }
-    Operation *newOp = rewriter.insert(Operation::create(
-        state.location, state.name, state.types, state.operands,
-        std::move(state.attributes), op->getPropertiesStorage(),
-        state.successors, state.regions));
+    Operation *newOp = op->clone(Operation::CloneOptions().withResultTypes(
+        llvm::to_vector(resultTypes)));
+    newOp->setOperands(convertedOperands);
+    rewriter.insert(newOp);
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.

@@ -355,11 +355,10 @@ void reorderTranspose(RewriterBase &rewriter,
       transposedOperands.push_back(transposed);
     }
     SmallVector<Type> resultTypes{transposedOperands.front().getType()};
-    OperationState state(op->getLoc(), op->getName(), transposedOperands,
-                         resultTypes,
-                         op->getDiscardableAttrDictionary().getValue());
-    state.propertiesAttr = op->getPropertiesAsAttribute();
-    Operation *newOp = rewriter.create(state);
+    Operation *newOp = op->clone(Operation::CloneOptions().withResultTypes(
+        llvm::to_vector(resultTypes)));
+    newOp->setOperands(transposedOperands);
+    rewriter.insert(newOp);
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
   }
 }

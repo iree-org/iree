@@ -74,8 +74,8 @@ compareCastCompatibleOperations(transform::TransformOpInterface transformOp,
            << payload->getAttrDictionary();
   }
 
-  if (target->getPropertiesAsAttribute() !=
-      payload->getPropertiesAsAttribute()) {
+  if (!target->getName().compareOpProperties(target->getPropertiesStorage(),
+                                             payload->getPropertiesStorage())) {
     return transformOp.emitSilenceableError()
            << "target properties do not match payload properties";
   }

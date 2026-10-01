@@ -108,20 +108,20 @@ public:
 
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
-    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
-                         newResults, newAttrs, op->getSuccessors());
-    for (Region &r : op->getRegions()) {
-      Region *newRegion = state.addRegion();
-      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
-      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+    Operation *newOp = op->clone(
+        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
+    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
+    for (auto [r, newRegion] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
+      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
+      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
       (void)getTypeConverter()->convertSignatureArgs(
-          newRegion->getArgumentTypes(), result);
-      rewriter.applySignatureConversion(&newRegion->front(), result);
+          newRegion.getArgumentTypes(), result);
+      rewriter.applySignatureConversion(&newRegion.front(), result);
     }
-    Operation *newOp = rewriter.insert(Operation::create(
-        state.location, state.name, state.types, state.operands,
-        std::move(state.attributes), op->getPropertiesStorage(),
-        state.successors, state.regions));
+
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

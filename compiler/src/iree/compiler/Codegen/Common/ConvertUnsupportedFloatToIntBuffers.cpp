@@ -207,17 +207,16 @@ struct GenericTypeConversionPattern : ConversionPattern {
     llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
-    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
-                         newResults, newAttrs, op->getSuccessors());
+    Operation *newOp = op->clone(
+        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
+    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
 
-    for (Region &r : op->getRegions()) {
-      Region *newRegion = state.addRegion();
-      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
+    for (auto [r, newRegion] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
+      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
     }
-    Operation *newOp = rewriter.insert(Operation::create(
-        state.location, state.name, state.types, state.operands,
-        std::move(state.attributes), op->getPropertiesStorage(),
-        state.successors, state.regions));
 
     for (Region &newRegion : newOp->getRegions()) {
       TypeConverter::SignatureConversion result(newRegion.getNumArguments());
