@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AsmState.h"
@@ -485,13 +486,13 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
     return Tuple{1, 4, 1};
   case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
     return Tuple{4, 1, 1};
-  // VLs = vlen / 8 lanes, one LMUL=2 register group at 16-bit elements.
+  // RVV: M or N is vlen/8. Enum bit 0 is the swapped orientation.
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16: {
     int64_t vl = vlen / 8;
-    bool transposed =
-        intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16;
-    return transposed ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
+    return isMNSwapped(intrinsic) ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
   }
   default:
     if (isGenericScalar(intrinsic)) {
@@ -514,6 +515,11 @@ constexpr uint32_t kMMAIntrinsicISAX86Avx2 = 0x1200;
 constexpr uint32_t kMMAIntrinsicISAX86Avx512 = 0x1300;
 constexpr uint32_t kMMAIntrinsicISAArmSve = 0x2200;
 constexpr uint32_t kMMAIntrinsicISARiscvV = 0x3100;
+constexpr uint32_t kMMAIntrinsicMNSwappedBit = 0x0001;
+
+bool isMNSwapped(MMAIntrinsic intr) {
+  return (static_cast<uint32_t>(intr) & kMMAIntrinsicMNSwappedBit) != 0;
+}
 
 bool isGenericScalar(MMAIntrinsic intr) {
   return (static_cast<uint32_t>(intr) & kMMAIntrinsicISAMask) ==
@@ -737,6 +743,8 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
     return {f64, f64, f64};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F32:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
     return {f32, f32, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
@@ -962,16 +970,103 @@ static Value lowerX86Avx512Vnni16x16x2I8(OpBuilder &b, Location loc, Value lhs,
   return result;
 }
 
+// Insert a fixed 1-D vector into poison `nxv8` so 8 * vscale == vlen/8 lanes.
+// Poison plus a tail-agnostic policy lets LLVM treat the insert as a
+// register copy. Already-scalable values are returned unchanged.
+static Value insertFixedIntoNxv8(OpBuilder &b, Location loc, Value v) {
+  auto vt = dyn_cast<VectorType>(v.getType());
+  if (!vt) {
+    return v;
+  }
+  if (vt.getRank() > 1) {
+    v = vector::ShapeCastOp::create(
+        b, loc, VectorType::get({vt.getNumElements()}, vt.getElementType()), v);
+    vt = cast<VectorType>(v.getType());
+  }
+  if (vt.isScalable()) {
+    return v;
+  }
+  auto scalableTy = VectorType::get({8}, vt.getElementType(), {true});
+  Value pad = ub::PoisonOp::create(b, loc, scalableTy);
+  return vector::ScalableInsertOp::create(b, loc, v, pad, /*pos=*/0);
+}
+
+static Value extractNxv8ToFixed(OpBuilder &b, Location loc, Value v,
+                                int64_t lanes) {
+  auto vt = cast<VectorType>(v.getType());
+  if (!vt.isScalable()) {
+    return v;
+  }
+  auto fixedTy = VectorType::get({lanes}, vt.getElementType());
+  return vector::ScalableExtractOp::create(b, loc, fixedTy, v, /*pos=*/0);
+}
+
+// RVV `.vf` FMA (`vfmacc` / `vfwmaccbf16`). Enum bit 0 selects which operand
+// is the scalar (swapped => RHS). The vector operand is inserted into nxv8 so
+// 8 * vscale == vlen/8 lanes. ACC is left scalable when the caller already
+// legalized it (hoisted out of K). frm=7 is DYN; policy=1 is tail-agnostic.
+static Value lowerRiscvVFmaccLike(OpBuilder &b, Location loc,
+                                  MMAIntrinsic intrinsic, int64_t vlen,
+                                  Value lhs, Value rhs, Value acc,
+                                  StringRef llvmName) {
+  bool lhsIsScalar = !isMNSwapped(intrinsic);
+  Value scalarSrc = lhsIsScalar ? lhs : rhs;
+  Value vec = lhsIsScalar ? rhs : lhs;
+
+  auto flattenIfNeeded = [&](Value v) -> Value {
+    auto vt = dyn_cast<VectorType>(v.getType());
+    if (!vt || vt.getRank() <= 1) {
+      return v;
+    }
+    return vector::ShapeCastOp::create(
+        b, loc, VectorType::get({vt.getNumElements()}, vt.getElementType()), v);
+  };
+  vec = flattenIfNeeded(vec);
+  acc = flattenIfNeeded(acc);
+  scalarSrc = flattenIfNeeded(scalarSrc);
+
+  auto scalarTy = cast<VectorType>(scalarSrc.getType());
+  SmallVector<int64_t> zeros(scalarTy.getRank(), 0);
+  Value scalar = vector::ExtractOp::create(b, loc, scalarSrc, zeros);
+
+  Value accScalable = insertFixedIntoNxv8(b, loc, acc);
+  Value vecScalable = insertFixedIntoNxv8(b, loc, vec);
+  bool accWasScalable = cast<VectorType>(acc.getType()).isScalable();
+
+  int64_t lanes = vlen / 8;
+  Value frm = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(7));
+  Value vl = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(lanes));
+  // RISC-V vector policy: bit0 = tail (0=tu, 1=ta), bit1 = mask (0=mu, 1=ma).
+  // 1 = tail-agnostic. The intrinsic is unmasked, so the mask bit stays 0.
+  Value policy = arith::ConstantOp::create(b, loc, b.getI64IntegerAttr(1));
+  Value resultScalable =
+      LLVM::CallIntrinsicOp::create(
+          b, loc, accScalable.getType(), b.getStringAttr(llvmName),
+          ValueRange{accScalable, scalar, vecScalable, frm, vl, policy})
+          .getResult(0);
+  if (accWasScalable) {
+    return resultScalable;
+  }
+  auto accFixedTy = cast<VectorType>(acc.getType());
+  return vector::ScalableExtractOp::create(b, loc, accFixedTy, resultScalable,
+                                           /*pos=*/0);
+}
+
 // Lowers a MMAIntrinsic to a llvm.call_intrinsic op, plus any necessary
 // additional ops (potentially broadcasting or widening LHS/RHS or creating an
 // add op if the intrinsic isn't already adding the accumulator).
 static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
                                        MMAIntrinsic intrinsic, Value lhs,
-                                       Value rhs, Value acc) {
+                                       Value rhs, Value acc, int64_t vlen) {
   // The 16x16x2 i8 intrinsic processes whole panels and has its own widen /
   // shuffle scheme; it bypasses the per-row widen + broadcast path below.
   if (intrinsic == MMAIntrinsic::MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16) {
     return lowerX86Avx512Vnni16x16x2I8(builder, loc, lhs, rhs, acc);
+  }
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32) {
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
+                                "llvm.riscv.vfmacc");
   }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
@@ -1255,8 +1350,25 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
   }
   auto emitIntrinsic = [&](OpBuilder &b, Location loc, Value lhs, Value rhs,
                            Value acc) -> Value {
-    return createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs, acc);
+    return createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs, acc,
+                                     getVlen());
   };
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32) {
+    int64_t lanes = getVlen() / 8;
+    auto legalizeAcc = [](OpBuilder &b, Location loc, Value v) -> Value {
+      return insertFixedIntoNxv8(b, loc, v);
+    };
+    auto restoreAcc = [lanes](OpBuilder &b, Location loc, Value v) -> Value {
+      return extractNxv8ToFixed(b, loc, v, lanes);
+    };
+    return Codegen::buildDataTiledMMAUnderlyingOperations(
+        builder, loc, getSwizzle(*this, /*operandIdx=*/0),
+        getSwizzle(*this, /*operandIdx=*/1),
+        getSwizzle(*this, /*operandIdx=*/2), getIntrinsicsM(), getIntrinsicsN(),
+        getIntrinsicsK(), inputs, outputs, emitIntrinsic, results, legalizeAcc,
+        restoreAcc);
+  }
   return Codegen::buildDataTiledMMAUnderlyingOperations(
       builder, loc, getSwizzle(*this, /*operandIdx=*/0),
       getSwizzle(*this, /*operandIdx=*/1), getSwizzle(*this, /*operandIdx=*/2),

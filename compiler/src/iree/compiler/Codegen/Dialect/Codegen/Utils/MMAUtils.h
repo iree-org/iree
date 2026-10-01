@@ -75,6 +75,13 @@ distributeMmaFragmentToIntrinsics(OpBuilder &builder, Location loc, Value value,
 using DataTiledMMAIntrinsicEmitter = llvm::function_ref<Value(
     OpBuilder &builder, Location loc, Value lhs, Value rhs, Value acc)>;
 
+/// Optional map applied to each per-intrinsic ACC piece inside the hoistable
+/// distribute / reassemble pair. Empty means identity. Used by RVV to convert
+/// fixed ACC rows to scalable `nxv8` (and back) so that conversion hoists out
+/// of the K loop rather than running around every FMA.
+using DataTiledMMAValueXformer =
+    llvm::function_ref<Value(OpBuilder &builder, Location loc, Value value)>;
+
 /// Common body of `DataTiledMMAAttr::buildUnderlyingOperations`, used by both
 /// CPU and GPU. Distributes `inputs` and `outputs[0]` into per-intrinsic flat
 /// vectors using the three swizzles, runs an `(mu, nu, ku)` unroll loop
@@ -88,13 +95,17 @@ using DataTiledMMAIntrinsicEmitter = llvm::function_ref<Value(
 /// Operand vector ranks may be either the swizzle's full expanded form (GPU)
 /// or the 2-D (outer × inner) collapsed form (CPU); the helper reshapes as
 /// needed.
+///
+/// When `legalizeAcc` / `restoreAcc` are set they run inside the hoistable
+/// distribute / reassemble bodies and must be inverses of each other.
 LogicalResult buildDataTiledMMAUnderlyingOperations(
     OpBuilder &builder, Location loc, const TileSwizzle &lhsSwizzle,
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
     int64_t intrinsicsM, int64_t intrinsicsN, int64_t intrinsicsK,
     ValueRange inputs, ValueRange outputs,
-    DataTiledMMAIntrinsicEmitter emitIntrinsic,
-    SmallVectorImpl<Value> &results);
+    DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
+    DataTiledMMAValueXformer legalizeAcc = {},
+    DataTiledMMAValueXformer restoreAcc = {});
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

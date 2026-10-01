@@ -25,6 +25,9 @@ def IREECPU_Dialect : Dialect {
     LLVM are handled separately.
   }];
   let useDefaultAttributePrinterParser = 1;
+  // `DataTiledMMAAttr::buildUnderlyingOperations` creates `ub.poison` when
+  // lowering RVV intrinsics.
+  let dependentDialects = ["::mlir::ub::UBDialect"];
 
   let extraClassDeclaration = [{
     void registerAttributes();
