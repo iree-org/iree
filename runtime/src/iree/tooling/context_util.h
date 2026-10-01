@@ -57,6 +57,9 @@ iree_vm_module_t* iree_tooling_module_list_back(
 // |default_device_uri| can be specified to provide a default if a device flag
 // is not provided by the user.
 // |out_device_list| will contain the created devices if using the full HAL.
+// With --device_replay_output= it holds the replay-recording devices the
+// modules use, so fences and other HAL resources created on them enter the
+// capture, as do profiling sessions begun on them (replay skips those).
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
 // |out_replay_recorder| will contain a recorder that must be closed after all
@@ -99,6 +102,9 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 // |default_device_uri| can be specified to provide a default if a device flag
 // is not provided by the user.
 // |out_device_list| will contain the created devices if using the full HAL.
+// With --device_replay_output= it holds the replay-recording devices the
+// modules use, so fences and other HAL resources created on them enter the
+// capture, as do profiling sessions begun on them (replay skips those).
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
 // |out_replay_recorder| will contain a recorder that must be closed after all
