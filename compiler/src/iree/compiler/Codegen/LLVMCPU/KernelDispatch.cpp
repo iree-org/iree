@@ -2653,12 +2653,9 @@ getElementwiseVectorSizes(mlir::FunctionOpInterface entryPointFn,
   bool hasAArch64ScalableSupport =
       isAArch64(config) &&
       (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
-  if (isScalableVectorizationEnabled() &&
+  if (hasSMEFeature(config) && isScalableVectorizationEnabled() &&
       (hasAArch64ScalableSupport || isArmStreamingForced())) {
-    if (scalableFlags.size() == 3)
-      scalableFlags[1] = true;
-    else
-      scalableFlags.back() = true;
+    scalableFlags.back() = true;
   }
 
   LDBG() << "Elementwise vector sizes: " << tileSizes;
@@ -2695,8 +2692,6 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   auto [vecSizes, vecScalableDims] = *vecDims;
   distConfig.minTileSizes = vecSizes;
-  // distConfig.minTileSizes = getMinTilingSizesForEachDim(
-  //     entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
@@ -2754,7 +2749,6 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   LoweringConfigGenerator generator(genericOp);
   generator.setDistributionTileSizes(distTileSizes);
-  // vecScalableDims = SmallVector<bool>(vecTileSizes.size(), true);
   generator.setVectorTileSizes(vecTileSizes, vecScalableDims);
   IREE::CPU::LoweringConfigAttr loweringConfig =
       generator.generateCPULoweringConfig();
