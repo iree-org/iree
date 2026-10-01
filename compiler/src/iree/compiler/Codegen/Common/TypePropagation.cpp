@@ -210,8 +210,12 @@ struct NamedOpTypePropagation : TypePropagationPattern<OpTy> {
     }
     NamedAttrList attrs(namedOp->getAttrs());
     attrs.erase("operandSegmentSizes");
-    rewriter.replaceOpWithNewOp<OpTy>(namedOp, resultTypes, adaptor.getInputs(),
-                                      adaptor.getOutputs(), attrs.getAttrs());
+    OperationState state(namedOp.getLoc(), namedOp->getName());
+    state.getOrAddProperties<typename OpTy::Properties>() =
+        namedOp.getProperties();
+    OpTy::build(rewriter, state, resultTypes, adaptor.getInputs(),
+                adaptor.getOutputs(), attrs.getAttrs());
+    rewriter.replaceOp(namedOp, rewriter.create(state)->getResults());
     return success();
   }
 };
