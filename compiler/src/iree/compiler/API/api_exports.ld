@@ -443,6 +443,7 @@ VER_0 {
     mlirDialectHandleInsertDialect;
     mlirDialectHandleLoadDialect;
     mlirDialectHandleRegisterDialect;
+    mlirDialectMaterializeConstant;
     mlirDialectRegistryCreate;
     mlirDialectRegistryDestroy;
     mlirDictionaryAttrGet;

@@ -442,6 +442,7 @@ EXPORTS
   mlirDialectHandleInsertDialect
   mlirDialectHandleLoadDialect
   mlirDialectHandleRegisterDialect
+  mlirDialectMaterializeConstant
   mlirDialectRegistryCreate
   mlirDialectRegistryDestroy
   mlirDictionaryAttrGet

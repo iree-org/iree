@@ -452,6 +452,7 @@ extern void mlirDialectHandleGetNamespace();
 extern void mlirDialectHandleInsertDialect();
 extern void mlirDialectHandleLoadDialect();
 extern void mlirDialectHandleRegisterDialect();
+extern void mlirDialectMaterializeConstant();
 extern void mlirDialectRegistryCreate();
 extern void mlirDialectRegistryDestroy();
 extern void mlirDictionaryAttrGet();
@@ -1698,6 +1699,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&mlirDialectHandleInsertDialect;
   x += (uintptr_t)&mlirDialectHandleLoadDialect;
   x += (uintptr_t)&mlirDialectHandleRegisterDialect;
+  x += (uintptr_t)&mlirDialectMaterializeConstant;
   x += (uintptr_t)&mlirDialectRegistryCreate;
   x += (uintptr_t)&mlirDialectRegistryDestroy;
   x += (uintptr_t)&mlirDictionaryAttrGet;

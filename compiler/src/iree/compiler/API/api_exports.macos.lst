@@ -441,6 +441,7 @@ _mlirDialectHandleGetNamespace
 _mlirDialectHandleInsertDialect
 _mlirDialectHandleLoadDialect
 _mlirDialectHandleRegisterDialect
+_mlirDialectMaterializeConstant
 _mlirDialectRegistryCreate
 _mlirDialectRegistryDestroy
 _mlirDictionaryAttrGet
