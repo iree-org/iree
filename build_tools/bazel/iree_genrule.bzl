@@ -35,6 +35,8 @@ def iree_genrule(
         name = name,
         srcs = srcs,
         outs = outs,
-        cmd = cmd,
+        # CMake uses rootpath to distinguish source files from generated files.
+        # Bazel actions need execution paths for both, including external repos.
+        cmd = cmd.replace("$(rootpath ", "$(execpath "),
         **kwargs
     )
