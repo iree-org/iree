@@ -362,9 +362,16 @@ static iree_status_t iree_vm_bytecode_internal_enter(
   function.module = module;
   function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
   function.ordinal = function_ordinal;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_bytecode_function_enter(stack, function, iree_string_view_empty(),
-                                      out_callee_frame, out_callee_registers));
+  // Call register lists contain one entry per value, including 64-bit values.
+  // Use the callee signature to determine each value's width and ABI alignment.
+  iree_vm_function_signature_t signature =
+      iree_vm_function_signature(&function);
+  iree_string_view_t cconv_arguments;
+  iree_string_view_t cconv_results;
+  IREE_RETURN_IF_ERROR(iree_vm_function_call_get_cconv_fragments(
+      &signature, &cconv_arguments, &cconv_results));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_function_enter(
+      stack, function, cconv_results, out_callee_frame, out_callee_registers));
 
   // Remaps argument/result registers from a source list in the caller/callee
   // frame to the 0-N ABI registers in the callee/caller frame.
@@ -382,17 +389,27 @@ static iree_status_t iree_vm_bytecode_internal_enter(
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
     uint16_t src_reg = src_reg_list->registers[i];
-    if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
-      uint16_t dst_reg = ref_reg_offset++;
-      memset(&dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK], 0,
-             sizeof(iree_vm_ref_t));
-      iree_vm_ref_retain_or_move(
-          src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
-          &src_regs.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
-          &dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
-    } else {
-      uint16_t dst_reg = i32_reg_offset++;
-      dst_regs->i32[dst_reg] = src_regs.i32[src_reg];
+    switch (cconv_arguments.data[i]) {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        dst_regs->i32[i32_reg_offset++] = src_regs.i32[src_reg];
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        i32_reg_offset = iree_host_align(i32_reg_offset, 2);
+        memcpy(&dst_regs->i32[i32_reg_offset], &src_regs.i32[src_reg],
+               sizeof(int64_t));
+        i32_reg_offset += 2;
+        break;
+      case IREE_VM_CCONV_TYPE_REF: {
+        uint16_t dst_reg = ref_reg_offset++;
+        memset(&dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK], 0,
+               sizeof(iree_vm_ref_t));
+        iree_vm_ref_retain_or_move(
+            src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+            &src_regs.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+            &dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+      } break;
     }
   }
 
@@ -431,18 +448,31 @@ static iree_status_t iree_vm_bytecode_internal_leave(
   }
   iree_vm_registers_t caller_registers =
       iree_vm_bytecode_get_register_storage(caller_frame);
+  iree_vm_bytecode_frame_storage_t* callee_storage =
+      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
+          callee_frame);
+  iree_string_view_t cconv_results = callee_storage->cconv_results;
   for (int i = 0; i < src_reg_list->size; ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
     uint16_t src_reg = src_reg_list->registers[i];
     uint16_t dst_reg = dst_reg_list->registers[i];
-    if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
-      iree_vm_ref_retain_or_move(
-          src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
-          &callee_registers.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
-          &caller_registers.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
-    } else {
-      caller_registers.i32[dst_reg] = callee_registers.i32[src_reg];
+    switch (cconv_results.data[i]) {
+      case IREE_VM_CCONV_TYPE_I32:
+      case IREE_VM_CCONV_TYPE_F32:
+        caller_registers.i32[dst_reg] = callee_registers.i32[src_reg];
+        break;
+      case IREE_VM_CCONV_TYPE_I64:
+      case IREE_VM_CCONV_TYPE_F64:
+        memcpy(&caller_registers.i32[dst_reg], &callee_registers.i32[src_reg],
+               sizeof(int64_t));
+        break;
+      case IREE_VM_CCONV_TYPE_REF:
+        iree_vm_ref_retain_or_move(
+            src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+            &callee_registers.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+            &caller_registers.ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK]);
+        break;
     }
   }
   // Clear return_registers so it's not misinterpreted as resume state by
@@ -450,9 +480,6 @@ static iree_status_t iree_vm_bytecode_internal_leave(
   caller_storage->return_registers = NULL;
 
   // Mark successful completion - compiler guarantees all refs are released.
-  iree_vm_bytecode_frame_storage_t* callee_storage =
-      (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
-          callee_frame);
   callee_storage->result_code = IREE_STATUS_OK;
 
   // Leave and deallocate bytecode stack frame.
