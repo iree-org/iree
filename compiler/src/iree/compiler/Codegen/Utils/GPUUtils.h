@@ -275,20 +275,22 @@ FailureOr<XorShuffleParams> getXorShuffleParamsForUntunedChipset(
 /// computed by calculating the K tile size and LDS bank width. Note this
 /// generic heuristic for untuned cases is not guaranteed to be optimal for all
 /// targets and intrinsics.
-FailureOr<XorShuffleParams>
-getXorShuffleParams(IREE::GPU::TargetAttr target,
-                    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                    bool skipUntunedFallback = false);
+FailureOr<XorShuffleParams> getXorShuffleParams(
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+    bool skipUntunedFallback = false,
+    function_ref<LogicalResult(XorShuffleParams)> constraint = nullptr);
 
 /// Returns the XOR shuffle attribute for the given target, intrinsic, and
 /// operand index.
-FailureOr<Attribute>
-getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
-                  IREE::GPU::TargetAttr target,
-                  IREE::Codegen::InnerTileDescAttrInterface intrinsic,
-                  ArrayRef<int64_t> reductionTileSizes, int operandIndex,
-                  bool skipUntunedFallback = false);
+FailureOr<Attribute> getXorShuffleAttr(
+    MLIRContext *context, Attribute baseConfigAttr,
+    IREE::GPU::TargetAttr target,
+    IREE::Codegen::InnerTileDescAttrInterface intrinsic,
+    ArrayRef<int64_t> reductionTileSizes, int operandIndex,
+    bool skipUntunedFallback = false,
+    function_ref<LogicalResult(XorShuffleParams)> constraint = nullptr);
 
 /// Apply inverse XOR swizzle to a sub-tile-local source offset so that the
 /// DMA write-side permutation matches the read-side (ResolveSwizzleHints).
@@ -309,6 +311,14 @@ getXorShuffleAttr(MLIRContext *context, Attribute baseConfigAttr,
 Value applyInverseXorSwizzleToDMASourceOffset(
     OpBuilder &builder, Location loc, Value srcLinearOffset,
     IREE::Codegen::XORShuffleAttr swizzle, Value dest);
+
+/// When using direct-load, this function is used to constrain the XOR shuffle
+/// parameters based on the DMA sizes available in the target.
+/// The swizzle access width (in bits) must be at least as wide as the
+/// narrowest supported DMA load.
+std::function<LogicalResult(XorShuffleParams)>
+makeDmaConstraintFnForXorShuffle(IREE::GPU::TargetAttr target,
+                                 int64_t elemBits);
 
 //===----------------------------------------------------------------------===//
 // GPU CodeGen op filter
