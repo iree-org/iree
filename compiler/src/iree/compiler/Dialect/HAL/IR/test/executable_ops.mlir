@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 #executable_target_format = #hal.executable.target<"backend", "format">
 
@@ -12,21 +13,20 @@ hal.executable @executable {
     #hal.executable.object<{path = "bar.bin"}>
   ]) {
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
-    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]> attributes {test.discardable}
     hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
-    ]>) attributes {
+    ]>) <
       workgroup_size = [4 : index, 1 : index, 1 : index]
-    }
+    > attributes {test.discardable}
   }
   // CHECK: hal.executable.binary
-  hal.executable.binary @backend_binary attributes {
-    // CHECK-SAME: data = dense<1> : vector<128xi8>,
-    data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = "some_format"
-    format = "some_format"
-  }
+  hal.executable.binary @backend_binary <
+    // CHECK-SAME: format = "some_format", data = dense<1> : vector<128xi8>
+    format = "some_format",
+    data = dense<1> : vector<128xi8>
+  >
 }
 
 // -----
@@ -96,25 +96,23 @@ hal.executable @executable_with_condition {
     }
 
     // CHECK-DAG: hal.executable.export public @entry0 ordinal(0) layout(#pipeline_layout)
-    // CHECK:     subgroup_size = 64 : index
-    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index]
+    // CHECK:     workgroup_size = [4 : index, 1 : index, 1 : index], subgroup_size = 64
     hal.executable.export public @entry0 ordinal(0) layout(#hal.pipeline.layout<bindings = [
       #hal.pipeline.binding<storage_buffer>,
       #hal.pipeline.binding<storage_buffer>
     ]>) count(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index) -> (index, index, index) {
       hal.return %arg0, %arg1, %arg2 : index, index, index
-    } attributes {
-      subgroup_size = 64 : index,
+    } <
+      subgroup_size = 64,
       workgroup_size = [4 : index, 1 : index, 1 : index]
-    }
+    >
   }
   // CHECK: hal.executable.binary
-  hal.executable.binary @backend_binary attributes {
-    // CHECK-SAME: data = dense<1> : vector<128xi8>,
-    data = dense<1> : vector<128xi8>,
-    // CHECK-SAME: format = "some_format"
-    format = "some_format"
-  }
+  hal.executable.binary @backend_binary <
+    // CHECK-SAME: format = "some_format", data = dense<1> : vector<128xi8>
+    format = "some_format",
+    data = dense<1> : vector<128xi8>
+  >
 }
 
 // -----

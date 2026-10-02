@@ -447,12 +447,12 @@ module attributes {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x16x2x4x8x4x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x16x2x4x8x4x4x16x4xf32>) -> tensor<1x16x2x4x8x4x4x16x4xf32>
-    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1)<
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-        } : tensor<1x128x2x8x4x16x8xf8E4M3FNUZ>, tensor<16x128x4x4x4x16x8xf8E4M3FNUZ> into tensor<1x16x2x4x8x4x4x16x4xf32>
+        > : tensor<1x128x2x8x4x16x8xf8E4M3FNUZ>, tensor<16x128x4x4x4x16x8xf8E4M3FNUZ> into tensor<1x16x2x4x8x4x4x16x4xf32>
     return %2 : tensor<1x16x2x4x8x4x4x16x4xf32>
   }
 }
@@ -486,12 +486,12 @@ module attributes {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x4x8x8x2x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x4x8x8x2x4x16x4xf32>) -> tensor<1x4x8x8x2x4x16x4xf32>
-    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1)<
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FNUZ,  intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 8, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-        } : tensor<1x64x8x4x16x2x8xf8E4M3FNUZ>, tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ> into tensor<1x4x8x8x2x4x16x4xf32>
+        > : tensor<1x64x8x4x16x2x8xf8E4M3FNUZ>, tensor<4x64x8x2x4x16x2x8xf8E4M3FNUZ> into tensor<1x4x8x8x2x4x16x4xf32>
     return %2 : tensor<1x4x8x8x2x4x16x4xf32>
   }
 }
@@ -525,12 +525,12 @@ module attributes {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x501x2x4x8x4x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x501x2x4x8x4x4x16x4xf32>) -> tensor<1x501x2x4x8x4x4x16x4xf32>
-    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1)<
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x16_F16, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-        } : tensor<1x256x2x8x4x16x4xf16>, tensor<501x256x4x4x4x16x4xf16> into tensor<1x501x2x4x8x4x4x16x4xf32>
+        > : tensor<1x256x2x8x4x16x4xf16>, tensor<501x256x4x4x4x16x4xf16> into tensor<1x501x2x4x8x4x4x16x4xf32>
     return %2 : tensor<1x501x2x4x8x4x4x16x4xf32>
   }
 }
@@ -571,7 +571,7 @@ module attributes {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<16x64x2x2x4x8x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<16x64x2x2x4x8x4x16x4xf32>) -> tensor<16x64x2x2x4x8x4x16x4xf32>
-    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1, %arg2, %arg3) outs(%1) {
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1, %arg2, %arg3) outs(%1) <
       indexing_maps = [#map1, #map2, #map3, #map4, #map5],
       iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>, #linalg.iterator_type<reduction>],
       kind = #iree_gpu.data_tiled_scaled_mma_layout<
@@ -580,7 +580,7 @@ module attributes {
         operands_interleaving_intrinsics_m = [2], operands_interleaving_intrinsics_n = [3], operands_interleaving_intrinsics_k = [2, 3]
       >,
       semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-    } : tensor<16x64x1x2x4x2x4x16x32xf4E2M1FN>, tensor<64x64x1x2x8x2x4x16x32xf4E2M1FN>, tensor<16x64x2x4x16x4x2xf8E8M0FNU>, tensor<64x64x2x4x16x8x2xf8E8M0FNU> into tensor<16x64x2x2x4x8x4x16x4xf32>
+    > : tensor<16x64x1x2x4x2x4x16x32xf4E2M1FN>, tensor<64x64x1x2x8x2x4x16x32xf4E2M1FN>, tensor<16x64x2x4x16x4x2xf8E8M0FNU>, tensor<64x64x2x4x16x8x2xf8E8M0FNU> into tensor<16x64x2x2x4x8x4x16x4xf32>
     return %2 : tensor<16x64x2x2x4x8x4x16x4xf32>
   }
 }
@@ -615,12 +615,12 @@ module attributes {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x16x2x4x8x4x4x16x4xf32>
     %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x16x2x4x8x4x4x16x4xf32>) -> tensor<1x16x2x4x8x4x4x16x4xf32>
-    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1){
+    %2 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%1)<
           indexing_maps = [#map1, #map2, #map3],
           iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
           kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_F32_16x16x32_F8E4M3FN, intrinsics_m = 8, subgroups_m = 2, intrinsics_n = 4, subgroups_n = 4>,
           semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-        } : tensor<1x4x2x8x4x16x8xf8E4M3FN>, tensor<16x4x4x4x4x16x8xf8E4M3FN> into tensor<1x16x2x4x8x4x4x16x4xf32>
+        > : tensor<1x4x2x8x4x16x8xf8E4M3FN>, tensor<16x4x4x4x4x16x8xf8E4M3FN> into tensor<1x16x2x4x8x4x4x16x4xf32>
     return %2 : tensor<1x16x2x4x8x4x4x16x4xf32>
   }
 }

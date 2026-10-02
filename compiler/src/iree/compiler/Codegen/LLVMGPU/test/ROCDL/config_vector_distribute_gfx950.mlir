@@ -227,7 +227,7 @@ func.func @attention_20x4096x64x4096x64() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
@@ -285,7 +285,7 @@ func.func @attention_large_head_dim_shared_mem() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<1024x512xf32>) -> tensor<1024x512xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%10, %11, %12 : tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%10, %11, %12 : tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>
@@ -328,7 +328,7 @@ func.func @attention_check_mma_accs_compatible(%arg0: f32, %arg1: tensor<960x409
   %2 = linalg.fill ins(%cst : f32) outs(%arg4 : tensor<960x4096x64xf32>) -> tensor<960x4096x64xf32>
   %3 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<960x4096xf32>) -> tensor<960x4096xf32>
   %4 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<960x4096xf32>) -> tensor<960x4096xf32>
-  %5:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%arg1, %arg2, %arg3, %arg0 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, f32) outs(%2, %3, %4 : tensor<960x4096x64xf32>, tensor<960x4096xf32>, tensor<960x4096xf32>) {
+  %5:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%arg1, %arg2, %arg3, %arg0 : tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, tensor<960x4096x64xf8E4M3FN>, f32) outs(%2, %3, %4 : tensor<960x4096x64xf32>, tensor<960x4096xf32>, tensor<960x4096xf32>) {
   ^bb0(%arg6: f32):
     iree_linalg_ext.yield %arg6 : f32
   } -> tensor<960x4096x64xf32>, tensor<960x4096xf32>, tensor<960x4096xf32>

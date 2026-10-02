@@ -1091,19 +1091,19 @@ module {
     %29 = vector.transfer_write %22, %6[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
     %30 = vector.broadcast %25 : vector<8xindex> to vector<1x8x8xindex>
     %31 = vector.transfer_write %30, %7[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
-    %32 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c0] [%17, %22, %25 : index, vector<1x8x8xindex>, vector<8xindex>], %1 {indexing_maps = [#map, #map1, #map2, #map3]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %32 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c0] [%17, %22, %25 : index, vector<1x8x8xindex>, vector<8xindex>], %1 <indexing_maps = [#map, #map1, #map2, #map3]> : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
     %33 = arith.index_cast %32 : vector<1x8x8xi32> to vector<1x8x8xindex>
     %34 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
     %35 = vector.transfer_read %29[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
     %36 = vector.transfer_read %31[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
-    %37 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c1] [%34, %35, %36 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %1 {indexing_maps = [#map, #map2, #map2, #map2]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %37 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c1] [%34, %35, %36 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %1 <indexing_maps = [#map, #map2, #map2, #map2]> : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
     %38 = arith.index_cast %37 : vector<1x8x8xi32> to vector<1x8x8xindex>
     %39 = arith.maxsi %33, %cst_1 : vector<1x8x8xindex>
     %40 = arith.minui %39, %cst_0 : vector<1x8x8xindex>
     %41 = arith.maxsi %38, %cst_1 : vector<1x8x8xindex>
     %42 = arith.minui %41, %cst_0 : vector<1x8x8xindex>
     %43 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
-    %44 = iree_vector_ext.transfer_gather %arg5[%c0, %c0, %c0] [%43, %40, %42 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %0 {indexing_maps = [#map4, #map2, #map2, #map2]} : tensor<50x40x40xi8>, vector<1x8x8xi8>
+    %44 = iree_vector_ext.transfer_gather %arg5[%c0, %c0, %c0] [%43, %40, %42 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %0 <indexing_maps = [#map4, #map2, #map2, #map2]> : tensor<50x40x40xi8>, vector<1x8x8xi8>
     %45 = vector.transfer_read %26[%c0, %c0, %c0], %3 {in_bounds = [true, true, true]} : tensor<1x8x8xf32>, vector<1x8x8xf32>
     %46 = arith.cmpi ugt, %44, %cst : vector<1x8x8xi8>
     %47 = arith.select %46, %45, %cst_2 : vector<1x8x8xi1>, vector<1x8x8xf32>

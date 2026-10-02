@@ -71,6 +71,6 @@ stream.executable public @mul_dispatch_executable {
 // PTX:   mul.rn.f32
 
 //      CHECK: hal.executable public @smoketest_linked
-// CHECK-NEXT:   hal.executable.binary public @cuda_nvptx_fb attributes {
-// CHECK-SAME:     data = dense
+// CHECK-NEXT:   hal.executable.binary public @cuda_nvptx_fb <
 // CHECK-SAME:     format = "cuda-nvptx-fb"
+// CHECK-SAME:     data = dense

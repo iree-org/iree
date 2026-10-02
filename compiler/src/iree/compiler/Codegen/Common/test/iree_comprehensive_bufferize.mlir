@@ -2970,10 +2970,10 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.0 : f16
   %out = iree_vector_ext.transfer_gather %source[%c0, %c0]
-  [%indices : vector<8xindex>], %cst {
+  [%indices : vector<8xindex>], %cst <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : tensor<?x64xf16>, vector<8x64xf16>
+  > : tensor<?x64xf16>, vector<8x64xf16>
   return %out : vector<8x64xf16>
 }
 
@@ -2988,10 +2988,10 @@ func.func @transfer_gather(%source : tensor<?x64xf16>, %indices: vector<8xindex>
 func.func @transfer_scatter(%dest : tensor<?x64xf16>, %vector: vector<8x64xf16>, %indices: vector<8xindex>) -> tensor<?x64xf16> {
   %c0 = arith.constant 0 : index
   %out = iree_vector_ext.transfer_scatter %vector into %dest[%c0, %c0]
-  [%indices : vector<8xindex>] {
+  [%indices : vector<8xindex>] <
     indexing_maps = [affine_map<(d0, d1)[s0] -> (s0, d1)>,
                      affine_map<(d0, d1)[s0] -> (d0)>]
-  } : vector<8x64xf16>, tensor<?x64xf16> -> tensor<?x64xf16>
+  > : vector<8x64xf16>, tensor<?x64xf16> -> tensor<?x64xf16>
   return %out : tensor<?x64xf16>
 }
 

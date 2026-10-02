@@ -67,11 +67,19 @@ compareCastCompatibleOperations(transform::TransformOpInterface transformOp,
            << " does not match payload " << payload->getName();
   }
 
-  if (target->getAttrDictionary() != payload->getAttrDictionary()) {
+  if (target->getDiscardableAttrDictionary() !=
+      payload->getDiscardableAttrDictionary()) {
     return transformOp.emitSilenceableError()
-           << "target attribute dictionary " << target->getAttrDictionary()
+           << "target attribute dictionary "
+           << target->getDiscardableAttrDictionary()
            << " does not match payload attribute dictionary "
-           << payload->getAttrDictionary();
+           << payload->getDiscardableAttrDictionary();
+  }
+
+  if (!target->getName().compareOpProperties(target->getPropertiesStorage(),
+                                             payload->getPropertiesStorage())) {
+    return transformOp.emitSilenceableError()
+           << "target properties do not match payload properties";
   }
 
   if (target->getNumResults() != payload->getNumResults()) {
@@ -121,7 +129,7 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
     Operation *targetOp = targetWorklist.pop_back_val();
     Operation *payloadOp = payloadWorklist.pop_back_val();
 
-    if (targetOp->hasAttr("match.operation_name_only")) {
+    if (targetOp->hasDiscardableAttr("match.operation_name_only")) {
       if (targetOp->getName() != payloadOp->getName()) {
         return emitSilenceableError() << "only operation name op mismatch";
       }

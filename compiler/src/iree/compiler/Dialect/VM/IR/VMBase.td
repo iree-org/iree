@@ -15,7 +15,6 @@ include "iree/compiler/Utils/DocMetadata.td"
 //===----------------------------------------------------------------------===//
 
 def VM_Dialect : Dialect {
-  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "vm";
   let cppNamespace = "::mlir::iree_compiler::IREE::VM";
 
@@ -117,15 +116,15 @@ class VM_EncType<string expr> : VM_EncEncodeExpr<
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType({0}())", [name]>;
 class VM_EncPrimitiveAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodePrimitiveAttr(getOperation()->getAttrOfType<TypedAttr>(\"" # name # "\"))"> {
+    "e.encodePrimitiveAttr({0}Attr())", [name]> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncPrimitiveArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodePrimitiveArrayAttr(getOperation()->getAttrOfType<DenseElementsAttr>(\"" # name # "\"))"> {
+    "e.encodePrimitiveArrayAttr({0}Attr())", [name]> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeStrAttr(getOperation()->getAttrOfType<StringAttr>(\"" # name # "\"))">;
+    "e.encodeStrAttr({0}Attr())", [name]>;
 class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
     "e.encodeBranch({0}(), " # operandsName # "(), " # successorIndex # ")", [blockName]>;
 class VM_EncBranchTarget<string blockName> : VM_EncEncodeExpr<

@@ -268,7 +268,7 @@ func.func @attention_20x4096x64x4096x64() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
@@ -323,7 +323,7 @@ func.func @attention_20x4096x64x4096x64_f8() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%10, %11, %12 : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
@@ -382,7 +382,7 @@ func.func @attention_large_head_dim_shared_mem() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<1024x512xf32>) -> tensor<1024x512xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<1024xf32>) -> tensor<1024xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%10, %11, %12 : tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<1024x512xf16>, tensor<128x512xf16>, tensor<128x512xf16>, f16) outs(%10, %11, %12 : tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<1024x512xf32>, tensor<1024xf32>, tensor<1024xf32>
@@ -437,7 +437,7 @@ func.func @attention_20x64x4096x64_f8() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<20x64xf32>) -> tensor<20x64xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<20xf32>) -> tensor<20xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<20xf32>) -> tensor<20xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%10, %11, %12 : tensor<20x64xf32>, tensor<20xf32>, tensor<20xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<20x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, tensor<20x4096x64xf8E4M3FNUZ>, f8E4M3FNUZ) outs(%10, %11, %12 : tensor<20x64xf32>, tensor<20xf32>, tensor<20xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x64xf32>, tensor<20xf32>, tensor<20xf32>
@@ -466,7 +466,7 @@ func.func @attention_multi_m(%arg0 : tensor<20x256x16x64xf16>, %arg1 : tensor<20
   %3 = linalg.fill ins(%cst_0 : f32) outs(%1 : tensor<20x256x16x64xf32>) -> tensor<20x256x16x64xf32>
   %4 = linalg.fill ins(%cst_1 : f32) outs(%2 : tensor<20x256x16xf32>) -> tensor<20x256x16xf32>
   %5 = linalg.fill ins(%cst_2 : f32) outs(%2 : tensor<20x256x16xf32>) -> tensor<20x256x16xf32>
-  %6:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%arg0, %arg1, %arg2, %cst : tensor<20x256x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%3, %4, %5 : tensor<20x256x16x64xf32>, tensor<20x256x16xf32>, tensor<20x256x16xf32>) {
+  %6:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%arg0, %arg1, %arg2, %cst : tensor<20x256x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%3, %4, %5 : tensor<20x256x16x64xf32>, tensor<20x256x16xf32>, tensor<20x256x16xf32>) {
   ^bb0(%arg3: f32):
     iree_linalg_ext.yield %arg3 : f32
   } -> tensor<20x256x16x64xf32>, tensor<20x256x16xf32>, tensor<20x256x16xf32>
@@ -508,7 +508,7 @@ func.func @attention_multi_m_dynamic(%arg0 : tensor<20x8x?x16x64xf16>, %arg1 : t
   %3 = linalg.fill ins(%cst_2 : f32) outs(%1 : tensor<20x8x?x16x64xf32>) -> tensor<20x8x?x16x64xf32>
   %4 = linalg.fill ins(%cst_3 : f32) outs(%2 : tensor<20x8x?x16xf32>) -> tensor<20x8x?x16xf32>
   %5 = linalg.fill ins(%cst_4 : f32) outs(%2 : tensor<20x8x?x16xf32>) -> tensor<20x8x?x16xf32>
-  %6:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%arg0, %arg1, %arg2, %cst : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%3, %4, %5 : tensor<20x8x?x16x64xf32>, tensor<20x8x?x16xf32>, tensor<20x8x?x16xf32>) {
+  %6:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%arg0, %arg1, %arg2, %cst : tensor<20x8x?x16x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%3, %4, %5 : tensor<20x8x?x16x64xf32>, tensor<20x8x?x16xf32>, tensor<20x8x?x16xf32>) {
   ^bb0(%arg3: f32):
     iree_linalg_ext.yield %arg3 : f32
   } -> tensor<20x8x?x16x64xf32>, tensor<20x8x?x16xf32>, tensor<20x8x?x16xf32>
@@ -560,7 +560,7 @@ func.func @attention_f32_20x4096x128x4096x128() {
   %9 = linalg.fill ins(%cst_0 : f32) outs(%7 : tensor<20x4096x128xf32>) -> tensor<20x4096x128xf32>
   %10 = linalg.fill ins(%cst_1 : f32) outs(%8 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %11 = linalg.fill ins(%cst_2 : f32) outs(%8 : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %12:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]} ins(%4, %5, %6, %cst : tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, f32) outs(%9, %10, %11 : tensor<20x4096x128xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
+  %12:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> ins(%4, %5, %6, %cst : tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, tensor<20x4096x128xf32>, f32) outs(%9, %10, %11 : tensor<20x4096x128xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x4096x128xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>

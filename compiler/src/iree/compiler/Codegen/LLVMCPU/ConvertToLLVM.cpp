@@ -144,16 +144,13 @@ struct ConvertHALEntryPointFuncOp
         LLVM::LLVMFuncOp::getAttributeNames().begin(),
         LLVM::LLVMFuncOp::getAttributeNames().end());
     SmallVector<NamedAttribute> funcAttrs;
-    for (auto attr : stdFuncOp->getAttrs()) {
-      if (attr.getName() == stdFuncOp.getSymNameAttrName() ||
-          attr.getName() == stdFuncOp.getFunctionTypeAttrName()) {
-        continue;
-      }
+    SmallVector<NamedAttribute> llvmAttrs;
+    for (auto attr : stdFuncOp->getDiscardableAttrs()) {
       StringRef name = attr.getName().strref();
       StringRef stripped = name;
       if (stripped.consume_front("llvm.") && odsAttrNames.contains(stripped)) {
-        funcAttrs.push_back(
-            NamedAttribute(rewriter.getStringAttr(stripped), attr.getValue()));
+        llvmAttrs.emplace_back(rewriter.getStringAttr(stripped),
+                               attr.getValue());
       } else {
         funcAttrs.push_back(attr);
       }
@@ -166,6 +163,23 @@ struct ConvertHALEntryPointFuncOp
         rewriter, stdFuncOp.getLoc(), stdFuncOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
+    // Metadata names are dynamic; the inherent-attribute visitor skips unset
+    // optional fields, so it cannot install these values.
+    for (NamedAttribute attr : llvmAttrs) {
+      llvmFuncOp->setInherentAttr(attr.getName(), attr.getValue());
+    }
+    if (auto visibility = stdFuncOp.getSymVisibilityAttr()) {
+      llvmFuncOp.setSymVisibilityAttr(visibility);
+    }
+    if (auto argAttrs = stdFuncOp.getArgAttrsAttr()) {
+      llvmFuncOp.setArgAttrsAttr(argAttrs);
+    }
+    if (auto resAttrs = stdFuncOp.getResAttrsAttr()) {
+      llvmFuncOp.setResAttrsAttr(resAttrs);
+    }
+    if (auto noInline = stdFuncOp.getNoInlineAttr()) {
+      llvmFuncOp.setNoInlineAttr(noInline);
+    }
     rewriter.inlineRegionBefore(stdFuncOp.getFunctionBody(),
                                 llvmFuncOp.getFunctionBody(), llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(&llvmFuncOp.getFunctionBody(),
@@ -764,7 +778,7 @@ struct ConvertHALInstrumentMemoryStoreOp
 static SmallVector<StringRef> getExtraFields(Operation *forOp) {
   SmallVector<StringRef> extraFields;
   if (auto extraFieldsAttr =
-          forOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+          forOp->getDiscardableAttrOfType<ArrayAttr>("hal.import.fields")) {
     extraFields =
         llvm::map_to_vector(extraFieldsAttr.getValue(), [](Attribute attr) {
           return cast<StringAttr>(attr).getValue();
@@ -776,8 +790,9 @@ static SmallVector<StringRef> getExtraFields(Operation *forOp) {
 /// Return calling convention to use for the operation.
 static IREE::HAL::CallingConvention getCallingConvention(Operation *forOp) {
   auto cConv = IREE::HAL::CallingConvention::Default;
-  if (auto cConvAttr = forOp->getAttrOfType<IREE::HAL::CallingConventionAttr>(
-          "hal.import.cconv")) {
+  if (auto cConvAttr =
+          forOp->getDiscardableAttrOfType<IREE::HAL::CallingConventionAttr>(
+              "hal.import.cconv")) {
     cConv = cConvAttr.getValue();
   }
   return cConv;
@@ -798,7 +813,7 @@ struct RewriteFuncOpABI : OpRewritePattern<LLVM::LLVMFuncOp> {
     if (!funcOp.isExternal()) {
       return rewriter.notifyMatchFailure(funcOp, "skipping non-external calls");
     }
-    if (!funcOp->hasAttr("hal.import.bitcode")) {
+    if (!funcOp->hasDiscardableAttr("hal.import.bitcode")) {
       return rewriter.notifyMatchFailure(
           funcOp, "callee is not imported using bitcode linkage; skipping");
     }
@@ -819,23 +834,15 @@ struct RewriteFuncOpABI : OpRewritePattern<LLVM::LLVMFuncOp> {
             funcType.getReturnTypes(), funcType.getParams())) {
       return failure();
     }
-    auto attrs = getPrunedAttributeList(
-        funcOp, llvm::to_vector(LLVM::LLVMFuncOp::getAttributeNames()));
-    SmallVector<DictionaryAttr> argAttrs;
-    if (auto currArgAttrs = funcOp.getArgAttrsAttr()) {
-      argAttrs = llvm::map_to_vector(currArgAttrs, [](Attribute attr) {
-        return cast<DictionaryAttr>(attr);
-      });
-    }
-    std::optional<uint64_t> functionEntryCount;
-    if (auto attr = funcOp.getFunctionEntryCountAttr()) {
-      functionEntryCount = attr.getEntryCount();
-    }
-    LLVM::LLVMFuncOp::create(
-        rewriter, funcOp.getLoc(), funcOp.getName(), expectedType.value(),
-        funcOp.getLinkage(), funcOp.getDsoLocal(), funcOp.getCConv(),
-        /*comdat=*/nullptr, attrs, argAttrs, functionEntryCount);
-    rewriter.eraseOp(funcOp);
+    rewriter.modifyOpInPlace(funcOp, [&] {
+      funcOp.setFunctionType(*expectedType);
+      if (auto oldArgAttrs = funcOp.getArgAttrsAttr()) {
+        SmallVector<Attribute> argAttrs(oldArgAttrs.getValue());
+        argAttrs.resize(expectedType->getNumParams(),
+                        rewriter.getDictionaryAttr({}));
+        funcOp.setArgAttrsAttr(rewriter.getArrayAttr(argAttrs));
+      }
+    });
     return success();
   }
 
@@ -867,7 +874,7 @@ struct RewriteCallOpABI : OpRewritePattern<LLVM::CallOp> {
     // global function symbols we assume any missing callee is extern.
     auto calleeOp =
         SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(callOp, symbol);
-    if (!calleeOp || !calleeOp->hasAttr("hal.import.bitcode") ||
+    if (!calleeOp || !calleeOp->hasDiscardableAttr("hal.import.bitcode") ||
         !calleeOp.isExternal()) {
       return rewriter.notifyMatchFailure(
           callOp, "callee is not imported using bitcode linakge; skipping");
@@ -927,8 +934,8 @@ struct RewriteExternCallOpToDynamicImportCallOp
     // let it fall through to the linker stage where it can be picked up either
     // from the runtime build (in the case of us producing static libraries) or
     // the user-specified object files (when producing dynamic libraries).
-    if (calleeOp->hasAttr("hal.import.static") ||
-        calleeOp->hasAttr("hal.import.bitcode")) {
+    if (calleeOp->hasDiscardableAttr("hal.import.static") ||
+        calleeOp->hasDiscardableAttr("hal.import.bitcode")) {
       return rewriter.notifyMatchFailure(callOp,
                                          "external function is marked static "
                                          "and does not need an import wrapper");
@@ -936,8 +943,8 @@ struct RewriteExternCallOpToDynamicImportCallOp
 
     // The call may need some additional internal fields appended.
     SmallVector<StringRef> extraFields;
-    if (auto extraFieldsAttr =
-            calleeOp->getAttrOfType<ArrayAttr>("hal.import.fields")) {
+    if (auto extraFieldsAttr = calleeOp->getDiscardableAttrOfType<ArrayAttr>(
+            "hal.import.fields")) {
       for (auto extraFieldAttr : extraFieldsAttr) {
         extraFields.push_back(cast<StringAttr>(extraFieldAttr).getValue());
       }
@@ -947,7 +954,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
     // specified.
     StringRef importName = flatSymbol.getValue();
     if (auto importNameAttr =
-            calleeOp->getAttrOfType<StringAttr>("hal.import.name")) {
+            calleeOp->getDiscardableAttrOfType<StringAttr>("hal.import.name")) {
       importName = importNameAttr.getValue();
     }
 
@@ -1068,10 +1075,12 @@ void ConvertToLLVMPass::runOnOperation() {
   }
   // Add required attributes to the module so that the lowering knows how to
   // handle structs and data layouts.
-  moduleOp->setAttr(LLVM::LLVMDialect::getTargetTripleAttrName(),
-                    StringAttr::get(moduleOp->getContext(), targetTripleStr));
-  moduleOp->setAttr(LLVM::LLVMDialect::getDataLayoutAttrName(),
-                    StringAttr::get(moduleOp->getContext(), dataLayoutStr));
+  moduleOp->setDiscardableAttr(
+      LLVM::LLVMDialect::getTargetTripleAttrName(),
+      StringAttr::get(moduleOp->getContext(), targetTripleStr));
+  moduleOp->setDiscardableAttr(
+      LLVM::LLVMDialect::getDataLayoutAttrName(),
+      StringAttr::get(moduleOp->getContext(), dataLayoutStr));
 
   DictionaryAttr targetConfig;
   if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(moduleOp)) {

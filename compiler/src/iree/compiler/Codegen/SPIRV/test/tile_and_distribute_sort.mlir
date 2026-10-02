@@ -7,10 +7,7 @@
 ]>
 hal.executable private @static_3d_sort  {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @static_3d_sort layout(#pipeline_layout) attributes {
-      translation_info = #translation,
-      workgroup_size = [16 : index, 1 : index, 1 : index]
-    }
+    hal.executable.export public @static_3d_sort layout(#pipeline_layout) <workgroup_size = [16 : index, 1 : index, 1 : index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @static_3d_sort() {
         %c0 = arith.constant 0 : index

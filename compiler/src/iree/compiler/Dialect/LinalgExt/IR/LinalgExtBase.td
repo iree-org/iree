@@ -18,7 +18,6 @@ include "mlir/IR/EnumAttr.td"
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_Dialect : Dialect {
-  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "iree_linalg_ext";
   let cppNamespace = "::mlir::iree_compiler::IREE::LinalgExt";
   let summary = [{

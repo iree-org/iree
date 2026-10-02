@@ -46,6 +46,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -208,9 +209,9 @@ struct NamedOpTypePropagation : TypePropagationPattern<OpTy> {
       Type legalizedType = this->getTypeConverter()->convertType(resultType);
       resultTypes.push_back(legalizedType);
     }
-    rewriter.replaceOpWithNewOp<OpTy>(namedOp, resultTypes, adaptor.getInputs(),
-                                      adaptor.getOutputs(),
-                                      linalg::getPrunedAttributeList(namedOp));
+    auto newOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
+        rewriter, namedOp, resultTypes, adaptor.getOperands());
+    rewriter.replaceOp(namedOp, newOp->getResults());
     return success();
   }
 };
@@ -512,22 +513,16 @@ struct LegalizeResultElementType : ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> convertedOperands,
                   ConversionPatternRewriter &rewriter) const final {
-    Location loc = op->getLoc();
     SmallVector<Type> resultTypes;
     for (Type resultType : op->getResultTypes()) {
       Type legalizedType = this->typeConverter->convertType(resultType);
       assert(legalizedType && "Failed to drop encoding from type");
       resultTypes.push_back(legalizedType);
     }
-    OperationState state(loc, op->getName(), convertedOperands, resultTypes,
-                         op->getAttrs());
-    for (unsigned i = 0, e = op->getNumRegions(); i != e; ++i) {
-      state.addRegion();
-    }
-    for (auto successor : op->getSuccessors()) {
-      state.addSuccessors(successor);
-    }
-    Operation *newOp = rewriter.create(state);
+    Operation *newOp = op->clone(Operation::CloneOptions().withResultTypes(
+        llvm::to_vector(resultTypes)));
+    newOp->setOperands(convertedOperands);
+    rewriter.insert(newOp);
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.

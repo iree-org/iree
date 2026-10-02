@@ -97,13 +97,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   func.func @multi_mma_mfma_i32_16x16x32_i8_with_gpu_arch(%arg0: tensor<1x2x8x4x16x2x8xi8>, %arg1: tensor<1x2x4x2x4x16x2x8xi8>, %arg2: tensor<1x1x4x8x2x4x16x4xi32>) -> tensor<1x1x4x8x2x4x16x4xi32> {
-    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) {
-      indexing_maps = [#map, #map1, #map2],
-      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>,
-      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>,
-      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-    } : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8> into tensor<1x1x4x8x2x4x16x4xi32>
+    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) <indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>, semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>> {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8> into tensor<1x1x4x8x2x4x16x4xi32>
     return %0 : tensor<1x1x4x8x2x4x16x4xi32>
   }
 }
@@ -137,13 +131,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   func.func @multi_mma_mfma_i32_16x16x32_i8_without_gpu_arch(%arg0: tensor<1x2x8x4x16x2x8xi8>, %arg1: tensor<1x2x4x2x4x16x2x8xi8>, %arg2: tensor<1x1x4x8x2x4x16x4xi32>) -> tensor<1x1x4x8x2x4x16x4xi32> {
-    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) {
-      indexing_maps = [#map, #map1, #map2],
-      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>,
-      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>,
-      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>
-    } : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8> into tensor<1x1x4x8x2x4x16x4xi32>
+    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) <indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>, semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>> {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} : tensor<1x2x8x4x16x2x8xi8>, tensor<1x2x4x2x4x16x2x8xi8> into tensor<1x1x4x8x2x4x16x4xi32>
     return %0 : tensor<1x1x4x8x2x4x16x4xi32>
   }
 }
@@ -158,13 +146,7 @@ module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
   func.func @multi_mma_mfma_i32_16x16x32_i8_intrinsics_equal_to_one(%arg0: tensor<1x1x1x1x1x2x8xi8>, %arg1: tensor<1x1x1x1x1x2x8xi8>, %arg2: tensor<1x1x1x1x1x4xi32>) -> tensor<1x1x1x1x1x4xi32> {
-    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) {
-      indexing_maps = [#map, #map1, #map2],
-      iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>,
-      iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
-      kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>,
-      semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-    } : tensor<1x1x1x1x1x2x8xi8>, tensor<1x1x1x1x1x2x8xi8> into tensor<1x1x1x1x1x4xi32>
+    %0 = iree_codegen.inner_tiled ins(%arg0, %arg1) outs(%arg2) <indexing_maps = [#map, #map1, #map2], iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>], kind = #iree_gpu.data_tiled_mma_layout<intrinsic = MFMA_I32_16x16x32_I8, subgroups_n = 4, intrinsics_k = 2, operands_interleaving_intrinsics_k = [0, 1]>, semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>> {iree_codegen.ukernel = #iree_codegen.ukernel_descriptor<"iree_uk_amdgpu_multi_mma_mfma_i32_16x16x32_i8", bitcode>} : tensor<1x1x1x1x1x2x8xi8>, tensor<1x1x1x1x1x2x8xi8> into tensor<1x1x1x1x1x4xi32>
     return %0 : tensor<1x1x1x1x1x4xi32>
   }
 }

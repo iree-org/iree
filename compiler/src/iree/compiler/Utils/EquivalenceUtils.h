@@ -9,6 +9,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/OwningOpRef.h"
 
 namespace mlir {
 class Block;
@@ -20,13 +21,13 @@ namespace mlir::iree_compiler {
 // Recursively compares two regions for structural equivalence.
 //
 // Structural equivalence ensures that operations in both regions
-// |lhs| and |rhs| have the same attributes and same use-def structure.
+// |lhs| and |rhs| have the same attributes, properties, and use-def structure.
 bool isStructurallyEquivalentTo(Region &lhs, Region &rhs);
 
 // Recursively compares two operations for structural equivalence.
 //
 // Structural equivalence ensures that operations in the regions of both the
-// |lhs| and |rhs| have the same attributes and same use-def structure.
+// |lhs| and |rhs| have the same attributes, properties, and use-def structure.
 bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs);
 
 // Manages a cache of operation metadata used for efficient structural
@@ -54,6 +55,7 @@ public:
 
   struct OperationEntry {
     NamedAttrList attrs;
+    OwningOpRef<Operation *> normalizedOp;
   };
   OperationEntry &getOp(Operation *op);
 
@@ -71,7 +73,7 @@ private:
 // Recursively compares two operations for structural equivalence.
 //
 // Structural equivalence ensures that operations in the regions of both the
-// |lhs| and |rhs| have the same attributes and same use-def structure.
+// |lhs| and |rhs| have the same attributes, properties, and use-def structure.
 //
 // Uses |cache| to memoize operation information to improve repeated queries.
 // Callers must not mutate any IR that may be in the cache between queries.

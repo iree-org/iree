@@ -1103,6 +1103,8 @@ static Operation *createCollapsedOp(AttentionOpTy origOp,
   auto collapsedOp = AttentionOpTy::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
       rewriter.getAffineMapArrayAttr(indexingMaps));
+  collapsedOp.setDecompositionConfigAttr(origOp.getDecompositionConfigAttr());
+  collapsedOp->setDiscardableAttrs(origOp->getDiscardableAttrDictionary());
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
   return collapsedOp;

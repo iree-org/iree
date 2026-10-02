@@ -1,3 +1,4 @@
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @buffer_constant
@@ -20,8 +21,8 @@ util.func public @buffer_constant_string() -> !util.buffer {
 
 // CHECK-LABEL: @buffer_alloc
 util.func public @buffer_alloc(%arg0: index) -> !util.buffer {
-  // CHECK: = util.buffer.alloc uninitialized {alignment = 16 : index} : !util.buffer{%arg0}
-  %0 = util.buffer.alloc uninitialized {alignment = 16 : index} : !util.buffer{%arg0}
+  // CHECK: = util.buffer.alloc uninitialized <alignment = 16> {test.discardable} : !util.buffer{%arg0}
+  %0 = util.buffer.alloc uninitialized <alignment = 16> {test.discardable} : !util.buffer{%arg0}
   util.return %0 : !util.buffer
 }
 

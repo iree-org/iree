@@ -933,3 +933,18 @@ util.func public @matmul_memref_no_crash(%arg0: memref<10x20xf32>,
 // CHECK-LABEL: util.func public @matmul_memref_no_crash
 //       CHECK:   linalg.matmul
 //       CHECK:   util.return
+
+// -----
+
+// CHECK-LABEL: @unsigned_transpose
+// CHECK: linalg.matmul indexing_maps =
+// CHECK-SAME: cast = #linalg.type_fn<cast_unsigned>
+util.func public @unsigned_transpose(%lhs: tensor<2x4xi8>, %rhs: tensor<3x4xi8>, %init: tensor<2x3xi32>) -> tensor<2x3xi32> {
+  %empty = tensor.empty() : tensor<4x3xi8>
+  %transposed = linalg.generic {indexing_maps = [affine_map<(m, n) -> (m, n)>, affine_map<(m, n) -> (n, m)>], iterator_types = ["parallel", "parallel"]} ins(%rhs : tensor<3x4xi8>) outs(%empty : tensor<4x3xi8>) {
+  ^bb0(%x: i8, %y: i8):
+    linalg.yield %x : i8
+  } -> tensor<4x3xi8>
+  %result = linalg.matmul {cast = #linalg.type_fn<cast_unsigned>} ins(%lhs, %transposed : tensor<2x4xi8>, tensor<4x3xi8>) outs(%init : tensor<2x3xi32>) -> tensor<2x3xi32>
+  util.return %result : tensor<2x3xi32>
+}

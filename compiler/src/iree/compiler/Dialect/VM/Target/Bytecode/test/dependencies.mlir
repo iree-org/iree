@@ -6,7 +6,7 @@
 
 // CHECK-LABEL: "main_module"
 // CHECK: "version": 100
-vm.module @main_module attributes { version = 100 : i32 } {
+vm.module @main_module < version = 100 > {
   // CHECK: "dependencies":
 
   // CHECK: "name": "required"

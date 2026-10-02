@@ -66,12 +66,12 @@ func.func @distribute_inner_tiled_mfma_16x16x16(
   %B = iree_vector_ext.to_layout %rhs to layout(#layout_rhs) : vector<3x4x16x16xf16>
   %C = iree_vector_ext.to_layout %acc to layout(#layout_acc) : vector<2x4x16x16xf32>
 
-  %result = iree_codegen.inner_tiled ins(%A, %B) outs(%C) {
+  %result = iree_codegen.inner_tiled ins(%A, %B) outs(%C) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : vector<2x3x16x16xf16>, vector<3x4x16x16xf16> into vector<2x4x16x16xf32>
+  > : vector<2x3x16x16xf16>, vector<3x4x16x16xf16> into vector<2x4x16x16xf32>
 
   %O = iree_vector_ext.to_layout %result to layout(#layout_acc) : vector<2x4x16x16xf32>
   return %O : vector<2x4x16x16xf32>

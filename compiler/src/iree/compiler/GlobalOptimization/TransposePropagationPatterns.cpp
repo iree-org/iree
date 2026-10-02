@@ -1050,26 +1050,38 @@ public:
           namedOp, "transpose permutation does not match target permutation");
     }
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
+    auto castAttr = namedOp.getCastAttr();
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
 
     auto replaceOp = [&](auto *typePtr) {
-      rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      using TargetOp = std::remove_pointer_t<decltype(typePtr)>;
+      if (!castAttr) {
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), newInputs,
+            namedOp.getDpsInits(), attrs);
+      } else if constexpr (std::is_same_v<TargetOp, linalg::BatchMatmulOp>) {
+        SmallVector<Value> operands(newInputs);
+        llvm::append_range(operands, namedOp.getDpsInits());
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), operands, castAttr, attrs);
+      } else {
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), newInputs,
+            namedOp.getDpsInits(), castAttr, attrs);
+      }
     };
 
     Operation *op = namedOp.getOperation();
-    if (isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) {
-      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+    if ((isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) ||
+        (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1)) {
       replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
-      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+    } else if ((isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) ||
+               (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1)) {
       replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));

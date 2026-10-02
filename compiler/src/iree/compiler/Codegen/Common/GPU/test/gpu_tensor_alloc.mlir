@@ -275,8 +275,7 @@ func.func @online_attention(%query: tensor<192x1024x64xf16>,
   %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
-        { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR],
-          lowering_config = #config }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR]> {lowering_config = #config}
         ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
           ^bb0(%score : f32):

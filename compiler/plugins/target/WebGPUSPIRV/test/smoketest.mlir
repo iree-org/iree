@@ -39,6 +39,6 @@ stream.executable public @reduce_dispatch {
 
 }
 
-//      CHECK:   hal.executable.binary public @webgpu_wgsl_fb attributes
-// CHECK-SAME:     data = dense
+//      CHECK:   hal.executable.binary public @webgpu_wgsl_fb <
 // CHECK-SAME:     format = "webgpu-wgsl-fb"
+// CHECK-SAME:     data = dense

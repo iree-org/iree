@@ -55,7 +55,7 @@ def VM_ModuleOp : VM_Op<"module", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
     regions
   }];
 
@@ -399,7 +399,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     custom<SymbolVisibility>($sym_visibility)
     (`mutable` $is_mutable^)?
     $sym_name
-    attr-dict
+    prop-dict attr-dict
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -510,7 +510,7 @@ def VM_GlobalRefOp :
     custom<SymbolVisibility>($sym_visibility)
     (`mutable` $is_mutable^)?
     $sym_name
-    attr-dict
+    prop-dict attr-dict
     `:` $type
   }];
 
@@ -1239,7 +1239,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   );
 
   let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility) $sym_name attr-dict $value
+    custom<SymbolVisibility>($sym_visibility) $sym_name prop-dict attr-dict $value
   }];
 
   let skipDefaultBuilders = 1;
@@ -1310,7 +1310,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   );
 
   let assemblyFormat = [{
-    ($name^)? attr-dict `:` type($result) `=` $value
+    ($name^)? prop-dict attr-dict `:` type($result) `=` $value
   }];
 
   let builders = [
@@ -1356,7 +1356,7 @@ def VM_RodataTableInlineOp : VM_PureOp<"rodata.table.inline", [
   );
 
   let assemblyFormat = [{
-    $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+    $table_type prop-dict attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
   }];
 
   let builders = [
@@ -4508,12 +4508,13 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the argument operands to the called function as a mutable range, this is
@@ -4550,7 +4551,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
   );
 
   let assemblyFormat = [{
-    $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
+    $callee `(` operands `)` prop-dict attr-dict `:` functional-type(operands, results)
   }];
 
   let encoding = [
@@ -4685,7 +4686,7 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
   );
 
   let assemblyFormat = [{
-    $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+    $callee `(` $arguments `)` prop-dict attr-dict `:` `(` type($arguments) `)`
     `->` $dest custom<ResultTypeList>($result_types)
   }];
 
@@ -4723,12 +4724,13 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.
@@ -4798,7 +4800,7 @@ def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
   );
 
   let assemblyFormat = [{
-    $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+    $callee `(` $operands `)` prop-dict attr-dict `:` `(` type($operands) `)`
     `->` $dest custom<ResultTypeList>($result_types)
   }];
 
@@ -4848,12 +4850,13 @@ def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.

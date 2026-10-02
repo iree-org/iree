@@ -34,8 +34,8 @@ vm.func @const_ref_zero() -> !vm.ref<?> {
 // -----
 
 vm.module @my_module {
-  // CHECK: vm.rodata private @buf0 {alignment = 8 : i64} dense<[0, 1, 2]> : tensor<3xi8>
-  vm.rodata private @buf0 {alignment = 8 : i64} dense<[0, 1, 2]> : tensor<3xi8>
+  // CHECK: vm.rodata private @buf0 <alignment = 8> dense<[0, 1, 2]> : tensor<3xi8>
+  vm.rodata private @buf0 <alignment = 8> dense<[0, 1, 2]> : tensor<3xi8>
   // CHECK-LABEL: @const_ref_rodata
   vm.func @const_ref_rodata() -> !vm.buffer {
     // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !vm.buffer

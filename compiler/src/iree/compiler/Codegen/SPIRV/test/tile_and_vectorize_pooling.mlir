@@ -14,10 +14,7 @@ hal.executable private @pooling_nhwc_sum_f32 {
     hal.executable.export public @pooling_nhwc_sum_f32 layout(#pipeline_layout) count(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
-    } attributes {
-      workgroup_size = [2: index, 2: index, 2: index],
-      translation_info = #translation
-    }
+    } <workgroup_size = [2: index, 2: index, 2: index]> attributes {translation_info = #translation}
     builtin.module  {
       func.func @pooling_nhwc_sum_f32() {
         %c2 = arith.constant 2 : index

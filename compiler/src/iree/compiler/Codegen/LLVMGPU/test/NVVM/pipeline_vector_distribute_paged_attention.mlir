@@ -87,12 +87,10 @@ func.func @paged_attention_4xDx1x32x128_f16() attributes {hal.executable.target 
         linalg.yield %mask_value : f16
     } -> tensor<4x1x1x?x32xf16>
 
-  %attention:3 = iree_linalg_ext.online_attention {
-      decomposition_config = {
+  %attention:3 = iree_linalg_ext.online_attention <decomposition_config = {
         pv_attrs = {lowering_config = #pv_attrs_config},
         qk_attrs = {lowering_config = #qk_attrs_config}
-      },
-      indexing_maps = [
+      }, indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
@@ -100,9 +98,7 @@ func.func @paged_attention_4xDx1x32x128_f16() attributes {hal.executable.target 
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>],
-      lowering_config = #attention_lowering_config
-    }
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]> {lowering_config = #attention_lowering_config}
     ins(%query_tensor, %key, %value, %scale, %mask : tensor<4x1x1x128xf16>, tensor<4x?x1x32x128xf16>, tensor<4x?x1x32x128xf16>, f16, tensor<4x1x1x?x32xf16>)
     outs(%output_init, %max_init, %sum_init : tensor<4x1x1x128xf32>, tensor<4x1x1xf32>, tensor<4x1x1xf32>) {
       ^bb0(%score: f32):

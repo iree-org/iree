@@ -37,9 +37,7 @@ func.func @attention_f16(%q: tensor<4x1024x64xf16>, %k: tensor<4x1024x64xf16>,
                          %sum_init: tensor<4x1024xf16>)
     -> (tensor<4x1024x64xf16>, tensor<4x1024xf16>, tensor<4x1024xf16>)
     attributes {hal.executable.target = #exec_target} {
-  %res:3 = iree_linalg_ext.online_attention {
-      root_op = #iree_codegen.root_op<set = 0>,
-      indexing_maps = [#qmap, #kmap, #vmap, #smap, #omap, #maxmap, #summap]}
+  %res:3 = iree_linalg_ext.online_attention <indexing_maps = [#qmap, #kmap, #vmap, #smap, #omap, #maxmap, #summap]> {root_op = #iree_codegen.root_op<set = 0>}
       ins(%q, %k, %v, %scale : tensor<4x1024x64xf16>, tensor<4x1024x64xf16>,
                                 tensor<4x1024x64xf16>, f16)
       outs(%out_init, %max_init, %sum_init :

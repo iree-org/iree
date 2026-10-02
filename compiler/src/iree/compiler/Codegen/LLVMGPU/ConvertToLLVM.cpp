@@ -91,8 +91,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (variantOp != nullptr) {
     for (auto exportOp : variantOp.getExportOps()) {
-      exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
-                        builder.getIndexAttr(numberOfBytes));
+      exportOp.setWorkgroupLocalMemoryAttr(builder.getIndexAttr(numberOfBytes));
     }
   }
 }
@@ -110,44 +109,6 @@ void setSharedMemoryAlignment(ModuleOp moduleOp, uint64_t newAlignment) {
 }
 
 namespace {
-
-/// Scalarize math ops. It is needed to lower vector operation that don't have
-/// vector support in CUDA and ROCM device library.
-template <typename MathOpTy>
-struct ScalarizeMathOp : OpRewritePattern<MathOpTy> {
-  using OpRewritePattern<MathOpTy>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(MathOpTy mathOp,
-                                PatternRewriter &rewriter) const override {
-    auto vecType = dyn_cast<VectorType>(mathOp.getType());
-    if (!vecType) {
-      return failure();
-    }
-    Location loc = mathOp.getLoc();
-    Value newVector = arith::ConstantOp::create(rewriter, loc, vecType,
-                                                rewriter.getZeroAttr(vecType));
-
-    for (int64_t element : llvm::seq(int64_t(0), vecType.getNumElements())) {
-      llvm::SmallVector<int64_t> indices;
-      int64_t projectIndex = element;
-      for (int64_t dim : llvm::seq(int64_t(0), vecType.getRank())) {
-        int64_t index = projectIndex % vecType.getDimSize(dim);
-        projectIndex = projectIndex / vecType.getDimSize(dim);
-        indices.push_back(index);
-      }
-      SmallVector<Value> newOperands;
-      for (Value operand : mathOp->getOperands()) {
-        newOperands.push_back(
-            vector::ExtractOp::create(rewriter, loc, operand, indices));
-      }
-      Value scalarOp = MathOpTy::create(rewriter, loc, newOperands);
-      newVector =
-          vector::InsertOp::create(rewriter, loc, scalarOp, newVector, indices);
-    }
-    rewriter.replaceOp(mathOp, newVector);
-    return success();
-  }
-};
 
 struct ConvertSharedMemAllocOp : OpRewritePattern<memref::AllocOp> {
   using Base::Base;
@@ -320,13 +281,9 @@ public:
       signatureConverter.addInputs(llvmInputTypes);
     }
 
-    // Construct newFunc with all attributes except return type & symbol name.
+    // Preserve discardable metadata separately from the function properties.
     SmallVector<NamedAttribute> funcAttrs;
-    for (auto attr : funcOp->getAttrs()) {
-      if (attr.getName() == funcOp.getSymNameAttrName() ||
-          attr.getName() == funcOp.getFunctionTypeAttrName()) {
-        continue;
-      }
+    for (auto attr : funcOp->getDiscardableAttrs()) {
       funcAttrs.push_back(attr);
     }
 
@@ -336,6 +293,10 @@ public:
         rewriter, funcOp.getLoc(), funcOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
+    newFuncOp.setSymVisibilityAttr(funcOp.getSymVisibilityAttr());
+    newFuncOp.setArgAttrsAttr(funcOp.getArgAttrsAttr());
+    newFuncOp.setResAttrsAttr(funcOp.getResAttrsAttr());
+    newFuncOp.setNoInlineAttr(funcOp.getNoInlineAttr());
 
     // Copy all of funcOp's operations into newFuncOp's body and perform region
     // type conversion.

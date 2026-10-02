@@ -70,7 +70,7 @@ func.func @matmul_128x1024x256_1(%lhs : tensor<128x256xf32>, %rhs: tensor<256x10
 #config = #iree_codegen.lowering_config<tile_sizes = [[128, 256], [16, 16]]>
 func.func @attention(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, %arg2 : tensor<2x10x4x4xf16>, %arg3 : f16) -> tensor<2x10x6x4xf16> attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>} {
   %init = tensor.empty() : tensor<2x10x6x4xf16>
-  %result = iree_linalg_ext.attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, z}, indexing_maps = [#map, #map1, #map2, #map3, #map4], lowering_config = #config} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
+  %result = iree_linalg_ext.attention <decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, z}, indexing_maps = [#map, #map1, #map2, #map3, #map4]> {lowering_config = #config} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
         ^bb0(%arg: f32):
           iree_linalg_ext.yield %arg : f32
         } -> tensor<2x10x6x4xf16>
@@ -98,7 +98,7 @@ func.func @attention(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, 
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @attention_1(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, %arg2 : tensor<2x10x4x4xf16>, %arg3 : f16) -> tensor<2x10x6x4xf16> attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>} {
   %init = tensor.empty() : tensor<2x10x6x4xf16>
-  %result = iree_linalg_ext.attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, use_exp2}, indexing_maps = [#map, #map1, #map2, #map3, #map4], compilation_info = #compilation} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
+  %result = iree_linalg_ext.attention <decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, use_exp2}, indexing_maps = [#map, #map1, #map2, #map3, #map4]> {compilation_info = #compilation} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
         ^bb0(%arg: f32):
           iree_linalg_ext.yield %arg : f32
         } -> tensor<2x10x6x4xf16>
@@ -128,7 +128,7 @@ func.func @attention_1(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 func.func @attention_2(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4xf16>, %arg2 : tensor<2x10x4x4xf16>, %arg3 : f16) -> tensor<2x10x6x4xf16> attributes {translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.no_pipeline subgroup_size = 32>} {
   %init = tensor.empty() : tensor<2x10x6x4xf16>
-  %result = iree_linalg_ext.attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}}, indexing_maps = [#map, #map1, #map2, #map3, #map4], compilation_info = #compilation} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
+  %result = iree_linalg_ext.attention <decomposition_config = {pv_attrs = {x}, qk_attrs = {y}}, indexing_maps = [#map, #map1, #map2, #map3, #map4]> {compilation_info = #compilation} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%init : tensor<2x10x6x4xf16>) {
         ^bb0(%arg: f32):
           iree_linalg_ext.yield %arg : f32
         } -> tensor<2x10x6x4xf16>
@@ -158,7 +158,7 @@ func.func @online_attention(%arg0: tensor<2x10x6x4xf16>, %arg1 : tensor<2x10x4x4
   %acc = tensor.empty() : tensor<2x10x6x4xf32>
   %max = tensor.empty() : tensor<2x10x6xf32>
   %sum = tensor.empty() : tensor<2x10x6xf32>
-  %result:3 = iree_linalg_ext.online_attention {decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, z}, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5], lowering_config = #config} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%acc, %max, %sum : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) {
+  %result:3 = iree_linalg_ext.online_attention <decomposition_config = {pv_attrs = {x}, qk_attrs = {y}, z}, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]> {lowering_config = #config} ins(%arg0, %arg1, %arg2, %arg3 : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16) outs(%acc, %max, %sum : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) {
         ^bb0(%arg: f32):
           iree_linalg_ext.yield %arg : f32
         } -> tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>

@@ -23,14 +23,14 @@ func.func @hoist_shape_cast_chain(
   %c10 = arith.constant 10 : index
   %result = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init) -> vector<2x2x1x1x4x1xf32> {
     %inner_acc = vector.shape_cast %acc : vector<2x2x1x1x4x1xf32> to vector<2x2x4x1xf32>
-    %mma = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%inner_acc) {
+    %mma = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%inner_acc) <
       indexing_maps = #contraction_accesses,
       iterator_types = [#linalg.iterator_type<parallel>,
                         #linalg.iterator_type<parallel>,
                         #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-    } : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4x1xf32>
+    > : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4x1xf32>
     %back = vector.shape_cast %mma : vector<2x2x4x1xf32> to vector<2x2x1x1x4x1xf32>
     scf.yield %back : vector<2x2x1x1x4x1xf32>
   }
@@ -55,14 +55,14 @@ func.func @no_reshape(
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
   %result = scf.for %iv = %c0 to %c10 step %c1 iter_args(%acc = %init) -> vector<2x2x4x1xf32> {
-    %mma = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    %mma = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
       indexing_maps = #contraction_accesses2,
       iterator_types = [#linalg.iterator_type<parallel>,
                         #linalg.iterator_type<parallel>,
                         #linalg.iterator_type<reduction>],
       kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
       semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-    } : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4x1xf32>
+    > : vector<2x2x4xf16>, vector<2x2x4xf16> into vector<2x2x4x1xf32>
     scf.yield %mma : vector<2x2x4x1xf32>
   }
   return %result : vector<2x2x4x1xf32>

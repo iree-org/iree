@@ -208,3 +208,17 @@ llvm.func @sink_f32(%arg0: f32) {
 // CHECK:       llvm.call @sink_f32
 // CHECK-NOT:   free
 // CHECK:       llvm.return
+
+// -----
+
+// CHECK: llvm.func @preserve_abi_properties(!llvm.ptr {llvm.nonnull}, i32)
+// CHECK-SAME: convergent
+// CHECK-SAME: no_unwind
+module {
+  llvm.func @preserve_abi_properties(!llvm.ptr {llvm.nonnull}) attributes {
+    convergent,
+    no_unwind,
+    hal.import.bitcode = true,
+    hal.import.fields = ["processor_id"]
+  }
+}

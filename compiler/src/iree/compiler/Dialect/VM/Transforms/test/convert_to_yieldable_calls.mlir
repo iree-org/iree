@@ -133,7 +133,7 @@ vm.module @module_variadic {
   // CHECK-LABEL: @call_yieldable_variadic
   vm.func @call_yieldable_variadic(%arg0: i32, %arg1: i32) -> i32 {
     // CHECK: vm.call.variadic.yieldable @yieldable_variadic(%arg0, %arg1)
-    // CHECK-SAME: {segment_sizes = dense<2> : vector<1xi16>, segment_types = [i32]}
+    // CHECK-SAME: <segment_sizes = dense<2> : vector<1xi16>, segment_types = [i32]>
     // CHECK-SAME: : (i32, i32) -> ^bb1 (i32)
     // CHECK-NEXT: ^bb1(%[[RESULT:.*]]: i32):
     // CHECK-NEXT: vm.return %[[RESULT]] : i32

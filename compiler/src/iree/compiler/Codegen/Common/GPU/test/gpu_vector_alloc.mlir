@@ -18,7 +18,7 @@ func.func @promote_global_transfer_read(%src: memref<16x16xf16>) -> vector<16x16
   %cst = arith.constant 0.0 : f16
   %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
   %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -56,7 +56,7 @@ func.func @promote_global_transfer_read_dma(%src: memref<16x16xf16>) -> vector<1
   %cst = arith.constant 0.0 : f16
   %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
   %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -90,7 +90,7 @@ func.func @promote_global_gather(%src: memref<16x16xf16>,
   %gather = vector.gather %src[%c0, %c0] [%indices], %mask, %passthru
       : memref<16x16xf16>, vector<16x16xindex>, vector<16x16xi1>, vector<16x16xf16> into vector<16x16xf16>
   %out = iree_vector_ext.to_layout %gather to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -132,7 +132,7 @@ func.func @promote_global_transfer_read_in_loop(%src: memref<16x16xf16>,
   %result = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> (vector<16x16xf16>) {
     %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
     %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-        {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+        <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
     scf.yield %out : vector<16x16xf16>
   }
   return %result : vector<16x16xf16>
@@ -202,6 +202,6 @@ func.func @materialize_layout_conflict(%vector: vector<16x16xf16>) -> vector<16x
 
 func.func @invalid_shared_memory_conversion_attr(%vector: vector<16x16xf16>) -> vector<16x16xf16> {
   // expected-error @+1 {{shared_memory_conversion attribute must implement IREE::GPU::PromotionAttr}}
-  %out = iree_vector_ext.to_layout %vector to layout(#layout) {shared_memory_conversion = "invalid"} : vector<16x16xf16>
+  %out = iree_vector_ext.to_layout %vector to layout(#layout) <shared_memory_conversion = "invalid"> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }

@@ -1054,7 +1054,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
     linalg.yield %mask : i1
   } -> tensor<?x?xi1>
 
-  %out = iree_linalg_ext.attention {
+  %out = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(M, N, K2, K1) -> (M, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
@@ -1063,7 +1063,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
       affine_map<(M, N, K2, K1) -> (M, N)>
     ]
-  } ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+  > ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
   outs(%out_e : tensor<?x?xf16>) {
   ^bb0(%score : f32):
       iree_linalg_ext.yield %score : f32
@@ -1112,7 +1112,7 @@ util.func @online_attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16
     linalg.yield %mask : i1
   } -> tensor<?x?xi1>
 
-  %out:3 = iree_linalg_ext.online_attention {
+  %out:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(M, N, K2, K1) -> (M, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
@@ -1123,7 +1123,7 @@ util.func @online_attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16
       affine_map<(M, N, K2, K1) -> (M)>,
       affine_map<(M, N, K2, K1) -> (M)>
     ]
-  } ins(%Q, %K, %V, %scale, %causalmask :
+  > ins(%Q, %K, %V, %scale, %causalmask :
         tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
     outs(%acc, %max, %sum : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>) {
   ^bb0(%score : f32):
@@ -1508,12 +1508,12 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
       linalg.yield %val : bf16
   } -> tensor<10x20x40x50xbf16>
   %empty = tensor.empty() : tensor<10x20x30x40xbf16>
-  %attention = iree_linalg_ext.attention {
+  %attention = iree_linalg_ext.attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
-                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]>
       ins(%query, %key, %value, %cst
           : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
       outs(%empty : tensor<10x20x30x40xbf16>) {
@@ -3062,7 +3062,7 @@ util.func public @online_attention_normalize_fusion(
   %acc = linalg.fill ins(%cst : f32) outs(%acc_e : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
   %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %sum = linalg.fill ins(%cst : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %r:3 = iree_linalg_ext.online_attention {
+  %r:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(b, m, n, k1, k2) -> (b, m, k1)>,
       affine_map<(b, m, n, k1, k2) -> (b, k2, k1)>,
@@ -3072,7 +3072,7 @@ util.func public @online_attention_normalize_fusion(
       affine_map<(b, m, n, k1, k2) -> (b, m)>,
       affine_map<(b, m, n, k1, k2) -> (b, m)>
     ]
-  } ins(%Q, %K, %V, %scale : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
+  > ins(%Q, %K, %V, %scale : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
     outs(%acc, %max, %sum : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%score: f32):
     iree_linalg_ext.yield %score : f32
