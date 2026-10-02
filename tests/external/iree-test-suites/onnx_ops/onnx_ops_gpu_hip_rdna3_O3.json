@@ -303,7 +303,6 @@
     "onnx/node/generated/test_wrap_pad"
   ],
   "expected_run_failures": [
-    "onnx/node/generated/test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_True",
     "onnx/node/generated/test_bernoulli",
     "onnx/node/generated/test_bernoulli_double",
     "onnx/node/generated/test_bernoulli_double_expanded",
@@ -314,7 +313,6 @@
     "onnx/node/generated/test_gridsample_nearest_align_corners_0_additional_1",
     "onnx/node/generated/test_gridsample_nearest_align_corners_1_additional_1",
     "onnx/node/generated/test_lstm_with_peepholes",
-    "onnx/node/generated/test_nonmaxsuppression_flipped_coordinates",
     "onnx/node/generated/test_qlinearmatmul_2D_int8_float16",
     "onnx/node/generated/test_qlinearmatmul_2D_int8_float32",
     "onnx/node/generated/test_qlinearmatmul_3D_int8_float16",
@@ -330,11 +328,9 @@
     "onnx/node/generated/test_reduce_log_sum_default",
     "onnx/node/generated/test_reduce_log_sum_exp_default_axes_keepdims_example",
     "onnx/node/generated/test_reduce_log_sum_exp_default_axes_keepdims_random",
-    "onnx/node/generated/test_reduce_max_bool_inputs",
     "onnx/node/generated/test_reduce_max_empty_set",
     "onnx/node/generated/test_reduce_mean_default_axes_keepdims_example",
     "onnx/node/generated/test_reduce_mean_default_axes_keepdims_random",
-    "onnx/node/generated/test_reduce_min_bool_inputs",
     "onnx/node/generated/test_reduce_min_empty_set",
     "onnx/node/generated/test_reduce_sum_default_axes_keepdims_example",
     "onnx/node/generated/test_reduce_sum_default_axes_keepdims_random",
