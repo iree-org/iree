@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -1166,12 +1167,6 @@ struct ScatterIndexedDimsFirst final
     if (!inputBatchingDims.empty() || !scatterIndicesBatchingDims.empty()) {
       return rewriter.notifyMatchFailure(op, "batching dims are not handled");
     }
-
-    auto isIdentityPermutation = [](ArrayRef<int64_t> perm) {
-      return llvm::all_of(llvm::enumerate(perm), [](auto it) {
-        return static_cast<int64_t>(it.index()) == it.value();
-      });
-    };
 
     if (isIdentityPermutation(scatterDimsToOperandDims)) {
       return rewriter.notifyMatchFailure(

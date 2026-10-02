@@ -46,21 +46,6 @@ SmallVector<T> permute(ArrayRef<T> values, ArrayRef<Index> permutation) {
   return res;
 }
 
-// Check if the range is a sequence of numbers starting from 0.
-// Example: (0, 1, 2, 3).
-// TODO: Make the isIdentityPermutation in MLIR more generic to not only
-// accept int64_t and delete this.
-template <typename Range>
-bool isIdentityPermutation(Range &&range) {
-  using ValueType = std::decay_t<decltype(*std::begin(range))>;
-  ValueType i = static_cast<ValueType>(0);
-  return llvm::all_of(std::forward<Range>(range), [&i](ValueType v) {
-    bool res = (v == i);
-    ++i;
-    return res;
-  });
-}
-
 // Make a permutation that moves src to dst.
 // Example with size = 5, src = 1, dst = 3.
 // output = (0, 2, 3, 1, 4).
