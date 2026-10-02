@@ -244,6 +244,7 @@ iree_bytecode_module(
     "iree_samples_simple_embedding_test_module_vulkan"
   FLAGS
     "--iree-hal-target-device=vulkan"
+    "--iree-vulkan-target=vp_android_baseline_2022"
     "--iree-llvmcpu-debug-symbols=false"
   PUBLIC
 )
