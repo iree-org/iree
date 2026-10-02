@@ -75,6 +75,39 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
   return value;
 }
 
+// These ops become tied Flow views after dispatch formation. Treat their
+// results as indirect now so a required tie cannot mutate an earlier source.
+static bool isPreConversionTensorView(Operation *op) {
+  return isa_and_nonnull<tensor::BitcastOp, tensor::CastOp,
+                         tensor::CollapseShapeOp, tensor::ExpandShapeOp,
+                         tensor::ReshapeOp>(op);
+}
+
+// A required tie can reuse storage only through a direct, type-identical base.
+static Value getRequiredDirectTiedResultBase(DispatchRegionOp regionOp,
+                                             Value value) {
+  auto result = dyn_cast<OpResult>(value);
+  if (!result || !regionOp->isProperAncestor(result.getOwner())) {
+    return {};
+  }
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(result.getOwner());
+  if (!tiedOp || !tiedOp.isTiedResultRequired(result.getResultNumber())) {
+    return {};
+  }
+  Value tiedOperand = tiedOp.getTiedResultOperand(result);
+  if (!tiedOperand || isPreConversionTensorView(tiedOperand.getDefiningOp()) ||
+      tiedOperand.getType() != result.getType()) {
+    return {};
+  }
+  // One tied predecessor makes the operand indirect; there is no need to walk
+  // the rest of the chain for every candidate result.
+  auto operandOp = tiedOperand.getDefiningOp<IREE::Util::TiedOpInterface>();
+  if (operandOp && operandOp.getTiedResultOperand(tiedOperand)) {
+    return {};
+  }
+  return tiedOperand;
+}
+
 } // namespace
 
 /// Rewrite the DispatchRegionOp into a DispatchWorkgroupsOp. The
@@ -106,17 +139,28 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
              [](Value v) { return isa<UnrankedTensorType>(v.getType()); }) &&
          "unranked tensors are not supported");
 
-  // Compute dimensions of tensor args.
+  // Record capture indices and dimension offsets to avoid repeated scans.
+  DenseMap<Value, unsigned> argumentIndices;
   SmallVector<Value> argumentDims;
-  for (Value tensor : argumentsSet) {
+  SmallVector<unsigned> argumentDimOffsets;
+  for (auto [index, tensor] : llvm::enumerate(argumentsSet)) {
+    argumentIndices[tensor] = index;
+    argumentDimOffsets.push_back(argumentDims.size());
     auto tensorType = dyn_cast<RankedTensorType>(tensor.getType());
     if (!tensorType) {
       continue;
     }
     appendDynamicDims(rewriter, loc, argumentDims, tensor);
   }
+  argumentDimOffsets.push_back(argumentDims.size());
+  auto getArgumentDims = [&](unsigned index) -> ValueRange {
+    return ValueRange(argumentDims)
+        .slice(argumentDimOffsets[index],
+               argumentDimOffsets[index + 1] - argumentDimOffsets[index]);
+  };
 
   // Find tied results.
+  SmallVector<Value> requiredResults;
   DenseSet<Value> tiedArgumentsSet;
   SmallVector<int64_t> tiedArguments(numResults,
                                      IREE::Util::TiedOpInterface::kUntiedIndex);
@@ -129,6 +173,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   // The logic to find the tied arguments only works for single block regions.
   // For ops with multiple blocks, just ignore tied arguments for now.
   if (llvm::hasSingleElement(region)) {
+    SmallVector<std::pair<unsigned, Value>> requiredTies;
+    SmallVector<std::pair<unsigned, Value>> otherTies;
     for (const auto &it :
          llvm::enumerate(origTerminators.front()->getOperands())) {
       auto tiedArgument =
@@ -138,14 +184,64 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       }
       assert(argumentsSet.contains(*tiedArgument) &&
              "expected that tiedArgument is already an argument");
-      // Do not tie an argument to multiple results.
-      if (tiedArgumentsSet.contains(*tiedArgument)) {
+      bool isRequired = getRequiredDirectTiedResultBase(regionOp, it.value()) ==
+                        *tiedArgument;
+      auto &candidates = isRequired ? requiredTies : otherTies;
+      candidates.emplace_back(it.index(), *tiedArgument);
+    }
+    auto assignTies = [&](ArrayRef<std::pair<unsigned, Value>> candidates) {
+      for (auto [resultIndex, tiedArgument] : candidates) {
+        // Do not tie an argument to multiple results.
+        if (!tiedArgumentsSet.insert(tiedArgument).second) {
+          continue;
+        }
+        tiedArguments[resultIndex] = argumentIndices.lookup(tiedArgument);
+      }
+    };
+    // Required bindings claim shared storage before optional result ties.
+    assignTies(requiredTies);
+
+    // An operation-required result may have no users outside the dispatch, but
+    // still needs initialized writable storage. Materialize its binding here,
+    // where capture access and output stores are established, so region
+    // formation and canonicalization need only preserve ordinary SSA uses.
+    auto returnOp = origTerminators.front();
+    // A base with multiple data consumers is unavailable to every candidate.
+    DenseSet<Value> checkedBases;
+    for (Operation &op : region.front().without_terminator()) {
+      if (!isa<IREE::Util::TiedOpInterface>(op)) {
         continue;
       }
-      tiedArgumentsSet.insert(*tiedArgument);
-      tiedArguments[it.index()] = std::distance(
-          argumentsSet.begin(), llvm::find(argumentsSet, *tiedArgument));
+      bool hasLiveResult = llvm::any_of(op.getResults(), [&](Value result) {
+        return llvm::any_of(result.getUses(), [&](OpOperand &use) {
+          return use.getOwner() != returnOp ||
+                 !regionOp->getResult(use.getOperandNumber()).use_empty();
+        });
+      });
+      if (!hasLiveResult) {
+        continue;
+      }
+      for (Value result : op.getResults()) {
+        Value tiedBase = getRequiredDirectTiedResultBase(regionOp, result);
+        if (!tiedBase || !argumentsSet.contains(tiedBase) ||
+            tiedArgumentsSet.contains(tiedBase) ||
+            !checkedBases.insert(tiedBase).second) {
+          continue;
+        }
+        // Limit reuse to one data consumer instead of requiring alias/liveness
+        // analysis. Shape queries cannot observe a type-identical tie's writes.
+        if (!llvm::all_of(tiedBase.getUses(), [&](OpOperand &use) {
+              return use.getOwner() == &op ||
+                     isa<tensor::DimOp>(use.getOwner());
+            })) {
+          continue;
+        }
+        tiedArgumentsSet.insert(tiedBase);
+        tiedArguments.push_back(argumentIndices.lookup(tiedBase));
+        requiredResults.push_back(result);
+      }
     }
+    assignTies(otherTies);
   }
 
   // Create empty dispatch region.
@@ -160,10 +256,20 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     }
   }
 
+  // Required results are appended so existing dispatch result indices remain
+  // unchanged. Direct type-identical ties reuse the captured storage's shape.
+  SmallVector<Type> resultTypes(regionOp.getResultTypes());
+  SmallVector<Value> resultDims(regionOp.getResultDims());
+  for (auto [index, result] : llvm::enumerate(requiredResults)) {
+    resultTypes.push_back(result.getType());
+    auto dims = getArgumentDims(tiedArguments[numResults + index]);
+    resultDims.append(dims.begin(), dims.end());
+  }
+
   // Create the shell dispatch.workgroup ops.
   auto workgroupsOp = IREE::Flow::DispatchWorkgroupsOp::create(
-      rewriter, loc, regionOp.getWorkload(), regionOp.getResultTypes(),
-      regionOp.getResultDims(), arguments, argumentDims, tiedArguments);
+      rewriter, loc, regionOp.getWorkload(), resultTypes, resultDims, arguments,
+      argumentDims, tiedArguments);
   workgroupsOp->setDialectAttrs(regionOp->getDialectAttrs());
 
   // Populate the workgroup count region.
@@ -196,8 +302,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       continue;
     }
     auto inputBbArg = workgroupsOp.getInputBlockArgument(it.index());
-    auto dims =
-        IREE::Util::findDynamicDimsInList(it.index(), arguments, argumentDims);
+    auto dims = getArgumentDims(it.index());
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "dynamic dims not found among arguments");
     SmallVector<Value> bbArgDims =
@@ -227,7 +332,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       [&](IREE::Flow::ReturnOp returnOp) { terminators.push_back(returnOp); });
   for (auto terminator : terminators) {
     rewriter.setInsertionPoint(terminator);
-    for (const auto &it : llvm::enumerate(terminator->getOperands())) {
+    for (const auto &it : llvm::enumerate(
+             llvm::concat<Value>(terminator.getOperands(), requiredResults))) {
       auto outputBbArg = workgroupsOp.getOutputBlockArgument(it.index());
       ValueRange dims;
       if (tiedArguments[it.index()] ==
@@ -236,8 +342,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       } else {
         // This assumes that the number of dynamic dims does not change when
         // following an SSA use-def chain of tied values.
-        dims = IREE::Util::findDynamicDimsInList(tiedArguments[it.index()],
-                                                 arguments, argumentDims);
+        dims = getArgumentDims(tiedArguments[it.index()]);
       }
 #ifndef NDEBUG
       auto tensorType = cast<RankedTensorType>(it.value().getType());
@@ -255,7 +360,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     rewriter.eraseOp(terminator);
   }
 
-  rewriter.replaceOp(regionOp, workgroupsOp.getResults());
+  rewriter.replaceOp(regionOp,
+                     workgroupsOp.getResults().take_front(numResults));
   return workgroupsOp;
 }
 
