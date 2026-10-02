@@ -832,7 +832,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/true,
                             /*foldIdentitySlices=*/false,
-                            /*decomposeMasks=*/true);
+                            /*decomposeMasks=*/false);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
@@ -848,6 +848,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUVectorDistributePass());
+  // Resolve layout conflicts on compact masks before decomposing them.
+  funcPassManager.addPass(createMaterializeVectorMaskingPass());
   if (forROCDL) {
     funcPassManager.addPass(createAMDGPULowerAsyncDMAPass());
   }

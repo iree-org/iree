@@ -81,6 +81,8 @@ compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary) {
 
   tint::core::ir::Module irModule = irResult.Move();
   tint::wgsl::writer::Options writerOptions;
+  writerOptions.allowed_features.features.insert(
+      tint::wgsl::LanguageFeature::kImmediateAddressSpace);
   auto programResult =
       tint::wgsl::writer::ProgramFromIR(irModule, writerOptions);
   if (programResult != tint::Success) {

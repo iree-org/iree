@@ -19,6 +19,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -454,6 +455,143 @@ struct TransposeReshapeGenericDotGeneral final
     }
 
     rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+// Materialize reversal before StableHLO-to-LinalgExt runs. A reverse created
+// during the final convolution conversion instead takes the upstream affine
+// lowering, whose negative indexing coefficient is unsupported by CPU tiling.
+struct ConvolutionReversal final
+    : OpRewritePattern<mlir::stablehlo::ConvolutionOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
+                                PatternRewriter &rewriter) const override {
+    auto reversal = op.getWindowReversal();
+    if (!reversal) {
+      return failure();
+    }
+    SmallVector<int64_t> dimensions;
+    for (auto [i, reversed] : llvm::enumerate(*reversal)) {
+      if (reversed) {
+        dimensions.push_back(
+            op.getDimensionNumbers().getKernelSpatialDimensions()[i]);
+      }
+    }
+    if (dimensions.empty()) {
+      return failure();
+    }
+    Value filter = mlir::stablehlo::ReverseOp::create(
+        rewriter, op.getLoc(), op.getRhs(),
+        rewriter.getDenseI64ArrayAttr(dimensions));
+    rewriter.modifyOpInPlace(op, [&] {
+      op.getRhsMutable().assign(filter);
+      op.setWindowReversalAttr(rewriter.getDenseBoolArrayAttr(
+          SmallVector<bool>(reversal->size(), false)));
+    });
+    return success();
+  }
+};
+
+// Padding is the only operand dynamic_conv adds to convolution. Move it into
+// a dynamic_pad and lower the rest as a convolution.
+struct DynamicConvToPaddedConv final
+    : OpRewritePattern<mlir::stablehlo::DynamicConvOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicConvOp op,
+                                PatternRewriter &rewriter) const override {
+    // A constant padding folds to a static convolution later in the pipeline.
+    if (matchPattern(op.getPadding(), m_Constant())) {
+      return rewriter.notifyMatchFailure(op, "constant padding");
+    }
+    Location loc = op.getLoc();
+    auto lhsType = dyn_cast<RankedTensorType>(op.getLhs().getType());
+    auto paddingType = dyn_cast<RankedTensorType>(op.getPadding().getType());
+    if (!lhsType || !paddingType || !paddingType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "unranked lhs or padding");
+    }
+    auto dims = op.getDimensionNumbers();
+    ArrayRef<int64_t> spatialDims = dims.getInputSpatialDimensions();
+    int64_t rank = lhsType.getRank();
+    int64_t numSpatial = spatialDims.size();
+    Type paddingElementType = paddingType.getElementType();
+    unsigned paddingBitWidth = paddingElementType.getIntOrFloatBitWidth();
+
+    Value zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value oneIndex = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    Value zeroPaddingElement = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getIntegerAttr(paddingElementType, 0));
+    ArrayRef<int64_t> lhsDilation =
+        op.getLhsDilation().value_or(ArrayRef<int64_t>{});
+    SmallVector<APInt> interiorValues(rank, APInt(paddingBitWidth, 0));
+    SmallVector<Value> lows(rank, zeroPaddingElement);
+    SmallVector<Value> highs(rank, zeroPaddingElement);
+    for (auto [s, d] : llvm::enumerate(spatialDims)) {
+      Value row = arith::ConstantIndexOp::create(rewriter, loc, s);
+      Value lowElement = tensor::ExtractOp::create(
+          rewriter, loc, op.getPadding(), ValueRange{row, zeroIndex});
+      Value highElement = tensor::ExtractOp::create(
+          rewriter, loc, op.getPadding(), ValueRange{row, oneIndex});
+      lows[d] = lowElement;
+
+      // Base dilation is applied by the pad, so the convolution must not
+      // apply it again.
+      int64_t interior = lhsDilation.empty() ? 0 : lhsDilation[s] - 1;
+      interiorValues[d] = APInt(paddingBitWidth, interior);
+      Value lowIndex = arith::IndexCastOp::create(
+          rewriter, loc, rewriter.getIndexType(), lowElement);
+      Value highIndex = arith::IndexCastOp::create(
+          rewriter, loc, rewriter.getIndexType(), highElement);
+      Value size = tensor::DimOp::create(rewriter, loc, op.getLhs(), d);
+      Value interiorSize =
+          arith::ConstantIndexOp::create(rewriter, loc, interior);
+      Value span = arith::SubIOp::create(rewriter, loc, size, oneIndex);
+      span = arith::MaxSIOp::create(rewriter, loc, span, zeroIndex);
+      Value dilated = arith::AddIOp::create(
+          rewriter, loc, size,
+          arith::MulIOp::create(rewriter, loc, span, interiorSize));
+      // A fully cropped convolution has no output, but dynamic_pad cannot
+      // represent a negative extent. Clamp its intermediate extent to zero.
+      Value minimum = arith::SubIOp::create(
+          rewriter, loc, zeroIndex,
+          arith::AddIOp::create(rewriter, loc, dilated, lowIndex));
+      Value clamped = arith::MaxSIOp::create(rewriter, loc, highIndex, minimum);
+      highs[d] = arith::IndexCastOp::create(rewriter, loc, paddingElementType,
+                                            clamped);
+    }
+    Value low = tensor::FromElementsOp::create(rewriter, loc, lows);
+    Value high = tensor::FromElementsOp::create(rewriter, loc, highs);
+
+    Value interior = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc,
+        DenseIntElementsAttr::get(
+            RankedTensorType::get({rank}, paddingElementType), interiorValues));
+    Value zero = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc,
+        rewriter.getZeroAttr(
+            RankedTensorType::get({}, lhsType.getElementType())));
+
+    // Padded spatial dims are dynamic; the rest keep the lhs sizes.
+    SmallVector<int64_t> paddedShape(lhsType.getShape());
+    for (int64_t d : spatialDims) {
+      paddedShape[d] = ShapedType::kDynamic;
+    }
+    Value padded = mlir::stablehlo::DynamicPadOp::create(
+        rewriter, loc,
+        RankedTensorType::get(paddedShape, lhsType.getElementType()),
+        op.getLhs(), zero, low, high, interior);
+
+    auto zeroPadding = DenseIntElementsAttr::get(
+        RankedTensorType::get({numSpatial, 2}, rewriter.getI64Type()),
+        int64_t{0});
+    auto onesLhsDilation =
+        rewriter.getDenseI64ArrayAttr(SmallVector<int64_t>(numSpatial, 1));
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConvolutionOp>(
+        op, op.getType(), padded, op.getRhs(), op.getWindowStridesAttr(),
+        zeroPadding, onesLhsDilation, op.getRhsDilationAttr(),
+        op.getWindowReversalAttr(), dims, op.getFeatureGroupCount(),
+        op.getBatchGroupCount(), op.getPrecisionConfigAttr());
     return success();
   }
 };
@@ -2486,6 +2624,7 @@ struct StableHLOToStableHLOPreprocessing final
                     ScatterImplicitIndex, ScatterImplicitBatch,
                     ScatterMaterializeInsertedDim, ScatterCollapseBatch,
                     ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
+    patterns.insert<ConvolutionReversal, DynamicConvToPaddedConv>(context);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
