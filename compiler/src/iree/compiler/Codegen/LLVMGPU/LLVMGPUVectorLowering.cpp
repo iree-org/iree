@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -428,11 +429,6 @@ private:
       p *= vt.getDimSize(i);
     }
     return p;
-  }
-
-  static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
-    return llvm::all_of(llvm::enumerate(perm),
-                        [](auto p) { return p.value() == p.index(); });
   }
 
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,

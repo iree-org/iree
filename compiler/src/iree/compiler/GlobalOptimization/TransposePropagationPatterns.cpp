@@ -27,15 +27,6 @@ namespace mlir::iree_compiler::GlobalOptimization {
 // Transpose permutation helpers
 //===----------------------------------------------------------------------===//
 
-static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
-  for (auto [index, dim] : llvm::enumerate(perm)) {
-    if (index != dim) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // Constructs a transpose of the given tensor and permutation.
 static Value createTransposeInit(OpBuilder &builder, Value source,
                                  ArrayRef<int64_t> perm) {
