@@ -64,9 +64,10 @@ static Attribute convertIntegerAttribute(Attribute attr,
     if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(attr)) {
       auto elementType = dyn_cast<IntegerType>(shapedType.getElementType());
       if (elementType) {
-        return denseAttr.mapValues(elementType, [&elementType](APInt value) {
-          return APInt(elementType.getWidth(), value.getZExtValue());
-        });
+        return denseAttr.mapValues(
+            elementType, [&elementType](const APInt &value) {
+              return APInt(elementType.getWidth(), value.getZExtValue());
+            });
       }
     }
   }

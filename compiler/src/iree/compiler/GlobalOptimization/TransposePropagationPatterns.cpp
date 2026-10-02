@@ -1073,17 +1073,15 @@ public:
     };
 
     Operation *op = namedOp.getOperation();
-    if (isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) {
-      replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1) {
+    if ((isa<linalg::MatmulTransposeAOp>(op) && inputIdx == 0) ||
+        (isa<linalg::MatmulTransposeBOp>(op) && inputIdx == 1)) {
       replaceOp(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureMatmul(op) && inputIdx == 1) {
       replaceOp(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) {
-      replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1) {
+    } else if ((isa<linalg::BatchMatmulTransposeAOp>(op) && inputIdx == 0) ||
+               (isa<linalg::BatchMatmulTransposeBOp>(op) && inputIdx == 1)) {
       replaceOp(static_cast<linalg::BatchMatmulOp *>(nullptr));
     } else if (IREE::LinalgExt::isPureBatchMatmul(op) && inputIdx == 0) {
       replaceOp(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
