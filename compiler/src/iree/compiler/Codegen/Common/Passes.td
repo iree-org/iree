@@ -589,6 +589,31 @@ def FoldAffineMinInDistributedLoopsPass :
   let summary = "Fold `affine.min` ops in distributed loops";
 }
 
+def FoldMemRefCopyIntoDPSOpsPass :
+    InterfacePass<"iree-codegen-fold-memref-copy-into-dps-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Fold temporary output copies into destination-style memref ops";
+  let description = [{
+    Retargets destination-style operations from private temporaries to their
+    final output buffers. For example:
+
+      memref.copy %source, %temporary
+      linalg.generic outs(%temporary)
+      memref.copy %temporary, %target
+
+    becomes:
+
+      memref.copy %source, %target
+      linalg.generic outs(%target)
+
+    The rewrite requires a single copy-in, destination-style writer, and
+    copy-out, and rejects potentially aliasing inputs or intervening accesses
+    to the final target.
+  }];
+  let dependentDialects = [
+    "memref::MemRefDialect"
+  ];
+}
+
 def FoldReshapeIntoInterfaceTensorPass :
     Pass<"iree-codegen-fold-reshape-into-interface-tensor", ""> {
   let summary = "Folds reshape operations into the interface bindings.";
