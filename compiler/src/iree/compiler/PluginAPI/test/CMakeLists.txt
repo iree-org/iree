@@ -80,6 +80,8 @@ iree_lit_test_suite(
     "layout_mismatch.txt"
     "hidden_visibility.txt"
     "undefined_symbol.txt"
+    "plugin_with_deps.txt"
+    "dynamic_plugin.txt"
     "abi_hash_mismatch.txt"
     "null_field.txt"
     "duplicate_id.txt"
@@ -93,6 +95,7 @@ iree_package_ns(_PACKAGE_NS)
 string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
 foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "layout_mismatch.txt"
                   "hidden_visibility.txt" "undefined_symbol.txt"
+                  "plugin_with_deps.txt" "dynamic_plugin.txt"
                   "abi_hash_mismatch.txt" "null_field.txt" "duplicate_id.txt")
   set_property(TEST "${_PACKAGE_PATH}/${_TEST_SRC}.test" APPEND PROPERTY
     ENVIRONMENT
@@ -104,5 +107,76 @@ foreach(_TEST_SRC "invalid_plugin.txt" "valid_plugin.txt" "layout_mismatch.txt"
       "IREE_TEST_ABI_HASH_MISMATCH_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_abi_hash_mismatch_plugin>"
       "IREE_TEST_NULL_FIELD_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_null_field_plugin>"
       "IREE_TEST_DUPLICATE_ID_PLUGIN=$<TARGET_FILE:iree_compiler_PluginAPI_test_duplicate_id_plugin>"
+      $<$<BOOL:${IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DEPS_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_deps_plugin>>
+      $<$<BOOL:${IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS}>:IREE_TEST_DYNAMIC_PLUGIN=$<TARGET_FILE:iree_compiler_plugin_dynamic_test_plugin>>
   )
 endforeach()
+
+# A plugin naming MLIR symbols loads only if both sides renamed alike.
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
+  # Exercise a plugin with a separate helper library. Neither library is in
+  # the compiler, so the plugin link must include both.
+  iree_cc_library(
+    NAME
+      deps_helper
+    HDRS
+      "plugins/deps_helper.h"
+    SRCS
+      "plugins/deps_helper.cpp"
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
+      deps_plugin
+    SRCS
+      "plugins/deps_plugin.cpp"
+    DEPS
+      ::deps_helper
+      iree::compiler::PluginAPI
+    PUBLIC
+  )
+
+  iree_compiler_register_dynamic_plugin(
+    PLUGIN_ID
+      deps_plugin
+    TARGET
+      ::deps_plugin
+  )
+
+  iree_cc_library(
+    NAME
+      dynamic_plugin
+    SRCS
+      "dynamic_plugin.cpp"
+    DEPS
+      MLIRIR
+    PUBLIC
+  )
+
+  iree_compiler_register_dynamic_plugin(
+    PLUGIN_ID
+      dynamic_test_plugin
+    TARGET
+      ::dynamic_plugin
+  )
+
+endif()
+
+# A transitive shared dependency must survive the plugin's archive rewrite.
+if(IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS)
+  add_library(iree_plugin_shared_helper SHARED "plugins/deps_helper.cpp")
+  iree_cc_library(
+    NAME shared_deps_plugin
+    SRCS "plugins/shared_deps_plugin.cpp"
+    DEPS iree::compiler::PluginAPI iree_plugin_shared_helper
+  )
+  iree_compiler_register_dynamic_plugin(
+    PLUGIN_ID shared_deps_plugin
+    TARGET ::shared_deps_plugin
+  )
+  add_test(NAME "iree/compiler/PluginAPI/test/shared_dependency"
+    COMMAND $<TARGET_FILE:iree-opt>
+      "--iree-load-plugin=$<TARGET_FILE:iree_compiler_plugin_shared_deps_plugin>"
+      --help)
+endif()
