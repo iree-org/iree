@@ -1050,15 +1050,26 @@ public:
           namedOp, "transpose permutation does not match target permutation");
     }
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
-    if (Attribute castAttr = namedOp->getAttr("cast")) {
-      attrs.emplace_back(rewriter.getStringAttr("cast"), castAttr);
-    }
+    auto castAttr = namedOp.getCastAttr();
     SmallVector<Value> newInputs = namedOp.getInputs();
     newInputs[inputIdx] = transpose.getInput();
 
     auto replaceOp = [&](auto *typePtr) {
-      rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
-          namedOp, newInputs, namedOp.getDpsInits(), attrs);
+      using TargetOp = std::remove_pointer_t<decltype(typePtr)>;
+      if (!castAttr) {
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), newInputs,
+            namedOp.getDpsInits(), attrs);
+      } else if constexpr (std::is_same_v<TargetOp, linalg::BatchMatmulOp>) {
+        SmallVector<Value> operands(newInputs);
+        llvm::append_range(operands, namedOp.getDpsInits());
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), operands, castAttr, attrs);
+      } else {
+        rewriter.replaceOpWithNewOp<TargetOp>(
+            namedOp, namedOp->getResultTypes(), newInputs,
+            namedOp.getDpsInits(), castAttr, attrs);
+      }
     };
 
     Operation *op = namedOp.getOperation();

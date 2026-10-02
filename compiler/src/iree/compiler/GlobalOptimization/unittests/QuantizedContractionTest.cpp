@@ -38,7 +38,7 @@ protected:
   linalg::GenericOp contraction(StringRef id = "test") {
     linalg::GenericOp result;
     module->walk([&](linalg::GenericOp op) {
-      if (auto attr = op->getAttrOfType<StringAttr>("id")) {
+      if (auto attr = op->getDiscardableAttrOfType<StringAttr>("id")) {
         if (attr.getValue() == id) {
           result = op;
         }

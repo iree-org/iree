@@ -91,8 +91,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (variantOp != nullptr) {
     for (auto exportOp : variantOp.getExportOps()) {
-      exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
-                        builder.getIndexAttr(numberOfBytes));
+      exportOp.setWorkgroupLocalMemoryAttr(builder.getIndexAttr(numberOfBytes));
     }
   }
 }
@@ -282,13 +281,9 @@ public:
       signatureConverter.addInputs(llvmInputTypes);
     }
 
-    // Construct newFunc with all attributes except return type & symbol name.
+    // Preserve discardable metadata separately from the function properties.
     SmallVector<NamedAttribute> funcAttrs;
-    for (auto attr : funcOp->getAttrs()) {
-      if (attr.getName() == funcOp.getSymNameAttrName() ||
-          attr.getName() == funcOp.getFunctionTypeAttrName()) {
-        continue;
-      }
+    for (auto attr : funcOp->getDiscardableAttrs()) {
       funcAttrs.push_back(attr);
     }
 
@@ -298,6 +293,10 @@ public:
         rewriter, funcOp.getLoc(), funcOp.getName(), llvmFuncType,
         LLVM::Linkage::External, /*dsoLocal=*/false, /*cconv=*/LLVM::CConv::C,
         /*comdat=*/nullptr, funcAttrs);
+    newFuncOp.setSymVisibilityAttr(funcOp.getSymVisibilityAttr());
+    newFuncOp.setArgAttrsAttr(funcOp.getArgAttrsAttr());
+    newFuncOp.setResAttrsAttr(funcOp.getResAttrsAttr());
+    newFuncOp.setNoInlineAttr(funcOp.getNoInlineAttr());
 
     // Copy all of funcOp's operations into newFuncOp's body and perform region
     // type conversion.

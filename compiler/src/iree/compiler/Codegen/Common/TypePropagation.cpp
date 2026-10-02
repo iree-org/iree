@@ -46,6 +46,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -208,14 +209,9 @@ struct NamedOpTypePropagation : TypePropagationPattern<OpTy> {
       Type legalizedType = this->getTypeConverter()->convertType(resultType);
       resultTypes.push_back(legalizedType);
     }
-    NamedAttrList attrs(namedOp->getAttrs());
-    attrs.erase("operandSegmentSizes");
-    OperationState state(namedOp.getLoc(), namedOp->getName());
-    state.getOrAddProperties<typename OpTy::Properties>() =
-        namedOp.getProperties();
-    OpTy::build(rewriter, state, resultTypes, adaptor.getInputs(),
-                adaptor.getOutputs(), attrs.getAttrs());
-    rewriter.replaceOp(namedOp, rewriter.create(state)->getResults());
+    auto newOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
+        rewriter, namedOp, resultTypes, adaptor.getOperands());
+    rewriter.replaceOp(namedOp, newOp->getResults());
     return success();
   }
 };

@@ -4508,12 +4508,13 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the argument operands to the called function as a mutable range, this is
@@ -4723,12 +4724,13 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.
@@ -4848,12 +4850,13 @@ def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.

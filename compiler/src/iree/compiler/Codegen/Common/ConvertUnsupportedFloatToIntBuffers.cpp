@@ -158,6 +158,30 @@ struct ConvertMemRefAlloc final : OpConversionPattern<memref::AllocOp> {
   }
 };
 
+static Attribute convertFloatAttributeToInteger(
+    Attribute oldAttr, const UnsupportedFloatEmulationConverter &converter,
+    OpBuilder &builder) {
+  Attribute newAttr = oldAttr;
+  if (auto floatAttr = dyn_cast<FloatAttr>(oldAttr)) {
+    auto floatTy = cast<FloatType>(floatAttr.getType());
+    if (converter.shouldConvertFloat(floatTy)) {
+      APInt apint = floatAttr.getValue().bitcastToAPInt();
+      newAttr = builder.getIntegerAttr(
+          builder.getIntegerType(apint.getBitWidth()), apint);
+    }
+  } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
+    auto floatTy = cast<FloatType>(denseAttr.getType().getElementType());
+    if (converter.shouldConvertFloat(floatTy)) {
+      unsigned bitWidth = floatTy.getWidth();
+      newAttr = denseAttr.mapValues(
+          builder.getIntegerType(bitWidth),
+          [](const APFloat &src) { return src.bitcastToAPInt(); });
+    }
+  }
+
+  return newAttr;
+}
+
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
 struct GenericTypeConversionPattern : ConversionPattern {
@@ -173,37 +197,8 @@ struct GenericTypeConversionPattern : ConversionPattern {
     // them all the ops would become invalid. This may still be too broad,
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
-    llvm::SmallVector<NamedAttribute> newAttrs;
     auto *converter =
         static_cast<const UnsupportedFloatEmulationConverter *>(typeConverter);
-    if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::Util::GlobalOpInterface>(op)) {
-      for (auto attr : op->getAttrs()) {
-        auto oldAttr = attr.getValue();
-        Attribute newAttr = oldAttr;
-        if (auto floatAttr = dyn_cast<FloatAttr>(oldAttr)) {
-          auto floatTy = cast<FloatType>(floatAttr.getType());
-          if (converter->shouldConvertFloat(floatTy)) {
-            APInt apint = floatAttr.getValue().bitcastToAPInt();
-            newAttr = rewriter.getIntegerAttr(
-                rewriter.getIntegerType(apint.getBitWidth()), apint);
-          }
-        } else if (auto denseAttr = dyn_cast<DenseFPElementsAttr>(oldAttr)) {
-          auto floatTy = cast<FloatType>(denseAttr.getType().getElementType());
-          if (converter->shouldConvertFloat(floatTy)) {
-            unsigned bitWidth = floatTy.getWidth();
-            newAttr = denseAttr.mapValues(
-                rewriter.getIntegerType(bitWidth),
-                [&](const APFloat &src) { return src.bitcastToAPInt(); });
-          }
-        }
-
-        newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
-      }
-    } else {
-      newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
-    }
-
     llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
@@ -211,7 +206,20 @@ struct GenericTypeConversionPattern : ConversionPattern {
         Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
     newOp->setOperands(operands);
     rewriter.insert(newOp);
-    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
+    if (op->hasTrait<OpTrait::ConstantLike>() ||
+        isa<IREE::Util::GlobalOpInterface>(op)) {
+      newOp->getName().walkInherentAttrs(
+          newOp, [&converter, &rewriter](StringRef, Attribute &attr) {
+            attr = convertFloatAttributeToInteger(attr, *converter, rewriter);
+          });
+      SmallVector<NamedAttribute> attrs;
+      for (NamedAttribute attr : op->getDiscardableAttrs()) {
+        attrs.emplace_back(attr.getName(),
+                           convertFloatAttributeToInteger(
+                               attr.getValue(), *converter, rewriter));
+      }
+      newOp->setDiscardableAttrs(attrs);
+    }
 
     for (auto [r, newRegion] :
          llvm::zip_equal(op->getRegions(), newOp->getRegions())) {

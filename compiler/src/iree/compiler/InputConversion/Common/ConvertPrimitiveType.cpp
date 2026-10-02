@@ -156,17 +156,6 @@ struct GenericTypeConversionPattern : ConversionPattern {
     // them all the ops would become invalid. This may still be too broad,
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
-    llvm::SmallVector<NamedAttribute> newAttrs;
-    if (op->hasTrait<OpTrait::ConstantLike>()) {
-      for (auto attr : op->getAttrs()) {
-        auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
-                                        *getTypeConverter());
-        newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
-      }
-    } else {
-      newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
-    }
-
     llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
@@ -174,7 +163,9 @@ struct GenericTypeConversionPattern : ConversionPattern {
         Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
     newOp->setOperands(operands);
     rewriter.insert(newOp);
-    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
+    if (op->hasTrait<OpTrait::ConstantLike>()) {
+      convertAttributes(newOp, *getTypeConverter());
+    }
 
     for (auto [r, newRegion] :
          llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
@@ -197,15 +188,9 @@ struct GlobalOpConversionPattern
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOpInterface op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    llvm::SmallVector<NamedAttribute> newAttrs;
-    for (auto attr : op->getAttrs()) {
-      auto newAttr =
-          convertAttribute(op->getLoc(), attr.getValue(), *getTypeConverter());
-      newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
-    }
     Operation *newOp = rewriter.cloneWithoutRegions(*op);
     newOp->setOperands(operands);
-    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
+    convertAttributes(newOp, *getTypeConverter());
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

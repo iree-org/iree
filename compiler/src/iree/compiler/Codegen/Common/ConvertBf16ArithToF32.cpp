@@ -125,18 +125,6 @@ struct GenericTypeConversionPattern : ConversionPattern {
     // them all the ops would become invalid. This may still be too broad,
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
-    llvm::SmallVector<NamedAttribute> newAttrs;
-    if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::Util::GlobalOpInterface>(op)) {
-      for (auto attr : op->getAttrs()) {
-        auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
-                                        *getTypeConverter());
-        newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
-      }
-    } else {
-      newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
-    }
-
     llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
@@ -144,7 +132,10 @@ struct GenericTypeConversionPattern : ConversionPattern {
         Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
     newOp->setOperands(operands);
     rewriter.insert(newOp);
-    newOp->setAttrs(rewriter.getDictionaryAttr(newAttrs));
+    if (op->hasTrait<OpTrait::ConstantLike>() ||
+        isa<IREE::Util::GlobalOpInterface>(op)) {
+      convertAttributes(newOp, *getTypeConverter());
+    }
 
     for (auto [r, newRegion] :
          llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
