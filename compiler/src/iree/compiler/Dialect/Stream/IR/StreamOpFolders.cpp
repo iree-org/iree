@@ -2814,11 +2814,6 @@ struct FoldAsyncParameterReadTargetSubview
     Value newTargetEnd;
     if (auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
             newTargetResource.getDefiningOp())) {
-      newSourceOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), newSourceOffset,
-          rewriter.createOrFold<mlir::arith::IndexCastOp>(
-              subviewOp.getLoc(), rewriter.getI64Type(),
-              subviewOp.getSourceOffset()));
       newTargetResource = subviewOp.getSource();
       newTargetSize = subviewOp.getSourceSize();
       newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
@@ -2892,11 +2887,6 @@ struct FoldAsyncParameterWriteSourceSubview
           subviewOp.getLoc(), subviewOp.getSourceOffset(), newSourceOffset);
       newSourceEnd = rewriter.createOrFold<mlir::arith::AddIOp>(
           subviewOp.getLoc(), newSourceOffset, op.getSourceLength());
-      newTargetOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), newTargetOffset,
-          rewriter.createOrFold<mlir::arith::IndexCastOp>(
-              subviewOp.getLoc(), rewriter.getI64Type(),
-              subviewOp.getSourceOffset()));
       needsUpdate = true;
     }
     rewriter.restoreInsertionPoint(ip);
@@ -2966,15 +2956,11 @@ struct FoldAsyncParameterGatherTargetSubview
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(op);
 
-    // Adjust all source_offsets (I64) by adding index_cast(subview_offset).
-    SmallVector<Value> newSourceOffsets;
-    auto subviewOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
-        subviewOp.getLoc(), rewriter.getI64Type(), subviewOp.getSourceOffset());
-    for (auto sourceOffset : op.getSourceOffsets()) {
-      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), sourceOffset, subviewOffsetI64);
-      newSourceOffsets.push_back(newOffset);
-    }
+    // The parameter-file source_offsets live in an address space independent
+    // of the target resource, so folding a resource subview must not change
+    // them (only the target resource offsets shift).
+    SmallVector<Value> newSourceOffsets(op.getSourceOffsets().begin(),
+                                        op.getSourceOffsets().end());
 
     // Adjust all target_offsets (index) by adding subview_offset.
     SmallVector<Value> newTargetOffsets;
@@ -3077,15 +3063,11 @@ struct FoldAsyncParameterScatterSourceSubview
       newSourceEnds.push_back(newEnd);
     }
 
-    // Adjust all target_offsets (I64) by adding index_cast(subview_offset).
-    SmallVector<Value> newTargetOffsets;
-    auto subviewOffsetI64 = rewriter.createOrFold<mlir::arith::IndexCastOp>(
-        subviewOp.getLoc(), rewriter.getI64Type(), subviewOp.getSourceOffset());
-    for (auto targetOffset : op.getTargetOffsets()) {
-      auto newOffset = rewriter.createOrFold<mlir::arith::AddIOp>(
-          subviewOp.getLoc(), targetOffset, subviewOffsetI64);
-      newTargetOffsets.push_back(newOffset);
-    }
+    // The parameter-file target_offsets live in an address space independent
+    // of the source resource, so folding a resource subview must not change
+    // them (only the source resource offsets shift).
+    SmallVector<Value> newTargetOffsets(op.getTargetOffsets().begin(),
+                                        op.getTargetOffsets().end());
 
     rewriter.restoreInsertionPoint(ip);
 
