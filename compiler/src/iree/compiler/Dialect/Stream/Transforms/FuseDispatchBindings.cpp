@@ -188,10 +188,11 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
   // Insert new binding args before the old ones (because that's easier).
   // Since we need to do live replacement of the old arg values we can't
   // erase them yet.
+  Builder builder(funcOp.getContext());
   SmallVector<BlockArgument> newBindingArgs;
   auto bindingType = IREE::Stream::BindingType::get(funcOp.getContext());
   auto offsetType = IndexType::get(funcOp.getContext());
-  for (auto &binding : bindings) {
+  for (auto [idx, binding] : llvm::enumerate(bindings)) {
     SmallVector<Location> locs;
     for (unsigned oldIdx : binding.correlationMap.set_bits()) {
       locs.push_back(oldBindingArgs[oldIdx].getLoc());
@@ -200,6 +201,38 @@ static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
     auto bindingArg =
         entryBlock.insertArgument(newBindingArgs.size(), bindingType, loc);
     newBindingArgs.push_back(bindingArg);
+
+    // Store correlation information as an attribute on the binding argument.
+    // This tells us which other bindings are in the same correlation group
+    // (i.e., point to the same resource but with different offsets, so they
+    // don't alias each other).
+    //
+    // For bindings in different correlation groups (pointing to different
+    // resources), we also store this information so that LLVM codegen can
+    // infer that they don't alias each other (noalias).
+    SmallVector<Attribute> correlatedIndices;
+    SmallVector<Attribute> noaliasIndices;
+    for (auto [otherIdx, otherBinding] : llvm::enumerate(bindings)) {
+      if (idx == otherIdx) {
+        continue;
+      }
+
+      if (binding.correlationMap == otherBinding.correlationMap) {
+        // Same correlation group: same resource, different offsets (noalias).
+        correlatedIndices.push_back(builder.getI32IntegerAttr(otherIdx));
+      } else {
+        // Different correlation groups: different resources (noalias).
+        noaliasIndices.push_back(builder.getI32IntegerAttr(otherIdx));
+      }
+    }
+    if (!correlatedIndices.empty()) {
+      funcOp.setArgAttr(bindingArg.getArgNumber(), "stream.binding_correlation",
+                        ArrayAttr::get(funcOp.getContext(), correlatedIndices));
+    }
+    if (!noaliasIndices.empty()) {
+      funcOp.setArgAttr(bindingArg.getArgNumber(), "stream.binding_noalias",
+                        ArrayAttr::get(funcOp.getContext(), noaliasIndices));
+    }
   }
 
   // Replace uses of the old args with the new args and update the ranges.
