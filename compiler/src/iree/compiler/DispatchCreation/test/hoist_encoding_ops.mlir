@@ -340,6 +340,36 @@ util.func public @dont_hoist_pad_encoding() -> tensor<640x320xf32, #encoding> {
 
 // -----
 
+// Do not bubble `set_encoding` operations with pad encodings through their
+// producers.
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#encoding = #iree_encoding.padding<[0, 64]>
+util.func public @dont_bubble_pad_encoding(%arg0: tensor<128x256xi8>) -> tensor<128x256xf32, #encoding> {
+  %0 = flow.dispatch.region -> (tensor<128x256xf32, #encoding>) {
+    %1 = tensor.empty() : tensor<128x256xf32>
+    %2 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+        ins(%arg0 : tensor<128x256xi8>) outs(%1 : tensor<128x256xf32>) {
+    ^bb0(%in: i8, %out: f32):
+      %3 = arith.extui %in : i8 to i32
+      %4 = arith.uitofp %3 : i32 to f32
+      linalg.yield %4 : f32
+    } -> tensor<128x256xf32>
+    %5 = iree_encoding.set_encoding %2 : tensor<128x256xf32> -> tensor<128x256xf32, #encoding>
+    flow.return %5 : tensor<128x256xf32, #encoding>
+  }
+  util.return %0 : tensor<128x256xf32, #encoding>
+}
+// CHECK-LABEL: @dont_bubble_pad_encoding
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     %[[DEQUANT:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.+}} : tensor<128x256xi8>)
+//       CHECK:     %[[SET_ENCODING:.+]] = iree_encoding.set_encoding %[[DEQUANT]]
+//       CHECK:     flow.return %[[SET_ENCODING]]
+//       CHECK:   return %[[DISPATCH]]
+
+// -----
+
 // Avoid hoisting `set_encoding` operations on scalar tensors.
 
 #encoding = #iree_encoding.testing<>
