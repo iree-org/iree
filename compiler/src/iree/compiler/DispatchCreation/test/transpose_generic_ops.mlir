@@ -203,3 +203,49 @@ util.func public @non_contiguous_reductions_swap(%arg0: tensor<8x16x32x64xf32>, 
   } -> tensor<8x128xf32>
   util.return %0 : tensor<8x128xf32>
 }
+
+// -----
+
+// Without materialized layouts, the reduction loops of a data-tiled
+// convolution move innermost like for any other generic.
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+// CHECK-LABEL: util.func public @data_tiled_conv_interchange(
+// CHECK:         linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]
+util.func public @data_tiled_conv_interchange(%input: tensor<2x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>, %init: tensor<2x2x14x14x8xf32>) -> tensor<2x2x14x14x8xf32> {
+  %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+    ins(%input, %filter : tensor<2x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<2x2x14x14x8xf32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+    %mul = arith.mulf %lhs, %rhs : f32
+    %sum = arith.addf %mul, %acc : f32
+    linalg.yield %sum : f32
+  } -> tensor<2x2x14x14x8xf32>
+  util.return %conv : tensor<2x2x14x14x8xf32>
+}
+
+// -----
+
+// Data-tiled convolutions from materialized layouts keep their loop order.
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+#target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {target_triple = "aarch64-unknown-unknown-eabi-elf"}>
+module attributes {iree.encoding.materialized_layout_target = #target} {
+  // CHECK-LABEL: util.func public @no_interchange_materialized_data_tiled_conv(
+  // CHECK:         linalg.generic
+  // CHECK-SAME:      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]
+  util.func public @no_interchange_materialized_data_tiled_conv(%input: tensor<2x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>, %init: tensor<2x2x14x14x8xf32>) -> tensor<2x2x14x14x8xf32> {
+    %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+      ins(%input, %filter : tensor<2x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<2x2x14x14x8xf32>) {
+    ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+      %mul = arith.mulf %lhs, %rhs : f32
+      %sum = arith.addf %mul, %acc : f32
+      linalg.yield %sum : f32
+    } -> tensor<2x2x14x14x8xf32>
+    util.return %conv : tensor<2x2x14x14x8xf32>
+  }
+}

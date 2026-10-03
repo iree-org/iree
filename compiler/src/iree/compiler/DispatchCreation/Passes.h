@@ -139,6 +139,11 @@ struct DataTilingEncodingOptions {
   EncodingOptions encodingOption = EncodingOptions::Generic;
 };
 
+/// Returns the configuration selected by the
+/// `--iree-dispatch-creation-experimental-set-data-tiling-ops` and
+/// `--iree-dispatch-creation-set-encoding-strategy` flags.
+DataTilingEncodingOptions getDataTilingEncodingOptionsFromFlags();
+
 /// Assigns data-tiling encodings on every function-like op, as configured by
 /// `options`.
 void buildDataTilingEncodingPassPipeline(
