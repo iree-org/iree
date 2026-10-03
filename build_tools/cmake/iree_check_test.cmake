@@ -18,6 +18,31 @@ function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _S
   endif()
 endfunction()
 
+function(_iree_target_backend_to_compiler_flags OUT_VAR TARGET_BACKEND)
+  if(TARGET_BACKEND STREQUAL "llvm-cpu" OR
+     TARGET_BACKEND STREQUAL "vmvx" OR
+     TARGET_BACKEND STREQUAL "vmvx-inline")
+    set(_FLAGS
+      "--iree-hal-target-device=local"
+      "--iree-hal-local-target-device-backends=${TARGET_BACKEND}"
+    )
+  elseif(TARGET_BACKEND STREQUAL "rocm")
+    set(_FLAGS "--iree-hal-target-device=hip")
+  elseif(TARGET_BACKEND STREQUAL "vulkan-spirv")
+    set(_FLAGS "--iree-hal-target-device=vulkan")
+  elseif(TARGET_BACKEND STREQUAL "cuda")
+    set(_FLAGS "--iree-hal-target-device=cuda")
+  elseif(TARGET_BACKEND STREQUAL "metal-spirv")
+    set(_FLAGS "--iree-hal-target-device=metal")
+  elseif(TARGET_BACKEND STREQUAL "webgpu-spirv")
+    set(_FLAGS "--iree-hal-target-device=webgpu")
+  else()
+    message(FATAL_ERROR "Unsupported target backend: ${TARGET_BACKEND}")
+  endif()
+
+  set(${OUT_VAR} "${_FLAGS}" PARENT_SCOPE)
+endfunction()
+
 # iree_check_test()
 #
 # Creates a test using iree-check-module for the specified source file.
@@ -157,7 +182,10 @@ function(iree_check_test)
     set(_MODULE_FILE_NAME "${_MODULE_NAME}.vmfb")
   endif(DEFINED _RULE_MODULE_FILE_NAME)
 
-  set(_BASE_COMPILER_FLAGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+  _iree_target_backend_to_compiler_flags(
+    _BASE_COMPILER_FLAGS
+    "${_RULE_TARGET_BACKEND}"
+  )
   if(_RULE_INPUT_TYPE)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-input-type=${_RULE_INPUT_TYPE}")
   endif()
