@@ -46,6 +46,26 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def CollapseContractionDimensionsPass :
+    InterfacePass<"iree-dispatch-creation-collapse-contraction-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Collapse contiguous dimensions of contractions outside dispatches.";
+  let description = [{
+    Collapse contiguous dimensions of tensor contractions outside dispatches
+    using the same indexing-map and iterator legality as dispatch dimension
+    collapsing. Preserve operand and result shapes with tensor reshapes. This
+    makes collapsible multi-M/N/K/batch contractions eligible for encoding
+    without requiring dispatch formation first. Contractions inside dispatches
+    and contractions with a compilation info or lowering config are left
+    unchanged.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def InsertTensorBarriersPass :
     InterfacePass<"iree-dispatch-creation-insert-tensor-barriers",
                   "mlir::FunctionOpInterface"> {
