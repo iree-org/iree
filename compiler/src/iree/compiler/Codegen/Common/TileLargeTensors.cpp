@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -41,6 +43,25 @@ int64_t getLargestFactorLessThan(int64_t val, int64_t upperBound) {
   return 1;
 }
 
+/// Tries to compute a provable static upper bound for loop dim |dim| of
+/// |linalgOp| through the operand dims mapped to it. This mirrors the vector
+/// size inference in GenericVectorization (inferSizesFromIR) so that both
+/// stages agree on which dynamic dims masked vectorization can handle.
+static std::optional<int64_t>
+getProvenLoopDimUpperBound(linalg::LinalgOp linalgOp, unsigned dim) {
+  SmallVector<std::pair<Value, unsigned>> operandDimPairs;
+  linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
+  for (auto [operand, operandDim] : operandDimPairs) {
+    FailureOr<DimBoundSize> bound =
+        computeDimUpperBound(operand, operandDim, /*vscaleRange=*/std::nullopt,
+                             RoundUpVscaleMultiple::No);
+    if (succeeded(bound) && !bound->scalable) {
+      return bound->baseSize;
+    }
+  }
+  return std::nullopt;
+}
+
 /// Helper to tile and greedily fuse the given operation. This does not yield
 /// any fused operation and only replaces the tiling root. Because this pass is
 /// primarily concerned with managing large vector sizes, we only handle linalg
@@ -51,33 +72,46 @@ int64_t getLargestFactorLessThan(int64_t val, int64_t upperBound) {
 /// verification steps will throw an error if distribution does not occur.
 static void tileToMaxVectorSize(RewriterBase &rewriter,
                                 TilingInterface tilingInterfaceOp,
-                                ArrayRef<int64_t> bounds,
-                                int64_t maxVectorSize) {
+                                ArrayRef<int64_t> bounds, int64_t maxVectorSize,
+                                bool allowMaskedDynamicDims) {
   assert(maxVectorSize >= 1 && "maximum vector size must be at least 1");
   SmallVector<int64_t> staticTileSizes(bounds);
   SmallVector<utils::IteratorType> iteratorTypes =
       tilingInterfaceOp.getLoopIteratorTypes();
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingInterfaceOp.getOperation());
+  // Provable static upper bounds of dynamic parallel dims. With
+  // |allowMaskedDynamicDims|, bounded dims stay untiled (tile size 0, "no
+  // tiling" like reduction dims) so masked vectorization handles the partial
+  // tile remainders downstream.
+  SmallVector<std::optional<int64_t>> dynamicDimUBs(staticTileSizes.size());
 
   // Collect the total statically known parallel iterations of the linalg op.
   // We expect this to be the minimum required vector size for the op
   // because outputs should reflect the full parallel iteration space.
   int64_t staticNumTrips = 1;
-  for (auto [size, type] : llvm::zip_equal(staticTileSizes, iteratorTypes)) {
+  for (int64_t i = 0, e = staticTileSizes.size(); i < e; ++i) {
+    int64_t &size = staticTileSizes[i];
     // Skip tiling of reduction iterators.
-    if (type == utils::IteratorType::reduction) {
+    if (iteratorTypes[i] == utils::IteratorType::reduction) {
       size = 0;
       continue;
     }
-    if (ShapedType::isDynamic(size)) {
-      // Tile all dynamic dims to 1 as well to enable new vectorization
-      // opportunities. This also ensures all entries in staticTileSizes are
-      // static.
-      // TODO: This may want to be a pass option in case strategies like
-      // masked vectorization are employed for dynamic shapes.
-      size = 1;
-    } else {
+    if (!ShapedType::isDynamic(size)) {
       staticNumTrips *= size;
+      continue;
     }
+    if (allowMaskedDynamicDims && linalgOp) {
+      dynamicDimUBs[i] = getProvenLoopDimUpperBound(linalgOp, i);
+    }
+    if (dynamicDimUBs[i]) {
+      size = 0;
+      staticNumTrips *= *dynamicDimUBs[i];
+      continue;
+    }
+    // Tile dynamic dims without a proven bound to 1 to enable new
+    // vectorization opportunities. This also keeps all tiled entries in
+    // staticTileSizes static.
+    size = 1;
   }
 
   int64_t expectedMinVectorSize = staticNumTrips;
@@ -92,9 +126,16 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
     // that can be meaningfully vectorized is the inner most which is not always
     // true. Considering this is fallback logic, this is fine.
     if (expectedMinVectorSize > maxVectorSize) {
-      // These two quantities are always divisible. Also staticTileSizes[i] is
-      // always static since we set all dynamic entries to 1.
-      expectedMinVectorSize /= staticTileSizes[i];
+      // Dims kept dynamic for masked vectorization contribute their proven
+      // upper bound instead of a tile size.
+      int64_t dimSize = staticTileSizes[i];
+      if (dimSize == 0) {
+        if (!dynamicDimUBs[i]) {
+          continue; // Zero-trip dim; nothing useful to shrink.
+        }
+        dimSize = *dynamicDimUBs[i];
+      }
+      expectedMinVectorSize /= dimSize;
       staticTileSizes[i] = 1;
     }
   }
@@ -104,14 +145,29 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
 
   // For the inner most loop, pick the largest static integer factor that is
   // less than the maximum vector size. This might not be a great approximation
-  // and we may opt for a smaller default in the future.
+  // and we may opt for a smaller default in the future. For a dynamic dim kept
+  // for masked vectorization, tile to a factor of its proven bound instead;
+  // the remaining partial tile is masked downstream.
   if (expectedMinVectorSize > maxVectorSize) {
+    int64_t dimSize =
+        dynamicDimUBs[lastParallelDim].value_or(expectedMinVectorSize);
     staticTileSizes[lastParallelDim] =
-        getLargestFactorLessThan(expectedMinVectorSize, maxVectorSize);
+        getLargestFactorLessThan(dimSize, maxVectorSize);
   }
 
-  // Check if nothing to do.
-  if (staticTileSizes == bounds) {
+  // Check if nothing to do. Dims kept dynamic for masked vectorization carry
+  // tile size 0 ("no tiling") and count as unchanged for this comparison.
+  bool nothingToDo = true;
+  for (int64_t i = 0, e = staticTileSizes.size(); i < e; ++i) {
+    int64_t effective = (staticTileSizes[i] == 0 && dynamicDimUBs[i])
+                            ? bounds[i]
+                            : staticTileSizes[i];
+    if (effective != bounds[i]) {
+      nothingToDo = false;
+      break;
+    }
+  }
+  if (nothingToDo) {
     return;
   }
 
@@ -163,7 +219,7 @@ static void tileToMaxVectorSize(RewriterBase &rewriter,
 /// tiled or lowered by this point and this is a fallback to avoid large vector
 /// sizes.
 static void processRegion(RewriterBase &rewriter, Region *region,
-                          int64_t maxVectorSize) {
+                          int64_t maxVectorSize, bool allowMaskedDynamicDims) {
   // Process the region blocks in reverse.
   for (Block &block : llvm::reverse(region->getBlocks())) {
     // Save a reversed list of operations within the block. Ops will be
@@ -195,7 +251,7 @@ static void processRegion(RewriterBase &rewriter, Region *region,
         }
         SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
         tileToMaxVectorSize(rewriter, cast<TilingInterface>(&*linalgOp), bounds,
-                            maxVectorSize);
+                            maxVectorSize, allowMaskedDynamicDims);
         continue;
       }
 
@@ -207,13 +263,14 @@ static void processRegion(RewriterBase &rewriter, Region *region,
       if (auto mapStoreOp = dyn_cast<IREE::LinalgExt::MapStoreOp>(op)) {
         ArrayRef<int64_t> bounds = mapStoreOp.getInputType().getShape();
         tileToMaxVectorSize(rewriter, mapStoreOp, bounds,
-                            std::max<int64_t>(maxVectorSize / 4, 1));
+                            std::max<int64_t>(maxVectorSize / 4, 1),
+                            allowMaskedDynamicDims);
         continue;
       }
 
       // Else recursively process all nested operations.
       for (auto &region : op->getRegions()) {
-        processRegion(rewriter, &region, maxVectorSize);
+        processRegion(rewriter, &region, maxVectorSize, allowMaskedDynamicDims);
       }
     }
   }
@@ -224,7 +281,7 @@ void TileLargeTensorsPass::runOnOperation() {
 
   IRRewriter rewriter(funcOp->getContext());
   for (auto &region : funcOp->getRegions()) {
-    processRegion(rewriter, &region, maxVectorSize);
+    processRegion(rewriter, &region, maxVectorSize, allowMaskedDynamicDims);
   }
 }
 
