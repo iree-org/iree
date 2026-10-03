@@ -519,6 +519,11 @@ def ReplaceSlowMinMaxOpsPass
 def EliminateEmptyTensorsPass :
     InterfacePass<"iree-eliminate-empty-tensors", "mlir::FunctionOpInterface"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
+  let options = [
+    Option<"allowReturnAllocsFromLoops", "allow-return-allocs-from-loops", "bool",
+           /*default=*/"false",
+           "Allow newly allocated buffers to be returned from loops">,
+  ];
 }
 
 def EmulateNarrowTypePass :
@@ -739,6 +744,9 @@ def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let options = [
+    Option<"allowReturnAllocsFromLoops", "allow-return-allocs-from-loops", "bool",
+           /*default=*/"false",
+           "Allow newly allocated buffers to be returned from loops">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
             /*default=*/"false",
            "Only runs inplaceability analysis (for testing purposes only)">,

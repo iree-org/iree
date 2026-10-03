@@ -77,6 +77,8 @@ iree_lit_test_suite(
             "iree_bufferize_constants.mlir",
             "iree_codegen_canonicalize.mlir",
             "iree_comprehensive_bufferize.mlir",
+            "iree_comprehensive_bufferize_loop_allocs.mlir",
+            "iree_comprehensive_bufferize_loop_allocs_invalid.mlir",
             "iree_expand_strided_metadata.mlir",
             "iree_expand_strided_metadata_with_subview_expansion.mlir",
             "iree_inject_assume_alignment.mlir",
