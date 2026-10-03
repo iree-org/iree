@@ -55,11 +55,15 @@ void buildCodegenTranslationPostProcessingPassPipeline(
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager);
 
 using bufferization::BufferizationOptions;
+// Apply the loop-allocation policy consistently to empty-tensor analysis and
+// bufferization. Callers allowing loop-returned allocations must arrange their
+// deallocation after bufferization.
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn =
         std::nullopt,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt,
+    bool allowReturnAllocsFromLoops = false);
 
 /// Populate Encoding to Nop pass and canonicalizer pass to the pipeline.
 void addEncodingToNopPasses(FunctionLikeNest &passManager);
@@ -90,7 +94,8 @@ std::unique_ptr<Pass> createDecomposeMemrefsPass();
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn);
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool allowReturnAllocsFromLoops = false);
 
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
