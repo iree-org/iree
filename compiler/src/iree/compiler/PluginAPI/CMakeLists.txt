@@ -78,3 +78,7 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# Order header generation before consumers in child directories compile.
+add_dependencies(iree_compiler_PluginAPI_PluginABIHash
+  PluginABIHash_h__generate)

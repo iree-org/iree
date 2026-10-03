@@ -37,32 +37,110 @@ jobs:
         run: |
           source ./build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-        env:
-          # Build the first rocjitsu target's test deps along with everything else.
-          IREE_ROCM_TEST_TARGET_CHIP: gfx942
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
         env:
           CTEST_PARALLEL_LEVEL: 32
 
-      - name: Install TheRock SDK with rocjitsu
+      # Alerting on failure is the responsibility of the calling job.
+
+  rocjitsu_e2e:
+    runs-on: azure-linux-scale
+    container:
+      # Ubuntu 24.04 supplies Mesa with RDNA4 support.
+      image: ubuntu:24.04@sha256:a4453623f2f8319cfff65c43da9be80fe83b1a7ce689579b475867d69495b782
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build-rocjitsu
+      CC: clang
+      CXX: clang++
+      SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+      SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+      SCCACHE_CACHE_ZSTD_LEVEL: 10
+      SCCACHE_AZURE_KEY_PREFIX: "ci_rocjitsu_e2e"
+    steps:
+      - name: Install build and Vulkan dependencies
         run: |
-          sdk_venv="${BUILD_DIR}/rocjitsu/therock-venv"
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates clang lld cmake ninja-build \
+            python3-dev python3-venv git curl libssl-dev libzstd-dev zlib1g-dev \
+            pkg-config sccache mesa-vulkan-drivers libvulkan1 libdrm-amdgpu1
+          dpkg --compare-versions "$(dpkg-query -W -f='${Version}' mesa-vulkan-drivers)" ge 25.0.7
+          dpkg-query -W mesa-vulkan-drivers libvulkan1 libdrm-amdgpu1
+
+      - name: Checking out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+
+      # Keep the known-good ROCm pin until a wheel includes the SDMA count fix:
+      # https://github.com/ROCm/rocm-systems/pull/12708
+      - name: Install TheRock SDK for ROCm
+        run: |
+          sdk_venv="${BUILD_DIR}/rocjitsu/rocm-venv"
           python3 -m venv "${sdk_venv}"
+          "${sdk_venv}/bin/python" -m pip install \
+            -r ./build_tools/github_actions/ci_requirements.txt
           "${sdk_venv}/bin/python" -m pip install --pre \
             --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
             "rocm[libraries,devel]==10.2.0a20260914"
           "${sdk_venv}/bin/rocm-sdk" init
           "${sdk_venv}/bin/rocm-sdk" version
+          realpath "${sdk_venv}/bin" >> "${GITHUB_PATH}"
           rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
-          echo "ROCM_ROOT=${rocm_root}" >> "${GITHUB_ENV}"
-          echo "ROCJITSU_BIN=${rocm_root}/bin/mirage" >> "${GITHUB_ENV}"
+          {
+            echo "ROCM_ROOT=${rocm_root}"
+            echo "ROCJITSU_BIN=${rocm_root}/bin/mirage"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build IREE e2e dependencies
+        id: build_iree
+        run: |
+          source ./build_tools/cmake/setup_sccache.sh
+          cmake -G Ninja -S . -B "${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE=Release -DIREE_ENABLE_LLD=ON \
+            -DIREE_BUILD_COMPILER=ON -DIREE_BUILD_TESTS=ON \
+            -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_PYTHON_BINDINGS=OFF \
+            -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON \
+            -DIREE_TARGET_BACKEND_ROCM=ON -DIREE_TARGET_BACKEND_VULKAN_SPIRV=ON \
+            -DIREE_ROCM_TEST_TARGET_CHIP=gfx942
+          cmake --build "${BUILD_DIR}" --target all iree-test-deps
 
       - name: Run ROCm e2e tests under rocjitsu
         timeout-minutes: 120
         run: |
           ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
             "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
+        env:
+          IREE_ROCJITSU_RUN_ID: ci
+          CTEST_PARALLEL_LEVEL: 8
+
+      - name: Install TheRock SDK for Vulkan
+        id: install_vulkan_sdk
+        if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
+        run: |
+          sdk_venv="${BUILD_DIR}/rocjitsu/vulkan-venv"
+          python3 -m venv "${sdk_venv}"
+          "${sdk_venv}/bin/python" -m pip install --pre \
+            --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
+            "rocm[libraries,devel]==10.2.0a20261002"
+          "${sdk_venv}/bin/rocm-sdk" init
+          "${sdk_venv}/bin/rocm-sdk" version
+          rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
+          {
+            echo "ROCM_ROOT=${rocm_root}"
+            echo "ROCJITSU_BIN=${rocm_root}/bin/mirage"
+          } >> "${GITHUB_ENV}"
+
+      - name: Run Vulkan e2e tests under rocjitsu
+        if: ${{ !cancelled() && steps.install_vulkan_sdk.outcome == 'success' }}
+        timeout-minutes: 60
+        run: |
+          ./build_tools/cmake/test_vulkan_targets_with_rocjitsu.sh \
+            "${BUILD_DIR}" gfx1100 gfx1201
         env:
           IREE_ROCJITSU_RUN_ID: ci
           CTEST_PARALLEL_LEVEL: 8
@@ -74,5 +152,3 @@ jobs:
           name: rocjitsu-linux-x64-clang
           path: ${{ env.BUILD_DIR }}/rocjitsu/logs/ci/
           if-no-files-found: ignore
-
-      # Alerting on failure is the responsibility of the calling job.
