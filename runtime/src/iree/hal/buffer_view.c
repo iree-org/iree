@@ -22,6 +22,28 @@ struct iree_hal_buffer_view_t {
   iree_hal_dim_t shape[];
 };
 
+static iree_status_t iree_hal_buffer_view_compute_element_count(
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_device_size_t* out_element_count) {
+  *out_element_count = 0;
+  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+    if (shape[i] == 0) return iree_ok_status();
+  }
+
+  iree_device_size_t element_count = 1;
+  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+    if (IREE_UNLIKELY(!iree_device_size_checked_mul(element_count, shape[i],
+                                                    &element_count))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "shape element count overflows device size at "
+                              "dimension %" PRIhsz,
+                              i);
+    }
+  }
+  *out_element_count = element_count;
+  return iree_ok_status();
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, iree_host_size_t shape_rank,
     const iree_hal_dim_t* shape, iree_hal_element_type_t element_type,
@@ -34,6 +56,18 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   if (IREE_UNLIKELY(shape_rank > 0 && !shape)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "no shape dimensions specified");
+  }
+
+  iree_device_size_t byte_length = 0;
+  if (encoding_type == IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
+        shape_rank, shape, element_type, encoding_type, &byte_length));
+    if (IREE_UNLIKELY(byte_length > iree_hal_buffer_byte_length(buffer))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "buffer view byte length %" PRIdsz
+                              " exceeds backing buffer byte length %" PRIdsz,
+                              byte_length, iree_hal_buffer_byte_length(buffer));
+    }
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -53,13 +87,18 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     buffer_view->element_type = element_type;
     buffer_view->encoding_type = encoding_type;
     buffer_view->shape_rank = shape_rank;
-    iree_device_size_t element_count = 1;
     for (iree_host_size_t i = 0; i < shape_rank; ++i) {
       buffer_view->shape[i] = shape[i];
-      element_count *= shape[i];
     }
-    buffer_view->byte_length = iree_hal_element_packed_byte_count(
-        buffer_view->element_type, element_count);
+    if (encoding_type != IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+      iree_device_size_t element_count = 1;
+      for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+        element_count *= shape[i];
+      }
+      byte_length = iree_hal_element_packed_byte_count(
+          buffer_view->element_type, element_count);
+    }
+    buffer_view->byte_length = byte_length;
     *out_buffer_view = buffer_view;
   }
 
@@ -177,12 +216,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
                             shape_rank, buffer_view->shape_rank);
   }
 
-  iree_device_size_t new_element_count = 1;
-  for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-    new_element_count *= shape[i];
-  }
-  iree_device_size_t old_element_count =
-      iree_hal_buffer_view_element_count(buffer_view);
+  iree_device_size_t new_element_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_element_count(
+      shape_rank, shape, &new_element_count));
+  iree_device_size_t old_element_count = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_element_count(
+      buffer_view->shape_rank, buffer_view->shape, &old_element_count));
   if (new_element_count != old_element_count) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer view reshapes must have the same element "

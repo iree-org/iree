@@ -31,16 +31,48 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
 
   switch (encoding_type) {
     case IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR: {
-      if (IREE_UNLIKELY(iree_hal_element_bit_count(element_type) == 0)) {
+      const iree_host_size_t element_bit_count =
+          iree_hal_element_bit_count(element_type);
+      if (IREE_UNLIKELY(element_bit_count == 0)) {
         return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                 "opaque element types cannot be indexed");
       }
       iree_device_size_t element_count = 1;
+      bool has_zero_dimension = false;
       for (iree_host_size_t i = 0; i < shape_rank; ++i) {
-        element_count *= shape[i];
+        has_zero_dimension |= shape[i] == 0;
       }
-      byte_length =
-          iree_hal_element_packed_byte_count(element_type, element_count);
+      if (has_zero_dimension) {
+        element_count = 0;
+      } else {
+        for (iree_host_size_t i = 0; i < shape_rank; ++i) {
+          if (IREE_UNLIKELY(!iree_device_size_checked_mul(
+                  element_count, shape[i], &element_count))) {
+            return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                    "shape element count overflows device size "
+                                    "at dimension %" PRIhsz,
+                                    i);
+          }
+        }
+      }
+
+      // Compute ceil(element_count * element_bit_count / 8) without allowing
+      // the intermediate bit count to overflow.
+      iree_device_size_t whole_byte_length = 0;
+      if (IREE_UNLIKELY(!iree_device_size_checked_mul(
+              element_count / 8, element_bit_count, &whole_byte_length))) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "packed byte count overflows device size");
+      }
+      const iree_device_size_t trailing_bit_count =
+          (element_count % 8) * element_bit_count;
+      const iree_device_size_t trailing_byte_length =
+          (trailing_bit_count + 7) / 8;
+      if (IREE_UNLIKELY(!iree_device_size_checked_add(
+              whole_byte_length, trailing_byte_length, &byte_length))) {
+        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "packed byte count overflows device size");
+      }
       break;
     }
     default:
