@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import array
+import gc
 import logging
 import numpy as np
 from pathlib import Path
@@ -58,6 +59,55 @@ class ParameterTest(unittest.TestCase):
         self.instance = rt.VmInstance()
         self.device = rt.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
         self.config = rt.Config(device=self.device)
+
+    def _check_archive_provider_module(self, use_async):
+        expected = [
+            np.arange(n, dtype=np.int64) + i * 10 for i, n in enumerate((4, 4, 8, 8))
+        ]
+
+        def run_archives(directory):
+            providers = []
+            for scope, arrays in (("a", expected[:2]), ("b", expected[2:])):
+                path = directory / f"{scope}.irpa"
+                rt.save_archive_file(
+                    {f"{scope}{i}": value for i, value in enumerate(arrays)}, path
+                )
+                index = rt.ParameterIndex()
+                if use_async:
+                    index.load(str(path), mode="file_async")
+                    handle, _ = index.items()[0][1].file_storage
+                    self.assertTrue(handle.is_async)
+                    del handle
+                else:
+                    with open(path, "rb") as source:
+                        handle = rt.FileHandle.wrap_fd(source.fileno())
+                        index.load_from_file_handle(handle, "irpa")
+                    # The original Python file is closed before any parameter use.
+                    del handle
+                providers.append(index.create_provider(scope=scope))
+                del index
+            parameter_module = rt.create_io_parameters_module(self.instance, *providers)
+            del providers
+            gc.collect()
+            modules = rt.load_vm_modules(
+                parameter_module,
+                rt.create_hal_module(self.instance, self.device),
+                create_mm_test_module(self.instance),
+                config=self.config,
+            )
+            actual = modules[-1].echo()
+            for i, (want, got) in enumerate(zip(expected, actual)):
+                np.testing.assert_array_equal(want, got, err_msg=f"parameter {i}")
+
+        with tempfile.TemporaryDirectory() as td:
+            run_archives(Path(td))
+            gc.collect()
+
+    def test_async_archive_provider_module(self):
+        self._check_archive_provider_module(use_async=True)
+
+    def test_archive_provider_after_caller_close(self):
+        self._check_archive_provider_module(use_async=False)
 
     def test_index_provider_module(self):
         a0 = np.asarray([1] * 4, dtype=np.int64)

@@ -132,6 +132,10 @@ class FileHandle:
 
     @property
     def is_host_allocation(self) -> bool: ...
+    @property
+    def is_async(self) -> bool:
+        """Whether the handle was opened for asynchronous I/O."""
+        ...
 
 class HalAllocator:
     def allocate_buffer(
@@ -521,7 +525,7 @@ class ParameterIndex:
         pattern: Any,
         total_length: int,
         *,
-        metadata: Optional[Union[bytes, str]] = None
+        metadata: Optional[Union[bytes, str]] = None,
     ) -> None: ...
     def add_from_file_handle(
         self,
@@ -530,7 +534,7 @@ class ParameterIndex:
         length: int,
         *,
         offset: int = 0,
-        metadata: Optional[Union[bytes, str]] = None
+        metadata: Optional[Union[bytes, str]] = None,
     ) -> None: ...
     def add_buffer(
         self,
@@ -539,18 +543,25 @@ class ParameterIndex:
         *,
         readable: bool = True,
         writable: bool = False,
-        metadata: Optional[Union[bytes, str]] = None
+        metadata: Optional[Union[bytes, str]] = None,
     ) -> None: ...
     def load_from_file_handle(self, file_handle: FileHandle, format: str) -> None: ...
     def load(
         self,
         file_path: str,
-        *,
         format: Optional[str] = None,
         readable: bool = True,
         writable: bool = False,
-        mmap: bool = True
-    ) -> None: ...
+        mmap: Optional[bool] = None,
+        *,
+        mode: Optional[str] = None,
+    ) -> None:
+        """Load an archive using mmap (default), preload (mmap=False), or
+        read-only HAL streaming (mode="file_async"). Explicit mmap and mode
+        arguments are mutually exclusive. The index retains the file handle.
+        """
+        ...
+
     def create_archive_file(
         self,
         file_path: str,
