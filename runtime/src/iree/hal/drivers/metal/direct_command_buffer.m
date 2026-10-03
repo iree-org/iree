@@ -906,6 +906,14 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_copy_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_metal_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  // TODO(#24930): implement flushing of non-coherent memory. Treated as a no-op
+  // for now.
+  return iree_ok_status();
+}
+
 static iree_status_t iree_hal_metal_command_buffer_collective(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_channel_t* channel,
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
@@ -1145,6 +1153,7 @@ static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtab
     .fill_buffer = iree_hal_metal_command_buffer_prepare_fill_buffer,
     .update_buffer = iree_hal_metal_command_buffer_prepare_update_buffer,
     .copy_buffer = iree_hal_metal_command_buffer_prepare_copy_buffer,
+    .flush_buffer = iree_hal_metal_command_buffer_flush_buffer,
     .collective = iree_hal_metal_command_buffer_collective,
     .dispatch = iree_hal_metal_command_buffer_prepare_dispatch,
 };

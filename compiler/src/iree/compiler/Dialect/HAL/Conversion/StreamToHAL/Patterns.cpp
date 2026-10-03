@@ -624,8 +624,17 @@ struct CmdFlushOpPattern : StreamConversionPattern<IREE::Stream::CmdFlushOp> {
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(benvanik): HAL command buffer op for flush.
-    rewriter.eraseOp(op);
+    // The flush is recorded into the command buffer of the executing device.
+    // The source affinity holds the device that will consume the flushed memory;
+    // it is not needed to issue the flush.
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
+    auto targetBinding = commandBufferMapping.resolveBinding(
+        op.getLoc(), op.getTarget(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getTargetLength(), rewriter);
+    [[maybe_unused]] auto sourceAffinity = op.getSourceAffinity();
+    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFlushBufferOp>(
+        op, commandBufferMapping.getHandle(), targetBinding.buffer,
+        targetBinding.byteOffset, targetBinding.byteLength);
     return success();
   }
 };
@@ -1216,18 +1225,23 @@ static void insertSerializationBarriers(Location loc, Block &block,
 
 // Checks if |executeOp| contains only a single transfer operation and returns
 // it. Non-transfer/dispatch operations like cache control will be ignored.
+// Flushes are not ignored: there is no queue operation for them yet so they
+// must be recorded into a command buffer.
 //
 // Intended to match things like:
 //   stream.cmd.execute ... {
 //     stream.cmd.invalidate
 //     stream.cmd.fill        <----- returned
-//     stream.cmd.flush
 //   }
 // And not:
 //   stream.cmd.execute ... {
 //     stream.cmd.invalidate
 //     stream.cmd.fill
 //     stream.cmd.flush
+//   }
+//   stream.cmd.execute ... {
+//     stream.cmd.invalidate
+//     stream.cmd.fill
 //     stream.cmd.dispatch
 //   }
 static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
@@ -1236,8 +1250,8 @@ static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
     for (auto &op : block) {
       if (!TypeSwitch<Operation *, bool>(&op)
                // Ignore non-transfer/dispatch ops.
-               .Case<IREE::Stream::CmdInvalidateOp, IREE::Stream::CmdFlushOp,
-                     IREE::Stream::CmdDiscardOp, IREE::Stream::YieldOp>(
+               .Case<IREE::Stream::CmdInvalidateOp, IREE::Stream::CmdDiscardOp,
+                     IREE::Stream::YieldOp>(
                    [&](auto metaOp) { return true; })
                .Case<IREE::Stream::CmdFillOp, IREE::Stream::CmdCopyOp>(
                    [&](auto transferOp) {

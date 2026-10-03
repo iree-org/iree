@@ -1,7 +1,8 @@
 // RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --verify-diagnostics %s | FileCheck %s
 
-// Today all memory control operations are ignored and we're just left with
-// the normal sequential execution barriers.
+// Flushes are recorded into the command buffer. Invalidates and discards are
+// still ignored and we're just left with the normal sequential execution
+// barriers.
 
 util.global private @device : !hal.device
 
@@ -11,6 +12,8 @@ util.func public @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: in
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
+    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%arg0 : !hal.buffer)[%c0, %c128]
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     stream.cmd.flush %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
@@ -53,8 +56,7 @@ util.func public @cmdFill(%target: !stream.resource<transient>, %target_size: in
 // -----
 
 // Tests that an execution region with a single fill is converted to a queue
-// operation instead of a command buffer. The extra flush is ignored as queue
-// operations have implicit flushes (today).
+// operation instead of a command buffer.
 
 util.global private @device : !hal.device
 
@@ -109,8 +111,7 @@ util.func public @cmdCopy(%source: !stream.resource<transient>, %source_size: in
 // -----
 
 // Tests that an execution region with a single copy is converted to a queue
-// operation instead of a command buffer. The extra flush is ignored as queue
-// operations have implicit flushes (today).
+// operation instead of a command buffer.
 
 util.global private @device : !hal.device
 

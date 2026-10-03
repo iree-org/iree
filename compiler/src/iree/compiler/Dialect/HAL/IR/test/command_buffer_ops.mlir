@@ -131,6 +131,46 @@ util.func public @command_buffer_copy_buffer(
 
 // -----
 
+// CHECK-LABEL: @command_buffer_flush_buffer
+//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME:  %[[OFFSET:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[LENGTH:[a-z0-9]+]]: index)
+util.func public @command_buffer_flush_buffer(
+    %cmd: !hal.command_buffer,
+    %buffer: !hal.buffer,
+    %offset: index,
+    %length: index
+  ) {
+  //      CHECK: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]], %[[LENGTH]]]
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      target(%buffer : !hal.buffer)[%offset, %length]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_flush_buffer_indirect
+//  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
+//  CHECK-SAME:  %[[BUFFER_SLOT:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[OFFSET:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[LENGTH:[a-z0-9]+]]: index)
+util.func public @command_buffer_flush_buffer_indirect(
+    %cmd: !hal.command_buffer,
+    %buffer_slot: index,
+    %offset: index,
+    %length: index
+  ) {
+  //      CHECK: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[BUFFER_SLOT]] : index)[%[[OFFSET]], %[[LENGTH]]]
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      target(%buffer_slot : index)[%offset, %length]
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_copy_buffer_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[BUFFER_SLOT:[a-z0-9]+]]: index,
