@@ -45,15 +45,16 @@ public:
   }
 };
 
-static Attribute convertIntegerAttribute(Attribute attr,
-                                         const TypeConverter &converter) {
+static Attribute
+convertIntegerAttributeIfNeeded(Attribute attr,
+                                const TypeConverter &converter) {
   auto typedAttr = dyn_cast<TypedAttr>(attr);
   if (!typedAttr) {
     return attr;
   }
   Type newType = converter.convertType(typedAttr.getType());
-  if (!newType) {
-    return {};
+  if (!newType || newType == typedAttr.getType()) {
+    return attr;
   }
   if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
     if (auto intType = dyn_cast<IntegerType>(newType)) {
@@ -71,7 +72,7 @@ static Attribute convertIntegerAttribute(Attribute attr,
       }
     }
   }
-  return {};
+  return attr;
 }
 
 // Handles the type conversion component of the TypeConversion. This updates
@@ -98,7 +99,7 @@ public:
     bool conversionFailed = false;
     newOp->getName().walkInherentAttrs(newOp, [&](StringRef, Attribute &attr) {
       if (Attribute converted =
-              convertIntegerAttribute(attr, *getTypeConverter())) {
+              convertIntegerAttributeIfNeeded(attr, *getTypeConverter())) {
         attr = converted;
       } else {
         conversionFailed = true;
@@ -106,8 +107,8 @@ public:
     });
     SmallVector<NamedAttribute> attrs;
     for (NamedAttribute attr : op->getDiscardableAttrs()) {
-      if (Attribute converted =
-              convertIntegerAttribute(attr.getValue(), *getTypeConverter())) {
+      if (Attribute converted = convertIntegerAttributeIfNeeded(
+              attr.getValue(), *getTypeConverter())) {
         attrs.emplace_back(attr.getName(), converted);
       } else {
         conversionFailed = true;
