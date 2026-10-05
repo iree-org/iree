@@ -4246,17 +4246,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#dynamic-compiler-plugins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dynamic compiler plugins
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#gpu-test-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6398,17 +6387,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#dynamic-compiler-plugins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dynamic compiler plugins
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#gpu-test-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6916,17 +6894,6 @@ helpers for local development.</p>
   etc.)</li>
 </ul>
 <p>All three files are loaded automatically by Bazel in this order.</p>
-<h3 id="dynamic-compiler-plugins">Dynamic compiler plugins<a class="headerlink" href="#dynamic-compiler-plugins" title="Permanent link">link</a></h3>
-<p>Dynamic compiler plugins are experimental. Build them with
-<code>iree_compiler_register_experimental_dynamic_plugin</code> from
-<code>//build_tools/bazel:renamed_link.bzl</code>. The compiler tools link the shared
-compiler library by default (<code>--//compiler/src/iree/compiler/API:link_shared=true</code>)
-to provide the symbols these plugins require. Setting this flag to <code>false</code>
-does not provide the exported compiler ABI required by these plugins.</p>
-<p>Build plugins with the host compiler's IREE and LLVM/MLIR revisions and matching
-ABI-affecting build settings. See the
-<a href="https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md">compiler plugin documentation</a>
-for loading, activation, and compatibility requirements.</p>
 <h3 id="gpu-test-targets">GPU test targets<a class="headerlink" href="#gpu-test-targets" title="Permanent link">link</a></h3>
 <p>GPU tests and samples need a target chip architecture (e.g., <code>gfx1100</code> for AMD
 RDNA3). These are exposed as Bazel
