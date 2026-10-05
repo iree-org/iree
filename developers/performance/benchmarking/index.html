@@ -6406,6 +6406,33 @@ Benchmark<span class="w">                                    </span>Time<span cl
 BM_RunModule/process_time/real_time<span class="w">      </span><span class="m">0</span>.011<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.014<span class="w"> </span>ms<span class="w">        </span><span class="m">61654</span>
 </code></pre></div>
 <p>Remember to <a href="#cpu-configuration">restore CPU scaling</a> when you're done.</p>
+<p><code>--batch_size</code> counts logical benchmark iterations. Its execution depends on
+the exported function's ABI:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>One measured batch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Synchronous entry point</td>
+<td>One VM invocation. Match <code>--batch_size</code> to the compiler's <code>--iree-hal-benchmark-dispatch-repeat-count</code>.</td>
+</tr>
+<tr>
+<td>Asynchronous entry point</td>
+<td><code>--batch_size</code> VM invocations, rounded up to a multiple of <code>--batch_concurrency</code>, followed by one completion wait. Fence and argument setup and output cleanup are outside the measured interval.</td>
+</tr>
+<tr>
+<td>Generated dispatch benchmark</td>
+<td>One VM invocation with <code>--batch_size</code> as its repeat count.</td>
+</tr>
+</tbody>
+</table>
+<p><code>--enable_output_processing</code> retains the last measured invocation's outputs
+for the usual <code>--output</code> and <code>--expected_output</code> flags, including asynchronous
+entry points. Select a single function when processing outputs.</p>
 <h2 id="executable-benchmarks">Executable Benchmarks<a class="headerlink" href="#executable-benchmarks" title="Permanent link">link</a></h2>
 <p>We also benchmark the performance of individual parts of the IREE system in
 isolation. IREE breaks a model down to dispatch functions. To benchmark all the
