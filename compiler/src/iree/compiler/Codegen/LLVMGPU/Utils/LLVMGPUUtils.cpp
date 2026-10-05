@@ -355,8 +355,8 @@ void reorderTranspose(RewriterBase &rewriter,
       transposedOperands.push_back(transposed);
     }
     SmallVector<Type> resultTypes{transposedOperands.front().getType()};
-    Operation *newOp = op->clone(Operation::CloneOptions().withResultTypes(
-        llvm::to_vector(resultTypes)));
+    Operation *newOp =
+        op->clone(Operation::CloneOptions().withResultTypes(resultTypes));
     newOp->setOperands(transposedOperands);
     rewriter.insert(newOp);
     rewriter.replaceAllUsesWith(transposeOp.getResult(), newOp->getResult(0));
