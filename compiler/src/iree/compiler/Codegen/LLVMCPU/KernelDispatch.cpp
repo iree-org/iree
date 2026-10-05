@@ -2644,10 +2644,10 @@ getElementwiseVectorSizes(mlir::FunctionOpInterface entryPointFn,
                           const TargetMLTransformInfo &targetMLTransInfo) {
   SmallVector<int64_t> tileSizes;
   SmallVector<bool> scalableFlags;
-  auto config = 
-    IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn).getConfiguration();
-  tileSizes = getMinTilingSizesForEachDim(entryPointFn, genericOp,
-    linalgOpInfo, targetMLTransInfo);
+  auto config =
+      IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn).getConfiguration();
+  tileSizes = getMinTilingSizesForEachDim(entryPointFn, genericOp, linalgOpInfo,
+                                          targetMLTransInfo);
   scalableFlags = SmallVector<bool>(tileSizes.size(), false);
   // Check if target supports scalable vectors.
   bool hasAArch64ScalableSupport =
@@ -2685,7 +2685,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
   std::optional<SizesAndScalableFlags> vecDims = getElementwiseVectorSizes(
-    entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   if (!vecDims) {
     return failure();
   }
