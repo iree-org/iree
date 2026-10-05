@@ -495,6 +495,17 @@ static iree_status_t iree_tooling_load_hal_async_module(
     status = iree_status_join(status, iree_hal_replay_recorder_scope_end(
                                           replay_recorder, IREE_SV("init")));
   }
+  if (iree_status_is_ok(status) && replay_device_group) {
+    // Callers creating fences and other HAL resources must use the same
+    // recording devices as the module so those resources enter the capture.
+    for (iree_host_size_t i = 0; i < device_list->count; ++i) {
+      iree_hal_device_t* recording_device =
+          iree_hal_device_group_device_at(replay_device_group, i);
+      iree_hal_device_retain(recording_device);
+      iree_hal_device_release(device_list->devices[i]);
+      device_list->devices[i] = recording_device;
+    }
+  }
   iree_hal_device_group_release(replay_device_group);
   iree_hal_device_group_release(device_group);
 

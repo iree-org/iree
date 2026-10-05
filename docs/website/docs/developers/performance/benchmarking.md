@@ -103,6 +103,19 @@ BM_RunModule/process_time/real_time      0.011 ms        0.014 ms        61654
 
 Remember to [restore CPU scaling](#cpu-configuration) when you're done.
 
+`--batch_size` counts logical benchmark iterations. Its execution depends on
+the exported function's ABI:
+
+| Function | One measured batch |
+| --- | --- |
+| Synchronous entry point | One VM invocation. Match `--batch_size` to the compiler's `--iree-hal-benchmark-dispatch-repeat-count`. |
+| Asynchronous entry point | `--batch_size` VM invocations, rounded up to a multiple of `--batch_concurrency`, followed by one completion wait. Fence and argument setup and output cleanup are outside the measured interval. |
+| Generated dispatch benchmark | One VM invocation with `--batch_size` as its repeat count. |
+
+`--enable_output_processing` retains the last measured invocation's outputs
+for the usual `--output` and `--expected_output` flags, including asynchronous
+entry points. Select a single function when processing outputs.
+
 ## Executable Benchmarks
 
 We also benchmark the performance of individual parts of the IREE system in
