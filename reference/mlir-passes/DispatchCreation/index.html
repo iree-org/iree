@@ -3301,6 +3301,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-collapse-contraction-dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-dispatch-creation-collapse-contraction-dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-collapse-dimensions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6802,6 +6813,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-collapse-contraction-dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-dispatch-creation-collapse-contraction-dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-collapse-dimensions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7365,6 +7387,15 @@ converting to dispatch workgroups with explicit captures.</p>
 <h4 id="options_2">Options<a class="headerlink" href="#options_2" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-aggressive : Include operations that are cloned only under aggressive fusion mode
 </code></pre></div>
+<h3 id="-iree-dispatch-creation-collapse-contraction-dimensions"><code>-iree-dispatch-creation-collapse-contraction-dimensions</code><a class="headerlink" href="#-iree-dispatch-creation-collapse-contraction-dimensions" title="Permanent link">link</a></h3>
+<p><em>Collapse contiguous dimensions of contractions outside dispatches.</em></p>
+<p>Collapse contiguous dimensions of tensor contractions outside dispatches
+using the same indexing-map and iterator legality as dispatch dimension
+collapsing. Preserve operand and result shapes with tensor reshapes. This
+makes collapsible multi-M/N/K/batch contractions eligible for encoding
+without requiring dispatch formation first. Contractions inside dispatches
+and contractions with a compilation info or lowering config are left
+unchanged.</p>
 <h3 id="-iree-dispatch-creation-collapse-dimensions"><code>-iree-dispatch-creation-collapse-dimensions</code><a class="headerlink" href="#-iree-dispatch-creation-collapse-dimensions" title="Permanent link">link</a></h3>
 <p><em>Collapse dimensions of Linalg Ops on tensor ops.</em></p>
 <p>Collapse dimensions of Linalg Ops on tensor ops inside dispatch.region ops
