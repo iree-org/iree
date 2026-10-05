@@ -22,6 +22,8 @@ iree_lit_test_suite(
             "bubble_up_expand_shapes.mlir",
             "bubble_up_extract_slice.mlir",
             "clone_producers_into_dispatch_regions.mlir",
+            "collapse_contraction_dimensions.mlir",
+            "collapse_contraction_dimensions_scope.mlir",
             "collapse_dimensions.mlir",
             "collapse_linalg_generic_on_tensors.mlir",
             "convert_encoding_to_flow.mlir",
