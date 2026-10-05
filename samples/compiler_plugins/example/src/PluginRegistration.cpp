@@ -10,9 +10,10 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 
-// The id is a build parameter so one source is both linked into the compiler
-// and dlopen'd by it. Every global name derives from it: a second
-// registration, cl option or category of one name aborts.
+// This source is compiled twice: as the static example plugin and the loadable
+// example_dyn plugin. Distinct IDs keep their registration symbols,
+// command-line options, and categories from colliding when both are in the same
+// process.
 #ifndef IREE_EXAMPLE_PLUGIN_ID
 #define IREE_EXAMPLE_PLUGIN_ID example
 #endif

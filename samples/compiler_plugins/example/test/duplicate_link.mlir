@@ -11,6 +11,7 @@
 // RUN:   --iree-plugin=example_dyn --compile-to=input %s 2>&1 | FileCheck %s
 
 // CHECK: remark: This remark is from the example plugin activation
+// CHECK-NOT: remark: This remark is from the example plugin activation
 func.func @main() {
   return
 }
