@@ -186,7 +186,7 @@ to a growing community of developers. The project is governed by a Technical
 Steering Committee — see
 [GOVERNANCE.md](https://github.com/iree-org/iree/blob/main/GOVERNANCE.md).
 
-See how IREE is used:
+Find out about IREE community meetings and see how IREE is used:
 
 [:octicons-arrow-right-24: Community](./community/index.md)
 

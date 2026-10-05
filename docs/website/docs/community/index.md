@@ -1,3 +1,18 @@
+# Community meetings
+
+The IREE project maintainers host regular virtual Community Meetings with 
+updates on the project alongside presentations from IREE contributors and users.
+
+The calendar for upcoming Community Meetings is available through the [Linux Foundation Calendar](https://zoom-lfx.platform.linuxfoundation.org/meetings/iree) and invitations can be 
+dowloaded using the "iCal" button available on the calendar. Select the web 
+link to download the iCal file. Once downloaded this file can be imported to 
+[Outlook](https://support.microsoft.com/en-us/outlook/import-or-subscribe-to-a-calendar-in-outlook-com-or-outlook-on-the-web), 
+[Google Calendar](https://support.google.com/calendar/answer/37118?hl=en-GB&co=GENIE.Platform%3DDesktop) and other clients.
+
+Invitations are also posted on the IREE project "general" [Discord channel](https://discord.gg/wEWh6Z9nMU).
+
+Meetings are recorded and published on the [IREE YouTube Channel](https://www.youtube.com/@iree-org).
+
 # Community projects
 
 Projects built by community members:
