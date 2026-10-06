@@ -16,6 +16,10 @@ if(IREE_INPUT_TOSA)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/input/TOSA input/TOSA)
 endif()
 
+if(IREE_INPUT_SHARDY)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/input/Shardy input/Shardy)
+endif()
+
 if(IREE_TARGET_BACKEND_CUDA)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/CUDA target/CUDA)
 endif()
