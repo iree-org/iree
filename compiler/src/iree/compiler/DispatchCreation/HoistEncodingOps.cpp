@@ -43,7 +43,7 @@
 
 namespace mlir::iree_compiler::DispatchCreation {
 #define GEN_PASS_DEF_HOISTENCODINGOPSPASS
-#define GEN_PASS_DEF_PROPAGATEDATATILINGENCODINGSPASS
+#define GEN_PASS_DEF_PROPAGATEENCODINGSTHROUGHGENERICOPSPASS
 #include "iree/compiler/DispatchCreation/Passes.h.inc"
 
 /// Bubbles a SetEncodingOp up through a linalg::GenericOp. The `genericOp`
@@ -229,9 +229,9 @@ struct HoistEncodingOpsPass final
 
 // TODO(#20179): Merge with PropagateEncodingsPass once bubbling through
 // generic ops goes through the encoding propagation interfaces.
-struct PropagateDataTilingEncodingsPass final
-    : impl::PropagateDataTilingEncodingsPassBase<
-          PropagateDataTilingEncodingsPass> {
+struct PropagateEncodingsThroughGenericOpsPass final
+    : impl::PropagateEncodingsThroughGenericOpsPassBase<
+          PropagateEncodingsThroughGenericOpsPass> {
   void runOnOperation() override;
 };
 
@@ -255,7 +255,7 @@ struct BubbleUpSetEncodingOp : OpRewritePattern<IREE::Encoding::SetEncodingOp> {
           encodingOp, "producer is outside the propagation scope");
     }
     if (scope == EncodingPropagationScope::WithinDispatch) {
-      // Preserve the late policy: bubble only within the same dispatch region.
+      // Only bubble through producers in the same dispatch region.
       auto dispatch = producer->getParentOfType<IREE::Flow::DispatchRegionOp>();
       if (!dispatch ||
           dispatch !=
@@ -350,7 +350,7 @@ static LogicalResult propagateEncodings(Operation *root,
   return applyPatternsGreedily(root, std::move(patterns), config);
 }
 
-void PropagateDataTilingEncodingsPass::runOnOperation() {
+void PropagateEncodingsThroughGenericOpsPass::runOnOperation() {
   if (failed(propagateEncodings(getOperation(),
                                 EncodingPropagationScope::OutsideDispatch))) {
     signalPassFailure();

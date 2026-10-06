@@ -1,8 +1,9 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-propagate-data-tiling-encodings))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-propagate-encodings-through-generic-ops))" %s | FileCheck %s
 
-// The same encoding rules as hoist_encoding_ops, applied before dispatch formation.
-// The late pass must keep its original placement policy on these inputs.
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-hoist-encoding-ops %s | FileCheck %s --check-prefix=LATE
+// The pass applies the rewrites of hoist-encoding-ops outside dispatches.
+// hoist-encoding-ops itself only propagates within dispatches, so it must leave
+// the encoding ops outside dispatches in place.
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-hoist-encoding-ops %s | FileCheck %s --check-prefix=HOIST
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -18,9 +19,9 @@
 // CHECK-SAME: tensor<2x11008x128xi8, #
 // CHECK-NOT: iree_encoding.set_encoding
 // CHECK: util.return
-// LATE-LABEL: @bubble_through_dequant(
-// LATE: %[[DEQUANT:.*]] = linalg.generic
-// LATE: iree_encoding.set_encoding %[[DEQUANT]]
+// HOIST-LABEL: @bubble_through_dequant(
+// HOIST: %[[DEQUANT:.*]] = linalg.generic
+// HOIST: iree_encoding.set_encoding %[[DEQUANT]]
 util.func public @bubble_through_dequant(
     %arg0: tensor<2x11008x128xi8>, %arg1: tensor<2x11008xf32>, %arg2: tensor<2x11008xf32>) -> tensor<2x11008x128xf32, #encoding> {
     %8 = tensor.empty() : tensor<2x11008x128xf32>
@@ -102,9 +103,9 @@ util.func public @no_bubble_padding_encoding(%arg0: tensor<128x256xi8>) -> tenso
 // CHECK: %[[RESULT:.*]] = linalg.generic
 // CHECK-SAME: ins(%arg0, %arg1 : tensor<4096x?xf32, #{{.*}}>, f32)
 // CHECK: iree_encoding.unset_encoding %[[RESULT]]
-// LATE-LABEL: @propagate_unset_encoding_through_generic_with_scalar(
-// LATE: %[[RAW:.*]] = iree_encoding.unset_encoding
-// LATE: linalg.generic {{.*}} ins(%[[RAW]],
+// HOIST-LABEL: @propagate_unset_encoding_through_generic_with_scalar(
+// HOIST: %[[RAW:.*]] = iree_encoding.unset_encoding
+// HOIST: linalg.generic {{.*}} ins(%[[RAW]],
 util.func public @propagate_unset_encoding_through_generic_with_scalar(%arg0: tensor<4096x?xf32, #encoding>, %arg1: f32, %arg2: index) -> tensor<4096x?xf32> {
     %1 = iree_encoding.unset_encoding %arg0 : tensor<4096x?xf32, #encoding> -> tensor<4096x?xf32>{%arg2}
     %2 = tensor.empty(%arg2) : tensor<4096x?xf32>
@@ -143,7 +144,8 @@ util.func public @sink_unset_encoding_with_encoding_dims(%arg0: tensor<?x4096xf3
 
 // -----
 
-// The early placement policy must leave dispatch-contained encodings alone.
+// Encoding ops whose producers are in the same dispatch region are left to
+// hoist-encoding-ops.
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]>
@@ -169,6 +171,75 @@ util.func public @no_bubble_inside_existing_dispatch(
     flow.return %13 : tensor<2x11008x128xf32, #encoding>
   }
   util.return %6 : tensor<2x11008x128xf32, #encoding>
+}
+
+// -----
+
+// The broadcast producer is outside the dispatch region that holds the
+// set_encoding, so the set_encoding is not bubbled out of the dispatch.
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#encoding = #iree_encoding.encoding<operand_index = 1 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]>
+// CHECK-LABEL: @no_bubble_out_of_dispatch(
+// CHECK-NOT:     iree_encoding.set_encoding
+// CHECK:         %[[BCAST:.+]] = linalg.generic
+// CHECK:         flow.dispatch.region
+// CHECK-NEXT:      iree_encoding.set_encoding %[[BCAST]]
+util.func public @no_bubble_out_of_dispatch(%arg0: tensor<11008x128xf32>) -> tensor<2x11008x128xf32, #encoding> {
+  %empty = tensor.empty() : tensor<2x11008x128xf32>
+  %bcast = linalg.generic {
+      indexing_maps = [#map1, #map],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<11008x128xf32>)
+      outs(%empty : tensor<2x11008x128xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<2x11008x128xf32>
+  %result = flow.dispatch.region -> (tensor<2x11008x128xf32, #encoding>) {
+    %encoded = iree_encoding.set_encoding %bcast : tensor<2x11008x128xf32> -> tensor<2x11008x128xf32, #encoding>
+    %init = tensor.empty() : tensor<2x11008x128xf32, #encoding>
+    %neg = linalg.generic {
+        indexing_maps = [#map, #map],
+        iterator_types = ["parallel", "parallel", "parallel"]}
+        ins(%encoded : tensor<2x11008x128xf32, #encoding>)
+        outs(%init : tensor<2x11008x128xf32, #encoding>) {
+    ^bb0(%in: f32, %out: f32):
+      %0 = arith.negf %in : f32
+      linalg.yield %0 : f32
+    } -> tensor<2x11008x128xf32, #encoding>
+    flow.return %neg : tensor<2x11008x128xf32, #encoding>
+  }
+  util.return %result : tensor<2x11008x128xf32, #encoding>
+}
+
+// -----
+
+// The only consumer is inside a dispatch region, so the unset_encoding outside
+// of it is not sunk into the dispatch.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> ()>
+#encoding = #iree_encoding.encoding<operand_index = 2 : index, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>
+// CHECK-LABEL: @no_sink_into_dispatch(
+// CHECK:         %[[RAW:.+]] = iree_encoding.unset_encoding
+// CHECK:         flow.dispatch.region
+// CHECK:           linalg.generic {{.*}} ins(%[[RAW]], %{{.+}} : tensor<4096x?xf32>, f32)
+// CHECK-NOT:     iree_encoding.unset_encoding
+// CHECK:         util.return
+util.func public @no_sink_into_dispatch(%arg0: tensor<4096x?xf32, #encoding>, %arg1: f32, %arg2: index) -> tensor<4096x?xf32> {
+  %raw = iree_encoding.unset_encoding %arg0 : tensor<4096x?xf32, #encoding> -> tensor<4096x?xf32>{%arg2}
+  %result = flow.dispatch.region -> (tensor<4096x?xf32>{%arg2}) {
+    %empty = tensor.empty(%arg2) : tensor<4096x?xf32>
+    %scaled = linalg.generic {indexing_maps = [#map3, #map4, #map3], iterator_types = ["parallel", "parallel"]} ins(%raw, %arg1 : tensor<4096x?xf32>, f32) outs(%empty : tensor<4096x?xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %mul = arith.mulf %in, %in_0 : f32
+      linalg.yield %mul : f32
+    } -> tensor<4096x?xf32>
+    flow.return %scaled : tensor<4096x?xf32>
+  }
+  util.return %result : tensor<4096x?xf32>
 }
 
 // -----
