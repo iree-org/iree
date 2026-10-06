@@ -3696,6 +3696,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-propagate-encodings-through-generic-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-dispatch-creation-propagate-encodings-through-generic-ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-remove-tensor-barriers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7208,6 +7219,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-dispatch-creation-propagate-encodings-through-generic-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-dispatch-creation-propagate-encodings-through-generic-ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-dispatch-creation-remove-tensor-barriers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7517,6 +7539,19 @@ into and out of the compute region with the barrier operations.</p>
 <p>Apply dispatch workgroups canonicalization patterns.</p>
 <h3 id="-iree-dispatch-creation-propagate-encodings"><code>-iree-dispatch-creation-propagate-encodings</code><a class="headerlink" href="#-iree-dispatch-creation-propagate-encodings" title="Permanent link">link</a></h3>
 <p><em>Propagate encodings across other operations.</em></p>
+<h3 id="-iree-dispatch-creation-propagate-encodings-through-generic-ops"><code>-iree-dispatch-creation-propagate-encodings-through-generic-ops</code><a class="headerlink" href="#-iree-dispatch-creation-propagate-encodings-through-generic-ops" title="Permanent link">link</a></h3>
+<p><em>Propagates data-tiling encodings through linalg.generic ops outside dispatches.</em></p>
+<p>Bubbles set_encoding ops up through bit-extending and broadcasting
+linalg.generic producers, and sinks unset_encoding ops down through
+elementwise linalg.generic consumers, for operations that are outside
+dispatches and in the same block. These are the same encoding rewrites that
+iree-dispatch-creation-hoist-encoding-ops applies within dispatch regions.
+Unsupported operations and encodings, multiple uses, existing dispatches and
+region boundaries remain encoding boundaries. The pass neither hoists out of
+dispatches nor propagates across calls. Unlike
+iree-dispatch-creation-propagate-encodings, which only swaps set_encoding
+ops with tensor.cast producers, it rewrites the generic ops around the
+encoding ops.</p>
 <h3 id="-iree-dispatch-creation-remove-tensor-barriers"><code>-iree-dispatch-creation-remove-tensor-barriers</code><a class="headerlink" href="#-iree-dispatch-creation-remove-tensor-barriers" title="Permanent link">link</a></h3>
 <p><em>Remove tensor barrier markers from the program.</em></p>
 <p>Removes iree_tensor_ext.compute_barrier.start and iree_tensor_ext.compute_barrier.end
