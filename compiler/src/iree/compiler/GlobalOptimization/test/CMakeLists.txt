@@ -25,6 +25,9 @@ iree_lit_test_suite(
     "data_layout_propagation.mlir"
     "demote_contraction_inputs.mlir"
     "detach_elementwise_from_named_ops.mlir"
+    "early_data_tiling.mlir"
+    "early_data_tiling_fallback.mlir"
+    "early_data_tiling_invalid.mlir"
     "expand_tensor_shapes.mlir"
     "fuse_dequantization_matmul.mlir"
     "generalize_named_ops.mlir"
@@ -44,6 +47,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+    not
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -42,6 +42,20 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 
   binder.opt<bool>(
+      "iree-opt-experimental-early-data-tiling", earlyDataTiling,
+      llvm::cl::desc(
+          "Experimental. Assigns, propagates and materializes data-tiling "
+          "layouts before dispatch creation for supported single-target CPU "
+          "modules, so that data-tiled ops fuse with their epilogues; other "
+          "modules use dispatch-time data tiling. Unlike "
+          "--iree-global-opt-data-tiling with early materialization, it also "
+          "normalizes contraction dimensions and propagates layouts through "
+          "elementwise ops. Overrides the other data-tiling placement flags, "
+          "and uses the operation families and encoding strategy of "
+          "dispatch-time data tiling."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
       "iree-opt-const-expr-hoisting", constExprHoisting,
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "

@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Codegen/Dialect/CPU/IR/IREECPUTypes.h"
 #include "iree/compiler/Codegen/Utils/EncodingUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -99,6 +101,24 @@ LogicalResult MaterializeEncodingTypeConverter::getOffsetsSizesStrides(
   return getLayoutAttr().getOffsetsSizesStrides(
       builder, loc, type, dynamicDims, offsets, sizes, strides, newOffsets,
       newSizes, newStrides);
+}
+
+// TODO: This CPU-specific allowlist is part of the layout decision of the
+// early data-tiling route. Move it into the component that makes that decision,
+// and let each encoding resolver declare whether its layouts can be
+// materialized before dispatch creation.
+bool isHostEncodingMaterializationSupported(
+    IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (!isLLVMCPUBackend(targetAttr)) {
+    return false;
+  }
+  DictionaryAttr config = targetAttr.getConfiguration();
+  if (!config || !config.getAs<IREE::CPU::CPUEncodingResolverAttr>(
+                     IREE::Encoding::kEncodingResolverAttrName)) {
+    return false;
+  }
+  return (isX86_64(config) || isAArch64(config)) &&
+         !isInnerTiledEnabled(config);
 }
 
 } // namespace mlir::iree_compiler

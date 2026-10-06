@@ -31,6 +31,10 @@ struct GlobalPipelineOptions {
   // deprecated eventually.
   bool dataTiling = false;
 
+  // Assign, propagate, and materialize encodings before dispatch creation for
+  // supported homogeneous targets. Other targets retain late data tiling.
+  bool earlyDataTiling = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;
 };
