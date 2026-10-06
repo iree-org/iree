@@ -426,24 +426,7 @@ struct AllocationScope {
     });
 
     // Propagate alias subranges when present.
-    for (auto alias : valueAliases.getValueAliases(resource)) {
-      ResourceRange aliasRange = resourceRange;
-      if (auto subviewOp =
-              IREE::Stream::ResourceSubviewOp::findSubviewOp(alias)) {
-        aliasRange.resource = subviewOp.getSubrangeResource();
-        aliasRange.resourceSize = subviewOp.getSubrangeResourceSize();
-        aliasRange.offset = subviewOp.getSubrangeOffset();
-        aliasRange.length = subviewOp.getSubrangeLength();
-      }
-      resourceRangeMap.insert(std::make_pair(alias, aliasRange));
-      LLVM_DEBUG({
-        llvm::dbgs() << "   = alias ";
-        alias.printAsOperand(llvm::dbgs(), *asmState);
-        llvm::dbgs() << " = ";
-        aliasRange.print(llvm::dbgs(), *asmState);
-        llvm::dbgs() << "\n";
-      });
-    }
+    mapResourceAliases(resource, resourceRange, asmState);
   }
 
   // Returns a storage range backing the given stream |resource|.
@@ -486,6 +469,66 @@ struct AllocationScope {
   }
 
 private:
+  // Map tied operands before their results so each alias inherits its source's
+  // allocated buffer and offset.
+  void mapResourceAliases(Value resource, const ResourceRange &baseRange,
+                          AsmState *asmState) {
+    SmallVector<Value> worklist;
+    for (auto alias : valueAliases.getValueAliases(resource)) {
+      worklist.push_back(alias);
+    }
+
+    while (!worklist.empty()) {
+      Value alias = worklist.back();
+      if (resourceRangeMap.contains(alias)) {
+        worklist.pop_back();
+        continue;
+      }
+
+      ResourceRange aliasRange = baseRange;
+      if (auto tiedOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
+              alias.getDefiningOp())) {
+        // If the source is not mapped yet, leave this alias pending and tend
+        // to the source in case it aliases a subview into an already-resolved
+        // range.
+        if (Value source = tiedOp.getTiedResultOperand(alias)) {
+          auto it = resourceRangeMap.find(source);
+          if (it == resourceRangeMap.end()) {
+            worklist.push_back(source);
+            continue;
+          }
+          aliasRange = it->second;
+        }
+      }
+
+      mapResourceAlias(alias, aliasRange, asmState);
+      worklist.pop_back();
+    }
+  }
+
+  // Map one alias using its source's allocated range.
+  void mapResourceAlias(Value alias, ResourceRange aliasRange,
+                        AsmState *asmState) {
+    if (auto subviewOp =
+            alias.getDefiningOp<IREE::Stream::ResourceSubviewOp>()) {
+      // Keep the resolved buffer and its total size for the event that the
+      // original SSA value is not the final allocated buffer. Only adjust the
+      // view's range.
+      aliasRange.offset = add(subviewOp.getLoc(), aliasRange.offset,
+                              subviewOp.getSubrangeOffset());
+      aliasRange.length = subviewOp.getSubrangeLength();
+    }
+
+    resourceRangeMap.insert(std::make_pair(alias, aliasRange));
+    LLVM_DEBUG({
+      llvm::dbgs() << "   = alias ";
+      alias.printAsOperand(llvm::dbgs(), *asmState);
+      llvm::dbgs() << " = ";
+      aliasRange.print(llvm::dbgs(), *asmState);
+      llvm::dbgs() << "\n";
+    });
+  }
+
   Operation *rootOp;
 
   // Disjoint-set of values that alias each other. That two things alias does
