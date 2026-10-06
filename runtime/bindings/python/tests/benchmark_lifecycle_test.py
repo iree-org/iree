@@ -108,6 +108,36 @@ util.func public @main(
 }
 """
 
+# Returns a list that the module retains and updates on every invocation with
+# the invocation count and a tensor filled with it.
+STATEFUL_LIST = """
+util.global private mutable @count = 0 : i32
+util.global private @list : !util.list<?>
+util.initializer {
+  %size = arith.constant 2 : index
+  %list = util.list.create %size : !util.list<?>
+  util.list.resize %list, %size : !util.list<?>
+  util.global.store %list, @list : !util.list<?>
+  util.return
+}
+func.func @main() -> !util.list<?> {
+  %old = util.global.load @count : i32
+  %one = arith.constant 1 : i32
+  %next = arith.addi %old, %one : i32
+  util.global.store %next, @count : i32
+  %count = arith.sitofp %next : i32 to f32
+  %empty = tensor.empty() : tensor<4xf32>
+  %counts = linalg.fill ins(%count : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+  %view = hal.tensor.export %counts : tensor<4xf32> -> !hal.buffer_view
+  %list = util.global.load @list : !util.list<?>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  util.list.set %list[%c0], %next : i32 -> !util.list<?>
+  util.list.set %list[%c1], %view : !hal.buffer_view -> !util.list<?>
+  return %list : !util.list<?>
+}
+"""
+
 # One dispatch, dumped as a generated dispatch benchmark.
 ABSOLUTE = """
 func.func @abs(%input: tensor<4xf32>) -> tensor<4xf32> {
@@ -619,6 +649,26 @@ class BenchmarkLifecycleTest(unittest.TestCase):
                         expected_output=f"4xf32={count}",
                     )
                     self.assertIn("[SUCCESS]", stdout)
+
+    def test_profiling_preserves_list_outputs(self):
+        # Profiling updates the returned list after the four measured
+        # iterations, but the outputs are those of the fourth invocation.
+        for model in ("async-internal", "async-external"):
+            with self.subTest(model=model):
+                module = compile_module(
+                    self.directory,
+                    model,
+                    STATEFUL_LIST,
+                    f"--iree-execution-model={model}",
+                )
+                stdout, _ = run_benchmark(
+                    module,
+                    inputs=[],
+                    dispatch_statistics=True,
+                    enable_output_processing=True,
+                )
+                self.assertIn("child_list[0]: i32=4\n", stdout)
+                self.assertIn("4xf32=4 4 4 4\n", stdout)
 
     def test_dispatch_rows_for_dispatch_benchmarks(self):
         # Both discovery and selection report the one call per repetition.

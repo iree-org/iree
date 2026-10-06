@@ -815,6 +815,13 @@ class BenchmarkSession {
   // ensures host accessibility may leave them aliasing the original storage.
   iree_status_t SnapshotOutputs(Workload& workload) {
     if (!workload.outputs) return iree_ok_status();
+    return SnapshotList(workload.outputs.get());
+  }
+
+  // Replaces the buffers, buffer views and lists in |list| with copies. Nested
+  // lists may be retained and mutated by the module, so they are cloned before
+  // their elements are replaced; only |list| itself must be owned by the tool.
+  iree_status_t SnapshotList(iree_vm_list_t* list) {
     iree_hal_buffer_params_t params = {};
     params.usage =
         IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
@@ -822,12 +829,18 @@ class BenchmarkSession {
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
     params.queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
-    for (iree_host_size_t i = 0; i < iree_vm_list_size(workload.outputs.get());
-         ++i) {
+    for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
       iree_vm_variant_t value = iree_vm_variant_empty();
-      IREE_RETURN_IF_ERROR(
-          iree_vm_list_get_variant_assign(workload.outputs.get(), i, &value));
+      IREE_RETURN_IF_ERROR(iree_vm_list_get_variant_assign(list, i, &value));
       if (!iree_vm_variant_is_ref(value) || !value.ref.ptr) continue;
+      if (iree_vm_list_isa(value.ref)) {
+        vm::ref<iree_vm_list_t> copy;
+        IREE_RETURN_IF_ERROR(iree_vm_list_clone(
+            iree_vm_list_deref(value.ref), iree_allocator_system(), &copy));
+        IREE_RETURN_IF_ERROR(SnapshotList(copy.get()));
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_ref_retain(list, i, copy));
+        continue;
+      }
       iree_hal_buffer_view_t* source_view = nullptr;
       iree_hal_buffer_t* source = nullptr;
       if (iree_hal_buffer_view_isa(value.ref)) {
@@ -849,11 +862,11 @@ class BenchmarkSession {
         vm::ref<iree_hal_buffer_view_t> copy_view;
         IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create_like(
             copy.get(), source_view, iree_allocator_system(), &copy_view));
-        IREE_RETURN_IF_ERROR(iree_vm_list_set_buffer_view_retain(
-            workload.outputs.get(), i, copy_view.get()));
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_buffer_view_retain(list, i, copy_view.get()));
       } else {
-        IREE_RETURN_IF_ERROR(iree_vm_list_set_buffer_retain(
-            workload.outputs.get(), i, copy.get()));
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_set_buffer_retain(list, i, copy.get()));
       }
     }
     return iree_ok_status();
