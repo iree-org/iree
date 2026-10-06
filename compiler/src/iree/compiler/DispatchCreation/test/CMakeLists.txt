@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "pipeline_tests_split_reduction.mlir"
     "propagate_bitcast.mlir"
     "propagate_encodings.mlir"
+    "propagate_encodings_through_generic_ops.mlir"
     "remove_tensor_barriers.mlir"
     "set_encoding.mlir"
     "set_encoding_padding.mlir"

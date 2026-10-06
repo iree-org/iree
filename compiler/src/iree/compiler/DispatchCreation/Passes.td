@@ -424,6 +424,29 @@ def PropagateEncodingsPass :
   ];
 }
 
+def PropagateEncodingsThroughGenericOpsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings-through-generic-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Propagates data-tiling encodings through linalg.generic ops outside dispatches.";
+  let description = [{
+    Bubbles set_encoding ops up through bit-extending and broadcasting
+    linalg.generic producers, and sinks unset_encoding ops down through
+    elementwise linalg.generic consumers, for operations that are outside
+    dispatches and in the same block. These are the same encoding rewrites that
+    iree-dispatch-creation-hoist-encoding-ops applies within dispatch regions.
+    Unsupported operations and encodings, multiple uses, existing dispatches and
+    region boundaries remain encoding boundaries. The pass neither hoists out of
+    dispatches nor propagates across calls. Unlike
+    iree-dispatch-creation-propagate-encodings, which only swaps set_encoding
+    ops with tensor.cast producers, it rewrites the generic ops around the
+    encoding ops.
+  }];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
 def AnnotateDataTilingHintsPass :
     InterfacePass<"iree-dispatch-creation-annotate-data-tiling-hints", "mlir::FunctionOpInterface"> {
   let summary = "Adds data-tiling hint attribute to linalg operations.";
