@@ -277,9 +277,6 @@ class MaterializeRefDiscardsPass
     for (Block &block : funcOp.getBlocks()) {
       Operation *terminator = block.getTerminator();
       for (Block *succ : block.getSuccessors()) {
-        auto succLiveIns = liveness.getBlockLiveIns(succ);
-        auto liveOuts = liveness.getBlockLiveOuts(&block);
-
         SmallVector<Value> dyingRefs;
         for (Value ref : allRefs) {
           if (escapingRefs.contains(ref)) {
@@ -287,7 +284,7 @@ class MaterializeRefDiscardsPass
           }
 
           // Check if ref should be discarded on this edge.
-          bool isInLiveOuts = llvm::is_contained(liveOuts, ref);
+          bool isInLiveOuts = liveness.isLiveOut(&block, ref);
           bool isForwardedOnAny = false;
           if (auto branchOp = dyn_cast<BranchOpInterface>(terminator)) {
             for (unsigned i = 0; i < terminator->getNumSuccessors(); ++i) {
@@ -304,7 +301,7 @@ class MaterializeRefDiscardsPass
           }
 
           // Skip if ref is live-in to successor.
-          if (llvm::is_contained(succLiveIns, ref)) {
+          if (liveness.isLiveIn(succ, ref)) {
             continue;
           }
 
@@ -330,20 +327,19 @@ class MaterializeRefDiscardsPass
       }
     }
 
-    // Insert batched discards for each edge.
-    for (auto &[pred, succ, refs] : edgeDiscards) {
-      Location loc = pred->getTerminator()->getLoc();
-      insertDiscardOnEdge(builder, pred, succ, refs, loc);
-    }
-
-    // Phase 2: Mid-block discards.
-    // Collect refs dying mid-block (last use is not at block end and ref is not
-    // live-out), grouped by insertion point for batching.
+    // Phase 2 (collection only): mid-block discards.
+    // Collect refs dying mid-block (last use is not at block end and ref is
+    // not live-out), grouped by insertion point for batching. All liveness
+    // queries in this pass (phase 1 above and this loop) run against the
+    // unmutated IR the analysis was computed on; every insertion happens
+    // below, after the last query. Phases 1 and 2 target disjoint refs, so
+    // deferring the insertions cannot double-discard: a mid-block discard
+    // requires the last use to be a non-terminator op and the ref to not be
+    // live-out, while an edge discard only applies to refs that are
+    // live-out of (or forwarded by) the block's terminator.
+    SmallVector<std::pair<Operation *, SmallVector<Value>>> midBlockDiscards;
+    llvm::DenseMap<Operation *, size_t> opToIndex;
     for (Block &block : funcOp.getBlocks()) {
-      // Group refs by their insertion point (the op after which to insert).
-      // Key is the op, value is the list of refs dying after that op.
-      SmallVector<std::pair<Operation *, SmallVector<Value>>> midBlockDiscards;
-      llvm::DenseMap<Operation *, size_t> opToIndex;
 
       for (Operation &op : block) {
         if (isa<IREE::VM::DiscardRefsOp>(&op)) {
@@ -364,8 +360,7 @@ class MaterializeRefDiscardsPass
           // Check if this is the last use and value doesn't escape via
           // live-outs.
           if (liveness.isLastValueUse(value, &op, operand.getOperandNumber())) {
-            auto liveOuts = liveness.getBlockLiveOuts(&block);
-            if (!llvm::is_contained(liveOuts, value)) {
+            if (!liveness.isLiveOut(&block, value)) {
               // For terminators, don't insert mid-block discards for their
               // operands. Terminator ref operands fall into three categories:
               // 1. Forwarded (branch args) → successor block takes ownership
@@ -402,16 +397,26 @@ class MaterializeRefDiscardsPass
           }
         }
       }
+    }
 
-      // Insert batched mid-block discards.
-      for (auto &[op, values] : midBlockDiscards) {
-        if (op->hasTrait<OpTrait::IsTerminator>()) {
-          builder.setInsertionPoint(op);
-        } else {
-          builder.setInsertionPointAfter(op);
-        }
-        IREE::VM::DiscardRefsOp::create(builder, op->getLoc(), values);
+    // Apply all insertions, now that every liveness query has run. Edge
+    // discards first: splitting a critical edge creates new blocks the
+    // analysis has never seen, which is safe here precisely because nothing
+    // queries liveness after this point. The new blocks contain only the
+    // inserted discards and a forwarding branch, so they need no mid-block
+    // discards; mid-block insertion points are operations, which keep their
+    // blocks across edge splitting.
+    for (auto &[pred, succ, refs] : edgeDiscards) {
+      Location loc = pred->getTerminator()->getLoc();
+      insertDiscardOnEdge(builder, pred, succ, refs, loc);
+    }
+    for (auto &[op, values] : midBlockDiscards) {
+      if (op->hasTrait<OpTrait::IsTerminator>()) {
+        builder.setInsertionPoint(op);
+      } else {
+        builder.setInsertionPointAfter(op);
       }
+      IREE::VM::DiscardRefsOp::create(builder, op->getLoc(), values);
     }
 
     // Phase 3: Unused refs.
