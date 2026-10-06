@@ -63,6 +63,14 @@ static llvm::cl::opt<DispatchCreation::EncodingOptions> clSetEncodingStrategy(
                    "Encode tensors that need to be padded")),
     llvm::cl::init(DispatchCreation::EncodingOptions::Generic));
 
+static constexpr IREE::Encoding::EncodingOpType kDefaultDataTilingOpTypes[] = {
+    IREE::Encoding::EncodingOpType::matmul,
+    IREE::Encoding::EncodingOpType::scaled_matmul};
+
+ArrayRef<IREE::Encoding::EncodingOpType> getDefaultDataTilingOpTypes() {
+  return kDefaultDataTilingOpTypes;
+}
+
 static llvm::cl::list<mlir::iree_compiler::IREE::Encoding::EncodingOpType>
     clDataTilingOps(
         "iree-dispatch-creation-experimental-set-data-tiling-ops",
@@ -79,11 +87,7 @@ static llvm::cl::list<mlir::iree_compiler::IREE::Encoding::EncodingOpType>
             clEnumValN(
                 mlir::iree_compiler::IREE::Encoding::EncodingOpType::conv,
                 "convolution", "Convolutions.")),
-        llvm::cl::list_init<
-            mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
-            {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
-             mlir::iree_compiler::IREE::Encoding::EncodingOpType::
-                 scaled_matmul}));
+        llvm::cl::list_init(getDefaultDataTilingOpTypes()));
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -118,6 +122,28 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
+
+void buildDataTilingEncodingPassPipeline(
+    OpPassManager &passManager, const DataTilingEncodingOptions &options) {
+  FunctionLikeNest(passManager)
+      // Run canonicalizer first to make propagation easier.
+      .addPass([]() {
+        IREE::Flow::CanonicalizePassOptions options;
+        options.cseConstants = false;
+        return IREE::Flow::createCanonicalizePass(options);
+      })
+      .addPass([&]() {
+        return createAnnotateDataTilingHintsPass(
+            AnnotateDataTilingHintsPassOptions{options.opTypes});
+      })
+      // Set encodings on all eligible ops. When this runs after dispatch
+      // formation, the encodings are placed inside the dispatch regions with
+      // the data-tiled op.
+      .addPass([&]() {
+        return createSetEncodingPass(
+            SetEncodingPassOptions{options.encodingOption});
+      });
+}
 
 static void addDispatchRegionCreationPreprocessingPasses(
     OpPassManager &passManager, const TransformOptions &dispatchOptions) {
@@ -293,28 +319,11 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
   // after fusion decisions have already been made, so encodings can be
   // separated from compiler fusion decisions.
   if (options.dataTiling) {
-    FunctionLikeNest(passManager)
-        // Run canonicalizer first to make propagation easier.
-        .addPass([&]() {
-          IREE::Flow::CanonicalizePassOptions options;
-          options.cseConstants = false;
-          return IREE::Flow::createCanonicalizePass(options);
-        })
-        .addPass([&]() {
-          AnnotateDataTilingHintsPassOptions passOpts;
-          if (!clDataTilingOps.empty()) {
-            passOpts.opTypes.assign(clDataTilingOps.begin(),
-                                    clDataTilingOps.end());
-          }
-          return createAnnotateDataTilingHintsPass(passOpts);
-        })
-        // Set encodings on all eligible ops. All ops should be in compiler
-        // formed dispatch regions, so encodings will be placed inside of the
-        // dispatch regions with the data-tiled op.
-        .addPass([&]() {
-          return DispatchCreation::createSetEncodingPass(
-              DispatchCreation::SetEncodingPassOptions{clSetEncodingStrategy});
-        });
+    AssignDataTilingEncodingsPassOptions assignOptions;
+    assignOptions.opTypes.assign(clDataTilingOps.begin(),
+                                 clDataTilingOps.end());
+    assignOptions.encodingOption = clSetEncodingStrategy;
+    passManager.addPass(createAssignDataTilingEncodingsPass(assignOptions));
     // SetEncodingOps should not be in the same dispatch as the data-tiled
     // op, so hoist them out of their current dispatch regions. Also, bubble
     // SetEncodingOps through special operations like bit-extending ops and
@@ -351,6 +360,9 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
 // Apply preprocessing and form dispatch regions
 void buildDispatchCreationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
+  // Layouts materialized before dispatch creation are specific to the target
+  // that they were materialized for, independent of the data-tiling options.
+  passManager.addPass(createVerifyMaterializedLayoutTargetPass());
 
   // Inject tensor tracing early as we need to have the tracers in the IR
   // prior to dispatch region formation where we may lose access to them.

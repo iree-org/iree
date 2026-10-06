@@ -274,6 +274,19 @@ def TransposeGenericOpsPass :
   ];
 }
 
+def VerifyMaterializedLayoutTargetPass :
+    Pass<"iree-dispatch-creation-verify-materialized-layout-target", "mlir::ModuleOp"> {
+  let summary = "Verifies the target of layouts materialized before dispatch creation.";
+  let description = [{
+    A module whose tensor layouts were materialized before dispatch creation
+    records the executable target in the
+    `iree.encoding.materialized_layout_target` attribute. The layouts are only
+    valid for that target, so this pass fails if the module is compiled for
+    another executable target, for several targets, or for none. Modules
+    without the attribute are unchanged.
+  }];
+}
+
 //===---------------------------------------------------------------------===//
 // Dispatch region creation passes.
 //===---------------------------------------------------------------------===//
@@ -464,10 +477,42 @@ def AnnotateDataTilingHintsPass :
         "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
         "Op families eligible for data-tiling annotation. "
         "Defaults to {matmul, scaled_matmul}.",
-        [{::llvm::cl::list_init<
-            mlir::iree_compiler::IREE::Encoding::EncodingOpType>(
-            {mlir::iree_compiler::IREE::Encoding::EncodingOpType::matmul,
-             mlir::iree_compiler::IREE::Encoding::EncodingOpType::scaled_matmul})}]>,
+        [{::llvm::cl::list_init(
+            mlir::iree_compiler::DispatchCreation::getDefaultDataTilingOpTypes())}]>,
+  ];
+}
+
+def AssignDataTilingEncodingsPass :
+    Pass<"iree-dispatch-creation-assign-data-tiling-encodings", "mlir::ModuleOp"> {
+  let summary = "Assign data-tiling encodings unless layouts are already materialized.";
+  let description = [{
+    Runs canonicalization, iree-dispatch-creation-annotate-data-tiling-hints
+    and iree-dispatch-creation-set-encoding on every function-like op, with the
+    operation families and encoding strategy given by the options. Modules
+    carrying the `iree.encoding.materialized_layout_target` attribute already
+    have target-specific layouts and are left unchanged.
+  }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data tiling. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init(
+            mlir::iree_compiler::DispatchCreation::getDefaultDataTilingOpTypes())}]>,
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
   ];
 }
 
