@@ -14,55 +14,86 @@ jobs:
   linux_x64_clang:
     runs-on: azure-linux-scale
     container:
-      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+      # Ubuntu 24.04 supplies Mesa with RDNA4 support.
+      image: ubuntu:24.04@sha256:a4453623f2f8319cfff65c43da9be80fe83b1a7ce689579b475867d69495b782
     defaults:
       run:
         shell: bash
     env:
       BUILD_DIR: build
+      CC: clang
+      CXX: clang++
       SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
       SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
       SCCACHE_CACHE_ZSTD_LEVEL: 10
       SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang"
     steps:
-      - name: "Checking out repository"
+      - name: Install build and Vulkan dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates clang clang-tools lld cmake ninja-build \
+            python3-dev python3-venv git curl libssl-dev libzstd-dev zlib1g-dev \
+            pkg-config ccache sccache mesa-vulkan-drivers libvulkan1 libdrm-amdgpu1 \
+            vulkan-validationlayers
+          dpkg --compare-versions "$(dpkg-query -W -f='${Version}' mesa-vulkan-drivers)" ge 25.0.7
+          dpkg-query -W mesa-vulkan-drivers libvulkan1 libdrm-amdgpu1 \
+            vulkan-validationlayers
+
+      - name: Checking out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
-      - name: Install Python requirements
+
+      - name: Install Python requirements and TheRock SDK
         run: |
-          python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-          python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
+          sdk_venv="${BUILD_DIR}/rocjitsu/therock-venv"
+          python3 -m venv "${sdk_venv}"
+          "${sdk_venv}/bin/python" -m pip install \
+            -r ./runtime/bindings/python/iree/runtime/build_requirements.txt \
+            -r ./build_tools/github_actions/ci_requirements.txt
+          "${sdk_venv}/bin/python" -m pip install --pre \
+            --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
+            "rocm[libraries,devel]==10.2.0a20261006"
+          "${sdk_venv}/bin/rocm-sdk" init
+          "${sdk_venv}/bin/rocm-sdk" version
+          realpath "${sdk_venv}/bin" >> "${GITHUB_PATH}"
+          rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
+          {
+            echo "ROCM_ROOT=${rocm_root}"
+            echo "ROCJITSU_BIN=${rocm_root}/bin/mirage"
+          } >> "${GITHUB_ENV}"
+
       - name: Build IREE
+        id: build_iree
         run: |
           source ./build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
         env:
           # Build the first rocjitsu target's test deps along with everything else.
           IREE_ROCM_TEST_TARGET_CHIP: gfx942
+
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
         env:
           CTEST_PARALLEL_LEVEL: 32
 
-      - name: Install TheRock SDK with rocjitsu
-        run: |
-          sdk_venv="${BUILD_DIR}/rocjitsu/therock-venv"
-          python3 -m venv "${sdk_venv}"
-          "${sdk_venv}/bin/python" -m pip install --pre \
-            --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
-            "rocm[libraries,devel]==10.2.0a20260914"
-          "${sdk_venv}/bin/rocm-sdk" init
-          "${sdk_venv}/bin/rocm-sdk" version
-          rocm_root="$("${sdk_venv}/bin/rocm-sdk" path --root)"
-          echo "ROCM_ROOT=${rocm_root}" >> "${GITHUB_ENV}"
-          echo "ROCJITSU_BIN=${rocm_root}/bin/mirage" >> "${GITHUB_ENV}"
-
       - name: Run ROCm e2e tests under rocjitsu
+        if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
         timeout-minutes: 120
         run: |
           ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
             "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
+        env:
+          IREE_ROCJITSU_RUN_ID: ci
+          CTEST_PARALLEL_LEVEL: 8
+
+      - name: Run Vulkan e2e tests under rocjitsu
+        if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
+        timeout-minutes: 60
+        run: |
+          ./build_tools/cmake/test_vulkan_targets_with_rocjitsu.sh \
+            "${BUILD_DIR}" gfx1100 gfx1201
         env:
           IREE_ROCJITSU_RUN_ID: ci
           CTEST_PARALLEL_LEVEL: 8
