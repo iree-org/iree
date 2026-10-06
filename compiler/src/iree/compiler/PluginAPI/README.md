@@ -89,9 +89,9 @@ one source can support static and dynamic linking.
 
 CMake provides `iree_compiler_register_dynamic_plugin`; Bazel provides
 `iree_compiler_register_experimental_dynamic_plugin`. Both build the library
-and apply the symbol rename described below. An install tree
-provides it through `find_package(IREECompiler)`; see
-`samples/compiler_plugins/out_of_tree_example/README.md`.
+and apply the symbol rename described below. The installed CMake package also
+provides the CMake rule through `find_package(IREECompiler)`; see the
+[out-of-tree example](../../../../../samples/compiler_plugins/out_of_tree_example/README.md).
 
 #### Build requirements
 
@@ -109,8 +109,13 @@ including generated headers from that build. Match these compilation settings:
   flags: `IREE_ENABLE_ASSERTIONS` can enable assertions in a release build.
 * Sanitizer instrumentation and its runtime requirements, when enabled.
 
-In-tree plugins inherit the build settings. External plugins must match them
-explicitly. Matching only `CMAKE_BUILD_TYPE` is insufficient. Optimization levels
+In-tree plugins inherit the build settings. External CMake plugins should link
+`iree_compiler_PluginAPI_build_options` to each plugin and helper target. It
+supplies the installed host's configured C++ flags, assertion state, RTTI and
+exception options, and headers without changing unrelated targets. Use a
+compatible compiler and matching toolchain settings; `find_package(IREECompiler)`
+does not select the project's compiler or sysroot. Matching only
+`CMAKE_BUILD_TYPE` is insufficient. Optimization levels
 and debug information need not match unless they change one of the settings
 above.
 
