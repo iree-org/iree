@@ -767,6 +767,8 @@ iree_cc_test(
     "driver=vulkan"
     "requires-gpu-vulkan"
     "vulkan_uses_vk_khr_buffer_device_address"
+  TIMEOUT
+    300
 )
 
 iree_cc_test(
