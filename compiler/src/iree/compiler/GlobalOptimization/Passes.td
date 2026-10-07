@@ -24,9 +24,21 @@ def ConvertBatchMatmulToMatmulPass :
   ];
 }
 
-def ConvertConv2DToImg2ColPass :
-    Pass<"iree-global-opt-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+def ConvertConvToIm2ColPass :
+    Pass<"iree-global-opt-convert-conv-to-im2col", ""> {
+  let summary = "Rewrites convolutions as contractions over an im2col gather";
+  let description = [{
+    Rewrites every linalg op that implements a convolution, named or generic,
+    as an all-parallel `linalg.generic` that gathers the convolved input
+    windows, followed by a contraction over the gathered tensor with the
+    original payload. Contraction loops are collapsed wherever the operand
+    layouts allow, so standard layouts become plain or batched matmuls.
+    Pooling ops are left unchanged.
+
+    The pass expects quantization to be lowered already: quantized
+    convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and
+    dequantize producers are not looked through.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
