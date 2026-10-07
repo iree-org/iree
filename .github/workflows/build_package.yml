@@ -150,13 +150,13 @@ jobs:
           # MacOS packages.
           # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
           # - runs-on:
-          #     - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-14' }}
+          #     - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-15' }}
           #     - os-family=macOS
-          - runs-on: macos-14
+          - runs-on: macos-15
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: macos-14
+          - runs-on: macos-15
             build-family: macos
             build-package: py-runtime-pkg
             experimental: true
