@@ -73,7 +73,7 @@ iree_cc_library(
   SRCS
     "CleanupNumericNarrowing.cpp"
     "ConvertBatchMatmulToMatmul.cpp"
-    "ConvertConv2DToImg2Col.cpp"
+    "ConvertConvToIm2Col.cpp"
     "ConvertQDQToIntegerMath.cpp"
     "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
