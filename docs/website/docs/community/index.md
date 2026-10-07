@@ -2,7 +2,7 @@
 
 ## Community meetings
 
-The IREE project maintainers host regular virtual Community Meetings with 
+The IREE project maintainers host regular virtual Community Meetings with
 updates on the project alongside presentations from IREE contributors and users.
 
 The calendar for upcoming Community Meetings is available through the
