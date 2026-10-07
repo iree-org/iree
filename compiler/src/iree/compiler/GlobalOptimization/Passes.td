@@ -33,7 +33,9 @@ def ConvertConvToIm2ColPass :
     windows, followed by a contraction over the gathered tensor with the
     original payload. Contraction loops are collapsed wherever the operand
     layouts allow, so standard layouts become plain or batched matmuls.
-    Pooling ops are left unchanged.
+    Convolutions without an output channel dimension, i.e. depthwise
+    convolutions with a unit multiplier and pooling ops, are left unchanged:
+    nothing reuses the gathered input, so the rewrite never pays off.
 
     The pass expects quantization to be lowered already: quantized
     convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and
