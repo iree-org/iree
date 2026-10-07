@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/DispatchCreation/CollapseDimensions.h"
+
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -111,11 +113,7 @@ collapseExtractSlice(tensor::ExtractSliceOp sliceOp,
       .getResult();
 }
 
-/// Searches the same sequence in all the affine maps and collapses these
-/// dimensions. It only applies these to "parallel" loops without mixing them
-/// with "reduction" types. It is expected that the `op` has projected
-/// permutations only as indexing maps. (Checked using `isEligibleForCollapse`).
-static SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
+SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
   auto fusionInterfaceOp = cast<LinalgFusionOpInterface>(op);
   auto tilingInterfaceOp = cast<TilingInterface>(op);
 
