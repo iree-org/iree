@@ -84,7 +84,8 @@ func.func @conv_nchw_strided_dilated(%input: tensor<1x4x16x16xf32>, %filter: ten
 
 // -----
 
-// Depthwise channels are batch loops of the contraction and come first.
+// A depthwise convolution has no output channel to reuse the gathered input
+// across, so it is left alone.
 func.func @depthwise_conv_nhwc_hwc(%input: tensor<1x114x114x16xf32>, %filter: tensor<3x3x16xf32>,
                                    %init: tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32> {
   %0 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
@@ -92,23 +93,13 @@ func.func @depthwise_conv_nhwc_hwc(%input: tensor<1x114x114x16xf32>, %filter: te
       outs(%init : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
   return %0 : tensor<1x112x112x16xf32>
 }
-// CHECK-DAG:  #[[$GATHER_READ:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2 + d4, d3 + d5, d0)>
-// CHECK-DAG:  #[[$LHS:.+]] = affine_map<(d0, d1, d2) -> (d1, d0, d2)>
-// CHECK-DAG:  #[[$RHS:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
-// CHECK-DAG:  #[[$OUT:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: func.func @depthwise_conv_nhwc_hwc(
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       indexing_maps = [#[[$GATHER_READ]],
-//  CHECK-SAME:       outs(%{{.+}} : tensor<16x1x112x112x3x3xf32>)
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       indexing_maps = [#[[$LHS]], #[[$RHS]], #[[$OUT]]]
-//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
-//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<16x12544x9xf32>, tensor<9x16xf32>)
-//  CHECK-SAME:       outs(%{{.+}} : tensor<12544x16xf32>)
+//       CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
+//   CHECK-NOT:   linalg.generic
 
 // -----
 
-// Groups are batch loops as well.
+// Groups are batch loops of the contraction and come first.
 func.func @grouped_conv_ngchw_gfchw(%input: tensor<1x2x4x10x10xf32>, %filter: tensor<2x8x4x3x3xf32>,
                                     %init: tensor<1x2x8x8x8xf32>) -> tensor<1x2x8x8x8xf32> {
   %0 = linalg.conv_2d_ngchw_gfchw {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
@@ -216,7 +207,7 @@ func.func @conv_1d_dynamic(%input: tensor<?x?x4xf32>, %filter: tensor<3x4x8xf32>
 
 // -----
 
-// Pooling ops only use the filter for its shape and are left alone.
+// Pooling ops have no output channel either and are left alone.
 func.func @pooling_nhwc_sum(%input: tensor<1x16x16x4xf32>, %window: tensor<3x3xf32>,
                             %init: tensor<1x14x14x4xf32>) -> tensor<1x14x14x4xf32> {
   %0 = linalg.pooling_nhwc_sum {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}

@@ -14,6 +14,8 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include <functional>
+
 namespace mlir::iree_compiler::GlobalOptimization {
 
 #define GEN_PASS_DEF_CONVERTCONVTOIM2COLPASS
@@ -154,8 +156,14 @@ static GatheredInput gatherInput(RewriterBase &rewriter,
 /// Filter window loops of extent one are substituted with zero before deciding
 /// what to gather. When that leaves the input access a projected permutation,
 /// as for an unstrided 1x1 convolution, the input is read in place.
+///
+/// The pattern only checks that the rewrite is valid; whether it is worth
+/// applying to a given convolution is decided by `controlFn`.
 struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
-  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+  using ControlFn = std::function<bool(linalg::LinalgOp)>;
+
+  ConvertConvToIm2Col(MLIRContext *context, ControlFn controlFn)
+      : OpInterfaceRewritePattern(context), controlFn(std::move(controlFn)) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -176,11 +184,9 @@ struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to infer convolution dims");
     }
-    // Pooling ops use the filter only for its shape; gathering their windows
-    // would just copy the input.
-    if (linalgOp.getMatchingBlockArgument(linalgOp.getDpsInputOperand(1))
-            .use_empty()) {
-      return rewriter.notifyMatchFailure(linalgOp, "filter values are unused");
+    if (!controlFn(linalgOp)) {
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "rejected by the control function");
     }
 
     AffineMap inputMap =
@@ -231,14 +237,30 @@ struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     rewriter.replaceOp(contractionOp, collapsed->results);
     return success();
   }
+
+private:
+  // Decides which valid convolutions are rewritten.
+  ControlFn controlFn;
 };
+
+/// Returns true if im2col can pay off for `convOp`, independent of the target.
+/// The gather copies every input element once per filter window position it
+/// falls into, and the contraction only amortizes that copy by reusing each
+/// gathered element across output channels. Without an output channel
+/// dimension, i.e. for depthwise convolutions with a unit multiplier and for
+/// pooling, nothing reuses the gather and the rewrite only adds memory traffic.
+static bool hasOutputChannelReuse(linalg::LinalgOp convOp) {
+  FailureOr<linalg::ConvolutionDimensions> convDims =
+      linalg::inferConvolutionDims(convOp);
+  return succeeded(convDims) && !convDims->outputChannel.empty();
+}
 
 struct ConvertConvToIm2ColPass final
     : impl::ConvertConvToIm2ColPassBase<ConvertConvToIm2ColPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<ConvertConvToIm2Col>(context);
+    patterns.add<ConvertConvToIm2Col>(context, hasOutputChannelReuse);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
