@@ -6,8 +6,8 @@
 // CHECK: arith.truncf %{{.+}} : f64 to f32
 // CHECK: iree_linalg_ext.quantize_affine
 // CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
-// CHECK-SAME: quant_max = 255 : i64
-// CHECK-SAME: quant_min = 0 : i64
+// CHECK-SAME: quant_min = 0
+// CHECK-SAME: quant_max = 255
 // CHECK-SAME: storage_unsigned
 // CHECK-SAME: ins({{.*}} : tensor<4x8xf32>, f32, i64)
 // CHECK-SAME: outs({{.*}} : tensor<4x8xi8>)
