@@ -37,7 +37,6 @@ iree_cc_library(
     LLVMSupport
     LLVMTargetParser
     MLIRAMDGPUDialect
-    MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
@@ -54,6 +53,7 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRROCDLDialect
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSideEffectInterfaces

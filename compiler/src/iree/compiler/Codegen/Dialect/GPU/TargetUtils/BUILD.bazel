@@ -60,8 +60,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common/GPU:GPUHeuristics",
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AMDGPUUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:ROCDLDialect",
         "@llvm-project//mlir:Support",
     ],
 )

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
@@ -34,11 +35,13 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
@@ -54,22 +57,29 @@ namespace {
 // instruction, with NO memory fences. Fences are handled separately.
 //
 // Based on LDSBarrierOpLowering but without the release/acquire fences.
-// Chipset handling:
-//   pre-gfx90a: inline asm s_barrier
-//   gfx90a-gfx11: rocdl.s.barrier
-//   gfx12+: rocdl.s.barrier.signal + rocdl.s.barrier.wait
+// Target handling:
+//   no split barriers and no barrier back-off (e.g. pre-gfx90a):
+//     inline asm s_barrier
+//   barrier back-off but no split barriers (gfx90a-gfx11): rocdl.s.barrier
+//   split barriers (gfx12+): rocdl.s.barrier.signal + rocdl.s.barrier.wait
 struct LowerGlobalSubgroupBarrier
     : OpRewritePattern<IREE::GPU::GlobalSubgroupBarrierOp> {
-  LowerGlobalSubgroupBarrier(MLIRContext *context, amdgpu::Chipset chipset)
-      : OpRewritePattern(context), chipset(chipset) {}
+  LowerGlobalSubgroupBarrier(MLIRContext *context,
+                             const ROCDL::TargetInfo &target)
+      : OpRewritePattern(context), target(target) {}
 
   LogicalResult matchAndRewrite(IREE::GPU::GlobalSubgroupBarrierOp op,
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
-    constexpr amdgpu::Chipset kGfx90a(9, 0, 0x0a);
+    bool hasSplitBarriers = target.has(llvm::AMDGPU::FEAT_GFX12_INSTS);
+    // Inline assembly is only needed where the hardware has neither split
+    // barriers nor barrier back-off (mainly early gfx9), to bypass the
+    // conservative insertion of global memory waits at barriers.
+    bool requiresInlineAsm =
+        !hasSplitBarriers && !target.has(llvm::AMDGPU::FEAT_BACK_OFF_BARRIER);
 
-    if (chipset < kGfx90a) {
-      // Pre-gfx90a: use inline asm.
+    if (requiresInlineAsm) {
+      // Use inline asm.
       auto asmDialectAttr = LLVM::AsmDialectAttr::get(rewriter.getContext(),
                                                       LLVM::AsmDialect::AD_ATT);
       const char *asmStr = ";;;WARNING: BREAKS DEBUG WATCHES\ns_barrier";
@@ -81,11 +91,11 @@ struct LowerGlobalSubgroupBarrier
           /*convergent=*/true,
           /*asm_dialect=*/asmDialectAttr,
           /*operand_attrs=*/ArrayAttr());
-    } else if (chipset.majorVersion < 12) {
-      // gfx90a-gfx11: use rocdl.s.barrier.
+    } else if (!hasSplitBarriers) {
+      // Use rocdl.s.barrier.
       rewriter.replaceOpWithNewOp<ROCDL::SBarrierOp>(op);
     } else {
-      // gfx12+: use rocdl.s.barrier.signal + rocdl.s.barrier.wait.
+      // Use rocdl.s.barrier.signal + rocdl.s.barrier.wait.
       ROCDL::BarrierSignalOp::create(rewriter, loc, -1);
       rewriter.replaceOpWithNewOp<ROCDL::BarrierWaitOp>(
           op, static_cast<int16_t>(-1));
@@ -94,13 +104,13 @@ struct LowerGlobalSubgroupBarrier
   }
 
 private:
-  amdgpu::Chipset chipset;
+  ROCDL::TargetInfo target;
 };
 
 static void
 populateLowerGlobalSubgroupBarrierPatterns(RewritePatternSet &patterns,
-                                           const amdgpu::Chipset &chipset) {
-  patterns.add<LowerGlobalSubgroupBarrier>(patterns.getContext(), chipset);
+                                           const ROCDL::TargetInfo &target) {
+  patterns.add<LowerGlobalSubgroupBarrier>(patterns.getContext(), target);
 }
 
 /// Hacky pattern to swap `s_setprio` operations with `amdgpu.mfma` ops.
@@ -180,7 +190,7 @@ static bool containsAPred(Type type) {
 // Note: different chips take different FP8 formats but re-use the same
 // instruction and intrinsic names, so we must filter out the "wrong" FP8 here.
 static LogicalResult validateDataTypes(Operation *op,
-                                       const amdgpu::Chipset &chipset) {
+                                       const ROCDL::TargetInfo &target) {
   // Only validate arith.extf and arith.truncf - these are the operations that
   // need hardware or software conversion support. Other ops (memrefs, etc.)
   // just store fp8 data and don't need special handling.
@@ -188,8 +198,7 @@ static LogicalResult validateDataTypes(Operation *op,
     return success();
   }
 
-  constexpr amdgpu::Chipset kGfx942 = amdgpu::Chipset(9, 4, 2);
-  if (!amdgpu::hasOcpFp8(chipset)) {
+  if (!target.hasOcpFp8()) {
     auto pred = containsAPred<Float8E5M2Type, Float8E4M3FNType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
@@ -201,7 +210,7 @@ static LogicalResult validateDataTypes(Operation *op,
     }
   }
 
-  if (chipset != kGfx942) {
+  if (!target.hasFnuzFp8()) {
     auto pred = containsAPred<Float8E5M2FNUZType, Float8E4M3FNUZType>;
     if (llvm::any_of(op->getOperandTypes(), pred) ||
         llvm::any_of(op->getResultTypes(), pred)) {
@@ -232,11 +241,34 @@ struct ConvertToROCDLPass final
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
-    StringRef targetArch = getGPUTargetAttr(m).getArch();
-    FailureOr<amdgpu::Chipset> maybeChipset =
-        amdgpu::Chipset::parse(targetArch);
-    if (failed(maybeChipset)) {
-      m.emitOpError() << "Invalid chipset name: " << targetArch;
+    IREE::GPU::TargetAttr targetAttr = getGPUTargetAttr(m);
+    StringRef targetArch = targetAttr.getArch();
+    // The wave size is part of the target description: targets that support
+    // both wave32 and wave64 default to wave32 unless told otherwise. IREE
+    // requires a single subgroup size per executable variant (the ROCM target
+    // rejects exports that disagree), so resolve it once for the module from
+    // the functions' translation info, defaulting to the target's preferred
+    // size like the ROCM target does. If the functions disagree, fall back to
+    // the target default; the mismatch is diagnosed by the ROCM target later.
+    std::optional<int64_t> waveSize;
+    for (FunctionOpInterface funcOp : m.getOps<FunctionOpInterface>()) {
+      std::optional<int64_t> funcWaveSize = getSubgroupSize(funcOp);
+      if (!funcWaveSize) {
+        continue;
+      }
+      if (waveSize && *waveSize != *funcWaveSize) {
+        waveSize = 0;
+        break;
+      }
+      waveSize = funcWaveSize;
+    }
+    if (!waveSize) {
+      waveSize = targetAttr.getPreferredSubgroupSize();
+    }
+    FailureOr<ROCDL::TargetInfo> maybeTargetInfo =
+        ROCDL::TargetInfo::get(targetArch, static_cast<unsigned>(*waveSize),
+                               [&] { return m.emitOpError(); });
+    if (failed(maybeTargetInfo)) {
       return signalPassFailure();
     }
 
@@ -270,7 +302,7 @@ struct ConvertToROCDLPass final
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
       WalkResult allTypesValid = m.walk([&](Operation *op) {
-        if (failed(validateDataTypes(op, *maybeChipset))) {
+        if (failed(validateDataTypes(op, *maybeTargetInfo))) {
           return WalkResult::interrupt();
         }
         return WalkResult::advance();
@@ -283,10 +315,10 @@ struct ConvertToROCDLPass final
       arith::populateArithToAMDGPUConversionPatterns(
           patterns, /*convertFP8Arithmetic=*/true, /*saturateFP8Truncf=*/false,
           /*allowPackedF16Rtz=*/false, supportsScaledExtTrunc,
-          /*chipset=*/*maybeChipset);
+          /*target=*/*maybeTargetInfo);
       arith::populateCeilFloorDivExpandOpsPatterns(patterns);
       populateSwapSetPrioWithMFMAPatterns(patterns);
-      populateLowerGlobalSubgroupBarrierPatterns(patterns, *maybeChipset);
+      populateLowerGlobalSubgroupBarrierPatterns(patterns, *maybeTargetInfo);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -320,7 +352,7 @@ struct ConvertToROCDLPass final
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, maybeChipset);
+      populateGpuPromoteShuffleToAMDGPUPatterns(patterns, *maybeTargetInfo);
       if (failed(applyPatternsGreedily(m, std::move(patterns), config))) {
         return signalPassFailure();
       }
@@ -355,7 +387,7 @@ struct ConvertToROCDLPass final
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
-                                              *maybeChipset);
+                                              *maybeTargetInfo);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
       vector::populateVectorStepLoweringPatterns(llvmPatterns);
@@ -366,12 +398,12 @@ struct ConvertToROCDLPass final
       // We pass Runtime::HIP in order to enable gpu.printf for debugging.
       // At time of writing, that flag has no other effect.
       populateGpuToROCDLConversionPatterns(
-          converter, llvmPatterns, gpu::amd::Runtime::HIP, *maybeChipset);
+          converter, llvmPatterns, gpu::amd::Runtime::HIP, *maybeTargetInfo);
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
       populateMathToROCDLConversionPatterns(converter, llvmPatterns,
-                                            /*chipset=*/*maybeChipset);
+                                            /*target=*/*maybeTargetInfo);
       ub::populateUBToLLVMConversionPatterns(converter, llvmPatterns);
       target.addLegalOp<IREE::Codegen::DispatchConfigOp,
                         IREE::Codegen::YieldOp>();

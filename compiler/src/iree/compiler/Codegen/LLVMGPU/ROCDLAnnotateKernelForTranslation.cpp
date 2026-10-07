@@ -17,8 +17,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/Support/LogicalResult.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
@@ -54,14 +54,14 @@ static void setDenormalFpenvForF32(LLVM::LLVMFuncOp funcOp,
   funcOp.setDenormalFpenvAttr(attr);
 }
 
-// Extracts the amdgpu chipset version from the chip architecture in the
-// executable target attribute.
-static FailureOr<amdgpu::Chipset>
-getChipsetVersion(MLIRContext *context,
-                  IREE::HAL::ExecutableTargetAttr targetAttr) {
+// Resolves the AMDGPU target from the chip architecture in the executable
+// target attribute.
+static FailureOr<ROCDL::TargetInfo>
+getTargetInfo(MLIRContext *context,
+              IREE::HAL::ExecutableTargetAttr targetAttr) {
   IREE::GPU::TargetAttr gpuTarget = getGPUTargetAttr(context, targetAttr);
   assert(gpuTarget);
-  return amdgpu::Chipset::parse(gpuTarget.getArch());
+  return ROCDL::TargetInfo::get(gpuTarget.getArch());
 }
 
 // Set attributes on `funcOp` in order to use upstream's translation of
@@ -126,13 +126,13 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   // Kernel argument preloading is only supported on gfx942 and newer targets
   // from the CDNA family. This is enabled using the `inreg` function argument
   // attribute.
-  FailureOr<amdgpu::Chipset> chipset =
-      getChipsetVersion(builder.getContext(), targetAttr);
-  if (failed(chipset)) {
+  FailureOr<ROCDL::TargetInfo> targetInfo =
+      getTargetInfo(builder.getContext(), targetAttr);
+  if (failed(targetInfo)) {
     return funcOp.emitError() << "failed to parse amdgpu chipset";
   }
 
-  if (chipset->majorVersion != 9 || *chipset < amdgpu::Chipset(9, 4, 0)) {
+  if (!targetInfo->has(llvm::AMDGPU::FEAT_GFX940_INSTS)) {
     return success();
   }
 
