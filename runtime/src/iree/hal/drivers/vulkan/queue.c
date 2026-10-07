@@ -6671,28 +6671,27 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
 
   const iree_hal_dealloca_flags_t known_flags =
       IREE_HAL_DEALLOCA_FLAG_PREFER_ORIGIN;
-  iree_status_t status = iree_ok_status();
   if (iree_any_bit_set(flags, ~known_flags)) {
-    status = iree_make_status(
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "unsupported Vulkan queue dealloca flags: 0x%" PRIx64, flags);
   }
-  if (iree_status_is_ok(status) &&
-      !iree_hal_local_transient_buffer_isa(buffer)) {
-    status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "Vulkan queue_dealloca buffer was not returned "
-                              "by Vulkan queue_alloca");
+  if (!iree_hal_local_transient_buffer_isa(buffer)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "Vulkan queue_dealloca buffer was not returned "
+                            "by Vulkan queue_alloca");
   }
-  if (iree_status_is_ok(status) &&
-      !iree_hal_local_transient_buffer_begin_dealloca(buffer)) {
-    status = iree_make_status(
+  if (!iree_hal_local_transient_buffer_begin_dealloca(buffer)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
         "Vulkan transient buffer has already been queued for deallocation");
   }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
-  }
+
+  iree_status_t status = iree_hal_vulkan_queue_validate_semaphore_list(
+      queue, wait_semaphore_list, IREE_SV("wait"));
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
         queue, signal_semaphore_list, IREE_SV("signal"));
@@ -6722,8 +6721,7 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
                                              iree_status_clone(status));
     }
     iree_hal_vulkan_queue_pending_submission_destroy(queue, submission);
-  } else if (!iree_status_is_ok(status) &&
-             iree_hal_local_transient_buffer_isa(buffer)) {
+  } else if (!iree_status_is_ok(status)) {
     iree_hal_local_transient_buffer_abort_dealloca(buffer);
   }
 
