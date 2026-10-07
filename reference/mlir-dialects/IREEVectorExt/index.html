@@ -6630,7 +6630,7 @@ reduction (initial max/min value and index).</p>
 <h3 id="iree_vector_extto_layout-vectorexttolayoutop"><code>iree_vector_ext.to_layout</code> (VectorExt::ToLayoutOp)<a class="headerlink" href="#iree_vector_extto_layout-vectorexttolayoutop" title="Permanent link">link</a></h3>
 <p><em>Layout conversion operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` `layout` `(` $layout `)` attr-dict `:` type($input)
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_layout` $input `to` `layout` `(` $layout `)` prop-dict attr-dict `:` type($input)
 </code></pre></div>
 <p>The layout conversion operator takes a shaped value and a layout and
 transforms the value to have that layout.</p>
@@ -6762,7 +6762,7 @@ distributed vectors.</p>
 <h3 id="iree_vector_exttransfer_gather-vectorexttransfergatherop"><code>iree_vector_ext.transfer_gather</code> (VectorExt::TransferGatherOp)<a class="headerlink" href="#iree_vector_exttransfer_gather-vectorexttransfergatherop" title="Permanent link">link</a></h3>
 <p><em>Gathers a supervector from a shaped source into an SSA vector value.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.transfer_gather` $base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.transfer_gather` $base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? prop-dict attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?
 </code></pre></div>
 <p>The <code>transfer_gather</code> operation reads elements from a shaped source (memref
 or tensor) into a vector, where each source dimension can be independently
@@ -6859,7 +6859,7 @@ index is gathered from an index vector, while the column is contiguous:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.transfer_scatter` $vector `into` $base `[` $offsets `]`
               (`[` $index_vecs^ `:` type($index_vecs) `]`)?
               (`,` $mask^)?
-              attr-dict `:` type($vector) `,` type($base)
+              prop-dict attr-dict `:` type($vector) `,` type($base)
               (`,` type($mask)^)?
               (`-&gt;` type($result)^)?
 </code></pre></div>

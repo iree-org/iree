@@ -10063,7 +10063,7 @@ breaking execution correctness.</p>
               custom&lt;DispatchOperands&gt;($resource_operands,
               $resource_operand_offsets,
               $resource_operand_ends,
-              $resource_operand_lengths) attr-dict `:`
+              $resource_operand_lengths) prop-dict attr-dict `:`
               custom&lt;ShapedFunctionType&gt;(ref($resource_operands),
               type($resource_operands), $resource_operand_sizes,
               type($results), $result_sizes,
@@ -12695,7 +12695,7 @@ explicitly.</p>
               custom&lt;CmdCallOperands&gt;($resource_operands,
               $resource_operand_offsets,
               $resource_operand_lengths,
-              $resource_operand_accesses) attr-dict `:`
+              $resource_operand_accesses) prop-dict attr-dict `:`
               custom&lt;ShapedFunctionType&gt;(ref($resource_operands),
               type($resource_operands),
               $resource_operand_sizes,
@@ -14245,7 +14245,7 @@ their reference-type and do not need additional ownership management.</p>
 <p><em>Returns the size of the resource storage in bytes.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.resource.size` $operand
-              attr-dict `:` type($operand)
+              prop-dict attr-dict `:` type($operand)
 </code></pre></div>
 <p>Returns a possibly runtime-dynamic byte size of the resource backing
 storage. This may differ from the logical storage size of a value based on

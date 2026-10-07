@@ -18998,7 +18998,7 @@ been released via a MOVE bit on a preceding use are elided from encoding.</p>
 <h4 id="vmrodatainline-vmrodatainlineop"><code>vm.rodata.inline</code> (VM::RodataInlineOp)<a class="headerlink" href="#vmrodatainline-vmrodatainlineop" title="Permanent link">link</a></h4>
 <p><em>Inlined constant rodata.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata.inline` ($name^)? attr-dict `:` type($result) `=` $value
+<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata.inline` ($name^)? prop-dict attr-dict `:` type($result) `=` $value
 </code></pre></div>
 <p>vm.rodata that can be embedded inline in functions. See vm.rodata for more
 information.</p>
@@ -19032,7 +19032,7 @@ information.</p>
 <h4 id="vmrodata-vmrodataop"><code>vm.rodata</code> (VM::RodataOp)<a class="headerlink" href="#vmrodata-vmrodataop" title="Permanent link">link</a></h4>
 <p><em>Read-only data definition operation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata` custom&lt;SymbolVisibility&gt;($sym_visibility) $sym_name attr-dict $value
+<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata` custom&lt;SymbolVisibility&gt;($sym_visibility) $sym_name prop-dict attr-dict $value
 </code></pre></div>
 <p>Defines a blob of read-only constant data that can be represented as a
 ref. This can be used to store arbitrary data within modules such as
@@ -19060,7 +19060,7 @@ default for cases where larger or smaller alignments are needed.</p>
 <h4 id="vmrodatatableinline-vmrodatatableinlineop"><code>vm.rodata.table.inline</code> (VM::RodataTableInlineOp)<a class="headerlink" href="#vmrodatatableinline-vmrodatatableinlineop" title="Permanent link">link</a></h4>
 <p><em>Inlined constant rodata table.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata.table.inline` $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+<div class="highlight"><pre><span></span><code>operation ::= `vm.rodata.table.inline` $table_type prop-dict attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
 </code></pre></div>
 <p>vm.rodata with another associated vm.rodata table specifying byte offsets
 and sizes as a subview into the flattened data. The table is a flat array
@@ -19220,7 +19220,7 @@ sizes reflect the unpadded attribute storage sizes.</p>
 <h4 id="vmcall-vmcallop"><code>vm.call</code> (VM::CallOp)<a class="headerlink" href="#vmcall-vmcallop" title="Permanent link">link</a></h4>
 <p><em>Call operation.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.call` $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.call` $callee `(` operands `)` prop-dict attr-dict `:` functional-type(operands, results)
 </code></pre></div>
 <p>Calls an internal VM function with the given arguments.</p>
 <p>Traits: <code>VM_MayFail</code></p>
@@ -19314,7 +19314,7 @@ attribute.</p>
 <h4 id="vmcallvariadicyieldable-vmcallvariadicyieldableop"><code>vm.call.variadic.yieldable</code> (VM::CallVariadicYieldableOp)<a class="headerlink" href="#vmcallvariadicyieldable-vmcallvariadicyieldableop" title="Permanent link">link</a></h4>
 <p><em>Variadic call operation that may yield.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.call.variadic.yieldable` $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vm.call.variadic.yieldable` $callee `(` $operands `)` prop-dict attr-dict `:` `(` type($operands) `)`
               `-&gt;` $dest custom&lt;ResultTypeList&gt;($result_types)
 </code></pre></div>
 <p>Calls a variadic VM import function that may yield. If the call yields,
@@ -19375,7 +19375,7 @@ attribute. Only imports are supported (not internal functions).</p>
 <h4 id="vmcallyieldable-vmcallyieldableop"><code>vm.call.yieldable</code> (VM::CallYieldableOp)<a class="headerlink" href="#vmcallyieldable-vmcallyieldableop" title="Permanent link">link</a></h4>
 <p><em>Call operation that may yield.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.call.yieldable` $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+<div class="highlight"><pre><span></span><code>operation ::= `vm.call.yieldable` $callee `(` $arguments `)` prop-dict attr-dict `:` `(` type($arguments) `)`
               `-&gt;` $dest custom&lt;ResultTypeList&gt;($result_types)
 </code></pre></div>
 <p>Calls a VM function (internal or imported) that may yield. If the call
@@ -23786,7 +23786,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.global.f32` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               custom&lt;TypeOrAttr&gt;($type, $initial_value)
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
@@ -23811,7 +23811,7 @@ Initialized to zero unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.global.f64` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               custom&lt;TypeOrAttr&gt;($type, $initial_value)
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
@@ -23836,7 +23836,7 @@ Initialized to zero unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.global.i32` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               custom&lt;TypeOrAttr&gt;($type, $initial_value)
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
@@ -23861,7 +23861,7 @@ Initialized to zero unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.global.i64` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               custom&lt;TypeOrAttr&gt;($type, $initial_value)
 </code></pre></div>
 <p>Defines a global value that is treated as a scalar literal at runtime.
@@ -24260,7 +24260,7 @@ Initialized to zero unless an initial value is specified.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.global.ref` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               `:` $type
 </code></pre></div>
 <p>Defines a global value that is a ref of a specific type. The global will
@@ -26757,7 +26757,7 @@ module.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `vm.module` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
-              attr-dict-with-keyword
+              prop-dict attr-dict-with-keyword
               regions
 </code></pre></div>
 <p>Top-level container for VM functions.</p>

@@ -14323,7 +14323,7 @@ result in propagated semaphore failure or device loss.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.binary` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
-              attr-dict-with-keyword
+              prop-dict attr-dict-with-keyword
 </code></pre></div>
 <p>A compiled executable binary with an optional nested module containing the
 IR prior to serialization (for debugging).</p>
@@ -14586,7 +14586,7 @@ runtime-derived parameters.</p>
               (`condition` `` custom&lt;ExportConditionRegion&gt;($condition)^)?
               (`fallback` `(` $condition_fallback^ `)`)?
               (`count` `` custom&lt;WorkgroupCountRegion&gt;($workgroup_count)^)?
-              attr-dict-with-keyword
+              prop-dict attr-dict-with-keyword
 </code></pre></div>
 <p>An entry point exported by the executable with statically-available
 information describing the IO interface it uses and other dispatch metadata.</p>
@@ -14800,7 +14800,7 @@ executable <em>may</em> have its loading deferred until first use.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.source` custom&lt;SymbolVisibility&gt;($sym_visibility)
               $sym_name
-              attr-dict-with-keyword
+              prop-dict attr-dict-with-keyword
               $body
 </code></pre></div>
 <p>This is an unspecialized source representation of an executable
@@ -15749,7 +15749,7 @@ forced with the <code>--iree-hal-memoization=false</code> flag.</p>
               $target_ordinals,
               $target_objects,
               $target_regions) `}` `)`
-              attr-dict-with-keyword
+              prop-dict attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches some number of workgroups across a 3-dimensional grid using a
 function defined externally in one or more referenced objects. Objects are

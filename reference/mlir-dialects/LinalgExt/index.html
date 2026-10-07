@@ -6936,7 +6936,7 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <h4 id="iree_linalg_extdequantize_affine-linalgextdequantizeaffineop"><code>iree_linalg_ext.dequantize_affine</code> (LinalgExt::DequantizeAffineOp)<a class="headerlink" href="#iree_linalg_extdequantize_affine-linalgextdequantizeaffineop" title="Permanent link">link</a></h4>
 <p><em>Affine (uniform) dequantization of an integer tensor.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.dequantize_affine` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.dequantize_affine` prop-dict attr-dict
               `ins` `(` $input `,` $scale (`,` $zero_point^)? `:`
               type($input) `,` type($scale) (`,` type($zero_point)^)? `)`
               `outs` `(` $output `:` type($output) `)`
@@ -6966,11 +6966,11 @@ four-bit quantization grid, which a consumer can use to pack the values
 into i4 storage.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code>%dq = iree_linalg_ext.dequantize_affine
-    {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;,
+    &lt;indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;],
-     input_unsigned}
+     input_unsigned&gt;
     ins(%q, %scale, %zp : tensor&lt;128x64xi8&gt;, tensor&lt;128xf32&gt;, tensor&lt;128xi32&gt;)
     outs(%init : tensor&lt;128x64xf32&gt;) -&gt; tensor&lt;128x64xf32&gt;
 </code></pre></div>
@@ -7031,7 +7031,7 @@ into i4 storage.</p>
 <h4 id="iree_linalg_extquantize_affine-linalgextquantizeaffineop"><code>iree_linalg_ext.quantize_affine</code> (LinalgExt::QuantizeAffineOp)<a class="headerlink" href="#iree_linalg_extquantize_affine-linalgextquantizeaffineop" title="Permanent link">link</a></h4>
 <p><em>Affine (uniform) quantization of a real valued tensor.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.quantize_affine` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.quantize_affine` prop-dict attr-dict
               `ins` `(` $input `,` $scale (`,` $zero_point^)? `:`
               type($input) `,` type($scale) (`,` type($zero_point)^)? `)`
               `outs` `(` $output `:` type($output) `)`
@@ -7068,11 +7068,11 @@ in those attributes, the integer element types themselves have to be
 signless: <code>si8</code> and <code>ui8</code> are rejected in favor of <code>i8</code>.</p>
 <p>Example:</p>
 <div class="highlight"><pre><span></span><code>%q = iree_linalg_ext.quantize_affine
-    {indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;,
+    &lt;indexing_maps = [affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0)&gt;,
                       affine_map&lt;(d0, d1) -&gt; (d0, d1)&gt;],
-     quant_min = -128 : i64, quant_max = 127 : i64}
+     quant_min = -128, quant_max = 127&gt;
     ins(%x, %scale, %zp : tensor&lt;128x64xf32&gt;, tensor&lt;128xf32&gt;, tensor&lt;128xi8&gt;)
     outs(%init : tensor&lt;128x64xi8&gt;) -&gt; tensor&lt;128x64xi8&gt;
 </code></pre></div>
@@ -7371,7 +7371,7 @@ in the result, which is useful when reducing over a tiled or sliced subregion.</
 <h4 id="iree_linalg_extattention-linalgextattentionop"><code>iree_linalg_ext.attention</code> (LinalgExt::AttentionOp)<a class="headerlink" href="#iree_linalg_extattention-linalgextattentionop" title="Permanent link">link</a></h4>
 <p><em>Attention operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.attention` prop-dict attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
               `outs` `(` $output `:` type($output) `)`
               $region
@@ -8058,7 +8058,7 @@ the mask value is true, the input value will be written.</p>
 <h4 id="iree_linalg_extonline_attention-linalgextonlineattentionop"><code>iree_linalg_ext.online_attention</code> (LinalgExt::OnlineAttentionOp)<a class="headerlink" href="#iree_linalg_extonline_attention-linalgextonlineattentionop" title="Permanent link">link</a></h4>
 <p><em>Online Attention operator.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.online_attention` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.online_attention` prop-dict attr-dict
               `ins` `(` $query `,` $key `,` $value `,` $scale (`,` $mask^)?  `:` type($query) `,` type($key) `,` type($value) `,` type($scale) (`,` type($mask)^ )?`)`
               `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
               $region

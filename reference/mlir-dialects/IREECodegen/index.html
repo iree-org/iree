@@ -8244,7 +8244,7 @@ purely to guide optimization passes.</p>
 <h3 id="iree_codegeninner_tiled-codegeninnertiledop"><code>iree_codegen.inner_tiled</code> (Codegen::InnerTiledOp)<a class="headerlink" href="#iree_codegeninner_tiled-codegeninnertiledop" title="Permanent link">link</a></h3>
 <p><em>Generic operation on tiled operands based on an intrinsic.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.inner_tiled` `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `iree_codegen.inner_tiled` `ins` `(` $inputs `)` `outs` `(` $outputs `)` prop-dict attr-dict
               `:` type($inputs) `into` type($outputs)
 </code></pre></div>
 <p>Each operand's shape is viewed as <code>outer_dims x inner_tile</code>:
@@ -8295,7 +8295,7 @@ swapped (the matmul is really an MMT at the tile level); this is
 expressed by the <code>[1, 0]</code> entry in <code>permutations</code> on the RHS operand,
 which makes its inner-tile shape <code>canonical[1] x canonical[0]</code> =
 <code>N x K</code> = <code>32 x 8</code>.</p>
-<div class="highlight"><pre><span></span><code>%0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+<div class="highlight"><pre><span></span><code>%0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) &lt;
     indexing_maps = [
       affine_map&lt;(m, n, k) -&gt; (m, k)&gt;,
       affine_map&lt;(m, n, k) -&gt; (n, k)&gt;,
@@ -8309,14 +8309,14 @@ which makes its inner-tile shape <code>canonical[1] x canonical[0]</code> =
     kind         = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;,
     semantics    = #iree_gpu.mma_semantics&lt;distributed = false, opaque = false&gt;,
     permutations = [array&lt;i64: 0, 1&gt;, array&lt;i64: 1, 0&gt;, array&lt;i64: 0, 1&gt;]
-  } : tensor&lt;?x?x32x8xf16&gt;, tensor&lt;?x?x32x8xf16&gt;
+  &gt; : tensor&lt;?x?x32x8xf16&gt;, tensor&lt;?x?x32x8xf16&gt;
       into tensor&lt;?x?x32x32xf32&gt;
 </code></pre></div>
 <p>After distribution across the 64 lanes of a wave, the per-operand
 inner tiles become the canonical <em>per-lane</em> shares of the intrinsic:
 <code>256 / 64 = 4</code> f16 elements per lane for LHS and RHS, <code>1024 / 64 = 16</code>
 f32 elements per lane for ACC.</p>
-<div class="highlight"><pre><span></span><code>%0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+<div class="highlight"><pre><span></span><code>%0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) &lt;
     indexing_maps = [
       affine_map&lt;(m, n, k) -&gt; (m, k)&gt;,
       affine_map&lt;(m, n, k) -&gt; (n, k)&gt;,
@@ -8329,7 +8329,7 @@ f32 elements per lane for ACC.</p>
     ],
     kind      = #iree_gpu.mma_layout&lt;MFMA_F32_32x32x8_F16&gt;,
     semantics = #iree_gpu.mma_semantics&lt;distributed = true, opaque = false&gt;
-  } : tensor&lt;?x?x4xf16&gt;, tensor&lt;?x?x4xf16&gt;
+  &gt; : tensor&lt;?x?x4xf16&gt;, tensor&lt;?x?x4xf16&gt;
       into tensor&lt;?x?x16xf32&gt;
 </code></pre></div>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>InferTypeOpAdaptor</code></p>

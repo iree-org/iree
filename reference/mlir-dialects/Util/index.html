@@ -8300,7 +8300,7 @@ and FloatType. All others are not folded.</p>
 <p><em>Allocates a buffer with undefined contents.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.buffer.alloc` `uninitialized`
-              attr-dict
+              prop-dict attr-dict
               `:`
               type($result) `` `{` $storage_size `}`
 </code></pre></div>
@@ -8416,7 +8416,7 @@ result must assume nothing of the contents.</p>
 <h4 id="utilbufferconstant-utilbufferconstantop"><code>util.buffer.constant</code> (Util::BufferConstantOp)<a class="headerlink" href="#utilbufferconstant-utilbufferconstantop" title="Permanent link">link</a></h4>
 <p><em>Constant host-side byte buffer.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.constant` ($name^)? attr-dict `:` type($result) `=` $value
+<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.constant` ($name^)? prop-dict attr-dict `:` type($result) `=` $value
 </code></pre></div>
 <p>Defines a compile-time byte buffer based on the given attribute value.
 The attribute will be serialized into the canonical IREE format for the
@@ -8725,7 +8725,7 @@ result type.</p>
 <h4 id="utilbufferslice-utilbuffersliceop"><code>util.buffer.slice</code> (Util::BufferSliceOp)<a class="headerlink" href="#utilbufferslice-utilbuffersliceop" title="Permanent link">link</a></h4>
 <p><em>Clones a subregion of a buffer.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.slice` $source `[` $source_offset `]` attr-dict `:`
+<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.slice` $source `[` $source_offset `]` prop-dict attr-dict `:`
               type($source) `` `{` $source_size `}` `-&gt;`
               type($result) `` `{` $result_size `}`
 </code></pre></div>
@@ -9135,7 +9135,7 @@ std.constant wrapped in an util.optimization_barrier.</p>
 <h4 id="utilnumericoptional_narrow-utilnumericoptionalnarrowop"><code>util.numeric.optional_narrow</code> (Util::NumericOptionalNarrowOp)<a class="headerlink" href="#utilnumericoptional_narrow-utilnumericoptionalnarrowop" title="Permanent link">link</a></h4>
 <p><em>Memorializes an optional numeric narrowing that is valid.</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.numeric.optional_narrow` $operand `:` type($operand) `as` $semantic_type attr-dict
+<div class="highlight"><pre><span></span><code>operation ::= `util.numeric.optional_narrow` $operand `:` type($operand) `as` $semantic_type prop-dict attr-dict
 </code></pre></div>
 <p>Serves as a placeholder for points in the computation where an optional
 numeric narrowing can be performed without loss of information. Such ops
@@ -9310,7 +9310,7 @@ tables.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global` custom&lt;SymbolVisibility&gt;($sym_visibility)
               (`mutable` $is_mutable^)?
               $sym_name
-              attr-dict
+              prop-dict attr-dict
               custom&lt;TypeOrAttr&gt;($type, $initial_value)
 </code></pre></div>
 <p>Declares a global variable that maintains its value across invocations.
@@ -9926,7 +9926,7 @@ when the input is constant.</p>
 <p><em>Function call operation.</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.call` $callee `(` $operands `)`
-              attr-dict `:`
+              prop-dict attr-dict `:`
               custom&lt;OperandTypeList&gt;(type($operands))
               `-&gt;`
               custom&lt;TiedFunctionResultList&gt;(ref($operands),
