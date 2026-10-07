@@ -185,7 +185,7 @@ def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
   );
 
   let assemblyFormat = [{
-    $operand `:` type($operand) `as` $semantic_type attr-dict
+    $operand `:` type($operand) `as` $semantic_type prop-dict attr-dict
   }];
 
   let builders = [
@@ -887,7 +887,7 @@ def Util_CallOp : Util_Op<"call", [
 
   let assemblyFormat = [{
     $callee `(` $operands `)`
-    attr-dict `:`
+    prop-dict attr-dict `:`
     custom<OperandTypeList>(type($operands))
     `->`
     custom<TiedFunctionResultList>(ref($operands),
@@ -905,10 +905,11 @@ def Util_CallOp : Util_Op<"call", [
     operand_iterator arg_operand_end() { return operand_end(); }
 
     CallInterfaceCallable getCallableForCallee() {
-      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     // Clones the call and potentially expands each operand and result.
@@ -1154,7 +1155,7 @@ def Util_GlobalOp : Util_Op<"global", [
     custom<SymbolVisibility>($sym_visibility)
     (`mutable` $is_mutable^)?
     $sym_name
-    attr-dict
+    prop-dict attr-dict
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -1514,7 +1515,7 @@ def Util_BufferConstantOp : Util_PureOp<"buffer.constant", [
   );
 
   let assemblyFormat = [{
-    ($name^)? attr-dict `:` type($result) `=` $value
+    ($name^)? prop-dict attr-dict `:` type($result) `=` $value
   }];
 
   let builders = [
@@ -1556,7 +1557,7 @@ def Util_BufferAllocOp : Util_PureOp<"buffer.alloc", [
 
   let assemblyFormat = [{
     `uninitialized`
-    attr-dict
+    prop-dict attr-dict
     `:`
     type($result) `` `{` $storage_size `}`
   }];
@@ -1620,7 +1621,7 @@ def Util_BufferSliceOp : Util_PureOp<"buffer.slice", [
   );
 
   let assemblyFormat = [{
-    $source `[` $source_offset `]` attr-dict `:`
+    $source `[` $source_offset `]` prop-dict attr-dict `:`
     type($source) `` `{` $source_size `}` `->`
     type($result) `` `{` $result_size `}`
   }];

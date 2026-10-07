@@ -434,9 +434,9 @@ hal.executable @masked_load_store {
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @interface_wg_size layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_size layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {} {
       func.func @interface_wg_size() {
         %c0 = arith.constant 0.0 : f32

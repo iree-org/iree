@@ -279,9 +279,9 @@ util.initializer {
 
 hal.executable @exe {
   hal.executable.variant @vmvx target(<"vmvx", "vmvx-bytecode-fb">) {
-    hal.executable.export public @entry ordinal(0) layout(#pipeline_layout_0) attributes {
+    hal.executable.export public @entry ordinal(0) layout(#pipeline_layout_0) <
       workgroup_size = [32 : index, 1 : index, 1 : index]
-    }
+    >
   }
 }
 

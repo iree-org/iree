@@ -17,7 +17,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 //===----------------------------------------------------------------------===//
 
 def Util_Dialect : Dialect {
-  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "util";
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 

@@ -138,14 +138,14 @@ func.func @gather_tensor_base_2d(%buffer: tensor<10x20xf32>,
 func.func @lower_avx512_1x16x1_f32(
     %lhs: vector<1x1x1x1xf32>, %rhs: vector<1x1x16x1xf32>,
     %acc: vector<1x1x1x16xf32>) -> vector<1x1x1x16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>,
                       #linalg.iterator_type<parallel>,
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32>,
     semantics = #iree_cpu.mma_semantics<>
-  } : vector<1x1x1x1xf32>, vector<1x1x16x1xf32> into vector<1x1x1x16xf32>
+  > : vector<1x1x1x1xf32>, vector<1x1x16x1xf32> into vector<1x1x1x16xf32>
   return %0 : vector<1x1x1x16xf32>
 }
 

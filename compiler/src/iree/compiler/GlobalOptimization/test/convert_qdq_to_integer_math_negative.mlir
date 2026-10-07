@@ -16,9 +16,9 @@
 func.func @single_quantized_operand(%aq: tensor<4x8xi8>, %a_s: f32, %b: tensor<8x16xf32>) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi8>, f32)
       outs(%a_i : tensor<4x8xf32>) -> tensor<4x8xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -40,16 +40,16 @@ func.func @single_quantized_operand(%aq: tensor<4x8xi8>, %a_s: f32, %b: tensor<8
 func.func @nonzero_init(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b_s: f32, %bias: tensor<4x16xf32>) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi8>, f32)
       outs(%a_i : tensor<4x8xf32>) -> tensor<4x8xf32>
   %b_i = tensor.empty() : tensor<8x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi8>, f32)
       outs(%b_i : tensor<8x16xf32>) -> tensor<8x16xf32>
   %c = linalg.matmul ins(%a, %b : tensor<4x8xf32>, tensor<8x16xf32>)
@@ -70,16 +70,16 @@ func.func @op_between_dequantize_and_contraction(%aq: tensor<4x6xi8>, %a_s: f32,
     %bq: tensor<8x16xi8>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x6xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x6xi8>, f32)
       outs(%a_i : tensor<4x6xf32>) -> tensor<4x6xf32>
   %b_i = tensor.empty() : tensor<8x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi8>, f32)
       outs(%b_i : tensor<8x16xf32>) -> tensor<8x16xf32>
   %pad_cst = arith.constant 0.000000e+00 : f32
@@ -109,16 +109,16 @@ func.func @op_between_dequantize_and_contraction(%aq: tensor<4x6xi8>, %a_s: f32,
 func.func @element_type_mismatch(%aq: tensor<4x8xi8>, %a_s: f16, %bq: tensor<8x16xi8>, %b_s: f16) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf16>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi8>, f16)
       outs(%a_i : tensor<4x8xf16>) -> tensor<4x8xf16>
   %b_i = tensor.empty() : tensor<8x16xf16>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi8>, f16)
       outs(%b_i : tensor<8x16xf16>) -> tensor<8x16xf16>
   %cst = arith.constant 0.000000e+00 : f32
@@ -150,12 +150,12 @@ func.func @narrowed_input(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -183,12 +183,12 @@ func.func @negated_input(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -215,12 +215,12 @@ func.func @negated_accumulator(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -247,12 +247,12 @@ func.func @negated_result(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -281,16 +281,16 @@ func.func @negated_result(%aq: tensor<1x8xi8>, %sa: f32,
 func.func @non_mul_add_body(%aq: tensor<4x8xi8>, %a_s: f32, %bq: tensor<8x16xi8>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi8>, f32)
       outs(%a_i : tensor<4x8xf32>) -> tensor<4x8xf32>
   %b_i = tensor.empty() : tensor<8x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi8>, f32)
       outs(%b_i : tensor<8x16xf32>) -> tensor<8x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -320,12 +320,12 @@ func.func @non_mul_product(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -353,12 +353,12 @@ func.func @multiply_ignores_rhs(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -386,12 +386,12 @@ func.func @add_drops_accumulator(%aq: tensor<1x8xi8>, %sa: f32,
     %bq: tensor<8x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x8xi8>, f32)
       outs(%ai : tensor<1x8xf32>) -> tensor<1x8xf32>
   %bi = tensor.empty() : tensor<8x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<8x1xi8>, f32)
       outs(%bi : tensor<8x1xf32>) -> tensor<8x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -428,16 +428,16 @@ func.func @form_none(%aq: tensor<4x8xi8>, %a_s: tensor<8xf32>,
     %bq: tensor<8x16xi8>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d1)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi8>, tensor<8xf32>)
       outs(%a_i : tensor<4x8xf32>) -> tensor<4x8xf32>
   %b_i = tensor.empty() : tensor<8x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi8>, f32)
       outs(%b_i : tensor<8x16xf32>) -> tensor<8x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -460,18 +460,18 @@ func.func @dynamic_reduction(%aq: tensor<4x?xi8>, %a_s: f32, %a_z: i8,
   %k = tensor.dim %aq, %c1 : tensor<4x?xi8>
   %a_i = tensor.empty(%k) : tensor<4x?xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s, %a_z : tensor<4x?xi8>, f32, i8)
       outs(%a_i : tensor<4x?xf32>) -> tensor<4x?xf32>
   %b_i = tensor.empty(%k) : tensor<?x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s, %b_z : tensor<?x16xi8>, f32, i8)
       outs(%b_i : tensor<?x16xf32>) -> tensor<?x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -497,18 +497,18 @@ func.func @dynamic_multi_dim_reduction(%aq: tensor<4x?x?xi8>, %a_s: f32, %a_z: i
   %k1 = tensor.dim %aq, %c2 : tensor<4x?x?xi8>
   %a_i = tensor.empty(%k0, %k1) : tensor<4x?x?xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2) -> ()>,
                         affine_map<(d0, d1, d2) -> ()>,
-                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]}
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
       ins(%aq, %a_s, %a_z : tensor<4x?x?xi8>, f32, i8)
       outs(%a_i : tensor<4x?x?xf32>) -> tensor<4x?x?xf32>
   %b_i = tensor.empty(%k0, %k1) : tensor<?x?x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2) -> ()>,
                         affine_map<(d0, d1, d2) -> ()>,
-                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]}
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
       ins(%bq, %b_s, %b_z : tensor<?x?x16xi8>, f32, i8)
       outs(%b_i : tensor<?x?x16xf32>) -> tensor<?x?x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -534,12 +534,12 @@ func.func @empty_reduction(%aq: tensor<1x0xi8>, %sa: f32,
     %bq: tensor<0x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x0xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x0xi8>, f32)
       outs(%ai : tensor<1x0xf32>) -> tensor<1x0xf32>
   %bi = tensor.empty() : tensor<0x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<0x1xi8>, f32)
       outs(%bi : tensor<0x1xf32>) -> tensor<0x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -565,22 +565,22 @@ func.func @reduction_dim_in_output(%aq: tensor<2x4xi8>, %sa: f32,
     -> (tensor<2xf32>, tensor<2xf32>) {
   %ai = tensor.empty() : tensor<2x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %sa : tensor<2x4xi8>, f32)
       outs(%ai : tensor<2x4xf32>) -> tensor<2x4xf32>
   %a_varying = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %varying_scale : tensor<2x4xi8>, tensor<2xf32>)
       outs(%ai : tensor<2x4xf32>) -> tensor<2x4xf32>
   %bi = tensor.empty() : tensor<2x4xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %sb : tensor<2x4xi8>, f32)
       outs(%bi : tensor<2x4xf32>) -> tensor<2x4xf32>
   %zero = arith.constant 0.0 : f32
@@ -634,18 +634,18 @@ func.func @reduction_dim_in_output(%aq: tensor<2x4xi8>, %sa: f32,
 func.func @acc_asymmetric_too_deep(%aq: tensor<4x65536xi8>, %a_s: f32, %a_z: i8, %bq: tensor<65536x16xi8>, %b_s: f32, %b_z: i8) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x65536xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s, %a_z : tensor<4x65536xi8>, f32, i8)
       outs(%a_i : tensor<4x65536xf32>) -> tensor<4x65536xf32>
   %b_i = tensor.empty() : tensor<65536x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s, %b_z : tensor<65536x16xi8>, f32, i8)
       outs(%b_i : tensor<65536x16xf32>) -> tensor<65536x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -667,12 +667,12 @@ func.func @acc_positive_endpoint(%aq: tensor<1x131072xi8>, %sa: f32,
     %bq: tensor<131072x1xi8>, %sb: f32) -> tensor<1x1xf32> {
   %ai = tensor.empty() : tensor<1x131072xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x131072xi8>, f32)
       outs(%ai : tensor<1x131072xf32>) -> tensor<1x131072xf32>
   %bi = tensor.empty() : tensor<131072x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<131072x1xi8>, f32)
       outs(%bi : tensor<131072x1xf32>) -> tensor<131072x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -691,16 +691,16 @@ func.func @acc_positive_endpoint(%aq: tensor<1x131072xi8>, %sa: f32,
 func.func @acc_wide_storage(%aq: tensor<4x8xi16>, %a_s: f32, %bq: tensor<8x16xi16>, %b_s: f32) -> tensor<4x16xf32> {
   %a_i = tensor.empty() : tensor<4x8xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s : tensor<4x8xi16>, f32)
       outs(%a_i : tensor<4x8xf32>) -> tensor<4x8xf32>
   %b_i = tensor.empty() : tensor<8x16xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s : tensor<8x16xi16>, f32)
       outs(%b_i : tensor<8x16xf32>) -> tensor<8x16xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -724,12 +724,12 @@ func.func @acc_dynamic_wide_storage(%aq: tensor<1x?xi64>, %sa: f32,
   %k = tensor.dim %aq, %dim : tensor<1x?xi64>
   %ai = tensor.empty(%k) : tensor<1x?xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%aq, %sa : tensor<1x?xi64>, f32)
       outs(%ai : tensor<1x?xf32>) -> tensor<1x?xf32>
   %bi = tensor.empty(%k) : tensor<?x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]}
+      <indexing_maps = [affine_map<(d0,d1)->(d0,d1)>, affine_map<(d0,d1)->()>, affine_map<(d0,d1)->(d0,d1)>]>
       ins(%bq, %sb : tensor<?x1xi64>, f32)
       outs(%bi : tensor<?x1xf32>) -> tensor<?x1xf32>
   %zero = arith.constant 0.0 : f32
@@ -750,20 +750,20 @@ func.func @acc_dynamic_wide_storage(%aq: tensor<1x?xi64>, %sa: f32,
 func.func @unsigned_reduction_16513(%aq: tensor<1x16513xi8>, %a_s: f32, %a_z: i8, %bq: tensor<16513x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
   %a_i = tensor.empty() : tensor<1x16513xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {input_unsigned, zp_unsigned,
+      <input_unsigned, zp_unsigned,
        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s, %a_z : tensor<1x16513xi8>, f32, i8)
       outs(%a_i : tensor<1x16513xf32>) -> tensor<1x16513xf32>
   %b_i = tensor.empty() : tensor<16513x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {input_unsigned, zp_unsigned,
+      <input_unsigned, zp_unsigned,
        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s, %b_z : tensor<16513x1xi8>, f32, i8)
       outs(%b_i : tensor<16513x1xf32>) -> tensor<16513x1xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -784,18 +784,18 @@ func.func @unsigned_reduction_16513(%aq: tensor<1x16513xi8>, %a_s: f32, %a_z: i8
 func.func @signed_reduction_33026(%aq: tensor<1x33026xi8>, %a_s: f32, %a_z: i8, %bq: tensor<33026x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
   %a_i = tensor.empty() : tensor<1x33026xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s, %a_z : tensor<1x33026xi8>, f32, i8)
       outs(%a_i : tensor<1x33026xf32>) -> tensor<1x33026xf32>
   %b_i = tensor.empty() : tensor<33026x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s, %b_z : tensor<33026x1xi8>, f32, i8)
       outs(%b_i : tensor<33026x1xf32>) -> tensor<33026x1xf32>
   %cst = arith.constant 0.000000e+00 : f32
@@ -816,19 +816,19 @@ func.func @signed_reduction_33026(%aq: tensor<1x33026xi8>, %a_s: f32, %a_z: i8, 
 func.func @mixed_reduction_21989(%aq: tensor<1x21989xi8>, %a_s: f32, %a_z: i8, %bq: tensor<21989x1xi8>, %b_s: f32, %b_z: i8) -> tensor<1x1xf32> {
   %a_i = tensor.empty() : tensor<1x21989xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {input_unsigned, zp_unsigned,
+      <input_unsigned, zp_unsigned,
        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%aq, %a_s, %a_z : tensor<1x21989xi8>, f32, i8)
       outs(%a_i : tensor<1x21989xf32>) -> tensor<1x21989xf32>
   %b_i = tensor.empty() : tensor<21989x1xf32>
   %b = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%bq, %b_s, %b_z : tensor<21989x1xi8>, f32, i8)
       outs(%b_i : tensor<21989x1xf32>) -> tensor<21989x1xf32>
   %cst = arith.constant 0.000000e+00 : f32

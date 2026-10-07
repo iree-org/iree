@@ -87,8 +87,22 @@ OperationEquivalenceCache::getOp(Operation *op) {
   }
   OperationEntry *entry = new OperationEntry();
   entry->attrs.append(op->getRawDictionaryAttrs().getValue());
-  if (op->getPropertiesStorageSize()) {
-    op->getName().populateInherentAttrs(op, entry->attrs);
+  bool hasSymbolAttrs = false;
+  op->getName().walkInherentAttrs(op, [&](StringRef name, Attribute &attr) {
+    auto nameAttr = StringAttr::get(op->getContext(), name);
+    entry->attrs.append(nameAttr, attr);
+    hasSymbolAttrs |= isSymbolAttrName(nameAttr);
+  });
+  if (hasSymbolAttrs) {
+    // Ignore symbol values without serializing or mutating the source
+    // properties.
+    entry->normalizedOp = op->clone(Operation::CloneOptions());
+    op->getName().walkInherentAttrs(
+        entry->normalizedOp.get(), [&](StringRef name, Attribute &attr) {
+          if (isSymbolAttrName(StringAttr::get(op->getContext(), name))) {
+            attr = {};
+          }
+        });
   }
   ops[op] = entry;
   return *entry;
@@ -142,7 +156,7 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
 
 // Recursively compares two regions for structural equivalence.
 // Structural equivalence ensures that operations on both the |lhs| and |rhs|
-// have the same attributes and same use-def structure.
+// have the same attributes, properties, and use-def structure.
 //
 // Example:
 //   func.func @lhs(%arg0 : index) -> index {
@@ -220,6 +234,16 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
 
   auto &lhsEntry = cache.getOp(&lhs);
   auto &rhsEntry = cache.getOp(&rhs);
+
+  Operation *lhsPropertiesOp =
+      lhsEntry.normalizedOp ? lhsEntry.normalizedOp.get() : &lhs;
+  Operation *rhsPropertiesOp =
+      rhsEntry.normalizedOp ? rhsEntry.normalizedOp.get() : &rhs;
+  if (!lhs.getName().compareOpProperties(
+          lhsPropertiesOp->getPropertiesStorage(),
+          rhsPropertiesOp->getPropertiesStorage())) {
+    return false;
+  }
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
   if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size()) {

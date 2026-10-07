@@ -175,7 +175,7 @@ struct FlattenElementwisePattern final : RewritePattern {
       return failure();
     }
 
-    auto newResultTypes = llvm::to_vector_of<Type, 2>(
+    auto newResultTypes = llvm::to_vector_of<Type>(
         llvm::map_range(op->getResultTypes(), flattenVectorType));
     if (llvm::any_of(newResultTypes, [](Type type) { return !type; })) {
       return failure();
@@ -196,8 +196,9 @@ struct FlattenElementwisePattern final : RewritePattern {
     }
 
     Operation *newOp =
-        rewriter.create(loc, op->getName().getIdentifier(), operands,
-                        newResultTypes, op->getAttrs());
+        op->clone(Operation::CloneOptions().withResultTypes(newResultTypes));
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
 
     // Shape cast results.
     for (auto [oldResult, newResult] :

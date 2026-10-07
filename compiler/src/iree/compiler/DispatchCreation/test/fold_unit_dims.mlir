@@ -28,7 +28,7 @@ util.func public @no_fold_unit_dims_in_dispatches(%arg0 : tensor<1x1x10xf32>) ->
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (0, 0)>
 module @fold_unit_dims {
-  util.global private mutable @global {inlining_policy = #util.inline.never} = #util.uninitialized : tensor<1x32x1x1x64xf32>
+  util.global private mutable @global <inlining_policy = #util.inline.never> = #util.uninitialized : tensor<1x32x1x1x64xf32>
   util.global private mutable @unit_global = #util.uninitialized : tensor<1x1xf32>
   util.func public @fold_global_unit_dims() -> tensor<32x64xf32> {
     %global = util.global.load @global : tensor<1x32x1x1x64xf32>
@@ -47,7 +47,7 @@ module @fold_unit_dims {
 }
 
 //      CHECK: module @fold_unit_dims
-//      CHECK:   util.global private mutable @[[GLOBAL:.+]] {inlining_policy = #util.inline.never} = #util.uninitialized : tensor<32x64xf32>
+//      CHECK:   util.global private mutable @[[GLOBAL:.+]] <inlining_policy = #util.inline.never> = #util.uninitialized : tensor<32x64xf32>
 //      CHECK:   util.global private mutable @[[UNIT_GLOBAL:.+]] = #util.uninitialized : tensor<f32>
 //      CHECK:   util.func public @fold_global_unit_dims
 //      CHECK:     %[[LOAD0:.+]] = util.global.load @[[GLOBAL]] : tensor<32x64xf32>
@@ -147,14 +147,14 @@ util.func public @scatter(%arg0 : tensor<4xi64>, %arg1 : tensor<4x1xi32>, %arg2 
 
 util.func public @attention_mask_multi_m_dims(%arg0: tensor<8x4x1x128xf32>, %arg1: tensor<?x32x8x128xf32>, %arg2: tensor<?x32x8x128xf32>, %arg3: f32, %arg4: tensor<8x4x1x?x32xf32>) -> tensor<8x4x1x128xf32> {
   %0 = tensor.empty() : tensor<8x4x1x128xf32>
-  %1 = iree_linalg_ext.attention {
+  %1 = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
-      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]>
     ins(%arg0, %arg1, %arg2, %arg3, %arg4 : tensor<8x4x1x128xf32>, tensor<?x32x8x128xf32>, tensor<?x32x8x128xf32>, f32, tensor<8x4x1x?x32xf32>)
     outs(%0 : tensor<8x4x1x128xf32>) {
   ^bb0(%arg5: f32):
@@ -187,14 +187,14 @@ util.func public @attention_mask_multi_m_dims(%arg0: tensor<8x4x1x128xf32>, %arg
 
 util.func public @attention_mask_single_m_dim(%arg0 : tensor<32x1x128xf16>, %arg1 : tensor<32x?x128xf16>, %arg2 : tensor<32x128x?xf16>, %arg3 : f16, %arg4 : tensor<32x1x?xf16>) -> tensor<32x1x128xf16> {
   %0 = tensor.empty() : tensor<32x1x128xf16>
-  %1 = iree_linalg_ext.attention {
+  %1 = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> ()>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]>
     ins(%arg0, %arg1, %arg2, %arg3, %arg4 : tensor<32x1x128xf16>, tensor<32x?x128xf16>, tensor<32x128x?xf16>, f16, tensor<32x1x?xf16>)
     outs(%0 : tensor<32x1x128xf16>) {
   ^bb0(%arg7: f32):
@@ -230,13 +230,13 @@ util.func public @attention_preserve_unit_k1_and_n_dims(
     %arg2: tensor<1x2x4x1xf16>,
     %arg3: f16) -> tensor<1x2x4x1xf16> {
   %0 = tensor.empty() : tensor<1x2x4x1xf16>
-  %1 = iree_linalg_ext.attention {
+  %1 = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
-      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
     ins(%arg0, %arg1, %arg2, %arg3
       : tensor<1x2x4x1xf16>, tensor<1x2x4x1xf16>, tensor<1x2x4x1xf16>, f16)
     outs(%0 : tensor<1x2x4x1xf16>) {
@@ -272,7 +272,7 @@ util.func public @online_attention_preserve_unit_k1_and_n_dims(
     %arg4: tensor<1x2x4x1xf32>,
     %arg5: tensor<1x2x4xf32>,
     %arg6: tensor<1x2x4xf32>) -> (tensor<1x2x4x1xf32>, tensor<1x2x4xf32>, tensor<1x2x4xf32>) {
-  %result:3 = iree_linalg_ext.online_attention {
+  %result:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
@@ -280,7 +280,7 @@ util.func public @online_attention_preserve_unit_k1_and_n_dims(
       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
-      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]}
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]>
     ins(%arg0, %arg1, %arg2, %arg3
       : tensor<1x2x4x1xf16>, tensor<1x2x4x1xf16>,
         tensor<1x2x4x1xf16>, f32)
@@ -613,14 +613,14 @@ util.func @fold_unit_dims_with_encoding(%arg0: tensor<1x1x4x8xi1, #iree_encoding
 
 util.func public @no_fold_attention_with_non_collapsible_encoding(%arg0 : tensor<1x32x128xf16>, %arg1 : tensor<32x?x128xf16>, %arg2 : tensor<32x128x?xf16>, %arg3 : f16, %arg4 : tensor<1x32x?xf16, #iree_encoding.testing<>>) -> tensor<1x32x128xf16> {
   %0 = tensor.empty() : tensor<1x32x128xf16>
-  %1 = iree_linalg_ext.attention {
+  %1 = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> ()>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]>
     ins(%arg0, %arg1, %arg2, %arg3, %arg4 : tensor<1x32x128xf16>, tensor<32x?x128xf16>, tensor<32x128x?xf16>, f16, tensor<1x32x?xf16, #iree_encoding.testing<>>)
     outs(%0 : tensor<1x32x128xf16>) {
   ^bb0(%arg7: f32):
@@ -656,7 +656,7 @@ util.func public @online_attention_unit_m_dim(
     %arg4: tensor<8x4x1x128xf32>,
     %arg5: tensor<8x4x1xf32>,
     %arg6: tensor<8x4x1xf32>) -> (tensor<8x4x1x128xf32>, tensor<8x4x1xf32>, tensor<8x4x1xf32>) {
-  %result:3 = iree_linalg_ext.online_attention {
+  %result:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d5, d6, d0, d4)>,
@@ -664,7 +664,7 @@ util.func public @online_attention_unit_m_dim(
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
-      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]}
+      affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]>
     ins(%arg0, %arg1, %arg2, %arg3
       : tensor<8x4x1x128xf32>, tensor<?x32x8x128xf32>,
         tensor<?x32x8x128xf32>, f32)
@@ -709,7 +709,7 @@ util.func public @online_attention_remap_index_after_unit_dim_drop(
     %output: tensor<1x8x64x64xf32>,
     %max: tensor<1x8x64xf32>,
     %sum: tensor<1x8x64xf32>) -> (tensor<1x8x64x64xf32>, tensor<1x8x64xf32>, tensor<1x8x64xf32>) {
-  %result:3 = iree_linalg_ext.online_attention {
+  %result:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>,
@@ -717,7 +717,7 @@ util.func public @online_attention_remap_index_after_unit_dim_drop(
       affine_map<(d0, d1, d2, d3, d4) -> ()>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
-      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]>
     ins(%query, %key, %value, %scale
       : tensor<1x8x64x64xf16>, tensor<1x8x64x64xf16>,
         tensor<1x8x64x64xf16>, f32)

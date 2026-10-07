@@ -76,7 +76,7 @@ func.func @paged_attention(
       outs(%max_empty : {STATISTICS_TYPE}) -> {STATISTICS_TYPE}
   %sum_init = linalg.fill ins(%zero_f32 : f32)
       outs(%sum_empty : {STATISTICS_TYPE}) -> {STATISTICS_TYPE}
-  %attention:3 = iree_linalg_ext.online_attention {{
+  %attention:3 = iree_linalg_ext.online_attention <
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
@@ -86,7 +86,7 @@ func.func @paged_attention(
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]
-    }}
+    >
     ins(%query, %key, %value, %scale, %mask :
       {QUERY_TYPE}, {GATHERED_KV_TYPE}, {GATHERED_KV_TYPE}, f16, {MASK_TYPE})
     outs(%output_init, %max_init, %sum_init :

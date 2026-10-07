@@ -196,14 +196,14 @@ util.func public @attention_rope_fusion(%arg0: index, %arg1: tensor<?x128xf32>,
         : tensor<4x32x?x128xf16> into tensor<4x8x4x?x128xf16>
   %2 = tensor.empty(%arg0) : tensor<4x?x8x4x128xf16>
   %3 = tensor.empty(%arg0) : tensor<4x8x4x?x128xf16>
-  %4 = iree_linalg_ext.attention {
+  %4 = iree_linalg_ext.attention <
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d5)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d6, d5)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d6)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d6)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>]}
+        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>]>
       ins(%expanded, %arg2, %arg3, %arg4, %arg5
         : tensor<4x8x4x?x128xf16>, tensor<4x8x4x?x128xf16>,
           tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x?xf16>)
@@ -475,19 +475,19 @@ util.func public @quantization_ops_are_decomposed(%arg0: tensor<128x64xf32>,
     %scale: tensor<128xf32>, %zp: tensor<128xi8>) -> tensor<128x64xf32> {
   %qinit = tensor.empty() : tensor<128x64xi8>
   %q = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+       quant_min = -128, quant_max = 127>
       ins(%arg0, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi8>)
       outs(%qinit : tensor<128x64xi8>) -> tensor<128x64xi8>
   %dqinit = tensor.empty() : tensor<128x64xf32>
   %dq = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%q, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi8>)
       outs(%dqinit : tensor<128x64xf32>) -> tensor<128x64xf32>
   util.return %dq : tensor<128x64xf32>

@@ -16,7 +16,7 @@ func.func @direct_propagation(%src: memref<16x16xf16>) -> vector<16x16xf16> {
   // expected-remark @below {{promotion type of result #0 is #iree_gpu.use_global_load_dma}}
   %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
   %out = iree_vector_ext.to_layout %read to layout(#layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -40,7 +40,7 @@ func.func @through_elementwise(%src: memref<16x16xf16>, %other: vector<16x16xf16
   // expected-remark @below {{promotion type of result #0 is #iree_gpu.use_global_load_dma}}
   %mul = arith.mulf %read, %other : vector<16x16xf16>
   %out = iree_vector_ext.to_layout %mul to layout(#layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -64,7 +64,7 @@ func.func @through_transpose(%src: memref<16x16xf16>) -> vector<16x16xf16> {
   // expected-remark @below {{promotion type of result #0 is #iree_gpu.use_global_load_dma}}
   %transpose = vector.transpose %read, [1, 0] : vector<16x16xf16> to vector<16x16xf16>
   %out = iree_vector_ext.to_layout %transpose to layout(#layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -94,6 +94,6 @@ func.func @through_scf_for(%src: memref<16x16xf16>) -> vector<16x16xf16> {
     scf.yield %update : vector<16x16xf16>
   }
   %out = iree_vector_ext.to_layout %loop to layout(#layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }

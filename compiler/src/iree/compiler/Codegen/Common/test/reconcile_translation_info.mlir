@@ -128,7 +128,7 @@ hal.executable private @reconcile_subgroup_size {
 }
 // CHECK-LABEL: hal.executable private @reconcile_subgroup_size
 //       CHECK: hal.executable.export public @entry_point
-//  CHECK-SAME:     subgroup_size = 32 : index
+//  CHECK-SAME:     subgroup_size = 32
 
 // -----
 

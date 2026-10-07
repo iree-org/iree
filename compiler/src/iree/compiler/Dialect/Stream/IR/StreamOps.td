@@ -378,7 +378,7 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
 
   let assemblyFormat = [{
     $operand
-    attr-dict `:` type($operand)
+    prop-dict attr-dict `:` type($operand)
   }];
 
   let extraClassDeclaration = [{
@@ -2964,7 +2964,7 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     custom<DispatchOperands>($resource_operands,
                              $resource_operand_offsets,
                              $resource_operand_ends,
-                             $resource_operand_lengths) attr-dict `:`
+                             $resource_operand_lengths) prop-dict attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands), $resource_operand_sizes,
                                type($results), $result_sizes,
@@ -2984,12 +2984,13 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     Value getOperandSize(unsigned idx) {
@@ -4037,7 +4038,7 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     custom<CmdCallOperands>($resource_operands,
                             $resource_operand_offsets,
                             $resource_operand_lengths,
-                            $resource_operand_accesses) attr-dict `:`
+                            $resource_operand_accesses) prop-dict attr-dict `:`
     custom<ShapedFunctionType>(ref($resource_operands),
                                type($resource_operands),
                                $resource_operand_sizes,
@@ -4057,12 +4058,13 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     Value getOperandSize(unsigned idx) {

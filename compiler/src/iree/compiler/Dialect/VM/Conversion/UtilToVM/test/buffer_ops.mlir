@@ -3,8 +3,8 @@
 
 // CHECK-LABEL: @buffer_constant
 func.func @buffer_constant() -> !util.buffer {
-  // CHECK-64: %[[BUFFER:.+]] = vm.rodata.inline "name"  {alignment = 64 : i64, mime_type = "text/plain"} : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
-  %0 = util.buffer.constant "name" {alignment = 64 : index, mime_type = "text/plain"} : !util.buffer = dense<[1, 2, 3]> : tensor<3xi32>
+  // CHECK-64: %[[BUFFER:.+]] = vm.rodata.inline "name"  <alignment = 64, mime_type = "text/plain"> : !vm.buffer = dense<[1, 2, 3]> : tensor<3xi32>
+  %0 = util.buffer.constant "name" <alignment = 64, mime_type = "text/plain"> : !util.buffer = dense<[1, 2, 3]> : tensor<3xi32>
   // CHECK-64: return %[[BUFFER]]
   return %0 : !util.buffer
 }
@@ -38,7 +38,7 @@ func.func @buffer_alloc_aligned(%arg0: index) -> !util.buffer {
   // CHECK-32: %[[SIZE_64:.+]] = vm.ext.i32.i64.u %arg0 : i32 -> i64
   // CHECK-32: %[[BUFFER:.+]] = vm.buffer.alloc %[[SIZE_64]], %c32 : !vm.buffer
   // CHECK-64: %[[BUFFER:.+]] = vm.buffer.alloc %arg0, %c32 : !vm.buffer
-  %0 = util.buffer.alloc uninitialized {alignment = 32 : index} : !util.buffer{%arg0}
+  %0 = util.buffer.alloc uninitialized <alignment = 32> : !util.buffer{%arg0}
   // CHECK-32: return %[[BUFFER]]
   return %0 : !util.buffer
 }
@@ -66,7 +66,7 @@ func.func @buffer_slice(%arg0: !util.buffer, %arg1: index, %arg2: index, %arg3: 
   // CHECK-64-DAG: %[[BUFFER:.+]] = vm.buffer.alloc %arg3, %c16 : !vm.buffer
   // CHECK-64-DAG: %[[ZERO:.+]] = vm.const.i64.zero
   // CHECK-64: vm.buffer.copy %arg0, %arg1, %[[BUFFER]], %[[ZERO]], %arg3 : !vm.buffer -> !vm.buffer
-  %0 = util.buffer.slice %arg0[%arg1] {alignment = 16 : index} : !util.buffer{%arg2} -> !util.buffer{%arg3}
+  %0 = util.buffer.slice %arg0[%arg1] <alignment = 16> : !util.buffer{%arg2} -> !util.buffer{%arg3}
   // CHECK-32: return %[[BUFFER]]
   return %0 : !util.buffer
 }

@@ -286,7 +286,7 @@ func.func @elementwise_large_rank(%11: tensor<3x5x7x11x13x17x19x23xf16>, %12: te
 
 func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
       %3: tensor<1x8x8x4x16x4xf32>, %4: tensor<1x8x4x2x4x16x4xf32>, %5: tensor<1x1x4x8x2x4x16x4xf32>) -> tensor<1x1x4x8x2x4x16x4xf32> {
-  %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) {
+  %6 = iree_codegen.inner_tiled ins(%3, %4) outs(%5) <
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
                        affine_map<(d0, d1, d2) -> (d1, d2)>,
                        affine_map<(d0, d1, d2) -> (d0, d1)>],
@@ -298,7 +298,7 @@ func.func @multi_mma_data_tiled_unrolled_MFMA_F32_16x16x4_F32(
                         intrinsics_m = 8, intrinsics_n = 2,
                         subgroups_n = 4,
                         intrinsics_k = 4, operands_interleaving_intrinsics_k = [0, 1]>,
-      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
+      semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>>
       : tensor<1x8x8x4x16x4xf32>, tensor<1x8x4x2x4x16x4xf32> into tensor<1x1x4x8x2x4x16x4xf32>
   return %6 : tensor<1x1x4x8x2x4x16x4xf32>
 }

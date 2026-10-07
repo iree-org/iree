@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
+// RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   %0 = iree_linalg_ext.sort
@@ -2147,11 +2148,11 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x1280xf32>) -> 
 func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]> {test.discardable}
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32)
                      outs(%0 : tensor<192x1024x64xf32>) {
                         ^bb0(%arg0: f32):
@@ -2173,7 +2174,7 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                 <indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]> {test.discardable}
 // CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%[[D0]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>) {
@@ -2187,11 +2188,11 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 func.func @cross_attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x2048x64xf32>, %value: tensor<192x2048x64xf32>) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x2048x64xf32>, tensor<192x2048x64xf32>, f32)
                      outs(%0 : tensor<192x1024x64xf32>) {
                         ^bb0(%arg0: f32):
@@ -2213,7 +2214,7 @@ func.func @cross_attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x204
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                 <indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]>
 // CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>, tensor<192x2048x64xf32>, tensor<192x2048x64xf32>, f32) outs(%[[D0]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>) {
@@ -2229,11 +2230,11 @@ func.func @cross_attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x204
 func.func @cross_attention_transposev(%query: tensor<192x1024x64xf32>, %key: tensor<192x2048x64xf32>, %value: tensor<192x64x2048xf32>) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x2048x64xf32>, tensor<192x64x2048xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
                         ^bb0(%arg0: f32):
                         iree_linalg_ext.yield %arg0 : f32
@@ -2253,7 +2254,7 @@ func.func @cross_attention_transposev(%query: tensor<192x1024x64xf32>, %key: ten
 // CHECK:         %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                 <indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]>
 // CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>, tensor<192x2048x64xf32>, tensor<192x64x2048xf32>, f32) outs(%[[D0]] :
 // CHECK-SAME:      tensor<192x1024x64xf32>) {
@@ -2266,11 +2267,11 @@ func.func @cross_attention_transposev(%query: tensor<192x1024x64xf32>, %key: ten
 
 func.func @cross_attention_transposev_dyn(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value: tensor<?x?x?xf32>, %init: tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
   %scale = arith.constant 1.0 : f32
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%init : tensor<?x?x?xf32>) {
                         ^bb0(%arg0: f32):
                         iree_linalg_ext.yield %arg0 : f32
@@ -2290,7 +2291,7 @@ func.func @cross_attention_transposev_dyn(%query: tensor<?x?x?xf32>, %key: tenso
 // CHECK-SAME:    %[[ARG3:[a-zA-Z0-9_]+]]: tensor<?x?x?xf32>
 // CHECK:         %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK:         %[[D1:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:                 {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                 <indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]>
 // CHECK-SAME:                 ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
 // CHECK-SAME:      tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32) outs(%[[ARG3]] :
 // CHECK-SAME:      tensor<?x?x?xf32>) {
@@ -2310,14 +2311,14 @@ module {
   func.func @flex_attn_with_indexing(%arg0: tensor<4x8x1024x64xf32>, %arg1: tensor<4x8x1024x64xf32>, %arg2: tensor<4x8x1024x64xf32>) -> tensor<4x8x1024x64xf32> {
     %cst = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
     %scale = arith.constant 1.000000e+00 : f32
-    %0 = iree_linalg_ext.attention {indexing_maps = [
+    %0 = iree_linalg_ext.attention <indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d5)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
       ]
-    } ins(%arg0, %arg1, %arg2, %scale : tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, f32) outs(%cst : tensor<4x8x1024x64xf32>) {
+    > ins(%arg0, %arg1, %arg2, %scale : tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, f32) outs(%cst : tensor<4x8x1024x64xf32>) {
     ^bb0(%score: f32):
       %idx0 = iree_linalg_ext.index 0 : index
       %idx1 = iree_linalg_ext.index 1 : index
@@ -2353,7 +2354,7 @@ module {
 // CHECK-DAG:     %[[INIT:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8x1024x64xf32>
 // CHECK-DAG:     %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
 // CHECK:         %[[ATTN:.+]] = iree_linalg_ext.attention
-// CHECK-SAME:                   {indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]}
+// CHECK-SAME:                   <indexing_maps = [#[[$MAP_Q]], #[[$MAP_K]], #[[$MAP_V]], #[[$MAP_S]], #[[$MAP_O]]]>
 // CHECK-SAME:                   ins(%[[ARG0]], %[[ARG1]], %[[ARG2]], %[[SCALE]] :
 // CHECK-SAME:        tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, tensor<4x8x1024x64xf32>, f32) outs(%[[INIT]] :
 // CHECK-SAME:        tensor<4x8x1024x64xf32>) {
@@ -2748,11 +2749,11 @@ func.func @map_load_memref_static(
 func.func @quantize_affine_per_tensor(%input: tensor<128x64xf32>, %scale: tensor<f32>,
     %zp: tensor<i8>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
   %0 = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+       quant_min = -128, quant_max = 127>
       ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<f32>, tensor<i8>)
       outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
   return %0 : tensor<128x64xi8>
@@ -2766,8 +2767,8 @@ func.func @quantize_affine_per_tensor(%input: tensor<128x64xf32>, %scale: tensor
 //  CHECK-SAME:   %[[INIT:[a-zA-Z0-9_]+]]
 //       CHECK:   iree_linalg_ext.quantize_affine
 //  CHECK-SAME:     indexing_maps = [#[[$IDENTITY]], #[[$QPARAM]], #[[$QPARAM]], #[[$IDENTITY]]]
-//  CHECK-SAME:     quant_max = 127 : i64
-//  CHECK-SAME:     quant_min = -128 : i64
+//  CHECK-SAME:     quant_min = -128
+//  CHECK-SAME:     quant_max = 127
 //  CHECK-SAME:     ins(%[[INPUT]], %[[SCALE]], %[[ZP]] :
 //  CHECK-SAME:     outs(%[[INIT]] :
 
@@ -2777,12 +2778,12 @@ func.func @quantize_affine_per_channel_unsigned(%input: tensor<128x64xf32>,
     %scale: tensor<128xf32>, %zp: tensor<128xi32>,
     %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
   %0 = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = 0 : i64, quant_max = 255 : i64,
-       storage_unsigned}
+       quant_min = 0, quant_max = 255,
+       storage_unsigned>
       ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi32>)
       outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
   return %0 : tensor<128x64xi8>
@@ -2801,17 +2802,17 @@ func.func @quantize_affine_per_channel_unsigned(%input: tensor<128x64xf32>,
 func.func @quantize_affine_symmetric_narrow_range(%input: tensor<128x64xf32>,
     %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
   %0 = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = -127 : i64, quant_max = 127 : i64}
+       quant_min = -127, quant_max = 127>
       ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
       outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
   return %0 : tensor<128x64xi8>
 }
 // CHECK-LABEL: func.func @quantize_affine_symmetric_narrow_range(
 //       CHECK:   iree_linalg_ext.quantize_affine
-//  CHECK-SAME:     quant_min = -127 : i64
+//  CHECK-SAME:     quant_min = -127
 //  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<128x64xf32>, tensor<128xf32>)
 
 // -----
@@ -2821,11 +2822,11 @@ func.func @quantize_affine_wider_scale(%input: tensor<128x64xf16>,
     %scale: tensor<128xf32>, %zp: tensor<128xi8>,
     %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
   %0 = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+       quant_min = -128, quant_max = 127>
       ins(%input, %scale, %zp : tensor<128x64xf16>, tensor<128xf32>, tensor<128xi8>)
       outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
   return %0 : tensor<128x64xi8>
@@ -2840,10 +2841,10 @@ func.func @quantize_affine_wider_scale(%input: tensor<128x64xf16>,
 func.func @dequantize_affine_per_tensor(%input: tensor<128x64xi8>, %scale: tensor<f32>,
     %zp: tensor<i8>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>], input_unsigned, zp_unsigned}
+                        affine_map<(d0, d1) -> (d0, d1)>], input_unsigned, zp_unsigned>
       ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<f32>, tensor<i8>)
       outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
   return %0 : tensor<128x64xf32>
@@ -2862,10 +2863,10 @@ func.func @dequantize_affine_independent_qparam_maps(
     %input: tensor<128x64xi8>, %scale: tensor<128xf32>, %zp: tensor<64xi8>,
     %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d1)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<64xi8>)
       outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
   return %0 : tensor<128x64xf32>
@@ -2880,20 +2881,20 @@ func.func @dequantize_affine_mixed_signedness(%input: tensor<128x64xi8>,
     %scale: tensor<128xf32>, %zp: tensor<128xi32>,
     %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>], input_unsigned,
-       quant_min = 0 : i64, quant_max = 255 : i64}
+       quant_min = 0, quant_max = 255>
       ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi32>)
       outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
   return %0 : tensor<128x64xf32>
 }
 // CHECK-LABEL: func.func @dequantize_affine_mixed_signedness(
 //       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     quant_min = 0
+//  CHECK-SAME:     quant_max = 255
 //  CHECK-SAME:     input_unsigned
-//  CHECK-SAME:     quant_max = 255 : i64
-//  CHECK-SAME:     quant_min = 0 : i64
 
 // -----
 
@@ -2902,10 +2903,10 @@ func.func @dequantize_affine_blocked(%input: tensor<128x2x32xi4>,
     %scale: tensor<128x2xf16>, %zp: tensor<128x2xi4>,
     %init: tensor<128x2x32xf16>) -> tensor<128x2x32xf16> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2) -> (d0, d1)>,
                         affine_map<(d0, d1, d2) -> (d0, d1)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]}
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
       ins(%input, %scale, %zp : tensor<128x2x32xi4>, tensor<128x2xf16>, tensor<128x2xi4>)
       outs(%init : tensor<128x2x32xf16>) -> tensor<128x2x32xf16>
   return %0 : tensor<128x2x32xf16>
@@ -2921,9 +2922,9 @@ func.func @dequantize_affine_blocked(%input: tensor<128x2x32xi4>,
 func.func @dequantize_affine_dynamic(%input: tensor<?x?xi8>, %scale: tensor<?xf32>,
     %init: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d1)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%input, %scale : tensor<?x?xi8>, tensor<?xf32>)
       outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -2939,9 +2940,9 @@ func.func @dequantize_affine_dynamic(%input: tensor<?x?xi8>, %scale: tensor<?xf3
 func.func @dequantize_affine_memref(%input: memref<128x64xi8>, %scale: memref<128xf32>,
     %output: memref<128x64xf32>) {
   iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%input, %scale : memref<128x64xi8>, memref<128xf32>)
       outs(%output : memref<128x64xf32>)
   return
@@ -2958,9 +2959,9 @@ func.func @dequantize_affine_memref(%input: memref<128x64xi8>, %scale: memref<12
 func.func @dequantize_affine_transposed(%input: tensor<128x64xi8>,
     %scale: tensor<128xf32>, %init: tensor<64x128xf32>) -> tensor<64x128xf32> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d1, d0)>]}
+                        affine_map<(d0, d1) -> (d1, d0)>]>
       ins(%input, %scale : tensor<128x64xi8>, tensor<128xf32>)
       outs(%init : tensor<64x128xf32>) -> tensor<64x128xf32>
   return %0 : tensor<64x128xf32>
@@ -2981,10 +2982,10 @@ func.func @dequantize_affine_constant_wide_zp(%input: tensor<128x64xi8>,
     %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
   %zp = arith.constant dense<-128> : tensor<128xi64>
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi64>)
       outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
   return %0 : tensor<128x64xf32>
@@ -3001,9 +3002,9 @@ func.func @dequantize_affine_constant_wide_zp(%input: tensor<128x64xi8>,
 func.func @dequantize_affine_wider_scale(%input: tensor<128x64xi8>,
     %scale: tensor<128xf32>, %init: tensor<128x64xf16>) -> tensor<128x64xf16> {
   %0 = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%input, %scale : tensor<128x64xi8>, tensor<128xf32>)
       outs(%init : tensor<128x64xf16>) -> tensor<128x64xf16>
   return %0 : tensor<128x64xf16>

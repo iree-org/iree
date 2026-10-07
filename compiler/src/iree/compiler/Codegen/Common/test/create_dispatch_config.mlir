@@ -92,7 +92,7 @@ hal.executable private @no_count_region {
 hal.executable private @export_metadata {
   hal.executable.variant public @variant target(#hal.executable.target<"", "">) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
-        attributes {workgroup_local_memory = 4096 : index}
+        <workgroup_local_memory = 4096>
     builtin.module {
       func.func @entry_point() {
         return

@@ -421,3 +421,43 @@ util.func public @dispatch_variants(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %1 = flow.dispatch @ex1::@variant::@dispatch[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   util.return %1 : tensor<4xf32>
 }
+
+// -----
+
+// Executables with different native properties are not equivalent.
+// CHECK-LABEL: flow.executable public @native_properties_sync
+flow.executable public @native_properties_sync {
+  flow.executable.export @entry
+  builtin.module {
+    func.func @entry() {
+      pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+        pcf.return
+      }
+      return
+    }
+  }
+}
+// CHECK-LABEL: flow.executable public @native_properties_async
+flow.executable public @native_properties_async {
+  flow.executable.export @entry
+  builtin.module {
+    func.func @entry() {
+      pcf.generic scope(#pcf.test_scope) execute[%id: index, %count: index] {
+        pcf.return
+      }
+      return
+    }
+  }
+}
+// CHECK-NOT: flow.executable public @native_properties_sync_duplicate
+flow.executable public @native_properties_sync_duplicate {
+  flow.executable.export @entry
+  builtin.module {
+    func.func @entry() {
+      pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+        pcf.return
+      }
+      return
+    }
+  }
+}

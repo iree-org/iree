@@ -34,10 +34,10 @@ hal.executable private @basic_exe {
 //       CHECK:       %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:       %[[X:.+]] = affine.apply
 //       CHECK:       hal.return %[[X]], %[[W1]], %[[C1]]
-//       CHECK:     } attributes {
-//  CHECK-SAME:       subgroup_size = 64 : index
-//  CHECK-SAME:       workgroup_local_memory = 4096 : index
+//       CHECK:     } <
 //  CHECK-SAME:       workgroup_size = [64 : index, 16 : index, 1 : index]
+//  CHECK-SAME:       subgroup_size = 64
+//  CHECK-SAME:       workgroup_local_memory = 4096
 //       CHECK:   builtin.module
 //       CHECK:     func.func @matmul()
 //   CHECK-NOT:     iree_codegen.dispatch_config
@@ -95,13 +95,13 @@ hal.executable private @specialized_exe {
 //       CHECK:     count(%{{.+}}: !hal.device, %[[W0A:.+]]: index)
 //       CHECK:       %[[C1A:.+]] = arith.constant 1 : index
 //       CHECK:       hal.return %[[W0A]], %[[C1A]], %[[C1A]]
-//       CHECK:     } attributes {subgroup_size = 64 : index, workgroup_size = [64 : index, 16 : index, 1 : index]}
+//       CHECK:     } <workgroup_size = [64 : index, 16 : index, 1 : index], subgroup_size = 64>
 //       CHECK:   hal.executable.export public @matmul_0
 //       CHECK:     count(%{{.+}}: !hal.device, %[[W0B:.+]]: index)
 //       CHECK:       %[[C1B:.+]] = arith.constant 1 : index
 //       CHECK:       %[[X:.+]] = affine.apply
 //       CHECK:       hal.return %[[X]], %[[C1B]], %[[C1B]]
-//       CHECK:     } attributes {subgroup_size = 64 : index, workgroup_size = [256 : index, 1 : index, 1 : index]}
+//       CHECK:     } <workgroup_size = [256 : index, 1 : index, 1 : index], subgroup_size = 64>
 
 // -----
 
@@ -133,7 +133,7 @@ hal.executable private @no_subgroup_exe {
 // CHECK-LABEL: hal.executable private @no_subgroup_exe
 //       CHECK:   hal.executable.export public @entry
 //       CHECK:       hal.return
-//       CHECK:     } attributes {workgroup_size = [1024 : index, 1 : index, 1 : index]}
+//       CHECK:     } <workgroup_size = [1024 : index, 1 : index, 1 : index]>
 //   CHECK-NOT:     subgroup_size
 
 // -----

@@ -108,9 +108,9 @@ hal.executable public @main {
         %max = tensor.empty() : tensor<2x10x4096xf32>
         %sum = tensor.empty() : tensor<2x10x4096xf32>
 
-        %result:3 = iree_linalg_ext.online_attention {
+        %result:3 = iree_linalg_ext.online_attention <
             indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]
-        } ins(%query, %key, %value, %cst :
+        > ins(%query, %key, %value, %cst :
             tensor<2x10x4096x64xf16>, tensor<2x10x64x64xf16>, tensor<2x10x64x64xf16>, f16)
           outs(%output, %max, %sum : tensor<2x10x4096x64xf32>, tensor<2x10x4096xf32>, tensor<2x10x4096xf32>) {
             ^bb0(%arg0: f32):
@@ -166,9 +166,9 @@ hal.executable public @main {
         %max = tensor.empty() : tensor<3x10x4096xf32>
         %sum = tensor.empty() : tensor<3x10x4096xf32>
 
-        %result:3 = iree_linalg_ext.online_attention {
+        %result:3 = iree_linalg_ext.online_attention <
             indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map5]
-        } ins(%query, %key, %value, %cst :
+        > ins(%query, %key, %value, %cst :
             tensor<3x10x4096x64xf16>, tensor<3x10x32x64xf16>, tensor<3x10x64x32xf16>, f16)
           outs(%output, %max, %sum : tensor<3x10x4096x64xf32>, tensor<3x10x4096xf32>, tensor<3x10x4096xf32>) {
             ^bb0(%arg0: f32):

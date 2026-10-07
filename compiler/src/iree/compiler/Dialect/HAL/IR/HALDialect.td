@@ -14,7 +14,6 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 //===----------------------------------------------------------------------===//
 
 def HAL_Dialect : Dialect {
-  let useStrictPropertiesInAssemblyFormat = 0;
   let name = "hal";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 

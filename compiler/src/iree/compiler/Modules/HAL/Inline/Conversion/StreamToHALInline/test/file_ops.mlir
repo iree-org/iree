@@ -59,7 +59,7 @@ util.func public @variable_read(%wait: !stream.timepoint) -> (!stream.resource<v
   %c64 = arith.constant 64 : index
   %c100 = arith.constant 100 : i64
   // CHECK: %[[CONSTANT:.+]] = util.buffer.constant
-  %constant = util.buffer.constant {alignment = 64 : index} : !util.buffer = dense<1> : tensor<64xi8>
+  %constant = util.buffer.constant <alignment = 64> : !util.buffer = dense<1> : tensor<64xi8>
   // CHECK: %[[BUFFER:.+]], %[[STORAGE:.+]] = hal_inline.buffer.allocate
   %resource = stream.resource.alloc uninitialized : !stream.resource<variable>{%c64}
   // CHECK: %[[SPAN:.+]] = util.buffer.subspan %[[CONSTANT]][%c16] : !util.buffer{%c64} -> !util.buffer{%c32}

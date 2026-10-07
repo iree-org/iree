@@ -244,7 +244,7 @@ util.func public @no_attention_producer(%arg0: tensor<4x8x4x?x32x2x64xf32>, %arg
   %c128 = arith.constant 128 : index
   %0 = flow.dispatch.region -> (tensor<4x8x4x?x32x128xf32>{%arg6}) {
     %3 = tensor.empty(%arg6) : tensor<4x8x4x?x32x128xf32>
-    %4 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d3, d4, d8, d9)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg0, %arg1, %arg2, %arg5, %arg3 : tensor<4x8x4x?x32x2x64xf32>, tensor<4x?x32x8x2x64xf32>, tensor<4x?x32x8x128xf32>, f32, tensor<?x32x?x32xf32>) outs(%3 : tensor<4x8x4x?x32x128xf32>) {
+    %4 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d6, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d8, d9, d1, d5)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d3, d4, d8, d9)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8, d9) -> (d0, d1, d2, d3, d4, d5)>]> ins(%arg0, %arg1, %arg2, %arg5, %arg3 : tensor<4x8x4x?x32x2x64xf32>, tensor<4x?x32x8x2x64xf32>, tensor<4x?x32x8x128xf32>, f32, tensor<?x32x?x32xf32>) outs(%3 : tensor<4x8x4x?x32x128xf32>) {
     ^bb0(%arg7: f32):
       iree_linalg_ext.yield %arg7 : f32
     } -> tensor<4x8x4x?x32x128xf32>

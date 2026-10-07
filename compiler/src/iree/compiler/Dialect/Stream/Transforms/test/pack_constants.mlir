@@ -22,7 +22,7 @@ util.func public @resourceConstants() -> (!stream.resource<constant>, !stream.re
   // CHECK-DAG: %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
 
   // Fetch the read-only host data containing the constants.
-  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : index} : !util.buffer = #composite_of_192b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant <alignment = 64> : !util.buffer = #composite_of_192b
   %0:4 = stream.resource.constants :
     !stream.resource<constant>{%c4} = dense<100> : tensor<1xi32>,
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>,
@@ -68,7 +68,7 @@ util.func public @resourceVariables() -> (!stream.resource<variable>, !stream.re
   %c1024 = arith.constant 1024 : index
 
   // CHECK-DAG: %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
-  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 64 : index} : !util.buffer = #composite_of_1088b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant <alignment = 64> : !util.buffer = #composite_of_1088b
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<variable>{%c1088}
   // CHECK: %[[FILE:.+]] = stream.file.constant %[[RODATA]][%c0 for %c1088] : !util.buffer{%c1088} -> !stream.file
   // CHECK: %[[READ_TIMEPOINT:.+]] = stream.file.read await(%[[IMMEDIATE]]) => %[[FILE]][%c0_i64], %[[ALLOC]][%c0], %c1088 : !stream.file -> !stream.resource<variable>{%c1088} => !stream.timepoint
@@ -115,14 +115,14 @@ util.func public @splitResourceConstants() -> (!stream.resource<constant>, !stre
 
   // CHECK-DAG: %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
 
-  // CHECK: %[[RODATA0:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b
+  // CHECK: %[[RODATA0:.+]] = util.buffer.constant <alignment = 16> : !util.buffer = #composite_of_16b
   // CHECK: %[[DID_MAP0:.+]], %[[TRY_MAP0:.+]] = stream.resource.try_map %[[RODATA0]]
   // CHECK: %[[IF0:.+]]:2 = scf.if %[[DID_MAP0]]
   // CHECK: %[[FILE0:.+]] = stream.file.constant %[[RODATA0]]
   // CHECK: stream.file.read await(%[[IMMEDIATE]]) => %[[FILE0]]
   // CHECK: %[[RES0:.+]] = stream.resource.subview %[[IF0]]#1[%c0] : !stream.resource<constant>{%c16} -> !stream.resource<constant>{%c4}
 
-  // CHECK: %[[RODATA1:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_16b1
+  // CHECK: %[[RODATA1:.+]] = util.buffer.constant <alignment = 16> : !util.buffer = #composite_of_16b1
   // CHECK: %[[DID_MAP1:.+]], %[[TRY_MAP1:.+]] = stream.resource.try_map %[[RODATA1]]
   // CHECK: %[[IF1:.+]]:2 = scf.if %[[DID_MAP1]]
   // CHECK: %[[FILE1:.+]] = stream.file.constant %[[RODATA1]]
@@ -163,8 +163,8 @@ util.func public @singleConstantExceedsLimit() -> (!stream.resource<constant>, !
     attributes {stream.resources = #singleConstantExceedsLimitConfig} {
   %c256 = arith.constant 256 : index
 
-  // CHECK-NOT: %[[RODATA:.+]] = util.buffer.constant {alignment = {{[:digit:]]+}} : index} : !util.buffer = #composite_of_0b
-  // CHECK: %[[RODATA:.+]] = util.buffer.constant {alignment = 16 : index} : !util.buffer = #composite_of_256b
+  // CHECK-NOT: %[[RODATA:.+]] = util.buffer.constant <alignment = {{[:digit:]]+}}> : !util.buffer = #composite_of_0b
+  // CHECK: %[[RODATA:.+]] = util.buffer.constant <alignment = 16> : !util.buffer = #composite_of_256b
   // CHECK: %[[DID_MAP:.+]], %[[TRY_MAP:.+]] = stream.resource.try_map %[[RODATA]]
   // CHECK: %[[IF:.+]]:2 = scf.if %[[DID_MAP]]
   // CHECK: %[[RES:.+]] = stream.resource.subview %[[IF]]#1[%c0] : !stream.resource<constant>{%c256} -> !stream.resource<constant>{%c256}

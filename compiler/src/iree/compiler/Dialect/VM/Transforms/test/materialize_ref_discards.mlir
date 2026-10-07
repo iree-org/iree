@@ -959,7 +959,7 @@ vm.module @my_module {
     // Neither ref should be discarded - both are passed to variadic yieldable call.
     // CHECK-NOT: vm.discard.refs
     // CHECK: vm.call.variadic.yieldable @variadic(%{{.*}}, %{{.*}})
-    vm.call.variadic.yieldable @variadic(%buf1, %buf2) {segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [!vm.buffer, !vm.buffer]} : (!vm.buffer, !vm.buffer) -> ^done(!vm.buffer)
+    vm.call.variadic.yieldable @variadic(%buf1, %buf2) <segment_sizes = dense<[1, 1]> : vector<2xi16>, segment_types = [!vm.buffer, !vm.buffer]> : (!vm.buffer, !vm.buffer) -> ^done(!vm.buffer)
   ^done(%result: !vm.buffer):
     vm.return %result : !vm.buffer
   }

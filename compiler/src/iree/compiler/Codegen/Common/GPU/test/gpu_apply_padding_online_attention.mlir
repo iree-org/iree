@@ -26,10 +26,7 @@ func.func @online_attention_fail_to_pad_no_mask(%query: tensor<192x1024x64xf32>,
 
   // expected-error@+1{{Padding OnlineAttention without existing mask is not yet supported}}
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) {
                       ^bb0(%score: f32):
@@ -72,10 +69,7 @@ func.func @online_attention_tile_then_pad(%query: tensor<192x1024x64xf32>, %key:
   //         CHECK: iree_linalg_ext.online_attention {{.*}} ins(%{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}
   //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xf32>)
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<192x1024x?xf32>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         {
@@ -119,10 +113,7 @@ func.func @online_attention_tile_then_pad_bool_mask(%query: tensor<192x1024x64xf
   //         CHECK: iree_linalg_ext.online_attention
   //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xi1>)
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<192x1024x?xi1>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         {
@@ -166,10 +157,7 @@ func.func @online_attention_tile_then_pad_i8_mask(%query: tensor<192x1024x64xf32
   //         CHECK: iree_linalg_ext.online_attention
   //    CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x32x64xf32>, tensor<192x32x64xf32>, f32, tensor<192x1024x32xi8>)
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale, %mask : tensor<192x1024x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<192x1024x?xi8>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         {
@@ -214,10 +202,7 @@ func.func @online_attention_tile_then_pad_7(%n_batches: index, %query: tensor<?x
   //    CHECK-SAME:     outs(%{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}, %{{[0-9a-z_]*}}
   //    CHECK-SAME:   : tensor<4x8x64xf32>, tensor<4x8xf32>, tensor<4x8xf32>)
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale, %mask : tensor<?x1021x64xf32>, tensor<192x?x64xf32>, tensor<192x?x64xf32>, f32, tensor<?x1021xf32>)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<?x1021x64xf32>, tensor<?x1021xf32>, tensor<?x1021xf32>)
         {
@@ -260,10 +245,7 @@ func.func @online_attention_no_mask_aligned_dims(%query: tensor<192x1024x64xf32>
   //   CHECK-SAME:     outs(%{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}, %{{[A-Za-z0-9_]+}}
   //   CHECK-SAME:   : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
   %out:3 = iree_linalg_ext.online_attention
-        {
-          indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR],
-          lowering_config = #lowering_config
-        }
+        <indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR]> {lowering_config = #lowering_config}
         ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x64x64xf32>, tensor<192x64x64xf32>, f32)
         outs(%output_fill, %acc_fill, %sum_fill : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         {

@@ -213,10 +213,10 @@ builtin.module @named_module attributes {
 
 // -----
 
-// CHECK: util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
-util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
+// CHECK: util.global private @dupeCst0 <inlining_policy = #util.inline.never> = 5 : index
+util.global private @dupeCst0 <inlining_policy = #util.inline.never> = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
-util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
+util.global private @dupeCst1 <inlining_policy = #util.inline.never> = 5 : index
 // CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index) attributes {
   some.attr = @dupeCst1
@@ -273,24 +273,15 @@ util.func @foo() -> (index, index) {
 
 // CHECK: util.global private @dupeCst0
 // CHECK-SAME: some.attr = 100 : index
-util.global private @dupeCst0 {
-  inlining_policy = #util.inline.never,
-  some.attr = 100 : index
-} = 5 : index
+util.global private @dupeCst0 <inlining_policy = #util.inline.never> {some.attr = 100 : index} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
-util.global private @dupeCst1 {
-  inlining_policy = #util.inline.never,
-  some.attr = 100 : index
-} = 5 : index
+util.global private @dupeCst1 <inlining_policy = #util.inline.never> {some.attr = 100 : index} = 5 : index
 // CHECK: util.global private @nondupeCst0
-util.global private @nondupeCst0 {
+util.global private @nondupeCst0 <
   inlining_policy = #util.inline.never
-} = 5 : index
+> = 5 : index
 // CHECK: util.global private @nondupeCst1
-util.global private @nondupeCst1 {
-  inlining_policy = #util.inline.never,
-  some.attr = 123 : index
-} = 5 : index
+util.global private @nondupeCst1 <inlining_policy = #util.inline.never> {some.attr = 123 : index} = 5 : index
 // CHECK-LABEL: util.func public @foo
 util.func @foo() -> (index, index, index, index) {
   // CHECK-NEXT: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
