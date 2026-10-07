@@ -243,11 +243,10 @@ random_matrix_seed = 0
 
 # Generate a matrix function argument of the given size as `%name`.
 def generate_random_matrix(
-    name: str, matrix_shape: list, element_type: MatrixElemTypeId, increment_seed=True
+    name: str, matrix_shape: list, element_type: MatrixElemTypeId
 ):
     global random_matrix_seed
-    if increment_seed:
-        random_matrix_seed += 1
+    random_matrix_seed += 1
     return (
         f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
         f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
