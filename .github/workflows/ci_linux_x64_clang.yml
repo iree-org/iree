@@ -88,7 +88,7 @@ jobs:
           IREE_ROCJITSU_RUN_ID: ci
           CTEST_PARALLEL_LEVEL: 8
 
-      - name: Run Vulkan e2e tests under rocjitsu
+      - name: Run Vulkan e2e and HAL CTS tests under rocjitsu
         if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
         timeout-minutes: 60
         run: |

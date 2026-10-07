@@ -791,6 +791,9 @@ iree_runtime_cc_test(
 
 iree_runtime_cc_test(
     name = "bda_raw_spirv_tests",
+    # Concurrent replay coverage dispatches 8M workgroups twice, taking over a
+    # minute under CPU simulation.
+    timeout = "moderate",
     srcs = [
         "bda_raw_spirv_test.cc",
         "//runtime/src/iree/hal/cts/util:test_main.cc",

@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Runs the regular build's Vulkan compute e2e tests through Mesa RADV on
+# Runs the regular build's Vulkan compute e2e and HAL CTS tests through RADV on
 # simulated RDNA3/RDNA4 GPUs. Build all and iree-test-deps before running.
 set -euo pipefail
 
@@ -15,8 +15,9 @@ usage() {
 Usage: test_vulkan_targets_with_rocjitsu.sh [BUILD_DIR] [TARGET ...]
 
 BUILD_DIR defaults to IREE_BUILD_DIR or "build". Targets default to gfx1100
-and gfx1201. The existing SPIR-V test modules are shared between targets;
-RADV compiles them to the simulated GPU's native instructions at runtime.
+and gfx1201. Runs the Vulkan compute e2e and HAL CTS tests. The existing
+SPIR-V test modules are shared between targets; RADV compiles them to the
+simulated GPU's native instructions at runtime.
 
 Requires Mesa RADV and rocjitsu with Vulkan compute support.
 Set ROCJITSU_BIN and ROCJITSU_CONFIG_DIR for a source build, or ROCM_ROOT
@@ -106,7 +107,8 @@ RUN_ENV=(env -u LD_LIBRARY_PATH -u LD_PRELOAD
   -u VK_ADD_DRIVER_FILES -u VK_INSTANCE_LAYERS -u VK_LOADER_DRIVERS_SELECT
   -u VK_LOADER_DRIVERS_DISABLE -u RADV_FORCE_FAMILY -u IREE_VULKAN_DISABLE
   "VK_DRIVER_FILES=${VK_DRIVER_FILES}" "VK_ICD_FILENAMES=${VK_DRIVER_FILES}" DRI_PRIME=)
-CTEST_FILTER=(-L '^driver=vulkan$' -L '^iree/tests/e2e/'
+CTEST_FILTER=(-L '^driver=vulkan$'
+  -L '^iree/(tests/e2e/|hal/drivers/vulkan/cts$)'
   -LE '^requires-gpu-(nvidia|sm[0-9]+)$|^very-expensive$|^requires-multiple-devices$')
 if [[ -n "${IREE_ROCJITSU_TESTS_REGEX:-}" ]]; then
   CTEST_FILTER+=(-R "${IREE_ROCJITSU_TESTS_REGEX}")
@@ -118,7 +120,7 @@ for target in "${TARGETS[@]}"; do
   log_dir="${WORK_DIR}/logs/${RUN_ID}/vulkan/${target}"
   mkdir -p "${log_dir}"
   config="$(realpath "${ROCJITSU_CONFIG_DIR}/${CONFIGS[${target}]}")"
-  echo "=== Vulkan e2e tests: ${target} ==="
+  echo "=== Vulkan e2e and HAL CTS tests: ${target} ==="
   if (
     # Keep socket paths short and isolate concurrent helper invocations.
     runtime_dir="$(mktemp -d "${TMPDIR:-/tmp}/iree-vulkan-${target}.XXXXXX")" || exit 1
