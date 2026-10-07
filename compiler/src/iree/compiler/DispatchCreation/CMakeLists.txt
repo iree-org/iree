@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     DispatchCreation
   HDRS
+    "CollapseDimensions.h"
     "FusionUtils.h"
     "MaterializedLayoutTarget.h"
     "Passes.h"
