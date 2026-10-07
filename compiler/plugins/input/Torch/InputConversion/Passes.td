@@ -29,6 +29,18 @@ def ConvertTorchUnstructuredToLinalgExtPass :
   let summary = "Convert unstructured Torch ops to LinalgExt ops";
 }
 
+def ConvertTorchQuantizationToLinalgExtPass :
+    InterfacePass<"torch-iree-torch-quantization-to-linalg-ext", "mlir::FunctionOpInterface"> {
+  let summary = "Convert PT2E quantization operations to LinalgExt";
+  let description = [{
+    Preserves PT2E per-tensor and per-channel quantization as
+    `iree_linalg_ext.quantize_affine` and `dequantize_affine` operations. This
+    pass runs before Torch-to-Linalg expands the PT2E operations into generic
+    arithmetic so later IREE optimization can still identify quantized
+    computations.
+  }];
+}
+
 def SetStrictSymbolicShapesPass :
     InterfacePass<"torch-iree-set-strict-symbolic-shapes", "mlir::FunctionOpInterface"> {
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
