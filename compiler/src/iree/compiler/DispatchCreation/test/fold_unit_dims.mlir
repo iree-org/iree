@@ -759,9 +759,9 @@ util.func public @online_attention_remap_index_after_unit_dim_drop(
 
 // -----
 
-// A unit batch dim on a dequantize is dropped alongside the one on its consumer,
-// so the reshape ends up above the dequantize on the quantized input rather than
-// between the dequantize and the convolution.
+// Folding the unit batch dim shared by a dequantize and its convolution
+// consumer collapses the quantized input, so the dequantize still feeds the
+// convolution directly.
 util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<f32>,
     %z: tensor<i8>, %filter: tensor<2x2x2x2xf32>) -> tensor<1x3x3x2xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -798,6 +798,7 @@ util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<
 //  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 //  CHECK-SAME:       ins(%[[INPUT]],
 //  CHECK-SAME:       -> tensor<4x4x2xf32>
-// The dequantize feeds the convolution directly, with no reshape in between.
+// The dequantize feeds the convolution directly, with no collapse_shape in
+// between.
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       ins(%[[DQ]],
