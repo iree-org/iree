@@ -194,6 +194,37 @@ class DeviceHalTest(unittest.TestCase):
             "<HalBufferView (3, 4), element_type=0x20000011, 48 bytes (at offset 0 into 48), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING|MAPPING_PERSISTENT>",
         )
 
+    def testAllocateBufferViewCopyFailureReleasesBuffer(self):
+        ary = np.zeros(16, dtype=np.uint8)
+        before = self.allocator.statistics
+        # The binding rejects a view larger than the buffer it just allocated.
+        with self.assertRaisesRegex(IndexError, "exceeds backing buffer byte length"):
+            self.allocator.allocate_buffer_copy(
+                memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+                allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+                device=self.device,
+                buffer=ary,
+                element_type=iree.runtime.HalElementType.SINT_32,
+            )
+        if self.allocator.has_statistics:
+            after = self.allocator.statistics
+            self.assertGreater(
+                sum(
+                    after[f"{memory_type}_bytes_allocated"]
+                    - before[f"{memory_type}_bytes_allocated"]
+                    for memory_type in ("host", "device")
+                ),
+                0,
+            )
+            for memory_type in ("host", "device"):
+                with self.subTest(memory_type=memory_type):
+                    allocated = f"{memory_type}_bytes_allocated"
+                    freed = f"{memory_type}_bytes_freed"
+                    self.assertEqual(
+                        after[allocated] - before[allocated],
+                        after[freed] - before[freed],
+                    )
+
     def testAllocateHostStagingBufferCopy(self):
         buffer = self.allocator.allocate_host_staging_buffer_copy(
             self.device, np.int32(0)
