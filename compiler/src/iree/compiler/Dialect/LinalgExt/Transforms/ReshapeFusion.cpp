@@ -1256,13 +1256,10 @@ struct DropMappedOperandsUnitDims final : OpRewritePattern<OpTy> {
           llvm::map_to_vector(newOperands.take_back(op.getNumDpsInits()),
                               [](Value v) { return v.getType(); });
 
-      IRMapping mapping;
-      for (auto [oldOperand, newOperand] :
-           llvm::zip(op->getOperands(), newOperands)) {
-        mapping.map(oldOperand, newOperand);
-      }
-      auto *cloned = b.clone(*op, mapping);
-      auto newOp = cast<OpTy>(cloned);
+      // Replace operands by position: the same value can appear as several
+      // operands with different indexing maps and so different replacements.
+      auto newOp = cast<OpTy>(b.clone(*op));
+      newOp->setOperands(newOperands);
       for (auto [result, type] : llvm::zip(newOp->getResults(), resultTypes)) {
         result.setType(type);
       }

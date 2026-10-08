@@ -54,10 +54,10 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
                                                 "constant");
     }
 
-    // The quantized pad has to yield a single value: a zero point that varies
-    // per channel, even along an unpadded dimension, would need a pad whose
-    // value depends on the padded index, which downstream pad handling does
-    // not support.
+    // The quantized pad must yield a value defined outside its body:
+    // tensor.pad tiling (tensor::bubbleUpPadSlice) supports no other padding
+    // value, so a zero point that varies per channel, which the pad body would
+    // have to read using the channel index, could not be compiled.
     Value zeroPoint = dequantizeOp.getZeroPoint();
     if (zeroPoint && dequantizeOp.getZeroPointMap().getNumResults() != 0) {
       return rewriter.notifyMatchFailure(padOp, "zero point is not per-tensor");
@@ -101,8 +101,13 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
 
     AffineMap outputToInput =
         dequantizeOp.getInputMap().compose(outputToIteration);
+    // Keep any static extents the original pad result has beyond what its
+    // source and padding amounts imply.
+    auto paddedInputType = RankedTensorType::get(
+        applyPermutationMap(outputToInput, padOp.getResultType().getShape()),
+        storageType);
     auto paddedInput = tensor::PadOp::create(
-        rewriter, loc, /*resultType=*/Type(), dequantizeOp.getInput(),
+        rewriter, loc, paddedInputType, dequantizeOp.getInput(),
         applyPermutationMap<OpFoldResult>(outputToInput,
                                           padOp.getMixedLowPad()),
         applyPermutationMap<OpFoldResult>(outputToInput,
@@ -126,10 +131,11 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
 };
 
 /// Allows a collapse_shape feeding quantize or an expand_shape consuming
-/// dequantize. Both require a single-use edge so propagation removes a reshape
-/// from the real-valued side without adding one for another consumer. Only the
-/// quantize's value operand counts: a collapse_shape producing a quantization
-/// parameter does not separate the quantize from its real-valued producer.
+/// dequantize. Both require a single-use edge so propagation removes the
+/// collapse_shape or expand_shape from the real-valued side without adding one
+/// for another consumer. Only the quantize's value operand counts: a
+/// collapse_shape producing a quantization parameter does not separate the
+/// quantize from its real-valued producer.
 static bool canPropagateAffineQuantizationReshape(OpOperand *operand) {
   if (auto quantize = dyn_cast<QuantizeAffineOp>(operand->getOwner())) {
     return operand == &quantize.getInputMutable() &&

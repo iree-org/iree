@@ -30,8 +30,8 @@ func.func @absorb_quantize_producer_collapse(%input: tensor<2x3x4xf32>, %scale: 
 #row2 = affine_map<(d0, d1) -> (d0)>
 
 // Only a collapse_shape on the quantize's value operand is folded. Folding one
-// that produces the scale would expand the real-valued input instead, adding a
-// reshape on the real-valued side rather than removing one.
+// that produces the scale would add an expand_shape on the real-valued input
+// rather than remove the collapse_shape.
 func.func @decline_quantize_scale_collapse(%input: tensor<6x4xf32>,
     %scale: tensor<2x3xf32>) -> tensor<6x4xi8> {
   %collapsed = tensor.collapse_shape %scale [[0, 1]]
@@ -46,7 +46,6 @@ func.func @decline_quantize_scale_collapse(%input: tensor<6x4xf32>,
 }
 // CHECK-LABEL: func.func @decline_quantize_scale_collapse(
 //  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<6x4xf32>
-//   CHECK-NOT:   tensor.expand_shape
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape
 //       CHECK:   iree_linalg_ext.quantize_affine
 //  CHECK-SAME:     ins(%[[INPUT]], %[[COLLAPSED]] :
@@ -56,8 +55,8 @@ func.func @decline_quantize_scale_collapse(%input: tensor<6x4xf32>,
 #id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #scalar3 = affine_map<(d0, d1, d2) -> ()>
 
-// A reshape consuming a dequantize moves onto the quantized side, so whatever
-// consumed the reshape sees the dequantize directly.
+// An expand_shape consuming a dequantize moves onto the quantized side, so the
+// consumers of the expand_shape read the dequantize directly.
 func.func @absorb_consumer_expand(%aq: tensor<3x6x6xi8>, %sa: f32, %za: i64) -> tensor<1x3x6x6xf32> {
   %init = tensor.empty() : tensor<3x6x6xf32>
   %a = iree_linalg_ext.dequantize_affine
@@ -82,8 +81,8 @@ func.func @absorb_consumer_expand(%aq: tensor<3x6x6xi8>, %sa: f32, %za: i64) -> 
 #scalar3 = affine_map<(d0, d1, d2) -> ()>
 
 // An expand_shape is not absorbed when the dequantize has another consumer.
-// Expanding the dequantize would put a reshape on that consumer's path instead
-// of removing one from the program.
+// Expanding the dequantize would put a collapse_shape on that consumer's path
+// instead of removing the expand_shape.
 func.func @decline_expand_with_multiple_consumers(%aq: tensor<3x6x6xi8>, %sa: f32, %za: i64)
     -> (tensor<1x3x6x6xf32>, tensor<3x6x6xf32>) {
   %init = tensor.empty() : tensor<3x6x6xf32>
@@ -172,6 +171,37 @@ func.func @bubble_pad_through_0d_zero_point_dequantize(%aq: tensor<4x4xi8>,
 // -----
 
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
+// A pad may have a static result type for a dynamic source; the quantized pad
+// keeps that static result type.
+func.func @bubble_pad_keeps_static_result_type(%aq: tensor<?x4xi8>, %sa: f32, %za: i8)
+    -> tensor<6x6xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %aq, %c0 : tensor<?x4xi8>
+  %init = tensor.empty(%dim) : tensor<?x4xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      ins(%aq, %sa, %za : tensor<?x4xi8>, f32, i8)
+      outs(%init : tensor<?x4xf32>) -> tensor<?x4xf32>
+  %padded = tensor.pad %a low[1, 1] high[1, 1] {
+  ^bb0(%i: index, %j: index):
+    tensor.yield %cst : f32
+  } : tensor<?x4xf32> to tensor<6x6xf32>
+  return %padded : tensor<6x6xf32>
+}
+// CHECK-LABEL: func.func @bubble_pad_keeps_static_result_type(
+//  CHECK-SAME:     %[[AQ:[a-zA-Z0-9_]+]]: tensor<?x4xi8>
+//       CHECK:   %[[PADDED:.+]] = tensor.pad %[[AQ]] low[1, 1] high[1, 1]
+//       CHECK:   } : tensor<?x4xi8> to tensor<6x6xi8>
+//       CHECK:   iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[PADDED]]
+//  CHECK-SAME:     -> tensor<6x6xf32>
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
 #row2 = affine_map<(d0, d1) -> (d0)>
 
 // A symmetric dequantize has an implicit zero point of zero, so the quantized
@@ -229,9 +259,9 @@ func.func @decline_pad_along_quantized_axis(%aq: tensor<4x4xi8>, %sa: tensor<4xf
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #scalar2 = affine_map<(d0, d1) -> ()>
 
-// A per-channel zero point cannot pad the quantized side even though it varies
-// only along the unpadded dimension: each padded column would need its own
-// zero point, and the quantized pad has to yield a single value.
+// A per-channel zero point cannot pad the quantized side: the quantized pad
+// would have to read the zero point from its body using the channel index, and
+// tensor.pad tiling only supports a padding value defined outside the pad.
 func.func @decline_pad_with_per_channel_zero_point(%aq: tensor<4x4xi8>, %sa: tensor<4xf32>,
     %za: tensor<4xi8>) -> tensor<4x6xf32> {
   %cst = arith.constant 0.000000e+00 : f32
