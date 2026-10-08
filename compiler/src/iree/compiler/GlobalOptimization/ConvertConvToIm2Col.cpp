@@ -159,6 +159,10 @@ static GatheredInput gatherInput(RewriterBase &rewriter,
 ///
 /// The pattern only checks that the rewrite is valid; whether it is worth
 /// applying to a given convolution is decided by `controlFn`.
+///
+/// TODO: Upstream this pattern and `getCollapsibleLoops` to MLIR, where they
+/// would generalize `linalg::populateConvertConv2DToImg2ColPatterns` beyond
+/// its four named 2-D convolutions.
 struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using ControlFn = std::function<bool(linalg::LinalgOp)>;
 
