@@ -140,6 +140,35 @@ func.func @bubble_pad_through_asymmetric_dequantize(%aq: tensor<4x4xi8>, %sa: f3
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #scalar2 = affine_map<(d0, d1) -> ()>
 
+// A pad bubbles through a dequantize that has other users: the pad reads a new
+// dequantize of the padded quantized value, and the other users keep the
+// original dequantize.
+func.func @bubble_pad_through_multi_use_dequantize(%aq: tensor<4x4xi8>, %sa: f32, %za: i64)
+    -> (tensor<6x6xf32>, tensor<4x4xf32>) {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<4x4xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      ins(%aq, %sa, %za : tensor<4x4xi8>, f32, i64)
+      outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
+  %padded = tensor.pad %a low[1, 1] high[1, 1] {
+  ^bb0(%i: index, %j: index):
+    tensor.yield %cst : f32
+  } : tensor<4x4xf32> to tensor<6x6xf32>
+  return %padded, %a : tensor<6x6xf32>, tensor<4x4xf32>
+}
+// CHECK-LABEL: func.func @bubble_pad_through_multi_use_dequantize(
+//  CHECK-SAME:     %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x4xi8>
+//   CHECK-DAG:   %[[UNPADDED:.+]] = iree_linalg_ext.dequantize_affine {{.*}} ins(%[[AQ]],
+//   CHECK-DAG:   %[[PADDED_Q:.+]] = tensor.pad %[[AQ]] low[1, 1] high[1, 1]
+//   CHECK-DAG:   %[[PADDED:.+]] = iree_linalg_ext.dequantize_affine {{.*}} ins(%[[PADDED_Q]],
+//       CHECK:   return %[[PADDED]], %[[UNPADDED]]
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
 // A per-tensor zero point may also be a 0-d tensor. Its single element pads
 // the quantized side.
 func.func @bubble_pad_through_0d_zero_point_dequantize(%aq: tensor<4x4xi8>,
