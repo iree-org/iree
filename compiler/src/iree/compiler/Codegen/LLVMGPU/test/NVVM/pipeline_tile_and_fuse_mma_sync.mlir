@@ -184,5 +184,5 @@ func.func @matmul_tile_and_fuse_mma_sync_fp8e4m3fn()
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x1x2x4xf8E4M3FN> to vector<2x2x4xf8E4M3FN>
 //       CHECK:       vector.transpose {{.*}}, [1, 0, 2] : vector<2x2x4xf8E4M3FN> to vector<2x2x4xf8E4M3FN>
 //       CHECK:       vector.shape_cast {{.*}} : vector<2x2x4xf8E4M3FN> to vector<4x4xf8E4M3FN>
-// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) {mmaShape = [16, 8, 32]} : ({{.*}}) -> vector<2x2xf32>
+// CHECK-COUNT-8: nvgpu.mma.sync({{.*}}) mmaShape = [16, 8, 32] : ({{.*}}) -> vector<2x2xf32>
 //       CHECK:   scf.yield
