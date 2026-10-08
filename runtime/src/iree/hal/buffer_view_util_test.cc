@@ -87,6 +87,69 @@ static iree_status_t iree_hal_test_generate_buffer_callback(
   return iree_make_status(IREE_STATUS_CANCELLED, "contract check complete");
 }
 
+TEST(BufferViewUtilTest, ComputeElementCount) {
+  iree_device_size_t element_count = 0;
+  IREE_ASSERT_OK(iree_hal_buffer_view_compute_element_count(
+      /*shape_rank=*/0, /*shape=*/NULL, &element_count));
+  EXPECT_EQ(1u, element_count);
+
+  const iree_hal_dim_t shape[] = {2, 3};
+  IREE_ASSERT_OK(iree_hal_buffer_view_compute_element_count(
+      IREE_ARRAYSIZE(shape), shape, &element_count));
+  EXPECT_EQ(6u, element_count);
+
+  const iree_hal_dim_t max_shape[] = {IREE_DEVICE_SIZE_MAX};
+  IREE_ASSERT_OK(iree_hal_buffer_view_compute_element_count(
+      IREE_ARRAYSIZE(max_shape), max_shape, &element_count));
+  EXPECT_EQ(IREE_DEVICE_SIZE_MAX, element_count);
+
+  const iree_hal_dim_t zero_first_shape[] = {0, IREE_DEVICE_SIZE_MAX, 2};
+  IREE_ASSERT_OK(iree_hal_buffer_view_compute_element_count(
+      IREE_ARRAYSIZE(zero_first_shape), zero_first_shape, &element_count));
+  EXPECT_EQ(0u, element_count);
+
+  const iree_hal_dim_t zero_last_shape[] = {IREE_DEVICE_SIZE_MAX, 2, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_view_compute_element_count(
+      IREE_ARRAYSIZE(zero_last_shape), zero_last_shape, &element_count));
+  EXPECT_EQ(0u, element_count);
+
+  const iree_hal_dim_t overflow_shape[] = {IREE_DEVICE_SIZE_MAX, 2};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_buffer_view_compute_element_count(
+          IREE_ARRAYSIZE(overflow_shape), overflow_shape, &element_count));
+  EXPECT_EQ(0u, element_count);
+}
+
+TEST(BufferViewUtilTest, ComputePackedByteCount) {
+  iree_device_size_t byte_count = 0;
+  IREE_ASSERT_OK(iree_hal_element_compute_packed_byte_count(
+      IREE_HAL_ELEMENT_TYPE_INT_8, IREE_DEVICE_SIZE_MAX, &byte_count));
+  EXPECT_EQ(IREE_DEVICE_SIZE_MAX, byte_count);
+
+  IREE_ASSERT_OK(iree_hal_element_compute_packed_byte_count(
+      IREE_HAL_ELEMENT_TYPE_INT_4, IREE_DEVICE_SIZE_MAX, &byte_count));
+  EXPECT_EQ(IREE_DEVICE_SIZE_MAX / 2 + 1, byte_count);
+
+  IREE_ASSERT_OK(iree_hal_element_compute_packed_byte_count(
+      IREE_HAL_ELEMENT_TYPE_INT_4, 3, &byte_count));
+  EXPECT_EQ(2u, byte_count);
+
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_element_compute_packed_byte_count(
+          IREE_HAL_ELEMENT_TYPE_INT_16, IREE_DEVICE_SIZE_MAX, &byte_count));
+  EXPECT_EQ(0u, byte_count);
+
+  const iree_hal_element_type_t int_24_type =
+      iree_hal_make_element_type(IREE_HAL_NUMERICAL_TYPE_INTEGER, 24);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_element_compute_packed_byte_count(
+          int_24_type, 8 * (IREE_DEVICE_SIZE_MAX / 24) + 7, &byte_count));
+  EXPECT_EQ(0u, byte_count);
+}
+
 TEST(BufferViewUtilTest, ComputeViewSizeRejectsElementCountOverflow) {
   const iree_hal_dim_t zero_byte_shape[] = {IREE_DEVICE_SIZE_MAX / 2 + 1, 2};
   iree_device_size_t allocation_size = 0;
@@ -176,6 +239,23 @@ TEST(BufferViewUtilTest, CreateAndReshapeRejectInvalidShapes) {
                                   iree_allocator_system(), &buffer_view));
   EXPECT_EQ(NULL, buffer_view);
 
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_buffer_view_create(buffer, IREE_ARRAYSIZE(shape), shape,
+                                  IREE_HAL_ELEMENT_TYPE_INT_8,
+                                  IREE_HAL_ENCODING_TYPE_OPAQUE,
+                                  iree_allocator_system(), &buffer_view));
+  EXPECT_EQ(NULL, buffer_view);
+
+  const iree_hal_dim_t max_shape[] = {IREE_DEVICE_SIZE_MAX};
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_OUT_OF_RANGE,
+      iree_hal_buffer_view_create(buffer, IREE_ARRAYSIZE(max_shape), max_shape,
+                                  IREE_HAL_ELEMENT_TYPE_INT_16,
+                                  IREE_HAL_ENCODING_TYPE_OPAQUE,
+                                  iree_allocator_system(), &buffer_view));
+  EXPECT_EQ(NULL, buffer_view);
+
   const iree_hal_dim_t oversized_shape[] = {2};
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_OUT_OF_RANGE,
@@ -187,6 +267,13 @@ TEST(BufferViewUtilTest, CreateAndReshapeRejectInvalidShapes) {
     iree_hal_buffer_view_release(buffer_view);
     buffer_view = NULL;
   }
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      buffer, IREE_ARRAYSIZE(oversized_shape), oversized_shape,
+      IREE_HAL_ELEMENT_TYPE_INT_8, IREE_HAL_ENCODING_TYPE_OPAQUE,
+      iree_allocator_system(), &buffer_view));
+  EXPECT_EQ(2u, iree_hal_buffer_view_byte_length(buffer_view));
+  iree_hal_buffer_view_release(buffer_view);
+  buffer_view = NULL;
 
   const iree_hal_dim_t valid_shape[] = {1, 1};
   IREE_ASSERT_OK(iree_hal_buffer_view_create(

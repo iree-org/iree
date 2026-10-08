@@ -1085,7 +1085,20 @@ static iree_status_t iree_tooling_write_variant_to_binary_file(
 
   // Write to the file from the mapped memory.
   if (iree_status_is_ok(status)) {
-    status = iree_io_stream_write(stream, byte_length, mapping.contents.data);
+    if (iree_hal_buffer_view_encoding_type(buffer_view) !=
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+      byte_length =
+          iree_hal_buffer_byte_length(iree_hal_buffer_view_buffer(buffer_view));
+    }
+    if (IREE_UNLIKELY(byte_length > mapping.contents.data_length)) {
+      status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                "binary output byte length %" PRIdsz
+                                " exceeds mapped buffer byte length %" PRIhsz,
+                                byte_length, mapping.contents.data_length);
+    }
+    if (iree_status_is_ok(status)) {
+      status = iree_io_stream_write(stream, byte_length, mapping.contents.data);
+    }
   }
 
   iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));

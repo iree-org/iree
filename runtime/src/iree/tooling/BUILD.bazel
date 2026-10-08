@@ -141,6 +141,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/testing:temp_file",
         "//runtime/src/iree/vm",
     ],
 )

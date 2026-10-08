@@ -443,11 +443,11 @@ IREE_VM_ABI_EXPORT(iree_hal_inline_module_buffer_view_create,  //
   }
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+  iree_status_t status = iree_hal_buffer_view_create(
       subspan_buffer ? subspan_buffer : source_buffer, shape_rank, shape_dims,
-      element_type, encoding_type, state->host_allocator, &buffer_view));
-
+      element_type, encoding_type, state->host_allocator, &buffer_view);
   iree_hal_buffer_release(subspan_buffer);
+  IREE_RETURN_IF_ERROR(status);
 
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
