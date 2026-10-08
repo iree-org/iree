@@ -62,6 +62,8 @@ static void iree_uk_test_make_cpu_data_for_features(iree_uk_test_t* test,
   // Comma-separated lists of arm features.
   expected[0] = IREE_CPU_DATA0_ARM_64_DOTPROD | IREE_CPU_DATA0_ARM_64_I8MM;
   iree_uk_test_make_cpu_data_for_features_case(test, "dotprod,i8mm", expected);
+  expected[0] = IREE_CPU_DATA0_ARM_64_SVE | IREE_CPU_DATA0_ARM_64_I8MM;
+  iree_uk_test_make_cpu_data_for_features_case(test, "sve,i8mm", expected);
   // Named arm64 feature sets: none at the moment.
 
 #endif  // defined(IREE_ARCH_X86_64)
