@@ -56,8 +56,8 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/AMDGPUTargetParser.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
@@ -787,12 +787,12 @@ public:
                << "object file could not be loaded: " << objectAttr;
       }
     } else {
-      auto maybeChipset = amdgpu::Chipset::parse(targetArch);
-      if (failed(maybeChipset)) {
-        return variantOp.emitOpError()
-               << "could not parse AMDGPU chipset name '" << targetArch << "'";
+      FailureOr<ROCDL::TargetInfo> maybeTargetInfo = ROCDL::TargetInfo::get(
+          targetArch, /*waveSize=*/0, [&] { return variantOp.emitOpError(); });
+      if (failed(maybeTargetInfo)) {
+        return failure();
       }
-      amdgpu::Chipset chipset = *maybeChipset;
+      ROCDL::TargetInfo targetInfo = *maybeTargetInfo;
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
@@ -851,7 +851,7 @@ public:
                                   ? llvm::GlobalISelAbortMode::Enable
                                   : llvm::GlobalISelAbortMode::Disable;
         SmallVector<std::string> features;
-        if (chipset.majorVersion >= 10 && chipset.majorVersion <= 12) {
+        if (targetInfo.supportsBothWavefrontSizes()) {
           switch (subgroupSize.value_or(preferredSubgroupSize)) {
           case 32:
             isWave64 = false;
@@ -862,6 +862,8 @@ public:
             features.emplace_back("+wavefrontsize64");
             break;
           }
+        } else {
+          isWave64 = targetInfo.getWavefrontSize().value_or(64) == 64;
         }
 
         // Mixed precision fma instructions have complicated semantics on
@@ -971,8 +973,8 @@ public:
         }
 
         // Sets HIP platform globals based on the target architecture.
-        if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(), chipset,
-                                 isWave64, abiVersion))) {
+        if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(),
+                                 targetInfo, isWave64, abiVersion))) {
           return failure();
         }
       }

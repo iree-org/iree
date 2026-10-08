@@ -45,7 +45,6 @@ iree_cc_library(
     MLIRAMDGPUDialect
     MLIRAMDGPUToROCDL
     MLIRAMDGPUTransforms
-    MLIRAMDGPUUtils
     MLIRBuiltinToLLVMIRTranslation
     MLIRIR
     MLIRLLVMDialect

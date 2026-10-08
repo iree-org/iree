@@ -18,11 +18,11 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/InterleavedRange.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -915,12 +915,12 @@ bool isXORShuffleValid(int64_t numRowElems, int64_t numAccessElems,
 FailureOr<XorShuffleParams> getXorShuffleParamsForTunedChipset(
     IREE::GPU::TargetAttr target,
     IREE::Codegen::InnerTileDescAttrInterface intrinsic, int operandIndex) {
-  FailureOr<amdgpu::Chipset> maybeChipset =
-      amdgpu::Chipset::parse(target.getArch());
-  if (failed(maybeChipset)) {
+  FailureOr<ROCDL::TargetInfo> maybeTargetInfo =
+      ROCDL::TargetInfo::get(target.getArch());
+  if (failed(maybeTargetInfo)) {
     return failure();
   }
-  if (*maybeChipset == amdgpu::Chipset(9, 5, 0)) {
+  if (maybeTargetInfo->has(llvm::AMDGPU::FEAT_GFX950_INSTS)) {
     return validateXorShuffle(getXorShuffleParamsForGfx950(target, intrinsic),
                               intrinsic, operandIndex);
   }
@@ -1324,11 +1324,12 @@ bool targetSupportsGlobalLoadDMA(IREE::GPU::TargetAttr target) {
   if (!target) {
     return false;
   }
-  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(target.getArch());
-  if (failed(chipset)) {
+  FailureOr<ROCDL::TargetInfo> maybeTargetInfo =
+      ROCDL::TargetInfo::get(target.getArch());
+  if (failed(maybeTargetInfo)) {
     return false;
   }
-  return chipset->majorVersion == 9 && chipset->minorVersion >= 5;
+  return maybeTargetInfo->has(llvm::AMDGPU::FEAT_GFX950_INSTS);
 }
 
 bool targetSupportsShuffleBitwidth(IREE::GPU::TargetAttr target,

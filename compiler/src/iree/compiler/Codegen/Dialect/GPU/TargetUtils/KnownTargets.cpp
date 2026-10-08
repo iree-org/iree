@@ -12,7 +12,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -1654,19 +1654,19 @@ const ArchSeedSet &getArchSeedSet(TargetAttr target) {
   }
 
   StringRef arch = target.getArch();
-  FailureOr<amdgpu::Chipset> chipset = amdgpu::Chipset::parse(arch);
+  FailureOr<ROCDL::TargetInfo> targetInfo = ROCDL::TargetInfo::get(arch);
 
-  // CDNA4 is gfx950 (major=9, minor=5).
-  bool isCDNA4 = succeeded(chipset) && chipset->majorVersion == 9 &&
-                 chipset->minorVersion == 5;
+  // CDNA4 is gfx950.
+  bool isCDNA4 =
+      succeeded(targetInfo) && targetInfo->has(llvm::AMDGPU::FEAT_GFX950_INSTS);
   if (isCDNA4 || arch == "cdna4") {
     return kCDNA4Seeds;
   }
 
-  // RDNA4 is gfx1200/gfx1201 (major=12, minor=0). CDNA5 is gfx1250
-  // (major=12, minor=5) and should not use RDNA4 seeds.
-  bool isRDNA4 = succeeded(chipset) && chipset->majorVersion == 12 &&
-                 chipset->minorVersion <= 1;
+  // RDNA4 is gfx1200/gfx1201. CDNA5 is gfx1250, which is also a gfx12
+  // generation target but should not use RDNA4 seeds.
+  bool isRDNA4 = succeeded(targetInfo) && targetInfo->isGeneration(12) &&
+                 !targetInfo->has(llvm::AMDGPU::FEAT_GFX1250_INSTS);
   if (isRDNA4 || arch == "rdna4") {
     return kRDNA4Seeds;
   }
