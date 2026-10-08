@@ -33,7 +33,8 @@ namespace {
 /// The quantized pad uses the dequantize's zero point, which represents real
 /// zero through `(zp - zp) * scale`. Moving the pad above the dequantize makes
 /// the dequantize the immediate producer of whatever consumed the pad, and
-/// pads narrower data on the way.
+/// pads narrower data on the way. Other users of the dequantize keep reading
+/// the original one.
 struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
   using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
@@ -42,9 +43,6 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
     auto dequantizeOp = padOp.getSource().getDefiningOp<DequantizeAffineOp>();
     if (!dequantizeOp) {
       return rewriter.notifyMatchFailure(padOp, "source is not a dequantize");
-    }
-    if (!dequantizeOp->getResult(0).hasOneUse()) {
-      return rewriter.notifyMatchFailure(padOp, "dequantize has other users");
     }
     // Only a pad with real zero can move to the quantized side, where the zero
     // point represents it.
