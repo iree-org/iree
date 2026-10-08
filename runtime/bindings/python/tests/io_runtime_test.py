@@ -17,7 +17,7 @@ import iree.compiler
 import iree.runtime as rt
 
 
-TEST_COMPILED = None
+TEST_COMPILED: bytes | None = None
 TEST_ASM = r"""
 util.global private @a0 = #flow.parameter.named<"a"::"a0"> : tensor<4xi64>
 util.global private @a1 = #flow.parameter.named<"a"::"a1"> : tensor<4xi64>
@@ -33,22 +33,23 @@ func.func @echo() -> (tensor<4xi64>, tensor<4xi64>, tensor<8xi64>, tensor<8xi64>
 """
 
 
-def compile_mm_test():
+def compile_mm_test() -> bytes:
     global TEST_COMPILED
     if not TEST_COMPILED:
         TEST_COMPILED = iree.compiler.compile_str(
             TEST_ASM,
             target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
         )
+    assert TEST_COMPILED is not None, "Expected compiled module bytes"
     return TEST_COMPILED
 
 
-def create_mm_test_module(instance):
+def create_mm_test_module(instance: rt.VmInstance) -> rt.VmModule:
     binary = compile_mm_test()
     return rt.VmModule.copy_buffer(instance, binary)
 
 
-def create_index_from_arrays(**kwargs) -> rt.ParameterIndex:
+def create_index_from_arrays(**kwargs: np.ndarray) -> rt.ParameterIndex:
     idx = rt.ParameterIndex()
     for key, value in kwargs.items():
         idx.add_buffer(key, value)
@@ -56,7 +57,7 @@ def create_index_from_arrays(**kwargs) -> rt.ParameterIndex:
 
 
 class ParameterTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.instance = rt.VmInstance()
         self.device = rt.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
         self.config = rt.Config(device=self.device)
@@ -125,7 +126,7 @@ class ParameterTest(unittest.TestCase):
             self._create_archive_provider_after_caller_close
         )
 
-    def test_index_provider_module(self):
+    def test_index_provider_module(self) -> None:
         a0 = np.asarray([1] * 4, dtype=np.int64)
         a1 = np.asarray([2] * 4, dtype=np.int64)
         b0 = np.asarray([3] * 8, dtype=np.int64)
