@@ -667,8 +667,9 @@ class BenchmarkLifecycleTest(unittest.TestCase):
                     dispatch_statistics=True,
                     enable_output_processing=True,
                 )
-                self.assertIn("child_list[0]: i32=4\n", stdout)
-                self.assertIn("4xf32=4 4 4 4\n", stdout)
+                lines = stdout.splitlines()
+                self.assertIn("child_list[0]: i32=4", lines)
+                self.assertIn("4xf32=4 4 4 4", lines)
 
     def test_dispatch_rows_for_dispatch_benchmarks(self):
         # Both discovery and selection report the one call per repetition.
