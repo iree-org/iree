@@ -564,6 +564,26 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  IREE_ASSERT_ARGUMENT(command_buffer);
+  if (target_ref.length == 0) {
+    // No-op flush. All other validation is skipped.
+    return iree_ok_status();
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IF_VALIDATING(command_buffer, {
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_hal_command_buffer_flush_buffer_validation(
+                command_buffer, VALIDATION_STATE(command_buffer), target_ref));
+  });
+  iree_status_t status = _VTABLE_DISPATCH(command_buffer, flush_buffer)(
+      command_buffer, target_ref);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
     iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,
     iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
