@@ -1645,6 +1645,51 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
 
 // TODO(benvanik): event ops.
 
+def HAL_CommandBufferFlushBufferOp : HAL_Op<"command_buffer.flush_buffer"> {
+  let summary = [{Makes prior writes available to external consumers.}];
+  let description = [{
+    Makes prior writes to the target buffer range available to external
+    consumers.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `,` $length `]`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_CommandBufferInvalidateBufferOp
+    : HAL_Op<"command_buffer.invalidate_buffer"> {
+  let summary = [{Makes external writes visible to subsequent consumers.}];
+  let description = [{
+    Makes external writes to the target buffer range visible to subsequent
+    consumers.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `,` $length `]`
+    attr-dict-with-keyword
+  }];
+}
+
 def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
   let summary = [{Command buffer buffer fill recording operation.}];
   let description = [{
