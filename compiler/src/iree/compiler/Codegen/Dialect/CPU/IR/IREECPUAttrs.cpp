@@ -490,7 +490,13 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
-  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16: {
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32: {
     int64_t vl = vlen / 8;
     return isMNSwapped(intrinsic) ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
   }
@@ -748,11 +754,17 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
     return {f32, f32, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_X86_AVX512_16x1x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
     return {f16, f16, f32};
   case MMAIntrinsic::MMA_X86_AVX512FP16_1x32x1_F16_F16:
   case MMAIntrinsic::MMA_X86_AVX512FP16_32x1x1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32:
     return {f16, f16, f16};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
@@ -1001,7 +1013,7 @@ static Value extractNxv8ToFixed(OpBuilder &b, Location loc, Value v,
   return vector::ScalableExtractOp::create(b, loc, fixedTy, v, /*pos=*/0);
 }
 
-// RVV `.vf` FMA (`vfmacc` / `vfwmaccbf16`). Enum bit 0 selects which operand
+// RVV `.vf` FMA (`vfmacc` / `vfwmacc`). Enum bit 0 selects which operand
 // is the scalar (swapped => RHS). The vector operand is inserted into nxv8 so
 // 8 * vscale == vlen/8 lanes. ACC is left scalable when the caller already
 // legalized it (hoisted out of K). frm=7 is DYN; policy=1 is tail-agnostic.
@@ -1064,9 +1076,16 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     return lowerX86Avx512Vnni16x16x2I8(builder, loc, lhs, rhs, acc);
   }
   if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32 ||
-      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32) {
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16) {
     return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
                                 "llvm.riscv.vfmacc");
+  }
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16) {
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
+                                "llvm.riscv.vfwmacc");
   }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
@@ -1080,6 +1099,16 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     }
     return arith::ExtSIOp::create(builder, loc, wideTy, v);
   };
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32) {
+    Type f32 = builder.getF32Type();
+    Value wideLhs = widen(lhs, f32);
+    Value wideRhs = widen(rhs, f32);
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, wideLhs, wideRhs,
+                                acc, "llvm.riscv.vfmacc");
+  }
 
   // For *_CAST* intrinsics, widen lhs/rhs to the intrinsic's element type
   // *before* the broadcast below. The alternative — widening after the
@@ -1354,13 +1383,41 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
                                      getVlen());
   };
   if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32 ||
-      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32) {
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32) {
     int64_t lanes = getVlen() / 8;
-    auto legalizeAcc = [](OpBuilder &b, Location loc, Value v) -> Value {
+    bool widenF16Acc =
+        intrinsic ==
+            MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
+        intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32;
+    auto legalizeAcc = [widenF16Acc](OpBuilder &b, Location loc,
+                                     Value v) -> Value {
+      // Zvfhmin has no f16 MAC. extf here and truncf in restoreAcc are
+      // inverses, so the f32 accumulator hoists across K.
+      if (widenF16Acc) {
+        Type f32 = b.getF32Type();
+        auto vt = cast<VectorType>(v.getType());
+        v = arith::ExtFOp::create(b, loc, VectorType::get(vt.getShape(), f32),
+                                  v, arith::FastMathFlagsAttr{});
+      }
       return insertFixedIntoNxv8(b, loc, v);
     };
-    auto restoreAcc = [lanes](OpBuilder &b, Location loc, Value v) -> Value {
-      return extractNxv8ToFixed(b, loc, v, lanes);
+    auto restoreAcc = [lanes, widenF16Acc](OpBuilder &b, Location loc,
+                                           Value v) -> Value {
+      v = extractNxv8ToFixed(b, loc, v, lanes);
+      if (widenF16Acc) {
+        auto vt = cast<VectorType>(v.getType());
+        v = arith::TruncFOp::create(
+            b, loc, VectorType::get(vt.getShape(), b.getF16Type()), v);
+      }
+      return v;
     };
     return Codegen::buildDataTiledMMAUnderlyingOperations(
         builder, loc, getSwizzle(*this, /*operandIdx=*/0),
