@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import array
+from collections.abc import Callable
+import gc
 import logging
 import numpy as np
 from pathlib import Path
@@ -15,7 +17,7 @@ import iree.compiler
 import iree.runtime as rt
 
 
-TEST_COMPILED = None
+TEST_COMPILED: bytes | None = None
 TEST_ASM = r"""
 util.global private @a0 = #flow.parameter.named<"a"::"a0"> : tensor<4xi64>
 util.global private @a1 = #flow.parameter.named<"a"::"a1"> : tensor<4xi64>
@@ -31,22 +33,23 @@ func.func @echo() -> (tensor<4xi64>, tensor<4xi64>, tensor<8xi64>, tensor<8xi64>
 """
 
 
-def compile_mm_test():
+def compile_mm_test() -> bytes:
     global TEST_COMPILED
     if not TEST_COMPILED:
         TEST_COMPILED = iree.compiler.compile_str(
             TEST_ASM,
             target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
         )
+    assert TEST_COMPILED is not None, "Expected compiled module bytes"
     return TEST_COMPILED
 
 
-def create_mm_test_module(instance):
+def create_mm_test_module(instance: rt.VmInstance) -> rt.VmModule:
     binary = compile_mm_test()
     return rt.VmModule.copy_buffer(instance, binary)
 
 
-def create_index_from_arrays(**kwargs) -> rt.ParameterIndex:
+def create_index_from_arrays(**kwargs: np.ndarray) -> rt.ParameterIndex:
     idx = rt.ParameterIndex()
     for key, value in kwargs.items():
         idx.add_buffer(key, value)
@@ -54,12 +57,76 @@ def create_index_from_arrays(**kwargs) -> rt.ParameterIndex:
 
 
 class ParameterTest(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.instance = rt.VmInstance()
         self.device = rt.get_device(iree.compiler.core.DEFAULT_TESTING_DRIVER)
         self.config = rt.Config(device=self.device)
 
-    def test_index_provider_module(self):
+    def _create_async_archive_provider(
+        self, path: Path, scope: str
+    ) -> rt.ParameterProvider:
+        index = rt.ParameterIndex()
+        index.load(str(path), mode="file_async")
+        handle, _ = index.items()[0][1].file_storage
+        self.assertTrue(handle.is_async)
+        return index.create_provider(scope=scope)
+
+    def _create_archive_provider_after_caller_close(
+        self, path: Path, scope: str
+    ) -> rt.ParameterProvider:
+        index = rt.ParameterIndex()
+        with open(path, "rb") as source:
+            handle = rt.FileHandle.wrap_fd(source.fileno())
+            index.load_from_file_handle(handle, "irpa")
+        # The original Python file is closed before any parameter use.
+        return index.create_provider(scope=scope)
+
+    def _run_archive_provider_module(
+        self,
+        directory: Path,
+        expected: list[np.ndarray],
+        create_provider: Callable[[Path, str], rt.ParameterProvider],
+    ) -> None:
+        providers = []
+        for scope, arrays in (("a", expected[:2]), ("b", expected[2:])):
+            path = directory / f"{scope}.irpa"
+            rt.save_archive_file(
+                {f"{scope}{i}": value for i, value in enumerate(arrays)}, path
+            )
+            providers.append(create_provider(path, scope))
+        parameter_module = rt.create_io_parameters_module(self.instance, *providers)
+        del providers
+        gc.collect()
+        modules = rt.load_vm_modules(
+            parameter_module,
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
+        )
+        actual = modules[-1].echo()
+        for i, (want, got) in enumerate(zip(expected, actual)):
+            np.testing.assert_array_equal(want, got, err_msg=f"parameter {i}")
+
+    def _check_archive_provider_module(
+        self, create_provider: Callable[[Path, str], rt.ParameterProvider]
+    ) -> None:
+        expected = [
+            np.arange(n, dtype=np.int64) + i * 10 for i, n in enumerate((4, 4, 8, 8))
+        ]
+
+        with tempfile.TemporaryDirectory() as td:
+            self._run_archive_provider_module(Path(td), expected, create_provider)
+            gc.collect()
+
+    def test_async_archive_provider_module(self) -> None:
+        self._check_archive_provider_module(self._create_async_archive_provider)
+
+    def test_archive_provider_after_caller_close(self) -> None:
+        self._check_archive_provider_module(
+            self._create_archive_provider_after_caller_close
+        )
+
+    def test_index_provider_module(self) -> None:
         a0 = np.asarray([1] * 4, dtype=np.int64)
         a1 = np.asarray([2] * 4, dtype=np.int64)
         b0 = np.asarray([3] * 8, dtype=np.int64)
