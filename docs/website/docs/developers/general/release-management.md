@@ -203,10 +203,23 @@ We periodically promote one of these candidates to a "stable" release.
 
 ## :octicons-rocket-16: Running a release
 
-A pinned issue tracking the next release should be filed like
-<https://github.com/iree-org/iree/issues/18380>. Developers authoring patches
-that include major or breaking changes should coordinate merge timing and
-contribute release notes on those issues.
+Developers authoring patches that include major or breaking changes should
+coordinate merge timing and contribute release notes on the pinned issue that
+tracks the next release. A pinned issue tracking the release should be filed, based on
+[release-tracker-template.md](https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/release-tracker-template.md):
+copy it, replace the placeholders, and file it with the GitHub CLI:
+
+```bash
+cp docs/website/docs/developers/general/release-tracker-template.md /tmp/release-tracker.md
+# Fill in the version, release date and previous release in /tmp/release-tracker.md.
+gh issue create --repo iree-org/iree \
+  --title "Release Tracker vX.Y.Z - (YYYY-MM-DD)" \
+  --body-file /tmp/release-tracker.md
+gh issue pin <issue number> --repo iree-org/iree
+```
+
+Until the release, watch for major or breaking changes and decide whether to
+batch them with this release or defer them until the next one.
 
 ### :material-check-all: Picking a candidate to promote
 
@@ -223,44 +236,108 @@ When you've identified a potential candidate, comment on the tracking issue with
 the proposal and solicit feedback. People may point out known regressions or
 request that some feature make the cut.
 
+### :octicons-note-16: Compiling release notes
+
+Release notes are collected on the tracking issue, where either contributors add
+announcements and notable changes as they land, or they are collected on release day.
+
+Generate the "New contributors" list and the full changelog for the range from the previous stable release to the candidate, e.g. with the "Generate release notes" button when drafting a GitHub release, or:
+```bash
+gh api repos/iree-org/iree/releases/generate-notes \
+  -f tag_name=v3.12.0 \
+  -f target_commitish=iree-3.12.0rc20260917 \
+  -f previous_tag_name=v3.11.0 --jq .body
+```
+
+The "Release notes" section of the
+[release tracker template](https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/release-tracker-template.md)
+has the expected structure.
+
+The header of the release notes lists the VMFB bytecode version and the HAL
+module version, and whether they changed since the previous release:
+
+* VMFB bytecode version: `IREE_VM_BYTECODE_VERSION_MAJOR` and
+  `IREE_VM_BYTECODE_VERSION_MINOR`.
+* HAL module version: `IREE_HAL_MODULE_VERSION_LATEST`.
+
 ### :octicons-package-dependents-16: Promoting a candidate to stable
 
 1. (Authorized users only) Push to PyPI using
-    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
+    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh).
+    The script is a dry run by default. Check its output, then pass
+    `--publish` to upload. Keep the whl folder for upload to GitHub.
 
 2. Create a new release on GitHub:
 
-    * Set the tag to be created and select a target commit. For example, if the
+    * Create a new GitHub draft release (via the WebUI or CLI). Set the tag to be created and select a target commit. For example, if the
         candidate release was tagged `iree-3.1.0rc20241119` at commit `3ed07da`,
-        set the new release tag `v3.1.0` and use the same commit.
+        set the new release tag `v3.1.0` and use the same commit. GitHub
+        creates the tag when the release is published, so nothing needs to be
+        pushed beforehand.
 
         ![rename_tag](./release-tag.png)
 
-        If the commit does not appear in the list, create and push a tag
-        manually:
+        The target picker only lists recent commits. If the candidate's commit
+        does not appear there, create and push the tag yourself, then select it
+        as an existing tag:
 
         ```bash
-        git checkout iree-3.1.0rc20250107
-        git tag -a v3.1.0 -m "Version 3.1.0 release."
-        git push upstream v3.1.0
+        git tag -a v3.1.0 iree-3.1.0rc20241119 -m "Version 3.1.0 release."
+        git rev-parse 'v3.1.0^{commit}'  # Check that this is the candidate's commit.
+        git push upstream refs/tags/v3.1.0  # Pushes only the tag.
+        ```
+
+        The release can also be created from the command line. `gh` creates
+        the tag on publish, the same way the web UI does. The command also sets
+        the title and release notes from the next two steps. The assets are
+        uploaded to the draft later. You can extract the release notes `notes.md` from the release
+        tracking issue.
+
+        ```bash
+        gh issue view <issue number> --repo iree-org/iree --json body --jq .body \
+          | tr -d '\r' \
+          | awk 'started { print; next } prev == "---" && $0 == "---" { started = 1 } { prev = $0 }' \
+          > notes.md
+        gh release create v3.1.0 --repo iree-org/iree \
+          --target "$(git rev-parse 'iree-3.1.0rc20241119^{commit}')" \
+          --draft --title "Release v3.1.0" --notes-file notes.md
         ```
 
     * Set the title to `Release vX.Y.Z`.
 
     * Paste the release notes from the release tracking issue.
 
-    * Upload the `.whl` files produced by the `pypy_deploy.sh` script (look for
-        them in your `/tmp/` directory). These have the stable release versions
-        in them.
+    * Upload the `iree-dist-*.tar.xz` files of the release candidate and
+        `.whl` files of `pypi_deploy.sh` to the release draft.
 
-    * Download the `iree-dist-.*.tar.xz` files from the candidate release and
-        upload them to the new stable release.
+        Download the `iree-dist-*.tar.xz` files from the candidate release.
 
-    * Uncheck the option for "pre-release", and check the option for "latest".
+        ```bash
+        WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
+        gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
+          --pattern 'iree-dist-*' --dir "${WHEEL_DIR}"
+        gh release upload v3.1.0 --repo iree-org/iree \
+          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/iree-dist-*.tar.xz
+        ```
+
+    * Publish the release. Uncheck the option for "pre-release", and check the
+        option for "latest" and hit publish.
 
         ![promote_release](./release-latest.png)
 
-3. Complete any remaining checkbox items on the release tracking issue then
+        Or via the CLI:
+        `gh release edit v3.1.0 --repo iree-org/iree --draft=false --latest`.
+
+3. Release the iree-turbine packages, following
+   [iree-turbine's release docs](https://github.com/iree-org/iree-turbine/blob/main/docs/infra/releasing.md).
+
+4. Increment the versions in source code to the next minor release, so that
+   nightly releases sort after the new stable release (see
+   [Versioning scheme](./versioning-scheme.md)): set `package-version` to
+   `X.{Y+1}.0.dev` in both `compiler/version.json` and `runtime/version.json`,
+   e.g. <https://github.com/iree-org/iree/pull/23866>.
+
+5. Complete any remaining checkbox items on the release tracking issue then
    close it and open a new one for the next release.
 
 ## :octicons-stack-16: Creating a patch release
@@ -273,8 +350,8 @@ request that some feature make the cut.
     <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
 
     ```shell
-    git checkout v3.0.0
-    git checkout -b v3.0.1
+    git checkout v3.12.0
+    git checkout -b v3.12.1
     ```
 
 2. Apply and commit the patches.

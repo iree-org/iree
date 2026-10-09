@@ -103,4 +103,4 @@ There are presently two build promotion processes documented:
 * Releasing IREE core packages:
   https://iree.dev/developers/general/release-management/
 * Releasing iree-turbine packages:
-  https://github.com/iree-org/iree-turbine/blob/main/docs/releasing.md
+  https://github.com/iree-org/iree-turbine/blob/main/docs/infra/releasing.md
