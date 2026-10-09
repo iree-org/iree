@@ -69,3 +69,39 @@ func.func @illegal_conv_config(%0: memref<1x11x11x576xf32>, %1: memref<5x5x576xf
   linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, lowering_config = #config, strides = dense<1> : tensor<2xi64>} ins(%0, %1 : memref<1x11x11x576xf32>, memref<5x5x576xf32>) outs(%2 : memref<1x7x7x576xf32>)
   return
 }
+
+// -----
+
+#config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0, 1], vector_common_parallel = [6, 1, 7, 32, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 3, 3, 4]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @illegal_conv_config_too_many_tile_sizes(%0: memref<36x9x9x512xf32>, %1: memref<3x3x512x512xf32>, %2: memref<36x7x7x512xf32>) attributes {
+  translation_info = #translation
+} {
+  // expected-error @+1 {{expected no more than 7 tile sizes in the distribution tiling level, but 8 were set}}
+  linalg.conv_2d_nhwc_hwcf {lowering_config = #config} ins(%0, %1 : memref<36x9x9x512xf32>, memref<3x3x512x512xf32>) outs(%2 : memref<36x7x7x512xf32>)
+  return
+}
+
+// -----
+
+#config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 64, 0, 0, 0], vector_common_parallel = [6, 1, 7, 32, 0, 0, 0]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @illegal_conv_config_missing_tiling_level(%0: memref<36x9x9x512xf32>, %1: memref<3x3x512x512xf32>, %2: memref<36x7x7x512xf32>) attributes {
+  translation_info = #translation
+} {
+  // expected-error @+1 {{expected vector_reduction is set}}
+  linalg.conv_2d_nhwc_hwcf {lowering_config = #config} ins(%0, %1 : memref<36x9x9x512xf32>, memref<3x3x512x512xf32>) outs(%2 : memref<36x7x7x512xf32>)
+  return
+}
+
+// -----
+
+#config = #iree_cpu.lowering_config<distribution = [0, 7, 7, 0, 0], vector_common_parallel = [1, 1, 7, 0, 0], vector_reduction = [0, 0, 0, 3, 4]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @illegal_conv_config_unsupported_conv(%0: memref<1x11x576xf32>, %1: memref<5x576x576xf32>, %2: memref<1x7x576xf32>) attributes {
+  translation_info = #translation
+} {
+  // expected-error @+1 {{unsupported conv types}}
+  linalg.conv_1d_nwc_wcf {lowering_config = #config} ins(%0, %1 : memref<1x11x576xf32>, memref<5x576x576xf32>) outs(%2 : memref<1x7x576xf32>)
+  return
+}
