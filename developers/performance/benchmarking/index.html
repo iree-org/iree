@@ -4704,6 +4704,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Module Benchmarks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-dispatch-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-dispatch breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6217,6 +6234,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Module Benchmarks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-dispatch-breakdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-dispatch breakdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -6433,6 +6467,41 @@ the exported function's ABI:</p>
 <p><code>--enable_output_processing</code> retains the last measured invocation's outputs
 for the usual <code>--output</code> and <code>--expected_output</code> flags, including asynchronous
 entry points. Select a single function when processing outputs.</p>
+<h3 id="per-dispatch-breakdown">Per-dispatch breakdown<a class="headerlink" href="#per-dispatch-breakdown" title="Permanent link">link</a></h3>
+<p>Pass <code>--dispatch_statistics</code> to see where the time goes. Each benchmark result
+is followed by one row per dispatch function, longest total time first:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./bazel-bin/tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/module.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>main<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="nv">64x64xf32</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>--input<span class="o">=</span><span class="nv">64x64xf32</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>--input<span class="o">=</span><span class="nv">64x32xf32</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--dispatch_statistics
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>------------------------------------------------------------------------------------------------------
+Benchmark<span class="w">                                            </span>Time<span class="w">             </span>CPU<span class="w">   </span>Iterations<span class="w"> </span>UserCounters...
+------------------------------------------------------------------------------------------------------
+BM_main/process_time/real_time<span class="w">                   </span><span class="m">0</span>.066<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.098<span class="w"> </span>ms<span class="w">        </span><span class="m">13876</span><span class="w"> </span><span class="nv">items_per_second</span><span class="o">=</span><span class="m">15</span>.1222k/s
+BM_main/main_dispatch_0_matmul_64x64x64_f32<span class="w">      </span><span class="m">0</span>.020<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.027<span class="w"> </span>ms<span class="w">        </span><span class="m">13876</span><span class="w"> </span><span class="nv">calls</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">percent</span><span class="o">=</span><span class="m">80</span>.5021
+BM_main/main_dispatch_2_matmul_64x32x64_f32<span class="w">      </span><span class="m">0</span>.005<span class="w"> </span>ms<span class="w">        </span><span class="m">0</span>.007<span class="w"> </span>ms<span class="w">        </span><span class="m">13876</span><span class="w"> </span><span class="nv">calls</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">percent</span><span class="o">=</span><span class="m">19</span>.4979
+</code></pre></div>
+<p>Dispatch rows report the time spent in that function per benchmark iteration,
+<code>calls</code> is the number of dispatches per iteration, and <code>percent</code> is the
+function's share of all dispatch time. On CPU devices the <code>CPU</code> column is the
+worker time summed over all tiles of the dispatches.</p>
+<p>After each measured repetition, Google Benchmark reruns the same function and
+batch schedule with a lightweight HAL profiling session on every device. The
+profile pass runs outside the measured interval and uses the same iteration
+budget. Dispatch rows aggregate all profiled repetitions and divide by their
+total logical iteration count. They appear in console, JSON, and CSV output,
+including <code>--benchmark_out</code> files and aggregate-only reports.</p>
+<p>Profiling executes the program again, so stateful programs observe extra
+invocations. Output processing retains the measured pass's results. Profiles
+require backend support for profiling existing command buffers and attributing
+dispatches; other backends either fail to start the session or report no
+rows. Missing attribution, unscalable timestamps, or dropped records produce a
+warning. This flag cannot be combined with the
+<a href="../device-profiling/">device profiling</a> or
+<a href="../device-replay/">device replay</a> capture flags.</p>
 <h2 id="executable-benchmarks">Executable Benchmarks<a class="headerlink" href="#executable-benchmarks" title="Permanent link">link</a></h2>
 <p>We also benchmark the performance of individual parts of the IREE system in
 isolation. IREE breaks a model down to dispatch functions. To benchmark all the
