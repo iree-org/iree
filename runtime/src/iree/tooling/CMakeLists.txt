@@ -172,6 +172,7 @@ iree_cc_test(
     iree::modules::hal
     iree::testing::gtest
     iree::testing::gtest_main
+    iree::testing::temp_file
     iree::vm
 )
 

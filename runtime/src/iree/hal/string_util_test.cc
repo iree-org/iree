@@ -506,7 +506,7 @@ struct BufferView final
   }
 
   // Returns the total number of elements stored in the view.
-  inline iree_host_size_t element_count() const noexcept {
+  inline iree_device_size_t element_count() const noexcept {
     return iree_hal_buffer_view_element_count(get());
   }
 

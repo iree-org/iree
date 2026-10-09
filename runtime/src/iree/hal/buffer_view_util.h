@@ -24,6 +24,18 @@ extern "C" {
 // Buffer view math
 //===----------------------------------------------------------------------===//
 
+// Calculates the number of elements in |shape| without wrapping on overflow.
+// Any zero dimension produces an element count of zero.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_element_count(
+    iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
+    iree_device_size_t* out_element_count);
+
+// Calculates the number of bytes for densely packed elements without wrapping
+// on overflow. A zero-bit element type produces zero bytes.
+IREE_API_EXPORT iree_status_t iree_hal_element_compute_packed_byte_count(
+    iree_hal_element_type_t element_type, iree_device_size_t element_count,
+    iree_device_size_t* out_byte_count);
+
 // Calculates the allocation size of a buffer view.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
     iree_host_size_t shape_rank, const iree_hal_dim_t* shape,

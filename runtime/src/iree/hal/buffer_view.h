@@ -116,13 +116,6 @@ typedef uint8_t iree_hal_numerical_type_t;
 #define iree_hal_element_dense_byte_count(element_type) \
   ((iree_hal_element_bit_count(element_type) + 8 - 1) / 8)
 
-// Returns the total byte count for |element_count| densely-packed elements of
-// |element_type|. For sub-byte types, multiple elements share a byte
-// (e.g. 8 i4 elements = 4 bytes). For byte-aligned types, this is equivalent
-// to element_count * iree_hal_element_dense_byte_count(element_type).
-#define iree_hal_element_packed_byte_count(element_type, element_count) \
-  (((element_count) * iree_hal_element_bit_count(element_type) + 7) / 8)
-
 // Returns true if the given |element_type| represents an integer of exactly
 // |bit_width|. This ignores the signedness of the integer type.
 #define iree_hal_element_type_is_integer(element_type, bit_width) \
@@ -273,7 +266,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_reshape(
     iree_host_size_t shape_rank);
 
 // Returns the total number of elements stored in the view.
-IREE_API_EXPORT iree_host_size_t
+IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_view_element_count(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the element type of the buffer.
