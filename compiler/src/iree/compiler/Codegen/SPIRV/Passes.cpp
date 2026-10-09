@@ -614,9 +614,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
 
   // Handle vector reduction operations specifically.
-  VectorReductionToGPUPassOptions options;
-  options.expandSubgroupReduction = false;
-  funcPassManager.addPass(createVectorReductionToGPUPass(options));
+  funcPassManager.addPass(createVectorReductionToGPUPass());
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(funcPassManager);

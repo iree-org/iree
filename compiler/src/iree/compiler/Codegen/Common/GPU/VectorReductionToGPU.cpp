@@ -345,13 +345,11 @@ struct VectorReductionToGPUPass final
         funcOp->emitOpError("missing subgroup size");
         return signalPassFailure();
       }
-      auto groupReductionFn = [subgroupSize, &expandSubgroupReduction =
-                                                 this->expandSubgroupReduction](
-                                  Location loc, OpBuilder &builder, Value input,
-                                  vector::CombiningKind kind,
-                                  uint32_t size) -> Value {
+      auto groupReductionFn =
+          [subgroupSize](Location loc, OpBuilder &builder, Value input,
+                         vector::CombiningKind kind, uint32_t size) -> Value {
         return emitGPUGroupReduction(loc, builder, input, kind, size,
-                                     *subgroupSize, expandSubgroupReduction);
+                                     *subgroupSize);
       };
       auto distributionFn = [](Value val) {
         auto vecType = dyn_cast<VectorType>(val.getType());

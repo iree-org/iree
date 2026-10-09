@@ -28,9 +28,6 @@ func.func @subgroup_reduce() {
 // CHECK-LABEL: spirv.func @subgroup_reduce
 
 // CHECK-DAG:   %[[C0:.+]] = spirv.Constant 0 : i32
-// CHECK-DAG:   %[[C1:.+]] = spirv.Constant 1 : i32
-// CHECK-DAG:   %[[C2:.+]] = spirv.Constant 2 : i32
-// CHECK-DAG:   %[[C4:.+]] = spirv.Constant 4 : i32
 // CHECK-DAG:   %[[F0:.+]] = spirv.Constant 0.000000e+00 : f32
 // CHECK-DAG:   %[[FV0:.+]] = spirv.Constant dense<0.000000e+00> : vector<4xf32>
 // CHECK-DAG:   %[[FV1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf32>
@@ -56,14 +53,9 @@ func.func @subgroup_reduce() {
 // CHECK:   spirv.ControlBarrier <Workgroup>, <Workgroup>, <AcquireRelease|WorkgroupMemory>
 
 // CHECK:   %[[LOAD_VAL:.+]] = spirv.Load "Workgroup" {{.+}} : f32
-// CHECK:   %[[S4:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[LOAD_VAL]], %[[C1]] : f32, i32
-// CHECK:   %[[ADD7:.+]] = spirv.FAdd %[[LOAD_VAL]], %[[S4]] : f32
-// CHECK:   %[[S5:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD7]], %[[C2]] : f32, i32
-// CHECK:   %[[ADD8:.+]] = spirv.FAdd %[[ADD7]], %[[S5]] : f32
-// CHECK:   %[[S6:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD8]], %[[C4]] : f32, i32
-// CHECK:   %[[ADD9:.+]] = spirv.FAdd %[[ADD8]], %[[S6]] : f32
-// CHECK:   %[[S7:.+]] = spirv.GroupNonUniformShuffle <Subgroup> %[[ADD9]], %[[C0]] : f32, i32
-// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[S7]], %[[F0]] : f32
+// CHECK:   %[[PAD:.+]] = spirv.Select {{.*}}, %{{.*}}, %[[LOAD_VAL]] : i1, f32
+// CHECK:   %[[REDUCED:.+]] = spirv.GroupNonUniformFAdd <Subgroup> <Reduce> %[[PAD]] : f32 -> f32
+// CHECK:   %[[ADD10:.+]] = spirv.FAdd %[[REDUCED]], %[[F0]] : f32
 
 // CHECK:   spirv.mlir.selection {
 // CHECK:     spirv.BranchConditional %[[WG_EQ0]], ^bb1, ^bb2

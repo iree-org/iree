@@ -482,11 +482,6 @@ def VectorReductionToGPUPass :
     "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
     "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
   ];
-  let options = [
-    Option<"expandSubgroupReduction", "expand-subgroup-reduction", "bool",
-           /*default=*/"true",
-           "Lower subgroup reductions to gpu ops immediately where possible.">,
-  ];
 }
 
 def ExpandGPUOpsPass :

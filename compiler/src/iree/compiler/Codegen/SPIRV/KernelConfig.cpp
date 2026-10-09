@@ -1465,10 +1465,9 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     parallelSize /= 2;
   }
 
-  // Current warp reduction pattern is a two step butterfly warp reduce.
-  // First, do warp reductions along multiple subgroups.
-  // Second, reduce results from multiple subgroups using single warp reduce.
-  // The final warp reduce requires subgroup count <= subgroup size to work.
+  // Each subgroup reduces its own lanes, then one more subgroup reduction
+  // combines those partials. The second step needs the subgroup count to be
+  // at most the subgroup size.
   if ((groupSize / subgroupSize) > subgroupSize) {
     return failure();
   }

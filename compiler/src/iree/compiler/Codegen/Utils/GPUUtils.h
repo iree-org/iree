@@ -142,11 +142,10 @@ void propagateSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 /// Inserts barriers before and after shared memory copy.
 void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 
-/// Emit reduction across a group for a given input. Emits `gpu.shuffle`
-/// based reduction only when `expandSubgroupReduce` is set.
+/// Emit reduction across a group for a given input using `gpu.subgroup_reduce`.
 Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
-                            int warpSize, bool expandSubgroupReduce);
+                            int warpSize);
 
 /// Return the native size of an operation used in contraction calculation.
 // TODO: Make this take HW specific sizes.

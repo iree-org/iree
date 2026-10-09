@@ -33,11 +33,7 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 }
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch_0
-//     CHECK-DAG:    %[[C0I:.+]] = arith.constant 0 : i32
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-//     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
-//     CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : i32
-//     CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : i32
 //     CHECK-DAG:    %[[C32I:.+]] = arith.constant 32 : index
 //     CHECK-DAG:    %[[C512:.+]] = arith.constant 512 : index
 //     CHECK-DAG:    %[[C10240:.+]] = arith.constant 10240 : index
@@ -61,12 +57,9 @@ func.func @warp_reduction_dispatch_0() attributes {hal.executable.target = #exec
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    %[[LANE_ID_IN_BOUNDS:.*]] = arith.minui %[[LANE_ID]]
 //         CHECK:    %[[LOAD_VAL:.+]] = memref.load %[[ALLOC]][%[[LANE_ID_IN_BOUNDS]]] : memref<4xf32, #gpu.address_space<workgroup>>
-//         CHECK:    %[[S5:.+]], %{{.*}} = gpu.shuffle xor %[[LOAD_VAL]], %[[C1]], %[[C32]] : f32
-//         CHECK:    %[[R7:.+]] = arith.addf %[[LOAD_VAL]], %[[S5]] : f32
-//         CHECK:    %[[S6:.+]], %{{.*}} = gpu.shuffle xor %[[R7]], %[[C2]], %[[C32]] : f32
-//         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
-//         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle idx %[[R8]], %[[C0I]], %[[C32]] : f32
-//         CHECK:    %[[R12:.+]] = arith.addf %[[S7]], %[[CF]] : f32
+//         CHECK:    %[[PAD:.+]] = arith.select {{.*}}, %{{.*}}, %[[LOAD_VAL]] : f32
+//         CHECK:    %[[REDUCED:.+]] = gpu.subgroup_reduce add %[[PAD]] : (f32) -> f32
+//         CHECK:    %[[R12:.+]] = arith.addf %[[REDUCED]], %[[CF]] : f32
 //         CHECK:    %[[R13:.+]] = vector.broadcast %[[R12]] : f32 to vector<1xf32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
@@ -115,11 +108,6 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 
 //   CHECK-LABEL:  func.func @warp_reduction_dispatch_1
 
-//     CHECK-DAG:    %[[I0:.+]] = arith.constant 0 : i32
-//     CHECK-DAG:    %[[I1:.+]] = arith.constant 1 : i32
-//     CHECK-DAG:    %[[I2:.+]] = arith.constant 2 : i32
-//     CHECK-DAG:    %[[I32:.+]] = arith.constant 32 : i32
-
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 //     CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
 //     CHECK-DAG:    %[[C9216:.+]] = arith.constant 9216 : index
@@ -136,12 +124,9 @@ func.func @warp_reduction_dispatch_1() attributes {hal.executable.target = #exec
 //         CHECK:      %[[DELIN:.+]]:2 = affine.delinearize_index %{{.+}} into (10, 9216)
 //         CHECK:      %[[TIDX:.+]] = gpu.thread_id  x
 //         CHECK:      gpu.barrier memfence [#gpu.address_space<workgroup>]
-//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32
-//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I2]], %[[I32]] : i32
-//         CHECK:      %{{.+}}, %{{.+}} = gpu.shuffle  idx %{{.+}}, %[[I0]], %[[I32]] : i32
-//         CHECK:      %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
-//         CHECK:      %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
-//         CHECK:      %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
+//         CHECK:      %[[PARTIAL:.+]] = arith.select {{.*}} : f16
+//         CHECK:      %[[REDUCED:.+]] = gpu.subgroup_reduce add %[[PARTIAL]] : (f16) -> f16
+//         CHECK:      %[[ADD1:.+]] = arith.addf %[[REDUCED]], %[[F0]] : f16
 //         CHECK:      %[[BROADCAST:.+]] = vector.broadcast %[[ADD1]] : f16 to vector<4xf16>
 //         CHECK:      scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:        %[[OFFSET:.+]] = affine.apply {{.*}}(%[[IV]])[%[[TIDX]]]
@@ -196,16 +181,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    arith.minui
 //         CHECK:    memref.load
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.maxnumf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.maxnumf
+//         CHECK:    gpu.subgroup_reduce maxnumf
 //         CHECK:    vector.broadcast %{{.*}} : f32 to vector<4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read
@@ -221,16 +197,7 @@ func.func @softmax() attributes {hal.executable.target = #executable_target_vulk
 //         CHECK:    }
 //         CHECK:    gpu.barrier memfence [#gpu.address_space<workgroup>]
 //         CHECK:    memref.load
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.addf
-//         CHECK:    gpu.shuffle xor
-//         CHECK:    arith.addf
+//         CHECK:    gpu.subgroup_reduce add
 //         CHECK:    arith.addf
 //         CHECK:    vector.broadcast
 //         CHECK:    vector.broadcast
@@ -335,3 +302,41 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:           %[[DIV:.+]] = arith.divf %[[EXP]], %[[SUM_BCAST]] : vector<1xf16>
 // CHECK:           vector.transfer_write %[[DIV]], {{.*}} %[[MASK3]] {{.*}} : vector<1xf16>, memref<32x?xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK:         }
+
+// -----
+
+// Lanes without a per-warp partial must see the i32 maxsi identity, which is
+// INT32_MIN. A truncated 64-bit limit would be 0.
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle|arithmetic,
+    subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @warp_reduction_maxsi() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %cst = arith.constant 0 : i32
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x256xi32>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xi32>>
+  %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 256], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<2x256xi32>> -> tensor<2x256xi32>
+  %3 = tensor.empty() : tensor<2xi32>
+  %4 = linalg.fill ins(%cst : i32) outs(%3 : tensor<2xi32>) -> tensor<2xi32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<2x256xi32>) outs(%4 : tensor<2xi32>) {
+  ^bb0(%in: i32, %out: i32):
+    %6 = arith.maxsi %in, %out : i32
+    linalg.yield %6 : i32
+  } -> tensor<2xi32>
+  iree_tensor_ext.dispatch.tensor.store %5, %1, offsets = [0], sizes = [2], strides = [1] : tensor<2xi32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<2xi32>>
+  return
+}
+
+// CHECK-LABEL: func.func @warp_reduction_maxsi
+// CHECK-DAG:   %[[IDENT:.+]] = arith.constant -2147483648 : i32
+// CHECK:       arith.select %{{.*}}, %[[IDENT]], %{{.*}} : i32
+// CHECK:       gpu.subgroup_reduce maxsi

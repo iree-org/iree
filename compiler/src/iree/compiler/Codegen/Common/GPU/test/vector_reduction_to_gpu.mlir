@@ -34,13 +34,6 @@ module {
 
 // CHECK-LABEL: func.func @simple_reduce()
 //   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : i32
-//   CHECK-DAG:   %[[C2:.*]] = arith.constant 2 : i32
-//   CHECK-DAG:   %[[C4:.*]] = arith.constant 4 : i32
-//   CHECK-DAG:   %[[C8:.*]] = arith.constant 8 : i32
-//   CHECK-DAG:   %[[C16:.*]] = arith.constant 16 : i32
-//   CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : i32
-//   CHECK-DAG:   %[[C32I:.*]] = arith.constant 32 : index
 //   CHECK-DAG:   %[[TID:.*]] = gpu.thread_id x
 //   CHECK-DAG:   %[[VCST:.*]] = arith.constant dense<0.000000e+00> : vector<1xf32>
 //       CHECK:   %[[F:.*]] = scf.for %{{.*}} = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[V0:.*]] = %[[VCST]]) -> (vector<1xf32>) {
@@ -48,17 +41,8 @@ module {
 //   CHECK-DAG:     %[[ID:.*]] = affine.apply
 //   CHECK-DAG:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
 //       CHECK:     %[[S:.*]] = vector.extract %[[V1]][0] : f32 from vector<1xf32>
-//       CHECK:     %[[S0:.*]], %{{.*}} = gpu.shuffle xor %[[S]], %[[C1]], %[[C32]] : f32
-//       CHECK:     %[[S1:.*]] = arith.addf %[[S]], %[[S0]] : f32
-//       CHECK:     %[[S2:.*]], %{{.*}} = gpu.shuffle xor %[[S1]], %[[C2]], %[[C32]] : f32
-//       CHECK:     %[[S3:.*]] = arith.addf %[[S1]], %[[S2]] : f32
-//       CHECK:     %[[S4:.*]], %{{.*}} = gpu.shuffle xor %[[S3]], %[[C4]], %[[C32]] : f32
-//       CHECK:     %[[S5:.*]] = arith.addf %[[S3]], %[[S4]] : f32
-//       CHECK:     %[[S6:.*]], %{{.*}} = gpu.shuffle xor %[[S5]], %[[C8]], %[[C32]] : f32
-//       CHECK:     %[[S7:.*]] = arith.addf %[[S5]], %[[S6]] : f32
-//       CHECK:     %[[S8:.*]], %{{.*}} = gpu.shuffle xor %[[S7]], %[[C16]], %[[C32]] : f32
-//       CHECK:     %[[S9:.*]] = arith.addf %[[S7]], %[[S8]] : f32
-//       CHECK:     %[[S10:.*]] = arith.addf %[[S9]], %[[E]] : f32
+//       CHECK:     %[[RED:.*]] = gpu.subgroup_reduce add %[[S]] : (f32) -> f32
+//       CHECK:     %[[S10:.*]] = arith.addf %[[RED]], %[[E]] : f32
 //       CHECK:     %[[B:.*]] = vector.broadcast %[[S10]] : f32 to vector<1xf32>
 //       CHECK:     scf.yield %[[B]] : vector<1xf32>
 //       CHECK:   }
@@ -108,13 +92,12 @@ module {
 //       CHECK: #[[$MAP:.+]] = affine_map<(d0) -> (d0 * 2)>
 // CHECK-LABEL: func.func @reduce_forall()
 //   CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : i32
 //       CHECK:   scf.forall (%[[WG_ID:.*]]) in (64) {
 //       CHECK:     %[[TID:.*]] = gpu.thread_id  x
 //       CHECK:     affine.apply #[[$MAP]](%[[WG_ID]])
 //       CHECK:     scf.for {{.*}} -> (vector<1xf32>) {
 //       CHECK:       vector.transfer_read {{.*}} : memref<128x384xf32>, vector<1xf32>
-// CHECK-COUNT-5:     gpu.shuffle  xor {{.*}} %[[C32]] : f32
+//       CHECK:       gpu.subgroup_reduce add {{.*}} : (f32) -> f32
 //       CHECK:       scf.yield {{.*}} : vector<1xf32>
 //       CHECK:     }
 //       CHECK:     %[[CMP:.*]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
@@ -178,7 +161,7 @@ module {
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-// CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     gpu.subgroup_reduce add {{.*}} : (f32) -> f32
 //         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
@@ -236,7 +219,7 @@ module {
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan layout({{.+}}) binding(1) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-// CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     gpu.subgroup_reduce add {{.*}} : (f32) -> f32
 //         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
@@ -321,7 +304,7 @@ module {
 //       CDNA3:     arith.mulf %{{.*}}, %{{.*}} : vector<4x8xf16>
 //       CDNA3:     arith.addf %{{.*}}, %{{.*}} : vector<4x8xf16>
 //       CDNA3:   }
-// CDNA3-COUNT-12: gpu.shuffle xor
+//  CDNA3-COUNT-4: gpu.subgroup_reduce add {{.*}} : (f16) -> f16
 //       CDNA3:   scf.if {{.*}} {
 //       CDNA3:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
 //       CDNA3:   }

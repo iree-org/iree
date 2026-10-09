@@ -443,84 +443,6 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
   return unpackedVector;
 }
 
-/// Emit warp reduction code sequence for a given scalar input value.
-static Value warpReduction(Location loc, OpBuilder &builder, Value input,
-                           vector::CombiningKind kind, uint32_t warpSize,
-                           uint32_t numLaneToReduce,
-                           bool expandSubgroupReduce) {
-  assert(llvm::isPowerOf2_32(numLaneToReduce));
-  assert((isa<IntegerType, FloatType>(input.getType())) &&
-         "Input must be a scalar");
-  IntegerType shuffleIntType = builder.getIntegerType(kShuffleBitWidth);
-  Type origInputType = input.getType();
-  const unsigned origBitWidth = origInputType.getIntOrFloatBitWidth();
-  assert(origBitWidth <= kShuffleBitWidth && "Unsupported input type bitwidth");
-
-  const bool needsPacking = kShuffleBitWidth != origBitWidth;
-  IntegerType equivIntType = builder.getIntegerType(origBitWidth);
-
-  // Defer expansion of subgroup reduction until later in pass pipeline to
-  // enable conditional lowering to DPP ops, for potential perf gains over
-  // gpu.shuffle ops.
-  if (!expandSubgroupReduce && numLaneToReduce <= warpSize &&
-      warpSize % numLaneToReduce == 0) {
-    gpu::AllReduceOperation gpuReduceKind = combiningKindToAllReduce(kind);
-
-    // SPIRV currently doesn't have a lowering for clustered reduction,
-    // so if possible avoid adding problematic attribute until it is supported.
-    if (numLaneToReduce == warpSize) {
-      return gpu::SubgroupReduceOp::create(builder, loc, input, gpuReduceKind,
-                                           /*uniform=*/false);
-    }
-    return gpu::SubgroupReduceOp::create(builder, loc, input, gpuReduceKind,
-                                         /*uniform=*/false, numLaneToReduce);
-  }
-
-  // Otherwise, perform the shuffles over the supported scalar type. For inputs
-  // of smaller bitwidth, perform packing and unpacking via the supported
-  // integer type.
-  auto unpack = [loc, &builder, needsPacking, equivIntType,
-                 origInputType](Value packedVal) -> Value {
-    if (!needsPacking) {
-      return packedVal;
-    }
-    auto asInt = arith::TruncIOp::create(builder, loc, equivIntType, packedVal);
-    return arith::BitcastOp::create(builder, loc, origInputType, asInt);
-  };
-
-  auto pack = [loc, &builder, needsPacking, equivIntType,
-               shuffleIntType](Value unpackedVal) -> Value {
-    if (!needsPacking) {
-      return unpackedVal;
-    }
-    auto asInt =
-        arith::BitcastOp::create(builder, loc, equivIntType, unpackedVal);
-    return arith::ExtUIOp::create(builder, loc, shuffleIntType, asInt);
-  };
-
-  // Lane value always stays in the original type. We use it to perform arith
-  // reductions.
-  Value laneVal = input;
-  // Parallel reduction using butterfly shuffles.
-  for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
-    Value shuffled = gpu::ShuffleOp::create(builder, loc, pack(laneVal), i,
-                                            /*width=*/warpSize,
-                                            /*mode=*/gpu::ShuffleMode::XOR)
-                         .getShuffleResult();
-    laneVal = makeArithReduction(builder, loc, kind, laneVal, unpack(shuffled));
-  }
-  // Broadcast the result to all the lanes.
-  if (warpSize != numLaneToReduce) {
-    Value shuffled = gpu::ShuffleOp::create(builder, loc, pack(laneVal), 0,
-                                            /*width=*/warpSize,
-                                            /*mode=*/gpu::ShuffleMode::IDX)
-                         .getShuffleResult();
-    laneVal = unpack(shuffled);
-  }
-
-  return laneVal;
-}
-
 // List of identity elements by operation.
 // https://en.wikipedia.org/wiki/Identity_element
 static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
@@ -536,13 +458,20 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
     return builder.getFloatAttr(type, 1);
   }
   case vector::CombiningKind::MINUI:
+    return builder.getIntegerAttr(
+        type, APInt::getMaxValue(type.getIntOrFloatBitWidth()));
   case vector::CombiningKind::MINSI:
-    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::max());
+    return builder.getIntegerAttr(
+        type, APInt::getSignedMaxValue(type.getIntOrFloatBitWidth()));
   case vector::CombiningKind::MAXUI:
+    return builder.getIntegerAttr(type,
+                                  APInt::getZero(type.getIntOrFloatBitWidth()));
   case vector::CombiningKind::MAXSI:
-    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::min());
+    return builder.getIntegerAttr(
+        type, APInt::getSignedMinValue(type.getIntOrFloatBitWidth()));
   case vector::CombiningKind::AND:
-    return builder.getIntegerAttr(type, 1);
+    return builder.getIntegerAttr(
+        type, APInt::getAllOnes(type.getIntOrFloatBitWidth()));
   case vector::CombiningKind::OR:
   case vector::CombiningKind::XOR:
     return builder.getZeroAttr(type);
@@ -616,71 +545,69 @@ gpu::AllReduceOperation combiningKindToAllReduce(vector::CombiningKind kind) {
 /// Emit reduction across a group for a given input.
 Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
                             vector::CombiningKind kind, uint32_t size,
-                            int warpSize, bool expandSubgroupReduce) {
+                            int warpSize) {
   assert(
       size % warpSize == 0 &&
       "Group reduction only support for sizes aligned on warp size for now.");
 
   // First reduce on a single thread to get per lane reduction value.
   Value laneVal = vector::ReductionOp::create(builder, loc, kind, input);
-  laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize,
-                          expandSubgroupReduce);
-  // Simple case -- emit `gpu.subgroup_reduce` directly.
-  if (!expandSubgroupReduce && size == warpSize) {
+  assert((isa<IntegerType, FloatType>(laneVal.getType())) &&
+         "Input must be a scalar");
+  gpu::AllReduceOperation gpuReduceKind = combiningKindToAllReduce(kind);
+  laneVal = gpu::SubgroupReduceOp::create(builder, loc, laneVal, gpuReduceKind,
+                                          /*uniform=*/false);
+  if (size == warpSize) {
     return laneVal;
   }
 
-  // More-involved case -- generate `gpu.shuffle` ops over i32 values (using the
-  // butterfly shuffle algorithm).
-  // if we have more than one warp, reduce across warps.
-  if (size > warpSize) {
-    uint32_t numWarp = size / warpSize;
-    assert(numWarp <= warpSize &&
-           "Only support 1 level, need to implement recursive/loop for this "
-           "case.");
-    auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
-        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
-    MemRefType memrefType =
-        MemRefType::get(numWarp, laneVal.getType(), MemRefLayoutAttrInterface{},
-                        addressSpaceAttr);
-    Value alloc = memref::AllocOp::create(builder, loc, memrefType);
-    Value threadX = gpu::ThreadIdOp::create(
-        builder, loc, builder.getIndexType(), gpu::Dimension::x);
-    Value cstWarpSize = arith::ConstantIndexOp::create(builder, loc, warpSize);
-    Value warpId = arith::DivUIOp::create(builder, loc, threadX, cstWarpSize);
-    Value laneId = arith::RemUIOp::create(builder, loc, threadX, cstWarpSize);
-    Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
-    Value lane0 = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
-                                        laneId, zero);
-    // Store the reduction for each warp.
-    SmallVector<Value> indices = {warpId};
-    scf::IfOp::create(builder, loc, lane0, [&](OpBuilder &b, Location l) {
-      memref::StoreOp::create(b, l, laneVal, alloc, indices);
-      scf::YieldOp::create(b, l);
-    });
-    gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
-    // Further reduce the outputs from each warps with a single warp reduce.
-    Value memrefSize =
-        arith::ConstantIndexOp::create(builder, loc, numWarp - 1);
-    Value laneIdInBounds =
-        arith::MinUIOp::create(builder, loc, laneId, memrefSize);
-    Value loadVal = memref::LoadOp::create(builder, loc, alloc, laneIdInBounds);
+  // Reduce across warps: each warp writes its partial, then one subgroup
+  // reduction combines those partials. Lanes that do not hold a partial
+  // contribute the identity so the full-subgroup reduction matches a reduction
+  // of the first `numWarp` lanes and the result is available on every lane.
+  assert(size > warpSize &&
+         "Group reduction size must be a multiple of the warp size.");
+  uint32_t numWarp = size / warpSize;
+  assert(numWarp <= warpSize &&
+         "Only support 1 level, need to implement recursive/loop for this "
+         "case.");
+  auto addressSpaceAttr = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  MemRefType memrefType =
+      MemRefType::get(numWarp, laneVal.getType(), MemRefLayoutAttrInterface{},
+                      addressSpaceAttr);
+  Value alloc = memref::AllocOp::create(builder, loc, memrefType);
+  Value threadX = gpu::ThreadIdOp::create(builder, loc, builder.getIndexType(),
+                                          gpu::Dimension::x);
+  Value cstWarpSize = arith::ConstantIndexOp::create(builder, loc, warpSize);
+  Value warpId = arith::DivUIOp::create(builder, loc, threadX, cstWarpSize);
+  Value laneId = arith::RemUIOp::create(builder, loc, threadX, cstWarpSize);
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value lane0 = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
+                                      laneId, zero);
+  // Store the reduction for each warp.
+  SmallVector<Value> indices = {warpId};
+  scf::IfOp::create(builder, loc, lane0, [&](OpBuilder &b, Location l) {
+    memref::StoreOp::create(b, l, laneVal, alloc, indices);
+    scf::YieldOp::create(b, l);
+  });
+  gpu::BarrierOp::create(builder, loc, gpu::AddressSpace::Workgroup);
+  // Further reduce the outputs from each warp with a subgroup reduction.
+  Value memrefSize = arith::ConstantIndexOp::create(builder, loc, numWarp - 1);
+  Value laneIdInBounds =
+      arith::MinUIOp::create(builder, loc, laneId, memrefSize);
+  Value loadVal = memref::LoadOp::create(builder, loc, alloc, laneIdInBounds);
+  if (numWarp < warpSize) {
     Value cstNumWarp = arith::ConstantIndexOp::create(builder, loc, numWarp);
-    if (!llvm::isPowerOf2_32(numWarp)) {
-      // Pad with identity element if numel < warpSize for valid warp reduction.
-      Value useIdentityElement = arith::CmpIOp::create(
-          builder, loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
-      numWarp = llvm::PowerOf2Ceil(numWarp);
-      Value identity =
-          getCombiningIdentityValue(loc, builder, kind, loadVal.getType());
-      loadVal = arith::SelectOp::create(builder, loc, useIdentityElement,
-                                        identity, loadVal);
-    }
-    laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp,
-                            /*expandSubgroupReduce=*/true);
+    Value useIdentityElement = arith::CmpIOp::create(
+        builder, loc, arith::CmpIPredicate::sge, laneId, cstNumWarp);
+    Value identity =
+        getCombiningIdentityValue(loc, builder, kind, loadVal.getType());
+    loadVal = arith::SelectOp::create(builder, loc, useIdentityElement,
+                                      identity, loadVal);
   }
-
-  return laneVal;
+  return gpu::SubgroupReduceOp::create(builder, loc, loadVal, gpuReduceKind,
+                                       /*uniform=*/false);
 }
 
 std::optional<SmallVector<int64_t>> getWmmaNativeVectorSize(Operation *op) {

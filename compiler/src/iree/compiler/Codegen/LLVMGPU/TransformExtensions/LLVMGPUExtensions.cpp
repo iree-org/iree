@@ -554,13 +554,12 @@ static void populatePropagateVectorDistribution(Operation *target,
                                                 RewritePatternSet &patterns,
                                                 PatternBenefit benefit,
                                                 unsigned subgroupSize) {
-  auto groupReductionFn =
-      [subgroupSize](Location loc, OpBuilder &builder, Value input,
-                     vector::CombiningKind kind, uint32_t size) {
-        return mlir::iree_compiler::emitGPUGroupReduction(
-            loc, builder, input, kind, size, subgroupSize,
-            /*expandSubgroupReduce=*/true);
-      };
+  auto groupReductionFn = [subgroupSize](
+                              Location loc, OpBuilder &builder, Value input,
+                              vector::CombiningKind kind, uint32_t size) {
+    return mlir::iree_compiler::emitGPUGroupReduction(loc, builder, input, kind,
+                                                      size, subgroupSize);
+  };
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populatePropagateWarpVectorDistributionPatterns(
       patterns, simpleDistributionFunction, simpleWarpShuffleFunction, benefit);
