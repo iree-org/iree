@@ -808,6 +808,25 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
+    queue_tests
+  SRCS
+    "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
+    "queue_test.cc"
+  DEPS
+    ::backends
+    iree::base::tooling::flags
+    iree::hal
+    iree::hal::cts::util::registry
+    iree::hal::cts::util::test_base
+    iree::hal::local::transient_buffer
+    iree::testing::gtest
+  LABELS
+    "driver=vulkan"
+    "requires-gpu-vulkan"
+)
+
+iree_cc_test(
+  NAME
     queue_host_call_tests
   SRCS
     "${PROJECT_SOURCE_DIR}/runtime/src/iree/hal/cts/util/test_main.cc"
