@@ -101,6 +101,67 @@ func.func @symmetric_per_channel(
 
 // -----
 
+// Per-channel-group parameters index the input with its last dimension split
+// into groups.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @per_channel_group(
+// CHECK: iree_linalg_ext.quantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
+// CHECK-SAME: ins({{.*}} : tensor<4x2x4xf32>, tensor<4x2xf32>, tensor<4x2xi8>)
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
+func.func @per_channel_group(
+    %input: !torch.vtensor<[4,8],f32>,
+    %scales: !torch.vtensor<[4,2],f32>,
+    %zero_points: !torch.vtensor<[4,2],si8>) -> !torch.vtensor<[4,8],f32> {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %quantized = torch.quantized_decomposed.quantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size
+      : !torch.vtensor<[4,8],f32>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],si8>, !torch.int, !torch.int, !torch.int,
+        !torch.int -> !torch.vtensor<[4,8],si8>
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %quantized, %scales, %zero_points, %minimum, %maximum, %dtype,
+      %group_size, %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],si8>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @symmetric_per_channel_group(
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map]
+// CHECK-SAME: ins({{.*}} : tensor<4x2x4xi8>, tensor<4x2xf32>)
+func.func @symmetric_per_channel_group(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %none = torch.constant.none
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %none, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>, !torch.none,
+        !torch.int, !torch.int, !torch.int, !torch.int, !torch.int
+        -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
 // Dynamic bounds cannot be represented as LinalgExt attributes. The pass
 // leaves this op for the general Torch-to-Linalg lowering that follows it.
 // CHECK-LABEL: func.func @dynamic_bounds(
@@ -146,6 +207,31 @@ func.func @out_of_range_axis(
 
 // -----
 
+// Groups that do not evenly split the last dimension cannot be expressed by
+// splitting it, so the op is left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @indivisible_group_size(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @indivisible_group_size(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 3
+  %none = torch.constant.none
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %none, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>, !torch.none,
+        !torch.int, !torch.int, !torch.int, !torch.int, !torch.int
+        -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
 // LinalgExt storage is a signless integer, so fp8 storage is left for the
 // Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @float_storage(
@@ -167,6 +253,30 @@ func.func @float_storage(%input: !torch.vtensor<[4,8],f32>)
 
 // -----
 
+// LinalgExt dequantizes to floats only, so an integer `out_dtype` is left for
+// the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @integer_dequantize_result(
+// CHECK: torch.quantized_decomposed.dequantize_per_tensor
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @integer_dequantize_result(%input: !torch.vtensor<[4,8],si8>)
+    -> !torch.vtensor<[4,8],si32> {
+  %scale = torch.constant.float 3.000000e-01
+  %zero_point = torch.constant.int 0
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %int32 = torch.constant.int 3
+  %out_dtype = torch.derefine %int32 : !torch.int to !torch.optional<int>
+  %result = torch.quantized_decomposed.dequantize_per_tensor
+      %input, %scale, %zero_point, %minimum, %maximum, %dtype, %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.float, !torch.int, !torch.int,
+        !torch.int, !torch.int, !torch.optional<int>
+        -> !torch.vtensor<[4,8],si32>
+  return %result : !torch.vtensor<[4,8],si32>
+}
+
+// -----
+
 // LinalgExt cannot mix distinct float types of equal width, so bf16 values
 // with f16 scales are left for the Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @equal_width_scale(
@@ -184,6 +294,29 @@ func.func @equal_width_scale(
       %input, %scales, %zero_points, %axis, %minimum, %maximum, %dtype
       : !torch.vtensor<[4,8],bf16>, !torch.vtensor<[4],f16>,
         !torch.vtensor<[4],si8>, !torch.int, !torch.int, !torch.int,
+        !torch.int -> !torch.vtensor<[4,8],si8>
+  return %result : !torch.vtensor<[4,8],si8>
+}
+
+// -----
+
+// quantize_affine computes in the element type of the scale, so f16 scales
+// for f32 values are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @narrow_scale_quantize(
+// CHECK: torch.quantized_decomposed.quantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.quantize_affine
+func.func @narrow_scale_quantize(
+    %input: !torch.vtensor<[4,8],f32>,
+    %scales: !torch.vtensor<[4,2],f16>,
+    %zero_points: !torch.vtensor<[4,2],si8>) -> !torch.vtensor<[4,8],si8> {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %result = torch.quantized_decomposed.quantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size
+      : !torch.vtensor<[4,8],f32>, !torch.vtensor<[4,2],f16>,
+        !torch.vtensor<[4,2],si8>, !torch.int, !torch.int, !torch.int,
         !torch.int -> !torch.vtensor<[4,8],si8>
   return %result : !torch.vtensor<[4,8],si8>
 }
