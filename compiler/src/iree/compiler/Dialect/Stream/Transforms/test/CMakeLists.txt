@@ -50,6 +50,7 @@ iree_lit_test_suite(
     "layout_slices.mlir"
     "materialize_builtins.mlir"
     "materialize_copy_on_write.mlir"
+    "materialize_cow_dispatch_cse_aliasing.mlir"
     "materialize_encodings.mlir"
     "materialize_transient_size_queries.mlir"
     "pack_constants.mlir"
