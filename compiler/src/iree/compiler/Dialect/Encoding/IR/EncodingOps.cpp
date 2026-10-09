@@ -104,6 +104,21 @@ LogicalResult UnsetEncodingOp::verify() {
   return success();
 }
 
+OpFoldResult UnsetEncodingOp::fold(FoldAdaptor operands) {
+  auto setEncodingOp = getSource().getDefiningOp<SetEncodingOp>();
+  if (!setEncodingOp) {
+    return {};
+  }
+  if (setEncodingOp.getSourceType() != getResultType()) {
+    return {};
+  }
+  // Both ops must agree on the dynamic values the encoding is resolved with.
+  if (!llvm::equal(setEncodingOp.getEncodingDims(), getEncodingDims())) {
+    return {};
+  }
+  return setEncodingOp.getSource();
+}
+
 LogicalResult UnsetEncodingOp::reifyResultShapes(
     OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   OpBuilder::InsertionGuard g(builder);
