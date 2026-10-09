@@ -1087,20 +1087,6 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
                                 "llvm.riscv.vfwmacc");
   }
-  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32 ||
-      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32 ||
-      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
-      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32) {
-    Type f32 = builder.getF32Type();
-    auto widenF16 = [&](Value v) -> Value {
-      auto vt = cast<VectorType>(v.getType());
-      return arith::ExtFOp::create(builder, loc,
-                                   VectorType::get(vt.getShape(), f32), v,
-                                   arith::FastMathFlagsAttr{});
-    };
-    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, widenF16(lhs),
-                                widenF16(rhs), acc, "llvm.riscv.vfmacc");
-  }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
   // intrinsic only exists at the wider type.
@@ -1113,6 +1099,16 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
     }
     return arith::ExtSIOp::create(builder, loc, wideTy, v);
   };
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32) {
+    Type f32 = builder.getF32Type();
+    Value wideLhs = widen(lhs, f32);
+    Value wideRhs = widen(rhs, f32);
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, wideLhs, wideRhs,
+                                acc, "llvm.riscv.vfmacc");
+  }
 
   // For *_CAST* intrinsics, widen lhs/rhs to the intrinsic's element type
   // *before* the broadcast below. The alternative — widening after the
