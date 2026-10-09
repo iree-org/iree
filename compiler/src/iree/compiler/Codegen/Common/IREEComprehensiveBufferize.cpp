@@ -80,6 +80,7 @@ namespace {
 class EliminateEmptyTensorsPass final
     : public impl::EliminateEmptyTensorsPassBase<EliminateEmptyTensorsPass> {
 public:
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     // BufferizationDialect is needed for using type interfaces, like
     // TensorLikeType. Because the builtin types, e.g., RankedTensorType, etc.,
@@ -100,8 +101,10 @@ public:
   using Base::Base;
   explicit IREEComprehensiveBufferizePass(
       BufferizationOptions::AllocationFn allocationFn,
-      BufferizationOptions::MemCpyFn memCpyFn)
-      : allocationFn(allocationFn), memCpyFn(memCpyFn) {}
+      BufferizationOptions::MemCpyFn memCpyFn, bool allowReturnAllocsFromLoops)
+      : allocationFn(allocationFn), memCpyFn(memCpyFn) {
+    this->allowReturnAllocsFromLoops = allowReturnAllocsFromLoops;
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
@@ -219,6 +222,7 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   IRRewriter rewriter(funcOp->getContext());
   moveUpMemrefReshapeOps(rewriter, funcOp);
   auto bufferizationOptions = getBufferizationOptions();
+  bufferizationOptions.allowReturnAllocsFromLoops = allowReturnAllocsFromLoops;
   OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
   if (failed(analyzeOp(funcOp, state))) {
@@ -273,6 +277,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
+  options.allowReturnAllocsFromLoops = allowReturnAllocsFromLoops;
   options.allocationFn = allocationFn;
   options.memCpyFn = memCpyFn;
   // Disable parallel-region conflict checks to avoid conservative copies.
@@ -339,15 +344,16 @@ void IREEBufferizeConstantsPass::runOnOperation() {
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool allowReturnAllocsFromLoops) {
   if (!allocationFn) {
     allocationFn = defaultAllocationFn;
   }
   if (!memCpyFn) {
     memCpyFn = defaultMemCpyFn;
   }
-  return std::make_unique<IREEComprehensiveBufferizePass>(allocationFn.value(),
-                                                          memCpyFn.value());
+  return std::make_unique<IREEComprehensiveBufferizePass>(
+      allocationFn.value(), memCpyFn.value(), allowReturnAllocsFromLoops);
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
@@ -365,11 +371,14 @@ void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
-    std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  funcPassManager.addPass(createEliminateEmptyTensorsPass());
+    std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
+    bool allowReturnAllocsFromLoops) {
+  EliminateEmptyTensorsPassOptions eliminateOptions;
+  eliminateOptions.allowReturnAllocsFromLoops = allowReturnAllocsFromLoops;
+  funcPassManager.addPass(createEliminateEmptyTensorsPass(eliminateOptions));
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
-  funcPassManager.addPass(
-      createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
+  funcPassManager.addPass(createIREEComprehensiveBufferizePass(
+      allocationFn, memCpyFn, allowReturnAllocsFromLoops));
   addIREEPostBufferizationPasses(funcPassManager);
 }
 
