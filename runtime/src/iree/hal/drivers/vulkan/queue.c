@@ -2889,6 +2889,9 @@ static iree_status_t iree_hal_vulkan_queue_validate_host_call(
   return iree_ok_status();
 }
 
+// Validates a queue submission semaphore list
+// Foreign semaphores are explicitly allowed
+// see resolve_waits and publish_signals for how they are handled
 static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
     iree_hal_vulkan_queue_t* queue, iree_hal_semaphore_list_t semaphore_list,
     iree_string_view_t usage) {
@@ -2901,13 +2904,6 @@ static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
         (int)usage.size, usage.data, semaphore_list.count);
   }
   for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
-    iree_hal_semaphore_t* semaphore = semaphore_list.semaphores[i];
-    if (!iree_hal_vulkan_semaphore_is_local(semaphore, queue->device)) {
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "Vulkan queue %.*s semaphore %" PRIhsz
-                              " is not a local Vulkan semaphore",
-                              (int)usage.size, usage.data, i);
-    }
     if (semaphore_list.payload_values[i] > IREE_HAL_SEMAPHORE_MAX_VALUE) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
@@ -4602,6 +4598,19 @@ static iree_status_t iree_hal_vulkan_queue_resolve_waits(
     IREE_RETURN_IF_ERROR(iree_hal_semaphore_query(semaphore, &current_value));
     if (current_value >= minimum_value) continue;
 
+    // For foreign semaphores the submission must be held until the host
+    // observes the signal
+    if (!iree_hal_vulkan_semaphore_is_local(semaphore, queue->device)) {
+      if (allow_software_deferral) {
+        resolution->needs_deferral = true;
+        return iree_ok_status();
+      }
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "Vulkan queue wait on foreign semaphore %" PRIhsz
+                              " requires software deferral",
+                              i);
+    }
+
     iree_hal_vulkan_last_signal_flags_t signal_flags = 0;
     iree_async_axis_t producer_axis = 0;
     uint64_t producer_epoch = 0;
@@ -4675,9 +4684,15 @@ static void iree_hal_vulkan_queue_publish_signals(
       iree_async_fixed_frontier_as_const_frontier(&submission->frontier);
   for (iree_host_size_t i = 0; i < submission->signal_semaphore_list.count;
        ++i) {
-    iree_hal_vulkan_semaphore_publish_signal(
-        submission->signal_semaphore_list.semaphores[i], queue->axis, frontier,
-        submission->epoch, submission->signal_semaphore_list.payload_values[i]);
+    // Update last-signal cache of local semaphores
+    // Foreign semaphores observe the host-side signal at completion
+    iree_hal_semaphore_t* semaphore =
+        submission->signal_semaphore_list.semaphores[i];
+    if (iree_hal_vulkan_semaphore_is_local(semaphore, queue->device)) {
+      iree_hal_vulkan_semaphore_publish_signal(
+          semaphore, queue->axis, frontier, submission->epoch,
+          submission->signal_semaphore_list.payload_values[i]);
+    }
   }
 }
 
