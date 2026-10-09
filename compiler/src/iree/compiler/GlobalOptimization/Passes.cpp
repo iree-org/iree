@@ -136,7 +136,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
-                         createConvertConv2DToImg2ColPass)
+                         createConvertConvToIm2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
