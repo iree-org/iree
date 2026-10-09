@@ -339,3 +339,35 @@ func.func @reduction_with_permuted_consumer_and_extra_parallel_dim(
 //      CHECK:   linalg.generic
 // CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel"]
 // CHECK-SAME:       lowering_config = #[[FUSED]]
+
+// -----
+
+// A target with more than one subgroup size has the chosen size recorded so
+// the runtime can pin it. A single-size target leaves it unset.
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
+    subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @subgroup_reduce_variable_subgroup_size(%2: tensor<2x512xf32>) -> tensor<2xf32> attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %cst = arith.constant 0.000000e+00 : f32
+  %3 = tensor.empty() : tensor<2xf32>
+  %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<2xf32>) -> tensor<2xf32>
+  %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<2x512xf32>) outs(%4 : tensor<2xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %6 = arith.addf %out, %in : f32
+    linalg.yield %6 : f32
+  } -> tensor<2xf32>
+  return %5 : tensor<2xf32>
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1], [0, 512]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<SubgroupReduce> workgroup_size = [128, 1, 1] subgroup_size = 32>
+//      CHECK: func.func @subgroup_reduce_variable_subgroup_size(
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]

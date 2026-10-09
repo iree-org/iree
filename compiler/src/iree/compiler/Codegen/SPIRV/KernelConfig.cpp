@@ -1367,6 +1367,13 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   }
 
   int subgroupSize = target.getPreferredSubgroupSize();
+  // Request a subgroup size only when the target can run more than one.
+  // A single-size target already matches, and Vulkan refuses the pipeline
+  // when a size is requested but subgroupSizeControl is unavailable.
+  std::optional<int64_t> requestedSubgroupSize;
+  if (target.getMinSubgroupSize() != target.getMaxSubgroupSize()) {
+    requestedSubgroupSize = subgroupSize;
+  }
 
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1391,7 +1398,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
     if (failed(setOpConfigAndEntryPointFnTranslation(
             op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
             getSPIRVTranslationInfo(ctx, SPIRVPipeline::SubgroupReduce,
-                                    workgroupSize)))) {
+                                    workgroupSize, requestedSubgroupSize)))) {
       return failure();
     }
 
@@ -1511,7 +1518,7 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   if (failed(setOpConfigAndEntryPointFnTranslation(
           op->getParentOfType<mlir::FunctionOpInterface>(), op, config,
           getSPIRVTranslationInfo(ctx, SPIRVPipeline::SubgroupReduce,
-                                  workgroupSize)))) {
+                                  workgroupSize, requestedSubgroupSize)))) {
     return failure();
   }
 
