@@ -213,7 +213,7 @@ TEST(BufferViewUtilTest, ComputeViewSizeAllowsZeroDimensions) {
   EXPECT_EQ(0u, allocation_size);
 }
 
-TEST(BufferViewUtilTest, CreateAndReshapeRejectInvalidShapes) {
+TEST(BufferViewUtilTest, CreateAndReshapeValidateShapes) {
   iree_hal_allocator_t* allocator = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_create_heap(
       iree_make_cstring_view("host_local"), iree_allocator_system(),
@@ -296,6 +296,20 @@ TEST(BufferViewUtilTest, CreateAndReshapeRejectInvalidShapes) {
   EXPECT_EQ(1u, iree_hal_buffer_view_shape_dim(buffer_view, 1));
 
   iree_hal_buffer_view_release(buffer_view);
+
+  const iree_hal_dim_t zero_shape[] = {IREE_DEVICE_SIZE_MAX, 2, 0};
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      buffer, IREE_ARRAYSIZE(zero_shape), zero_shape,
+      IREE_HAL_ELEMENT_TYPE_INT_8, IREE_HAL_ENCODING_TYPE_OPAQUE,
+      iree_allocator_system(), &buffer_view));
+  EXPECT_EQ(0u, iree_hal_buffer_view_element_count(buffer_view));
+  const iree_hal_dim_t reshaped_zero_shape[] = {0, IREE_DEVICE_SIZE_MAX, 2};
+  IREE_ASSERT_OK(iree_hal_buffer_view_reshape(
+      buffer_view, reshaped_zero_shape, IREE_ARRAYSIZE(reshaped_zero_shape)));
+  EXPECT_EQ(0u, iree_hal_buffer_view_element_count(buffer_view));
+  EXPECT_EQ(0u, iree_hal_buffer_view_shape_dim(buffer_view, 0));
+  iree_hal_buffer_view_release(buffer_view);
+
   iree_hal_buffer_release(buffer);
   iree_hal_allocator_release(allocator);
 }

@@ -1074,30 +1074,49 @@ static iree_status_t iree_tooling_write_variant_to_binary_file(
   iree_hal_buffer_view_t* buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_tooling_create_buffer_view_from_variant(
       variant, device_allocator, host_allocator, &buffer_view));
+  iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
   iree_device_size_t byte_length =
       iree_hal_buffer_view_byte_length(buffer_view);
+  iree_device_size_t map_byte_length = byte_length;
+  if (iree_hal_buffer_view_encoding_type(buffer_view) ==
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
+    // WebGPU requires four-byte-aligned mapping lengths; do not write padding.
+    iree_device_size_t padding = (4 - byte_length % 4) % 4;
+    iree_device_size_t backing_length = iree_hal_buffer_byte_length(buffer);
+    if (byte_length <= backing_length &&
+        padding <= backing_length - byte_length &&
+        (iree_device_size_t)(iree_host_size_t)(byte_length + padding) ==
+            byte_length + padding) {
+      map_byte_length += padding;
+    }
+  } else {
+    byte_length = iree_hal_buffer_byte_length(buffer);
+    map_byte_length = byte_length;
+  }
+  iree_host_size_t host_byte_length = (iree_host_size_t)byte_length;
+  if (IREE_UNLIKELY((iree_device_size_t)host_byte_length != byte_length)) {
+    iree_hal_buffer_view_release(buffer_view);
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "binary output byte length exceeds host size");
+  }
 
   // Map the buffer memory into a host pointer so we can access it.
   iree_hal_buffer_mapping_t mapping;
   iree_status_t status = iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
-      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_HAL_WHOLE_BUFFER, &mapping);
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
+      map_byte_length, &mapping);
 
   // Write to the file from the mapped memory.
   if (iree_status_is_ok(status)) {
-    if (iree_hal_buffer_view_encoding_type(buffer_view) !=
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR) {
-      byte_length =
-          iree_hal_buffer_byte_length(iree_hal_buffer_view_buffer(buffer_view));
-    }
-    if (IREE_UNLIKELY(byte_length > mapping.contents.data_length)) {
+    if (IREE_UNLIKELY(host_byte_length > mapping.contents.data_length)) {
       status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                                 "binary output byte length %" PRIdsz
                                 " exceeds mapped buffer byte length %" PRIhsz,
                                 byte_length, mapping.contents.data_length);
     }
     if (iree_status_is_ok(status)) {
-      status = iree_io_stream_write(stream, byte_length, mapping.contents.data);
+      status =
+          iree_io_stream_write(stream, host_byte_length, mapping.contents.data);
     }
   }
 
