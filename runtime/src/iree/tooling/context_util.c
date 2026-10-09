@@ -255,7 +255,7 @@ IREE_FLAG(
     "when referenced files will be copied or staged to a different "
     "filesystem.");
 
-static bool iree_tooling_device_replay_capture_requested(void) {
+bool iree_tooling_device_replay_capture_requested(void) {
   return strlen(FLAG_device_replay_output) != 0;
 }
 

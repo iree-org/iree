@@ -7,9 +7,13 @@
 """Exercises iree-benchmark-module lifecycle contracts.
 
 Covers execution models, batching, discovery, output ownership, capture and
-failures through iree.runtime.benchmark.
+failures through iree.runtime.benchmark, and the --dispatch_statistics rows
+across them, repetitions and reporters.
 """
 
+import csv
+import io
+import json
 import os
 from pathlib import Path
 import re
@@ -86,6 +90,54 @@ func.func @main(%input: tensor<4xf32>) -> tensor<4xf32> {
 }
 """
 
+# Writes the invocation count into caller-owned storage and returns an alias.
+# A later invocation overwrites the same storage.
+STATEFUL_IN_PLACE = """
+util.global private mutable @count = 0 : i32
+util.func public @main(
+    %storage: tensor<4xf32> {iree.abi.output = 0 : index}
+) -> tensor<4xf32> {
+  %old = util.global.load @count : i32
+  %one = arith.constant 1 : i32
+  %next = arith.addi %old, %one : i32
+  util.global.store %next, @count : i32
+  %count = arith.sitofp %next : i32 to f32
+  %empty = tensor.empty() : tensor<4xf32>
+  %counts = linalg.fill ins(%count : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+  util.return %counts : tensor<4xf32>
+}
+"""
+
+# Returns a list that the module retains and updates on every invocation with
+# the invocation count and a tensor filled with it.
+STATEFUL_LIST = """
+util.global private mutable @count = 0 : i32
+util.global private @list : !util.list<?>
+util.initializer {
+  %size = arith.constant 2 : index
+  %list = util.list.create %size : !util.list<?>
+  util.list.resize %list, %size : !util.list<?>
+  util.global.store %list, @list : !util.list<?>
+  util.return
+}
+func.func @main() -> !util.list<?> {
+  %old = util.global.load @count : i32
+  %one = arith.constant 1 : i32
+  %next = arith.addi %old, %one : i32
+  util.global.store %next, @count : i32
+  %count = arith.sitofp %next : i32 to f32
+  %empty = tensor.empty() : tensor<4xf32>
+  %counts = linalg.fill ins(%count : f32) outs(%empty : tensor<4xf32>) -> tensor<4xf32>
+  %view = hal.tensor.export %counts : tensor<4xf32> -> !hal.buffer_view
+  %list = util.global.load @list : !util.list<?>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  util.list.set %list[%c0], %next : i32 -> !util.list<?>
+  util.list.set %list[%c1], %view : !hal.buffer_view -> !util.list<?>
+  return %list : !util.list<?>
+}
+"""
+
 # One dispatch, dumped as a generated dispatch benchmark.
 ABSOLUTE = """
 func.func @abs(%input: tensor<4xf32>) -> tensor<4xf32> {
@@ -94,8 +146,36 @@ func.func @abs(%input: tensor<4xf32>) -> tensor<4xf32> {
 }
 """
 
+# Uses a HAL device but runs no dispatch.
+SPLAT = """
+func.func @main() -> tensor<1024xf32> {
+  %result = util.unfoldable_constant dense<1.0> : tensor<1024xf32>
+  return %result : tensor<1024xf32>
+}
+"""
+
+# One dispatch on each of two devices.
+MULTI_DEVICE = """
+func.func public @multi_device_mul(
+  %input_a: tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}
+) -> (tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}) {
+  %constant_a = arith.constant dense<[0.0, 1.0, 2.0, 3.0]> : tensor<4xf32>
+  %transient_a = arith.mulf %input_a, %constant_a : tensor<4xf32>
+  %transient_b = flow.tensor.transfer %transient_a : tensor<4xf32> to #hal.device.promise<@device_b>
+  %constant_b = arith.constant dense<[4.0, 5.0, 6.0, 7.0]> : tensor<4xf32>
+  %result_b = arith.mulf %transient_b, %constant_b : tensor<4xf32>
+  %result_a = flow.tensor.transfer %result_b : tensor<4xf32> to #hal.device.promise<@device_a>
+  func.return %result_a : tensor<4xf32>
+}
+"""
+
 LOCAL_TARGET = [
     "--iree-hal-target-device=local",
+    "--iree-hal-local-target-device-backends=llvm-cpu",
+]
+TWO_LOCAL_TARGETS = [
+    "--iree-hal-target-device=device_a=local[0]",
+    "--iree-hal-target-device=device_b=local[1]",
     "--iree-hal-local-target-device-backends=llvm-cpu",
 ]
 MATMUL_INPUTS = ["64x64xf32=1", "64x64xf32=1", "64x32xf32=1"]
@@ -124,11 +204,11 @@ def setUpModule():
     unittest.addModuleCleanup(patch.stop)
 
 
-def compile_module(directory, name, source, *flags):
+def compile_module(directory, name, source, *flags, targets=LOCAL_TARGET):
     """Compiles MLIR source to directory/name.vmfb and returns its path."""
     output = directory / f"{name}.vmfb"
     iree.compiler.compile_str(
-        source, extra_args=[*LOCAL_TARGET, *flags], output_file=str(output)
+        source, extra_args=[*targets, *flags], output_file=str(output)
     )
     return output
 
@@ -159,6 +239,16 @@ def run_benchmark(module, function="main", inputs=MATMUL_INPUTS, **flags):
         **{**BENCHMARK_FLAGS, **flags},
     )
     return run_benchmark_command(args, timeout=TIMEOUT_SECONDS)
+
+
+def json_reports(text):
+    """Returns the benchmark entries of a Google Benchmark JSON report."""
+    return json.loads(text)["benchmarks"]
+
+
+def dispatch_rows(results):
+    """Returns the dispatch rows, which are the results with a calls counter."""
+    return [result for result in results if "calls" in result.report]
 
 
 def run_replay_tool(name, *args):
@@ -220,6 +310,15 @@ class BenchmarkLifecycleTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="benchmark-lifecycle-test-")
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
+
+    def assertMatmulDispatchRows(self, results, iterations=4):
+        """Checks the rows of MATMUL's two dispatch functions."""
+        rows = dispatch_rows(results)
+        calls = sorted(row.report["calls"] for row in rows)
+        self.assertEqual(calls, [1, 2], results)
+        self.assertEqual([int(row.iterations) for row in rows], [iterations] * 2)
+        percent = sum(row.report["percent"] for row in rows)
+        self.assertAlmostEqual(percent, 100, delta=1e-6)
 
     def assertBenchmarkFails(self, message, module, **kwargs):
         """Checks that run_benchmark fails with message in its output."""
@@ -370,6 +469,267 @@ class BenchmarkLifecycleTest(unittest.TestCase):
                 self.assertBenchmarkFails(
                     "batch size and concurrency must be positive", self.sync, **flags
                 )
+
+    def test_dispatch_rows_for_each_execution_model(self):
+        for module, batch_size in self.batched:
+            with self.subTest(module=module.stem):
+                results = benchmark_results(
+                    module, dispatch_statistics=True, batch_size=batch_size
+                )
+                self.assertMatmulDispatchRows(results)
+
+    def test_dispatch_rows_follow_rounded_batch(self):
+        # Three timelines run a batch of four as six invocations.
+        results = benchmark_results(
+            self.async_module,
+            dispatch_statistics=True,
+            batch_size=4,
+            batch_concurrency=3,
+        )
+        self.assertMatmulDispatchRows(results, iterations=6)
+
+    def test_rows_aggregate_repetitions(self):
+        # Profiles aggregate all repetitions using their own total iteration
+        # count, also when only aggregates are reported.
+        for aggregates_only in (False, True):
+            with self.subTest(aggregates_only=aggregates_only):
+                results = benchmark_results(
+                    self.sync,
+                    dispatch_statistics=True,
+                    benchmark_repetitions=2,
+                    benchmark_report_aggregates_only=aggregates_only,
+                )
+                self.assertMatmulDispatchRows(results, iterations=8)
+
+    def test_display_and_file_reports_match(self):
+        output = self.directory / "results.json"
+        for aggregates_only in (False, True):
+            with self.subTest(aggregates_only=aggregates_only):
+                stdout, _ = run_benchmark(
+                    self.sync,
+                    dispatch_statistics=True,
+                    benchmark_repetitions=2,
+                    benchmark_format="json",
+                    benchmark_out=output,
+                    benchmark_report_aggregates_only=aggregates_only,
+                )
+                self.assertEqual(json_reports(stdout), json_reports(output.read_text()))
+
+    def test_csv_reports_rows(self):
+        stdout, _ = run_benchmark(
+            self.sync,
+            dispatch_statistics=True,
+            benchmark_repetitions=2,
+            benchmark_format="csv",
+        )
+        reports = list(csv.DictReader(io.StringIO(stdout)))
+        calls = sorted(float(report["calls"]) for report in reports if report["calls"])
+        self.assertEqual(calls, [1, 2], reports)
+
+    def test_output_file_from_environment(self):
+        output = self.directory / "environment.json"
+        environment = {"BENCHMARK_OUT": str(output), "BENCHMARK_OUT_FORMAT": "json"}
+        with mock.patch.dict(os.environ, environment):
+            stdout, _ = run_benchmark(
+                self.sync, dispatch_statistics=True, benchmark_format="json"
+            )
+        self.assertEqual(json_reports(stdout), json_reports(output.read_text()))
+
+    def test_tabular_console_output_file(self):
+        output = self.directory / "tabular.txt"
+        run_benchmark(
+            self.sync,
+            dispatch_statistics=True,
+            benchmark_out=output,
+            benchmark_out_format="console",
+            benchmark_counters_tabular=True,
+        )
+        text = output.read_text()
+        self.assertIn("calls", text)
+        self.assertNotIn("calls=", text)
+
+    def test_list_tests(self):
+        stdout, _ = run_benchmark(
+            self.sync, dispatch_statistics=True, benchmark_list_tests=True
+        )
+        self.assertIn("BM_main", stdout)
+
+    def test_dispatch_rows_for_discovered_functions(self):
+        for model in ("async-internal", "async-external"):
+            with self.subTest(model=model):
+                module = compile_module(
+                    self.directory,
+                    model,
+                    NO_INPUTS,
+                    f"--iree-execution-model={model}",
+                )
+                results = benchmark_results(
+                    module, function=None, inputs=[], dispatch_statistics=True
+                )
+                self.assertEqual(len(results), 4, results)
+                self.assertEqual(len(dispatch_rows(results)), 2, results)
+
+    def test_dispatch_rows_follow_filter_and_time_unit(self):
+        for model in ("async-internal", "async-external"):
+            with self.subTest(model=model):
+                module = compile_module(
+                    self.directory,
+                    model,
+                    NO_INPUTS,
+                    f"--iree-execution-model={model}",
+                )
+                results = benchmark_results(
+                    module,
+                    function=None,
+                    inputs=[],
+                    dispatch_statistics=True,
+                    benchmark_filter="BM_two",
+                    time_unit="ns",
+                )
+                self.assertEqual(len(results), 2, results)
+                for result in results:
+                    self.assertTrue(result.time.endswith(" ns"), result)
+
+    def test_dispatch_statistics_requires_devices(self):
+        module = compile_module(self.directory, "pure", PURE)
+        self.assertBenchmarkFails(
+            "--dispatch_statistics requires a module that uses HAL devices",
+            module,
+            inputs=[],
+            dispatch_statistics=True,
+        )
+
+    def test_program_without_dispatches_warns(self):
+        # The benchmark still runs and warns that the breakdown is empty.
+        module = compile_module(self.directory, "splat", SPLAT)
+        _, stderr = run_benchmark(module, inputs=[], dispatch_statistics=True)
+        self.assertIn("--dispatch_statistics: BM_main: 0 functions", stderr)
+        self.assertIn("timings may be incomplete", stderr)
+
+    def test_outputs_belong_to_measured_pass(self):
+        # Profiling invokes the same stateful function after the four measured
+        # iterations, but the outputs are those of the fourth invocation.
+        for model in ("async-internal", "async-external"):
+            with self.subTest(model=model):
+                module = compile_module(
+                    self.directory,
+                    model,
+                    STATEFUL,
+                    f"--iree-execution-model={model}",
+                )
+                stdout, _ = run_benchmark(
+                    module,
+                    inputs=["4xf32=-1"],
+                    dispatch_statistics=True,
+                    enable_output_processing=True,
+                    expected_output="4xf32=5",
+                )
+                self.assertIn("[SUCCESS]", stdout)
+
+    def test_profiling_preserves_in_place_outputs(self):
+        for model in ("async-internal", "async-external"):
+            module = compile_module(
+                self.directory,
+                model,
+                STATEFUL_IN_PLACE,
+                f"--iree-execution-model={model}",
+            )
+            for repetitions in (1, 2):
+                with self.subTest(model=model, repetitions=repetitions):
+                    # Each repetition measures four calls, then profiles four
+                    # more. Output processing must see the last measured call.
+                    count = 8 * repetitions - 4
+                    stdout, _ = run_benchmark(
+                        module,
+                        inputs=["4xf32=0"],
+                        batch_size=4 if model == "async-external" else 1,
+                        benchmark_repetitions=repetitions,
+                        dispatch_statistics=True,
+                        enable_output_processing=True,
+                        expected_output=f"4xf32={count}",
+                    )
+                    self.assertIn("[SUCCESS]", stdout)
+
+    def test_profiling_preserves_list_outputs(self):
+        # Profiling updates the returned list after the four measured
+        # iterations, but the outputs are those of the fourth invocation.
+        for model in ("async-internal", "async-external"):
+            with self.subTest(model=model):
+                module = compile_module(
+                    self.directory,
+                    model,
+                    STATEFUL_LIST,
+                    f"--iree-execution-model={model}",
+                )
+                stdout, _ = run_benchmark(
+                    module,
+                    inputs=[],
+                    dispatch_statistics=True,
+                    enable_output_processing=True,
+                )
+                lines = stdout.splitlines()
+                self.assertIn("child_list[0]: i32=4", lines)
+                self.assertIn("4xf32=4 4 4 4", lines)
+
+    def test_dispatch_rows_for_dispatch_benchmarks(self):
+        # Both discovery and selection report the one call per repetition.
+        module, name = compile_dispatch_benchmark(self.directory)
+        for function in (None, name):
+            with self.subTest(function=function):
+                results = benchmark_results(
+                    module,
+                    function=function,
+                    inputs=[],
+                    dispatch_statistics=True,
+                    batch_size=3,
+                )
+                rows = dispatch_rows(results)
+                self.assertEqual(
+                    [(row.report["calls"], row.iterations) for row in rows],
+                    [(1, "6")],
+                    results,
+                )
+
+    def test_profile_covers_every_device(self):
+        module = compile_module(
+            self.directory,
+            "multi",
+            MULTI_DEVICE,
+            "--iree-execution-model=async-external",
+            targets=TWO_LOCAL_TARGETS,
+        )
+        results = benchmark_results(
+            module,
+            function="multi_device_mul",
+            inputs=["4xf32=10,11,12,13"],
+            device=[DEVICE, DEVICE],
+            dispatch_statistics=True,
+        )
+        calls = [row.report["calls"] for row in dispatch_rows(results)]
+        self.assertEqual(calls, [1, 1], results)
+
+    def test_dispatch_statistics_rejects_device_profiling(self):
+        # Conflicts are rejected before any session starts, so the tool reports
+        # them rather than a backend lacking the capture provider.
+        self.assertBenchmarkFails(
+            "--dispatch_statistics cannot be combined with device profiling",
+            self.sync,
+            dispatch_statistics=True,
+            device_capture_tool="bogus",
+        )
+
+    def test_dispatch_statistics_rejects_replay_capture(self):
+        # The conflict is rejected before the capture file is opened, which
+        # would truncate an existing capture.
+        capture = self.directory / "existing.ireereplay"
+        capture.write_bytes(b"existing capture")
+        self.assertBenchmarkFails(
+            "--dispatch_statistics cannot be combined with --device_replay_output",
+            self.sync,
+            dispatch_statistics=True,
+            device_replay_output=capture,
+        )
+        self.assertEqual(capture.read_bytes(), b"existing capture")
 
 
 if __name__ == "__main__":

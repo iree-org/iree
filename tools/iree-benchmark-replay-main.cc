@@ -334,7 +334,7 @@ iree_status_t ReplayScopeTimingCallback(
 
 void BenchmarkReplay(const iree_hal_replay_plan_t* replay_plan,
                      iree_hal_device_group_t* device_group,
-                     iree_hal_profiling_from_flags_t* profiling,
+                     iree_hal_profiling_session_t* profiling,
                      iree_hal_replay_execute_options_t options,
                      benchmark::State& state) {
   iree_allocator_t host_allocator = iree_allocator_system();
@@ -374,10 +374,10 @@ void BenchmarkReplay(const iree_hal_replay_plan_t* replay_plan,
     IREE_TRACE_ZONE_END(z0);
     if (!scoped_timing) {
       state.PauseTiming();
-      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
+      IREE_CHECK_OK(iree_hal_profiling_session_flush(profiling));
       state.ResumeTiming();
     } else {
-      IREE_CHECK_OK(iree_hal_flush_profiling_from_flags(profiling));
+      IREE_CHECK_OK(iree_hal_profiling_session_flush(profiling));
     }
   }
   state.SetItemsProcessed(state.iterations());
@@ -513,7 +513,7 @@ static int runMain(int argc, char** argv) {
   // Start profiling after tool setup. The replay payload itself may contain
   // setup operations captured from the original application; those remain part
   // of the benchmark because they are user HAL traffic.
-  iree_hal_profiling_from_flags_t* profiling = nullptr;
+  iree_hal_profiling_session_t* profiling = nullptr;
   if (iree_status_is_ok(status)) {
     status = iree_hal_begin_device_group_profiling_from_flags(
         device_group, host_allocator, &profiling);
@@ -574,8 +574,7 @@ static int runMain(int argc, char** argv) {
     ::benchmark::RunSpecifiedBenchmarks();
   }
 
-  status =
-      iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  status = iree_status_join(status, iree_hal_profiling_session_end(profiling));
   iree_hal_replay_plan_destroy(replay_plan);
   ReleaseReplayExecutableSubstitutions(host_allocator,
                                        &executable_substitutions);
