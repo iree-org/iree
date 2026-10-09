@@ -505,14 +505,20 @@ static bool isDataTiledEpilogueOperand(OpOperand &operand) {
 // example by marking the ops it materializes, instead of dispatch formation
 // re-deriving the layouts. That would also drop the dependency on
 // Codegen/Dialect/Codegen/Utils.
-static bool isDataTiledRoot(Operation *op,
-                            FormDispatchRegionsPassOptions const &options) {
+static bool isDataTiledRoot(Operation *op) {
+  return isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(op) ||
+         IREE::Codegen::isDataTiledConvGeneric(op);
+}
+
+/// Returns true if `op` is a data-tiled root and `options` enable fusion for
+/// its kind of contraction.
+static bool
+isDataTiledFusionEnabled(Operation *op,
+                         FormDispatchRegionsPassOptions const &options) {
   if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(op)) {
     return options.fuseMmt4d;
   }
-  auto generic = dyn_cast<linalg::GenericOp>(op);
-  return options.fuseDataTiledConvolution && generic &&
-         IREE::Codegen::isDataTiledConvGeneric(generic);
+  return options.fuseDataTiledConvolution && isDataTiledRoot(op);
 }
 
 /// Returns true if `collapse` folds a unit batch dimension of a data-tiled
@@ -542,7 +548,7 @@ findDataTiledRoot(Value value, FormDispatchRegionsPassOptions const &options) {
         !visited.insert(producer).second) {
       continue;
     }
-    if (isDataTiledRoot(producer, options)) {
+    if (isDataTiledFusionEnabled(producer, options)) {
       return producer;
     }
     if (auto collapse = dyn_cast<tensor::CollapseShapeOp>(producer);
@@ -659,7 +665,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
 
   const FusionGroup &group = tracker.getFusionGroup(producer);
   Operation *groupRoot = group.getRoot();
-  if (isDataTiledRoot(groupRoot, options)) {
+  if (isDataTiledFusionEnabled(groupRoot, options)) {
     // The result unpack is the final operation in a data-tiled group.
     if (isUnpackLikeOp(producer)) {
       return false;
