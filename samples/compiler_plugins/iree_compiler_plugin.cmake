@@ -6,3 +6,4 @@
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/example samples/example)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/simple_io_sample samples/simple_io_sample)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/out_of_tree_example samples/out_of_tree_example)
