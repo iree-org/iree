@@ -185,6 +185,7 @@ py::str HalAllocator::FormattedStatistics() {
   iree_hal_allocator_query_statistics(raw_ptr(), &stats);
   auto status = iree_hal_allocator_statistics_format(&stats, &builder);
   iree_string_view_t view = iree_string_builder_view(&builder);
+  // FIXME: Guard the builder and status if Python string construction throws.
   py::str result = py::str(view.data, view.size);
   iree_string_builder_deinitialize(&builder);
 
@@ -229,11 +230,11 @@ py::object HalAllocator::AllocateBufferCopy(
           IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
     }
   }
+  HalBuffer owned_buffer = HalBuffer::StealFromRawPtr(hal_buffer);
   CheckApiStatus(status, "Failed to allocate buffer copy");
 
   if (!raw_element_type) {
-    return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
-                    py::rv_policy::move);
+    return py::cast(std::move(owned_buffer), py::rv_policy::move);
   }
 
   // Create the buffer_view. (note that numpy shape is ssize_t, so we need to
@@ -244,13 +245,24 @@ py::object HalAllocator::AllocateBufferCopy(
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
   std::vector<iree_hal_dim_t> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
-  iree_hal_buffer_view_t* hal_buffer_view;
+  // Buffer view creation does not validate the backing buffer range. Check it
+  // here while owned_buffer still guards the allocation on failure.
+  iree_device_size_t view_byte_length = 0;
   CheckApiStatus(
-      iree_hal_buffer_view_create(
-          hal_buffer, dims.size(), dims.data(), element_type, encoding_type,
-          iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view),
-      "Error allocating buffer_view");
-  iree_hal_buffer_release(hal_buffer);
+      iree_hal_buffer_compute_view_size(dims.size(), dims.data(), element_type,
+                                        encoding_type, &view_byte_length),
+      "Error computing buffer_view size");
+  if (view_byte_length > iree_hal_buffer_byte_length(hal_buffer)) {
+    CheckApiStatus(iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                                    "buffer view exceeds backing buffer byte "
+                                    "length"),
+                   "Error allocating buffer_view");
+  }
+  iree_hal_buffer_view_t* hal_buffer_view;
+  status = iree_hal_buffer_view_create(
+      hal_buffer, dims.size(), dims.data(), element_type, encoding_type,
+      iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view);
+  CheckApiStatus(status, "Error allocating buffer_view");
 
   return py::cast(HalBufferView::StealFromRawPtr(hal_buffer_view),
                   py::rv_policy::move);
@@ -292,9 +304,10 @@ HalBuffer HalAllocator::AllocateHostStagingBufferCopy(HalDevice& device,
           IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
     }
   }
+  HalBuffer owned_buffer = HalBuffer::StealFromRawPtr(hal_buffer);
   CheckApiStatus(status, "Failed to allocate device visible buffer");
 
-  return HalBuffer::StealFromRawPtr(hal_buffer);
+  return owned_buffer;
 }
 
 //------------------------------------------------------------------------------
@@ -949,6 +962,7 @@ std::vector<std::string> HalDriver::Query() {
                                          iree_allocator_system(),
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
+  // FIXME: Guard driver_infos if constructing the result throws.
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
     driver_names[i] = std::string(driver_infos[i].driver_name.data,
@@ -1002,6 +1016,7 @@ py::list HalDriver::QueryAvailableDevices() {
   CheckApiStatus(iree_hal_driver_query_available_devices(
                      raw_ptr(), iree_allocator_system(), &count, &device_infos),
                  "Error querying devices");
+  // FIXME: Guard device_infos if constructing the Python result throws.
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
     py::dict device_data;
@@ -1068,6 +1083,7 @@ static iree_status_t CreateSingleDeviceGroup(
 
 static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
                                        std::optional<py::list> allocators) {
+  HalDevice owned_device = HalDevice::StealFromRawPtr(device);
   iree_hal_device_group_t* device_group = nullptr;
   iree_status_t status = ConfigureDevice(device, allocators);
   if (iree_status_is_ok(status)) {
@@ -1076,12 +1092,12 @@ static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_device_group_release(device_group);
-    iree_hal_device_release(device);
     CheckApiStatus(
         status,
         "Error configuring the device and assigning its frontier tracker");
   }
-  return HalDevice::StealFromRawPtrAndDeviceGroup(device, device_group);
+  return HalDevice::StealFromRawPtrAndDeviceGroup(owned_device.steal_raw_ptr(),
+                                                  device_group);
 }
 
 HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
@@ -1624,10 +1640,14 @@ void SetupHalBindings(nanobind::module_ m) {
            [](HalDriver& self, iree_hal_device_id_t device_id) {
              iree_string_builder_t builder;
              iree_string_builder_initialize(iree_allocator_system(), &builder);
-             CheckApiStatus(iree_hal_driver_dump_device_info(
-                                self.raw_ptr(), device_id, &builder),
-                            "Querying device info");
+             iree_status_t status = iree_hal_driver_dump_device_info(
+                 self.raw_ptr(), device_id, &builder);
+             if (!iree_status_is_ok(status)) {
+               iree_string_builder_deinitialize(&builder);
+               CheckApiStatus(status, "Querying device info");
+             }
              iree_string_view_t view = iree_string_builder_view(&builder);
+             // FIXME: Guard the builder if Python string construction throws.
              py::str result(view.data, view.size);
              iree_string_builder_deinitialize(&builder);
              return result;
