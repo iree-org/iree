@@ -438,6 +438,11 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
     return {"+v", "+zvfh"};
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32:
+  case MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32:
+    // On AArch64, +sve2 implies +sve; the feature-check helper treats the
+    // presence of either as satisfying this +sve requirement.
+    return {"+sve"};
   default:
     return {};
   }
@@ -569,8 +574,18 @@ checkIntrinsicRequiredFeatures(DictionaryAttr config,
     if (required.empty()) {
       continue;
     }
-    if (llvm::all_of(required,
-                     [&](StringRef f) { return hasFeature(config, f); })) {
+    // AArch64: +sve2 implies +sve, so treat +sve2 as satisfying a +sve
+    // requirement.
+    auto featurePresent = [&](StringRef f) {
+      if (hasFeature(config, f)) {
+        return true;
+      }
+      if (f == "+sve" && hasFeature(config, "+sve2")) {
+        return true;
+      }
+      return false;
+    };
+    if (llvm::all_of(required, featurePresent)) {
       out.push_back(intr);
     }
   }
@@ -626,6 +641,18 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
     };
     checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
+  }
+  // AArch64 SVE/SVE2 intrinsics: gated on scalable vectorization being
+  // enabled. The SVE FMLA intrinsics use scalable vector types
+  // (vector<[4]xf32>) that map to AArch64's scalable vector registers.
+  // Feature requirements (+sve, with +sve2 implying +sve) are registered in
+  // `getMmaIntrinsicRequiredFeatures` and checked by the table-driven helper.
+  if (isAArch64(config) && isScalableVectorizationEnabled()) {
+    static const MMAIntrinsic kAllArmSve[] = {
+        MMAIntrinsic::MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32,
+        MMAIntrinsic::MMA_ARM_SVE_FMLA_4VLx1x1_F32_F32,
+    };
+    checkIntrinsicRequiredFeatures(config, kAllArmSve, out);
   }
   out.push_back(pickGenericScalarMMAForTarget(config));
   assert(isMmaIntrinsicArrayValid(config, out) &&
@@ -1213,7 +1240,8 @@ enumerateMatmulTileRiscv32(DictionaryAttr config) {
 //   - f16 (16 bits): 64/16 = 4 elements per vscale
 static SmallVector<TileMxNxK>
 enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
-  // Data-tiling is only implemented for the V extension.
+
+  // Data-Tiling is only implemented for the V extension
   if (!hasFeature(config, "+v")) {
     return {};
   }
