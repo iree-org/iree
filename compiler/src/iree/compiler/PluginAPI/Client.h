@@ -70,6 +70,9 @@ public:
   virtual void populateDetectedCustomInputConversionTypes(
       ModuleOp &module, llvm::StringSet<> &typeMnemonics) {}
 
+  // Allows a plugin to remove conflicting types from the set.
+  virtual void resolveDetectedCustomInputConversionTypes(
+      llvm::StringSet<> &typeMnemonics) {}
   // Adds passes to the input preprocessing pipeline for the given
   // InputDialectOptions::Type::plugin type with the given mnemonic.
   // Returns true if extensions were made.

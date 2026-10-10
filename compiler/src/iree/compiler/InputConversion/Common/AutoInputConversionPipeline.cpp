@@ -40,6 +40,11 @@ void AutoInputConversionPipelinePass::runOnOperation() {
   llvm::StringSet<> detectedTypeMnemonics;
   pipelineExtensions->populateDetectedCustomInputConversionTypes(
       moduleOp, detectedTypeMnemonics);
+
+  // Allow plugins to resolve input type conflicts.
+  pipelineExtensions->resolveDetectedCustomInputConversionTypes(
+      detectedTypeMnemonics);
+
   if (detectedTypeMnemonics.empty()) {
     return;
   }
