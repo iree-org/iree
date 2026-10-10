@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
+#include "iree/compiler/Codegen/LLVMGPU/FP8Lowering.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
@@ -163,6 +164,8 @@ struct ConvertToNVVMPass final
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateCeilFloorDivExpandOpsPatterns(llvmPatterns);
+      // Lower FP8 extensions from their i8 storage representation.
+      populateFP8ToNVVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       vector::populateVectorRankReducingFMAPattern(llvmPatterns);
       vector::populateVectorInsertExtractStridedSliceTransforms(llvmPatterns);
