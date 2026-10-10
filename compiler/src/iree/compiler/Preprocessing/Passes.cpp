@@ -20,6 +20,11 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
+static llvm::cl::opt<bool> clEnableElementwiseFusion(
+    "iree-preprocessing-enable-elementwise-fusion",
+    llvm::cl::desc("Enable elementwise fusion in preprocessing."),
+    llvm::cl::init(true));
+
 using FunctionLikeNest =
     MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
@@ -166,18 +171,22 @@ buildMakeSingleDispatchPassPipeline(OpPassManager &passManager,
   bubbleOptions.enableReshapeMovementAcrossReductions = true;
   passManager.addPass(
       DispatchCreation::createBubbleUpExpandShapesPass(bubbleOptions));
-  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
-      DispatchCreation::ElementwiseOpFusionPassOptions{
-          /*enableElementWiseFuseMultiReduction=*/true}));
+  if (clEnableElementwiseFusion) {
+    passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+        DispatchCreation::ElementwiseOpFusionPassOptions{
+            /*enableElementWiseFuseMultiReduction=*/true}));
+  }
   // After elementwise operation fusion sink reshapes that block
   // producer-consumer fusion.
   passManager.addPass(DispatchCreation::createSinkReshapesPass());
   passManager.addPass(createMakeSingleDispatchForFunctionPass());
-  passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
-      DispatchCreation::ElementwiseOpFusionPassOptions{
-          /*intraDispatch=*/true,
-          /*fuseMultiReduction=*/false,
-          /*fuseTruncateOps=*/true}));
+  if (clEnableElementwiseFusion) {
+    passManager.addPass(DispatchCreation::createElementwiseOpFusionPass(
+        DispatchCreation::ElementwiseOpFusionPassOptions{
+            /*intraDispatch=*/true,
+            /*fuseMultiReduction=*/false,
+            /*fuseTruncateOps=*/true}));
+  }
 }
 
 void registerPreprocessingPasses() {
