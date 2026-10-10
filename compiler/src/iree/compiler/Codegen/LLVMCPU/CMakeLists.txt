@@ -154,6 +154,8 @@ iree_cc_library(
     MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRX86Transforms
+    MLIRRISCVIME
+    MLIRRISCVIMETransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass

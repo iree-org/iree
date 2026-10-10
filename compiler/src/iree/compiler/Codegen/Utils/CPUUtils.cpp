@@ -176,6 +176,9 @@ bool hasAnyVFeature(DictionaryAttr targetConfig) {
          hasFeature(targetConfig, "+zve64f") ||
          hasFeature(targetConfig, "+zve64d");
 }
+bool hasXSMTVdotFeature(DictionaryAttr targetConfig) {
+  return hasFeature(targetConfig, "+xsmtvdot");
+}
 
 bool targetSupportsScalableVectors(DictionaryAttr targetConfig) {
   if (!targetConfig) {

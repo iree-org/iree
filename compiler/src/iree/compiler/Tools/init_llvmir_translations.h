@@ -16,13 +16,14 @@
 #include "mlir/Target/LLVMIR/Dialect/ArmNeon/ArmNeonToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-
+#include "mlir/Target/LLVMIR/Dialect/RISCVIME/RISCVIMEToLLVMIRTranslation.h"
 namespace mlir::iree_compiler {
 
 inline void registerLLVMIRTranslations(DialectRegistry &registry) {
   mlir::registerBuiltinDialectTranslation(registry);
   mlir::registerLLVMDialectTranslation(registry);
   mlir::registerArmNeonDialectTranslation(registry);
+mlir::registerRISCVIMEDialectTranslation(registry);   // ← add this
 }
 
 } // namespace mlir::iree_compiler

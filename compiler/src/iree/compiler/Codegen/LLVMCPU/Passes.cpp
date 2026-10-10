@@ -34,6 +34,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/RISCVIME/Transforms/Passes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -99,6 +100,10 @@ void buildLLVMCPUVectorLoweringPipeline(
   // accumulator, and the per-intrinsic conversion pairs that
   // `LLVMCPUVirtualVectorLoweringPass` emits below fail to hoist (no
   // direct iter_arg match) and fall back to inlining-in-place.
+funcPassManager.addPass(
+    mlir::riscv_ime::createLowerVectorContractToRISCVIMEPass());
+/*funcPassManager.addPass(
+    mlir::riscv_ime::createLegalizeForLLVMExportPass());*/
   funcPassManager.addPass(createHoistInnerTiledAccReshapesPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
       LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,

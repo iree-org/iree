@@ -151,6 +151,7 @@ iree_cc_library(
     MLIRArmNeonToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMToLLVMIRTranslation
+   MLIRRISCVIMEToLLVMIRTranslation
   PUBLIC
 )
 

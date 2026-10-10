@@ -1510,7 +1510,46 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
           entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
     }
   }
-
+  // SpacemiT IME: s8xs8->s32 uses vmadot-friendly tiles {4,4,8}.
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasXSMTVdotFeature(targetAttr.getConfiguration())) {
+    Type lhsE = getElementTypeOrSelf(op->getOperand(0).getType());
+    Type rhsE = getElementTypeOrSelf(op->getOperand(1).getType());
+    Type resE = getElementTypeOrSelf(op->getResult(0).getType());
+    if (lhsE.isInteger(8) && rhsE.isInteger(8) && resE.isInteger(32)) {
+      matmulTileSizes = {4, 4, 8};
+      matmulScalableFlags = {false, false, false};
+    }
+  }
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasXSMTVdotFeature(targetAttr.getConfiguration())) {
+    auto lhsType =
+        cast<ShapedType>(op->getOperand(0).getType()).getElementType();
+    auto rhsType =
+        cast<ShapedType>(op->getOperand(1).getType()).getElementType();
+    auto resType =
+        cast<ShapedType>(op->getResult(0).getType()).getElementType();
+    if (lhsType.isInteger(8) && rhsType.isInteger(8) &&
+        resType.isInteger(32)) {
+      // Match LowerContractionToRISCVIME kM0,kN0,kK0
+      // Use the SAME tile API as the RVV branch below
+      // (vectorSize / distTileSizes / setMatmulRootConfig / etc.)
+      // Example only — copy structure from the hasAnyVFeature block:
+      //   distTileSizes = {..., ...};
+      //   vecTileSizes  = {4, 4, 8};
+      //   return setRootConfig(...);
+    }
+  }
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasXSMTVdotFeature(targetAttr.getConfiguration())) {
+    Type lhsE = getElementTypeOrSelf(op->getOperand(0).getType());
+    Type rhsE = getElementTypeOrSelf(op->getOperand(1).getType());
+    Type resE = getElementTypeOrSelf(op->getResult(0).getType());
+    if (lhsE.isInteger(8) && rhsE.isInteger(8) && resE.isInteger(32)) {
+      // TODO: replace this return path with the exact same helper call
+      // used in the hasAnyVFeature branch below, only with tiles {4,4,8}.
+    }
+  }
   if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
       hasAnyVFeature(targetAttr.getConfiguration())) {
     // Use default tile size for matmul_transpose_b &
@@ -1665,7 +1704,32 @@ setContractionRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   // FIXME: Apply maxTileSize modification for all targets.
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  // SpacemiT IME: s8xs8->s32 uses vmadot-friendly tiles {4,4,8}.
   if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasXSMTVdotFeature(targetAttr.getConfiguration())) {
+    auto lhsType =
+        cast<ShapedType>(linalgOp->getOperand(0).getType()).getElementType();
+    auto rhsType =
+        cast<ShapedType>(linalgOp->getOperand(1).getType()).getElementType();
+    auto resType =
+        cast<ShapedType>(linalgOp->getResult(0).getType()).getElementType();
+    if (lhsType.isInteger(8) && rhsType.isInteger(8) &&
+        resType.isInteger(32)) {
+      // TODO: set the proper tile sizes for IME (e.g. {4,4,8})
+      // and call the same helper that the RVV path uses.
+    }
+  }
+
+  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
+      hasXSMTVdotFeature(targetAttr.getConfiguration())) {
+    Type lhsE = getElementTypeOrSelf(linalgOp->getOperand(0).getType());
+    Type rhsE = getElementTypeOrSelf(linalgOp->getOperand(1).getType());
+    Type resE = getElementTypeOrSelf(linalgOp->getResult(0).getType());
+    if (lhsE.isInteger(8) && rhsE.isInteger(8) && resE.isInteger(32)) {
+      // TODO: replace this return path with the exact same helper call
+      // used in the hasAnyVFeature branch below, only with tiles {4,4,8}.
+    }
+  }  if (targetAttr && isRISCV(targetAttr.getConfiguration()) &&
       hasAnyVFeature(targetAttr.getConfiguration())) {
     LDBG() << "RISC-V Aggressive Distribution: " << clEnableRiscvAggressiveDist;
     for (auto loopNum :

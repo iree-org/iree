@@ -73,7 +73,7 @@ bool hasZve64xFeature(DictionaryAttr targetConfig);
 /// Returns true if the 'targetAttr' contains any riscv vector feature in its
 /// cpu features.
 bool hasAnyVFeature(DictionaryAttr targetConfig);
-
+bool hasXSMTVdotFeature(DictionaryAttr targetConfig);
 /// Returns true if target supports scalable vector code generation.
 bool targetSupportsScalableVectors(DictionaryAttr targetConfig);
 

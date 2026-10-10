@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
 #define IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
 
+#include "mlir/Dialect/RISCVIME/RISCVIMEDialect.h"   // or the correct path
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
@@ -91,6 +92,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   arm_neon::ArmNeonDialect,
                   arm_sve::ArmSVEDialect,
                   arm_sme::ArmSMEDialect,
+                  riscv_ime::RISCVIMEDialect,          // ← add this
                   func::FuncDialect,
                   mlir::arith::ArithDialect,
                   vector::VectorDialect,
