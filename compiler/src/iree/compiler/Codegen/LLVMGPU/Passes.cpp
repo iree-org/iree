@@ -564,7 +564,14 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       createCombineResultLayoutTransformationPass(combineLayoutOptions));
   funcPassManager.addPass(createGPUGreedilyDistributeToThreadsPass());
-  funcPassManager.addPass(createTileLargeTensorsPass());
+  {
+    TileLargeTensorsPassOptions options;
+    // This pipeline always vectorizes with masking (Step 6), so leave bounded
+    // dynamic parallel dims for masked vectorization instead of tiling them
+    // down to scalars.
+    options.allowMaskedDynamicDims = true;
+    funcPassManager.addPass(createTileLargeTensorsPass(options));
+  }
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());
