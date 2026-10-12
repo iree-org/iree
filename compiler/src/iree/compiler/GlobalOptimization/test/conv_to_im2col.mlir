@@ -228,6 +228,21 @@ func.func @depthwise_conv_multiplier(%input: tensor<1x10x10x4xf32>, %filter: ten
 
 // -----
 
+// A unit channel multiplier still has an output channel loop, but nothing
+// reuses the gathered input across it, so the convolution is left alone.
+func.func @depthwise_conv_unit_multiplier(%input: tensor<1x10x10x4xf32>, %filter: tensor<3x3x4x1xf32>,
+                                          %init: tensor<1x8x8x4x1xf32>) -> tensor<1x8x8x4x1xf32> {
+  %0 = linalg.depthwise_conv_2d_nhwc_hwcm {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+      ins(%input, %filter : tensor<1x10x10x4xf32>, tensor<3x3x4x1xf32>)
+      outs(%init : tensor<1x8x8x4x1xf32>) -> tensor<1x8x8x4x1xf32>
+  return %0 : tensor<1x8x8x4x1xf32>
+}
+// CHECK-LABEL: func.func @depthwise_conv_unit_multiplier(
+//       CHECK:   linalg.depthwise_conv_2d_nhwc_hwcm
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
 // The gather copies the narrow input type; the extensions stay in the
 // contraction payload.
 func.func @conv_mixed_precision(%input: tensor<1x4x10x10xbf16>, %filter: tensor<16x4x3x3xbf16>,

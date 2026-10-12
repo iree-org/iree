@@ -165,7 +165,8 @@ static GatheredInput gatherInput(RewriterBase &rewriter,
 /// would generalize `linalg::populateConvertConv2DToImg2ColPatterns` beyond
 /// its four named 2-D convolutions.
 struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
-  using ControlFn = std::function<bool(linalg::LinalgOp)>;
+  using ControlFn = std::function<bool(linalg::LinalgOp,
+                                       const linalg::ConvolutionDimensions &)>;
 
   ConvertConvToIm2Col(MLIRContext *context, ControlFn controlFn)
       : OpInterfaceRewritePattern(context), controlFn(std::move(controlFn)) {}
@@ -195,7 +196,7 @@ struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to infer convolution dims");
     }
-    if (!controlFn(linalgOp)) {
+    if (!controlFn(linalgOp, *convDims)) {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "rejected by the control function");
     }
@@ -257,13 +258,17 @@ private:
 /// Returns true if im2col can pay off for `convOp`, independent of the target.
 /// The gather copies every input element once per filter window position it
 /// falls into, and the contraction only amortizes that copy by reusing each
-/// gathered element across output channels. Without an output channel
-/// dimension, i.e. for depthwise convolutions with a unit multiplier and for
-/// pooling, nothing reuses the gather and the rewrite only adds memory traffic.
-static bool hasOutputChannelReuse(linalg::LinalgOp convOp) {
-  FailureOr<linalg::ConvolutionDimensions> convDims =
-      linalg::inferConvolutionDims(convOp);
-  return succeeded(convDims) && !convDims->outputChannel.empty();
+/// gathered element across output channels. Without an output channel loop of
+/// extent other than one, i.e. for depthwise convolutions with a unit
+/// multiplier and for pooling, nothing reuses the gather and the rewrite only
+/// adds memory traffic. A dynamic output channel extent may exceed one, so it
+/// counts as reuse.
+static bool
+hasOutputChannelReuse(linalg::LinalgOp convOp,
+                      const linalg::ConvolutionDimensions &convDims) {
+  SmallVector<int64_t> loopSizes = convOp.getStaticLoopRanges();
+  return llvm::any_of(convDims.outputChannel,
+                      [&](unsigned loop) { return loopSizes[loop] != 1; });
 }
 
 struct ConvertConvToIm2ColPass final
