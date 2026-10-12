@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/DispatchCreation/CollapseDimensions.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -179,6 +180,12 @@ struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
     if (!linalgOp.hasPureTensorSemantics() || linalgOp->getNumRegions() != 1) {
       return rewriter.notifyMatchFailure(
           linalgOp, "expected tensor semantics and a body region");
+    }
+    // A preset compilation info or lowering config refers to the loops of the
+    // original op, which the rewrite replaces.
+    if (getCompilationInfo(linalgOp) || getLoweringConfig(linalgOp)) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "has a preset compilation info or lowering config");
     }
     // Requiring exactly an input and a filter excludes quantized convolutions
     // with zero-point operands; they are lowered before im2col runs.
