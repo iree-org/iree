@@ -3472,6 +3472,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-propagate-affine-quantization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-propagate-affine-quantization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-propagate-linalg-transpose" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6670,6 +6681,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-propagate-affine-quantization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-propagate-affine-quantization
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-propagate-linalg-transpose" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6852,6 +6874,16 @@ transformation when reference floating-point semantics are required with
 <p><em>Materializes logical encodings to physical encodings if there is a single device target.</em></p>
 <h3 id="-iree-global-opt-optimize-numerics"><code>-iree-global-opt-optimize-numerics</code><a class="headerlink" href="#-iree-global-opt-optimize-numerics" title="Permanent link">link</a></h3>
 <p><em>Optimizes numerics given annotations added via iree-global-opt-infer-numeric-narrowing.</em></p>
+<h3 id="-iree-global-opt-propagate-affine-quantization"><code>-iree-global-opt-propagate-affine-quantization</code><a class="headerlink" href="#-iree-global-opt-propagate-affine-quantization" title="Permanent link">link</a></h3>
+<p><em>Propagates affine quantization through adjacent tensor operations.</em></p>
+<p>Moves <code>iree_linalg_ext.quantize_affine</code> before a producer-side
+<code>tensor.collapse_shape</code>, and moves a consumer-side <code>tensor.expand_shape</code>,
+or a zero <code>tensor.pad</code> whose padded dimensions do not index the scale and
+whose zero point is per-tensor, before <code>iree_linalg_ext.dequantize_affine</code>.
+These shape operations then run on quantized values. A consumer-side
+<code>linalg.transpose</code> is fused into the dequantize's output map instead. When
+a contraction consumes the result, the dequantize becomes its direct
+producer so the integer contraction rewrite can match it.</p>
 <h3 id="-iree-global-opt-propagate-linalg-transpose"><code>-iree-global-opt-propagate-linalg-transpose</code><a class="headerlink" href="#-iree-global-opt-propagate-linalg-transpose" title="Permanent link">link</a></h3>
 <p><em>Propagates linalg.transpose through a restricted set of ops.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
