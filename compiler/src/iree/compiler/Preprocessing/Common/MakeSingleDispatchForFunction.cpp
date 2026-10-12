@@ -48,6 +48,11 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
             tensor::TensorDialect>(dialect)) {
       return true;
     }
+
+    if(op->getDialect()->getNamespace() == "torq_hl") {
+      return true;
+    }
+
     if (isa<arith::ArithDialect>(dialect)) {
       return !isa<arith::ConstantOp>(op);
     }
@@ -97,9 +102,20 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // the slice and used outside of the slice.
   SetVector<Value> results;
   for (Operation *op : secondSlice) {
+
     for (OpOperand &use : op->getUses()) {
       Operation *user = use.getOwner();
-      if (!secondSlice.contains(user)) {
+
+      // walk over all ancestors to see if the use is inside the slice
+      do {
+        if (secondSlice.contains(user)) {
+          break;
+        }
+        user = user->getParentOp();
+      } while (user != funcOp);
+
+      // none of the parents of the use is in the slice, so this is a result
+      if (user == funcOp) {
         results.insert(use.get());
       }
     }
